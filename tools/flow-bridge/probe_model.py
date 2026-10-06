@@ -53,7 +53,7 @@ async def main(args):
                         if not isinstance(model_slot, str) or not re.fullmatch(r"[a-zA-Z_0-9]{1,40}", model_slot):
                             model_slot = "unexpected"
                         evidence.update(submit=safe_tree(rpc), model_slot=model_slot,
-                            patched_model_guard=_image_body_problem(_post_data(request), (), Model.NARWHAL),
+                            patched_model_guard=_image_body_problem(_post_data(request), (), Model.from_cli(args.model)),
                             aborted_before_google=True)
                     finally:
                         await route.abort()
@@ -63,7 +63,7 @@ async def main(args):
             composer = MigratedComposer()
             await composer.ensure_editor(page, args.project)
             request = GenerateImageRequest(prompt="Flow bridge inspection. Do not generate.",
-                model=Model.NARWHAL, aspect=Aspect.SQUARE, count=1)
+                model=Model.from_cli(args.model), aspect=Aspect.SQUARE, count=1)
             await composer.apply_image_settings(page, request)
             await composer.send_prompt(page, request.prompt)
             submit = await composer._pre_submit_gate(page)
@@ -83,4 +83,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--model", choices=['nano2','nano-pro'], default='nano2')
     asyncio.run(main(parser.parse_args()))

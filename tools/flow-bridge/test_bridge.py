@@ -60,5 +60,26 @@ class JobTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             bridge.verified_file(proof)
 
+    async def test_pro_is_sent_as_pro_and_an_existing_id_cannot_switch_models(self):
+        stub = AsyncMock(return_value={"status":"completed","files":[str(self.image)]})
+        with patch("gflow_cli.mcp.tools.gflow_generate_image",stub):
+            first = await bridge.flow_generate_image("pro-job","blue sphere",model="nano-pro")
+            repeated = await bridge.flow_generate_image("pro-job","blue sphere",model="nano-pro")
+            wrong = await bridge.flow_generate_image("pro-job","blue sphere",model="nano2")
+        self.assertEqual(stub.await_count,1)
+        self.assertEqual(stub.call_args.kwargs['model'],'nano-pro')
+        self.assertEqual(first['requested_model'],'nano-pro')
+        self.assertEqual(repeated['status'],'completed')
+        self.assertEqual(wrong['status'],'error')
+
+    async def test_each_video_model_keeps_its_identity_on_submission(self):
+        for model in ('veo_fast','veo_quality','veo_lite','omni_flash'):
+            stub=AsyncMock(return_value={'status':'needs_reconciliation'})
+            with patch('gflow_cli.mcp.tools.gflow_generate_video',stub):
+                await bridge.flow_generate_video('video-'+model,'a blue sphere',model=model)
+                await bridge.flow_generate_video('video-'+model,'a blue sphere',model=model)
+            self.assertEqual(stub.await_count,1)
+            self.assertEqual(stub.call_args.kwargs['model'],model)
+
 if __name__ == "__main__":
     unittest.main()

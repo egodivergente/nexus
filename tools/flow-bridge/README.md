@@ -2,6 +2,8 @@
 
 Puente local basado en [gflow-cli 0.82.1](https://github.com/ffroliva/gflow-cli), con MCP por stdio y un perfil independiente de Chromium. Usa la sesión personal de Flow iniciada por el usuario. Grok Bots no es necesario para esta ruta.
 
+Desde el 2026-10-06 admite `nano-pro` (preferido) y `nano2` para imagen; `veo_fast`, `veo_quality`, `veo_lite` y `omni_flash` para vídeo. Los modelos se leyeron en la cuenta real y sus contratos se inspeccionaron abortando las solicitudes antes de Google. Esto no prueba una generación completa de cada modelo. Nano Banana Lite sigue desactivado. Consulta [los modelos y la verificación](../../docs/FLOW-MODELOS-DISPONIBLES.md).
+
 ## Estado comprobado el 2026-10-06
 
 - **PASS:** Google reconoce la sesión guardada del perfil `nexus`.

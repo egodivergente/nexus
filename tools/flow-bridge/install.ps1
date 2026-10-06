@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $flowPython)) {
 if ($LASTEXITCODE -ne 0) { throw 'Instalación de dependencias fallida.' }
 & $flowPython -m pip check
 if ($LASTEXITCODE -ne 0) { throw 'Dependencias incompatibles.' }
-$runtimeFiles = @('launcher.py','runtime_compat.py','image_guard.py','bridge_tools.py','flow_quote.py','flow_session.py','recover_image.py','client.py','configure.py','probe_model.py')
+$runtimeFiles = @('launcher.py','runtime_compat.py','image_guard.py','bridge_tools.py','flow_quote.py','flow_session.py','recover_image.py','recover_video.py','video_file.py','video_guard.py','client.py','configure.py','probe_model.py','probe_video.py')
 foreach ($runtimeFile in $runtimeFiles) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $runtimeFile) -Destination $flowRuntime
 }

@@ -6,6 +6,8 @@ import json
 MODEL_CODES = {"NARWHAL": {"NARWHAL", "BELUGA"}}
 
 def model_problem(body, requested):
+    if requested == "HARBOR_SEAL":
+        return "Nano Banana Lite is prohibited by the user; submission refused."
     try:
         start = body.index("f.req=") + len("f.req=")
         envelope, _ = json.JSONDecoder().raw_decode(body[start:])

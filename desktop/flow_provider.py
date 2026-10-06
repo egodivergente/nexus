@@ -29,12 +29,22 @@ def catalog():
         'contractEndpoint':'flow', 'contractMedia':[], 'promptRequired':True, 'isFlagship':False}
     aspect = lambda options: {'key':'aspect', 'displayName':'Formato', 'type':'ENUM', 'nativeType':'string',
         'options':options, 'defaultValue':options[0], 'isRequired':True}
-    result = [dict(common, id='google-flow/nano2', providerModelId='nano2', displayName='Nano Banana 2 · tu cuenta Flow',
-        modelFamily='Nano Banana', modalities=['IMAGE'], parameters=[aspect(['1:1','16:9','9:16','4:3','3:4'])],
+    result = [dict(common, id='google-flow/nano-pro', providerModelId='nano-pro', displayName='Nano Banana Pro · tu cuenta Flow',
+        modelFamily='Nano Banana', modalities=['IMAGE'], capabilities=['TEXT_TO_IMAGE'], isFlagship=True, parameters=[aspect(['1:1','16:9','9:16','4:3','3:4'])],
+        shortDescription='Tu opción preferida: Nano Banana Pro con tu cuenta de Google Flow.'),
+        dict(common, id='google-flow/nano2', providerModelId='nano2', displayName='Nano Banana 2 · tu cuenta Flow',
+        modelFamily='Nano Banana', modalities=['IMAGE'], capabilities=['TEXT_TO_IMAGE'], parameters=[aspect(['1:1','16:9','9:16','4:3','3:4'])],
         shortDescription='Crea una imagen con Nano Banana 2 usando tu cuenta de Google Flow.'),
         dict(common, id='google-flow/veo-fast', providerModelId='veo_fast', displayName='Veo 3.1 Fast · tu cuenta Flow',
-        modelFamily='Veo', modalities=['VIDEO'], parameters=[aspect(['16:9','9:16'])],
+        modelFamily='Veo', modalities=['VIDEO'], capabilities=['TEXT_TO_VIDEO'], parameters=[aspect(['16:9','9:16'])],
         shortDescription='Genera un vídeo con Veo Fast usando tus créditos de Google Flow. Duración automática.')]
+    for identifier,name,description in [
+        ('veo_quality','Veo 3.1 Quality','Vídeo con Veo Quality y la duración automática de Flow.'),
+        ('veo_lite','Veo 3.1 Lite','Vídeo con Veo Lite y la duración automática de Flow.'),
+        ('omni_flash','Omni 1.1 Flash','Vídeo con Omni Flash y los ajustes predeterminados de Flow.')]:
+        result.append(dict(common,id='google-flow/'+identifier,providerModelId=identifier,displayName=name+' · tu cuenta Flow',
+            modelFamily='Omni' if identifier=='omni_flash' else 'Veo',modalities=['VIDEO'],capabilities=['TEXT_TO_VIDEO'],parameters=[aspect(['16:9','9:16'])],
+            shortDescription=description))
     for identifier,name,modality,options in [
         ('image_upscale','Escalar imagen Flow','IMAGE',['2k','4k']),
         ('video_upscale','Escalar vídeo Flow','VIDEO',['1080p','4k']),
@@ -45,6 +55,9 @@ def catalog():
                 'description':'jobId del historial de NEXUS o nexus_job_id del asset, de un resultado completado google_flow. No usar asset_id ni generation_id.'},
                 {'key':'resolution','displayName':'Resolución','type':'ENUM','nativeType':'string','options':options,'defaultValue':options[0],'isRequired':True}],
             shortDescription='Mejora/exporta un resultado existente de tu cuenta Flow. Usa el jobId de su historial; conserva el original.'))
+    for model in result:
+        if model['promptRequired'] and model['inputMode']=='TEXT_ONLY' and not model['contractMedia']:
+            model['capabilities'] = ['TEXT_TO_IMAGE' if model['modalities']==['IMAGE'] else 'TEXT_TO_VIDEO']
     return result
 
 def parameters(args):
@@ -55,8 +68,9 @@ def parameters(args):
         if not isinstance(source,str) or not IDENTIFIER.fullmatch(source) or args.get('resolution') not in options[model]:
             raise ValueError('Elige un trabajo original de Flow y una resolución compatible.')
         return {'model':model,'source_request_id':source,'resolution':args['resolution']}
-    aspect = args.get('aspect', '16:9' if model == 'veo_fast' else '1:1')
-    allowed = {'nano2':{'1:1','16:9','9:16','4:3','3:4'}, 'veo_fast':{'16:9','9:16'}}
+    aspect = args.get('aspect', '1:1' if model in {'nano2','nano-pro'} else '16:9')
+    allowed = {'nano-pro':{'1:1','16:9','9:16','4:3','3:4'}, 'nano2':{'1:1','16:9','9:16','4:3','3:4'},
+        **{model:{'16:9','9:16'} for model in ('veo_fast','veo_quality','veo_lite','omni_flash')}}
     if model not in allowed or aspect not in allowed[model]:
         raise ValueError('Modelo o formato Flow no admitido. Nano Banana Lite está excluido.')
     return {'model':model, 'aspect':aspect}
@@ -92,8 +106,10 @@ def quote(args):
     if verified.get('status') == 'quoted':
         return {'amount':verified['credits'],'currency':'flow_credits','time':int(time.time()*1000),
             'detail':'Créditos mostrados por tu cuenta Flow para una generación. Saldo no verificado.', 'source':'Flow settings'}
-    if params['model'] == 'nano2':
-        raise ValueError('No se ha podido leer la configuración de Nano Banana 2 en Flow. No se ha enviado ninguna generación.')
+    if params['model'] in {'nano2','nano-pro'}:
+        raise ValueError('No se ha podido leer la configuración del modelo de imagen en Flow. No se ha enviado ninguna generación.')
+    if params['model'] != 'veo_fast':
+        raise ValueError('Flow no confirma el importe de este modelo de vídeo. Vuelve a consultar sus ajustes.')
     return {'amount':20, 'currency':'flow_credits', 'time':int(time.time()*1000), 'upperBound':True,
         'detail':'Estimación conservadora: hasta 20 créditos por vídeo; Google publica 10 para Ultra. Saldo no verificado.',
         'source':SOURCE}
@@ -148,7 +164,7 @@ def work(data, request_id, params, recover=False, recovery_started_at=0):
             tool='flow_process_asset'
             arguments={k:v for k,v in params.items() if k!='model'}
         else:
-            tool = 'flow_generate_image' if params['model'] == 'nano2' else 'flow_generate_video'
+            tool = 'flow_generate_image' if params['model'] in {'nano2','nano-pro'} else 'flow_generate_video'
             arguments=params
         result = call(tool, {'request_id':request_id, **arguments},
                       'recovery-'+uuid.uuid4().hex if recover else request_id)
