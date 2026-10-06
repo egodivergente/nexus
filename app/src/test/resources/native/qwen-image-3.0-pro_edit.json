@@ -1,0 +1,199 @@
+{
+  "info": {
+    "description": "The AtlasCloud API.",
+    "title": "AtlasCloud API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/model/generateImage": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            },
+            "description": "The request status."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Input"
+              }
+            }
+          }
+        }
+      },
+      "x-api-name": "model_run"
+    },
+    "/api/v1/model/prediction/{request_id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            },
+            "description": "Result of the request."
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "schema": {
+              "type": "string",
+              "description": "Request ID"
+            },
+            "required": true
+          }
+        ]
+      },
+      "x-api-name": "model_result"
+    }
+  },
+  "openapi": "3.0.0",
+  "servers": [
+    {
+      "url": "https://api.atlascloud.ai"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Input": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "model name",
+            "default": "qwen-image-3.0/edit"
+          },
+          "prompt": {
+            "description": "The editing instruction describing how to transform the reference image(s).",
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_image_urls": {
+            "description": "Reference image URLs for image editing. Provide one URL for single-image editing, or up to three URLs for multi-image reference / subject-driven editing. Accepts public HTTP(S) URLs, OSS temporary URLs, or Base64 data URIs. Recommended 384–2048 px, up to 10MB each.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "x-ui-component": "uploaders"
+          },
+          "size": {
+            "description": "Output resolution as width*height (e.g. 1440*1440). Omit to let the model pick a resolution automatically. Valid range: 512*512–1440*1440.",
+            "type": "string"
+          },
+          "n": {
+            "description": "Number of images to generate.",
+            "type": "integer",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 4
+          },
+          "negative_prompt": {
+            "description": "Describes content that should NOT appear in the generated image.",
+            "type": "string"
+          },
+          "seed": {
+            "description": "Seed for reproducible generation, range [0, 2147483647]. Omit for a random seed.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "prompt_extend": {
+            "description": "Enable intelligent prompt rewriting for richer results.",
+            "type": "boolean",
+            "default": true
+          },
+          "prompt_extend_mode": {
+            "description": "Prompt rewriting strategy. 'direct' (DPE) rewrites in a single pass; 'agent' (APE) uses an agentic rewrite pipeline.",
+            "type": "string",
+            "default": "direct",
+            "enum": [
+              "direct"
+            ],
+            "x-ui-component": "select"
+          }
+        },
+        "required": [
+          "model",
+          "prompt",
+          "reference_image_urls"
+        ],
+        "type": "object",
+        "x-order-properties": [
+          "model",
+          "prompt",
+          "reference_image_urls",
+          "size",
+          "n",
+          "negative_prompt",
+          "seed",
+          "prompt_extend",
+          "prompt_extend_mode"
+        ]
+      },
+      "PredictionResponse": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "model name",
+            "default": "qwen-image-3.0/edit"
+          },
+          "created_at": {
+            "description": "ISO timestamp of when the request was created (e.g., \"2023-04-01T12:34:56.789Z\").",
+            "format": "date-time",
+            "type": "string"
+          },
+          "has_nsfw_contents": {
+            "description": "Array of boolean values indicating NSFW detection for each output.",
+            "items": {
+              "type": "boolean"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Unique identifier for the prediction.",
+            "type": "string"
+          },
+          "outputs": {
+            "description": "Array of URLs to the generated images. Null when status is not completed. URLs are valid for about 24 hours — download promptly.",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "status": {
+            "description": "Status of the task: created, processing, completed, or failed.",
+            "type": "string"
+          },
+          "urls": {
+            "description": "Object containing related API endpoints.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "in": "header",
+        "name": "Authorization",
+        "type": "apiKey"
+      }
+    }
+  }
+}

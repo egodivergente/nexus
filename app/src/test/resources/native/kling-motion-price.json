@@ -1,0 +1,13 @@
+{
+  "model": "kwaivgi/kling-v3.0-std/motion-control",
+  "price": {
+    "discount": "85",
+    "actual": {
+      "base_price": "0.107"
+    },
+    "origin": {
+      "base_price": "0.126"
+    }
+  },
+  "readme": "https://static.atlascloud.ai/model/readme/kwaivgi-kling-v3.0-std-motion-control.md"
+}
