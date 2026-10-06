@@ -36,11 +36,22 @@ try:
           return {draft:Agent.draft,attachments:Agent.attachments.length,messages:Agent.items.length};
         }""")
         assert result=={'draft':'Conservar mi borrador','attachments':1,'messages':0}
+        saves=page.evaluate("""async()=>{
+          const original=rpc,calls=[];let pending=0,max=0;
+          rpc=async(op,args)=>{if(op!=='save')return original(op,args);pending++;max=Math.max(max,pending);await new Promise(r=>setTimeout(r,30));calls.push(args.draft.prompt);pending--;};
+          try{state.draft.prompt='primero';const first=flush();state.draft.prompt='segundo';const second=flush();await Promise.all([first,second]);return {calls,max,clean:savedRevision===saveRevision};}
+          finally{rpc=original;}
+        }""")
+        assert saves=={'calls':['primero','segundo'],'max':1,'clean':True}
         page.evaluate("""()=>{
           view='canvas';loaded=E.normalize({id:'qa',providerId:'atlas_cloud',displayName:'QA',modalities:['IMAGE'],parameters:[]},{components:{schemas:{Input:{properties:{prompt:{type:'string',maxLength:3}}}}}});
           state.draft={modelId:'qa',prompt:'abcd',values:{},media:[]};render();
         }""")
         assert '4 / 3' in page.locator('#prompt-limits').inner_text()
+        assert page.locator('#prompt').get_attribute('aria-invalid')=='true'
+        page.evaluate("modal('<h2>Confirmacion QA</h2>')")
+        assert page.get_by_role('dialog',name='Confirmacion QA').count()==1
+        page.locator('[data-action=close]').click()
         assert page.locator('#generate').is_disabled()
         for width in (1360,760):
             page.set_viewport_size({'width':width,'height':900})

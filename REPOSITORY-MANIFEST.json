@@ -2000,8 +2000,12 @@
     "bytes": 6114
   },
   "desktop/tools/test-app-optimization.py": {
-    "sha256": "8b9d158539d8654a4b725f3f4f0809aca2d8a9e79be23b5744bf99b368df4c86",
-    "bytes": 2824
+    "sha256": "40bab4a4dda62380e3f14b6f06466d9e690e50fca1ede4db7029c14b90301de2",
+    "bytes": 3703
+  },
+  "desktop/tools/test-axel-ux.py": {
+    "sha256": "e328ea04e189c1dc43eb5916b14ef1aae6d7c124f64d4aa3b6db88685924c022",
+    "bytes": 2949
   },
   "desktop/tools/test-engine.js": {
     "sha256": "13ce2226e1e5813927d0a7f50c53fd92bac78c30cc27dce26db5533dea337d33",
@@ -2068,8 +2072,8 @@
     "bytes": 1962
   },
   "desktop/ui/app.js": {
-    "sha256": "c4e266c8ee78c71fed98dddaf8afb36032ceb5c469d3804dbdf0ca520aa83aa1",
-    "bytes": 33767
+    "sha256": "fb3eadc65720cc6d4c2c787bca9783e697f2d460b362341cbeff5630c2821f84",
+    "bytes": 33994
   },
   "desktop/ui/assistant.css": {
     "sha256": "3ecab2cb6950792d0c6e40b44bc99dee28de7de07589a4d95c62a62646c4013f",
@@ -2224,8 +2228,8 @@
     "bytes": 6144
   },
   "desktop/ui/studio.js": {
-    "sha256": "12c98ea4878395d0c8567a4e778b182babc1a8ac34ebb0cd5bf8149b3e0b0afd",
-    "bytes": 13081
+    "sha256": "db0de910b7a9f47988656cabe5828357e6104cc3257e1ae08eaab1cd7ec72110",
+    "bytes": 13206
   },
   "desktop/ui/style.css": {
     "sha256": "788d1511f3d73ba55a410e23f5c5d35380d7592775658537e28531d85b54a9a2",
@@ -2272,8 +2276,8 @@
     "bytes": 403
   },
   "SOURCE-MANIFEST.json": {
-    "sha256": "0ad62dd29e9805198d9b5da04a0d4bd59d8708a5948d88c3e181b407696a2dc7",
-    "bytes": 198494
+    "sha256": "b413af0c9b68ac0ac486d8e1de5554e30dbac0294032cea32f34359cf706a044",
+    "bytes": 198980
   },
   "tools/ecosystem-build/guard-proof.py": {
     "sha256": "2b26c8969308b68c114c5d0d49775eff65c3cba0e52e64254e1de3a9d71b46f0",
@@ -2406,6 +2410,10 @@
   "tools/flow-bridge/probe_model.py": {
     "sha256": "a94903dbf9e3783a9adb33b44de2ddd8dcc8410393e287b780d61d71d7ea8194",
     "bytes": 3753
+  },
+  "tools/flow-bridge/probe_video.py": {
+    "sha256": "06b0c9308baf225e0099ebef56b8595979a6d26c6b2556e160be05b1746a4bc7",
+    "bytes": 3563
   },
   "tools/flow-bridge/README.md": {
     "sha256": "cdcf900ea4404f584d81d9679a048019d8068c1ab4dd0f2e602a409a6023570a",

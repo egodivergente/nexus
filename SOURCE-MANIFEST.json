@@ -2544,8 +2544,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\transfer-build\\dex\\classes.dex"
   },
   "desktop/ui/app.js": {
-    "sha256": "c4e266c8ee78c71fed98dddaf8afb36032ceb5c469d3804dbdf0ca520aa83aa1",
-    "bytes": 33767,
+    "sha256": "fb3eadc65720cc6d4c2c787bca9783e697f2d460b362341cbeff5630c2821f84",
+    "bytes": 33994,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\app.js"
   },
   "desktop/ui/assistant.css": {
@@ -2614,8 +2614,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\studio.css"
   },
   "desktop/ui/studio.js": {
-    "sha256": "12c98ea4878395d0c8567a4e778b182babc1a8ac34ebb0cd5bf8149b3e0b0afd",
-    "bytes": 13081,
+    "sha256": "db0de910b7a9f47988656cabe5828357e6104cc3257e1ae08eaab1cd7ec72110",
+    "bytes": 13206,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\studio.js"
   },
   "desktop/ui/style.css": {
@@ -2934,8 +2934,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\runtime_compat.py"
   },
   "desktop/tools/test-app-optimization.py": {
-    "sha256": "8b9d158539d8654a4b725f3f4f0809aca2d8a9e79be23b5744bf99b368df4c86",
-    "bytes": 2824,
+    "sha256": "40bab4a4dda62380e3f14b6f06466d9e690e50fca1ede4db7029c14b90301de2",
+    "bytes": 3703,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\test-app-optimization.py"
   },
   "desktop/tools/test-schema-cache.py": {
@@ -3022,5 +3022,15 @@
     "sha256": "69db0799a4353f30038b80356b09f18d81a1c343a6e6c880e8ce9680ba30cd2a",
     "bytes": 1888,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\install.ps1"
+  },
+  "desktop/tools/test-axel-ux.py": {
+    "sha256": "e328ea04e189c1dc43eb5916b14ef1aae6d7c124f64d4aa3b6db88685924c022",
+    "bytes": 2949,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\test-axel-ux.py"
+  },
+  "tools/flow-bridge/probe_video.py": {
+    "sha256": "06b0c9308baf225e0099ebef56b8595979a6d26c6b2556e160be05b1746a4bc7",
+    "bytes": 3563,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\probe_video.py"
   }
 }
