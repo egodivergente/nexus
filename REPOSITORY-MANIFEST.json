@@ -4,8 +4,8 @@
     "bytes": 247
   },
   "AGENTS.md": {
-    "sha256": "0b0907fc58078c01aae8243ca198a8fade7e1cec83754360f0153ad36ee1c3b7",
-    "bytes": 587
+    "sha256": "c324f1625056a7a9e4b4db104e6a12503418e56a8acb342c28095e31ff92fbc3",
+    "bytes": 1254
   },
   "app/build.gradle.kts": {
     "sha256": "ac6717ca53a8558f7660289bdaa452bad52bd1bcd09721d065ed8002dc9d447d",
@@ -1148,8 +1148,8 @@
     "bytes": 298
   },
   "CONTINUAR.md": {
-    "sha256": "62d0c0196dd8523d946bdaf7d91ac753c13991e0d044531661f045db61d71ca9",
-    "bytes": 1132
+    "sha256": "7345b1e53f105bf39a2eabab06b4485118c9983ac3873dd68e4ab4b197befa5d",
+    "bytes": 1269
   },
   "gradle/wrapper/gradle-wrapper.jar": {
     "sha256": "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17",
