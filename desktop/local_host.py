@@ -37,7 +37,7 @@ SCHEMA_LOCK = threading.Lock()
 ALLOWED_PROVIDERS = {'atlas_cloud': 'https://api.atlascloud.ai',
                      'runway': 'https://api.dev.runwayml.com',
                      'crun': 'https://api.crun.ai'}
-MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif':'image/gif',
         '.webp': 'image/webp', '.mp4': 'video/mp4', '.mov': 'video/quicktime',
         '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
         '.m4a': 'audio/mp4'}
@@ -313,10 +313,12 @@ def dispatch(keys, operation, args):
         flow_models = flow_provider.catalog()
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
                 'version': '1.7.0-agent-desktop', 'platform': 'HP EliteBook · Windows x64'}
-    if operation in ('flowQuote', 'flowSubmit', 'flowStatus'):
+    if operation in ('flowQuote', 'flowSubmit', 'flowStatus', 'flowAssetOptions'):
         if OFFLINE_QA:
             raise ValueError('Laboratorio: Flow bloqueado.')
         import flow_provider
+        if operation == 'flowAssetOptions':
+            return flow_provider.asset_options(args.get('source_request_id', ''))
         if operation == 'flowQuote':
             return flow_provider.quote(args)
         if operation == 'flowSubmit':

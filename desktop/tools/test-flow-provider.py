@@ -28,5 +28,17 @@ class ProviderTests(unittest.TestCase):
     def test_lite_and_wrong_aspect_are_rejected(self):
         for args in ({'model':'nano_lite'},{'model':'veo_fast','aspect':'1:1'}):
             with self.assertRaises(ValueError):flow.parameters(args)
+    def test_upscale_requires_source_and_compatible_resolution(self):
+        self.assertEqual(flow.parameters({'model':'video_upscale','source_request_id':'source','resolution':'4k'})['resolution'],'4k')
+        for args in ({'model':'video_upscale','source_request_id':'source','resolution':'2k'},
+                     {'model':'image_upscale','source_request_id':'../profile','resolution':'4k'}):
+            with self.assertRaises(ValueError):flow.parameters(args)
+    def test_existing_upscale_does_not_quote_or_spawn_again(self):
+        with tempfile.TemporaryDirectory() as folder,patch.object(flow,'quote',return_value={'amount':50}) as quote,patch.object(flow.threading,'Thread') as worker:
+            args={'request_id':'upscale','model':'video_upscale','source_request_id':'source','resolution':'4k','cost':50}
+            try:
+                flow.submit(folder,args);flow.submit(folder,args)
+                self.assertEqual(quote.call_count,1);self.assertEqual(worker.call_count,1)
+            finally:flow.WORKERS.discard('upscale')
 
 if __name__=='__main__':unittest.main()

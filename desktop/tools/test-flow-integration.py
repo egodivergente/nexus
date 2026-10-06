@@ -23,7 +23,7 @@ with sync_playwright() as pw:
        imageError:E.validate(model,'Prueba',{aspect:'1:1'},[]),videoError:E.validate(video,'Prueba',{aspect:'16:9'},[]),
        malicious:isMediaUrl('/media/../../credentials.dpapi'),local:isMediaUrl('/media/'+ 'a'.repeat(32)+'.mp4')};
     }""")
-    assert len(result['flow'])==2 and all('lite' not in m['name'].lower() for m in result['flow'])
+    assert len(result['flow'])==5 and all('lite' not in m['name'].lower() for m in result['flow'])
     assert result['schema']['parameters'][0]['key']=='aspect'
     assert result['imageError'] is None and result['videoError'] is None
     assert result['malicious'] is False and result['local'] is True

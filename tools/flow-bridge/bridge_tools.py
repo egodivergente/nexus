@@ -47,8 +47,10 @@ def verified_file(result):
     else:
         with Image.open(path) as image:
             dimensions, image_format = image.size, image.format
+            frames=image.n_frames if image_format=='GIF' else None
             image.verify()
         metadata = {"dimensions": dimensions, "format": image_format}
+        if frames is not None:metadata.update(frames=frames,animated=frames>1)
     return {**result, "path": str(path), "files": [str(path)], "bytes": len(data),
         **metadata, "sha256": digest}
 
@@ -82,7 +84,14 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
                 result = json.loads(row["result_json"])
                 if result.get("path"):
                     try:
-                        return verified_file(result)
+                        proof=verified_file(result)
+                        if json.loads(row['params_json']).get('operation')=='process_asset':
+                            from asset_process import check_dimensions
+                            check_dimensions(proof['kind'],proof['resolution'],proof)
+                            proof['status']='completed'
+                            connection.execute('UPDATE jobs SET result_json=?,state=? WHERE request_id=?',
+                                (json.dumps(proof),'completed',request_id))
+                        return proof
                     except (OSError, ValueError):
                         pass
             task_id = row["task_id"]
@@ -275,6 +284,8 @@ def install():
     server.add_tool(flow_get_result, structured_output=True)
     server.add_tool(flow_list_jobs, structured_output=True)
     server.add_tool(flow_get_quote, structured_output=True)
+    server.add_tool(flow_get_asset_options, structured_output=True)
+    server.add_tool(flow_process_asset, structured_output=True)
 
 async def flow_get_quote(model: str = "nano2", aspect: str = "1:1") -> dict[str, Any]:
     """Read this account's Flow settings price for one generation; spends no credits."""
@@ -285,3 +296,55 @@ async def flow_get_quote(model: str = "nano2", aspect: str = "1:1") -> dict[str,
         return {'status':'quoted',**await quote(model,aspect)}
     except Exception as exc:
         return {'status':'error','error_class':type(exc).__name__,'detail':'No verified account price. No generation sent.'}
+
+async def flow_get_asset_options(source_request_id: str) -> dict[str, Any]:
+    """Read an existing owned Flow asset's download/upscale options and credits.
+
+    Images: original, 2k, 4k. Videos: original, 1080p, 4k, gif. Only available
+    enabled options are returned. No generation or upscale is submitted.
+    """
+    from asset_process import source_asset, operate
+    try:
+        return await operate(source_asset(source_request_id))
+    except Exception as exc:
+        return {'status':'error','error_class':type(exc).__name__,'detail':'Cannot verify this source asset and its options.'}
+
+async def flow_process_asset(request_id: str, source_request_id: str, resolution: str,
+                             expected_credits: int) -> dict[str, Any]:
+    """Upscale/export a completed asset using the user's own Flow account.
+
+    First read flow_get_asset_options and pass its exact credits. For images use
+    2k/4k; videos 1080p/4k or gif; original re-downloads the existing asset.
+    Reuse request_id after interruptions. A reserved id never clicks twice.
+    Original files are retained. No text-to-image/video or Lite fallback is used.
+    """
+    from asset_process import source_asset, operate, CHOICES
+    if not IDENTIFIER.fullmatch(request_id) or type(expected_credits) is not int or expected_credits<0:
+        return {'status':'error','detail':'Invalid request id or credit amount.'}
+    try:
+        source=source_asset(source_request_id)
+        if resolution not in CHOICES[source['kind']]:raise ValueError('Invalid resolution')
+    except Exception:
+        return {'status':'error','detail':'A verified completed source and compatible resolution are required.'}
+    params={'operation':'process_asset','source_request_id':source_request_id,'resolution':resolution,
+            'expected_credits':expected_credits}
+    with database() as db:
+        try:
+            db.execute('INSERT INTO jobs VALUES (?,?,?,?,?)',(request_id,json.dumps(params),None,None,'reserved'))
+        except sqlite3.IntegrityError:
+            row=db.execute('SELECT params_json,result_json FROM jobs WHERE request_id=?',(request_id,)).fetchone()
+            if json.loads(row['params_json'])!=params:
+                return {'status':'error','detail':'request_id belongs to different parameters. No action submitted.'}
+            existing=True
+        else:existing=False
+    if existing:return await flow_get_result(request_id=request_id)
+    try:
+        result=await operate(source,resolution,expected_credits,request_id)
+    except Exception as exc:
+        with database() as db:
+            row=db.execute('SELECT result_json FROM jobs WHERE request_id=?',(request_id,)).fetchone()
+            checkpoint=json.loads(row['result_json'] or '{}')
+        result={**checkpoint,'status':'needs_reconciliation','request_id':request_id,**source,
+                'error_class':type(exc).__name__,'detail':'Upscale/export outcome requires review. No automatic retry.'}
+    save(request_id,result)
+    return result

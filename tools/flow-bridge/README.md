@@ -52,7 +52,7 @@ La segunda llamada genera contenido y utiliza la cuota de la cuenta. El agente d
 
 La primera llamada real encontró un cambio de modelo (`NARWHAL` frente a `BELUGA`) después del envío. La recuperación lee el checkpoint nativo para localizar el proyecto y decodifica su listado `Zzl0ze`; exige una única imagen con el prompt exacto. Descarga únicamente desde dominios Google admitidos, comprueba cada redirección y solicita la versión original del handle `/asb/`, exigiendo las dimensiones que registra Google. No publica URLs firmadas ni cookies.
 
-Si falta el checkpoint o hay varias coincidencias, devuelve `needs_reconciliation`. Si un proceso se interrumpe antes de guardar su task id, el identificador permanece reservado y no permite otro envío. La recuperación de vídeo exige un registro con el prompt exacto del proyecto existente. La forma medida del registro lleva `null` donde upstream esperaba `CAE`. Cuando el listado entrega una miniatura, se abre el editor del activo y se descarga exclusivamente 720p de tamaño original. No se solicitan mejoras de resolución. No presentar el puente como una API oficial.
+Si falta el checkpoint o hay varias coincidencias, devuelve `needs_reconciliation`. Si un proceso se interrumpe antes de guardar su task id, el identificador permanece reservado y no permite otro envío. La recuperación de vídeo exige un registro con el prompt exacto del proyecto existente. La forma medida del registro lleva `null` donde upstream esperaba `CAE`. Cuando el listado entrega una miniatura, se abre el editor del activo y se descarga exclusivamente 720p de tamaño original. La recuperación no solicita mejoras; los escalados pasan por la operación explícita descrita abajo. No presentar el puente como una API oficial.
 
 ## Reproducción
 
@@ -81,3 +81,19 @@ NEXUS integra dos modelos del proveedor `google_flow` en su catálogo y las func
 El host instalado sigue en su puerto loopback y conserva los 85 trabajos anteriores. Se añadieron los dos resultados verificados: 87 trabajos después de la integración. Los procesos de generación se ejecutan ocultos y con prioridad baja; una reserva persistente evita repetir un envío. Los resultados se copian al almacén de NEXUS después de comprobar SHA-256 y se sirven mediante sus rutas locales existentes.
 
 Pruebas reproducibles: `desktop/tools/test-flow-provider.py`, `desktop/tools/test-flow-integration.py` y las pruebas `test_*.py` del puente. `desktop/tools/verify-flow-live.py` es una prueba real autorizada que crea una imagen solo cuando el coste leído es 0; preserva su identificador y no debe utilizarse como prueba offline. No se compiló ni empaquetó APK o EXE.
+
+## Escalado y exportación de activos existentes
+
+`flow_get_asset_options(source_request_id)` abre únicamente el activo identificado por un trabajo completado de este puente. Lee su menú nativo, excluye opciones deshabilitadas y devuelve el precio indicado antes de cualquier clic de mejora. Se comprobaron en esta cuenta: imágenes original/2K/4K; vídeos original/1080p/4K/GIF 270p. El vídeo 4K muestra 50 puntos; las otras opciones no muestran cargo. Eso no verifica el saldo ni el descuento efectivo.
+
+```json
+{"request_id":"imagen-2k-001","source_request_id":"imagen-ejemplo-001","resolution":"2k","expected_credits":0}
+```
+
+Enviar esos argumentos a `flow_process_asset`. Una reserva SQLite se guarda antes de la acción, el precio se comprueba otra vez antes del clic y un identificador repetido nunca vuelve a escalar. Un archivo ya descargado puede reconciliarse desde disco; una acción incierta permanece bloqueada para evitar duplicar consumo. Los prompts y RPC de generación de imagen/vídeo están bloqueados en este navegador de postprocesado, sin fallback a Lite. Solo se admite un archivo original propio con SHA-256 válido y sus UUID de proyecto y activo. Se conserva el original; los resultados nuevos verifican formato, dimensiones y SHA-256.
+
+La biblioteca de NEXUS ofrece «Mejorar / exportar» en los detalles de resultados Flow. Su catálogo y el gateway común del Agente ofrecen `image_upscale`, `video_upscale` y `video_gif`, con `source_request_id` (jobId del historial) y `resolution`. El coste se expresa en créditos Flow. El envío comparte el almacén de trabajos y la descarga local; no requiere otra cuenta o API de pago.
+
+Validación real: imágenes 2K de 2048 × 2048 y 4K de 4096 × 4096; vídeo 1080p de 1920 × 1080 y 8 segundos; GIF animado de 480 × 270 y 128 fotogramas. Se comprobó la lectura repetida de los mismos identificadores sin reenviar. La imagen 4K pasó por `agentCallback submit`, el host, el MCP y la biblioteca de NEXUS mediante `desktop/tools/verify-flow-upscales.py`; esta prueba solo permite la opción cotizada en 0. El menú de mejora de vídeo se verificó en la interfaz y no registró errores JavaScript. El contador de generaciones nativas siguió en cuatro: no se enviaron prompts nuevos en esta ampliación. Vídeo 4K: opción y coste comprobados, ejecución de pago NO PROBADA. Conversación con el LLM y Android siguen NO PROBADOS.
+
+Las pruebas offline del puente cubren reservas, cambios de parámetros, fuente desconocida, recuperación desde archivo, precio ilegible/opciones deshabilitadas, integridad y resolución. `verify-flow-upscales.py` debe ejecutarse con un host de prueba aislado; nunca constituye una prueba offline ni envía vídeo 4K.
