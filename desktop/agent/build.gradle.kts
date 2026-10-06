@@ -9,7 +9,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation(kotlin("test-junit5"))
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+tasks.test { useJUnitPlatform() }
 application { mainClass.set("DesktopAgentKt") }
 tasks.register<Copy>("runtime") {
     dependsOn(tasks.jar, ":core:jar")

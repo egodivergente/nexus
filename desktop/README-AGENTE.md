@@ -56,11 +56,53 @@ continua con el movil ni se ha trasladado informacion posterior desde el S25.
 - Navegacion independiente por todas las salidas de un trabajo y descarga de la salida seleccionada.
 - Credenciales del asistente protegidas con DPAPI CurrentUser, separadas de las credenciales de generacion.
 
-Bedrock no esta configurado en Windows. Mientras no se introduzcan o se
-trasladen sus credenciales, la app utiliza el planificador local original y
-lo indica en pantalla. Las fuentes no sustituyen a la configuracion privada
-del telefono. No se ha probado una respuesta real de Bedrock ni una generacion
-de pago desde esta adaptacion.
+Bedrock esta configurado mediante credenciales existentes protegidas con DPAPI.
+Se verifico una respuesta real de Sonnet; no se realizaron generaciones de pago.
+La interfaz bloquea el envio conversacional si falta LLM y muestra configuracion.
+
+## Asesor experto compacto
+
+### Revision visual y preferencias aprobadas
+
+- `Revisar imagen` analiza una imagen o compara dos (referencia primero,
+  resultado despues). Comprueba que los pixeles se pueden cargar antes de pedir
+  una valoracion al LLM. Respeta el ajuste de envio de imagenes.
+- La revision pide conservar aciertos, identificar hasta dos fallos observables
+  y cambiar una sola variable. No fuerza defectos cuando no se ven ni genera medios.
+- `Revisar con Nexus` en los detalles de biblioteca lleva el resultado y su
+  prompt al borrador. Las imagenes remotas requieren acceso CORS; si el proveedor
+  lo bloquea, se debe adjuntar un archivo local. No se afirma haberlas visto.
+- `Guardar preferencia` permite editar y aprobar una regla del proyecto.
+  Conserva el resto de su memoria y evita duplicados exactos sin distinguir
+  mayusculas. Se puede editar o eliminar desde Memoria del proyecto.
+- La memoria se usa tambien en conversaciones nuevas. No hay entrenamiento,
+  aprendizaje automatico ni memoria global entre proyectos.
+
+Prueba `desktop/tools/test-review.py`: host y proyecto aislados, memoria
+persistente, deduplicacion, controles de consentimiento, pantallas de 1360/760 px
+y consulta visual real con formas sinteticas; sin generaciones de pago.
+
+El adaptador incorpora `ExpertKnowledge.kt` y 11 guias en
+`agent/assets/expert-guides.json`, con fuentes primarias, alcance por variante y
+fecha de revision. No son benchmarks ni prueban todas las variantes del catalogo.
+Las fichas con mas de 90 dias se marcan pendientes de revalidacion; no existe
+actualizacion automatica desde Internet. El archivo se recarga cuando cambia.
+
+`get_model_brief` agrupa hasta tres candidatos, esquemas y guias por consulta.
+Los precios desconocidos quedan pendientes, nunca gratis. Las recomendaciones
+creativas generales se distinguen de capacidades verificadas por variante.
+Se conserva SpendGuard y la confirmacion de cada generacion.
+
+El catalogo completo de skills no se inyecta en cada peticion. Los saludos no
+incluyen herramientas; las consultas normales tienen cinco rondas como techo y
+1800 tokens de salida. Estos limites no garantizan una latencia fija del proveedor.
+La memoria conserva preferencias aprobadas, no supone aprendizaje automatico.
+
+Verificacion de esta revision: 85 pruebas JVM aprobadas en ASUSVIDAL (74 del
+core y 11 nuevas). En tres consultas aisladas con Bedrock real: saludo 3,63 s
+(1297 tokens de entrada, cero herramientas), prompt FLUX 2 Pro 7,69 s y nombre
+inventado rechazado 4,56 s (una ronda de herramientas en cada consulta tecnica).
+Son muestras, no garantia de latencia ni comparativa de calidad de imagen.
 
 ## Ejecutable nativo
 

@@ -25,7 +25,6 @@ PubkeyAuthentication yes
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitEmptyPasswords no
-UsePAM no
 PidFile $ECO_STATE/sshd.pid
 PrintMotd no
 LogLevel ERROR
@@ -46,4 +45,5 @@ else
   sshd -f "$ECO_STATE/sshd_config" -E "$ECO_STATE/sshd.log"
 fi
 cp "$ECO_STATE/host_ed25519.pub" "$ECO_TRANSFER/host-key.pub"
+if command -v termux-wake-lock >/dev/null; then termux-wake-lock; fi
 echo 'Background channel ready; listen address 127.0.0.1 only.'

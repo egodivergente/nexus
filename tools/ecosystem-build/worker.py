@@ -48,6 +48,9 @@ def compatible(node, metrics, recipe):
     if metrics.get("io_pressure") is not None and metrics["io_pressure"] > 35: why.append("disco saturado")
     if metrics.get("temperature_c") is not None and metrics["temperature_c"] > node.get("max_temperature_c", 85): why.append("temperatura alta")
     if metrics.get("os") == "android" or node.get("device_kind")=="android":
+        physical_ram=metrics.get("android_ram_available_mb")
+        if physical_ram is not None and physical_ram < recipe.get("min_ram_mb",1024)+node.get("android_reserve_ram_mb",node.get("reserve_ram_mb",512)):
+            why.append("RAM física Android insuficiente con reserva")
         if metrics.get("model")!=node.get("expected_model") or metrics.get("physical_serial")!=node.get("expected_serial"):
             why.append("identidad física Android sin comprobar")
         if metrics.get("battery_percent") is None or metrics.get("temperature_c") is None:
@@ -67,6 +70,9 @@ def compatible(node, metrics, recipe):
         if metrics.get("java_major") != recipe.get("java_major", 17): why.append("JDK requerido no comprobado")
         if "android-"+str(recipe["compile_sdk"]) not in metrics.get("android_platforms", []): why.append("falta plataforma Android")
         if not metrics.get("aapt2_ok"): why.append("AAPT2 incompatible o ausente")
+        override=node.get("env",{}).get("AAPT2")
+        if override and override.replace("\\","/").rsplit("/",1)[-1] not in {"aapt2","aapt2.exe"}:
+            why.append("el override de Gradle requiere el nombre de ejecutable aapt2")
     if recipe.get("kind") not in ("android-gradle", "command"): why.append("tipo de receta desconocido")
     if metrics.get("os") == "windows" and not recipe.get("low_impact", False):
         why.append("receta Windows sin límites de memoria/paralelismo declarados")

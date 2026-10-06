@@ -57,9 +57,11 @@ private class DesktopRuntime(private val root: File, private val data: File) {
     private var secrets = JsonObject(emptyMap())
     private var mode = AgentMode.COPILOT
     private val guard = SpendGuard()
+    private var turnModels: List<ModelSummary>? = null
+    private val turnSchemas = mutableMapOf<ModelRef, ModelSchema>()
     private val registry = object : ModelRegistry {
-        override suspend fun list(): List<ModelSummary> = json.decodeFromJsonElement(callback("models"))
-        override suspend fun schema(ref: ModelRef): ModelSchema = json.decodeFromJsonElement(callback("schema", encoded(ref)))
+        override suspend fun list(): List<ModelSummary> = turnModels ?: json.decodeFromJsonElement<List<ModelSummary>>(callback("models")).also { turnModels = it }
+        override suspend fun schema(ref: ModelRef): ModelSchema = turnSchemas[ref] ?: json.decodeFromJsonElement<ModelSchema>(callback("schema", encoded(ref))).also { turnSchemas[ref] = it }
     }
     private var skills = loadSkills()
     private fun loadSkills() = SkillStore(listOf(
@@ -85,6 +87,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) })
     private var deps = deps()
     private var offline = true
+    private val knowledge = ExpertKnowledge(File(root, "assets/expert-guides.json"))
     private fun makeOrchestrator(): AgentOrchestrator {
         val direct = settings.text("backend", "direct") != "proxy"
         val llm: LlmProvider = if (direct && secrets.text("accessKey").isNotBlank() && secrets.text("secretKey").isNotBlank()) {
@@ -95,13 +98,16 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             BedrockProxyProvider(settings.text("endpoint"), { secrets.text("token") })
         } else OfflinePlannerProvider()
         offline = llm is OfflinePlannerProvider
-        return AgentOrchestrator(llm, AgentConfig(
+        return AgentOrchestrator(ExpertProvider(llm), AgentConfig(
             provider = llm.id, modelId = settings.text("modelId", "us.anthropic.claude-sonnet-4-6"),
             region = settings.text("region", "us-east-1"), endpoint = settings.text("endpoint"),
-            maxTokens = settings["maxTokens"]?.jsonPrimitive?.intOrNull?.coerceIn(256, 32000) ?: 4096,
+            maxTokens = settings["maxTokens"]?.jsonPrimitive?.intOrNull?.coerceIn(256, 1800) ?: 1800,
+            maxToolRounds = 5, systemPromptOverride = ExpertPolicy.PROMPT,
             temperature = settings["temperature"]?.jsonPrimitive?.doubleOrNull,
             mode = mode, sendImagesToLlm = settings["sendImages"]?.jsonPrimitive?.booleanOrNull ?: true
-        ), NexusToolkit.all(deps), skills, assets, images = AttachmentImageLoader { attachment ->
+        ), NexusToolkit.all(deps).filterNot { it.name in ExpertPolicy.retiredTools } +
+            ExpertBriefTool(registry, knowledge) { settings.text("excludedFamilies", "veo").split(',', ';').map { it.trim().lowercase() }.toSet() },
+            skills, assets, images = AttachmentImageLoader { attachment ->
             val response = callback("thumbnail", encoded(attachment)).jsonObject
             ContentBlock.Image(response.text("format"), Base64.getDecoder().decode(response.text("bytes")))
         })
@@ -129,11 +135,15 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 conversation.session.activeProjectId = settings.text("projectId").ifBlank { null }
             }
             "send" -> {
+                turnModels = null; turnSchemas.clear()
+                val started = System.nanoTime()
                 val attachments = args["attachments"]?.let { json.decodeFromJsonElement<List<Attachment>>(it) } ?: emptyList()
                 val turn = orchestrator.send(conversation, args.text("text"), attachments)
                 return obj("text" to JsonPrimitive(turn.text), "html" to JsonPrimitive(markdownHtml(turn.text)), "tools" to encoded(turn.toolCalls),
                     "inputTokens" to JsonPrimitive(turn.usage.inputTokens), "outputTokens" to JsonPrimitive(turn.usage.outputTokens),
-                    "snapshot" to snapshot())
+                    "elapsedMs" to JsonPrimitive((System.nanoTime() - started) / 1_000_000),
+                    "toolRounds" to JsonPrimitive(turn.toolRounds), "stop" to JsonPrimitive(turn.stop),
+                    "expertVersion" to JsonPrimitive(ExpertPolicy.VERSION), "snapshot" to snapshot())
             }
             "new" -> {
                 guard.plans().forEach { guard.discard(it.id) }

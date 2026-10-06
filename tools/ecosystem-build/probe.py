@@ -60,8 +60,11 @@ def windows_metrics():
 def linux_metrics():
     mem = dict(re.findall(r"^(\w+):\s+(\d+)", read("/proc/meminfo"), re.M))
     def cpu():
-        return list(map(int, read("/proc/stat").splitlines()[0].split()[1:9]))
+        lines=read("/proc/stat").splitlines()
+        return list(map(int,lines[0].split()[1:9])) if lines else []
     a = cpu(); time.sleep(0.6); b = cpu(); delta = [y-x for x,y in zip(a,b)]
+    try: load=os.getloadavg()[0] / max(1,os.cpu_count() or 1)
+    except OSError: load=None
     def pressure(kind):
         match = re.search(r"some avg10=([\d.]+)", read("/proc/pressure/" + kind))
         return float(match[1]) if match else None
@@ -74,10 +77,17 @@ def linux_metrics():
             pass
     return {"ram_available_mb": int(mem.get("MemAvailable", mem.get("MemFree", 0))) // 1024,
             "ram_total_mb": int(mem.get("MemTotal", 0)) // 1024,
-            "cpu_percent": round(100 * (1 - (delta[3]+delta[4]) / max(1,sum(delta))),1),
-            "load_per_cpu": os.getloadavg()[0] / max(1,os.cpu_count() or 1),
+            "cpu_percent": round(100 * (1 - (delta[3]+delta[4]) / max(1,sum(delta))),1) if len(delta)>=5 else None,
+            "load_per_cpu": load,
             "memory_pressure": pressure("memory"), "io_pressure": pressure("io"),
             "temperature_c": max(temps) if temps else None, "interactive": False}
+
+
+def cap_android_ram(result, health):
+    result["android_ram_available_mb"]=health.get("ram_available_mb")
+    if result.get("os")=="linux":
+        result["vm_ram_available_mb"]=result.get("ram_available_mb")
+        result["ram_available_mb"]=min(result["ram_available_mb"],health["ram_available_mb"]) if result.get("ram_available_mb") is not None and health.get("ram_available_mb") is not None else None
 
 
 def probe(config):
@@ -126,6 +136,8 @@ def probe(config):
                     for key in ("battery_percent","charging","temperature_c","screen_on"):
                         result[key]=health[key]
                     result["device_health_source"]="verified ADB sample under 60 seconds"
+                    cap_android_ram(result,health)
+                    if result["os"]=="android": result["cpu_percent"]=health.get("cpu_percent")
             except (OSError,ValueError,KeyError): pass
     state = Path(config["state_root"])
     parent = state

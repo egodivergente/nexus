@@ -15,7 +15,7 @@ import tarfile
 import time
 import uuid
 from pathlib import Path
-from probe import probe, run
+from probe import probe, run, cap_android_ram
 from worker import compatible, digest, save
 
 ROOT = Path(__file__).resolve().parent
@@ -105,7 +105,7 @@ def adb_inventory(bridge, phones):
         if len(fields)<2 or fields[1]!="device": continue
         serial = fields[0]
         hints = line.replace("_"," ")
-        candidates = [p for p in phones if p["expected_serial"] in line or p["expected_model"] in hints]
+        candidates = [p for p in phones if p["id"] not in found and (p["expected_serial"] in line or p["expected_model"] in hints)]
         if not candidates: continue
         model = adb_command(bridge,["-s",serial,"shell","getprop","ro.product.model"]).strip()
         physical = adb_command(bridge,["-s",serial,"shell","getprop","ro.serialno"]).strip()
@@ -114,6 +114,12 @@ def adb_inventory(bridge, phones):
             battery = adb_command(bridge,["-s",serial,"shell","dumpsys","battery"])
             mem = adb_command(bridge,["-s",serial,"shell","cat","/proc/meminfo"])
             power = adb_command(bridge,["-s",serial,"shell","dumpsys","power"])
+            def cpu_sample():
+                raw=adb_command(bridge,["-s",serial,"shell","head","-1","/proc/stat"]).split()
+                try: return list(map(int,raw[1:9])) if raw and raw[0]=="cpu" else []
+                except ValueError: return []
+            cpu_a=cpu_sample(); time.sleep(0.6); cpu_b=cpu_sample()
+            cpu_delta=[b-a for a,b in zip(cpu_a,cpu_b)]
             def number(pattern,text,scale=1):
                 m = re.search(pattern,text)
                 return int(m[1])/scale if m else None
@@ -122,6 +128,7 @@ def adb_inventory(bridge, phones):
                 "ram_available_mb":number(r"MemAvailable:\s+(\d+)",mem,1024),
                 "battery_percent":number(r"level:\s+(\d+)",battery),
                 "temperature_c":number(r"temperature:\s+(\d+)",battery,10),
+                "cpu_percent":round(100*(1-(cpu_delta[3]+cpu_delta[4])/max(1,sum(cpu_delta))),1) if len(cpu_delta)>=5 else None,
                 "charging":bool(re.search(r"(?:AC|USB|Wireless) powered: true",battery)),
                 "screen_on":("mWakefulness=Awake" in power) if "mWakefulness=" in power else None,
                 "measured_at":time.time(),"background_executor":False,"error":"falta ejecutor de fondo verificado en Termux"}
@@ -160,26 +167,35 @@ def ecosystem():
             n,m = f.result(); results[n["id"]] = (n,m)
         found = {}
         for f in inventories:
-            found.update(f.result())
+            for phone_id, metrics in f.result().items():
+                found.setdefault(phone_id, []).append(metrics)
     code, raw = run(["tailscale","status","--json"],5)
     try: peers = list(json.loads(raw).get("Peer",{}).values()) if code==0 else []
     except (ValueError,AttributeError): peers=[]
     for n in phones:
-        metrics = found.get(n["id"],{"online":False,"adb_access":False,"background_executor":False,"error":"sin transporte ADB autorizado actual"})
+        routes = sorted(found.get(n["id"], []), key=lambda m: m["adb_bridge"] != "elitebook")
+        metrics = dict(routes[0]) if routes else {"online":False,"adb_access":False,"background_executor":False,"error":"sin transporte ADB autorizado actual"}
         peer = next((p for p in peers if p.get("HostName")==n.get("tailscale_name")),{})
         metrics["tailscale_online"] = peer.get("Online")
         if n.get("executor") and metrics.get("adb_access"):
-            try: execnode=mobile_executor(n,metrics,hosts)
-            except Exception as e:
-                metrics["error"]=str(e); results[n["id"]]=(n,metrics); continue
-            _,host=host_probe(execnode)
-            # A shell is insufficient: physical identity and fresh device-use metrics must match.
-            if metrics.get("adb_access") and host.get("online"):
-                for key in ("battery_percent","charging","temperature_c","screen_on","physical_serial","model","adb_bridge","adb_serial","measured_at"):
-                    host[key]=metrics.get(key)
-                host["background_executor"]=True
-                results[n["id"]]=(execnode,host); continue
-            metrics["error"]=host.get("error","ejecutor de fondo no disponible")
+            for route in routes:
+                try:
+                    execnode=mobile_executor(n,route,hosts)
+                    _,host=host_probe(execnode)
+                    if not host.get("online"):
+                        metrics["error"]=host.get("error","ejecutor de fondo no disponible")
+                        continue
+                    for key in ("battery_percent","charging","temperature_c","screen_on","physical_serial","model","adb_bridge","adb_serial","measured_at"):
+                        host[key]=route.get(key)
+                    cap_android_ram(host,route)
+                    if host.get("os")=="android": host["cpu_percent"]=route.get("cpu_percent")
+                    host["background_executor"]=True
+                    results[n["id"]]=(execnode,host)
+                    break
+                except Exception as e:
+                    metrics["error"]=str(e)
+            if n["id"] in results:
+                continue
         results[n["id"]]=(n,metrics)
     return results
 
@@ -281,7 +297,19 @@ def status(record, tail=0):
     node=record["node"]; path=record["job_path"]; local=Path(record["local_path"])
     if node["transport"]=="ssh":
         try: raw=ssh(node,"cat "+shlex.quote(path+"/status.json"))
-        except Exception as e: return {"job_id":record["job_id"],"state":"unknown","reason":str(e),"dispatch_state":record["state"]}
+        except Exception as initial_error:
+            try:
+                if node.get("device_kind") != "android": raise initial_error
+                fresh, metrics = ecosystem()[node["id"]]
+                if (not metrics.get("background_executor") or fresh.get("state_root") != node.get("state_root")
+                        or fresh.get("expected_serial") != node.get("expected_serial")):
+                    raise initial_error
+                # Reconnect to the same physical device and job; never dispatch another worker.
+                node=fresh
+                raw=ssh(node,"cat "+shlex.quote(path+"/status.json"))
+                record["node"]=node; save(local/"record.json",record)
+            except Exception as e:
+                return {"job_id":record["job_id"],"state":"unknown","reason":str(e),"dispatch_state":record["state"]}
         result=json.loads(raw); save(local/"status.json",result)
         if tail:
             try: result["log_tail"]=ssh(node,"tail -n "+str(tail)+" "+shlex.quote(path+"/build.log")).decode(errors="replace")

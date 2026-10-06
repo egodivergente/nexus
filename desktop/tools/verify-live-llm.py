@@ -15,9 +15,12 @@ with sync_playwright() as p:
     page.wait_for_function('Agent.snapshot && !Agent.busy', timeout=45000)
     result = page.evaluate("""async()=>{
       if(Agent.snapshot.offline)throw Error('El motor sigue offline');
-      const result=await agentCall('send',{text:'hey. Solo saludame brevemente en espanol, sin recomendar modelos ni usar herramientas.',attachments:[]});
-      return {text:result.text,inputTokens:result.inputTokens,outputTokens:result.outputTokens,offline:Agent.snapshot.offline};
+      const result=await agentCall('send',{text:'hey',attachments:[]});
+      return {text:result.text,inputTokens:result.inputTokens,outputTokens:result.outputTokens,
+        offline:Agent.snapshot.offline,expertVersion:result.expertVersion,elapsedMs:result.elapsedMs,toolRounds:result.toolRounds};
     }""")
     print(json.dumps(result,ensure_ascii=False))
+    assert result['expertVersion'] == '2026-10-06.1'
+    assert result['offline'] is False
     browser.close()
 

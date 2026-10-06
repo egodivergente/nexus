@@ -1,4 +1,7 @@
 'use strict';
+const reviewScript=document.createElement('script');
+reviewScript.src='review.js';
+document.head.append(reviewScript);
 const Studio={tab:'results',detail:null,pickerQuery:'',pickerKind:'IMAGE',reference:null};
 const openBeforeStudio=openModel;
 openModel=async function(id,reset=true){
@@ -34,7 +37,16 @@ renderCanvas=function(){
  const preview=$('.canvas-right .preview');
  if(preview){const latest=state.jobs.find(j=>j.outputs?.length);preview.outerHTML=latest?'<div class="studio-latest">'+baseJobCard(latest)+'</div>':'<div class="studio-blank">'+icon('canvas')+'</div>';}
  const title=$('.canvas-right h2');if(title)title.textContent='Actividad reciente';
+ const prompt=$('#prompt');
+ if(prompt){prompt.insertAdjacentHTML('afterend','<small id="prompt-limits" class="hint" aria-live="polite"></small>');studioPromptLimits();}
 };
+function studioPromptLimits(){
+ const node=$('#prompt-limits'),prompt=$('#prompt');if(!node||!prompt)return;
+ const max=loaded?.textLimits?.prompt?.maximum,count=Array.from(prompt.value.trim()).length;
+ node.textContent=max==null?count+' caracteres · limite sin verificar':count+' / '+max+' caracteres';
+ node.classList.toggle('error',max!=null&&count>max);
+}
+document.addEventListener('input',e=>{if(e.target.id==='prompt')studioPromptLimits();});
 function studioPicker(){
  Studio.pickerQuery='';Studio.pickerKind=loaded?.modalities[0]||'IMAGE';
  modal('<h2>Modelo</h2><div class="studio-picker-toolbar"><input id="studio-model-search" type="search" placeholder="Buscar modelo o proveedor" aria-label="Buscar modelo"><select id="studio-model-kind" aria-label="Formato">'+pcOptions([['IMAGE','Imagen'],['VIDEO','Video'],['AUDIO','Audio'],['CHAT','Texto']],Studio.pickerKind)+'</select></div><div id="studio-model-list"></div><button data-studio="catalog">Catalogo completo</button>');

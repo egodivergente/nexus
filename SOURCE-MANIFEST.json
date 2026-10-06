@@ -1919,8 +1919,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\Nexus-Studio.bat"
   },
   "desktop/README-AGENTE.md": {
-    "sha256": "d39a89e065fdd1384c4d4567191b0297c7480fbf62c151e02c86548893689f3c",
-    "bytes": 5618,
+    "sha256": "14b01c65d4546d5150ece3854d9effcb98f5a788760b0f3a866d000b3f96cbcf",
+    "bytes": 8186,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\README-AGENTE.md"
   },
   "desktop/README-LOCAL.md": {
@@ -1974,8 +1974,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\verify-release.ps1"
   },
   "desktop/agent/build.gradle.kts": {
-    "sha256": "a388eeff7ae2c718c984ea062e475a226e8f94824a58f53e73a65493bfdd280e",
-    "bytes": 627,
+    "sha256": "ca6d053c2738300d0dedcad3f6e2fc9ce0ff4d5c8e7454af53b311b5573bd24c",
+    "bytes": 773,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\build.gradle.kts"
   },
   "desktop/agent/gradle.properties": {
@@ -2244,8 +2244,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\core\\src\\main\\kotlin\\com\\vidadomu\\nexus\\agent\\core\\log\\Redactor.kt"
   },
   "desktop/agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/registry/ModelRegistry.kt": {
-    "sha256": "80a8adf1874b26b8253f62826430d700a10b0fd53ae58d4b282fae7d37d85224",
-    "bytes": 3567,
+    "sha256": "5d6599902f583fe701ba47b88579418b988f9badbe274bbee1ca339c4ac33fb6",
+    "bytes": 3814,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\core\\src\\main\\kotlin\\com\\vidadomu\\nexus\\agent\\core\\registry\\ModelRegistry.kt"
   },
   "desktop/agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/router/ModelRouter.kt": {
@@ -2399,8 +2399,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\core\\src\\test\\resources\\skill_coverage.json"
   },
   "desktop/agent/src/main/kotlin/DesktopAgent.kt": {
-    "sha256": "40636030311f128e5ebaaf469d46c0449d04193929f30eac23dd2b680265fd2a",
-    "bytes": 13744,
+    "sha256": "d98647e56f39b09882aea2f449ae51983b35ee24a4571667a485b5f476f9b6d6",
+    "bytes": 14734,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\src\\main\\kotlin\\DesktopAgent.kt"
   },
   "desktop/src/Program.cs": {
@@ -2519,8 +2519,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\verify-agent-installed.py"
   },
   "desktop/tools/verify-live-llm.py": {
-    "sha256": "ef59cbe391cbed40e462454bb56efac05dd590eb932a0ca176f0e29389c76593",
-    "bytes": 1137,
+    "sha256": "74df6f0226f2e0bbd09bc83c9817ccb5c87ca77c3d5a69c4bea3251110a19e69",
+    "bytes": 1245,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\verify-live-llm.py"
   },
   "desktop/tools/verify-studio-installed.py": {
@@ -2554,8 +2554,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\assistant.css"
   },
   "desktop/ui/assistant.js": {
-    "sha256": "e5368a4740b92a2a6824f45a19ea0c181a20bf0a5a23f8765e48f26c60f7f232",
-    "bytes": 21522,
+    "sha256": "df7a6962699845e218b651c09ffbccf0169d95dd2450e4ae942307af943c8a3e",
+    "bytes": 21579,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\assistant.js"
   },
   "desktop/ui/catalog.json": {
@@ -2564,8 +2564,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\catalog.json"
   },
   "desktop/ui/engine.js": {
-    "sha256": "185e2ccbfb455b617377f8bc019070f266e4beeab3a11b1ee150431a08c2acae",
-    "bytes": 13621,
+    "sha256": "ca9da49a5cfd68d2e0ad46548babc9d4000d65b303a32851773de0e01e0fa703",
+    "bytes": 14414,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\engine.js"
   },
   "desktop/ui/favicon.ico": {
@@ -2614,8 +2614,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\studio.css"
   },
   "desktop/ui/studio.js": {
-    "sha256": "707ed5168fe2b243ca594fe47db05751bc1ee0ed200ed0381e9dbe00a4617bb0",
-    "bytes": 12231,
+    "sha256": "8851c0f6d77b6596d06c88b22648bcd478b6f4076f68e12a826241bd28e15acb",
+    "bytes": 12970,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\studio.js"
   },
   "desktop/ui/style.css": {
@@ -2754,13 +2754,13 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\logos\\wan.png"
   },
   "tools/ecosystem-build/README.md": {
-    "sha256": "3216c59b396f08c637e78948e4f7351d8c1c469a96b5d371fc0429318e727fac",
-    "bytes": 8504,
+    "sha256": "48864e89b28777aa4484d895d276f9bb2f3de445d46d77d44f038a3ca84e384f",
+    "bytes": 11822,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\README.md"
   },
   "tools/ecosystem-build/install.py": {
-    "sha256": "97f3a2bcd776a9286b2f833d6b961c82baea1c259f8eaccf9cdf1f239ba66324",
-    "bytes": 7834,
+    "sha256": "c0aa0e5231e0b6159939dab6f38102c154ff632a119cf423f0e698c6763779a0",
+    "bytes": 7963,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\install.py"
   },
   "tools/ecosystem-build/nodes.json": {
@@ -2774,23 +2774,23 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\prepare-linux-pixel.sh"
   },
   "tools/ecosystem-build/prepare-pixel.sh": {
-    "sha256": "2ee49bb3cc54d0d962731b21bcb5cdaed5959b85f357f2d706e8a8c76015d362",
-    "bytes": 2016,
+    "sha256": "cdb7d4851d9b5d77e123bccc7c108d092713370915ea09756a4dcb2936e206a3",
+    "bytes": 2075,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\prepare-pixel.sh"
   },
   "tools/ecosystem-build/probe.py": {
-    "sha256": "014058337196ef3c07891e5e012fe21e2663ead40a44afc88313dd6f8d6e80bb",
-    "bytes": 9523,
+    "sha256": "6852744508fa0ac103748b4783b7e3c2bb8631be2bb36ff0df999bd484f05ce0",
+    "bytes": 10191,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\probe.py"
   },
   "tools/ecosystem-build/restore-pixel-toolchain.py": {
-    "sha256": "2a7fcbce41b514d009da52fce8d7e3ef85b1a26f85b5fe8862cdd23e30fd8228",
-    "bytes": 2603,
+    "sha256": "c2bbc7fabdcd86e49938bf050b9dd7b9984a58aa968deb5669b0fbe827b70d94",
+    "bytes": 2819,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\restore-pixel-toolchain.py"
   },
   "tools/ecosystem-build/router.py": {
-    "sha256": "af3634d5ab4b35cf17dba7e5740c8a07bb34b79864902f9b3104ead90130cd0c",
-    "bytes": 22808,
+    "sha256": "e5e900d325b5fd021648996f027bf3155fa57ba32e9bd28e392bbfac0d34d005",
+    "bytes": 24460,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\router.py"
   },
   "tools/ecosystem-build/smoke.py": {
@@ -2799,13 +2799,13 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\smoke.py"
   },
   "tools/ecosystem-build/test_router.py": {
-    "sha256": "fffa4e57585faff729c2a1aa4ad718ccd675962da4b168a2cf8d27cd410637c8",
-    "bytes": 6021,
+    "sha256": "67e5e471766cee9eae56295e2034496d3be2b142bba3a90a1304c560ff680516",
+    "bytes": 10595,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\test_router.py"
   },
   "tools/ecosystem-build/worker.py": {
-    "sha256": "3de8463a58141de4ed0aa107f33a2ef4d3c122003c84bded72548112ec8b028e",
-    "bytes": 14115,
+    "sha256": "5c5dd7c2f01ffba5c65cd4b39c1145ad5f82076ba2c5dc739a7bd61de12fe998",
+    "bytes": 14634,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\worker.py"
   },
   "tools/ecosystem-build/recipes/nexus-apk.json": {
@@ -2852,5 +2852,85 @@
     "sha256": "3bb938fb70049e3e45f533b37ccae995ae96516e04c2f35b0c1142e47b2a39c1",
     "bytes": 788493,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\outputs\\desktop-parity-20261006\\drive-source\\Nexus\\app\\src\\main\\res\\raw\\sample_video.mp4"
+  },
+  "desktop/agent/assets/expert-guides.json": {
+    "sha256": "64b677c667f069dbf535418cea39d94cd27b53fdb5c1c066a66106bc58edfc46",
+    "bytes": 11531,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\assets\\expert-guides.json"
+  },
+  "desktop/agent/src/main/kotlin/ExpertKnowledge.kt": {
+    "sha256": "f30b0875a1e84558467367a85e9d18156380abfaec3734e920fb7de4cbda896a",
+    "bytes": 10952,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\src\\main\\kotlin\\ExpertKnowledge.kt"
+  },
+  "desktop/agent/src/test/kotlin/ExpertKnowledgeTest.kt": {
+    "sha256": "1736201b9598b1fb88d995789a4a017541a5234b9d5bd24df25460250aefdc9a",
+    "bytes": 5662,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\agent\\src\\test\\kotlin\\ExpertKnowledgeTest.kt"
+  },
+  "desktop/tools/test-review.py": {
+    "sha256": "403e3b8116ff96487599cf3e5afc9efe10f2080e814861442d0d66519897e832",
+    "bytes": 5136,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\test-review.py"
+  },
+  "desktop/tools/test-text-limits.js": {
+    "sha256": "ec67ff671c090e703644135e544dadad58089f22b9c84bcf5828a9797e2a0254",
+    "bytes": 1173,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\test-text-limits.js"
+  },
+  "desktop/tools/verify-expert.py": {
+    "sha256": "0e9aef299310ac29086659f66285b1c2d0266b0ea461c9c5ef1957b8767ffac3",
+    "bytes": 3360,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\verify-expert.py"
+  },
+  "desktop/ui/review.js": {
+    "sha256": "8a32bcb5f011488ceb36eb7197346e0d39aec99d24925b1db5ae5ab37c90d36c",
+    "bytes": 6237,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\review.js"
+  },
+  "tools/ecosystem-build/recipes/nexus-expert.json": {
+    "sha256": "dac44622212ff81cbf4ba4241b82eb678b6e8a1ac0e2c34b079c79fabf6db284",
+    "bytes": 1240,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\recipes\\nexus-expert.json"
+  },
+  "tools/ecosystem-build/recipes/pixel-apk.json": {
+    "sha256": "0cac99c4a13d8af618f0588047600611855cc38af3df05e2d7d8e6daff82596c",
+    "bytes": 734,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\recipes\\pixel-apk.json"
+  },
+  "tools/flow-bridge/.gitignore": {
+    "sha256": "c71f44540e4bc0f6bd85b2e1f7cd0b2966cab522ada6cb8e83736c3667880cea",
+    "bytes": 47,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\.gitignore"
+  },
+  "tools/flow-bridge/PLAN.md": {
+    "sha256": "771315d662e266255beb52cbc6cefb096ce1251c5f8584692695d095ad5d0f95",
+    "bytes": 1212,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\PLAN.md"
+  },
+  "tools/flow-bridge/client.py": {
+    "sha256": "86248edf36ea57ab921a0a4a565f07869f016887c44284264d0a0b6b5c654473",
+    "bytes": 2232,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\client.py"
+  },
+  "tools/flow-bridge/configure.py": {
+    "sha256": "ad7ace01892dc9d6d5eb999ef349bc4d6a9510564748ece2949cee7c53aea88d",
+    "bytes": 1127,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\configure.py"
+  },
+  "tools/flow-bridge/launcher.py": {
+    "sha256": "53362b8241f338cddb4f69dfef9e5bf7b30a2831a6ef910476a47f07edccae17",
+    "bytes": 984,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\launcher.py"
+  },
+  "tools/flow-bridge/requirements.lock": {
+    "sha256": "d62b3b0e089481ce0e63e5267591309cec0901b693fb6e35eed4151c3ba73b9a",
+    "bytes": 1091,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\requirements.lock"
+  },
+  "tools/flow-bridge/runtime_compat.py": {
+    "sha256": "5089c5f94c3432a3945a885cb3cf0120ff1cc9c962e087064e6325fd72c4eb40",
+    "bytes": 2263,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\runtime_compat.py"
   }
 }

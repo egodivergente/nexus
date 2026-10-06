@@ -65,7 +65,7 @@ function agentSchema(m){
   const value={key:p.key,displayName:p.displayName,uiType:p.type,nativeType:p.nativeType,options:p.options||[],
    min:p.minValue,max:p.maxValue,step:p.step,default:p.defaultValue==null?undefined:String(p.defaultValue),required:!!p.isRequired,advanced:!!p.isAdvanced,description:p.description};
   return Object.fromEntries(Object.entries(value).filter(([,v])=>v!=null));
- }),media:Object.fromEntries(Object.entries(media).filter(([,v])=>v!=null)),promptRequired:m.promptRequired!==false,unsupportedRequired:unsupported,source:m.schemaUrl||'Nexus desktop contract'};
+ }),textLimits:m.textLimits||{},media:Object.fromEntries(Object.entries(media).filter(([,v])=>v!=null)),promptRequired:m.promptRequired!==false,unsupportedRequired:unsupported,source:m.schemaUrl||'Nexus desktop contract'};
 }
 function agentMedia(plan,m){
  return (plan.media||[]).map(ref=>{
@@ -146,14 +146,14 @@ render=function(){
  $('#navigation').insertAdjacentHTML('afterbegin',`<button data-nav="assistant" class="${view==='assistant'?'active':''}">${aiIcon('chat')}Asistente</button>`);
  if(view==='assistant')$('#navigation').querySelectorAll('[data-nav]:not([data-nav="assistant"])').forEach(b=>b.classList.remove('active'));
 };
-async function sendAgent(){
+async function sendAgent(requestText){
  const text=Agent.draft.trim();if(!text||Agent.busy)return;
  if(!Agent.snapshot||Agent.snapshot.offline){
   try{await agentCall('snapshot');}catch(error){toast(error.message);return;}
   if(Agent.snapshot.offline){toast('El asistente necesita una conexion LLM. Configurala en sus ajustes.');agentSettings();return;}
  }
  const attachments=Agent.attachments.slice();Agent.items.push({role:'user',text,attachments});Agent.draft='';Agent.attachments=[];
- try{const result=await agentCall('send',{text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
+ try{const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
   Agent.items.push({role:'assistant',text:result.text,html:result.html,usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
  }catch(error){Agent.items.push({role:'assistant',text:error.message});Agent.draft=text;Agent.attachments=attachments;}
  renderAssistant();

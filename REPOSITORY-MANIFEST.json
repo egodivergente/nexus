@@ -1679,9 +1679,13 @@
     "sha256": "d876bfcbcb3bc78acff8b4441ca4473aa155a3e848d78098148e00e4c2f60ca7",
     "bytes": 91165
   },
+  "desktop/agent/assets/expert-guides.json": {
+    "sha256": "64b677c667f069dbf535418cea39d94cd27b53fdb5c1c066a66106bc58edfc46",
+    "bytes": 11531
+  },
   "desktop/agent/build.gradle.kts": {
-    "sha256": "a388eeff7ae2c718c984ea062e475a226e8f94824a58f53e73a65493bfdd280e",
-    "bytes": 627
+    "sha256": "ca6d053c2738300d0dedcad3f6e2fc9ce0ff4d5c8e7454af53b311b5573bd24c",
+    "bytes": 773
   },
   "desktop/agent/core/build.gradle.kts": {
     "sha256": "7c7f029b2ce7b177c90181d29a6e163513499d51335c9c89231a832bbe5f01ba",
@@ -1744,8 +1748,8 @@
     "bytes": 1622
   },
   "desktop/agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/registry/ModelRegistry.kt": {
-    "sha256": "80a8adf1874b26b8253f62826430d700a10b0fd53ae58d4b282fae7d37d85224",
-    "bytes": 3567
+    "sha256": "5d6599902f583fe701ba47b88579418b988f9badbe274bbee1ca339c4ac33fb6",
+    "bytes": 3814
   },
   "desktop/agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/router/ModelRouter.kt": {
     "sha256": "3a1eaa8c0aecd0c4c893b586cebd207e64b66585099f7c3baf7be2dd6377693d",
@@ -1876,8 +1880,16 @@
     "bytes": 200
   },
   "desktop/agent/src/main/kotlin/DesktopAgent.kt": {
-    "sha256": "40636030311f128e5ebaaf469d46c0449d04193929f30eac23dd2b680265fd2a",
-    "bytes": 13744
+    "sha256": "d98647e56f39b09882aea2f449ae51983b35ee24a4571667a485b5f476f9b6d6",
+    "bytes": 14734
+  },
+  "desktop/agent/src/main/kotlin/ExpertKnowledge.kt": {
+    "sha256": "f30b0875a1e84558467367a85e9d18156380abfaec3734e920fb7de4cbda896a",
+    "bytes": 10952
+  },
+  "desktop/agent/src/test/kotlin/ExpertKnowledgeTest.kt": {
+    "sha256": "1736201b9598b1fb88d995789a4a017541a5234b9d5bd24df25460250aefdc9a",
+    "bytes": 5662
   },
   "desktop/agent_host.py": {
     "sha256": "e49a604c73309a48ac455232351d1e01f4434badb3fec0d741fc7f44069015b7",
@@ -1904,8 +1916,8 @@
     "bytes": 30781
   },
   "desktop/README-AGENTE.md": {
-    "sha256": "d39a89e065fdd1384c4d4567191b0297c7480fbf62c151e02c86548893689f3c",
-    "bytes": 5618
+    "sha256": "14b01c65d4546d5150ece3854d9effcb98f5a788760b0f3a866d000b3f96cbcf",
+    "bytes": 8186
   },
   "desktop/README-LOCAL.md": {
     "sha256": "5d235aa9785a049b952e9a1e7e938eb4bd38cc41e1607d238f641e35b1b3c2b6",
@@ -2003,9 +2015,17 @@
     "sha256": "0d265a4972a1905ca9d8d583a310dfbfc4740ef4377ced7a1f8dccd8ff2f8d90",
     "bytes": 4528
   },
+  "desktop/tools/test-review.py": {
+    "sha256": "403e3b8116ff96487599cf3e5afc9efe10f2080e814861442d0d66519897e832",
+    "bytes": 5136
+  },
   "desktop/tools/test-studio.py": {
     "sha256": "0e095b69a5f0f99afb25b5e061ac6577d729700c3b63e6af61d6fd10ef249e40",
     "bytes": 6344
+  },
+  "desktop/tools/test-text-limits.js": {
+    "sha256": "ec67ff671c090e703644135e544dadad58089f22b9c84bcf5828a9797e2a0254",
+    "bytes": 1173
   },
   "desktop/tools/transfer-build/classes/com/vidadomu/nexus/transfer/Transfer.class": {
     "sha256": "04172aceff452fdb287d92888b0707974980b57cd57a20671a5c02c088640af3",
@@ -2027,9 +2047,13 @@
     "sha256": "0f4f0e9795c4fce6b45f2e2d08a19f03805cbb65efe97faefec23d1b55ce4dda",
     "bytes": 1718
   },
+  "desktop/tools/verify-expert.py": {
+    "sha256": "0e9aef299310ac29086659f66285b1c2d0266b0ea461c9c5ef1957b8767ffac3",
+    "bytes": 3360
+  },
   "desktop/tools/verify-live-llm.py": {
-    "sha256": "ef59cbe391cbed40e462454bb56efac05dd590eb932a0ca176f0e29389c76593",
-    "bytes": 1137
+    "sha256": "74df6f0226f2e0bbd09bc83c9817ccb5c87ca77c3d5a69c4bea3251110a19e69",
+    "bytes": 1245
   },
   "desktop/tools/verify-studio-installed.py": {
     "sha256": "caae5e52967f70f31a8a83d01712ae258802cb583562df027f2bbf0574001f77",
@@ -2044,16 +2068,16 @@
     "bytes": 3883
   },
   "desktop/ui/assistant.js": {
-    "sha256": "e5368a4740b92a2a6824f45a19ea0c181a20bf0a5a23f8765e48f26c60f7f232",
-    "bytes": 21522
+    "sha256": "df7a6962699845e218b651c09ffbccf0169d95dd2450e4ae942307af943c8a3e",
+    "bytes": 21579
   },
   "desktop/ui/catalog.json": {
     "sha256": "226ebbe54c0923e83bfacd4d58ffa25c0d17e71903bf4d9f18c395ba31f79c3b",
     "bytes": 2273487
   },
   "desktop/ui/engine.js": {
-    "sha256": "185e2ccbfb455b617377f8bc019070f266e4beeab3a11b1ee150431a08c2acae",
-    "bytes": 13621
+    "sha256": "ca9da49a5cfd68d2e0ad46548babc9d4000d65b303a32851773de0e01e0fa703",
+    "bytes": 14414
   },
   "desktop/ui/favicon.ico": {
     "sha256": "407a3beff5fd5b0125d84285d60f3cd37597c59910cb7d0a21bbf9e63c55c139",
@@ -2183,13 +2207,17 @@
     "sha256": "4f31b5556d7316b140d6bc1e9906be094fda5c84827c2b606a9346a20a730fb4",
     "bytes": 1324
   },
+  "desktop/ui/review.js": {
+    "sha256": "8a32bcb5f011488ceb36eb7197346e0d39aec99d24925b1db5ae5ab37c90d36c",
+    "bytes": 6237
+  },
   "desktop/ui/studio.css": {
     "sha256": "532e80585a16743639acd4dd9b8d13fe31a1449a8b6d906abcbf42cb8ee36250",
     "bytes": 6144
   },
   "desktop/ui/studio.js": {
-    "sha256": "707ed5168fe2b243ca594fe47db05751bc1ee0ed200ed0381e9dbe00a4617bb0",
-    "bytes": 12231
+    "sha256": "8851c0f6d77b6596d06c88b22648bcd478b6f4076f68e12a826241bd28e15acb",
+    "bytes": 12970
   },
   "desktop/ui/style.css": {
     "sha256": "788d1511f3d73ba55a410e23f5c5d35380d7592775658537e28531d85b54a9a2",
@@ -2236,12 +2264,12 @@
     "bytes": 403
   },
   "SOURCE-MANIFEST.json": {
-    "sha256": "d1bc68fb2079ede2830d4d65d9cb51376ff857923519b67c85ad392f21bc59f4",
-    "bytes": 189895
+    "sha256": "6b8b35067122dfc7fcd7b9093c7fbe13e64251abfee7a65fdf5e88a74e4d5225",
+    "bytes": 193917
   },
   "tools/ecosystem-build/install.py": {
-    "sha256": "97f3a2bcd776a9286b2f833d6b961c82baea1c259f8eaccf9cdf1f239ba66324",
-    "bytes": 7834
+    "sha256": "c0aa0e5231e0b6159939dab6f38102c154ff632a119cf423f0e698c6763779a0",
+    "bytes": 7963
   },
   "tools/ecosystem-build/nodes.json": {
     "sha256": "ffa73cfb96981aa891885ca98218c26c07090e70458754c56951a7fe53794cef",
@@ -2252,16 +2280,16 @@
     "bytes": 2666
   },
   "tools/ecosystem-build/prepare-pixel.sh": {
-    "sha256": "2ee49bb3cc54d0d962731b21bcb5cdaed5959b85f357f2d706e8a8c76015d362",
-    "bytes": 2016
+    "sha256": "cdb7d4851d9b5d77e123bccc7c108d092713370915ea09756a4dcb2936e206a3",
+    "bytes": 2075
   },
   "tools/ecosystem-build/probe.py": {
-    "sha256": "014058337196ef3c07891e5e012fe21e2663ead40a44afc88313dd6f8d6e80bb",
-    "bytes": 9523
+    "sha256": "6852744508fa0ac103748b4783b7e3c2bb8631be2bb36ff0df999bd484f05ce0",
+    "bytes": 10191
   },
   "tools/ecosystem-build/README.md": {
-    "sha256": "3216c59b396f08c637e78948e4f7351d8c1c469a96b5d371fc0429318e727fac",
-    "bytes": 8504
+    "sha256": "48864e89b28777aa4484d895d276f9bb2f3de445d46d77d44f038a3ca84e384f",
+    "bytes": 11822
   },
   "tools/ecosystem-build/recipes/nexus-apk.json": {
     "sha256": "bcf2a0d209d9d42dd09b54dfb398db395871dd0dcee3d8bad470d772a0d435c3",
@@ -2271,28 +2299,68 @@
     "sha256": "67be0ded2b2857387792016aefbe5ac4cb18c77627293e11b5490b198f651a7f",
     "bytes": 741
   },
+  "tools/ecosystem-build/recipes/nexus-expert.json": {
+    "sha256": "dac44622212ff81cbf4ba4241b82eb678b6e8a1ac0e2c34b079c79fabf6db284",
+    "bytes": 1240
+  },
+  "tools/ecosystem-build/recipes/pixel-apk.json": {
+    "sha256": "0cac99c4a13d8af618f0588047600611855cc38af3df05e2d7d8e6daff82596c",
+    "bytes": 734
+  },
   "tools/ecosystem-build/recipes/pixel-smoke.json": {
     "sha256": "c5422a3b6fda40fafd59a63839d8757b937753ef9a52780ebb086474775afb8c",
     "bytes": 390
   },
   "tools/ecosystem-build/restore-pixel-toolchain.py": {
-    "sha256": "2a7fcbce41b514d009da52fce8d7e3ef85b1a26f85b5fe8862cdd23e30fd8228",
-    "bytes": 2603
+    "sha256": "c2bbc7fabdcd86e49938bf050b9dd7b9984a58aa968deb5669b0fbe827b70d94",
+    "bytes": 2819
   },
   "tools/ecosystem-build/router.py": {
-    "sha256": "af3634d5ab4b35cf17dba7e5740c8a07bb34b79864902f9b3104ead90130cd0c",
-    "bytes": 22808
+    "sha256": "e5e900d325b5fd021648996f027bf3155fa57ba32e9bd28e392bbfac0d34d005",
+    "bytes": 24460
   },
   "tools/ecosystem-build/smoke.py": {
     "sha256": "92502a84186630be2eccd1ec7a2be068e13c5fec7101149e9e03518727bd9334",
     "bytes": 369
   },
   "tools/ecosystem-build/test_router.py": {
-    "sha256": "fffa4e57585faff729c2a1aa4ad718ccd675962da4b168a2cf8d27cd410637c8",
-    "bytes": 6021
+    "sha256": "67e5e471766cee9eae56295e2034496d3be2b142bba3a90a1304c560ff680516",
+    "bytes": 10595
   },
   "tools/ecosystem-build/worker.py": {
-    "sha256": "3de8463a58141de4ed0aa107f33a2ef4d3c122003c84bded72548112ec8b028e",
-    "bytes": 14115
+    "sha256": "5c5dd7c2f01ffba5c65cd4b39c1145ad5f82076ba2c5dc739a7bd61de12fe998",
+    "bytes": 14634
+  },
+  "tools/flow-bridge/.gitignore": {
+    "sha256": "c71f44540e4bc0f6bd85b2e1f7cd0b2966cab522ada6cb8e83736c3667880cea",
+    "bytes": 47
+  },
+  "tools/flow-bridge/client.py": {
+    "sha256": "86248edf36ea57ab921a0a4a565f07869f016887c44284264d0a0b6b5c654473",
+    "bytes": 2232
+  },
+  "tools/flow-bridge/configure.py": {
+    "sha256": "ad7ace01892dc9d6d5eb999ef349bc4d6a9510564748ece2949cee7c53aea88d",
+    "bytes": 1127
+  },
+  "tools/flow-bridge/launcher.py": {
+    "sha256": "53362b8241f338cddb4f69dfef9e5bf7b30a2831a6ef910476a47f07edccae17",
+    "bytes": 984
+  },
+  "tools/flow-bridge/PLAN.md": {
+    "sha256": "771315d662e266255beb52cbc6cefb096ce1251c5f8584692695d095ad5d0f95",
+    "bytes": 1212
+  },
+  "tools/flow-bridge/requirements.lock": {
+    "sha256": "d62b3b0e089481ce0e63e5267591309cec0901b693fb6e35eed4151c3ba73b9a",
+    "bytes": 1091
+  },
+  "tools/flow-bridge/runtime_compat.py": {
+    "sha256": "5089c5f94c3432a3945a885cb3cf0120ff1cc9c962e087064e6325fd72c4eb40",
+    "bytes": 2263
+  },
+  "tools/flow-bridge/UPSTREAM-DEPENDENCY.md": {
+    "sha256": "7f384b448b77f1d4a6be4372c3da4129a51bdecf739ea409e6001bc2e49dca37",
+    "bytes": 370
   }
 }

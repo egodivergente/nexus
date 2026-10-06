@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "reviewed": "2026-10-06",
+  "policy": "Reviewed snapshots, not live guarantees. No tariff, release ranking or universal quality score is inferred.",
+  "guides": [
+    {
+      "id": "flux2-pro-max",
+      "patterns": [
+        "^(black-forest-labs/|crun/)flux[-_]?2[-_](pro|max)(/|$)"
+      ],
+      "scope": "FLUX.2 pro/max image prompting only; not FLUX.3 or video.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://docs.bfl.ai/guides/prompting_guide_flux2",
+          "title": "BFL FLUX.2 pro/max prompting guide"
+        }
+      ],
+      "advice": [
+        "No usa prompts negativos: describir el resultado deseado.",
+        "Empezar por el sujeto y la accion importantes; concretar estilo, luz y contexto.",
+        "Para texto, indicar cadena literal, ubicacion, jerarquia y color. Los colores HEX deben asociarse a un objeto.",
+        "En edicion multirreferencia, asignar a cada referencia una funcion y declarar que se conserva."
+      ],
+      "limits": [
+        "Los limites de archivos y parametros pertenecen a la ruta concreta, no a esta guia.",
+        "No prometer tipografia, identidad ni color perfectos."
+      ]
+    },
+    {
+      "id": "runway45-i2v",
+      "patterns": [
+        "^runway/gen[-_]?4[._]5/(i2v|image-to-video)$"
+      ],
+      "scope": "Runway Gen-4.5 image-to-video.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://help.runwayml.com/hc/en-us/articles/48324313115155-Image-to-Video-Prompting-Guide",
+          "title": "Runway image-to-video prompting guide"
+        }
+      ],
+      "advice": [
+        "Describir principalmente movimiento: sujeto, entorno, camara, direccion, velocidad y ritmo.",
+        "Empezar simple; anadir detalles solo para corregir un fallo.",
+        "No redescribir la imagen salvo transformaciones o elementos nuevos.",
+        "Secuenciar acciones compatibles con la duracion; las marcas temporales son orientativas."
+      ],
+      "limits": [
+        "La imagen puede sugerir movimiento que contradice el texto.",
+        "No garantizar camara totalmente fija ni continuidad perfecta."
+      ]
+    },
+    {
+      "id": "gemini-image",
+      "patterns": [
+        "^google/(nano-banana(-2|-pro)?|gemini-3[.]1-flash-image|gemini-3-pro-image)(/|$)"
+      ],
+      "scope": "Consejos de generacion/edicion Gemini Image. Alias del catalogo sujetos a esquema; no transferir limites entre versiones.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://ai.google.dev/gemini-api/docs/image-generation",
+          "title": "Google Gemini image generation"
+        }
+      ],
+      "advice": [
+        "Redactar una descripcion coherente de la escena, no solo etiquetas.",
+        "En edicion especificar el cambio local y preservar el resto de la imagen, perspectiva e iluminacion.",
+        "Para composiciones complejas ordenar espacialmente los elementos; indicar el texto literal.",
+        "Iterar con cambios pequenos. El prompt por si solo no asegura un numero exacto de resultados."
+      ],
+      "limits": [
+        "El schema del proveedor de Nexus puede exponer menos capacidades que Gemini directo.",
+        "No prometer que todos los alias comparten formatos, videos de entrada o resoluciones."
+      ]
+    },
+    {
+      "id": "gpt-image",
+      "patterns": [
+        "^openai/gpt-image-(1([.]5)?|2|2[.]5-(sunburst|flare))([/-]|$)"
+      ],
+      "scope": "GPT Image documented image generation/editing family, not an API parameter contract for Atlas.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/image-generation",
+          "title": "OpenAI image generation"
+        }
+      ],
+      "advice": [
+        "Distinguir generacion desde texto de edicion con imagen de entrada.",
+        "Separar el cambio pedido de los elementos que deben permanecer iguales.",
+        "Revisar texto, posicion de elementos y consistencia entre imagenes: siguen siendo posibles fallos."
+      ],
+      "limits": [
+        "No garantizar identidad ni colocacion exacta.",
+        "El precio final depende de entradas, calidad y tamano; una tarifa de tokens no es un precio fijo por imagen.",
+        "No transferir input_fidelity o calidad entre versiones sin consultar el esquema."
+      ]
+    },
+    {
+      "id": "seedream-documented",
+      "patterns": [
+        "(^|/)seedream[-_]?v?(4[.-]0|4[.-]5|5[.-]0-lite)(/|$)"
+      ],
+      "scope": "Seedream 4.0, 4.5 y 5.0-lite. No prueba de Seedream 5 Pro.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://github.com/bytedance/agentkit-samples/blob/main/skills/byted-seedream-image-generate/SKILL.md",
+          "title": "ByteDance Seedream integration guide"
+        }
+      ],
+      "advice": [
+        "Definir sujeto, estilo, iluminacion y ambiente con instrucciones concretas.",
+        "Distinguir generar desde texto de transformar referencias.",
+        "Lotes, formato y herramientas dependen de la version y de la integracion."
+      ],
+      "limits": [
+        "No extrapolar herramientas de busqueda de 5.0-lite a 5 Pro.",
+        "Usar exclusivamente parametros del schema de Nexus."
+      ]
+    },
+    {
+      "id": "minimax-h3",
+      "patterns": [
+        "^minimax/h3(-developer|-max)?/"
+      ],
+      "scope": "MiniMax H3 generation modes; availability and limits depend on the provider route.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://platform.minimax.io/docs/guides/video-generation",
+          "title": "MiniMax video generation"
+        }
+      ],
+      "advice": [
+        "Elegir la ruta por las entradas reales: texto, fotograma o referencias.",
+        "En referencias, indicar que aporta cada archivo: personaje, movimiento, camara, estilo o ritmo.",
+        "No trasladar automaticamente parametros de H3 Max a H3 o a la variante Developer."
+      ],
+      "limits": [
+        "Esta ficha documenta modos, no un benchmark de calidad ni una sintaxis de prompt universal.",
+        "Audio, fotograma final y duraciones deben existir en el esquema de la ruta concreta."
+      ]
+    },
+    {
+      "id": "kling-motion-control",
+      "patterns": [
+        "kling.*motion[-_]?control"
+      ],
+      "scope": "Kling Motion Control; excerpt verified, full guide could not be fetched.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://kling.ai/quickstart/motion-control-user-guide",
+          "title": "Kling Motion Control user guide",
+          "access": "search_excerpt_only"
+        }
+      ],
+      "advice": [
+        "Separar la referencia de movimiento del personaje de las instrucciones sobre el fondo.",
+        "Verificar los campos de imagen y video del schema antes de preparar."
+      ],
+      "limits": [
+        "La guia completa no se pudo consultar. No inferir limites, orientacion ni duraciones de este extracto."
+      ]
+    },
+    {
+      "id": "luma-ray2",
+      "patterns": [
+        "^(luma/)?ray[-_]?2([/-]|$)"
+      ],
+      "scope": "Luma Ray2 documented keyframe workflows only.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://docs.lumalabs.ai/docs/video-generation",
+          "title": "Luma video generation API"
+        }
+      ],
+      "advice": [
+        "El flujo puede partir de texto o de keyframes segun la ruta.",
+        "Distinguir fotograma inicial y final; describir la transicion deseada."
+      ],
+      "limits": [
+        "Esta guia no verifica Ray3 ni las capacidades de la ruta de Nexus.",
+        "No asumir que una extension de video esta disponible sin schema."
+      ]
+    },
+    {
+      "id": "seedream5pro",
+      "patterns": [
+        "(^|/)seedream[-_]?v?5([.-]0)?-pro(/|$)"
+      ],
+      "scope": "Seedream 5.0 Pro: examples and capabilities published by ByteDance, not an independent benchmark.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://seed.bytedance.com/en/seedream5_0_pro",
+          "title": "ByteDance Seedream 5.0 Pro"
+        }
+      ],
+      "advice": [
+        "Para infografias, describir jerarquia, distribucion espacial, texto literal y estilo de cada bloque.",
+        "Para edicion, usar anotaciones o referencias espaciales y delimitar cambios, conservando lo demas.",
+        "Para fotografia, concretar luz, materiales y textura en vez de una lista de superlativos.",
+        "Admite instrucciones multilingues segun el fabricante; no es obligatorio traducir todo al ingles."
+      ],
+      "limits": [
+        "La pagina del fabricante no demuestra una tasa de acierto ni superioridad universal.",
+        "Separacion de capas requiere la ruta y los campos adecuados; no asumirla en text-to-image.",
+        "Tarifas, duraciones y numero de referencias: consultar schema y cotizacion de Nexus."
+      ]
+    },
+    {
+      "id": "h3-reference-prompt",
+      "patterns": [
+        "^minimax/h3(-developer)?/reference-to-video$"
+      ],
+      "scope": "Official MiniMax H3 full-reference rewrite format; use only when the provider accepts this prompt format.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3/raw/main/docs/VIDEO_PROMPT_WRITING_GUIDE_ref_en.md",
+          "title": "MiniMax H3 reference prompt guide"
+        }
+      ],
+      "advice": [
+        "La guia organiza el texto en subject_definitions, summary, retention_analysis, detailed_description, overall_soundscape y non_diegetic_music.",
+        "Las secciones se redactan en ingles; conservar el idioma original del dialogo y del texto visible.",
+        "Asignar etiquetas estables a sujeto, imagen, video y audio; declarar que aporta cada referencia.",
+        "Describir acciones, camara, sonido y cambios por plano en orden de reproduccion; no reducirlo a un resumen de trama."
+      ],
+      "limits": [
+        "Son secciones del texto del prompt, no nuevas claves JSON de la API.",
+        "No fingir referencias adjuntas ni audio activo si no existen en el schema.",
+        "El alias Developer puede tener contrato diferente al modelo abierto."
+      ]
+    },
+    {
+      "id": "h3-base-prompt",
+      "patterns": [
+        "^minimax/h3(-developer)?/(text-to-video|image-to-video|start-end-to-video)$"
+      ],
+      "scope": "Official MiniMax H3 base prompting; external provider schema still controls available conditioning modes.",
+      "checked": "2026-10-06",
+      "sources": [
+        {
+          "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3/raw/main/docs/VIDEO_PROMPT_WRITING_GUIDE_base_en.md",
+          "title": "MiniMax H3 base prompt guide"
+        }
+      ],
+      "advice": [
+        "El formato documentado distingue integrated_multimodal_description, overall_soundscape y non_diegetic_music.",
+        "Si hay keyframes, indicar su posicion temporal antes del cuerpo del prompt.",
+        "En I2V establecer primero los elementos ancla del fotograma y desarrollar la accion; en inicio/final describir una transicion continua.",
+        "Distinguir zoom de desplazamiento de camara; indicar amplitud y velocidad solo cuando aporten control."
+      ],
+      "limits": [
+        "Los nombres de seccion son contenido del prompt, no parametros de la API.",
+        "No incluir modos de condicionamiento que Nexus no exponga.",
+        "No importar estas convenciones de H3 a Runway, Kling u otras familias."
+      ]
+    }
+  ]
+}

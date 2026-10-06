@@ -3,12 +3,15 @@ const valid=v=>typeof v==='string'&&v.trim()&&!['null','undefined','-','–','�
 const labels={prompt:'Prompt',negative_prompt:'Evitar',aspect_ratio:'Relación de aspecto',ratio:'Formato',resolution:'Resolución',quality:'Calidad',duration:'Duración',num_images:'Imágenes',outputCount:'Imágenes',seed:'Semilla',character_orientation:'Orientación del personaje',keep_original_sound:'Conservar sonido original',generate_audio:'Generar sonido',guidance_scale:'Fidelidad al prompt',steps:'Pasos',num_inference_steps:'Pasos',image:'Imagen de entrada',images:'Imágenes de referencia',video:'Vídeo de entrada',referenceImages:'Referencias',reference_images:'Referencias',size:'Tamaño',enable_safety_checker:'Filtro de seguridad',prompt_enhancement:'Mejorar prompt'};
 const label=k=>labels[k]||k.replace(/[_.]/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,s=>s.toUpperCase());
 function normalize(input,schema){
- const m=structuredClone(input);m.fields=[];m.unsupported=[];
+ const m=structuredClone(input);m.fields=[];m.unsupported=[];m.textLimits={};
  if(m.providerId==='crun'&&!m.providerModelId)m.providerModelId=({'crun/kling-v3-std':'kling/v3','crun/kling-v3-pro':'kling/v3','crun/kling-v3-motion-control-std':'kling/v3-motion-control','crun/kling-v3-motion-control-pro':'kling/v3-motion-control'})[m.id];
  if(!m.contractEndpoint&&m.nativeRequiredFields?.length)m.promptRequired=m.nativeRequiredFields.includes('prompt');
  if(schema){
   const s=schema.components?.schemas?.Input;if(!s?.properties)throw Error('El esquema no contiene una definición Input compatible.');
   m.parameters=[];m.promptRequired=(s.required||[]).includes('prompt');m.schemaLoaded=true;
+  for(const [key,p] of Object.entries(s.properties)){
+   if(p?.type==='string')m.textLimits[key]={unit:'unicode_code_points',minimum:Number.isInteger(p.minLength)&&p.minLength>=0?p.minLength:null,maximum:Number.isInteger(p.maxLength)&&p.maxLength>=0?p.maxLength:null,source:m.schemaUrl||'Provider Input schema',description:p.description||null};
+  }
   for(const [key,p] of Object.entries(s.properties)){
    if(!valid(key)||key.startsWith('__')||['prompt','model'].includes(key))continue;
    const required=(s.required||[]).includes(key);
@@ -37,6 +40,12 @@ function type(p,v){const t=p.nativeType||(p.type==='BOOLEAN'?'boolean':['INTEGER
 function validate(m,prompt,values,media){
  if(m.unsupported?.length)return 'Entradas aún no compatibles: '+m.unsupported.join(', ');
  if(m.promptRequired!==false&&!prompt.trim())return 'Escribe un prompt.';
+ for(const [key,limit] of Object.entries(m.textLimits||{})){
+  const raw=key==='prompt'?prompt.trim():values[key];if(raw==null||raw==='')continue;
+  const count=Array.from(String(raw)).length;
+  if(limit.maximum!=null&&count>limit.maximum)return label(key)+': '+count+' caracteres; maximo '+limit.maximum+'.';
+  if(limit.minimum!=null&&count<limit.minimum)return label(key)+': minimo '+limit.minimum+' caracteres.';
+ }
  for(const f of m.fields){const items=media.filter(x=>x.field===f.key);if((f.required&&!items.length)||items.length<(f.minItems||0))return 'Añade '+f.label.toLowerCase()+'.';if(items.length>f.maximum)return f.label+': máximo '+f.maximum+'.';if(items.some(x=>!x.mime.startsWith(f.mime.split('/')[0]+'/')))return 'Revisa el formato de '+f.label.toLowerCase()+'.';}
  for(const p of m.parameters){const v=values[p.key];if(v==null||String(v).trim()===''){if(p.isRequired)return 'Completa '+p.displayName+'.';continue;}try{const n=type(p,v);if(p.options?.length&&!p.options.includes(String(v)))return 'El valor de '+p.displayName+' no está admitido.';if(p.minValue!=null&&Number(n)<p.minValue||p.maxValue!=null&&Number(n)>p.maxValue)return 'Revisa los límites de '+p.displayName+'.';}catch(e){return e.message;}}
  if(media.some(x=>!m.fields.some(f=>f.key===x.field)))return 'Hay archivos que no corresponden a este modelo.';

@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const E=require('../ui/engine.js');
+const base={id:'test',providerId:'atlas_cloud',modalities:['IMAGE'],parameters:[],schemaUrl:'https://example.test/schema'};
+const make=properties=>E.normalize(base,{components:{schemas:{Input:{properties}}}});
+const m=make({prompt:{type:'string',minLength:1,maxLength:3},negative_prompt:{type:'string',maxLength:2}});
+assert.equal(m.textLimits.prompt.maximum,3);
+assert.equal(m.textLimits.prompt.source,base.schemaUrl);
+assert.equal(E.validate(m,'abc',{},[]),null);
+assert.match(E.validate(m,'abcd',{},[]),/maximo 3/);
+assert.equal(E.validate(m,'\u{1f600}ab',{},[]),null);
+assert.match(E.validate(m,'a',{negative_prompt:'abc'},[]),/maximo 2/);
+assert.throws(()=>E.payload(m,'abcd',{},[]),/maximo 3/);
+assert.equal(make({prompt:{type:'string'}}).textLimits.prompt.maximum,null);
+assert.equal(E.validate(make({prompt:{type:'string'}}),'a'.repeat(10000),{},[]),null);
+assert.deepEqual(E.normalize(base).textLimits,{});
+assert.equal(E.validate(make({prompt:{type:'string',maxLength:0}}),'',{},[]),null);
+console.log('PASS: 11 text-limit assertions, including Unicode, unknown and payload guard');

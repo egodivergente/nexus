@@ -29,8 +29,11 @@ for name in ("jdk17","android-sdk"):
 for rel in ("wrapper","caches/modules-2","caches/jars-9","caches/transforms-4"):
     src=old/"gradle-home"/rel
     if src.is_dir(): shutil.copytree(src,new/"gradle-home"/rel,symlinks=True,dirs_exist_ok=True)
+(state/"bin").mkdir(exist_ok=True)
+shutil.copy2(state/"aapt2-arm64",state/"bin/aapt2")
+if sha(state/"aapt2-arm64") != sha(state/"bin/aapt2"): raise ValueError("AAPT2 copy mismatch")
 record={"source":str(old),"destination":str(new),"verified_tool_files":counts,
-        "aapt2_sha256":sha(state/"aapt2-arm64"),"backup_untouched":True}
+        "aapt2_sha256":sha(state/"bin/aapt2"),"aapt2_path":str(state/"bin/aapt2"),"backup_untouched":True}
 (state/"toolchain-restoration.json").write_text(json.dumps(record,indent=2))
 unit='''[Unit]
 Description=Private Pixel ecosystem build SSH
