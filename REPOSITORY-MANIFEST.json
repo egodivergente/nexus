@@ -2068,8 +2068,8 @@
     "bytes": 1962
   },
   "desktop/ui/app.js": {
-    "sha256": "46e2a0b553335784f2a0ea0c87a26082c0df6472f0dbbaccdbd93697d08fc3a9",
-    "bytes": 33289
+    "sha256": "c4e266c8ee78c71fed98dddaf8afb36032ceb5c469d3804dbdf0ca520aa83aa1",
+    "bytes": 33767
   },
   "desktop/ui/assistant.css": {
     "sha256": "3ecab2cb6950792d0c6e40b44bc99dee28de7de07589a4d95c62a62646c4013f",
@@ -2100,8 +2100,8 @@
     "bytes": 1659
   },
   "desktop/ui/local-bridge.js": {
-    "sha256": "0800ee89fabc1a9aafdb7b4267813adfea3762495283187cd6fe2e7ad2afd4ed",
-    "bytes": 1147
+    "sha256": "d27664f4fc714e1aca1303741b1045ec2a9cbcc12e8c60b6f892e77bc2977b0d",
+    "bytes": 1171
   },
   "desktop/ui/logos/anthropic.png": {
     "sha256": "b3bfc6a5ef9127ac407d05eb5bd56d6950adf43374031fd3d452671672a8683a",
@@ -2272,8 +2272,8 @@
     "bytes": 403
   },
   "SOURCE-MANIFEST.json": {
-    "sha256": "d782fac521293b2b512b7ac275809ec6e18c8c3c4f56de838cd84746bae63428",
-    "bytes": 197782
+    "sha256": "0ad62dd29e9805198d9b5da04a0d4bd59d8708a5948d88c3e181b407696a2dc7",
+    "bytes": 198494
   },
   "tools/ecosystem-build/guard-proof.py": {
     "sha256": "2b26c8969308b68c114c5d0d49775eff65c3cba0e52e64254e1de3a9d71b46f0",
@@ -2288,8 +2288,8 @@
     "bytes": 4274
   },
   "tools/ecosystem-build/install.py": {
-    "sha256": "7a265f60af514b7e59442e84e756e8cdfa98ce89c1922f3eef98e6a7c31955d0",
-    "bytes": 8357
+    "sha256": "5612ecf72cb8775be2486a857fb4f44d2c4e7fc8b80412b359f074b9bd9a0e58",
+    "bytes": 10096
   },
   "tools/ecosystem-build/nodes.json": {
     "sha256": "ffa73cfb96981aa891885ca98218c26c07090e70458754c56951a7fe53794cef",
@@ -2308,8 +2308,8 @@
     "bytes": 10191
   },
   "tools/ecosystem-build/README.md": {
-    "sha256": "1b4682a56580a843840b5243934ead0ac95d740ea61dab688a72e63a9a013874",
-    "bytes": 16244
+    "sha256": "ae0bff64d1cc7e3a873b85ce16e2fbcd0e3129e89e820acd79d3e5812b29f766",
+    "bytes": 16842
   },
   "tools/ecosystem-build/recipes/guard-proof-linux.json": {
     "sha256": "d652bfe8c6ede78e1c3f831c8d9ff8af936c729fdc301cd744d45d4ca07479d3",
@@ -2371,9 +2371,13 @@
     "sha256": "c71f44540e4bc0f6bd85b2e1f7cd0b2966cab522ada6cb8e83736c3667880cea",
     "bytes": 47
   },
+  "tools/flow-bridge/AGENTS.md": {
+    "sha256": "3e30ad5583b7e238a7612ad8f48c30c9101b650af7bb3ce7da8bd67871c1c1c7",
+    "bytes": 930
+  },
   "tools/flow-bridge/bridge_tools.py": {
-    "sha256": "4074bda5bf204472e56a207cf0cdfec203341742734ffc736c2b271089678279",
-    "bytes": 9604
+    "sha256": "5daffbcae90c699839667d50a10b625b0b8b6f2ad2f05d234e4ee3974aa98266",
+    "bytes": 9622
   },
   "tools/flow-bridge/client.py": {
     "sha256": "a3886d7a88c2e767afd8440a092bdd35b931ca41d9bc8f4cccb6d76260292ebe",
@@ -2387,17 +2391,25 @@
     "sha256": "ce2d7aead051b4f2d97c9ee7a3ff6b8865b2dc48e5f96439c608b7c2c7fa704b",
     "bytes": 1145
   },
+  "tools/flow-bridge/install.ps1": {
+    "sha256": "69db0799a4353f30038b80356b09f18d81a1c343a6e6c880e8ce9680ba30cd2a",
+    "bytes": 1888
+  },
   "tools/flow-bridge/launcher.py": {
     "sha256": "ab326efbb1e9eaacff288e03fa3187c73ee2b7193ef5181664ffa1586c39d05c",
     "bytes": 1123
   },
   "tools/flow-bridge/PLAN.md": {
-    "sha256": "771315d662e266255beb52cbc6cefb096ce1251c5f8584692695d095ad5d0f95",
-    "bytes": 1212
+    "sha256": "13b49252f84c5a46d9fa99bbc832725234994781e60281e54a2ea84608dd6e80",
+    "bytes": 2268
   },
   "tools/flow-bridge/probe_model.py": {
-    "sha256": "42a6f3a2d3d385650dc6fbaad0a5cc34981daacf9c11292126d5924a6c4da1cd",
-    "bytes": 3583
+    "sha256": "a94903dbf9e3783a9adb33b44de2ddd8dcc8410393e287b780d61d71d7ea8194",
+    "bytes": 3753
+  },
+  "tools/flow-bridge/README.md": {
+    "sha256": "cdcf900ea4404f584d81d9679a048019d8068c1ab4dd0f2e602a409a6023570a",
+    "bytes": 6896
   },
   "tools/flow-bridge/recover_image.py": {
     "sha256": "8a55cf3a9c30205488d88bccc14d29bb65cdfc61882af7564ce88fdacf85c33e",

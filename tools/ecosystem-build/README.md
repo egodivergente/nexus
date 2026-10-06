@@ -43,6 +43,8 @@ python $router collect JOB_ID --dest 'C:/Users/User/Documents/ChatGPT/NEXUS/outp
 
 La habilidad y la regla global de Codex aplican este procedimiento a nuevas peticiones. No intercepta compiladores lanzados manualmente ni sustituye reglas de otros asistentes. La carga global de instrucciones se hace al iniciar la conversación, según la [documentación oficial de AGENTS.md](https://developers.openai.com/codex/guides/agents-md/).
 
+Al cerrar un encargo, Codex debe actualizar el repositorio GitHub correspondiente con sus cambios versionables y verificar el commit publicado en la rama o PR del proyecto. Esta es una obligación del flujo de trabajo, no un push automático desde el worker remoto: se revisan las fuentes originales, se preserva trabajo ajeno y se excluyen credenciales, cachés y outputs privados. Sin cambios, se comprueba la sincronización sin commits vacíos. Un commit local no demuestra que GitHub esté actualizado. Si falta remoto o acceso, se registra el impedimento y se solicita el destino necesario.
+
 ## Recetas de otros proyectos
 
 Crear un JSON con `kind: command`, `host_os`, `host_arch` si procede, `requires_tools`, `command` como lista de argumentos, `source_includes`, `artifacts` y presupuesto de RAM/disco. Declarar `low_impact: true` solo después de limitar el paralelismo y consumo del comando Windows; `max_memory_mb` define el techo del Job Object. La extensión EXE no determina por sí sola la plataforma: un compilador cruzado comprobado puede permitir Linux; PyInstaller o WebView2 pueden necesitar Windows según el producto.

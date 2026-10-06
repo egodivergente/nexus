@@ -11,3 +11,11 @@ Conectar Codex con la cuenta personal de Flow mediante el MCP de gflow-cli. La p
 7. Consultar el resultado desde una nueva conexión y confirmar que persiste. Un envío ambiguo se reconcilia con su trabajo; no se reenvía automáticamente.
 
 La configuración local de Codex no habilita por sí sola ChatGPT web o móvil. La incorporación del mismo puente a NEXUS Agent será una fase posterior.
+
+## Ejecución del 2026-10-06
+
+Pasos 1–5 completados. En el paso 6 se envió una generación real; gflow-cli falló al comparar el código del modelo. Se recuperó el JPEG de 1024 × 1024 desde el proyecto existente, con formato y SHA-256 verificados, sin repetir la generación.
+
+Paso 7 completado: recuperación por MCP desde una nueva conexión, respuesta estructurada con archivo local y repetición del mismo request_id sin otro trabajo nativo. Se incorporó una base SQLite de identificadores persistentes y un control previo al envío que reconoce el código observado `BELUGA`. La comprobación real de ese control se hizo abortando el RPC antes de Google.
+
+El recorrido de la última capa se ha comprobado con una generación nueva: petición MCP, control de modelo, trabajo nativo completado y JPEG de 1024 × 1024 recibido sin recuperación adicional. Dos generaciones reales enviadas en total. Vídeo y NEXUS Agent quedan NO PROBADO/PENDIENTE. Publicación GitHub pendiente de identificar un destino accesible; este checkout no tiene remoto.

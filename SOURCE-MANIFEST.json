@@ -2544,8 +2544,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\tools\\transfer-build\\dex\\classes.dex"
   },
   "desktop/ui/app.js": {
-    "sha256": "46e2a0b553335784f2a0ea0c87a26082c0df6472f0dbbaccdbd93697d08fc3a9",
-    "bytes": 33289,
+    "sha256": "c4e266c8ee78c71fed98dddaf8afb36032ceb5c469d3804dbdf0ca520aa83aa1",
+    "bytes": 33767,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\app.js"
   },
   "desktop/ui/assistant.css": {
@@ -2584,8 +2584,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\index.html"
   },
   "desktop/ui/local-bridge.js": {
-    "sha256": "0800ee89fabc1a9aafdb7b4267813adfea3762495283187cd6fe2e7ad2afd4ed",
-    "bytes": 1147,
+    "sha256": "d27664f4fc714e1aca1303741b1045ec2a9cbcc12e8c60b6f892e77bc2977b0d",
+    "bytes": 1171,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\local-bridge.js"
   },
   "desktop/ui/parity.js": {
@@ -2754,13 +2754,13 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\desktop\\ui\\logos\\wan.png"
   },
   "tools/ecosystem-build/README.md": {
-    "sha256": "1b4682a56580a843840b5243934ead0ac95d740ea61dab688a72e63a9a013874",
-    "bytes": 16244,
+    "sha256": "ae0bff64d1cc7e3a873b85ce16e2fbcd0e3129e89e820acd79d3e5812b29f766",
+    "bytes": 16842,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\README.md"
   },
   "tools/ecosystem-build/install.py": {
-    "sha256": "7a265f60af514b7e59442e84e756e8cdfa98ce89c1922f3eef98e6a7c31955d0",
-    "bytes": 8357,
+    "sha256": "5612ecf72cb8775be2486a857fb4f44d2c4e7fc8b80412b359f074b9bd9a0e58",
+    "bytes": 10096,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\install.py"
   },
   "tools/ecosystem-build/nodes.json": {
@@ -2904,8 +2904,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\.gitignore"
   },
   "tools/flow-bridge/PLAN.md": {
-    "sha256": "771315d662e266255beb52cbc6cefb096ce1251c5f8584692695d095ad5d0f95",
-    "bytes": 1212,
+    "sha256": "13b49252f84c5a46d9fa99bbc832725234994781e60281e54a2ea84608dd6e80",
+    "bytes": 2268,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\PLAN.md"
   },
   "tools/flow-bridge/client.py": {
@@ -2979,8 +2979,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\ecosystem-build\\recipes\\guard-proof-windows.json"
   },
   "tools/flow-bridge/bridge_tools.py": {
-    "sha256": "4074bda5bf204472e56a207cf0cdfec203341742734ffc736c2b271089678279",
-    "bytes": 9604,
+    "sha256": "5daffbcae90c699839667d50a10b625b0b8b6f2ad2f05d234e4ee3974aa98266",
+    "bytes": 9622,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\bridge_tools.py"
   },
   "tools/flow-bridge/image_guard.py": {
@@ -2989,8 +2989,8 @@
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\image_guard.py"
   },
   "tools/flow-bridge/probe_model.py": {
-    "sha256": "42a6f3a2d3d385650dc6fbaad0a5cc34981daacf9c11292126d5924a6c4da1cd",
-    "bytes": 3583,
+    "sha256": "a94903dbf9e3783a9adb33b44de2ddd8dcc8410393e287b780d61d71d7ea8194",
+    "bytes": 3753,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\probe_model.py"
   },
   "tools/flow-bridge/recover_image.py": {
@@ -3007,5 +3007,20 @@
     "sha256": "a75997f9d2cbf268b070db41728c26c68b6912ff20d0d5c7386bd6a8a0e84780",
     "bytes": 1284,
     "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\test_image_guard.py"
+  },
+  "tools/flow-bridge/AGENTS.md": {
+    "sha256": "3e30ad5583b7e238a7612ad8f48c30c9101b650af7bb3ce7da8bd67871c1c1c7",
+    "bytes": 930,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\AGENTS.md"
+  },
+  "tools/flow-bridge/README.md": {
+    "sha256": "cdcf900ea4404f584d81d9679a048019d8068c1ab4dd0f2e602a409a6023570a",
+    "bytes": 6896,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\README.md"
+  },
+  "tools/flow-bridge/install.ps1": {
+    "sha256": "69db0799a4353f30038b80356b09f18d81a1c343a6e6c880e8ce9680ba30cd2a",
+    "bytes": 1888,
+    "source": "C:\\Users\\User\\Documents\\ChatGPT\\NEXUS\\tools\\flow-bridge\\install.ps1"
   }
 }

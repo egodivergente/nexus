@@ -3,9 +3,11 @@
 Uses an existing dedicated test project. Persists only a redacted structural tree.
 """
 import asyncio
+import argparse
 import json
 import os
 import re
+from pathlib import Path
 from urllib.parse import parse_qs
 from launcher import ROOT, environment
 
@@ -25,7 +27,7 @@ def safe_tree(value):
         return f"[string:{len(value)}]"
     return value
 
-async def main():
+async def main(args):
     os.environ.update(environment())
     from runtime_compat import install
     install()
@@ -59,7 +61,7 @@ async def main():
                     await route.continue_()
             await page.route("**/*batchexecute*", intercept)
             composer = MigratedComposer()
-            await composer.ensure_editor(page, "7704e246-225a-40a9-8479-15c478a19b8f")
+            await composer.ensure_editor(page, args.project)
             request = GenerateImageRequest(prompt="Flow bridge inspection. Do not generate.",
                 model=Model.NARWHAL, aspect=Aspect.SQUARE, count=1)
             await composer.apply_image_settings(page, request)
@@ -72,10 +74,13 @@ async def main():
                 await page.wait_for_timeout(500)
             if not evidence:
                 raise RuntimeError("No aborted request was observed")
-            (ROOT / "model-probe.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+            Path(args.output).write_text(json.dumps(evidence, indent=2), encoding="utf-8")
             print(json.dumps(evidence, indent=2))
         finally:
             await ctx.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--project", required=True)
+    parser.add_argument("--output", required=True)
+    asyncio.run(main(parser.parse_args()))

@@ -21,6 +21,7 @@ if (!window.chrome?.webview) {
         });
         reply = await response.json();
       } catch (error) {
+        session = null;
         reply = {id: message.id, ok: false, error: error.message || 'No se pudo conectar con Nexus local.'};
       }
       for (const callback of listeners) callback({data: reply});

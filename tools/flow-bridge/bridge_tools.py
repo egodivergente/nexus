@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 import sqlite3
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 from pathlib import Path
 from typing import Any
 from launcher import ROOT
@@ -51,7 +51,7 @@ def native_task(task_id):
     path = ROOT / "state" / "gflow.db"
     if not path.exists():
         return None
-    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute("SELECT * FROM generation_queue WHERE task_id=? AND profile_name='nexus'",
             (task_id,)).fetchone()

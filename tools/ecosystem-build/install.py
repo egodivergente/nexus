@@ -32,6 +32,7 @@ Configuración: `nodes.json` junto a la herramienta. Detalles y recetas: `README
 2. Ejecutar `python <router.py> plan --recipe <receta.json> --source <proyecto>`. Revisa recursos actuales y tiempos reales comparables por proyecto/variante/ejecutor. Distingue tareas con y sin caché; sin muestras comparables mantiene la política de recursos. Las previsiones no garantizan duración. Si SSH falla, consultar Desktop Commander `list_devices` y usar `probe-command --node asus` a través de su `start_process`; conservar la misma identidad y protocolo de trabajo.
 3. Ejecutar `submit` con esa receta y el código actual. Si no hay nodo apto, mantener la tarea pendiente y reevaluar con `--wait-seconds 60`; no ignorar los bloqueos ni iniciar otra compilación. Si el estado de un envío es ambiguo, consultar su job_id; nunca repetirlo a ciegas. La herramienta vuelve a comprobar recursos antes de arrancar.
 4. Seguir `status <job_id> --tail 20` y terminar con `collect <job_id> --dest <directorio>`. El worker vigila recursos durante el trabajo: Windows baja CPU al 5 % con interacción; Linux/Android pausa por uso/calor y cancela por falta de RAM o pausa prolongada. El relé móvil depende del ordenador lanzador; sin telemetría fresca se pausa. Comprobar éxito, manifiestos y SHA-256. No duplicar trabajos pausados. Informar del nodo elegido, resultado y limitaciones sin extenderse. Instalar o probar el producto únicamente si forma parte del encargo.
+5. Actualizar el GitHub del proyecto con los cambios versionables del encargo y verificar el commit publicado en su rama o PR. La instrucción del usuario autoriza la actualización rutinaria. Un commit local no es sincronización. Mantener fuera credenciales, backups, cachés y outputs privados; conservar cambios ajenos e historial remoto. Sin cambios, comprobar sincronización sin commits vacíos. Si falta remoto/acceso, aclarar el destino y dejar constancia de lo pendiente, sin inventar un repositorio.
 
 ASUS y Pixel son dedicados y tienen preferencia cuando son compatibles y están libres. EliteBook: ventanas ocultas, Job Object con CPU al 15 %, memoria limitada y prioridad baja. S25: solo ejecutor de fondo verificado, pantalla apagada, temperatura y batería adecuadas. No abrir Terminal/Termux ni inyectar teclas para cada compilación automática. El Pixel usa Termux nativo por SSH privado sobre ADB; su Linux nativo está actualizado y conservado, pero fuera de la ruta automática por ANR de Terminal. Consultar nodes.local.json y README.md. La configuración inicial del Pixel dedicado forma parte del encargo de montar el sistema, comprobando que está libre y validando después el canal en segundo plano. No despertar el S25, arrancar emuladores ni cambiar ADB a tcpip.
 
@@ -69,6 +70,15 @@ elif "## Compilaciones y pruebas: selector del ecosistema" in existing:
     updated=existing
 else:
     updated=existing.rstrip()+"\n\n"+new
+github_heading="## GitHub: actualización obligatoria"
+github_rule='''## GitHub: actualización obligatoria
+
+Al finalizar cualquier tarea que modifique código, configuración o documentación versionable, actualizar el repositorio GitHub correspondiente: revisar el diff, incluir los cambios del encargo, crear el commit y publicarlo en la rama adecuada mediante push o el flujo de PR del proyecto. Esta instrucción del usuario autoriza la actualización rutinaria; no pedir confirmación de nuevo. Verificar que GitHub contiene el commit publicado y comunicar el enlace o SHA. Un commit local no cuenta como sincronización. Si no hay cambios pendientes, comprobar la sincronización sin crear commits vacíos.
+
+Conservar cambios de otras tareas y el historial remoto. No incluir indiscriminadamente el workspace con git add . ni usar force-push; excluir credenciales, claves, backups, cachés y outputs privados. Cuando falte remoto, acceso o haya conflictos, resolver lo posible y explicar qué queda pendiente; pedir únicamente el dato que falte para identificar el destino. No afirmar que GitHub está actualizado si no se verificó.
+'''
+if github_heading not in updated:
+    updated=updated.rstrip()+"\n\n"+github_rule
 if updated!=existing:
     if global_agents.exists():
         backup=global_agents.with_name("AGENTS.md.before-ecosystem-"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+".bak")
