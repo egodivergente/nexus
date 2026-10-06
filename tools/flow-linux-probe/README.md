@@ -48,3 +48,25 @@ systemd-run --user --wait --pipe --collect \
 Optional `--signin` follows the page-provided Sign in URL to Google's login
 page; it never enters credentials. Reports and screenshots stay in the
 private runtime directory, not Git. Do not run against an interactive profile.
+
+## Temporary interactive login
+
+`login.py` starts ordinary sandboxed Chromium with the same isolated profile,
+x11vnc and noVNC. Debian packages `x11vnc`, `novnc`, `websockify` and their
+dependencies were installed (11.4 MB). No Google credentials are scripted.
+
+- VNC binds only `127.0.0.1:5909`; IPv6 is explicitly disabled with `-no6`.
+  Initial verification detected a wildcard IPv6 listener, stopped that run,
+  corrected the flag, and verified the restarted listeners were loopback only.
+- Web access binds `127.0.0.1:6099`. Existing authenticated SSH forwards it
+  to `127.0.0.1:6199` on the user's Windows PC. No public endpoint.
+- A random per-run VNC password is kept in mode-0600 files, outside Git.
+- Run under a transient systemd user unit with `MemoryMax=1200M`,
+  `CPUQuota=100%`, `Nice=10`, `RuntimeMaxSec=1200`, `TimeoutStopSec=10`.
+- Native Chromium is not launched with automation flags or disabled sandbox.
+- Interactive noVNC connection and visible Flow page verified in Codex.
+  User sign-in and authenticated Flow operations remain pending.
+
+Close only this task's session with `systemctl --user stop nexus-flow-login`.
+Stop its Windows SSH forwarding process separately after user handoff ends.
+Do not launch the automated probe while this profile is open interactively.
