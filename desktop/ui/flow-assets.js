@@ -14,6 +14,18 @@ function flowArguments(model,values,media=[]){
 // Keep the existing providers available, while opening an owned Flow model's
 // selector on that account. Apply after the Studio wrappers have loaded.
 document.addEventListener('DOMContentLoaded',()=>{
+ const assistantBefore=renderAssistant;
+ renderAssistant=function(){assistantBefore();
+  for(const plan of Agent.snapshot?.plans||[]){
+   const job=state.jobs.find(j=>j.agentPlanId===plan.plan.id&&j.providerId==='google_flow');
+   const card=document.querySelector('[data-agent-generate="'+CSS.escape(plan.plan.id)+'"]')?.closest('.agent-plan');
+   if(job&&card)card.insertAdjacentHTML('beforeend',flowAgentResult(job));
+  }
+ };
+ const refreshBefore=refreshJobViews;
+ refreshJobViews=function(ids){refreshBefore(ids);
+  if(view==='assistant'&&!Agent.busy&&state.jobs.some(j=>j.agentPlanId&&ids.includes(j.id)))renderAssistant();
+ };
  const detailBefore=studioDetails;
  studioDetails=function(id){detailBefore(id);const job=state.jobs.find(j=>j.id===id);
   const actions=document.querySelector('.studio-detail-actions');
@@ -29,6 +41,14 @@ document.addEventListener('DOMContentLoaded',()=>{
  const renderBefore=renderCanvas;
  renderCanvas=function(){renderBefore();scheduleFlowAvailability();};
 });
+function flowAgentResult(job){
+ const labels={COMPLETED:'Completado',FAILED:'Revisar envío',SENDING:'Envío sin confirmar',QUEUED:'En cola',GENERATING:'Generando',PROCESSING:'Procesando'};
+ const output=job.outputs?.[0],url=typeof output==='string'?output:output?.url;
+ const local=typeof url==='string'&&/^\/media\/[a-f0-9]{32}\.(png|jpe?g|webp|gif|mp4|webm)$/.test(url);
+ const ready=job.status==='COMPLETED'&&local;
+ const preview=ready?(job.modality==='VIDEO'?'<video src="'+escape(url)+'" controls preload="metadata" style="width:100%;max-height:480px"></video>':'<img src="'+escape(url)+'" alt="Resultado de '+escape(job.name||job.modelId)+'" style="width:100%;max-height:480px;object-fit:contain">'):'';
+ return '<div class="flow-agent-result" aria-live="polite"><p role="status">'+escape(labels[job.status]||job.status)+' · Google Flow</p>'+preview+(ready?'<a href="'+escape(url)+'" download>Guardar resultado</a>':'')+(job.error?'<p class="error">'+escape(job.error)+'</p>':'')+'</div>';
+}
 let flowAvailabilityTimer,flowAvailabilityKey='',flowAvailabilityExpiry,flowAvailabilityValue=null,flowAvailabilityVerifiedKey='';
 function scheduleFlowAvailability(){
  clearTimeout(flowAvailabilityTimer);

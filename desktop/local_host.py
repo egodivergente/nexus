@@ -358,7 +358,8 @@ def dispatch(keys, operation, args):
     if operation == 'agentEvents':
         return agent_host().events(args.get('owner'))
     if operation == 'agentReply':
-        return agent_host().reply(args)
+        from flow_agent import reply
+        return reply(agent_host(), args, read_state())
     if operation == 'init':
         import flow_provider
         flow_models = flow_provider.catalog()
