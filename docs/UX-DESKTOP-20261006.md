@@ -72,3 +72,23 @@ success with offline=false and us.anthropic.claude-sonnet-4-6 configured.
 NO PROBADO: live model inference, paid generation, all causes of historical fetch
 errors, screen reader and stability over extended use. No build/restart of the
 user's active instance was performed; existing windows require a frontend reload.
+
+## Visible account balances
+
+Added a persistent balance strip below the main header in every view. Configured
+providers show their own units, reading time and a manual refresh control. Initial
+loading queries only read-only balance endpoints, once per window; rendering does
+not duplicate requests. Unsupported providers show unavailable, never a fake zero.
+On refresh failure, an earlier value remains explicitly marked as the last datum.
+Settings account queries use the same parser and presentation.
+
+Live read-only checks on 2026-10-06 succeeded for Atlas, Runway and Crun. Atlas
+returns available.value plus available.currency, not a scalar available field;
+this nested response is now parsed correctly. No account identifiers or tokens
+were copied into this report or the source. Flow balance remains unsupported.
+
+PASS: tests cover nested/string amount, true zero, failure/unavailable, a single
+strip across rerenders, and visible responsive balances at 1360/760/480px.
+PASS: assistant keyboard and loopback-restart regression suite after this change.
+No compilation/package or paid generation was performed. No claim is made about
+provider balances staying unchanged after the reading or about a combined total.

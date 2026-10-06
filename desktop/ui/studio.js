@@ -2,6 +2,7 @@
 const reviewScript=document.createElement('script');
 reviewScript.src='review.js';
 document.head.append(reviewScript);
+const balanceScript=document.createElement('script');balanceScript.src='balances.js';document.head.append(balanceScript);
 const Studio={tab:'results',detail:null,pickerQuery:'',pickerKind:'IMAGE',reference:null};
 const openBeforeStudio=openModel;
 openModel=async function(id,reset=true){

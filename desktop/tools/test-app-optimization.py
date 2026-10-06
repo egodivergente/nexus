@@ -26,7 +26,26 @@ try:
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.route('https://**/*',lambda route:route.abort())
         page.goto(f"http://127.0.0.1:{s['port']}/")
-        page.wait_for_function("typeof reviewImages==='function'")
+        page.wait_for_function("typeof reviewImages==='function'&&typeof refreshBalances==='function'&&window.nexusQA")
+        balances=page.evaluate("""async()=>{
+          const original=rpc,configured=initial.configured;let calls=0;
+          initial.configured=['atlas_cloud','runway','crun','google_flow'];
+          rpc=async(op,args)=>{calls++;if(args.provider==='atlas_cloud')return {data:{available:{value:'25.019026',currency:'usd'}}};if(args.provider==='runway')return {creditBalance:0};throw Error('QA unavailable');};
+          try{
+            await Promise.all([refreshBalances(),refreshBalances()]);render();render();
+            return {calls,bars:document.querySelectorAll('#account-balances').length,text:document.querySelector('#account-balances').textContent};
+          }finally{rpc=original;initial.configured=configured;renderBalances();}
+        }""")
+        assert balances['calls']==3 and balances['bars']==1,balances
+        assert '25,019' in balances['text'] and '0 créditos' in balances['text'],balances
+        assert balances['text'].count('No disponible')==2,balances
+        page.evaluate("initial.configured=['atlas_cloud','runway','crun','google_flow'];renderBalances()")
+        for width in (1360,760,480):
+            page.set_viewport_size({'width':width,'height':900})
+            assert page.locator('#account-balances').is_visible()
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.screenshot(path=str(data/f'balances-{width}.png'))
+        page.evaluate('initial.configured=[];renderBalances()')
         result=page.evaluate("""async()=>{
           Agent.snapshot={offline:false,index:{projects:[]},plans:[],proposals:[],skills:[]};
           Agent.draft='Conservar mi borrador';Agent.attachments=[{id:'test',url:'/media/test',mime:'image/png'}];
