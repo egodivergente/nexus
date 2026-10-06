@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
+                    topBar = { com.vidadomu.nexus.ui.accounts.AccountBalanceBar() },
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)
                     }

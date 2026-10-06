@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -471,9 +473,12 @@ private fun InputBar(ui: AssistantUiState, text: String, onInput: (String) -> Un
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar imagen o vídeo") }
-                OutlinedTextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Describe el plano, la escena…") }, maxLines = 5)
+                OutlinedTextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Describe el plano, la escena…") }, maxLines = 5,
+                    enabled = !ui.thinking,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { if (!ui.thinking && !ui.attaching && (text.isNotBlank() || ui.pendingAttachments.isNotEmpty())) onSend() }))
                 if (ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar") }
-                else IconButton(onClick = onSend, enabled = text.isNotBlank() || ui.pendingAttachments.isNotEmpty()) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar") }
+                else IconButton(onClick = onSend, enabled = !ui.attaching && (text.isNotBlank() || ui.pendingAttachments.isNotEmpty())) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar") }
             }
         }
     }

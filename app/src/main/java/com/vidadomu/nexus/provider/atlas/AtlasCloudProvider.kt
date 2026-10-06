@@ -471,7 +471,9 @@ class AtlasCloudProvider(
                 val bonusObj = jsonElement["bonus"] as? JsonObject
                 val frozenObj = jsonElement["frozen"] as? JsonObject
 
-                val avail = (availObj?.get("value") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull() ?: 0.0
+                val avail = (availObj?.get("value") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+                    ?.takeIf { it.isFinite() && it >= 0.0 }
+                    ?: return@withContext Result.failure(ProviderError("Atlas no ha devuelto un saldo disponible válido."))
                 val cash = (cashObj?.get("value") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull() ?: avail
                 val bonus = (bonusObj?.get("value") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull() ?: 0.0
                 val frozen = (frozenObj?.get("value") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull() ?: 0.0
