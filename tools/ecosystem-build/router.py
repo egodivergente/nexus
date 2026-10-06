@@ -17,6 +17,7 @@ import uuid
 from pathlib import Path
 from probe import probe, run, cap_android_ram
 from worker import compatible, digest, save
+from history import signature, samples, estimate
 
 ROOT = Path(__file__).resolve().parent
 STATE = Path.home()/".codex"/"build-state"
@@ -200,7 +201,7 @@ def ecosystem():
     return results
 
 
-def decision(recipe, results, preferred=None):
+def decision(recipe, results, preferred=None, timings=None, source_signature=None, cache_mode="auto"):
     candidates=[]
     for node,metrics in results.values():
         if node["transport"]=="android" and not metrics.get("background_executor"):
@@ -214,16 +215,28 @@ def decision(recipe, results, preferred=None):
         if not node.get("dedicated") and metrics.get("interactive",True): score-=40
         if preferred and preferred==node["id"]: score+=1000
         if recipe.get("prefer") == node["id"]: score+=10
-        candidates.append({"node":node["id"],"label":node["label"],"eligible":not why,"reasons":why,"score":round(score,1),"metrics":metrics})
+        timing=estimate(timings or [],node,source_signature,cache_mode)
+        if timing["estimate"]:
+            timing["adjusted_seconds"]=round(timing["estimate"]["seconds"] / max(.25,1-(metrics.get("cpu_percent") or 0)/100),2)
+        candidates.append({"node":node["id"],"label":node["label"],"eligible":not why,"reasons":why,"score":round(score,1),"metrics":metrics,
+                           "dedicated":bool(node.get("dedicated")),"timing":timing})
     ready=sorted((c for c in candidates if c["eligible"]),key=lambda c:c["score"],reverse=True)
+    selection_basis="live_resource_policy"
+    pool=[c for c in ready if c["dedicated"]] or ready
+    if not preferred and len(pool)>1 and all(c["timing"]["estimate"] for c in pool) and len({c["timing"]["basis"] for c in pool})==1:
+        fastest=min(pool,key=lambda c:c["timing"]["adjusted_seconds"])
+        ready=[fastest]+[c for c in ready if c is not fastest]
+        selection_basis="observed_build_times_with_live_load"
     return {"measured_at":time.time(),"selected":ready[0]["node"] if ready else None,"candidates":candidates,
-            "state":"ready" if ready else "waiting","policy":"compatibilidad, reserva de recursos y prioridad de equipos dedicados"}
+            "state":"ready" if ready else "waiting","selection_basis":selection_basis,"cache_mode":cache_mode,
+            "source_signature":source_signature,"explicit_preference":preferred,
+            "policy":"compatibilidad, reservas y uso; tiempos comparables entre equipos dedicados disponibles"}
 
 
 EXCLUDED_DIRS={".git",".gradle",".idea",".venv","venv","node_modules","build","dist","outputs","entregas","__pycache__",".codex-remote-attachments"}
 
 
-def snapshot(source, includes, job):
+def source_files(source, includes):
     if not includes: raise ValueError("indicar source_includes; no enviar todo el directorio por defecto")
     files={}
     for include in includes:
@@ -237,6 +250,11 @@ def snapshot(source, includes, job):
             if not p.is_file(): continue
             if p.name=="local.properties" or p.name.startswith(".env") or p.suffix.lower() in {".keystore",".jks",".pem",".key",".p12",".pfx"}: continue
             files[rel.as_posix()]=p
+    return files
+
+
+def snapshot(source, includes, job):
+    files=source_files(source,includes)
     manifest={}
     # Hash the actual archived bytes: source edits during transfer never create an ambiguous snapshot.
     with tarfile.open(job/"source.tar","w") as archive:
@@ -251,25 +269,32 @@ def snapshot(source, includes, job):
 
 
 def start_job(source,recipe,choice,results):
-    node=results[choice["selected"]][0]
     jobid=datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")+"-"+uuid.uuid4().hex[:8]
     job=STATE/"jobs"/jobid; job.mkdir(parents=True)
     archive_sha=snapshot(source,recipe["source_includes"],job)
+    actual_signature=signature(json.loads((job/"source-manifest.json").read_text()))
+    if choice.get("source_signature") and choice["source_signature"]!=actual_signature:
+        choice=decision(recipe,results,choice.get("explicit_preference"),samples(STATE,source,recipe),actual_signature,choice.get("cache_mode","auto"))
+        choice["source_changed_during_plan"]=True
+    node=dict(results[choice["selected"]][0])
+    remote=node["state_root"].rstrip("/")+"/jobs/"+jobid if node["transport"]=="ssh" else str(job)
+    if node.get("device_kind")=="android":
+        node["device_metrics_file"]=remote+"/device-health.json"
     save(job/"request.json",{"node":node,"recipe":recipe,"source_path":str(source),"source_archive_sha256":archive_sha})
     save(job/"decision.json",choice)
-    for name in ("worker.py","probe.py"): shutil.copy2(ROOT/name,job/name)
-    remote=node["state_root"].rstrip("/")+"/jobs/"+jobid if node["transport"]=="ssh" else str(job)
+    for name in ("worker.py","probe.py","guard.py","history.py"): shutil.copy2(ROOT/name,job/name)
     record={"job_id":jobid,"node":node,"job_path":remote,"local_path":str(job),"state":"staging"}
     save(job/"record.json",record)
     if node["transport"]=="ssh":
         ssh(node,"umask 077; mkdir -p "+shlex.quote(remote))
-        for name in ("source.tar","source-manifest.json","request.json","worker.py","probe.py"):
+        for name in ("source.tar","source-manifest.json","request.json","worker.py","probe.py","guard.py","history.py"):
             scp(node,job/name,remote+"/"+name)
         if node.get("device_metrics_file"):
             bridgeid=results[node["id"]][1]["adb_bridge"]
             bridge=results[bridgeid][0]
             health=adb_inventory(bridge,[node]).get(node["id"])
             if not health: raise ValueError("se perdió la identidad ADB del móvil durante la preparación")
+            health["job_id"]=jobid
             save(job/"device-health.json",health)
             scp(node,job/"device-health.json",node["device_metrics_file"])
         cmd="nohup "+" ".join(shlex.quote(s) for s in [node.get("python","python3"),remote+"/worker.py",remote])+" >"+shlex.quote(remote+"/worker.log")+" 2>&1 </dev/null &"
@@ -278,6 +303,7 @@ def start_job(source,recipe,choice,results):
         try: ssh(node,cmd,12)
         except Exception as e:
             record.update(state="dispatch_unknown",reason=str(e)); save(job/"record.json",record)
+            launch_relay(record)
             return record
     else:
         p=subprocess.Popen([sys.executable,str(job/"worker.py"),str(job)],stdout=open(job/"worker.log","wb"),
@@ -285,7 +311,48 @@ def start_job(source,recipe,choice,results):
             start_new_session=os.name!="nt")
         record["worker_pid"]=p.pid
     record["state"]="dispatched"; save(job/"record.json",record)
+    launch_relay(record)
     return record
+
+
+def launch_relay(record):
+    if record["node"].get("device_kind")=="android":
+        job=Path(record["local_path"])
+        relay=subprocess.Popen([sys.executable,str(ROOT/"router.py"),"relay",record["job_id"]],
+            stdout=open(job/"relay.log","wb"),stderr=subprocess.STDOUT,
+            creationflags=(0x08000000|0x200|0x4000) if os.name=="nt" else 0,start_new_session=os.name!="nt")
+        record["relay_pid"]=relay.pid; save(job/"record.json",record)
+
+
+def relay_health(record):
+    """Finite per-job ADB relay; no resident service, UI or worker dispatch."""
+    node=record["node"]; local=Path(record["local_path"])
+    hosts=[n for n in config() if n["transport"]!="android" and (n["transport"]=="local" or n.get("adb"))]
+    deadline=time.monotonic()+12*3600
+    unknown_since=None
+    while time.monotonic()<deadline:
+        try:
+            result=status(record)
+            if result.get("state") in {"succeeded","failed","deferred"}: return
+            if "worker desaparecido" in result.get("reason",""): return
+            if result.get("state")=="unknown":
+                unknown_since=unknown_since or time.monotonic()
+                if time.monotonic()-unknown_since>=300: return
+            else: unknown_since=None
+            health=None
+            for bridge in hosts:
+                health=adb_inventory(bridge,[node]).get(node["id"])
+                if health: break
+            if health:
+                health["job_id"]=record["job_id"]
+                save(local/"relay-health.json",health)
+                fresh=mobile_executor(node,health,hosts)
+                fresh["device_metrics_file"]=node["device_metrics_file"]
+                scp(fresh,local/"relay-health.json",node["device_metrics_file"]+".next")
+                ssh(fresh,"mv "+shlex.quote(node["device_metrics_file"]+".next")+" "+shlex.quote(node["device_metrics_file"]))
+        except Exception as e:
+            print(json.dumps({"relay_error":str(e),"at":time.time()}),flush=True)
+        time.sleep(10)
 
 
 def get_record(jobid):
@@ -393,25 +460,31 @@ def main():
         if name=="submit": p.add_argument("--wait-seconds",type=int,default=0)
     p=sub.add_parser("status"); p.add_argument("job_id"); p.add_argument("--tail",type=int,default=0)
     p=sub.add_parser("collect"); p.add_argument("job_id"); p.add_argument("--dest",type=Path,required=True)
+    p=sub.add_parser("relay",help=argparse.SUPPRESS); p.add_argument("job_id")
     args=parser.parse_args()
     if args.action=="probe": output={n:metrics for n,(_,metrics) in ecosystem().items()}
     elif args.action=="probe-command": output=probe_command(next(n for n in config() if n["id"]==args.node))
     elif args.action in {"plan","submit"}:
         recipe=json.loads(args.recipe.read_text(encoding="utf-8-sig")); validate_recipe(recipe)
+        source=args.source.resolve()
+        source_signature=signature({name:digest(path) for name,path in source_files(source,recipe["source_includes"]).items()})
+        timings=samples(STATE,source,recipe)
         deadline=time.monotonic()+getattr(args,"wait_seconds",0)
         while True:
-            results=ecosystem(); choice=decision(recipe,results,args.prefer)
+            results=ecosystem(); choice=decision(recipe,results,args.prefer,timings,source_signature,recipe.get("timing_cache_mode","auto"))
             if args.action=="plan" or choice["selected"] or time.monotonic()>=deadline: break
             print(json.dumps({"state":"waiting","next_probe_seconds":15}),flush=True)
             time.sleep(min(15,max(0,deadline-time.monotonic())))
         output=choice if args.action=="plan" or not choice["selected"] else start_job(args.source.resolve(),recipe,choice,results)
     elif args.action=="status": output=status(get_record(args.job_id),min(max(args.tail,0),100))
+    elif args.action=="relay": relay_health(get_record(args.job_id)); return 0
     else: output=collect(get_record(args.job_id),args.dest)
     print(json.dumps(output,ensure_ascii=False,indent=2),flush=True)
     return 2 if output.get("state") in {"failed","waiting","unknown","dispatch_unknown"} else 0
 
 
 def validate_recipe(recipe):
+    if recipe.get("timing_cache_mode","auto") not in {"auto","cold","cached","partial"}: raise ValueError("timing_cache_mode inválido")
     if recipe.get("kind") not in {"android-gradle","command"}: raise ValueError("kind debe ser android-gradle o command")
     if not recipe.get("source_includes"): raise ValueError("source_includes requerido")
     if not recipe.get("host_os"): raise ValueError("host_os requerido; compatibilidad no se infiere por extensión")

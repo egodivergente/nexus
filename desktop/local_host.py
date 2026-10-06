@@ -32,6 +32,8 @@ KEY_FILE = DATA / 'credentials.dpapi'
 SESSION_FILE = DATA / 'local-session.json'
 STATE_LOCK = threading.Lock()
 OFFLINE_QA = False
+SCHEMA_CACHE = {}
+SCHEMA_LOCK = threading.Lock()
 ALLOWED_PROVIDERS = {'atlas_cloud': 'https://api.atlascloud.ai',
                      'runway': 'https://api.dev.runwayml.com',
                      'crun': 'https://api.crun.ai'}
@@ -123,13 +125,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 OPENER = urllib.request.build_opener(NoRedirect)
 
 
-def public_json(url, headers=None, body=None, method='GET'):
+def public_json(url, headers=None, body=None, method='GET', timeout=120):
     req_headers = {'User-Agent': 'Nexus/1.0.0 (Windows; Desktop)', 'Accept': 'application/json'}
     if headers:
         req_headers.update(headers)
     request = urllib.request.Request(url, data=body, headers=req_headers, method=method)
     try:
-        with OPENER.open(request, timeout=120) as response:
+        with OPENER.open(request, timeout=timeout) as response:
             raw = response.read(20 * 1024 * 1024 + 1)
             if len(raw) > 20 * 1024 * 1024:
                 raise ValueError('Respuesta demasiado grande.')
@@ -291,6 +293,9 @@ def save_remote(url):
 
 def dispatch(keys, operation, args):
     if operation == 'agent':
+        if args.get('op') == 'reload':
+            with SCHEMA_LOCK:
+                SCHEMA_CACHE.clear()
         return agent_host().command(args)
     if operation == 'agentEvents':
         return agent_host().events(args.get('owner'))
@@ -329,7 +334,16 @@ def dispatch(keys, operation, args):
         uri = urllib.parse.urlsplit(args['url'])
         if uri.scheme != 'https' or uri.hostname != 'static.atlascloud.ai':
             raise ValueError('El esquema no procede de Atlas.')
-        return public_json(args['url'])
+        with SCHEMA_LOCK:
+            cached = SCHEMA_CACHE.get(args['url'])
+            if cached and cached[0] > time.monotonic() and not args.get('refresh'):
+                return json.loads(cached[1])
+        value = public_json(args['url'], timeout=15)
+        with SCHEMA_LOCK:
+            if len(SCHEMA_CACHE) >= 64:
+                SCHEMA_CACHE.pop(next(iter(SCHEMA_CACHE)))
+            SCHEMA_CACHE[args['url']] = (time.monotonic() + 300, json.dumps(value))
+        return value
     if operation == 'request':
         if OFFLINE_QA:
             raise ValueError('Laboratorio: red bloqueada.')

@@ -42,8 +42,8 @@ renderCanvas=function(){
 };
 function studioPromptLimits(){
  const node=$('#prompt-limits'),prompt=$('#prompt');if(!node||!prompt)return;
- const max=loaded?.textLimits?.prompt?.maximum,count=Array.from(prompt.value.trim()).length;
- node.textContent=max==null?count+' caracteres · limite sin verificar':count+' / '+max+' caracteres';
+ const limit=loaded?.textLimits?.prompt,max=limit?.maximum,utf16=limit?.unit==='utf16_code_units',count=utf16?prompt.value.trim().length:Array.from(prompt.value.trim()).length;
+ node.textContent=max==null?count+' caracteres · limite sin verificar':count+' / '+max+(utf16?' unidades UTF-16':' caracteres');
  node.classList.toggle('error',max!=null&&count>max);
 }
 document.addEventListener('input',e=>{if(e.target.id==='prompt')studioPromptLimits();});

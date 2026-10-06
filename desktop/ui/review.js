@@ -29,7 +29,10 @@ async function reviewImages(){
   for(const f of images){
    // Decode before sending: never request a visual judgement without pixels.
    const img=new Image();if(/^https:\/\//.test(f.url))img.crossOrigin='anonymous';
-   img.src=f.url;await img.decode();
+   img.src=f.url;
+   let timer;
+   try{await Promise.race([img.decode(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('La imagen no responde')),15000);})]);}
+   finally{clearTimeout(timer);}
    const canvas=document.createElement('canvas'),scale=Math.min(1,1280/Math.max(img.naturalWidth,img.naturalHeight));
    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);

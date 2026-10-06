@@ -86,5 +86,23 @@ class ExpertKnowledgeTest {
         assertEquals("unicode_code_points",schema.textLimits["prompt"]?.unit)
         assertTrue(ExpertPolicy.PROMPT.contains("nunca ilimitado"))
     }
+    @Test fun limitsBriefOmitsGuidesAndCatalog() {
+        val r=Registry(listOf(ModelSummary(ref,"Flux",modalities=setOf("IMAGE"))))
+        val item=run(r,"""{"focus":"limits"}""")["items"]!!.jsonArray.first().jsonObject
+        assertTrue("textLimits" in item);assertFalse("guides" in item);assertFalse("catalog_metadata" in item)
+    }
+    @Test fun compactionPreservesCurrentToolResultAndUserText() {
+        val large=buildJsonObject { put("payload","x".repeat(7000)) }
+        val messages=listOf(LlmMessage(Role.USER,listOf(ContentBlock.Text("Mi regla"))),
+            LlmMessage(Role.ASSISTANT,listOf(ContentBlock.ToolUse("old","get_model_brief",buildJsonObject{}))),
+            LlmMessage(Role.USER,listOf(ContentBlock.ToolResult("old",large))),
+            LlmMessage(Role.USER,listOf(ContentBlock.Text("Nueva consulta"))),
+            LlmMessage(Role.ASSISTANT,listOf(ContentBlock.ToolUse("new","get_model_brief",buildJsonObject{}))),
+            LlmMessage(Role.USER,listOf(ContentBlock.ToolResult("new",large))))
+        val result=ExpertPolicy.compact(request("x").copy(messages=messages))
+        assertEquals(messages.first(),result.messages.first())
+        assertTrue((result.messages[2].content.first() as ContentBlock.ToolResult).content.toString().length<1000)
+        assertEquals(messages.last(),result.messages.last())
+    }
 }
 

@@ -8,8 +8,11 @@ import subprocess
 import sys
 import tarfile
 import time
+import tempfile
 from pathlib import Path
 from probe import probe
+from guard import OwnedBuild, watch
+from history import build_statistics
 
 
 def digest(path):
@@ -20,9 +23,11 @@ def digest(path):
 
 
 def save(path, data):
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    # Status readers/relay may write concurrently; each writer owns its temp file.
+    with tempfile.NamedTemporaryFile(mode="w",encoding="utf-8",dir=path.parent,prefix=path.name+".",suffix=".tmp",delete=False) as stream:
+        json.dump(data,stream,indent=2); tmp=Path(stream.name)
+    try: os.replace(tmp,path)
+    finally: tmp.unlink(missing_ok=True)
 
 
 def compatible(node, metrics, recipe):
@@ -210,10 +215,13 @@ def execute(job):
                           verified_source_files=len(json.loads((job/"source-manifest.json").read_text())))
             save(job/"status.json",result)
             with open(job/"build.log","wb") as log:
-                process = subprocess.Popen(cmd,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT,
-                                           creationflags=0x08000000 if os.name == "nt" else 0)
-                result["build_pid"] = process.pid; save(job/"status.json",result)
-                code = process.wait()
+                build=OwnedBuild(cmd,source,env,log,job)
+                result.update(build_pid=build.process.pid,build_started_at=time.time(),runtime_guard=True)
+                save(job/"status.json",result)
+                code = watch(build,node,job,result,save,job_handle)
+                result["build_seconds"]=round(time.time()-result["build_started_at"],3)
+            result["build_statistics"]=build_statistics(job/"build.log",recipe["kind"])
+            if result.get("protection_abort"): code=125
             artifacts = {}
             if code == 0:
                 for pattern in recipe.get("artifacts", []):

@@ -2,7 +2,19 @@
 
 Sistema por encargo para Codex: mide el ecosistema antes de cada trabajo, filtra los ejecutores compatibles y elige entre ellos según disponibilidad, carga y preferencia por equipos dedicados. No necesita un servicio residente, una suscripción ni abrir aplicaciones.
 
-La selección busca reducir interferencia. La puntuación es una política configurable; no representa una comparación medida de velocidad entre CPUs. No garantiza cero lag: limita el consumo propio y aplaza el inicio si observa el equipo ocupado.
+La selección busca reducir interferencia. Usa duraciones observadas cuando hay evidencia comparable entre los equipos dedicados disponibles; sin esas muestras conserva la política de recursos. No garantiza cero lag: limita el consumo propio y aplaza el inicio si observa el equipo ocupado.
+
+## Tiempos reales y vigilancia durante el trabajo
+
+El historial se obtiene de trabajos terminados con éxito de los últimos 30 días, por ruta del proyecto, variante/comando y configuración del ejecutor. Los cambios de herramientas, entorno o ejecutor invalidan sus tiempos. Las muestras nuevas miden desde el lanzamiento hasta la salida del proceso; las anteriores se identifican como `legacy_worker` porque incluyen la preparación del worker. Se usa la mediana de las cinco muestras más recientes de cada grupo. Una muestra permite una estimación limitada; tres o más se marcan como evidencia medida. Los resultados pausados, reducidos o cancelados por protección no entrenan la comparación ordinaria.
+
+Para Gradle se cuentan las tareas realmente `FROM-CACHE` y `UP-TO-DATE`: `cold` significa sin reutilización de tareas, `cached` al menos la mitad reutilizada y `partial` una mezcla menor. Esto no indica si la descarga de dependencias estaba fría. Los comandos genéricos quedan sin clasificación de caché. En modo automático se comparan tiempos sin reutilización; no se presupone que las cachés actuales vayan a acertar. Las estimaciones con caché requieren el mismo manifiesto de fuente y se muestran por separado. Una receta puede fijar `timing_cache_mode: cached` para comparar explícitamente ese escenario; es una previsión, no una orden para limpiar o forzar cachés. Si falta una muestra comparable en cualquier candidato del grupo, se aplica la política de recursos. La CPU medida ajusta la estimación de forma heurística; no es una promesa de duración.
+
+El worker vigila recursos aproximadamente cada 10 segundos. EliteBook reduce el techo CPU del 15 % al 5 % con uso interactivo o carga alta, y lo restaura cuando cesa. El kernel verifica cada cambio. Linux/Android pausa y reanuda la sesión propia ante uso del móvil, calor o saturación de disco; la temperatura debe bajar dos grados para reanudar. RAM por debajo de la reserva o presión de memoria en dos muestras consecutivas cancela el trabajo propio para liberar memoria. Una pausa continua de cinco minutos termina con fallo de protección y logs recuperables, sin reenviar automáticamente.
+
+En móviles un relé oculto por trabajo refresca batería, pantalla, identidad, CPU y RAM mediante ADB existente. Cada muestra lleva el job_id y se escribe de forma atómica en el directorio aislado. Si el canal desaparece o la muestra supera 60 segundos, el worker pausa; no continúa indefinidamente con información vieja. El relé termina al finalizar el trabajo y tiene un límite de 12 horas. Depende del ordenador que lanzó el encargo; si ese ordenador se apaga, el móvil pausará y finalmente cancelará por falta de telemetría. No añade un servicio permanente ni abre aplicaciones.
+
+En Windows se asigna una puerta de lanzamiento a un Job Object hijo antes de iniciar el comando, para poder terminar sus descendientes conservando al worker y sus informes. Windows admite [jobs anidados](https://learn.microsoft.com/en-us/windows/win32/procthread/nested-jobs) y [límites CPU dinámicos](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information). Linux usa una sesión exclusiva y señales de [pausa/reanudación](https://man7.org/linux/man-pages/man7/signal.7.html). Nunca busca ni termina compiladores ajenos por nombre.
 
 ## Funcionamiento
 
@@ -61,6 +73,10 @@ Mantener las claves privadas de firma en su custodio actual. El APK de validaci�
 
 ## Comprobaciones
 
+Ampliación de tiempos y vigilancia del 2026-10-06: 39 pruebas superadas. Se verificó el cambio CPU 5 %/15 % mediante Set/Query del kernel Windows en un job vacío, sin añadir carga. La prueba `20261006T022006Z-e348bf8b` en ASUS confirmó pausa/reanudación del proceso y su hijo, cancelación de ambos y continuidad de un proceso ajeno, con disparadores controlados de prueba. El worker tomó muestras reales durante la ejecución y el informe se recuperó con SHA-256 verificado. Evidencia: `outputs/ecosystem-build/adaptive-verification.json`.
+
+La prueba completa de procesos en EliteBook quedó `waiting` por CPU 100 % y RAM inferior a la reserva, sin ejecutar el trabajo. La del Pixel quedó `waiting` porque su SSH Termux no respondió aunque ADB estaba disponible. Uso/calor/pérdida de telemetría móvil y el relé por job se validaron con pruebas simuladas; el relé no se probó en el teléfono durante esta ampliación. No se abrió Termux ni se configuró arranque automático tras reinicio.
+
 Resultados reales del 2026-10-06, conservados en `outputs/ecosystem-build/verification.json` del proyecto:
 
 - ASUS: APK NEXUS compilado y recuperado; primera compilación 13 min 56 s y repetición con caché 1 min 24 s.
@@ -71,7 +87,7 @@ Resultados reales del 2026-10-06, conservados en `outputs/ecosystem-build/verifi
 - 22 pruebas del selector superadas, incluida reserva física de RAM, permisos restringidos de Termux, exclusión de nodos ocupados y recuperación del mismo trabajo tras cambiar su puerto ADB.
 
 ```powershell
-python -m unittest discover -s tools/ecosystem-build -p test_router.py -v
+python -m unittest discover -s tools/ecosystem-build -p 'test_*.py' -v
 python C:/Users/User/.codex/skills/.system/skill-creator/scripts/quick_validate.py C:/Users/User/.codex/skills/ecosystem-build
 ```
 

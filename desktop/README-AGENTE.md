@@ -62,6 +62,35 @@ La interfaz bloquea el envio conversacional si falta LLM y muestra configuracion
 
 ## Asesor experto compacto
 
+### Optimizacion de consultas y recuperacion de errores
+
+- get_model_brief acepta focus limits/schema/prompt; limits omite guias y
+  metadatos generales. La seleccion predeterminada sigue siendo prompt.
+- Los esquemas publicos de Atlas se conservan cinco minutos en memoria, hasta
+  64 entradas, nunca cotizaciones ni errores. Actualizar skills limpia esta cache.
+  Su timeout de red es 15 segundos; los envios de generacion no cambian.
+- Solo se compactan respuestas antiguas de get_model_brief mayores de 6000
+  caracteres. Conserva nombres e identificadores, mensajes del usuario y todas
+  las respuestas del turno actual, sin romper los pares de herramientas.
+  No sustituye los mensajes por un resumen generado ni implica memoria infinita.
+- Un envio fallido conserva texto y adjuntos sin duplicar mensajes en pantalla.
+  No se reenvia automaticamente. Las imagenes de revision tienen una espera
+  maxima de decodificacion de 15 segundos.
+
+### Limites de texto
+
+Se conservan minLength/maxLength y descripciones del esquema Input por campo,
+incluido prompt y negative_prompt. El agente recibe textLimits en ModelSchema.
+El formulario cuenta caracteres Unicode del texto que enviara y bloquea el
+envio fuera de los limites confirmados, sin truncarlo. Ausencia de maximo no
+significa ilimitado. No se convierten tokens en caracteres.
+
+Los contratos Runway text_to_video de gen4.5, veo3.1, veo3.1_fast y
+happyhorse_1_0 incorporan los limites UTF-16 publicados en el SDK oficial,
+revisados el 2026-10-06. No se extrapolan a Atlas ni a image_to_video.
+Otros contratos sin esquema o ficha comprobada siguen marcados sin verificar.
+Fuente: https://github.com/runwayml/sdk-python/blob/main/src/runwayml/types/text_to_video_create_params.py
+
 ### Revision visual y preferencias aprobadas
 
 - `Revisar imagen` analiza una imagen o compara dos (referencia primero,

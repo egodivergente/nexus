@@ -9,6 +9,7 @@ import os
 
 ROOT = Path.home() / ".codex" / "integrations" / "google-flow"
 PROFILE = ROOT / "state" / "profile_nexus"
+_installed = False
 
 def owned_internal(profile):
     candidate = Path(profile).resolve()
@@ -17,12 +18,19 @@ def owned_internal(profile):
             and marker.read_text(encoding="utf-8").strip() == "internal")
 
 def install():
+    global _installed
+    if _installed:
+        return
     from playwright.async_api import BrowserType
     from gflow_cli.auth import cookies
     from gflow_cli.profile_lease import ProfileLease
+    from gflow_cli.api.transports import migrated_composer as migrated
+    from image_guard import model_problem
 
     original_launch = BrowserType.launch_persistent_context
     original_read = cookies._get_chrome_cookies_playwright
+    original_problem = migrated._image_body_problem
+    original_submit = migrated.MigratedComposer.submit_images_and_observe
 
     async def launch(browser, user_data_dir, **kwargs):
         if owned_internal(user_data_dir) and kwargs.get("channel") == "chrome":
@@ -51,3 +59,29 @@ def install():
 
     BrowserType.launch_persistent_context = launch
     cookies._get_chrome_cookies_playwright = read_owned
+
+    def image_problem(body, reference_ids, model=None):
+        if model is not None:
+            problem = model_problem(body, model.value)
+            if problem:
+                return problem
+        return original_problem(body, reference_ids, None)
+
+    async def guarded_submit(composer, page, request, *, reference_ids=()):
+        # Upstream registers its blocking route only for reference images. T2I
+        # must also refuse a mismatched/unknown model BEFORE Google receives it.
+        def matches(url):
+            return migrated._rpcid(str(url)) == migrated.IMAGE_SUBMIT_RPC
+
+        async def guard(route, raw_request):
+            await migrated._guard_image_submit(route, raw_request, reference_ids, request.model)
+
+        await page.route(matches, guard)
+        try:
+            return await original_submit(composer, page, request, reference_ids=reference_ids)
+        finally:
+            await page.unroute(matches, guard)
+
+    migrated._image_body_problem = image_problem
+    migrated.MigratedComposer.submit_images_and_observe = guarded_submit
+    _installed = True

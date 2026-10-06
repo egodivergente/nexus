@@ -27,6 +27,9 @@ function normalize(input,schema){
   }
   for(const key of s.required||[])if(valid(key)&&!['prompt','model'].includes(key)&&!s.properties[key])m.unsupported.push(label(key));
  }else{
+  // Reviewed 2026-10-06: official Runway SDK, exact text-to-video variants only.
+  const runwayTextMax={'gen4.5':1000,'veo3.1':1000,'veo3.1_fast':1000,'happyhorse_1_0':2500};
+  if(m.providerId==='runway'&&m.contractEndpoint==='text_to_video'&&Object.hasOwn(runwayTextMax,m.providerModelId))m.textLimits.prompt={unit:'utf16_code_units',minimum:1,maximum:runwayTextMax[m.providerModelId],source:'https://github.com/runwayml/sdk-python/blob/main/src/runwayml/types/text_to_video_create_params.py',description:'Reviewed 2026-10-06. API promptText limit; not a recommended prompt length.'};
   m.parameters=(m.parameters||[]).filter(p=>valid(p.key)&&valid(p.displayName)).filter((p,i,a)=>a.findIndex(x=>x.key===p.key)===i);
   m.fields=(m.contractMedia||[]).map(f=>({...f}));
   if(!m.contractEndpoint){for(const [key,mime,maximum,encoding] of [[m.firstFrameField,'image/*',m.firstFrameField?.endsWith('urls')?(m.maxImages||1):1,m.firstFrameField?.endsWith('urls')?'array':'string'],[m.lastFrameField,'image/*',1,'string'],[m.imagesArrayField,'image/*',m.maxImages||10,m.structuredImageReferences?'atlas-references':'array'],[m.videoField,'video/*',1,m.videoField?.endsWith('urls')?'array':'string'],[m.videosArrayField,'video/*',m.maxVideos||1,'array']]){
@@ -42,9 +45,10 @@ function validate(m,prompt,values,media){
  if(m.promptRequired!==false&&!prompt.trim())return 'Escribe un prompt.';
  for(const [key,limit] of Object.entries(m.textLimits||{})){
   const raw=key==='prompt'?prompt.trim():values[key];if(raw==null||raw==='')continue;
-  const count=Array.from(String(raw)).length;
-  if(limit.maximum!=null&&count>limit.maximum)return label(key)+': '+count+' caracteres; maximo '+limit.maximum+'.';
-  if(limit.minimum!=null&&count<limit.minimum)return label(key)+': minimo '+limit.minimum+' caracteres.';
+  const count=limit.unit==='utf16_code_units'?String(raw).length:Array.from(String(raw)).length;
+  const unit=limit.unit==='utf16_code_units'?'unidades UTF-16':'caracteres';
+  if(limit.maximum!=null&&count>limit.maximum)return label(key)+': '+count+' '+unit+'; maximo '+limit.maximum+'.';
+  if(limit.minimum!=null&&count<limit.minimum)return label(key)+': minimo '+limit.minimum+' '+unit+'.';
  }
  for(const f of m.fields){const items=media.filter(x=>x.field===f.key);if((f.required&&!items.length)||items.length<(f.minItems||0))return 'Añade '+f.label.toLowerCase()+'.';if(items.length>f.maximum)return f.label+': máximo '+f.maximum+'.';if(items.some(x=>!x.mime.startsWith(f.mime.split('/')[0]+'/')))return 'Revisa el formato de '+f.label.toLowerCase()+'.';}
  for(const p of m.parameters){const v=values[p.key];if(v==null||String(v).trim()===''){if(p.isRequired)return 'Completa '+p.displayName+'.';continue;}try{const n=type(p,v);if(p.options?.length&&!p.options.includes(String(v)))return 'El valor de '+p.displayName+' no está admitido.';if(p.minValue!=null&&Number(n)<p.minValue||p.maxValue!=null&&Number(n)>p.maxValue)return 'Revisa los límites de '+p.displayName+'.';}catch(e){return e.message;}}

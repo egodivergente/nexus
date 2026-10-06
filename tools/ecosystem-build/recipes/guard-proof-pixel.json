@@ -1,0 +1,9 @@
+{
+  "name":"Pixel resource guard proof",
+  "kind":"command", "host_os":["android"], "host_arch":["aarch64","arm64"],
+  "requires_tools":["python"],
+  "command":["python","tools/ecosystem-build/guard-proof.py"],
+  "source_includes":["tools/ecosystem-build/guard-proof.py","tools/ecosystem-build/guard.py","tools/ecosystem-build/probe.py"],
+  "artifacts":["guard-proof-result.json"], "min_ram_mb":128,"min_disk_mb":32,
+  "prefer":"pixel"
+}

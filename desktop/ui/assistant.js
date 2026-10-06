@@ -155,7 +155,7 @@ async function sendAgent(requestText){
  const attachments=Agent.attachments.slice();Agent.items.push({role:'user',text,attachments});Agent.draft='';Agent.attachments=[];
  try{const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
   Agent.items.push({role:'assistant',text:result.text,html:result.html,usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
- }catch(error){Agent.items.push({role:'assistant',text:error.message});Agent.draft=text;Agent.attachments=attachments;}
+ }catch(error){Agent.items.pop();toast(error.message);Agent.draft=text;Agent.attachments=attachments;}
  renderAssistant();
 }
 function agentSettings(){

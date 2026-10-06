@@ -28,7 +28,7 @@ async def run(args):
                     return {"server": initialized.server_info.model_dump(mode="json"),
                             "tools": [t.name for t in tools.tools],
                             "auth": status.model_dump(mode="json")}
-                parameters = json.loads(Path(args.args_file).read_text(encoding="utf-8")) if args.args_file else {}
+                parameters = json.loads(Path(args.args_file).read_text(encoding="utf-8-sig")) if args.args_file else {}
                 result = await session.call_tool(args.tool, parameters)
                 return result.model_dump(mode="json")
 

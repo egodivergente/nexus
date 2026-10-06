@@ -26,6 +26,7 @@ FIABILIDAD:
 - Coste sin cotizacion = coste pendiente, nunca gratis ni 0. No llames gratis a un redondeo. Una tarifa base no es una cotizacion. No conviertas creditos en dolares. Solo estimate_generation_cost con parametros concretos o la tarjeta permiten hablar de estimacion.
 RAPIDEZ:
 - Normalmente 1 consulta get_model_brief y luego responde. No inspecciones todo el catalogo, no compares familias ni recargues datos ya obtenidos en el turno. Hasta 3 candidatos; una recomendacion y una alternativa solo si ayuda.
+- En get_model_brief usa focus=limits para limites de entrada, focus=schema para parametros y focus=prompt para redactar. Para una variante identificada pide limit=1. No solicites guias para responder un simple limite.
 - Pregunta como maximo una cosa si desbloquea la tarea. No preguntes por parametros secundarios que puedes dejar por defecto.
 - Hasta 180 palabras salvo el prompt o una peticion explicita de detalle. Un prompt listo para pegar en bloque de codigo; parametros aparte y solo si estan verificados. No expliques tu proceso.
 PROMPT Y REVISION:
@@ -53,7 +54,23 @@ PROMPT Y REVISION:
                 "Consulta get_model_brief para evidencia por variante. Las skills heredadas son criterio editorial no revalidado."
             else part
         }
-        return request.copy(system = system,
+        val latestUser=request.messages.indexOfLast { m -> m.role == Role.USER && m.content.none { it is ContentBlock.ToolResult } }
+        val briefIds=request.messages.flatMap { it.content }.filterIsInstance<ContentBlock.ToolUse>()
+            .filter { it.name == "get_model_brief" }.map { it.id }.toSet()
+        val messages=request.messages.mapIndexed { index, message ->
+            if(index >= latestUser) message else message.copy(content=message.content.map { block ->
+                if(block is ContentBlock.ToolResult && block.toolUseId in briefIds && block.content.toString().length > 6000)
+                    block.copy(content=buildJsonObject {
+                        put("notice", "Ficha antigua compactada. Consulta de nuevo si necesitas valores exactos; conserva las decisiones del usuario.")
+                        val items=(block.content as? JsonObject)?.get("items") as? JsonArray
+                        put("models", JsonArray(items.orEmpty().mapNotNull { item ->
+                            (item as? JsonObject)?.let { obj -> JsonObject(obj.filterKeys { it in setOf("provider_id","model_id","name") }) }
+                        }))
+                    })
+                else block
+            })
+        }
+        return request.copy(system = system, messages = messages,
             tools = if (simple) emptyList() else request.tools.filterNot { it.name in retiredTools },
             maxTokens = if (simple) 128 else request.maxTokens.coerceAtMost(1800))
     }
@@ -91,6 +108,7 @@ class ExpertBriefTool(private val registry: ModelRegistry, private val knowledge
       {"type":"object","properties":{
         "query":{"type":"string","description":"Nombre o id del modelo, no el prompt creativo. Ej.: flux 2 pro. Deja vacio si solo sabes modalidad/capacidad."},
         "provider_id":{"type":"string"},
+        "focus":{"type":"string","enum":["prompt","limits","schema"],"description":"limits devuelve solo limites de texto y medios; schema devuelve contrato sin guias; prompt incluye guias."},
         "modality":{"type":"string","enum":["IMAGE","VIDEO","AUDIO","CHAT"]},
         "capability":{"type":"string","description":"Capacidad exacta del catalogo, por ejemplo IMAGE_TO_VIDEO."},
         "limit":{"type":"integer","minimum":1,"maximum":3}}}
@@ -101,6 +119,7 @@ class ExpertBriefTool(private val registry: ModelRegistry, private val knowledge
         val modality = input.word("modality").uppercase()
         val capability = input.word("capability").uppercase()
         val limit = (input["limit"] as? JsonPrimitive)?.intOrNull?.coerceIn(1,3) ?: 2
+        val focus = input.word("focus").ifBlank { "prompt" }
         val candidates = registry.list().filter { m ->
             val hay = normalizeExpert(m.ref.modelId + " " + m.name)
             (words.isEmpty() || words.all { it in hay }) &&
@@ -115,18 +134,24 @@ class ExpertBriefTool(private val registry: ModelRegistry, private val knowledge
             val guides = knowledge.guides(m.ref.modelId)
             buildJsonObject {
                 put("provider_id", m.ref.providerId); put("model_id", m.ref.modelId); put("name", m.name)
-                put("catalog_metadata", expertJson.encodeToJsonElement(m.copy(basePriceUsd=null, priceUnit=null, priceUnitVerified=false)))
+                if(focus == "prompt") put("catalog_metadata", expertJson.encodeToJsonElement(m.copy(basePriceUsd=null, priceUnit=null, priceUnitVerified=false)))
                 put("catalog_warning", "Disponibilidad local; no prueba de lanzamiento ni de superioridad. Capacidades sujetas al esquema.")
                 put("cost_status", "pending_quote")
                 try {
-                    put("schema", expertJson.encodeToJsonElement(registry.schema(m.ref)))
+                    val schema=registry.schema(m.ref)
+                    if(focus == "limits") {
+                        put("textLimits", expertJson.encodeToJsonElement(schema.textLimits))
+                        put("media", expertJson.encodeToJsonElement(schema.media))
+                        put("source", schema.source?.let(::JsonPrimitive) ?: JsonNull)
+                        put("unknown", "Campo ausente o maximum=null: limite sin verificar, nunca ilimitado.")
+                    } else put("schema", expertJson.encodeToJsonElement(schema))
                     put("schema_status", "available")
                 } catch (e: Exception) {
                     if(e is kotlinx.coroutines.CancellationException) throw e
                     put("schema_status", "unavailable")
                     put("schema_note", "No se pudo verificar el contrato; no inventar parametros.")
                 }
-                put("guides", JsonArray(guides))
+                if(focus == "prompt") put("guides", JsonArray(guides))
                 put("evidence_status", if(guides.isEmpty()) "no_variant_guide" else "documented_scope_only")
                 put("editorial_workflow", "Definir objetivo, preservar referencias, redactar prompt especifico, comprobar contrato; una variable por iteracion y evaluar resultado, sin garantizar calidad.")
             }

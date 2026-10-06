@@ -14,7 +14,7 @@ def environment():
         "GFLOW_CLI_CONCURRENCY": "1",
         "GFLOW_CLI_HEADLESS": "false",
         "GFLOW_CLI_AUTH_LOGIN_TIMEOUT": "3600",
-        "GFLOW_CLI_BROWSER_WINDOW_POSITION": "100,100",
+        "GFLOW_CLI_BROWSER_WINDOW_POSITION": "-10000,-10000",
         "PLAYWRIGHT_BROWSERS_PATH": str(ROOT / "browsers"),
         "PYTHONUTF8": "1",
         "PYTHONIOENCODING": "utf-8",
@@ -26,6 +26,9 @@ def main():
     os.chdir(ROOT)
     from runtime_compat import install
     install()
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
+        from bridge_tools import install as install_tools
+        install_tools()
     from gflow_cli.cli import main as gflow_main
     gflow_main()
 
