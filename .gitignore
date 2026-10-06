@@ -1,0 +1,37 @@
+# Local Android and Gradle state
+.gradle/
+**/build/
+local.properties
+*.keystore
+*.jks
+
+# Device backups, captures and generated deliverables may contain private data.
+outputs/
+.codex-remote-attachments/
+
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Private material and generated state
+.env
+.env.*
+!.env.example
+!.env.template
+local.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.db
+*.db-*
+*.sqlite*
+**/build/
+.gradle/
+.kotlin/
+node_modules/
+__pycache__/
+outputs/

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "asus", "label": "ASUSVIDAL", "transport": "ssh",
+      "ssh": "vidal@100.112.57.2", "expected_hostname": "ASUSVIDAL",
+      "python": "python3", "state_root": "/home/vidal/.local/share/ecosystem-build",
+      "dedicated": true, "base_score": 80, "reserve_ram_mb": 512,
+      "env": {
+        "JAVA_HOME": "/home/vidal/.aki/android-toolchain/jdk17",
+        "ANDROID_HOME": "/home/vidal/.aki/android-toolchain/sdk",
+        "GRADLE_USER_HOME": "/home/vidal/aki/toolchain/gradle-home"
+      },
+      "adb": "/usr/bin/adb", "commander_device_id": "c787e85a-bb9f-487a-a3de-b137d8574f8f"
+    },
+    {
+      "id": "pixel", "label": "Pixel 8 Pro", "transport": "android", "device_kind": "android",
+      "expected_model": "Pixel 8 Pro", "expected_serial": "38271FDJG00264",
+      "tailscale_name": "Pixel 8 Pro", "dedicated": true, "base_score": 110,
+      "reserve_ram_mb": 1024, "executor": null,
+      "observed_toolchain_root": "/data/data/com.termux/files/home/nexus-build/batches-20261002",
+      "max_temperature_c": 40, "min_battery_percent": 20
+    },
+    {
+      "id": "s25", "label": "S25 Ultra", "transport": "android", "device_kind": "android",
+      "expected_model": "SM-S938B", "expected_serial": "R5CXC3J630Y",
+      "tailscale_name": "S25 Ultra de Vidal", "dedicated": false, "base_score": 35,
+      "reserve_ram_mb": 2048, "executor": null, "max_temperature_c": 38,
+      "require_screen_off": true, "cpu_affinity": [0], "min_battery_percent": 30
+    },
+    {
+      "id": "elitebook", "label": "EliteBook", "transport": "local",
+      "state_root": "C:/Users/User/.codex/build-state",
+      "dedicated": false, "base_score": 20, "reserve_ram_mb": 3072,
+      "cpu_cap_percent": 15,
+      "env": {
+        "JAVA_HOME": "C:/Program Files/Microsoft/jdk-17.0.20.8-hotspot",
+        "ANDROID_HOME": "C:/Users/User/AppData/Local/Android/Sdk"
+      },
+      "tools": {"csc": "C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe"}
+    }
+  ]
+}
