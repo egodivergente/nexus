@@ -10,6 +10,16 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import flow_provider as flow
 
 class ProviderTests(unittest.TestCase):
+    def test_agent_discovers_generation_by_exact_capability(self):
+        with patch.object(flow, 'available', return_value=True):
+            models = flow.catalog()
+        image = [m['id'] for m in models if m['providerId']=='google_flow' and 'IMAGE' in m['modalities'] and 'TEXT_TO_IMAGE' in m['capabilities']]
+        video = [m['id'] for m in models if m['providerId']=='google_flow' and 'VIDEO' in m['modalities'] and 'TEXT_TO_VIDEO' in m['capabilities']]
+        self.assertIn('google-flow/nano2', image)
+        self.assertIn('google-flow/veo-fast', video)
+        self.assertTrue(all(m['id'] in image+video for m in models if m['promptRequired']))
+        self.assertTrue(all(m['id'] not in image+video for m in models if not m['promptRequired']))
+        self.assertTrue(all('nano' not in m['id'].lower() or 'lite' not in m['id'].lower() for m in models))
     def test_ambiguous_submission_never_starts_second_worker(self):
         with tempfile.TemporaryDirectory() as folder,patch.object(flow,'quote',return_value={'amount':0}),patch.object(flow.threading,'Thread') as worker:
             args={'request_id':'same-id','model':'nano2','prompt':'sphere','aspect':'1:1','cost':0}

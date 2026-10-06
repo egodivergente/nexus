@@ -127,10 +127,12 @@ def merge_jobs(incoming, previous):
             current = {**old, **current}
             # Completion can recover an uncertain failure, but an old active
             # snapshot must never erase an already confirmed terminal result.
-            preserve = (old.get('status') == 'COMPLETED' and job.get('status') != 'COMPLETED'
-                        or old.get('status') in terminal and job.get('status') not in terminal)
+            newer_recovery = job.get('flowRecoveryRevision', 0) > old.get('flowRecoveryRevision', 0)
+            stale_recovery = job.get('flowRecoveryRevision', 0) < old.get('flowRecoveryRevision', 0)
+            preserve = stale_recovery or (not newer_recovery and (old.get('status') == 'COMPLETED' and job.get('status') != 'COMPLETED'
+                        or old.get('status') in terminal and job.get('status') not in terminal))
             if preserve:
-                for key in ('status', 'outputs', 'error', 'uncertain', 'remoteId'):
+                for key in ('status', 'outputs', 'error', 'uncertain', 'remoteId', 'flowRecoveryRevision'):
                     if key in old:
                         current[key] = old[key]
                     else:
@@ -362,10 +364,12 @@ def dispatch(keys, operation, args):
         flow_models = flow_provider.catalog()
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
                 'version': '1.7.0-agent-desktop', 'platform': 'HP EliteBook · Windows x64'}
-    if operation in ('flowQuote', 'flowSubmit', 'flowStatus', 'flowAssetOptions'):
+    if operation in ('flowQuote', 'flowSubmit', 'flowStatus', 'flowAssetOptions', 'flowRecover'):
         if OFFLINE_QA:
             raise ValueError('Laboratorio: Flow bloqueado.')
         import flow_provider
+        if operation == 'flowRecover':
+            return flow_provider.recover(DATA, args.get('request_id', ''))
         if operation == 'flowAssetOptions':
             return flow_provider.asset_options(args.get('source_request_id', ''))
         if operation == 'flowQuote':
@@ -420,8 +424,14 @@ def dispatch(keys, operation, args):
     if operation == 'generate':
         if OFFLINE_QA:
             raise ValueError('Laboratorio: generaciones bloqueadas.')
+        body = args.get('body') or {}
+        if not isinstance(body, dict):
+            raise ValueError('Solicitud de generación no válida.')
+        for field in ('model', 'model_id', 'modelId'):
+            if re.search(r'nano[_ -]?banana.*lite|nano[_ -]?lite', str(body.get(field, '')), re.I):
+                raise ValueError('Nano Banana Lite está desactivado. Elige otro modelo.')
         cost = args.get('cost')
-        if not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0:
+        if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0:
             raise ValueError('Primero confirma un coste válido.')
         return provider_request(keys, args['provider'], args['path'], 'POST', args['body'], paid=True)
     if operation == 'upload':

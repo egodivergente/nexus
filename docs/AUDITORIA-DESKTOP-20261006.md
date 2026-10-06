@@ -41,7 +41,7 @@ No se cambió Kotlin ni se generaron APK, EXE o JAR. La comprobación previa de 
 
 ## Límites y mejora pendiente
 
-La recuperación de un trabajo Flow interrumpido existe en `flow_get_result` del MCP, con el mismo identificador y sin volver a generar. La interfaz de NEXUS aún no ofrece un botón específico para esa reconciliación: un trabajo incierto requiere usar el MCP. Se mantiene la regla de no reenviar automáticamente una generación ambigua.
+La mejora pendiente de recuperación desde la interfaz quedó resuelta en la implementación posterior de [Flow y UX](MEJORAS-FLOW-UX-20261006.md): los detalles ofrecen «Recuperar resultado» o «Comprobar resultado». El host consulta `flow_get_result` con el mismo identificador y sin volver a generar. Se mantiene la regla de no reenviar automáticamente una generación ambigua.
 
 Esta auditoría no volvió a generar medios, no probó el upscale de vídeo 4K de pago, no verificó saldos o cargos y no comprobó individualmente los 843 modelos contra sus proveedores. No constituye una prueba de penetración completa.
 

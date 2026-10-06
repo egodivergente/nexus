@@ -87,7 +87,9 @@ let activePopup=null;
 function closeSelect() {if(!activePopup)return;activePopup.list.remove();activePopup.trigger.setAttribute('aria-expanded','false');activePopup=null;}
 function openSelect(select,trigger) {
   closeSelect();
+  if(select.disabled)return;
   const list=document.createElement('div');list.className='select-popup';list.setAttribute('role','listbox');
+  trigger.dataset.popupId||='select-list-'+crypto.randomUUID();list.id=trigger.dataset.popupId;trigger.setAttribute('aria-controls',list.id);
   const options=[...select.options].filter(option=>!option.disabled);
   for(const option of options) {
     const item=document.createElement('button');item.type='button';item.className='select-option';item.setAttribute('role','option');
@@ -95,18 +97,19 @@ function openSelect(select,trigger) {
     item.addEventListener('click',()=>{
       select.value=option.value;trigger.textContent=option.textContent;closeSelect();
       select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}));
-      if(trigger.isConnected)trigger.focus();
+      requestAnimationFrame(()=>{enhanceSelects();const target=trigger.isConnected?trigger:document.getElementById(select.id)?.nextElementSibling;if(target?.matches('.select-trigger'))target.focus();});
     });list.appendChild(item);
   }
-  document.body.appendChild(list);
+  (select.closest('dialog[open]')||document.body).appendChild(list);
   const rect=trigger.getBoundingClientRect(),height=Math.min(280,list.scrollHeight);
-  list.style.left=`${Math.max(8,Math.min(rect.left,innerWidth-rect.width-8))}px`;
-  list.style.width=`${Math.max(rect.width,190)}px`;
+  const width=Math.min(innerWidth-16,Math.max(rect.width,190));
+  list.style.left=`${Math.max(8,Math.min(rect.left,innerWidth-width-8))}px`;
+  list.style.width=`${width}px`;
   list.style.top=`${rect.bottom+height+8>innerHeight?Math.max(8,rect.top-height-5):rect.bottom+5}px`;
-  trigger.setAttribute('aria-expanded','true');activePopup={list,trigger};
+  trigger.setAttribute('aria-expanded','true');activePopup={list,trigger,select};
   list.querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest'});
   list.addEventListener('keydown',event=>{
-    if(event.key==='Escape'){closeSelect();trigger.focus();}
+    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeSelect();trigger.focus();}
     if(event.key==='ArrowDown'||event.key==='ArrowUp'){
       event.preventDefault();const all=[...list.querySelectorAll('button')],index=all.indexOf(document.activeElement);
       all[Math.max(0,Math.min(all.length-1,index+(event.key==='ArrowDown'?1:-1)))].focus();
@@ -114,6 +117,7 @@ function openSelect(select,trigger) {
   });
 }
 function enhanceSelects() {
+  if(activePopup&&(!activePopup.select?.isConnected||activePopup.select.disabled))closeSelect();
   document.querySelectorAll('select:not([data-enhanced])').forEach(select=>{
     select.dataset.enhanced='true';select.classList.add('native-select-hidden');select.tabIndex=-1;select.setAttribute('aria-hidden','true');
     const trigger=document.createElement('button');trigger.type='button';trigger.className='select-trigger';
@@ -127,9 +131,17 @@ function enhanceSelects() {
       if(event.key==='Escape')closeSelect();
     });
   });
+  document.querySelectorAll('select[data-enhanced]').forEach(select=>{
+    const trigger=select.nextElementSibling;if(!trigger?.matches('.select-trigger'))return;
+    const text=select.selectedOptions[0]?.textContent||'Seleccionar';
+    if(trigger.textContent!==text)trigger.textContent=text;
+    if(trigger.disabled!==select.disabled)trigger.disabled=select.disabled;
+    if(trigger.getAttribute('aria-description')!==text)trigger.setAttribute('aria-description',text);
+  });
 }
 let selectFrame=0;
-new MutationObserver(()=>{if(selectFrame)return;selectFrame=requestAnimationFrame(()=>{selectFrame=0;enhanceSelects();});}).observe(document.body,{childList:true,subtree:true});
+new MutationObserver(()=>{if(selectFrame)return;selectFrame=requestAnimationFrame(()=>{selectFrame=0;enhanceSelects();});}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','selected']});
+document.addEventListener('change',event=>{if(event.target instanceof HTMLSelectElement)enhanceSelects();});
 enhanceSelects();
 document.addEventListener('pointerdown',event=>{
   if(activePopup&&!activePopup.list.contains(event.target)&&event.target!==activePopup.trigger)closeSelect();

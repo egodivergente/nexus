@@ -30,10 +30,10 @@ def catalog():
     aspect = lambda options: {'key':'aspect', 'displayName':'Formato', 'type':'ENUM', 'nativeType':'string',
         'options':options, 'defaultValue':options[0], 'isRequired':True}
     result = [dict(common, id='google-flow/nano2', providerModelId='nano2', displayName='Nano Banana 2 · tu cuenta Flow',
-        modelFamily='Nano Banana', modalities=['IMAGE'], parameters=[aspect(['1:1','16:9','9:16','4:3','3:4'])],
+        modelFamily='Nano Banana', modalities=['IMAGE'], capabilities=['TEXT_TO_IMAGE'], parameters=[aspect(['1:1','16:9','9:16','4:3','3:4'])],
         shortDescription='Crea una imagen con Nano Banana 2 usando tu cuenta de Google Flow.'),
         dict(common, id='google-flow/veo-fast', providerModelId='veo_fast', displayName='Veo 3.1 Fast · tu cuenta Flow',
-        modelFamily='Veo', modalities=['VIDEO'], parameters=[aspect(['16:9','9:16'])],
+        modelFamily='Veo', modalities=['VIDEO'], capabilities=['TEXT_TO_VIDEO'], parameters=[aspect(['16:9','9:16'])],
         shortDescription='Genera un vídeo con Veo Fast usando tus créditos de Google Flow. Duración automática.')]
     for identifier,name,modality,options in [
         ('image_upscale','Escalar imagen Flow','IMAGE',['2k','4k']),
@@ -45,6 +45,9 @@ def catalog():
                 'description':'jobId del historial de NEXUS o nexus_job_id del asset, de un resultado completado google_flow. No usar asset_id ni generation_id.'},
                 {'key':'resolution','displayName':'Resolución','type':'ENUM','nativeType':'string','options':options,'defaultValue':options[0],'isRequired':True}],
             shortDescription='Mejora/exporta un resultado existente de tu cuenta Flow. Usa el jobId de su historial; conserva el original.'))
+    for model in result:
+        if model['promptRequired'] and model['inputMode']=='TEXT_ONLY' and not model['contractMedia']:
+            model['capabilities'] = ['TEXT_TO_IMAGE' if model['modalities']==['IMAGE'] else 'TEXT_TO_VIDEO']
     return result
 
 def parameters(args):
@@ -132,17 +135,25 @@ def call(tool, args, request_id):
                     pass
     return result or {'status':'needs_reconciliation'}
 
-def work(data, request_id, params):
+def work(data, request_id, params, recover=False, recovery_started_at=0):
     try:
-        if 'source_request_id' in params:
+        if recover:
+            tool='flow_get_result'
+            arguments={}
+        elif 'source_request_id' in params:
             tool='flow_process_asset'
             arguments={k:v for k,v in params.items() if k!='model'}
         else:
             tool = 'flow_generate_image' if params['model'] == 'nano2' else 'flow_generate_video'
             arguments=params
-        result = call(tool, {'request_id':request_id, **arguments}, request_id)
+        result = call(tool, {'request_id':request_id, **arguments},
+                      'recovery-'+uuid.uuid4().hex if recover else request_id)
+        if not isinstance(result, dict):
+            raise ValueError('Flow devolvió un resultado no válido.')
     except Exception as exc:
         result = {'status':'needs_reconciliation', 'error_class':type(exc).__name__}
+    if recover:
+        result['recovery_started_at'] = recovery_started_at
     try:
         with LOCK:
             connection = ledger(data)
@@ -185,10 +196,60 @@ def submit(data, args):
                 with connection:
                     connection.execute('INSERT INTO jobs VALUES (?,?,NULL)', (request_id, json.dumps(params)))
                 WORKERS.add(request_id)
-                threading.Thread(target=work, args=(data, request_id, params), daemon=True).start()
+                try:
+                    threading.Thread(target=work, args=(data, request_id, params), daemon=True).start()
+                except Exception:
+                    WORKERS.discard(request_id)
+                    raise RuntimeError('No se pudo iniciar el trabajo. Comprueba su identificador antes de repetir.') from None
         finally:
             connection.close()
     return status(data, request_id)
+
+def recover(data, request_id):
+    """Recover an existing reservation using only flow_get_result; never submit."""
+    if not isinstance(request_id, str) or not IDENTIFIER.fullmatch(request_id):
+        raise ValueError('Identificador Flow no válido.')
+    with LOCK:
+        connection = ledger(data)
+        try:
+            row = connection.execute('SELECT result FROM jobs WHERE id=?', (request_id,)).fetchone()
+            if not row:
+                raise ValueError('Trabajo Flow no encontrado. No se envía ninguna generación.')
+            active = request_id in WORKERS
+        finally:
+            connection.close()
+    if active:
+        return status(data, request_id)
+    if row['result'] and json.loads(row['result']).get('status') == 'completed':
+        try:
+            return status(data, request_id)
+        except (OSError, ValueError):
+            pass  # The bridge can recover a missing or damaged existing download.
+    with LOCK:
+        connection = ledger(data)
+        try:
+            # Recheck under the reservation lock: simultaneous clicks share one worker.
+            latest = connection.execute('SELECT result FROM jobs WHERE id=?', (request_id,)).fetchone()['result']
+            changed_to_completed = latest != row['result'] and latest and json.loads(latest).get('status') == 'completed'
+            if request_id not in WORKERS and not changed_to_completed:
+                previous = connection.execute('SELECT result FROM jobs WHERE id=?', (request_id,)).fetchone()['result']
+                revision = max(int(time.time()*1000), (json.loads(previous).get('recovery_started_at', 0)+1) if previous else 0)
+                pending = {'status':'in_progress', 'recovery_started_at':revision}
+                with connection:
+                    connection.execute('UPDATE jobs SET result=? WHERE id=?', (json.dumps(pending), request_id))
+                WORKERS.add(request_id)
+                try:
+                    threading.Thread(target=work, args=(data, request_id, {}),
+                                     kwargs={'recover':True, 'recovery_started_at':revision}, daemon=True).start()
+                except Exception:
+                    WORKERS.discard(request_id)
+                    with connection:
+                        connection.execute('UPDATE jobs SET result=? WHERE id=?', (previous, request_id))
+                    raise RuntimeError('No se pudo iniciar la recuperación. No se ha generado nada.') from None
+        finally:
+            connection.close()
+    return status(data, request_id)
+
 
 def status(data, request_id):
     if not IDENTIFIER.fullmatch(request_id):
@@ -203,7 +264,13 @@ def status(data, request_id):
     if not row:
         raise ValueError('Trabajo Flow no encontrado.')
     result = json.loads(row['result']) if row['result'] else {'status':'in_progress' if active else 'needs_reconciliation'}
-    response = {'id':request_id, 'status':result.get('status'), 'outputs':[]}
+    if result.get('status') == 'in_progress' and not active:
+        result['status'] = 'needs_reconciliation'
+    if result.get('status') == 'completed' and not result.get('path'):
+        result['status'] = 'needs_reconciliation'
+    response = {'id':request_id, 'status':result.get('status'), 'outputs':[],
+                'recovery_started_at':result.get('recovery_started_at', 0),
+                'reconciling':bool(active and result.get('recovery_started_at'))}
     if result.get('status') == 'completed' and result.get('path'):
         source = Path(result['path']).resolve()
         if not source.is_relative_to((RUNTIME / 'results').resolve()) or source.suffix.lower() not in {'.png','.jpg','.jpeg','.webp','.mp4','.gif'}:

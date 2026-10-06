@@ -2,13 +2,15 @@
 // Run the actual UI functions in a VM: no browser, network or provider calls.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../ui/app.js'),'utf8');
-const functions=source.slice(source.indexOf('function parseResponse('),source.indexOf('\n',source.indexOf('async function dispatch(')));
+const functions=source.slice(source.indexOf('function forbiddenModel('),source.indexOf('\n',source.indexOf('async function dispatch(')));
 let release,posted;
 const saved=new Promise(resolve=>{release=resolve;});
 const context={structuredClone,Date,crypto:require('node:crypto').webcrypto,
  initial:{qa:false},state:{jobs:[]},E:{validate:()=>null,payload:(m,p,v,media)=>({prompt:p,...v,media}),endpoint:()=>'/fixture'},
  flush:()=>saved,rpc:async(op,args)=>{assert.equal(op,'generate');posted=args;return {id:'task',status:'completed',outputs:['result']};}};
 vm.createContext(context);vm.runInContext(functions,context);
+for(const id of ['google/nano-banana-2-lite/edit','nano_lite','crun/google/nano-banana-2-lite'])assert(context.forbiddenModel({id}));
+assert(!context.forbiddenModel({id:'google-flow/nano2',displayName:'Nano Banana 2'}));
 for(const providerId of ['atlas_cloud','runway','crun','google_flow']){
  for(const [remote,status] of [['failed','FAILED'],['processing','PROCESSING'],['succeeded','COMPLETED']]){
   const job={providerId,modality:'IMAGE',outputs:[]};
@@ -23,6 +25,7 @@ assert.equal(recovered.status,'COMPLETED');assert.equal(recovered.uncertain,fals
 const immediate={providerId:'atlas_cloud',modality:'IMAGE'};
 context.parseResponse(immediate,{outputs:['result']});assert.equal(immediate.status,'COMPLETED');
 (async()=>{
+ await assert.rejects(context.dispatch({model:{id:'google/nano-banana-2-lite/edit'},values:{},media:[],cost:null}),/Lite/);
  const plan={model:{id:'fixture',providerId:'atlas_cloud',modalities:['IMAGE']},prompt:'confirmed',
   values:{ratio:'1:1'},media:[{id:'ref',remoteUrl:'https://example.invalid/original'}],cost:{amount:1,time:Date.now()}};
  const sending=context.dispatch(plan);
