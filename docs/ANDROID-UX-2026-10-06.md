@@ -2,6 +2,11 @@
 
 ## Resultado actualizado tras pruebas fisicas
 
+- PASS (entrega posterior): S25 reconectado e identificado como R5CXC3J630Y.
+  Instalacion `adb install -r --user 0` completada con Success, sin borrar datos.
+  Package Manager confirma vc20 / 1.7.2-agent-preview, actualizada el 2026-10-06.
+  Queda resuelto el bloqueo de instalacion S25 descrito mas abajo.
+
 - PASS: APK Agent vc20 / 1.7.2-agent-preview recuperada de la tarea
   20261006T063456Z-f5369c86. SHA-256 remoto y local coinciden:
   ba68811a180af5df7eee15ecfb6407a1be05c76ba89a4deeedb3185377a1326a.
