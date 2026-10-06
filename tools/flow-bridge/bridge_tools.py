@@ -32,7 +32,7 @@ def save(request_id, result, task_id=None):
         connection.execute("UPDATE jobs SET result_json=?, state=?, task_id=COALESCE(?,task_id) WHERE request_id=?",
             (json.dumps(result, ensure_ascii=False), result["status"], task_id, request_id))
 
-def verified_file(result):
+def _verified_file(result):
     from PIL import Image
     path = Path(result["path"]).resolve()
     if not path.is_relative_to((ROOT / "results").resolve()):
@@ -54,17 +54,24 @@ def verified_file(result):
     return {**result, "path": str(path), "files": [str(path)], "bytes": len(data),
         **metadata, "sha256": digest}
 
+
+def verified_file(result):
+    artifacts = result.get('artifacts')
+    files = result.get('files') or [result['path']]
+    if not artifacts and len(files) == 1:
+        return _verified_file(result)
+    if not artifacts:
+        artifacts = [{'path':path} for path in files]
+    proofs = [_verified_file(item) for item in artifacts]
+    return {**result, **proofs[0], 'status':result.get('status'), 'files':[p['path'] for p in proofs], 'artifacts':proofs}
+
 def complete_block(result, count):
     if not isinstance(result, dict) or count < 1:
         raise ValueError('Flow block missing')
-    if count == 1:
-        return verified_file(result)
-    proofs = []
-    for file_path in (result.get('files') or ([result['path']] if result.get('path') else [])):
-        proofs.append(verified_file({**result, 'path': file_path}))
-    if len(proofs) != count:
+    proof = verified_file(result)
+    if len(proof['files']) != count:
         raise ValueError('Flow returned an incomplete block')
-    return {**result, **proofs[0], 'files': [p['path'] for p in proofs], 'artifacts': proofs}
+    return proof
 
 def native_task(task_id):
     path = ROOT / "state" / "gflow.db"
@@ -333,7 +340,7 @@ async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9"
 async def flow_get_quote(model: str = "nano2", aspect: str = "1:1", mode: str | None = None,
                          duration: int | None = None, resolution: str | None = None,
                          initial_frame: str | None = None, end_frame: str | None = None,
-                         reference_images: list[str] | None = None,voice: str | None = None) -> dict[str, Any]:
+                         reference_images: list[str] | None = None,voice: str | None = None, count: int = 1) -> dict[str, Any]:
     """Read the exact account settings price; never uploads or submits media."""
     from flow_quote import quote
     from flow_contract import normalize
