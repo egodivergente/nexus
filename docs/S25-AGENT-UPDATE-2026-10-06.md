@@ -1,9 +1,9 @@
-# NEXUS Agente: actualizacion S25 pendiente
+# NEXUS Agente: actualizacion S25 instalada
 
 ## Alcance
 
-Paquete objetivo: `com.vidadomu.nexus.agent`, instalado como versionCode 18,
-`1.7.0-agent-preview`. Se prepara versionCode 19, `1.7.1-agent-preview`.
+Paquete objetivo: `com.vidadomu.nexus.agent`, actualizado de versionCode 18,
+`1.7.0-agent-preview` a versionCode 19, `1.7.1-agent-preview`.
 No se modifica la instalacion separada `com.vidadomu.nexus`.
 
 ## Cambios
@@ -30,14 +30,26 @@ No se modifica la instalacion separada `com.vidadomu.nexus`.
   independientes de agent-core ni pruebas instrumentadas.
 - PASS: APK e informes recuperados con integridad SHA-256 verificada por el selector.
   APK previo a la firma original: 33077386 bytes.
-- PENDIENTE: firma con clave original en el portatil; selector sin ejecutor apto
-  por RAM disponible insuficiente en el equipo custodio.
-- NO PROBADO: firma final e instalacion nueva.
+- PASS: firma original en el portatil mediante `20261006T055357Z-4162777c`.
+  Limites verificados: CPU 5 %, memoria del proceso 512 MiB, reserva 1024 MiB.
+- PASS: certificado SHA-256 coincidente con el APK anterior:
+  `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`.
+- PASS: `adb install -r` devuelve Success; Package Manager confirma versionCode 19
+  y `1.7.1-agent-preview`, conservando firstInstallTime. No se desinstalo ni borro datos.
+- PASS: paquete separado `com.vidadomu.nexus` sigue en versionCode 17 / 1.6.3-results.
+- PASS: SHA-256 del APK final:
+  `32c7dd72a1e1d2eff8199efc78d85fedd83307dc776acdc0d0a320dad036884e`.
 - NO PROBADO: interfaz, saldos reales y teclado en S25. No se abrio la app ni
-  se realizaron generaciones de pago. La instalacion existente no se ha cambiado.
+  se realizaron generaciones de pago. No se inspeccionaron sus datos privados.
 
-La receta exige ahora mas RAM libre para no repetir intentos insuficientes.
-El APK compilado esta recuperado; no hace falta repetir la compilacion.
-Reevaluar la receta local de firma cuando el portatil tenga recursos.
-Firmar en el custodio de la clave original, verificar certificado,
-paquete y version, e instalar con actualizacion conservando los datos.
+## Ajuste del selector
+
+El perfil optativo `resource_profile: apk-sign` se limita a apksigner local Windows,
+Java con heap 128 MiB, memoria maxima del proceso 512 MiB y receta de bajo impacto.
+Reduce la reserva a 1024 MiB y limita CPU a 5 % tanto en admision como en ejecucion.
+La receta local usa `max_cpu_percent: 90`; conserva controles de presion, temperatura,
+disco, identidad, bloqueo exclusivo y vigilancia de recursos. No modifica perfiles
+de compilacion ni mueve claves. La receta privada de firma queda fuera de Git.
+
+PASS: 43 pruebas de selector (test_router, test_adaptive, test_signing_profile),
+incluidas cuatro nuevas para limites, aislamiento del perfil y rechazos.

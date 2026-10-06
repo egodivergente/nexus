@@ -30,7 +30,25 @@ def save(path, data):
     finally: tmp.unlink(missing_ok=True)
 
 
+def resource_node(node, recipe):
+    """Bounded APK signing keeps a smaller reserve, never the build profile."""
+    if recipe.get("resource_profile") != "apk-sign":
+        return node
+    command = recipe.get("command", [])
+    valid = (node.get("transport") == "local" and recipe.get("kind") == "command"
+             and recipe.get("host_os") == ["windows"] and recipe.get("low_impact") is True
+             and 0 < recipe.get("max_memory_mb", 0) <= 512
+             and recipe.get("min_ram_mb", 0) >= 256
+             and len(command) > 5 and command[:3] == ["java", "-Xmx128m", "-jar"]
+             and Path(command[3]).name == "apksigner.jar" and command[4] == "sign")
+    if not valid:
+        raise ValueError("apk-sign requires local bounded apksigner with a 512 MiB maximum")
+    return dict(node, reserve_ram_mb=1024, cpu_cap_percent=5)
+
+
 def compatible(node, metrics, recipe):
+    if recipe.get("resource_profile") == "apk-sign" and node.get("transport") == "local":
+        node = resource_node(node, recipe)
     why = []
     if not metrics.get("online"): return [metrics.get("error", "sin acceso")]
     if node.get("expected_hostname") and metrics.get("hostname", "").lower() != node["expected_hostname"].lower():
@@ -182,6 +200,7 @@ def build_command(source, node, metrics, recipe):
 def execute(job):
     request = json.loads((job/"request.json").read_text())
     node = request["node"]; recipe = request["recipe"]
+    node = resource_node(node, recipe)
     state = Path(node["state_root"]); state.mkdir(parents=True,exist_ok=True)
     result = {"job_id": job.name, "node": node["id"], "state": "starting", "worker_pid": os.getpid(),
               "started_at": time.time(), "source_archive_sha256": request["source_archive_sha256"]}
