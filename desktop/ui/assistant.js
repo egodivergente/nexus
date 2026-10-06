@@ -1,5 +1,5 @@
 'use strict';
-const Agent = {owner:crypto.randomUUID(),snapshot:null,settings:{},items:[],attachments:[],busy:false,callbacks:new Set(),draft:'',error:'',cardAnchors:new Map()};
+const Agent = {owner:crypto.randomUUID(),snapshot:null,settings:{},items:[],attachments:[],busy:false,callbacks:new Set(),draft:'',error:'',cardAnchors:new Map(),expandedBatches:new Set()};
 const agentIcons = {
  chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',send:'<path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/>',
@@ -107,7 +107,7 @@ async function agentCallback(op,args){
    const key=args.id,approved=Agent.approved;
    if(!approved||approved.id!==key)throw Error('Falta la confirmacion del plan.');
    plan.cost=approved.cost;Agent.approved=null;
-   const job=await dispatch(plan);job.agentPlanId=args.id;job.projectId=args.projectId;await flush();
+    const job=await dispatch(plan,null,{agentPlanId:args.id,agentBatchId:args.id,projectId:args.projectId});await flush();
    return {jobId:job.id,providerJobId:job.remoteId||null};
   }
   case'thumbnail':{
@@ -123,16 +123,93 @@ async function agentCallback(op,args){
  }
 }
 function agentModelLabel(){return (Agent.settings.modelId||'Modelo conectado').replace(/^us\.|^eu\.|^global\./,'').replace(/^anthropic\./,'').replace(/claude-sonnet-4-6/,'Claude Sonnet 4.6').replace(/claude-opus-4-6/,'Claude Opus 4.6');}
+function planOutputCount(plan){const count=Number(plan?.effectiveParams?.count??plan?.params?.count);return Number.isInteger(count)&&count>0?count:1;}
+function planAspect(plan){return plan?.effectiveParams?.aspect||plan?.params?.aspect||plan?.effectiveParams?.aspect_ratio||plan?.params?.aspect_ratio||'Original';}
+function isImagePlan(entry){const plan=entry?.plan;return plan?.modality==='IMAGE'&&Boolean(plan.ref?.providerId&&plan.ref?.modelId);}
+function jobsForPlan(id){return state.jobs.filter(job=>job.agentPlanId===id);}
+function batchIdentity(plan){return [plan.ref.providerId,plan.ref.modelId,String(plan.prompt||'').trim(),planAspect(plan)].join('\u241f');}
+function makeGenerationBatch(id,entries){
+ const plan=entries[0].plan,jobs=entries.flatMap(entry=>jobsForPlan(entry.plan.id));
+ const requested=entries.reduce((total,entry)=>total+planOutputCount(entry.plan),0);
+ const reported=jobs.reduce((total,job)=>total+(Number.isInteger(job.expectedOutputCount)&&job.expectedOutputCount>0?job.expectedOutputCount:0),0);
+ return {id,entries,plan,jobs,providerId:plan.ref.providerId,modelId:plan.ref.modelId,aspect:planAspect(plan),count:Math.max(requested,reported),cost:entries.map(entry=>entry.plan.estimate?.basis).find(Boolean)||'Coste pendiente'};
+}
+function generationBatches(entries){
+ const groups=[],claimed=new Set();
+ for(const entry of entries){
+  const plan=entry.plan;if(claimed.has(plan.id)||!isImagePlan(entry))continue;
+  const count=planOutputCount(plan);
+  if(count>1){groups.push(makeGenerationBatch('native:'+plan.id,[entry]));claimed.add(plan.id);continue;}
+  const key=batchIdentity(plan);
+  const siblings=entries.filter(candidate=>!claimed.has(candidate.plan.id)&&isImagePlan(candidate)&&planOutputCount(candidate.plan)===1&&batchIdentity(candidate.plan)===key);
+  if(siblings.length>1){
+   const id='group:'+siblings.map(candidate=>candidate.plan.id).sort().join('|');
+   groups.push(makeGenerationBatch(id,siblings));siblings.forEach(candidate=>claimed.add(candidate.plan.id));
+  }else{
+   groups.push(makeGenerationBatch('image:'+plan.id,[entry]));claimed.add(plan.id);
+  }
+ }
+ const byPlanId=new Map();for(const batch of groups)for(const entry of batch.entries)byPlanId.set(entry.plan.id,batch);
+ return {groups,byPlanId};
+}
+function batchOutputs(batch){
+ const seen=new Set(),outputs=[];
+ for(const job of batch.jobs)for(const value of job.outputs||[]){const url=typeof value==='string'?value:value?.url;if(isMediaUrl(url)&&!seen.has(url)){seen.add(url);outputs.push(url);}}
+ return outputs;
+}
+function batchStatus(batch){
+ const outputs=batchOutputs(batch),jobs=batch.jobs;
+ if(jobs.some(job=>job.uncertain))return 'Envío por comprobar';
+ if(jobs.some(job=>job.reconciling||job.flowRecoveryRevision&&job.status!=='COMPLETED'))return 'Recuperando resultado';
+ if(jobs.some(job=>job.status==='FAILED'))return 'Revisar envío';
+ if(!jobs.length){return batch.entries.some(entry=>entry.state==='UNCERTAIN')?'Envío por comprobar':batch.entries.some(entry=>entry.state==='SUBMITTED')?(batch.providerId==='google_flow'?'Enviando a Flow':'Enviando'):'Listo para generar';}
+ if(jobs.every(job=>job.status==='COMPLETED'))return 'Completado';
+ if(outputs.length)return `Renderizando ${Math.min(outputs.length,batch.count)}/${batch.count}`;
+ return batch.providerId==='google_flow'?'Enviando a Flow':'Enviando';
+}
+function batchCanGenerate(batch){return !batch.jobs.length&&batch.entries.every(entry=>!['SUBMITTED','UNCERTAIN','DISCARDED'].includes(entry.state));}
+function batchCanConsolidate(batch){return batch.entries.length===1||batch.providerId==='google_flow'||batch.entries.every(entry=>'count' in (entry.plan.params||{})||'count' in (entry.plan.effectiveParams||{}));}
+function legacyPlanCard(entry,disabled){const p=entry.plan;return `<article class="agent-plan" data-agent-card="plan:${escape(p.id)}"><div class="summary"><h3>${escape(p.modelName)}</h3><span>${escape(planLabels[entry.state]||entry.state)}</span></div><p class="agent-text">${escape(p.prompt)}</p><div class="agent-plan-meta">${Object.entries(p.effectiveParams||{}).map(([k,v])=>`<span>${escape(E.label(k))}: ${escape(v)}</span>`).join('')}</div><p>${escape(p.estimate?.basis||'Coste pendiente')}</p>${(p.warnings||[]).map(w=>`<p class="hint">${escape(w)}</p>`).join('')}<div class="toolbar"><button class="primary" data-agent-generate="${p.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(entry.state)?'disabled':''}>Revisar y generar</button><button data-agent-canvas="${p.id}" ${disabled}>Abrir en lienzo</button><button data-agent-edit="${p.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(entry.state)?'disabled':''}>Editar</button><button data-agent-discard="${p.id}" ${disabled}>Descartar</button></div></article>`;}
+function generationBatchCard(batch,disabled){
+ const outputs=batchOutputs(batch),status=batchStatus(batch),expanded=Agent.expandedBatches.has(batch.id),canGenerate=batchCanGenerate(batch),canConsolidate=batchCanConsolidate(batch);
+ const prompt=String(batch.plan.prompt||''),canExpand=prompt.length>96,actionLabel=`Generar ${batch.count}`;
+ const primary=canGenerate&&canConsolidate?`<button class="primary" data-agent-batch-generate="${escape(batch.id)}" ${Agent.busy?'disabled':''}>${actionLabel}</button>`:'';
+ const images=outputs.length?`<div class="generation-batch-grid" aria-label="${outputs.length} resultados del lote">${outputs.map((url,index)=>`<a class="generation-batch-output" href="${escape(url)}" download aria-label="Abrir resultado ${index+1} de ${batch.count}"><img src="${escape(url)}" alt="Resultado ${index+1} de ${batch.plan.modelName}" loading="lazy" decoding="async"></a>`).join('')}</div>`:'';
+ return `<article class="generation-batch-card" data-agent-card="batch:${escape(batch.id)}" data-agent-batch-members="${escape(batch.entries.map(entry=>entry.plan.id).join('|'))}"><div class="generation-batch-header"><span class="generation-batch-label">Generación de imágenes</span><span class="generation-batch-status">${escape(status)}</span></div><div class="generation-batch-chips"><span>${escape(batch.plan.modelName)}</span><span>${escape(providers[batch.providerId]||batch.providerId)}</span><span>${escape(batch.aspect)}</span><span>${escape(batch.cost)}</span><span>${batch.count} imágenes</span></div>${images}<div class="generation-batch-prompt ${expanded?'is-expanded':''}"><span>${escape(prompt)}</span>${canExpand?`<button class="small" data-agent-prompt-toggle="${escape(batch.id)}">${expanded?'Ver menos':'Ver más'}</button>`:''}</div>${batch.plan.warnings?.map(w=>`<p class="hint generation-batch-warning">${escape(w)}</p>`).join('')||''}<div class="generation-batch-actions">${primary}<button class="small" data-agent-batch-edit="${escape(batch.id)}" ${Agent.busy||!canGenerate?'disabled':''}>Editar prompt</button><button class="small" data-agent-batch-regenerate="${escape(batch.id)}" ${disabled}>Regenerar ${batch.count}</button><button class="small" data-agent-batch-canvas="${escape(batch.id)}" ${disabled}>Abrir en lienzo</button></div></article>`;
+}
+function renderGenerationPlans(snapshot,disabled){
+ const entries=(snapshot?.plans||[]).filter(entry=>entry.state!=='DISCARDED'),{byPlanId}=generationBatches(entries),rendered=new Set();
+ return entries.map(entry=>{const batch=byPlanId.get(entry.plan.id);if(!batch)return legacyPlanCard(entry,disabled);if(rendered.has(batch.id))return '';rendered.add(batch.id);return generationBatchCard(batch,disabled);}).join('');
+}
+function findGenerationBatch(id){return generationBatches((Agent.snapshot?.plans||[]).filter(entry=>entry.state!=='DISCARDED')).groups.find(batch=>batch.id===id);}
+async function openBatchCanvas(batch,regenerate=false){const p=batch.plan,m=await agentModel(p.ref),supportsCount='count' in (p.params||{})||'count' in (p.effectiveParams||{}),values={...p.params,...(supportsCount?{count:String(batch.count)}:{})};state.draft={modelId:p.ref.modelId,prompt:p.prompt,values,media:agentMedia(p,m)};persist();await openModel(p.ref.modelId,false);if(regenerate)toast(`Lote de ${batch.count} listo para regenerar.`);}
+async function consolidateBatch(batch,prompt=batch.plan.prompt){
+ if(!batchCanConsolidate(batch))throw Error('Este modelo no declara un lote nativo. Revísalo desde el lienzo para conservar sus confirmaciones.');
+ if(batch.providerId==='google_flow'&&batch.count>28)throw Error('Google Flow admite hasta 28 imágenes por lote.');
+ const leader=batch.entries[0].plan,params={...leader.params,count:String(batch.count)};
+ if(batch.entries.length>1||prompt!==leader.prompt)await agentCall('edit',{id:leader.id,prompt,params});
+ for(const entry of batch.entries.slice(1))await agentCall('discard',{id:entry.plan.id});
+ const merged=findGenerationBatch(batch.entries[0].plan.id?`native:${leader.id}`:batch.id);
+ return merged||findGenerationBatch(batch.id)||batch;
+}
+async function prepareBatchConfirmation(batch){
+ const merged=await consolidateBatch(batch),entry=merged.entries[0],p=entry.plan,m=await agentModel(p.ref);
+ const cost=await quotePlan({model:m,prompt:p.prompt,values:p.params,media:agentMedia(p,m)});
+ Agent.approved={id:p.id,fingerprint:entry.fingerprint,cost};
+ modal(`<h2>Confirmar lote</h2><h3>${escape(p.modelName)}</h3><p class="agent-text">${escape(p.prompt)}</p><p>${merged.count} imágenes · Coste estimado: <strong>${escape(amount(cost))}</strong></p><button class="primary" data-agent="confirm">Generar ${merged.count}</button>`);
+}
 function renderAssistant(){
  const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),disabled=Agent.busy?'disabled':'';
+ const generationMarkup=renderGenerationPlans(s,disabled),proposalMarkup=(s?.proposals||[]).map(p=>`<article class="agent-plan" data-agent-card="proposal:${escape(p.id)}"><p>${escape(p.description)}</p><button data-agent-apply="${p.id}" ${disabled}>Aplicar</button> <button data-agent-reject="${p.id}" ${disabled}>Descartar</button></article>`).join('');
+ const messageMarkup=Agent.items.length?Agent.items.map(i=>`<article class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}</article>`).join(''):(!generationMarkup&&!proposalMarkup?'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>':'');
  $('#content').classList.add('agent-view');
  $('#content').innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select>${aiButton('project-new','Nuevo proyecto','plus',Agent.busy)}${aiButton('memory','Memoria del proyecto','book',Agent.busy||!project)}</div></div>
  <div class="agent-session-info"><span>${s?(s.offline?'Sin modelo conectado':escape(agentModelLabel())):'Conectando con el asistente'}</span><button class="small" data-agent="skills" ${disabled}>Herramientas · ${s?.skills.length||0}</button></div>
  ${Agent.error?`<div class="agent-error" role="alert"><span>${escape(Agent.error)}</span><button type="button" data-agent="reconnect" ${disabled}>Comprobar conexión</button></div>`:''}
- <div class="agent-messages" role="log" aria-live="polite">${Agent.items.length?Agent.items.map(i=>`<article class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}</article>`).join(''):'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>'}
- ${(s?.plans||[]).filter(p=>p.state!=='DISCARDED').map(p=>`<article class="agent-plan" data-agent-card="plan:${escape(p.plan.id)}"><div class="summary"><h3>${escape(p.plan.modelName)}</h3><span>${escape(planLabels[p.state]||p.state)}</span></div><p class="agent-text">${escape(p.plan.prompt)}</p><div class="agent-plan-meta">${Object.entries(p.plan.effectiveParams).map(([k,v])=>`<span>${escape(E.label(k))}: ${escape(v)}</span>`).join('')}</div><p>${escape(p.plan.estimate?.basis||'Coste pendiente')}</p>${p.plan.warnings.map(w=>`<p class="hint">${escape(w)}</p>`).join('')}<div class="toolbar"><button class="primary" data-agent-generate="${p.plan.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(p.state)?'disabled':''}>Revisar y generar</button><button data-agent-canvas="${p.plan.id}" ${disabled}>Abrir en lienzo</button><button data-agent-edit="${p.plan.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(p.state)?'disabled':''}>Editar</button><button data-agent-discard="${p.plan.id}" ${disabled}>Descartar</button></div></article>`).join('')}
- ${(s?.proposals||[]).map(p=>`<article class="agent-plan" data-agent-card="proposal:${escape(p.id)}"><p>${escape(p.description)}</p><button data-agent-apply="${p.id}" ${disabled}>Aplicar</button> <button data-agent-reject="${p.id}" ${disabled}>Descartar</button></article>`).join('')}
- ${Agent.busy?'<div class="agent-thinking"><span class="loading"></span> Procesando…</div>':''}</div>
+ <div class="agent-messages" role="log" aria-live="polite">${messageMarkup}
+ ${generationMarkup}
+ ${proposalMarkup}
+ ${Agent.busy?'<div class="agent-thinking"><span class="loading"></span> Preparando…</div>':''}</div>
  <form id="agent-compose"><div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…" ${disabled}>${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${aiButton('attach','Adjuntar imagen o vídeo','clip',Agent.busy)}${aiButton('send','Enviar mensaje','send',Agent.busy)}</div></form>`;
  const messages=$('.agent-messages');
  const messageNodes=[...messages.querySelectorAll('.agent-message')];
@@ -141,7 +218,11 @@ function renderAssistant(){
  const cards=[...messages.querySelectorAll('[data-agent-card]')];
  for(const card of cards){
   const key=card.dataset.agentCard;
-  if(!Agent.cardAnchors.has(key))Agent.cardAnchors.set(key,Agent.items.at(-1)||null);
+  if(!Agent.cardAnchors.has(key)||!Agent.cardAnchors.get(key)&&Agent.items.length){
+   const memberAnchors=(card.dataset.agentBatchMembers||'').split('|').flatMap(id=>[...Agent.cardAnchors.entries()].filter(([anchorKey])=>anchorKey==='plan:'+id||anchorKey.startsWith('batch:')&&anchorKey.includes(id)).map(([,anchor])=>anchor)).filter(Boolean);
+   const earliest=memberAnchors.sort((a,b)=>Agent.items.indexOf(a)-Agent.items.indexOf(b))[0];
+   Agent.cardAnchors.set(key,earliest||Agent.items.at(-1)||null);
+  }
  }
  for(const card of cards.reverse()){
   const anchor=Agent.cardAnchors.get(card.dataset.agentCard),index=Agent.items.indexOf(anchor);
@@ -195,6 +276,7 @@ document.addEventListener('submit',async e=>{
   if(formId==='agent-project-form')await agentCall('createProject',fields);
   if(formId==='agent-memory')await agentCall('memory',fields);
   if(formId==='agent-edit'){const params=Object.fromEntries(Object.entries(fields).filter(([k])=>k.startsWith('param:')).map(([k,v])=>[k.slice(6),v||null]));await agentCall('edit',{id:fields.id,prompt:fields.prompt,params});}
+   if(formId==='agent-batch-edit'){const batch=findGenerationBatch(fields.batchId);if(!batch)throw Error('El lote ya no está disponible.');await consolidateBatch(batch,fields.prompt);}
   $('#dialog').close();
  }catch(error){toast(error.message);}
 });
@@ -204,7 +286,11 @@ document.addEventListener('click',async e=>{
   if(b.dataset.nav==='assistant'&&!Agent.busy){const first=!Agent.snapshot;await agentCall('snapshot');if(first)await agentCall('importHistory');}
   if(b.dataset.agentMode)await agentCall('mode',{mode:b.dataset.agentMode});
   if(b.dataset.agentRemove){Agent.attachments=Agent.attachments.filter(f=>f.id!==b.dataset.agentRemove);renderAssistant();}
+   if(b.dataset.agentPromptToggle){if(Agent.expandedBatches.has(b.dataset.agentPromptToggle))Agent.expandedBatches.delete(b.dataset.agentPromptToggle);else Agent.expandedBatches.add(b.dataset.agentPromptToggle);renderAssistant();return;}
   for(const action of ['apply','reject','discard'])if(b.dataset['agent'+action[0].toUpperCase()+action.slice(1)])await agentCall(action,{id:b.dataset['agent'+action[0].toUpperCase()+action.slice(1)]});
+   if(b.dataset.agentBatchCanvas||b.dataset.agentBatchRegenerate){const batch=findGenerationBatch(b.dataset.agentBatchCanvas||b.dataset.agentBatchRegenerate);if(!batch)throw Error('El lote ya no está disponible.');await openBatchCanvas(batch,Boolean(b.dataset.agentBatchRegenerate));return;}
+   if(b.dataset.agentBatchEdit){const batch=findGenerationBatch(b.dataset.agentBatchEdit);if(!batch)throw Error('El lote ya no está disponible.');modal(`<h2>Editar prompt</h2><form id="agent-batch-edit"><input type="hidden" name="batchId" value="${escape(batch.id)}"><label>Prompt<textarea name="prompt">${escape(batch.plan.prompt)}</textarea></label><button class="primary">Guardar</button></form>`);return;}
+   if(b.dataset.agentBatchGenerate){const batch=findGenerationBatch(b.dataset.agentBatchGenerate);if(!batch)throw Error('El lote ya no está disponible.');await prepareBatchConfirmation(batch);return;}
   if(b.dataset.agentCanvas){const p=Agent.snapshot.plans.find(p=>p.plan.id===b.dataset.agentCanvas).plan;
    const m=await agentModel(p.ref);state.draft={modelId:p.ref.modelId,prompt:p.prompt,values:p.params,media:agentMedia(p,m)};await openModel(p.ref.modelId,false);persist();}
   if(b.dataset.agentEdit){const p=Agent.snapshot.plans.find(p=>p.plan.id===b.dataset.agentEdit).plan,m=await agentModel(p.ref);
@@ -219,7 +305,7 @@ document.addEventListener('click',async e=>{
    case'reconnect':try{await rpc('init');await agentCall('snapshot');Agent.error='';toast('Conexión local comprobada. No se ha reenviado el mensaje.');}catch(error){Agent.error=error.message;}if(view==='assistant')renderAssistant();break;
    case'send':e.preventDefault();await sendAgent();break;
    case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();break;
-   case'new':await agentCall('new');Agent.items=[];Agent.attachments=[];Agent.cardAnchors.clear();renderAssistant();break;
+   case'new':await agentCall('new');Agent.items=[];Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();renderAssistant();break;
    case'settings':agentSettings();break;
    case'project-new':modal('<h2>Nuevo proyecto</h2><form id="agent-project-form"><label>Nombre<input name="name" maxlength="80" required></label><button class="primary">Crear proyecto</button></form>');break;
    case'memory':{const p=Agent.snapshot.index.projects.find(p=>p.id===Agent.snapshot.projectId),m=p.memory;

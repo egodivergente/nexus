@@ -15,14 +15,6 @@ function flowArguments(model,values,media=[]){
 // Keep the existing providers available, while opening an owned Flow model's
 // selector on that account. Apply after the Studio wrappers have loaded.
 document.addEventListener('DOMContentLoaded',()=>{
- const assistantBefore=renderAssistant;
- renderAssistant=function(){assistantBefore();
-  for(const plan of Agent.snapshot?.plans||[]){
-   const job=state.jobs.find(j=>j.agentPlanId===plan.plan.id&&j.providerId==='google_flow');
-   const card=document.querySelector('[data-agent-generate="'+CSS.escape(plan.plan.id)+'"]')?.closest('.agent-plan');
-   if(job&&card)card.insertAdjacentHTML('beforeend',flowAgentResult(job));
-  }
- };
  const refreshBefore=refreshJobViews;
  refreshJobViews=function(ids){refreshBefore(ids);
   if(view==='assistant'&&!Agent.busy&&state.jobs.some(j=>j.agentPlanId&&ids.includes(j.id)))renderAssistant();
