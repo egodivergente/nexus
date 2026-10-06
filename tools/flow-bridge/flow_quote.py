@@ -56,12 +56,12 @@ async def _quote(model, aspect, **options):
                 await close(page,strict=strict)
             composer._close_pane=read_price
             if model in {'nano2','nano-pro'}:
-                request=GenerateImageRequest(prompt='Inspection only',model=Model.from_cli(model),aspect=ImageAspect.from_cli(aspect),count=1,
+                request=GenerateImageRequest(prompt='Inspection only',model=Model.from_cli(model),aspect=ImageAspect.from_cli(aspect),count=params.get('count',1),
                     ref_paths=tuple(Path(p) for p in params.get('reference_images',[])))
                 await composer.apply_image_settings(page,request)
             elif model in {'veo_fast','veo_quality','veo_lite','omni_flash'}:
                 request=GenerateVideoRequest(prompt='Inspection only',model=VideoModel.from_cli(model),mode=Mode(params.get('mode','t2v')),
-                    aspect=VideoAspect.from_cli(aspect),count=1,duration=params.get('duration',8),resolution=params.get('resolution'),
+                    aspect=VideoAspect.from_cli(aspect),count=params.get('count',1),duration=params.get('duration',8),resolution=params.get('resolution'),
                     start_image=Path(params['initial_frame']) if params.get('initial_frame') else None,
                     end_image=Path(params['end_frame']) if params.get('end_frame') else None,
                     reference_images=tuple(Path(p) for p in params.get('reference_images',[])))
@@ -79,7 +79,7 @@ async def _quote(model, aspect, **options):
         finally:await ctx.close()
     result={**params,'credits':cost,'checked_at':time.time(),
         'source':'Flow native voice availability' if params.get('voice') else 'Flow settings',
-        'native_price_exposed':cost is not None,'generation_count':1,'new_generation_submitted':False}
+        'native_price_exposed':cost is not None,'generation_count':params.get('count',1),'new_generation_submitted':False}
     prices=ROOT/'jobs/verified-prices.json'
     previous=json.loads(prices.read_text()) if prices.exists() else {}
     previous[quote_key(params)]=result

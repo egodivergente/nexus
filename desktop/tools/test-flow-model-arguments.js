@@ -13,6 +13,8 @@ context.model={providerModelId:'image_upscale',promptRequired:false};
 context.values={source_request_id:'owned-result',resolution:'4k',aspect:'1:1'};
 assert.deepEqual(JSON.parse(JSON.stringify(vm.runInContext('flowArguments(model,values)',context))),{model:'image_upscale',source_request_id:'owned-result',resolution:'4k'});
 console.log('PASS: Pro and every video model retain their generation arguments; upscales retain the owned source.');
+context.model={providerModelId:'nano-pro',promptRequired:true};context.values={aspect:'1:1',count:'28'};
+assert.equal(JSON.parse(JSON.stringify(vm.runInContext('flowArguments(model,values)',context))).count,28);
 context.model={providerModelId:'omni_flash',flowMode:'i2v',contractMedia:[{key:'initial_frame'},{key:'end_frame'}]};
 context.values={aspect:'9:16',duration:'10',resolution:'360p'};
 context.media=[{field:'initial_frame',id:'first'},{field:'end_frame',id:'last'}];

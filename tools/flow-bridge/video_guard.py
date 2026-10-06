@@ -43,7 +43,7 @@ def codes(requested, mode, duration, end, resolution):
         return {b+'_'+str(seconds)+'s' for b in base}
     return base
 
-def model_problem(body, requested='veo_3_1_fast', *, mode='t2v', duration=None,
+def _single_model_problem(body, requested='veo_3_1_fast', *, mode='t2v', duration=None,
                   resolution=None,aspect=None,start_id=None,end_id=None,reference_ids=(),voice=None):
     try:
         rpc,row=unpack(body)
@@ -68,10 +68,33 @@ def model_problem(body, requested='veo_3_1_fast', *, mode='t2v', duration=None,
         return "Video model cannot be verified from its RPC structure; submission refused."
     return None
 
+def model_problem(body, requested='veo_3_1_fast', *, count=1, **options):
+    try:
+        start=body.index('f.req=')+len('f.req=')
+        envelope,_=json.JSONDecoder().raw_decode(body[start:])
+        if len(envelope)!=1 or len(envelope[0])!=1:raise ValueError()
+        entry=envelope[0][0]
+        payload=json.loads(entry[1])
+        rows=payload[0]
+        if type(count) is not int or not 1<=count<=4 or len(rows)!=count:raise ValueError()
+        for row in rows:
+            single='f.req='+json.dumps([[[entry[0],json.dumps([[row],*payload[1:]])]]])
+            problem=_single_model_problem(single,requested,**options)
+            if problem:return problem
+    except (TypeError,ValueError,IndexError,KeyError):
+        return 'Requested video count was not bound; submission refused.'
+    return None
+
 def interpolation_problem(body,rpc,start_id,end_id):
     """Structural frame check for the measured *_fl and first_last RPCs."""
     try:
-        actual,row=unpack(body)
+        start=body.index('f.req=')+len('f.req=')
+        envelope,_=json.JSONDecoder().raw_decode(body[start:])
+        if len(envelope)!=1 or len(envelope[0])!=1:raise ValueError()
+        entry=envelope[0][0];actual=entry[0];rows=json.loads(entry[1])[0]
+        if not 1<=len(rows)<=4:raise ValueError()
+        if any(row[4][1]!=start_id or row[5][1]!=end_id for row in rows):raise ValueError()
+        row=rows[0]
         if actual!=rpc or rpc!='nprQif' or not start_id or not end_id:raise ValueError()
         code=row[1]
         if not isinstance(code,str) or not (code.endswith('_fl') or 'first_last' in code or 'interpolation' in code):raise ValueError()

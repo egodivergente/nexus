@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 import uuid
-from flow_contract import normalize, quote_key, INPUTS
+from flow_contract import normalize, quote_key, block_counts, INPUTS
 
 RUNTIME = Path.home() / '.codex/integrations/google-flow'
 PYTHON = RUNTIME / 'venv/Scripts/python.exe'
@@ -94,6 +94,12 @@ def catalog():
                     'options':['Automática','Achernar','Achird','Algenib','Algieba','Alnilam','Aoede','Autonoe','Callirrhoe',
                         'Charon','Despina','Enceladus','Erinome','Fenrir','Gacrux','Iapetus'],
                     'defaultValue':'Automática','isRequired':False})
+    for model in result:
+        if model['providerModelId'] in {'nano2','nano-pro','veo_fast','veo_quality','veo_lite','omni_flash'}:
+            model['parameters'] = [*model['parameters'], {
+                'key':'count', 'displayName':'Cantidad de resultados', 'type':'INTEGER', 'nativeType':'integer',
+                'defaultValue':'1', 'minValue':1, 'step':1, 'isRequired':True,
+                'description':'Se generan en bloques de hasta 4. Puedes pedir más bloques en la misma solicitud.'}]
     return result
 
 def parameters(args):
@@ -129,6 +135,15 @@ def media_parameters(data, params):
 
 def quote(args, data=None):
     params = parameters(args)
+    if params.get('count', 1) > 4:
+        sizes = list(block_counts(params['count']))
+        estimates = {size: quote({**params, 'count':size}, data) for size in set(sizes)}
+        amounts = [estimates[size]['amount'] for size in sizes]
+        return {'amount':None if any(value is None for value in amounts) else sum(amounts),
+            'currency':'flow_account' if any(value is None for value in amounts) else 'flow_credits',
+            'time':int(time.time()*1000), 'count':params['count'], 'blocks':sizes,
+            'detail':f"{params['count']} resultados en {len(sizes)} bloques de hasta 4. Importe consultado por bloque.",
+            'source':'Flow settings per block'}
     if not available():
         raise ValueError('El puente local de Flow no está instalado.')
     if params['model']=='video_edit':
@@ -221,7 +236,11 @@ def call(tool, args, request_id):
 
 def work(data, request_id, params, recover=False, recovery_started_at=0):
     try:
-        if recover:
+        if params.get('count', 1) > 4:
+            import flow_batch
+            import sys
+            result = flow_batch.run(sys.modules[__name__], data, request_id, params, recover, recovery_started_at)
+        elif recover:
             tool='flow_get_result'
             arguments={}
         elif params.get('model')=='video_edit':
@@ -233,8 +252,9 @@ def work(data, request_id, params, recover=False, recovery_started_at=0):
         else:
             tool = 'flow_generate_image' if params['model'] in {'nano2','nano-pro'} else 'flow_generate_video'
             arguments=media_parameters(data,params)
-        result = call(tool, {'request_id':request_id, **arguments},
-                      'recovery-'+uuid.uuid4().hex if recover else request_id)
+        if params.get('count', 1) <= 4:
+            result = call(tool, {'request_id':request_id, **arguments},
+                          'recovery-'+uuid.uuid4().hex if recover else request_id)
         if not isinstance(result, dict):
             raise ValueError('Flow devolvió un resultado no válido.')
     except Exception as exc:
@@ -299,7 +319,7 @@ def recover(data, request_id):
     with LOCK:
         connection = ledger(data)
         try:
-            row = connection.execute('SELECT result FROM jobs WHERE id=?', (request_id,)).fetchone()
+            row = connection.execute('SELECT params,result FROM jobs WHERE id=?', (request_id,)).fetchone()
             if not row:
                 raise ValueError('Trabajo Flow no encontrado. No se envía ninguna generación.')
             active = request_id in WORKERS
@@ -321,12 +341,12 @@ def recover(data, request_id):
             if request_id not in WORKERS and not changed_to_completed:
                 previous = connection.execute('SELECT result FROM jobs WHERE id=?', (request_id,)).fetchone()['result']
                 revision = max(int(time.time()*1000), (json.loads(previous).get('recovery_started_at', 0)+1) if previous else 0)
-                pending = {'status':'in_progress', 'recovery_started_at':revision}
+                pending = {**(json.loads(previous) if previous else {}), 'status':'in_progress', 'recovery_started_at':revision}
                 with connection:
                     connection.execute('UPDATE jobs SET result=? WHERE id=?', (json.dumps(pending), request_id))
                 WORKERS.add(request_id)
                 try:
-                    threading.Thread(target=work, args=(data, request_id, {}),
+                    threading.Thread(target=work, args=(data, request_id, json.loads(row['params'])),
                                      kwargs={'recover':True, 'recovery_started_at':revision}, daemon=True).start()
                 except Exception:
                     WORKERS.discard(request_id)
@@ -353,17 +373,27 @@ def status(data, request_id):
     result = json.loads(row['result']) if row['result'] else {'status':'in_progress' if active else 'needs_reconciliation'}
     if result.get('status') == 'in_progress' and not active:
         result['status'] = 'needs_reconciliation'
-    if result.get('status') == 'completed' and not result.get('path'):
+    artifacts = result.get('artifacts') or ([result] if result.get('path') else [])
+    if result.get('blocks'):
+        artifacts = []
+        for part in result['blocks']:
+            proof = part.get('result', {})
+            artifacts.extend(proof.get('artifacts') or ([proof] if proof.get('path') else []))
+        response_blocks = [{'request_id':p['request_id'], 'count':p['count'], 'status':p['status']} for p in result['blocks']]
+    else:
+        response_blocks = []
+    if result.get('status') == 'completed' and not artifacts:
         result['status'] = 'needs_reconciliation'
     response = {'id':request_id, 'status':result.get('status'), 'outputs':[],
                 'recovery_started_at':result.get('recovery_started_at', 0),
-                'reconciling':bool(active and result.get('recovery_started_at'))}
-    if result.get('status') == 'completed' and result.get('path'):
-        source = Path(result['path']).resolve()
+                'reconciling':bool(active and result.get('recovery_started_at')), 'blocks':response_blocks,
+                'count':result.get('count', len(artifacts) or 1)}
+    for artifact in artifacts:
+        source = Path(artifact['path']).resolve()
         if not source.is_relative_to((RUNTIME / 'results').resolve()) or source.suffix.lower() not in {'.png','.jpg','.jpeg','.webp','.mp4','.gif'}:
             raise ValueError('Resultado Flow fuera del almacén permitido.')
         digest = hashlib.sha256(source.read_bytes()).hexdigest()
-        if digest != result.get('sha256'):
+        if digest != artifact.get('sha256'):
             raise ValueError('La integridad del resultado Flow no coincide.')
         destination = Path(data) / 'media' / (digest[:32] + source.suffix.lower())
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -373,8 +403,9 @@ def status(data, request_id):
             temporary.replace(destination)
         if hashlib.sha256(destination.read_bytes()).hexdigest() != digest:
             raise ValueError('La copia local de Flow no coincide.')
-        response.update(outputs=['/media/' + destination.name], sha256=digest,
-            dimensions=result.get('dimensions'), duration_seconds=result.get('duration_seconds'),
+        response['outputs'].append('/media/' + destination.name)
+        response.update(sha256=digest,
+            dimensions=artifact.get('dimensions'), duration_seconds=artifact.get('duration_seconds'),
             source_request_id=result.get('source_request_id'),resolution=result.get('resolution'),operation=result.get('operation'))
     if response['status'] in {'needs_reconciliation','error','failed'}:
         response['status'] = 'failed'

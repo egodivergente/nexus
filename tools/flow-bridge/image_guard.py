@@ -5,7 +5,7 @@ import json
 # BELUGA on 2026-10-06. The request was aborted before reaching Google.
 MODEL_CODES = {"NARWHAL": {"NARWHAL", "BELUGA"}}
 
-def model_problem(body, requested):
+def model_problem(body, requested, count=None):
     if requested == "HARBOR_SEAL":
         return "Nano Banana Lite is prohibited by the user; submission refused."
     try:
@@ -18,6 +18,8 @@ def model_problem(body, requested):
         rows = payload[1]
         if not isinstance(rows, list) or not rows:
             raise ValueError()
+        if count is not None and (type(count) is not int or not 1<=count<=4 or len(rows)!=count):
+            return 'Requested image count was not bound; submission refused.'
         codes = [row[5] for row in rows]
         expected = MODEL_CODES.get(requested, {requested})
         if any(code not in expected for code in codes):

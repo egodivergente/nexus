@@ -34,45 +34,48 @@ async def run(args):
             page=await ctx.new_page();page.on('response',collect)
             await page.goto('https://flow.google.com/project/'+args.project,wait_until='domcontentloaded',timeout=90000)
             for _ in range(60):
-                if found:break
+                if len(found)>=request.get("count",1):break
                 await page.wait_for_timeout(500)
             if pending:await asyncio.gather(*pending,return_exceptions=True)
-            if len(found)!=1:return {'status':'unresolved','matching_videos':len(found)}
-            record=next(iter(found.values()))
-            try:
-                stage='listing_download'
-                data=await MigratedComposer._fetch_mp4(page,record)
-            except Exception:
-                # The listing carries a poster handle on this cohort. Open only
-                # this exact-prompt asset and use the player's actual video URL.
-                await page.goto(f'https://flow.google.com/project/{args.project}/edit/{record.media_id}',wait_until='domcontentloaded',timeout=90000)
-                stage='download_button'
-                from gflow_cli.api.transports.ui_automation import _is_allowed_download_host
-                downloads=[]
-                page.on('download',lambda download:downloads.append(download))
-                button=page.get_by_role('button',name=re.compile('Descargar|Download',re.I)).first
-                await button.click(timeout=15000)
-                await page.wait_for_timeout(1000)
-                stage='download_menu'
-                if not downloads:
-                    menu=page.locator('.cdk-overlay-pane').last
-                    (ROOT/'jobs/video-download-menu-private.txt').write_text(await menu.inner_text(),encoding='utf-8')
-                    item=menu.get_by_role('menuitem',name=re.compile('720p',re.I)).first
-                    await item.click(timeout=10000)
-                for _ in range(60):
-                    if downloads:break
-                    await page.wait_for_timeout(500)
-                if not downloads:raise ValueError('Video download failed')
-                download=downloads[0]
-                if not _is_allowed_download_host(download.url) and not download.url.startswith('blob:https://flow.google.com/'):
-                    raise ValueError('Unexpected video origin')
-                downloaded=ROOT/'results'/f'{record.media_id}.download.mp4'
-                await download.save_as(downloaded)
-                data=downloaded.read_bytes();downloaded.unlink()
-                if data[4:8]!=b'ftyp':raise ValueError('Player download was not MP4')
-            path=ROOT/'results'/f'{record.media_id}.mp4';path.write_bytes(data)
-            return {'status':'recovered','path':str(path),'project_id':args.project,
-                'media_id':record.media_id,'new_generation_submitted':False,'requested_model':request['model']}
+            if len(found)!=request.get('count',1):return {'status':'unresolved','matching_videos':len(found)}
+            artifacts=[]
+            for record in sorted(found.values(),key=lambda record:record.media_id):
+                try:
+                    stage='listing_download'
+                    data=await MigratedComposer._fetch_mp4(page,record)
+                except Exception:
+                    # The listing carries a poster handle on this cohort. Open only
+                    # this exact-prompt asset and use the player's actual video URL.
+                    await page.goto(f'https://flow.google.com/project/{args.project}/edit/{record.media_id}',wait_until='domcontentloaded',timeout=90000)
+                    stage='download_button'
+                    from gflow_cli.api.transports.ui_automation import _is_allowed_download_host
+                    downloads=[]
+                    page.on('download',lambda download:downloads.append(download))
+                    button=page.get_by_role('button',name=re.compile('Descargar|Download',re.I)).first
+                    await button.click(timeout=15000)
+                    await page.wait_for_timeout(1000)
+                    stage='download_menu'
+                    if not downloads:
+                        menu=page.locator('.cdk-overlay-pane').last
+                        (ROOT/'jobs/video-download-menu-private.txt').write_text(await menu.inner_text(),encoding='utf-8')
+                        item=menu.get_by_role('menuitem',name=re.compile('720p',re.I)).first
+                        await item.click(timeout=10000)
+                    for _ in range(60):
+                        if downloads:break
+                        await page.wait_for_timeout(500)
+                    if not downloads:raise ValueError('Video download failed')
+                    download=downloads[0]
+                    if not _is_allowed_download_host(download.url) and not download.url.startswith('blob:https://flow.google.com/'):
+                        raise ValueError('Unexpected video origin')
+                    downloaded=ROOT/'results'/f'{record.media_id}.download.mp4'
+                    await download.save_as(downloaded)
+                    data=downloaded.read_bytes();downloaded.unlink()
+                    if data[4:8]!=b'ftyp':raise ValueError('Player download was not MP4')
+                path=ROOT/'results'/f'{record.media_id}.mp4';path.write_bytes(data)
+                artifact={'status':'recovered','path':str(path),'project_id':args.project,
+                    'media_id':record.media_id,'new_generation_submitted':False,'requested_model':request['model']}
+                artifacts.append(artifact)
+            return {**artifacts[0],'files':[a['path'] for a in artifacts],'artifacts':artifacts}
         except Exception:
             import traceback
             (ROOT/'jobs/video-recovery-trace-private.txt').write_text(traceback.format_exc(),encoding='utf-8')

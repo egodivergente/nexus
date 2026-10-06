@@ -6,6 +6,14 @@ IMAGES = {'nano2', 'nano-pro'}
 VIDEOS = {'veo_fast', 'veo_quality', 'veo_lite', 'omni_flash'}
 INPUTS = ('initial_frame', 'end_frame', 'reference_images')
 
+def block_counts(count):
+    if type(count) is not int or count < 1:
+        raise ValueError('La cantidad debe ser un número entero positivo.')
+    while count:
+        size = min(4, count)
+        yield size
+        count -= size
+
 def normalize(args):
     model = args.get('model')
     image = model in IMAGES
@@ -55,7 +63,9 @@ def normalize(args):
             raise ValueError('Resolución nativa no disponible. Las mejoras se solicitan sobre el resultado.')
         # Veo has no native resolution control: 720p is its native output.
         if model=='omni_flash':result['resolution']=resolution
-    if args.get('count',1)!=1:raise ValueError('Esta ruta entrega un resultado por trabajo.')
+    count = args.get('count', 1)
+    next(block_counts(count))
+    if count != 1:result['count'] = count
     return result
 
 def quote_key(params):

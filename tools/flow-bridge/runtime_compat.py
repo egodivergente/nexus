@@ -95,7 +95,10 @@ def install():
             return migrated._rpcid(str(url)) == migrated.IMAGE_SUBMIT_RPC
 
         async def guard(route, raw_request):
-            await migrated._guard_image_submit(route, raw_request, reference_ids, request.model)
+            if model_problem(migrated._post_data(raw_request), request.model.value, count=request.count):
+                await route.abort()
+            else:
+                await migrated._guard_image_submit(route, raw_request, reference_ids, request.model)
 
         await page.route(matches, guard)
         try:
@@ -165,7 +168,7 @@ def install():
                 mode=bound.mode.value if bound else None,duration=bound.duration if bound else None,
                 resolution=bound.resolution if bound else None,aspect=bound.aspect.value if bound else None,start_id=kwargs.get('expect_media_id'),
                 end_id=kwargs.get('expect_end_media_id'),reference_ids=kwargs.get('expect_reference_ids',()),
-                voice=bound.reference_audio if bound else None):
+                voice=bound.reference_audio if bound else None,count=bound.count if bound else 1):
                 await route.abort()
             else:
                 await route.continue_()

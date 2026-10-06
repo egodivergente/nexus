@@ -10,4 +10,7 @@ assert.doesNotMatch(render({...job,status:'PROCESSING'}),/<img |Guardar resultad
 assert.doesNotMatch(render({...job,outputs:['https://example.com/unverified.png']}),/<img |Guardar resultado/);
 assert.doesNotMatch(render({...job,outputs:['javascript:alert(1)']}),/<img |Guardar resultado/);
 assert.match(render({...job,modality:'VIDEO',outputs:['/media/'+'b'.repeat(32)+'.mp4']}),/<video /);
+const multiple=render({...job,outputs:['/media/'+'a'.repeat(32)+'.png','/media/'+'b'.repeat(32)+'.png']});
+assert.equal((multiple.match(/<img /g)||[]).length,2);
+assert.match(multiple,/Guardar resultado 2/);
 console.log('PASS: the agent displays completed local Flow results and preserves pending/unverified states.');

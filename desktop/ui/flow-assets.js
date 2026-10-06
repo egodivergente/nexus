@@ -4,6 +4,7 @@ function flowArguments(model,values,media=[]){
  if(model.flowOperation==='edit_video')return {...args,source_request_id:values.source_request_id};
  if(model.promptRequired===false)return {...args,source_request_id:values.source_request_id,resolution:values.resolution};
  args.aspect=values.aspect;
+ if(values.count!=null&&values.count!=='')args.count=Number(values.count);
  if(model.flowMode)args.mode=model.flowMode;
  if(values.duration!=null&&values.duration!=='')args.duration=Number(values.duration);
  if(values.resolution)args.resolution=values.resolution;
@@ -43,11 +44,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 function flowAgentResult(job){
  const labels={COMPLETED:'Completado',FAILED:'Revisar envío',SENDING:'Envío sin confirmar',QUEUED:'En cola',GENERATING:'Generando',PROCESSING:'Procesando'};
- const output=job.outputs?.[0],url=typeof output==='string'?output:output?.url;
- const local=typeof url==='string'&&/^\/media\/[a-f0-9]{32}\.(png|jpe?g|webp|gif|mp4|webm)$/.test(url);
- const ready=job.status==='COMPLETED'&&local;
- const preview=ready?(job.modality==='VIDEO'?'<video src="'+escape(url)+'" controls preload="metadata" style="width:100%;max-height:480px"></video>':'<img src="'+escape(url)+'" alt="Resultado de '+escape(job.name||job.modelId)+'" style="width:100%;max-height:480px;object-fit:contain">'):'';
- return '<div class="flow-agent-result" aria-live="polite"><p role="status">'+escape(labels[job.status]||job.status)+' · Google Flow</p>'+preview+(ready?'<a href="'+escape(url)+'" download>Guardar resultado</a>':'')+(job.error?'<p class="error">'+escape(job.error)+'</p>':'')+'</div>';
+ const results=(job.status==='COMPLETED'||job.uncertain?job.outputs||[]:[]).map(output=>typeof output==='string'?output:output?.url).filter(url=>typeof url==='string'&&/^\/media\/[a-f0-9]{32}\.(png|jpe?g|webp|gif|mp4|webm)$/.test(url));
+ const preview=results.map((url,index)=>'<div class="flow-agent-output">'+(job.modality==='VIDEO'?'<video src="'+escape(url)+'" controls preload="metadata" style="width:100%;max-height:480px"></video>':'<img src="'+escape(url)+'" alt="Resultado '+(index+1)+' de '+escape(job.name||job.modelId)+'" style="width:100%;max-height:480px;object-fit:contain">')+'<a href="'+escape(url)+'" download>Guardar resultado'+(results.length>1?' '+(index+1):'')+'</a></div>').join('');
+ return '<div class="flow-agent-result" aria-live="polite"><p role="status">'+escape(labels[job.status]||job.status)+' · Google Flow'+(results.length?' · '+results.length+' resultados':'')+'</p>'+preview+(job.error?'<p class="error">'+escape(job.error)+'</p>':'')+'</div>';
 }
 let flowAvailabilityTimer,flowAvailabilityKey='',flowAvailabilityExpiry,flowAvailabilityValue=null,flowAvailabilityVerifiedKey='';
 function scheduleFlowAvailability(){
