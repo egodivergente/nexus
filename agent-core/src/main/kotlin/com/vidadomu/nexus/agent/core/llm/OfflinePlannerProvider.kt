@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.agent.core.llm
 
+import com.vidadomu.nexus.agent.core.agent.ExternalServices
 import java.text.Normalizer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +46,7 @@ class OfflinePlannerProvider : LlmProvider {
     }
 
     private fun intent(text: String): LlmResponse {
+        if (ExternalServices.mentionsFlow(text.substringBefore("\n\n[Adjuntos:"))) return say(ExternalServices.OFFLINE_FLOW_REPLY)
         val t = norm(text)
         val images = Regex("attachment_id=([^,\\]]+), image/").findAll(text).count()
         val videos = Regex("attachment_id=([^,\\]]+), video/").findAll(text).count()

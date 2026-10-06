@@ -178,3 +178,26 @@ Following user authorization, when Google blocks unattended reauthentication, ac
 - PASS: signing job `20261006T143211Z-7adddb31` used the original certificate on Windows with verified 5% CPU cap. Signed APK SHA-256: `da489a661778d037771b89855974b5403adf61f246faa68ed10bacf346b465c1`.
 - PASS: update installed with `-r --user 0` on Pixel 8 Pro and S25; both report versionCode 21 / 1.7.3-agent-preview. No app data was cleared. Private recovery pairing returned `ok:true` on both; empty-token pairing was rejected on Pixel. S25 foreground application was not opened or changed.
 
+### Mobile keyboard recovery
+
+The remote desktop canvas does not request Android's keyboard when the user taps a Google password field. The portal now exposes a visible `Teclado` button that synchronously focuses noVNC's existing keyboard input during the user's tap, preserving its key forwarding and avoiding noVNC's touch-device detection gate. It does not collect passwords or introduce a text-submission endpoint.
+
+- PASS: live desktop browser click focuses `noVNC_keyboardinput` inside the remote iframe.
+- PASS: three Node tests cover synchronous focus, loading/unavailable input, and cleanup on remote close (`node --test tools/flow-linux-probe/test_recovery_keyboard.cjs`).
+- Deployment: HTML-only update on ASUS, no browser/service restart and no APK rebuild. The mobile page must reload to receive the button; the remote Google page remains open.
+- NO PROBADO: Android soft-keyboard appearance and password entry on the actual S25. The user is asked to verify this without the agent typing or submitting credentials.
+
+### Agent knowledge correction (1.7.4)
+
+The agent incorrectly treated the executable Nexus catalog as the universe of existing products. Fixed the system instruction and empty-search guidance. Google Flow now has a shared, source-attributed service description, including the private recovery entry point and the explicit absence of a Flow generation adapter in this APK. These facts are included even with a custom system prompt and in existing conversations; search results keep external-service metadata separate from executable models.
+
+The offline planner explains this boundary without selecting a replacement provider or creating a paid plan. It checks the user's text, not attachment filenames. Six regressions cover mandatory knowledge, read-only search metadata, offline requests, ambiguous names, attachment filenames, and the LLM request contract with a scripted provider. They do not demonstrate the behavior of a real paid LLM.
+
+Sources checked on 2026-10-06: [Google Flow video guide](https://support.google.com/flow/answer/16353334) and [image guide](https://support.google.com/flow/answer/16729550). No account-specific costs, model versions, limits or feature entitlement are inferred.
+
+The build recipe uses Gradle's unique project abbreviation `:agent:test` for `:agent-core:test`; the selector currently rejects hyphens in task paths. The full core and Android unit suites are requested before assembling the APK. Job `20261006T145312Z-dbc58720` was deliberately stopped (143) before delivery to include the attachment-filename regression in a fresh selector snapshot.
+
+- PASS: selector build `20261006T145906Z-509dca5d` completed on the screen-off Pixel in 17m 56s. Collected artifact and source manifests passed integrity verification. JUnit XML reports contain 217 app tests and 80 agent-core tests, including all six new regressions: zero failures, errors or skipped tests.
+- PASS: signing job `20261006T152243Z-bf568d73` completed on the key's Windows custodian with a verified 5% CPU / 512 MB cap. The original certificate SHA-256 is `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`; signed APK SHA-256 is `4db67c1c1e72e21fd99b270e08f77cf4781fb37176cb2b0b2ddef10f842d4e37`.
+- PASS: `install -r --user 0` succeeded on Pixel 8 Pro and S25 without clearing data. Package inspection and the read-only agent status provider both report `1.7.4-agent-preview`, versionCode 22. The S25 foreground activity remained unchanged. No app was brought to the foreground for this check.
+- NO PROBADO: a real paid LLM response, fresh visual interaction in the APK, account authentication and Flow generation. The status provider responds but reports `catalogReady:false` before UI initialization; this is not evidence of a loaded catalog. No paid generation or LLM request was submitted.

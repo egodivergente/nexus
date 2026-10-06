@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.agent.core.tools
 
+import com.vidadomu.nexus.agent.core.agent.ExternalServices
 import com.vidadomu.nexus.agent.core.assets.AssetIndex
 import com.vidadomu.nexus.agent.core.registry.ModelSummary
 import com.vidadomu.nexus.agent.core.router.TaskSpec
@@ -83,7 +84,7 @@ class ListModelsTool(private val d: ToolDeps) : BaseTool(
 
 class SearchModelsTool(private val d: ToolDeps) : BaseTool(
     "search_models", ToolCategory.READ,
-    "Busca modelos del registro de Nexus por texto (nombre, familia, organización, propósito). Úsalo para comprobar que un modelo existe antes de proponerlo.",
+    "Busca modelos disponibles en el registro de Nexus por texto. Un resultado vacío no demuestra que un producto o servicio externo no exista.",
     schema {
         string("query", "Texto, p. ej. «kling o3 image to video» o «seedance».", required = true)
         string("modality", "Restringe a una modalidad.", enum = MODALITIES)
@@ -107,7 +108,14 @@ class SearchModelsTool(private val d: ToolDeps) : BaseTool(
         return ok {
             put("count", hits.size)
             put("items", JsonArray(hits.map { it.first.compact(d.skills.forModel(it.first.ref.modelId)) }))
-            if (hits.isEmpty()) put("note", "Ningún modelo del registro coincide. No propongas modelos que no estén aquí.")
+            if (hits.isEmpty()) put("note", "Ningún modelo del registro coincide. No se puede preparar aquí sin un modelo registrado; esto no implica que el producto no exista fuera de Nexus.")
+            if (ExternalServices.mentionsFlow(input.req("query"))) put("external_service", buildJsonObject {
+                put("name", "Google Flow")
+                put("kind", "external_creative_service")
+                put("generation_available_in_nexus", false)
+                put("authentication_status", "not_checked")
+                put("information", ExternalServices.FLOW_INFO)
+            })
         }
     }
 }
