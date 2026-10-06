@@ -94,3 +94,26 @@ No cookies, profile files, account identifiers or screenshots are in Git.
 Next: user reauthentication is required. Investigate session persistence;
 then validate read-only bridge operations before any APK integration or
 generation. No additional public endpoint or permanent service was installed.
+
+### Second login and persistence check
+
+The user reauthenticated. PASS: existing projects visible, and refreshing the
+same open Chromium window preserved access. Structural diagnostics counted
+27 persistent Google/Flow cookies without reading/exporting their values.
+After normal UI close, Chromium recorded `exit_type=Normal` and the count
+remained 27. This rules out loss of all on-disk session data at that close.
+
+FAIL: a subsequent isolated `health.py` run returned `auth_required` after
+31.465 s (24.064 CPU seconds, peak 1 GiB, no job swap). After that browser
+closed, the structural count was 10 and exit remained Normal. The cause of
+the invalidation is not established; do not claim it is a user mistake,
+memory pressure, cookie encryption or Google's automation checks without
+further evidence. No third login was requested and no paid work was run.
+
+Important compatibility finding: the ordinary interactive Chromium launch
+does not specify a password-store backend, whereas Playwright/gflow launch
+with `--password-store=basic`. This difference requires investigation but
+does not alone explain the earlier ordinary-to-ordinary restart failure.
+Do not weaken credential storage or modify/export the profile as a blind fix.
+The health check's `busy` and `auth_required` paths are tested; `connected`
+and the end-to-end Android bridge remain NO PROBADO.
