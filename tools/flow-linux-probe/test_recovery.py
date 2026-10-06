@@ -79,6 +79,18 @@ class RecoveryTests(unittest.TestCase):
             with self.client.websocket_connect('/websockify', headers={'Origin': recovery.ORIGIN}):
                 pass
 
+    def test_websocket_does_not_force_unrequested_protocol(self):
+        self.unlock()
+        with patch.object(recovery.websockets, 'connect', side_effect=OSError):
+            with self.client.websocket_connect('/websockify', headers={'Origin': recovery.ORIGIN, 'Host': f'{recovery.HOST}:{recovery.PORT}', 'Cookie': f'nexus_flow={self.client.cookies.get("nexus_flow")}'}) as ws:
+                self.assertIsNone(ws.accepted_subprotocol)
+
+    def test_websocket_negotiates_requested_binary(self):
+        self.unlock()
+        with patch.object(recovery.websockets, 'connect', side_effect=OSError):
+            with self.client.websocket_connect('/websockify', headers={'Origin': recovery.ORIGIN, 'Host': f'{recovery.HOST}:{recovery.PORT}', 'Cookie': f'nexus_flow={self.client.cookies.get("nexus_flow")}'}, subprotocols=['binary']) as ws:
+                self.assertEqual(ws.accepted_subprotocol, 'binary')
+
     def test_static_traversal_denied(self):
         self.unlock()
         self.assertEqual(self.client.get('/%2e%2e/%2e%2e/etc/passwd').status_code, 404)

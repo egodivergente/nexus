@@ -20,7 +20,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.util.UUID
 
-/** ADB-only debug bridge. No sockets, credentials, file uploads or generation operation. */
+/** ADB-only debug bridge. Private recovery pairing, no uploads or generation operation. */
 class NexusAgentProvider:ContentProvider() {
     override fun onCreate()=true
     override fun call(method:String,arg:String?,extras:Bundle?):Bundle {
@@ -44,6 +44,12 @@ class NexusAgentProvider:ContentProvider() {
         val app=context!!.applicationContext as NexusApplication
         app.ready.await() // arranque en frío: no tocar los lateinit antes de Application.onCreate
         fun text(key:String)=input[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+        if(method=="flow_recovery_pair") {
+            val token=text("token")
+            require(token.matches(Regex("[A-Za-z0-9_-]{43}"))) {"Clave privada no v\u00e1lida."}
+            app.secureStorage.saveProviderApiKey(com.vidadomu.nexus.ui.settings.FLOW_RECOVERY_KEY,token)
+            return buildJsonObject {put("ok",true)}
+        }
         if(method=="status") return buildJsonObject {
             put("ok",true);put("appVersion",BuildConfig.VERSION_NAME);put("protocol",1)
             put("catalogReady",app.modelCatalogRepository.models.value.isNotEmpty())

@@ -119,6 +119,7 @@ fun SettingsScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 112.dp)
         ) {
+            item { FlowRecoverySettings() }
             item {
                 Text("Apariencia", modifier=Modifier.fillMaxWidth().combinedClickable(onClick={defaultSetting="Apariencia"},onLongClick={defaultSetting="Apariencia"}).padding(vertical=8.dp), style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(8.dp))

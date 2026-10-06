@@ -157,11 +157,24 @@ Following user authorization, when Google blocks unattended reauthentication, ac
 
 - `recovery.py`: FastAPI server binding `100.112.57.2:8899`, requiring exact Host header and Bearer/cookie token authentication (token generated locally with 32-byte entropy, mode 0600, outside Git).
 - Sandboxed Xvfb Chromium launched with `--persistent` and CDP port 9229.
-- `recovery.html`: Mobile-optimized UI for S25/Android. Embeds noVNC over secure WebSocket proxy (`/websockify`). Allows user to complete Google sign-in directly in the ASUS Chromium instance.
+- `recovery.html`: Responsive recovery controls embedding noVNC through an authenticated WebSocket proxy (`/websockify`). HTTP/WebSocket traffic uses the encrypted Tailscale network, not TLS at the application layer. Allows user to complete Google sign-in directly in the ASUS Chromium instance.
 - Bounded unit `nexus-flow-recovery.service`: `MemoryMax=1400M`, `CPUQuota=100%`, `Nice=10`, `UMask=0077`, `TimeoutStopSec=15`.
 - Closing the remote view (`/lock`) disconnects the mobile client and clears session cookies, but preserves the running Chromium browser on ASUS so the bridge can reuse that authenticated session without restarting.
 - PASS: 10 unit tests in `test_recovery.py` covering private routes, host/origin validation, token checks, body limits, lock/unlock persistence, expired sessions and traversal prevention.
-- PASS: live connection from mobile browser tested over Tailscale on port 8899.
-- PASS: status check detects `auth_required` when Flow lands on `/about` and `connected` once project gallery is accessible.
+- PASS: live desktop in-app browser connection over Tailscale on port 8899; physical S25 verification is pending.
+- PASS: status check detects `auth_required` when Flow lands on `/about`. The `connected` branch is implemented but not validated in the current recovery session.
 - No Google passwords, user credentials or profile data stored in Git.
+
+### Recovery validation and Android entry point
+
+- Fixed an unsolicited WebSocket `binary` subprotocol that current noVNC clients reject. Added both no-protocol and explicit-binary handshake regressions. Total: 12 recovery tests plus 6 authentication tests pass on ASUS.
+- Live noVNC canvas renders Flow; closing and reconnecting the portal preserves browser supervisor PID 1150678. Account status correctly reports that sign-in is required. No paid generation was submitted.
+- Startup readiness budget increased from 9 to 60 seconds so a slow initial browser launch is not prematurely reported as busy.
+- Android Settings adds `Google Flow > Conectar Flow`, opening this private portal. Its pairing key is kept in existing encrypted storage, passed in a URL fragment, then removed from browser history by the portal. ADB-only debug pairing can provision the token without typing it on the phone.
+- This is account recovery, not a Flow generation provider. `generation_enabled` remains false. Automatic job resumption and APK generation through ASUS remain unimplemented.
+- PASS: `check_recovery_live.py` verified the running service rejects anonymous access, negotiates RFB without a WebSocket subprotocol, closes an already-connected socket after revocation, and invalidates its cookie.
+- PASS: selector job `20261006T141333Z-ad51ac96` on the idle Pixel compiled Android 1.7.3-agent-preview and ran 217 tests (zero failures/errors). Collected archive integrity verified. Build duration: 13m32s.
+- PASS: physical Pixel reaches ASUS over Tailscale. NO PROBADO: physical browser/app UI; the tool policy blocked the requested browser launch, so no alternate launch route was attempted.
+- PASS: signing job `20261006T143211Z-7adddb31` used the original certificate on Windows with verified 5% CPU cap. Signed APK SHA-256: `da489a661778d037771b89855974b5403adf61f246faa68ed10bacf346b465c1`.
+- PASS: update installed with `-r --user 0` on Pixel 8 Pro and S25; both report versionCode 21 / 1.7.3-agent-preview. No app data was cleared. Private recovery pairing returned `ok:true` on both; empty-token pairing was rejected on Pixel. S25 foreground application was not opened or changed.
 

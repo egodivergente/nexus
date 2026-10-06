@@ -1,6 +1,6 @@
 """Private Tailscale recovery portal; no generation or Google password handling."""
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 import hmac
 import json
 import os
@@ -11,6 +11,7 @@ import time
 
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
 
@@ -63,7 +64,7 @@ async def start_browser():
         BROWSER = subprocess.Popen(['xvfb-run', '-a', '-s', '-screen 0 1280x800x24',
                                     'python3', str(ROOT / 'login.py'), '--persistent'],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        for _ in range(30):
+        for _ in range(200):
             if BROWSER.poll() is not None:
                 return False
             try:
@@ -209,7 +210,9 @@ async def socket(ws: WebSocket):
     if ws.headers.get('host') != f'{HOST}:{PORT}' or ws.headers.get('origin') != ORIGIN or not session_valid(sid):
         await ws.close(code=1008)
         return
-    await ws.accept(subprotocol='binary')
+    # Current noVNC sends no subprotocol; browsers reject an unsolicited one.
+    requested = ws.scope.get('subprotocols', [])
+    await ws.accept(subprotocol='binary' if 'binary' in requested else None)
     async def upstream(remote):
         while True:
             if not session_valid(sid):
@@ -236,7 +239,8 @@ async def socket(ws: WebSocket):
     except Exception:
         pass
     finally:
-        await ws.close()
+        with suppress(WebSocketDisconnect, RuntimeError):
+            await ws.close()
 
 
 @app.get('/{asset:path}')

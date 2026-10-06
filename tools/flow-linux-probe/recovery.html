@@ -2,11 +2,11 @@
 <html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conectar Flow | NEXUS</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#141617;color:#f4f6f7;font:16px system-ui;letter-spacing:0}
+*{box-sizing:border-box}body{margin:0;background:#141617;color:#f4f6f7;font:16px system-ui;letter-spacing:0;height:100dvh;display:flex;flex-direction:column}
 header{display:flex;align-items:center;gap:12px;padding:12px;flex-wrap:wrap;border-bottom:1px solid #42484b}
 h1{font-size:18px;margin:0}button,input{font:inherit;padding:12px;border-radius:6px;border:1px solid #7d888c;min-height:48px}
 button{background:#b9f1e3;color:#102c26;cursor:pointer}button:disabled{opacity:.55}input{background:#242a2d;color:white;max-width:100%}
-#access{padding:20px;display:flex;flex-wrap:wrap;gap:12px}#status{flex:1;min-width:150px}iframe{border:0;width:100%;height:calc(100dvh - 130px);background:#242a2d}
+#access{padding:20px;display:flex;flex-wrap:wrap;gap:12px}#status{flex:1;min-width:150px}iframe{border:0;width:100%;flex:1;min-height:0;background:#242a2d}
 :focus-visible{outline:3px solid #efc96c;outline-offset:3px}[hidden]{display:none!important}
 </style>
 <header><h1>Google Flow</h1><span id="status" role="status">Acceso privado del ASUS</span><button id="check" hidden>Comprobar acceso</button><button id="close" hidden>Cerrar acceso remoto</button></header>
@@ -15,9 +15,9 @@ button{background:#b9f1e3;color:#102c26;cursor:pointer}button:disabled{opacity:.
 <script>
 const $=id=>document.getElementById(id);let key=new URLSearchParams(location.hash.slice(1)).get('token')||sessionStorage.getItem('nexus-flow-key')||'';
 history.replaceState(null,'',location.pathname);$('token').value=key;
-async function connect(e){e?.preventDefault();key=$('token').value.trim();$('status').textContent='Conectando con el ASUS…';
+async function connect(e){e?.preventDefault();key=$('token').value.trim();$('access').querySelector('button').disabled=true;$('status').textContent='Conectando con el ASUS…';
 try{let r=await fetch('/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:key})});if(!r.ok)throw Error(r.status===409?'El navegador está ocupado. Vuelve a intentarlo.':'No se pudo abrir. Revisa la clave y Tailscale.');let v=await r.json();sessionStorage.setItem('nexus-flow-key',key);$('screen').src='/vnc.html#autoconnect=true&resize=scale&password='+encodeURIComponent(v.vnc_password);$('screen').hidden=false;$('access').hidden=true;$('check').hidden=false;$('close').hidden=false;$('status').textContent='Inicia sesión en el navegador del ASUS';}
-catch(e){$('status').textContent=e.message;$('access').hidden=false;}}
+catch(e){$('status').textContent=e instanceof TypeError?'No se puede contactar con el ASUS. Comprueba Tailscale.':e.message;$('access').hidden=false;}finally{$('access').querySelector('button').disabled=false;}}
 $('access').onsubmit=connect;
 $('check').onclick=async()=>{try{const r=await fetch('/status');if(!r.ok)throw Error();const v=await r.json();$('status').textContent=({connected:'Cuenta conectada',auth_required:'Flow necesita iniciar sesión',browser_closed:'Navegador cerrado',unverified:'Acceso todavía no verificado'})[v.status]||'Acceso todavía no verificado';}catch{$('status').textContent='Acceso remoto caducado. Vuelve a conectar.';$('access').hidden=false;}};
 $('close').onclick=async()=>{await fetch('/lock',{method:'POST'}).catch(()=>{});$('screen').src='about:blank';$('screen').hidden=true;$('access').hidden=false;$('check').hidden=true;$('close').hidden=true;$('status').textContent='Acceso remoto cerrado; navegador conservado';};
