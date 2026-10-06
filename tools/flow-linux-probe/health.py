@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 from urllib.parse import urlsplit
 
 from gflow_cli.auth.verification import has_migrated_app_session
@@ -13,7 +14,7 @@ from playwright.async_api import async_playwright
 ROOT = Path.home() / '.local/share/nexus-flow-probe'
 
 
-async def check():
+async def check(reauthenticate=False):
     profile = ROOT / 'profile'
     if (profile / 'SingletonLock').is_symlink():
         return {'status': 'busy'}
@@ -30,8 +31,15 @@ async def check():
             try:
                 await button.first.wait_for(state='visible', timeout=15000)
             except Exception:
-                return {'status': 'auth_required' if urlsplit(page.url).hostname == 'accounts.google.com'
-                        or urlsplit(page.url).path.startswith('/about') else 'unverified'}
+                if reauthenticate:
+                    from auto_auth import authenticate
+                    result = await authenticate(page, ROOT)
+                    if result['status'] != 'login_submitted':
+                        return result
+                    await button.first.wait_for(state='visible', timeout=15000)
+                else:
+                    return {'status': 'auth_required' if urlsplit(page.url).hostname == 'accounts.google.com'
+                            or urlsplit(page.url).path.startswith('/about') else 'unverified'}
             if not has_migrated_app_session(await context.cookies()):
                 return {'status': 'auth_required'}
             failed = page.get_by_text(re.compile(r'No se han podido cargar los proyectos|Failed to load projects|Unable to load projects', re.I))
@@ -54,7 +62,7 @@ def main():
             print(json.dumps({'status': 'busy'}))
             return
         try:
-            result = asyncio.run(check())
+            result = asyncio.run(check(reauthenticate='--reauthenticate' in sys.argv))
         except Exception as error:
             result = {'status': 'error', 'error_type': type(error).__name__}
         print(json.dumps(result))

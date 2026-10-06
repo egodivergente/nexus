@@ -117,3 +117,36 @@ does not alone explain the earlier ordinary-to-ordinary restart failure.
 Do not weaken credential storage or modify/export the profile as a blind fix.
 The health check's `busy` and `auth_required` paths are tested; `connected`
 and the end-to-end Android bridge remain NO PROBADO.
+
+## Explicitly authorized credential-based login
+
+The user authorized credential-based automatic login on 2026-10-06. The
+credential is outside Git, encrypted with `systemd-creds --user`, scoped to
+the ASUS user, mode 0600 under a private directory, with a 24-hour expiry.
+Plaintext is supplied through stdin at provisioning, not written to a file.
+No credential value, account identifier, ciphertext or browser profile is
+included in this repository. Do not renew its expiry without user intent.
+
+`health.py --reauthenticate` loads it only on an explicit reauthentication
+run. `auto_auth.py` allows the exact HTTPS Google login origin, one password
+submission and a 15-minute durable cooldown. It stops on consent, rejection,
+second-factor verification or unexpected destinations. A redirect to Flow
+is not success: workspace and server session checks still have to pass.
+No scheduler, permanent daemon or Android connector was enabled.
+
+PASS: agent-operated ordinary Chromium login with the authorized credential
+loaded the existing Flow project gallery without additional verification.
+PASS: six unit tests cover origin restrictions, credential validation,
+missing credentials, cooldown, rejection and second-factor handoff.
+FAIL: native `LoadCredentialEncrypted` in the user unit returned
+243/CREDENTIALS (host key permission). Explicit user-scoped systemd-creds
+decryption works; the loader uses its supported interface, capturing plaintext
+in memory only. It does not weaken key permissions or use plaintext storage.
+FAIL: real unattended reauthentication returned `needs_user` in 37.113 s,
+peak 1019.1 MiB, no job swap. Sanitized browser history confirmed Google's
+`/signin/rejected` route. No repeated password submissions or paid work.
+The rejection branch now returns `reason=browser_rejected` and is unit-tested.
+
+Ordinary browser login is verified; unattended engine login is NOT operational.
+The encrypted credential expires after 24 hours and changing the password
+requires explicitly updating it. It does not grant extra Google privileges.
