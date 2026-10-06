@@ -147,6 +147,22 @@
     "sha256": "295a561801ef12bb62982e17c220072357587e4c34a829dcd1223ea67f499926",
     "bytes": 4983
   },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/CatalogCacheRecovery.kt": {
+    "sha256": "d4f1246defac42159a6215235606bd417737748a8e53e140192309d4f485ff73",
+    "bytes": 455
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/CatalogVisibility.kt": {
+    "sha256": "e0ccb6ba7eb1c9b1c260d7f2de1d0e9342f2d88d62036aed090885bbd36df84a",
+    "bytes": 737
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/ModelCatalogCache.kt": {
+    "sha256": "df1f17dec157a523fa3d096fcf8b5a00a284cb5f2860f731e9dede51f212d0ce",
+    "bytes": 3690
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/Repositories.kt": {
+    "sha256": "a52897fce585ce63e2bc4d9270969025d27654fed8bd65079c56e140a6aca114",
+    "bytes": 11246
+  },
   "app/src/main/java/com/vidadomu/nexus/MainActivity.kt": {
     "sha256": "95914dc09a5c661e917bd2bfe605bb7ccad363f4878c58a753f8954ec278349a",
     "bytes": 10702
@@ -867,6 +883,14 @@
     "sha256": "1c832bf194d8eecd439a92bcced0df144c9f566b934b3d7865e983d8ee8dbdeb",
     "bytes": 273
   },
+  "app/src/main/res/raw/sample_audio.mp3": {
+    "sha256": "228648cf11aedfacb3b3d22166aeab616a45afbef1c1ad702140563e74e39a62",
+    "bytes": 28915
+  },
+  "app/src/main/res/raw/sample_video.mp4": {
+    "sha256": "3bb938fb70049e3e45f533b37ccae995ae96516e04c2f35b0c1142e47b2a39c1",
+    "bytes": 788493
+  },
   "app/src/main/res/values/strings.xml": {
     "sha256": "4387ea8eb56309d9dec0076c6ba4b36a7863924afbc4a5d319c197216ee639f4",
     "bytes": 129
@@ -1208,8 +1232,8 @@
     "bytes": 324
   },
   "SOURCE-MANIFEST.json": {
-    "sha256": "ae4cbc29b2ddd2f142e5d42cd333b7bbeeb699d2706cb323cdc1500bff51b44b",
-    "bytes": 92469
+    "sha256": "66cdbbd10f2036b86e7707dc4c53c650c91bbd9d17eb79b3d0eb106baeec9c12",
+    "bytes": 94325
   },
   "tools/ecosystem-build/install.py": {
     "sha256": "97f3a2bcd776a9286b2f833d6b961c82baea1c259f8eaccf9cdf1f239ba66324",
