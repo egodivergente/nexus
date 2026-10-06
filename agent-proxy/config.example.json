@@ -1,0 +1,17 @@
+{
+  "bind": "127.0.0.1",
+  "port": 8787,
+  "region": "REGION_DE_BEDROCK",
+  "aws_profile": null,
+  "allowed_models": ["MODEL_ID_O_INFERENCE_PROFILE_DE_CLAUDE"],
+  "default_model": null,
+  "device_token_sha256": ["HASH_GENERADO_CON_--new-token"],
+  "max_tokens_cap": 8192,
+  "requests_per_minute": 30,
+  "daily_budget_usd": 5.0,
+  "daily_token_budget": 2000000,
+  "prices_per_mtok": {
+    "MODEL_ID_O_INFERENCE_PROFILE_DE_CLAUDE": {"input": 0.0, "output": 0.0}
+  },
+  "usage_dir": "usage"
+}

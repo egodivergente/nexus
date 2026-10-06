@@ -1,0 +1,43 @@
+# Secretos: nunca al repositorio
+*.env
+.env*
+!.env.example
+**/secrets/**
+**/*credentials*
+**/*.pem
+**/*.key
+*.jks
+*.keystore
+agent-proxy/config.local.json
+agent-proxy/tokens.json
+# Build / IDE
+.gradle/
+build/
+**/build/
+local.properties
+.idea/
+*.iml
+__pycache__/
+*.pyc
+
+# Private material and generated state
+.env
+.env.*
+!.env.example
+!.env.template
+local.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.db
+*.db-*
+*.sqlite*
+**/build/
+.gradle/
+.kotlin/
+node_modules/
+__pycache__/
+outputs/

@@ -1,0 +1,229 @@
+{
+    "info": {
+        "title": "AtlasCloud API",
+        "version": "1.0.0",
+        "description": "The AtlasCloud API."
+    },
+    "paths": {
+        "/api/v1/model/prediction/{request_id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "request_id",
+                        "required": true,
+                        "schema": {
+                            "description": "Request ID",
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PredictionResponse"
+                                }
+                            }
+                        },
+                        "description": "Result of the request."
+                    }
+                },
+                "x-api-name": "model_result"
+            }
+        },
+        "/api/v1/model/generateImage": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Input"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PredictionResponse"
+                                }
+                            }
+                        },
+                        "description": "The request status."
+                    }
+                },
+                "x-api-name": "model_run"
+            }
+        }
+    },
+    "openapi": "3.0.0",
+    "servers": [
+        {
+            "url": "https://api.atlascloud.ai"
+        }
+    ],
+    "components": {
+        "schemas": {
+            "Input": {
+                "type": "object",
+                "required": [
+                    "model",
+                    "image",
+                    "prompt"
+                ],
+                "properties": {
+                    "model": {
+                        "type": "string",
+                        "description": "Model name.",
+                        "default": "youchuan/v8.2/image-to-image"
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "Input image to re-imagine. A publicly reachable https image URL (or upload). Each task returns 4 images.",
+                        "x-accept": "image/*",
+                        "x-ui-component": "uploader"
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "description": "Text prompt guiding the generation. Maximum 1024 characters. Each task returns 4 images."
+                    },
+                    "sref": {
+                        "type": "string",
+                        "description": "Optional URL of a style-reference image. Must be a publicly reachable https image URL.",
+                        "x-accept": "image/*",
+                        "x-ui-component": "uploader"
+                    },
+                    "aspect_ratio": {
+                        "type": "string",
+                        "default": "1:1",
+                        "enum": [
+                            "1:1",
+                            "9:16",
+                            "16:9",
+                            "4:3",
+                            "3:4",
+                            "2:3",
+                            "3:2",
+                            "9:21",
+                            "21:9"
+                        ],
+                        "description": "Aspect ratio of the generated image.",
+                        "x-placeholder": "Select Aspect Ratio",
+                        "x-ui-component": "select"
+                    },
+                    "hd": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable native 2K HD generation. Costs 1.5x."
+                    },
+                    "stylize": {
+                        "type": "integer",
+                        "default": 0,
+                        "minimum": 0,
+                        "maximum": 1000,
+                        "description": "Controls how strongly the model's default aesthetic is applied (0-1000).",
+                        "x-ui-component": "slider"
+                    },
+                    "chaos": {
+                        "type": "integer",
+                        "default": 0,
+                        "minimum": 0,
+                        "maximum": 100,
+                        "description": "Higher values produce more unusual and varied results (0-100).",
+                        "x-ui-component": "slider"
+                    },
+                    "weird": {
+                        "type": "integer",
+                        "default": 0,
+                        "minimum": 0,
+                        "maximum": 3000,
+                        "description": "Makes results quirky and unconventional (0-3000).",
+                        "x-ui-component": "slider"
+                    },
+                    "quality": {
+                        "type": "number",
+                        "default": 1,
+                        "enum": [
+                            1,
+                            4
+                        ],
+                        "description": "Controls image detail. 4 = higher detail at the same price (slower). v8.2 supports 1 or 4 only.",
+                        "x-ui-component": "select"
+                    },
+                    "seed": {
+                        "type": "integer",
+                        "default": -1,
+                        "description": "Use the same seed and inputs to get reproducible results. -1 = random."
+                    },
+                    "enable_base64_output": {
+                        "type": "boolean",
+                        "title": "Enable Output base64",
+                        "default": false,
+                        "disabled": true,
+                        "description": "If enabled, the output will be encoded into a BASE64 string instead of a URL."
+                    }
+                },
+                "x-order-properties": [
+                    "model",
+                    "image",
+                    "prompt",
+                    "sref",
+                    "aspect_ratio",
+                    "hd",
+                    "stylize",
+                    "chaos",
+                    "weird",
+                    "quality",
+                    "seed",
+                    "enable_base64_output"
+                ]
+            },
+            "PredictionResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the prediction, the ID of the prediction to get."
+                    },
+                    "urls": {
+                        "type": "object",
+                        "description": "Object containing related API endpoints."
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": "Model ID used for the prediction."
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Status of the task: created, processing, completed, or failed."
+                    },
+                    "outputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Array of URLs to the generated images (empty when status is not completed)."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO timestamp of when the request was created."
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "apiKeyAuth": {
+                "in": "header",
+                "name": "Authorization",
+                "type": "apiKey"
+            }
+        }
+    }
+}

@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deliberate offline redaction fixture and public AWS signing enum"
+regexTarget = "secret"
+regexes = ['^AKIAABCDEFGHIJKLMNOP$', '^v4-unsigned-body$']

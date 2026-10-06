@@ -1,0 +1,145 @@
+import java.util.Properties
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+android {
+    namespace = "com.vidadomu.nexus"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.vidadomu.nexus"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 18
+        versionName = "1.7.0-agent"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "OFFLINE_QA", "false")
+        // Claves de Bedrock opcionales desde un fichero local FUERA del repo: -PnexusBedrockFile=<ruta a .properties>
+        // (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, BEDROCK_MODEL_ID). Sin él quedan vacías.
+        val bedrock = Properties().apply {
+            (project.findProperty("nexusBedrockFile") as String?)?.let { f -> file(f).takeIf { it.isFile }?.inputStream()?.use { load(it) } }
+        }
+        fun bq(k: String) = "\"" + bedrock.getProperty(k, "").trim().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        buildConfigField("String", "BEDROCK_ACCESS_KEY", bq("AWS_ACCESS_KEY_ID"))
+        buildConfigField("String", "BEDROCK_SECRET_KEY", bq("AWS_SECRET_ACCESS_KEY"))
+        buildConfigField("String", "BEDROCK_REGION", bq("AWS_DEFAULT_REGION"))
+        buildConfigField("String", "BEDROCK_MODEL", bq("BEDROCK_MODEL_ID"))
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    buildTypes {
+        create("offlineQa") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".qa"
+            isDebuggable = true
+            matchingFallbacks += listOf("debug")
+            buildConfigField("boolean", "OFFLINE_QA", "true")
+        }
+        // Instalación de prueba JUNTO a la Nexus actual (otro paquete, otros datos): no la sustituye ni
+        // necesita su firma. No comparte claves ni historial con com.vidadomu.nexus.
+        create("agentPreview") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".agent"
+            versionNameSuffix = "-preview"
+            isDebuggable = true
+            matchingFallbacks += listOf("debug")
+        }
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            // Keep stable package ID
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.media3.common.util.UnstableApi"
+        )
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    // Skills del asistente (Markdown + YAML): se empaquetan como assets/skills/** y además se pueden
+    // sustituir sin recompilar desde files/skills o Documents/ALEXIA/Nexus/Skills.
+    sourceSets["main"].assets.srcDir(rootProject.file("agent-skills"))
+    testBuildType = "offlineQa"
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+}
+
+dependencies {
+    // Núcleo del asistente (Kotlin puro, probado en JVM).
+    implementation(project(":agent-core"))
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.activity:activity-compose:1.9.3")
+
+    val composeBom = platform("androidx.compose:compose-bom:2024.10.00")
+    implementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    implementation("androidx.navigation:navigation-compose:2.8.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+
+    // Kotlinx Serialization JSON
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Networking
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Video/Audio playback with Media3 ExoPlayer
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("androidx.media3:media3-common:1.4.1")
+
+    // Security Crypto for Keystore backed storage
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // WorkManager for background generation tracking
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Test dependencies
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    "offlineQaImplementation"("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
