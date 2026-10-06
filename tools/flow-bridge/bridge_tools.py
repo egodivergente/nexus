@@ -92,7 +92,7 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
             return {"status": "needs_reconciliation", "request_id": request_id,
                 "detail": "Submission may be in progress or its task id was not recorded. Do not resubmit."}
         task = native_task(task_id)
-        if not task or task["task_type"] not in ("t2i", "t2v"):
+        if not task or task["task_type"] not in ("t2i", "t2v", "i2v", "r2v"):
             return {"status": "error", "detail": "No supported task for this profile."}
         params = json.loads(task["payload_json"])
         checkpoint = json.loads(task.get("checkpoint_json") or "{}")
@@ -114,7 +114,7 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
             if len(projects) == 1:
                 checkpoint["project_id"] = projects.pop()
         request_id = request_id or f"task-{task_id}"
-        original_parameters = {key: params[key] for key in ("prompt", "model", "aspect", "count")}
+        original_parameters = {key: params[key] for key in ("prompt", "model", "aspect", "count", "mode", "duration", "resolution", "initial_frame", "end_frame", "reference_images") if key in params}
         connection.execute("INSERT OR IGNORE INTO jobs VALUES (?,?,?,?,?)",
             (request_id, json.dumps(original_parameters), task_id, None, "submitted"))
     base = {"request_id": request_id, "task_id": task_id,
@@ -126,7 +126,7 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
         return result
     if task["status"] in ("pending", "processing"):
         return {**base, "status": "in_progress"}
-    if task["task_type"] == "t2v":
+    if task["task_type"] in ("t2v", "i2v", "r2v"):
         # Completed native queue entries can be recovered from their persisted
         # result without opening a new generation. An unknown outcome stays held.
         for field in ("result_json", "output_json"):
@@ -168,20 +168,28 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
     save(request_id, result, task_id)
     return result
 
-async def flow_generate_image(request_id: str, prompt: str, aspect: str = "1:1", model: str = "nano2") -> dict[str, Any]:
+async def flow_generate_image(request_id: str, prompt: str, aspect: str = "1:1", model: str = "nano2",
+                              reference_images: list[str] | None = None) -> dict[str, Any]:
     """Generate one image using the signed-in personal Flow account.
 
     request_id must be stable for this intended generation. Reuse it after any
     timeout or failure: repeating an id never generates twice. A different id
     represents a new credit-consuming generation. Currently supports Nano Banana
-    2 and Nano Banana Pro text-to-image. On completion return/display files[0]; model_confirmed
+    2 and Nano Banana Pro, with up to ten owned reference images.
+    On completion return/display files[0]; model_confirmed
     reflects provider attribution. Browser automation runs on the local PC.
     """
     if not IDENTIFIER.fullmatch(request_id):
         return {"status": "error", "detail": "request_id must contain 1-80 letters, digits, underscores or hyphens."}
     if not prompt.strip() or model not in {"nano2", "nano-pro"} or aspect not in {"1:1", "16:9", "9:16", "4:3", "3:4"}:
         return {"status": "error", "detail": "Provide a prompt, model nano2 or nano-pro, and a supported image aspect."}
-    params = {"prompt": prompt, "model": model, "aspect": aspect, "count": 1}
+    from flow_contract import normalize
+    from flow_inputs import prepare
+    try:
+        params = prepare(normalize({"model":model,"aspect":aspect,"reference_images":reference_images or []}))
+    except (ValueError,OSError):
+        return {"status":"error","detail":"Invalid owned reference images or Flow configuration."}
+    params.update(prompt=prompt,count=1)
     with database() as connection:
         try:
             connection.execute("INSERT INTO jobs VALUES (?,?,?,?,?)",
@@ -189,7 +197,7 @@ async def flow_generate_image(request_id: str, prompt: str, aspect: str = "1:1",
         except sqlite3.IntegrityError:
             row = connection.execute("SELECT * FROM jobs WHERE request_id=?", (request_id,)).fetchone()
             previous = json.loads(row["params_json"])
-            if {key: previous.get(key) for key in params} != params:
+            if previous != params:
                 return {"status": "error", "detail": "request_id already belongs to different parameters. No generation sent."}
             existing = True
         else:
@@ -237,17 +245,26 @@ def install():
 
 
 async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9",
-                              model: str = "veo_fast") -> dict[str, Any]:
+                              model: str = "veo_fast", mode: str = "t2v", duration: int | None = None,
+                              resolution: str | None = None, initial_frame: str | None = None,
+                              end_frame: str | None = None, reference_images: list[str] | None = None) -> dict[str, Any]:
     """Generate one explicitly selected video model on the user's own Flow account.
 
     Reuse the same request_id after a timeout: a reserved id never submits twice.
-    Flow selects its default duration because this account has no duration control.
+    Bind text, frames or ingredients with explicit duration and native resolution.
     The completed MP4 contains the actual duration and dimensions. Supports
     veo_fast, veo_quality, veo_lite and omni_flash without changing the tier.
     """
     if not IDENTIFIER.fullmatch(request_id) or not prompt.strip() or model not in {'veo_fast','veo_quality','veo_lite','omni_flash'} or aspect not in {"16:9", "9:16"}:
         return {"status": "error", "detail": "Use a stable request_id, a prompt, a supported video model and 16:9 or 9:16."}
-    params = {"prompt": prompt, "model": model, "aspect": aspect, "count": 1}
+    from flow_contract import normalize
+    from flow_inputs import prepare
+    try:
+        params=prepare(normalize({"model":model,"aspect":aspect,"mode":mode,"duration":duration,"resolution":resolution,
+            "initial_frame":initial_frame,"end_frame":end_frame,"reference_images":reference_images or []}))
+    except (ValueError,OSError):
+        return {"status":"error","detail":"Invalid mode, duration, resolution or owned input images."}
+    params.update(prompt=prompt,count=1)
     with database() as connection:
         try:
             connection.execute("INSERT INTO jobs VALUES (?,?,?,?,?)",
@@ -262,7 +279,7 @@ async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9"
         return await flow_get_result(request_id=request_id)
     from gflow_cli.mcp.tools import gflow_generate_video
     try:
-        result = await gflow_generate_video(**params, mode="t2v", profile="nexus",
+        result = await gflow_generate_video(**params, profile="nexus",
             project_name=f"Codex {request_id}", ui_mode="classic", wait=True)
     except Exception as exc:
         result = {"status": "needs_reconciliation", "error_class": type(exc).__name__}
@@ -280,12 +297,19 @@ async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9"
     return result
 
 
-async def flow_get_quote(model: str = "nano2", aspect: str = "1:1") -> dict[str, Any]:
-    """Read this account's Flow settings price for one generation; spends no credits."""
-    if model not in {'nano2','nano-pro','veo_fast','veo_quality','veo_lite','omni_flash'} or aspect not in ({'1:1','16:9','9:16','4:3','3:4'} if model in {'nano2','nano-pro'} else {'16:9','9:16'}):
-        return {'status':'error','detail':'Unsupported model or aspect. Lite prohibited.'}
+async def flow_get_quote(model: str = "nano2", aspect: str = "1:1", mode: str | None = None,
+                         duration: int | None = None, resolution: str | None = None,
+                         initial_frame: str | None = None, end_frame: str | None = None,
+                         reference_images: list[str] | None = None) -> dict[str, Any]:
+    """Read the exact account settings price; never uploads or submits media."""
     from flow_quote import quote
+    from flow_contract import normalize
+    from flow_inputs import prepare
     try:
-        return {'status':'quoted',**await quote(model,aspect)}
+        args={"model":model,"aspect":aspect,"duration":duration,"resolution":resolution,
+            "initial_frame":initial_frame,"end_frame":end_frame,"reference_images":reference_images or []}
+        if mode is not None:args['mode']=mode
+        params=prepare(normalize(args))
+        return {'status':'quoted',**await quote(**params)}
     except Exception as exc:
         return {'status':'error','error_class':type(exc).__name__,'detail':'No verified account price. No generation sent.'}

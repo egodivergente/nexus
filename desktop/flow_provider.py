@@ -10,6 +10,7 @@ import subprocess
 import threading
 import time
 import uuid
+from flow_contract import normalize, quote_key, INPUTS
 
 RUNTIME = Path.home() / '.codex/integrations/google-flow'
 PYTHON = RUNTIME / 'venv/Scripts/python.exe'
@@ -55,9 +56,34 @@ def catalog():
                 'description':'jobId del historial de NEXUS o nexus_job_id del asset, de un resultado completado google_flow. No usar asset_id ni generation_id.'},
                 {'key':'resolution','displayName':'Resolución','type':'ENUM','nativeType':'string','options':options,'defaultValue':options[0],'isRequired':True}],
             shortDescription='Mejora/exporta un resultado existente de tu cuenta Flow. Usa el jobId de su historial; conserva el original.'))
+    # Separate entries keep required frames/references explicit in every form,
+    # including assistant-created plans. There are no hidden conditional fields.
+    video_models=[m for m in result if m['providerModelId'] in {'veo_fast','veo_quality','veo_lite','omni_flash'}]
+    field=lambda key,label,maximum=1,required=False: {'key':key,'label':label,'mime':'image/*','maximum':maximum,
+        'required':required,'minItems':1 if required else 0,'encoding':'array' if key=='reference_images' else 'string'}
     for model in result:
-        if model['promptRequired'] and model['inputMode']=='TEXT_ONLY' and not model['contractMedia']:
-            model['capabilities'] = ['TEXT_TO_IMAGE' if model['modalities']==['IMAGE'] else 'TEXT_TO_VIDEO']
+        if model['providerModelId'] in {'nano2','nano-pro'}:
+            model.update(supportsImageInput=True,inputMode='TEXT_OR_IMAGE',maxImages=10,
+                contractMedia=[field('reference_images','Imágenes de referencia',10)],
+                capabilities=['TEXT_TO_IMAGE','IMAGE_TO_IMAGE'])
+    for base in video_models:
+        identifier=base['providerModelId'];omni=identifier=='omni_flash'
+        for mode,suffix,label in [('t2v','','Texto'),('i2v','-frames','Fotogramas'),('r2v','-references','Referencias')]:
+            if mode=='r2v' and identifier=='veo_quality':continue
+            model=base if mode=='t2v' else dict(base)
+            durations=['4','6','8','10'] if omni else ['8'] if mode=='r2v' else ['4','6','8']
+            model.update(id=base['id']+suffix,flowMode=mode,displayName=base['displayName'].split(' · ')[0]+' · '+label,
+                supportsImageInput=mode!='t2v',inputMode='TEXT_ONLY' if mode=='t2v' else 'TEXT_AND_IMAGE',
+                capabilities=[{'t2v':'TEXT_TO_VIDEO','i2v':'IMAGE_TO_VIDEO','r2v':'REFERENCE_TO_VIDEO'}[mode]],
+                contractMedia=[] if mode=='t2v' else [field('initial_frame','Fotograma inicial',required=True),field('end_frame','Fotograma final (opcional)')] if mode=='i2v' else [field('reference_images','Imágenes de referencia',7 if omni else 3,True)],
+                parameters=[aspect(['16:9','9:16']),{'key':'duration','displayName':'Duración (segundos)','type':'ENUM',
+                    'nativeType':'integer','options':durations,'defaultValue':'8','isRequired':True},
+                    {'key':'resolution','displayName':'Resolución nativa','type':'ENUM','nativeType':'string',
+                        'options':['360p','720p'] if omni else ['720p'],'defaultValue':'720p','isRequired':True}],
+                supportedResolutions=['360p','720p'] if omni else ['720p'],
+                shortDescription={'t2v':'Crea vídeo desde texto.','i2v':'Anima un fotograma inicial; puedes fijar también el fotograma final.',
+                    'r2v':'Usa hasta '+str(7 if omni else 3)+' imágenes como ingredientes.'}[mode]+' Ajustes y créditos de tu cuenta Flow.')
+            if mode!='t2v':result.append(model)
     return result
 
 def parameters(args):
@@ -68,14 +94,26 @@ def parameters(args):
         if not isinstance(source,str) or not IDENTIFIER.fullmatch(source) or args.get('resolution') not in options[model]:
             raise ValueError('Elige un trabajo original de Flow y una resolución compatible.')
         return {'model':model,'source_request_id':source,'resolution':args['resolution']}
-    aspect = args.get('aspect', '1:1' if model in {'nano2','nano-pro'} else '16:9')
-    allowed = {'nano-pro':{'1:1','16:9','9:16','4:3','3:4'}, 'nano2':{'1:1','16:9','9:16','4:3','3:4'},
-        **{model:{'16:9','9:16'} for model in ('veo_fast','veo_quality','veo_lite','omni_flash')}}
-    if model not in allowed or aspect not in allowed[model]:
-        raise ValueError('Modelo o formato Flow no admitido. Nano Banana Lite está excluido.')
-    return {'model':model, 'aspect':aspect}
+    return normalize(args)
 
-def quote(args):
+def media_parameters(data, params):
+    """Resolve opaque imported IDs, never caller-provided filesystem paths."""
+    result=dict(params)
+    root=(Path(data)/'media').resolve()
+    for key in INPUTS:
+        values=params.get(key,[])
+        if isinstance(values,str):values=[values]
+        paths=[]
+        for value in values:
+            if not re.fullmatch(r'[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)',value):
+                raise ValueError('Importa la imagen en Nexus antes de usarla con Flow.')
+            path=(root/value).resolve(strict=True)
+            if path.parent!=root or not path.is_file():raise ValueError('Imagen local no disponible.')
+            paths.append(str(path))
+        if paths:result[key]=paths if key=='reference_images' else paths[0]
+    return result
+
+def quote(args, data=None):
     params = parameters(args)
     if not available():
         raise ValueError('El puente local de Flow no está instalado.')
@@ -91,11 +129,11 @@ def quote(args):
     # Never invent a free tier or turn an unknown image price into zero USD.
     prices = RUNTIME / 'jobs/verified-prices.json'
     if prices.is_file():
-        value = json.loads(prices.read_text(encoding='utf-8')).get(params['model'])
+        value = json.loads(prices.read_text(encoding='utf-8')).get(quote_key(params))
         if value and value.get('aspect')==params['aspect'] and time.time() - value['checked_at'] < 300:
             return {'amount':value['credits'], 'currency':'flow_credits', 'time':int(time.time()*1000),
-                'detail':'Créditos mostrados por tu cuenta Flow para una generación.', 'source':'Flow settings'}
-    verified=call('flow_get_quote',params,'quote-'+uuid.uuid4().hex)
+                'detail':'Incluido en tu cuenta Flow.' if value['credits']==0 else 'Uso de los créditos de tu cuenta Flow.', 'source':'Flow settings'}
+    verified=call('flow_get_quote',media_parameters(data,params) if any(k in params for k in INPUTS) and data else params,'quote-'+uuid.uuid4().hex)
     if verified.get('error_class') == 'SessionUnavailable':
         try:session_status=json.loads((RUNTIME/'jobs/session-health.json').read_text(encoding='utf-8')).get('status','error')
         except (OSError,ValueError):session_status='error'
@@ -105,14 +143,10 @@ def quote(args):
         raise ValueError(messages.get(session_status,messages['error']))
     if verified.get('status') == 'quoted':
         return {'amount':verified['credits'],'currency':'flow_credits','time':int(time.time()*1000),
-            'detail':'Créditos mostrados por tu cuenta Flow para una generación. Saldo no verificado.', 'source':'Flow settings'}
+            'detail':'Incluido en tu cuenta Flow.' if verified['credits']==0 else 'Uso de los créditos de tu cuenta Flow.', 'source':'Flow settings'}
     if params['model'] in {'nano2','nano-pro'}:
         raise ValueError('No se ha podido leer la configuración del modelo de imagen en Flow. No se ha enviado ninguna generación.')
-    if params['model'] != 'veo_fast':
-        raise ValueError('Flow no confirma el importe de este modelo de vídeo. Vuelve a consultar sus ajustes.')
-    return {'amount':20, 'currency':'flow_credits', 'time':int(time.time()*1000), 'upperBound':True,
-        'detail':'Estimación conservadora: hasta 20 créditos por vídeo; Google publica 10 para Ultra. Saldo no verificado.',
-        'source':SOURCE}
+    raise ValueError('Flow no confirma el importe de esta configuración de vídeo. Vuelve a consultar sus ajustes.')
 
 def asset_options(source_request_id):
     if not isinstance(source_request_id,str) or not IDENTIFIER.fullmatch(source_request_id):
@@ -165,7 +199,7 @@ def work(data, request_id, params, recover=False, recovery_started_at=0):
             arguments={k:v for k,v in params.items() if k!='model'}
         else:
             tool = 'flow_generate_image' if params['model'] in {'nano2','nano-pro'} else 'flow_generate_video'
-            arguments=params
+            arguments=media_parameters(data,params)
         result = call(tool, {'request_id':request_id, **arguments},
                       'recovery-'+uuid.uuid4().hex if recover else request_id)
         if not isinstance(result, dict):
@@ -201,7 +235,10 @@ def submit(data, args):
         comparable=json.loads(prior['params']);comparable.pop('expected_credits',None)
         if comparable!=params:raise ValueError('El identificador pertenece a otro trabajo. No se envía de nuevo.')
         return status(data,request_id)
-    estimate = quote(params)
+    # Validate local IDs before reserving; the private bridge freezes the bytes
+    # and binds those snapshots to its persistent request before any upload.
+    if any(k in params for k in INPUTS):media_parameters(data,params)
+    estimate = quote(params,data)
     if args.get('cost') != estimate['amount']:
         raise ValueError('Actualiza la estimación Flow antes del envío.')
     if 'source_request_id' in params:params['expected_credits']=estimate['amount']

@@ -71,3 +71,6 @@ Al repetir la autenticación con `auth login --browser internal --profile nexus`
 ## GitHub
 
 Al realizar esta tarea, el checkout no tenía commits ni remoto y el conector GitHub no mostraba repositorios accesibles. Se ha solicitado al usuario la URL del destino. Un commit local no equivale a publicación verificada.
+
+
+Las modalidades de texto, fotogramas y referencias, con duración y resolución explícitas, están documentadas en [FLOW-MODALIDADES.md](../../docs/FLOW-MODALIDADES.md). Nano Banana Pro conserva el acceso de la cuenta: cero se muestra como Incluido.

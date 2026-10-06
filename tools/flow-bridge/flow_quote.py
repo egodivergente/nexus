@@ -3,22 +3,25 @@ import json
 import os
 import re
 import time
+from pathlib import Path
+from flow_contract import normalize, quote_key
 from launcher import ROOT, environment
 
-async def quote(model, aspect):
+async def quote(model, aspect, **options):
     from flow_session import ensure
     await ensure()
     try:
-        return await _quote(model, aspect)
+        return await _quote(model, aspect, **options)
     except Exception as error:
         # Only this read-only settings operation is retried. A submit/result
         # reservation is never repeated by session renewal.
         if type(error).__name__ not in {'FlowAppError', 'AuthExpiredError'}:
             raise
         await ensure(force=True)
-        return await _quote(model, aspect)
+        return await _quote(model, aspect, **options)
 
-async def _quote(model, aspect):
+async def _quote(model, aspect, **options):
+    params=normalize({'model':model,'aspect':aspect,**options})
     os.environ.update(environment())
     from runtime_compat import install
     install()
@@ -53,19 +56,24 @@ async def _quote(model, aspect):
                 await close(page,strict=strict)
             composer._close_pane=read_price
             if model in {'nano2','nano-pro'}:
-                request=GenerateImageRequest(prompt='Inspection only',model=Model.from_cli(model),aspect=ImageAspect.from_cli(aspect),count=1)
+                request=GenerateImageRequest(prompt='Inspection only',model=Model.from_cli(model),aspect=ImageAspect.from_cli(aspect),count=1,
+                    ref_paths=tuple(Path(p) for p in params.get('reference_images',[])))
                 await composer.apply_image_settings(page,request)
             elif model in {'veo_fast','veo_quality','veo_lite','omni_flash'}:
-                request=GenerateVideoRequest(prompt='Inspection only',model=VideoModel.from_cli(model),mode=Mode.T2V,aspect=VideoAspect.from_cli(aspect),count=1)
+                request=GenerateVideoRequest(prompt='Inspection only',model=VideoModel.from_cli(model),mode=Mode(params.get('mode','t2v')),
+                    aspect=VideoAspect.from_cli(aspect),count=1,duration=params.get('duration',8),resolution=params.get('resolution'),
+                    start_image=Path(params['initial_frame']) if params.get('initial_frame') else None,
+                    end_image=Path(params['end_frame']) if params.get('end_frame') else None,
+                    reference_images=tuple(Path(p) for p in params.get('reference_images',[])))
                 await composer.apply_video_settings(page,request)
             else:raise ValueError('Unsupported model; Lite prohibited')
             if cost is None:raise ValueError('No unambiguous account price found')
         finally:await ctx.close()
-    result={'model':model,'aspect':aspect,'credits':cost,'checked_at':time.time(),
+    result={**params,'credits':cost,'checked_at':time.time(),
         'source':'Flow settings','generation_count':1,'new_generation_submitted':False}
     prices=ROOT/'jobs/verified-prices.json'
     previous=json.loads(prices.read_text()) if prices.exists() else {}
-    previous[model]=result
+    previous[quote_key(params)]=result
     temporary=prices.with_suffix('.tmp');temporary.write_text(json.dumps(previous),encoding='utf-8');temporary.replace(prices)
     return result
 

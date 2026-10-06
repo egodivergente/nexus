@@ -378,7 +378,7 @@ def dispatch(keys, operation, args):
         if operation == 'flowAssetOptions':
             return flow_provider.asset_options(args.get('source_request_id', ''))
         if operation == 'flowQuote':
-            return flow_provider.quote(args)
+            return flow_provider.quote(args, DATA)
         if operation == 'flowSubmit':
             return flow_provider.submit(DATA, args)
         return flow_provider.status(DATA, args.get('request_id', ''))

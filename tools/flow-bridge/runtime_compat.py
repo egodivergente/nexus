@@ -6,6 +6,8 @@ select the exact browser that created this one private profile instead.
 """
 from pathlib import Path
 import os
+import re
+from dataclasses import replace
 
 ROOT = Path.home() / ".codex" / "integrations" / "google-flow"
 PROFILE = ROOT / "state" / "profile_nexus"
@@ -34,6 +36,7 @@ def install():
     original_submit = migrated.MigratedComposer.submit_images_and_observe
     original_video_submit = migrated.MigratedComposer.submit_and_observe
     original_video_settings = migrated.MigratedComposer.apply_video_settings
+    original_select = migrated.MigratedComposer._select
     original_record = batchexecute._is_record
     def migrated_record(node):
         if original_record(node):
@@ -101,18 +104,57 @@ def install():
 
     migrated._image_body_problem = image_problem
     migrated.MigratedComposer.submit_images_and_observe = guarded_submit
+    async def select_duration(composer,page,pane,*,axis,lig=None,text=None):
+        if axis=='duration' and text and re.fullmatch(r'\d+\s*s',text):
+            seconds=re.sub(r'\s','',text)[:-1]
+            choices=pane.locator(migrated.RADIO).filter(has_text=re.compile(r'^\s*'+seconds+r'\s*s\s*$'))
+            if await choices.count()==1:text=(await choices.first.inner_text()).strip()
+        result=await original_select(composer,page,pane,axis=axis,lig=lig,text=text)
+        pending=getattr(composer,'_nexus_pending_request',None)
+        if axis=='mode' and lig=='videocam' and pending and pending.mode.value=='t2v':
+            await original_select(composer,page,pane,axis='submode',lig=migrated.FRAMES_LIGATURE)
+        return result
+    migrated.MigratedComposer._select = select_duration
+    async def pin_duration(composer,page,pane):
+        await composer._select(page,pane,axis='duration',text='8s')
+    migrated.MigratedComposer._pin_r2v_duration = pin_duration
     async def bound_video_settings(composer,page,request):
+        request=replace(request,duration=request.duration or 8,
+            resolution=request.resolution or '720p' if request.model and request.model.value=='omni_flash' else request.resolution)
+        composer._nexus_pending_request=request
         composer._nexus_video_model = None
-        result = await original_video_settings(composer,page,request)
+        composer._nexus_video_request = None
+        close=composer._close_pane
+        # This account exposes Omni references at 4/6/8/10 s. The upstream
+        # historical 8 s restriction remains intact for Veo. The submit guard
+        # still requires every uploaded reference in the actual RPC.
+        custom=request.mode.value=='r2v' and request.model and request.model.value=='omni_flash' and request.duration not in (None,8)
+        if custom:
+            async def set_omni_duration(page,*,strict):
+                if strict:
+                    pane=page.locator(migrated.OVERLAY).filter(has=page.locator(migrated.RADIOGROUP)).last
+                    await composer._select(page,pane,axis='duration',text=f'{request.duration}s')
+                await close(page,strict=strict)
+            composer._close_pane=set_omni_duration
+        try:
+            result = await original_video_settings(composer,page,replace(request,duration=None) if custom else request)
+        finally:composer._close_pane=close
         composer._nexus_video_model = request.model.value if request.model else None
+        composer._nexus_video_request = request
         return result
     migrated.MigratedComposer.apply_video_settings = bound_video_settings
+    from video_guard import interpolation_problem
+    migrated._interpolation_body_problem = interpolation_problem
     async def guarded_video_submit(composer, page, **kwargs):
         from video_guard import model_problem as video_problem
         def matches(url):
             return migrated._rpcid(str(url)) in migrated.SUBMIT_RPCS
         async def guard(route, raw_request):
-            if video_problem(migrated._post_data(raw_request),getattr(composer,'_nexus_video_model',None)):
+            bound=getattr(composer,'_nexus_video_request',None)
+            if video_problem(migrated._post_data(raw_request),getattr(composer,'_nexus_video_model',None),
+                mode=bound.mode.value if bound else None,duration=bound.duration if bound else None,
+                resolution=bound.resolution if bound else None,aspect=bound.aspect.value if bound else None,start_id=kwargs.get('expect_media_id'),
+                end_id=kwargs.get('expect_end_media_id'),reference_ids=kwargs.get('expect_reference_ids',())):
                 await route.abort()
             else:
                 await route.continue_()

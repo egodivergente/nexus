@@ -1,5 +1,53 @@
 'use strict';
-function flowArguments(model,values){return {model:model.providerModelId,...(model.promptRequired!==false?{aspect:values.aspect}:{source_request_id:values.source_request_id,resolution:values.resolution})};}
+function flowArguments(model,values,media=[]){
+ const args={model:model.providerModelId};
+ if(model.promptRequired===false)return {...args,source_request_id:values.source_request_id,resolution:values.resolution};
+ args.aspect=values.aspect;
+ if(model.flowMode)args.mode=model.flowMode;
+ if(values.duration!=null&&values.duration!=='')args.duration=Number(values.duration);
+ if(values.resolution)args.resolution=values.resolution;
+ for(const field of model.fields||model.contractMedia||[]){const ids=media.filter(f=>f.field===field.key).map(f=>f.id);if(ids.length)args[field.key]=field.key==='reference_images'?ids:ids[0];}
+ return args;
+}
+// Keep the existing providers available, while opening an owned Flow model's
+// selector on that account. Apply after the Studio wrappers have loaded.
+document.addEventListener('DOMContentLoaded',()=>{
+ const listBefore=studioModelList;
+ studioModelList=function(){listBefore();
+  for(const row of document.querySelectorAll('[data-studio-model]')){const m=models.find(m=>m.id===row.dataset.studioModel);if(m?.providerId==='google_flow'){const price=row.querySelector('.studio-price');if(price)price.textContent='Tu cuenta Flow';}}
+ };
+ const previous=studioPicker;
+ studioPicker=function(){previous();if(loaded?.providerId==='google_flow'){Studio.pickerProvider='google_flow';studioModelList();}};
+ const renderBefore=renderCanvas;
+ renderCanvas=function(){renderBefore();scheduleFlowAvailability();};
+});
+let flowAvailabilityTimer,flowAvailabilityKey='',flowAvailabilityExpiry,flowAvailabilityValue=null,flowAvailabilityVerifiedKey='';
+function scheduleFlowAvailability(){
+ clearTimeout(flowAvailabilityTimer);
+ if(view!=='canvas'||!loaded||loaded.providerId!=='google_flow'||busy||quote)return;
+ if($('#cost'))$('#cost').textContent='Disponibilidad sin consultar';
+ const plan={model:loaded,...structuredClone(state.draft)};
+ if(E.validate(plan.model,'Disponibilidad de la cuenta',plan.values,plan.media))return;
+ const key=JSON.stringify(flowArguments(plan.model,plan.values,plan.media));
+ if(key===flowAvailabilityVerifiedKey&&flowAvailabilityValue&&Date.now()-flowAvailabilityValue.time<300000){
+  quote=flowAvailabilityValue;if($('#cost'))$('#cost').textContent=amount(quote);updateReadiness();return;
+ }
+ if(key===flowAvailabilityKey)return;
+ flowAvailabilityTimer=setTimeout(async()=>{
+  if(view!=='canvas'||!loaded||JSON.stringify(flowArguments(loaded,state.draft.values,state.draft.media))!==key)return;
+  flowAvailabilityKey=key;
+  try{
+   const verified=await quotePlan(plan);
+   if(view!=='canvas'||!loaded||JSON.stringify(flowArguments(loaded,state.draft.values,state.draft.media))!==key)return;
+   quote=verified;flowAvailabilityValue=verified;flowAvailabilityVerifiedKey=key;clearTimeout(flowAvailabilityExpiry);
+   flowAvailabilityExpiry=setTimeout(()=>{if(quote===verified){quote=null;flowAvailabilityKey='';if(view==='canvas')renderCanvas();}},300001);
+   renderCanvas();
+  }catch(error){if(view==='canvas'&&loaded?.providerId==='google_flow'&&$('#cost'))$('#cost').textContent='Cuenta sin comprobar';}
+ },450);
+}
+document.addEventListener('input',scheduleFlowAvailability);
+document.addEventListener('change',scheduleFlowAvailability);
+document.addEventListener('click',e=>{if(e.target.closest('[data-remove],[data-pick]'))setTimeout(scheduleFlowAvailability,0);});
 let flowAssetPlan=null,flowAssetEpoch=0,flowAssetTimer=null;
 function clearFlowAssetPlan(){flowAssetPlan=null;flowAssetEpoch++;clearTimeout(flowAssetTimer);flowAssetTimer=null;}
 $('#dialog').addEventListener('close',clearFlowAssetPlan);

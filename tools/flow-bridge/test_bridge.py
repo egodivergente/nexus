@@ -2,6 +2,8 @@ import asyncio
 from pathlib import Path
 import tempfile
 import unittest
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'desktop'))
 from unittest.mock import patch, AsyncMock
 from PIL import Image
 import bridge_tools as bridge
@@ -80,6 +82,23 @@ class JobTests(unittest.IsolatedAsyncioTestCase):
                 await bridge.flow_generate_video('video-'+model,'a blue sphere',model=model)
             self.assertEqual(stub.await_count,1)
             self.assertEqual(stub.call_args.kwargs['model'],model)
+    async def test_frames_and_references_are_frozen_and_change_cannot_reuse_id(self):
+        import flow_inputs
+        folder=self.root/'inputs';folder.mkdir()
+        start=folder/'source.png';end=folder/'end.png'
+        Image.new('RGB',(8,8),'red').save(start);Image.new('RGB',(8,8),'green').save(end)
+        with patch.object(flow_inputs,'ROOT',self.root):
+            for mode,inputs in [('i2v',dict(initial_frame=str(start),end_frame=str(end))),('r2v',dict(reference_images=[str(start),str(end)]))]:
+                stub=AsyncMock(return_value={'status':'needs_reconciliation'})
+                with patch('gflow_cli.mcp.tools.gflow_generate_video',stub):
+                    await bridge.flow_generate_video('frozen-'+mode,'fixture',model='omni_flash',mode=mode,duration=10,resolution='360p',**inputs)
+                    await bridge.flow_generate_video('frozen-'+mode,'fixture',model='omni_flash',mode=mode,duration=10,resolution='360p',**inputs)
+                    changed=await bridge.flow_generate_video('frozen-'+mode,'fixture',model='omni_flash',mode=mode,duration=4,resolution='360p',**inputs)
+                self.assertEqual(stub.await_count,1)
+                self.assertEqual(changed['status'],'error')
+                self.assertEqual(stub.call_args.kwargs['mode'],mode)
+                snapshots=[stub.call_args.kwargs[k] for k in ('initial_frame','end_frame') if k in stub.call_args.kwargs] or stub.call_args.kwargs['reference_images']
+                self.assertTrue(all(Path(p).stem==__import__('hashlib').sha256(Path(p).read_bytes()).hexdigest() for p in snapshots))
 
 if __name__ == "__main__":
     unittest.main()
