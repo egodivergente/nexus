@@ -32,6 +32,11 @@
   una vez y se reanudo. Otra tarea volvio a abrir apps (Corte, AXEL Tasker y Drobe),
   pausando de nuevo la compilacion. Se ha solicitado permiso para coordinar esas
   tareas; no se han detenido sus procesos ni modificado sus trabajos.
+- PASS: informes recuperados del reintento, 217 tests Android, cero fallos y
+  cero errores en 36 suites. Archivo recuperado y manifiesto SHA-256 verificados.
+- FAIL: el reintento termina por proteccion tras cinco minutos de pausa por
+  pantalla encendida. No se ha recuperado una APK de ese trabajo ni instalado
+  esta version. La validacion visual y de descarga sigue pendiente de Pixel libre.
 - NO PROBADO aun: nueva APK instalada, guardado real en selector Android,
   accesibilidad visual y regresiones de navegacion en dispositivo.
 
