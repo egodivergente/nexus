@@ -1,0 +1,16 @@
+{
+  "name": "NEXUS Android offline UX verification",
+  "kind": "android-gradle",
+  "host_os": ["linux", "android", "windows"],
+  "host_arch": ["x86_64", "amd64", "aarch64", "arm64"],
+  "java_major": 17,
+  "compile_sdk": 35,
+  "source_includes": ["app", "agent-core", "agent-skills", "gradle", "gradlew", "gradlew.bat", "gradle.properties", "settings.gradle.kts", "build.gradle.kts"],
+  "tasks": [":app:assembleOfflineQa"],
+  "artifacts": ["app/build/outputs/apk/offlineQa/*.apk"],
+  "min_ram_mb": 2200,
+  "min_disk_mb": 3072,
+  "max_heap_mb": 1200,
+  "max_memory_mb": 2560,
+  "low_impact": true
+}
