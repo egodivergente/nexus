@@ -5,9 +5,11 @@ import hmac
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import subprocess
 import time
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -25,6 +27,47 @@ LOCK = asyncio.Lock()
 CHECK_LOCK = asyncio.Lock()
 BROWSER = None
 CACHE = {'status': 'not_checked', 'checked_at': 0}
+
+
+async def visible(locator):
+    for item in await locator.all():
+        if await item.is_visible():
+            return True
+    return False
+
+
+async def context_status(context):
+    needs_auth = False
+    for page in context.pages:
+        parts = urlsplit(page.url)
+        if parts.hostname == 'accounts.google.com':
+            needs_auth = True
+            continue
+        if parts.scheme != 'https' or parts.hostname != 'flow.google.com':
+            continue
+        if parts.path.startswith('/about'):
+            needs_auth = True
+            continue
+        errors = await visible(page.get_by_text(re.compile(
+            r'No se han podido cargar los proyectos|Failed to load projects|Unable to load projects', re.I)))
+        if errors:
+            continue
+        ready = await visible(page.get_by_role('button', name=re.compile(
+            r'^(New project|Nuevo proyecto|Crear proyecto)$', re.I)))
+        if not ready and re.fullmatch(r'/project/[^/]+/?', parts.path):
+            # An open project has a composer instead of the gallery's New project button.
+            composer = await visible(page.locator('[contenteditable="true"], textarea'))
+            workspace = await visible(page.get_by_text(re.compile(
+                r'^(Characters|Caracteres|Scenes|Escenas|Tools|Herramientas)$', re.I)))
+            ready = composer and workspace
+        if ready:
+            response = await context.request.get('https://myaccount.google.com/?hl=en', timeout=8000)
+            account = urlsplit(str(response.url))
+            if response.status == 200 and account.scheme == 'https' and account.hostname == 'myaccount.google.com':
+                return 'connected'
+            if account.hostname == 'accounts.google.com':
+                needs_auth = True
+    return 'auth_required' if needs_auth else 'unverified'
 
 
 def token():
@@ -98,28 +141,9 @@ async def status():
                 async with async_playwright() as pw:
                     browser = await pw.chromium.connect_over_cdp('http://127.0.0.1:9229', timeout=10000)
                     for context in browser.contexts:
-                        for page in context.pages:
-                            if page.url in ('', 'about:blank'):
-                                try:
-                                    await page.goto('https://flow.google.com/', timeout=8000)
-                                except Exception:
-                                    pass
-                            from urllib.parse import urlsplit
-                            parts = urlsplit(page.url)
-                            if parts.hostname == 'accounts.google.com':
-                                state = 'auth_required'
-                            elif parts.hostname == 'flow.google.com':
-                                if parts.path.startswith('/about'):
-                                    state = 'auth_required'
-                                    continue
-                                import re
-                                ready = await page.get_by_role('button', name=re.compile(r'^(New project|Nuevo proyecto|Crear proyecto)$', re.I)).count()
-                                errors = await page.get_by_text(re.compile(r'No se han podido cargar los proyectos|Failed to load projects|Unable to load projects', re.I)).count()
-                                if ready and not errors:
-                                    response = await context.request.get('https://myaccount.google.com/?hl=en', timeout=8000)
-                                    if response.status == 200 and urlsplit(str(response.url)).hostname == 'myaccount.google.com':
-                                        state = 'connected'
-                                        break
+                        current = await context_status(context)
+                        if current != 'unverified':
+                            state = current
                         if state == 'connected':
                             break
                     # Stop only Playwright's connection, never browser.close().

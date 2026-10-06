@@ -8,14 +8,56 @@ h1{font-size:18px;margin:0}button,input{font:inherit;padding:12px;border-radius:
 button{background:#b9f1e3;color:#102c26;cursor:pointer}button:disabled{opacity:.55}input{background:#242a2d;color:white;max-width:100%}
 button img{vertical-align:middle;margin-right:8px}
 #access{padding:20px;display:flex;flex-wrap:wrap;gap:12px}#status{flex:1;min-width:150px}iframe{border:0;width:100%;flex:1;min-height:0;background:#242a2d}
+#connected{padding:24px;max-width:640px;margin:auto;text-align:center}#connected h2{font-size:22px}
 :focus-visible{outline:3px solid #efc96c;outline-offset:3px}[hidden]{display:none!important}
 </style>
 <header><h1>Google Flow</h1><span id="status" role="status">Acceso privado del ASUS</span><button id="keyboard" type="button" title="Abrir teclado del dispositivo" aria-controls="screen" hidden disabled><img id="keyboard-icon" alt="" width="20" height="20">Teclado</button><button id="check" hidden>Comprobar acceso</button><button id="close" hidden>Cerrar acceso remoto</button></header>
 <form id="access"><input id="token" type="password" placeholder="Clave de acceso privado" aria-label="Clave de acceso privado" required autocomplete="off"><button>Conectar Flow</button></form>
+<section id="connected" hidden><h2>Google Flow conectado</h2><p>Sesión activa en el ASUS</p><button id="open" type="button">Abrir navegador</button></section>
 <iframe id="screen" title="Navegador privado del ASUS" hidden allow="clipboard-read; clipboard-write"></iframe>
 <script>
 const $=id=>document.getElementById(id);let key=new URLSearchParams(location.hash.slice(1)).get('token')||sessionStorage.getItem('nexus-flow-key')||'';
 history.replaceState(null,'',location.pathname);$('token').value=key;
+let timer=null,revision=0,checkingRevision=null,remotePassword='',manualView=false,failures=0,deadline=0;
+function stop(){clearTimeout(timer);timer=null;revision++;}
+function hideRemote(){ $('screen').src='about:blank';$('screen').hidden=true;$('keyboard').hidden=true;$('keyboard').disabled=true; }
+function showRemote(){
+    if(!$('screen').hidden)return;
+    $('connected').hidden=true;$('keyboard').disabled=true;
+    $('screen').src='/vnc.html#autoconnect=true&resize=scale&password='+encodeURIComponent(remotePassword);
+    $('keyboard-icon').src='/app/images/keyboard.svg';$('keyboard').hidden=false;$('screen').hidden=false;
+}
+async function request(path,options={}){
+    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),path==='/unlock'?75000:30000);
+    try{return await fetch(path,{...options,signal:controller.signal});}finally{clearTimeout(timeout);}
+}
+function schedule(){
+    clearTimeout(timer);
+    if(Date.now()<deadline)timer=setTimeout(()=>check(),failures?15000:6000);
+    else{$('status').textContent='Acceso remoto caducado. Vuelve a conectar.';hideRemote();$('access').hidden=false;}
+}
+async function check(){
+    if(checkingRevision===revision)return;const current=revision;checkingRevision=current;
+    try{
+        const r=await request('/status',{headers:{Authorization:'Bearer '+key}});
+        if(!r.ok)throw Error('status');const v=await r.json();if(current!==revision)return;
+        failures=0;
+        $('status').textContent=({connected:'Cuenta conectada',auth_required:'Flow necesita iniciar sesión',browser_closed:'Navegador cerrado',unverified:'Comprobando acceso a Flow…'})[v.status]||'Acceso todavía no verificado';
+        if(v.status==='connected'){
+            clearTimeout(timer);timer=null;
+            if(!manualView){hideRemote();remotePassword='';$('connected').hidden=false;await request('/lock',{method:'POST'}).catch(()=>{});}
+        }else{
+            $('connected').hidden=true;
+            if(remotePassword){showRemote();schedule();}else{$('access').hidden=false;}
+        }
+    }catch{
+        if(current!==revision)return;
+        failures++;
+        $('connected').hidden=true;
+        $('status').textContent='No se puede comprobar Flow. Revisa la conexión con el ASUS.';
+        if(failures<3)schedule();else{$('access').hidden=false;}
+    }finally{if(checkingRevision===current)checkingRevision=null;}
+}
 $('screen').addEventListener('load',()=>{
     const input=$('screen').contentDocument?.getElementById('noVNC_keyboardinput');
     $('keyboard').disabled=!input;
@@ -27,11 +69,12 @@ $('keyboard').onclick=()=>{
     input.focus({preventScroll:true});
     input.setSelectionRange(input.value.length,input.value.length);
 };
-async function connect(e){e?.preventDefault();key=$('token').value.trim();$('access').querySelector('button').disabled=true;$('status').textContent='Conectando con el ASUS…';
-try{let r=await fetch('/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:key})});if(!r.ok)throw Error(r.status===409?'El navegador está ocupado. Vuelve a intentarlo.':'No se pudo abrir. Revisa la clave y Tailscale.');let v=await r.json();sessionStorage.setItem('nexus-flow-key',key);$('keyboard').disabled=true;$('screen').src='/vnc.html#autoconnect=true&resize=scale&password='+encodeURIComponent(v.vnc_password);$('keyboard-icon').src='/app/images/keyboard.svg';$('keyboard').hidden=false;$('screen').hidden=false;$('access').hidden=true;$('check').hidden=false;$('close').hidden=false;$('status').textContent='Inicia sesión en el navegador del ASUS';}
-catch(e){$('status').textContent=e instanceof TypeError?'No se puede contactar con el ASUS. Comprueba Tailscale.':e.message;$('access').hidden=false;}finally{$('access').querySelector('button').disabled=false;}}
+async function connect(e,openView=false){e?.preventDefault();stop();const current=revision;manualView=openView;failures=0;key=$('token').value.trim();$('access').querySelector('button').disabled=true;$('open').disabled=true;$('status').textContent='Conectando con el ASUS…';
+try{let r=await request('/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:key})});if(current!==revision)return;if(!r.ok)throw Error(r.status===409?'El navegador está ocupado. Vuelve a intentarlo.':'No se pudo abrir. Revisa la clave y Tailscale.');let v=await r.json();if(current!==revision)return;remotePassword=v.vnc_password;sessionStorage.setItem('nexus-flow-key',key);hideRemote();$('connected').hidden=true;$('access').hidden=true;$('check').hidden=false;$('close').hidden=false;deadline=Date.now()+570000;if(openView)showRemote();await check();}
+catch(e){if(current!==revision)return;$('status').textContent=e instanceof TypeError||e.name==='AbortError'?'No se puede contactar con el ASUS. Comprueba Tailscale.':e.message;$('access').hidden=false;}finally{$('access').querySelector('button').disabled=false;$('open').disabled=false;}}
 $('access').onsubmit=connect;
-$('check').onclick=async()=>{try{const r=await fetch('/status');if(!r.ok)throw Error();const v=await r.json();$('status').textContent=({connected:'Cuenta conectada',auth_required:'Flow necesita iniciar sesión',browser_closed:'Navegador cerrado',unverified:'Acceso todavía no verificado'})[v.status]||'Acceso todavía no verificado';}catch{$('status').textContent='Acceso remoto caducado. Vuelve a conectar.';$('access').hidden=false;}};
-$('close').onclick=async()=>{await fetch('/lock',{method:'POST'}).catch(()=>{});$('screen').src='about:blank';$('screen').hidden=true;$('keyboard').hidden=true;$('keyboard').disabled=true;$('access').hidden=false;$('check').hidden=true;$('close').hidden=true;$('status').textContent='Acceso remoto cerrado; navegador conservado';};
+$('open').onclick=e=>connect(e,true);
+$('check').onclick=()=>check();
+$('close').onclick=async()=>{stop();hideRemote();remotePassword='';$('connected').hidden=true;$('access').hidden=false;$('check').hidden=true;$('close').hidden=true;$('status').textContent='Acceso remoto cerrado; navegador conservado';await request('/lock',{method:'POST'}).catch(()=>{});};
 if(key)connect();
 </script></html>
