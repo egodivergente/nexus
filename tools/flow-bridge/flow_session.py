@@ -91,9 +91,99 @@ async def click_signin(page):
                 return True
     return False
 
+async def existing_account(page, ctx):
+    """Resolve only an identity already signed in inside this owned profile."""
+    marker = PROFILE / '.gflow_account'
+    expected = marker.read_text(encoding='utf-8').strip() if marker.exists() else ''
+    if expected:
+        return expected
+    # Migrated Flow logins can leave the browser marker without an account
+    # marker. Ask Google's authenticated account page, using this same context.
+    from collections import Counter
+    from gflow_cli.auth.verification import find_emails
+    try:
+        answer = await ctx.request.get('https://myaccount.google.com/?hl=en', timeout=15000)
+        if answer.status == 200 and urlsplit(str(answer.url)).hostname == 'myaccount.google.com':
+            counts = Counter(find_emails(await answer.text()))
+            ranked = counts.most_common(2)
+            if ranked and (len(ranked) == 1 or ranked[0][1] > ranked[1][1]):
+                return ranked[0][0]
+    except Exception:
+        pass
+    # A chooser with exactly one already signed-in identity is unambiguous.
+    if allowed_signin(page.url) and '/accountchooser' in page.url.lower():
+        accounts = set(value for value, _ in await account_choices(page))
+        if len(accounts) == 1:
+            return accounts.pop()
+    return ''
+
+async def account_choices(page):
+    from gflow_cli.auth.verification import find_emails
+    if not allowed_signin(page.url) or '/accountchooser' not in page.url.lower():
+        return []
+    choices = []
+    cards = page.locator('[data-identifier], [data-email], li [role="link"]')
+    for index in range(await cards.count()):
+        card = cards.nth(index)
+        if not await card.is_visible():
+            continue
+        value = await card.get_attribute('data-identifier') or await card.get_attribute('data-email')
+        if not value:
+            emails = set(find_emails(await card.inner_text()))
+            value = emails.pop() if len(emails) == 1 else ''
+        if value and re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', value):
+            choices.append((value, card))
+    return choices
+
+async def advance_existing_signin(page, expected):
+    if not allowed_signin(page.url) or not expected:
+        return False
+    if '/accountchooser' in page.url.lower():
+        for value, card in await account_choices(page):
+            if value == expected:
+                await card.click(timeout=5000)
+                return True
+        account = page.get_by_text(expected, exact=True)
+        if await account.count() == 1 and await account.is_visible():
+            await account.click(timeout=5000)
+            return True
+    # This is the known account identifier, never a password or verification.
+    email = page.locator('input[type="email"]')
+    if await email.count() == 1 and await email.is_visible():
+        next_button = page.get_by_role('button', name=re.compile(r'^(Next|Siguiente)$', re.I))
+        if await next_button.count() == 1 and await next_button.is_visible():
+            await email.fill(expected)
+            await next_button.click(timeout=5000)
+            return True
+    return False
+
+async def signin_requirement(page):
+    if not allowed_signin(page.url):
+        return 'page_not_ready'
+    path = urlsplit(page.url).path.lower()
+    if '/rejected' in path or '/denied' in path:
+        return 'browser_rejected'
+    password = page.locator('input[type="password"]')
+    if await password.count() and await password.first.is_visible():
+        return 'password_required'
+    if '/challenge/' in path:
+        return 'verification_required'
+    if '/accountchooser' in path:
+        return 'account_selection_required'
+    return 'google_signin'
+
 async def renew(force=False):
     if not force and (value := cached()):
         return value
+    result = await _renew()
+    if result.get('reason') == 'browser_rejected':
+        # Some Google sign-in flows reject headless Chromium. Retry once with
+        # the existing browser in its normal mode, still off the user's screen.
+        # The first context and profile lease have both ended before this call.
+        return await _renew(headed=True)
+    return result
+
+async def _renew(headed=False):
     os.environ.update(environment())
     os.environ['GFLOW_CLI_LEASE_WAIT_SECONDS'] = '15'
     from runtime_compat import install
@@ -105,7 +195,10 @@ async def renew(force=False):
     stage = 'browser'
     try:
         async with ProfileLease(PROFILE), async_playwright() as pw:
-            ctx = await pw.chromium.launch_persistent_context(**login_launch_kwargs(PROFILE, True))
+            launch = login_launch_kwargs(PROFILE, not headed)
+            if headed:
+                launch['args'] = [*launch['args'], '--window-position=-10000,-10000']
+            ctx = await pw.chromium.launch_persistent_context(**launch)
             try:
                 page = await ctx.new_page()
                 stage = 'navigate'
@@ -125,24 +218,24 @@ async def renew(force=False):
                 await page.wait_for_timeout(3000)
                 # Selecting this already signed-in identity is permitted; passwords,
                 # consent, account creation and verification are never automated.
-                marker = PROFILE / '.gflow_account'
-                expected = marker.read_text(encoding='utf-8').strip() if marker.exists() else ''
-                if allowed_signin(page.url) and expected and '/accountchooser' in page.url.lower():
-                    stage = 'account'
-                    account = page.get_by_text(expected, exact=True)
-                    if await account.count() == 1 and await account.is_visible():
-                        await account.click(timeout=5000)
-                        renewed = True
+                stage = 'account'
+                expected = await existing_account(page, ctx)
                 for _ in range(4):
                     stage = 'verify'
                     if await app_ready(page, ctx):
+                        if expected:
+                            (PROFILE / '.gflow_account').write_text(expected, encoding='utf-8')
                         return remember('connected', renewed)
-                    if allowed_signin(page.url) and '/accountchooser' not in page.url.lower():
-                        break
+                    if allowed_signin(page.url):
+                        if not await advance_existing_signin(page, expected):
+                            break
+                        renewed = True
                     await page.wait_for_timeout(1500)
                 parts = urlsplit(page.url)
                 needs_auth = allowed_signin(page.url) or parts.hostname == 'flow.google.com' and parts.path == '/about'
-                result = remember('auth_required' if needs_auth else 'error', renewed, 'google_signin' if allowed_signin(page.url) else 'page_not_ready')
+                result = remember('auth_required' if needs_auth else 'error', renewed, await signin_requirement(page))
+                if result['reason'] == 'account_selection_required':
+                    result['saved_accounts'] = len(set(value for value, _ in await account_choices(page)))
                 return result
             finally:
                 await ctx.close()

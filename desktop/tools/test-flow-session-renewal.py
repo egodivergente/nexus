@@ -65,6 +65,50 @@ class BackgroundTests(unittest.TestCase):
                 provider.quote({'model':'veo_fast','aspect':'16:9'})
 
 class RenewalTests(unittest.IsolatedAsyncioTestCase):
+    async def test_headless_rejection_has_one_bounded_normal_browser_attempt(self):
+        with patch.object(session,'_renew',AsyncMock(side_effect=[{'status':'auth_required','reason':'browser_rejected'},{'status':'connected'}])) as renew:
+            self.assertEqual((await session.renew(force=True))['status'],'connected')
+            self.assertEqual(renew.await_count,2)
+            renew.assert_any_await(headed=True)
+
+    async def test_password_request_does_not_trigger_more_signin_attempts(self):
+        with patch.object(session,'_renew',AsyncMock(return_value={'status':'auth_required','reason':'password_required'})) as renew:
+            self.assertEqual((await session.renew(force=True))['reason'],'password_required')
+            self.assertEqual(renew.await_count,1)
+
+    async def test_unique_existing_google_identity_is_selected_without_a_button_in_nexus(self):
+        page=MagicMock(url='https://accounts.google.com/v3/signin/accountchooser')
+        card=MagicMock()
+        card.click=AsyncMock()
+        ctx=MagicMock()
+        ctx.request.get=AsyncMock(return_value=MagicMock(status=200,url='https://accounts.google.com/signin'))
+        with tempfile.TemporaryDirectory() as folder,patch.object(session,'PROFILE',Path(folder)),patch.object(session,'account_choices',AsyncMock(return_value=[('owned@example.com',card)])):
+            expected=await session.existing_account(page,ctx)
+            self.assertEqual(expected,'owned@example.com')
+            self.assertTrue(await session.advance_existing_signin(page,expected))
+            card.click.assert_awaited_once()
+
+    async def test_multiple_accounts_without_an_authenticated_identity_are_not_guessed(self):
+        page=MagicMock(url='https://accounts.google.com/v3/signin/accountchooser')
+        ctx=MagicMock()
+        ctx.request.get=AsyncMock(return_value=MagicMock(status=200,url='https://accounts.google.com/signin'))
+        with tempfile.TemporaryDirectory() as folder,patch.object(session,'PROFILE',Path(folder)),patch.object(session,'account_choices',AsyncMock(return_value=[('one@example.com',MagicMock()),('two@example.com',MagicMock())])):
+            self.assertEqual(await session.existing_account(page,ctx),'')
+
+    async def test_account_identifier_is_never_entered_on_an_unrelated_origin(self):
+        page=MagicMock(url='https://accounts.google.com.example.com/signin')
+        self.assertFalse(await session.advance_existing_signin(page,'owned@example.com'))
+        page.locator.assert_not_called()
+
+    async def test_password_and_verification_are_reported_separately(self):
+        page=MagicMock(url='https://accounts.google.com/v3/signin/challenge/pwd')
+        page.locator.return_value.count=AsyncMock(return_value=1)
+        page.locator.return_value.first.is_visible=AsyncMock(return_value=True)
+        self.assertEqual(await session.signin_requirement(page),'password_required')
+        page.url='https://accounts.google.com/v3/signin/challenge/ipp'
+        page.locator.return_value.count.return_value=0
+        self.assertEqual(await session.signin_requirement(page),'verification_required')
+
     def test_cached_connection_expires_and_unverified_states_are_not_cached(self):
         with tempfile.TemporaryDirectory() as folder,patch.object(session,'CACHE',Path(folder)/'health.json'):
             session.remember('auth_required')

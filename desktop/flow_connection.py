@@ -30,11 +30,12 @@ def probe(interactive=False):
             command.append('--interactive')
         run = subprocess.run(command,
             cwd=RUNTIME, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, timeout=3900 if interactive else 110, creationflags=flags)
+            stderr=subprocess.DEVNULL, timeout=3900 if interactive else 180, creationflags=flags)
         value = json.loads(output.read_text(encoding='utf-8')) if run.returncode == 0 else {}
         status = value.get('status')
         return {'status': status if status in {'connected','auth_required','busy','error'} else 'error',
-                'checked_at': time.time(), 'refreshed': value.get('refreshed') is True}
+                'checked_at': time.time(), 'refreshed': value.get('refreshed') is True,
+                'reason': value.get('reason') if value.get('reason') in {'browser_rejected','password_required','verification_required','account_selection_required','google_signin','page_not_ready'} else None}
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return {'status': 'error', 'checked_at': time.time()}
     finally:

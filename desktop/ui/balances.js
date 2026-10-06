@@ -2,9 +2,11 @@
 const AccountBalances={values:{},busy:false,started:false};
 const FlowConnection={value:null,busy:false,timer:null};
 function flowConnectionText(){
+ if(FlowConnection.value?.status==='auth_required')return {browser_rejected:'Google rechaza el acceso',password_required:'Google solicita contraseña',verification_required:'Verificar en Google',account_selection_required:'Elegir cuenta de Google'}[FlowConnection.value.reason]||'Iniciar sesión';
  return {pending:'Conectando…',refreshing:'Renovando sesión…',signing_in:'Completa el acceso en Google',connected:'Conectado',auth_required:'Iniciar sesión',busy:'En uso',error:'Reintentando conexión',unavailable:'Puente no instalado'}[FlowConnection.value?.status||'pending'];
 }
 function flowConnectionHelp(){
+ if(FlowConnection.value?.status==='auth_required')return {browser_rejected:'Google ha rechazado el acceso automático. Abre Conectar para usar su acceso normal.',password_required:'Google solicita tu contraseña; Nexus no la guarda ni la introduce.',verification_required:'Google exige que completes su verificación de identidad.',account_selection_required:'Hay varias cuentas o no se puede identificar una sola. Completa la selección en Google para que Nexus recuerde esa identidad.'}[FlowConnection.value.reason]||'Google necesita que completes el acceso a Flow. La conexión automática se ha intentado.';
  return {pending:'Comprobando la sesión de Flow; saldo sin consultar.',refreshing:'Renovando el acceso con tu sesión de Google existente.',signing_in:'Completa el acceso en la ventana de Google. Nexus detectará el resultado automáticamente.',connected:'Sesión de Flow comprobada; saldo sin consultar.',auth_required:'Google necesita que completes el acceso a Flow. La renovación automática se ha intentado sin enviar generaciones.',busy:'Flow está usando el perfil. La conexión se comprobará al terminar.',error:'La comprobación de conexión falló y se reintentará automáticamente.',unavailable:'Falta el puente local de Flow.'}[FlowConnection.value?.status||'pending'];
 }
 async function refreshFlowConnection(force=false){
