@@ -1,0 +1,1457 @@
+{
+  "app/build.gradle.kts": {
+    "sha256": "ac6717ca53a8558f7660289bdaa452bad52bd1bcd09721d065ed8002dc9d447d",
+    "bytes": 4163,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/build.gradle.kts"
+  },
+  "app/src/androidTest/java/com/vidadomu/nexus/AgentDraftStoreTest.kt": {
+    "sha256": "d283139b71f13d3a760468384f94453f69c9f5ec000e167a631c0bef73d809ad",
+    "bytes": 2021,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/androidTest/java/com/vidadomu/nexus/AgentDraftStoreTest.kt"
+  },
+  "app/src/androidTest/java/com/vidadomu/nexus/ComparisonOfflineTest.kt": {
+    "sha256": "008556f196b32df18c66c24db0ce358818f54abf7137059f069501f1b1727742",
+    "bytes": 4339,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/androidTest/java/com/vidadomu/nexus/ComparisonOfflineTest.kt"
+  },
+  "app/src/androidTest/java/com/vidadomu/nexus/CreationPersistenceTest.kt": {
+    "sha256": "9249c0ed022cc10ec1f02da52b0305f1ec59630af7f7b232add0eb3b0876b680",
+    "bytes": 2001,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/androidTest/java/com/vidadomu/nexus/CreationPersistenceTest.kt"
+  },
+  "app/src/androidTest/java/com/vidadomu/nexus/DatabaseMigrationTest.kt": {
+    "sha256": "61ba4577d7f8b9587e55ebf630d1a47af4c7e9368d90807fdb1cdaa02c947c4b",
+    "bytes": 2735,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/androidTest/java/com/vidadomu/nexus/DatabaseMigrationTest.kt"
+  },
+  "app/src/androidTest/java/com/vidadomu/nexus/MultiOutputTest.kt": {
+    "sha256": "73294e4885dc18bc76a599a6f922cf23689d7bccdbd4bf589e3f6756f3df72ba",
+    "bytes": 5358,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/androidTest/java/com/vidadomu/nexus/MultiOutputTest.kt"
+  },
+  "app/src/main/AndroidManifest.xml": {
+    "sha256": "3b525a2df4d1a46b68fb2b23a77ad7fc8378575d4c771b7b4fdee537940e592d",
+    "bytes": 3647,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/AndroidManifest.xml"
+  },
+  "app/src/main/assets/atlas_catalog_snapshot.json": {
+    "sha256": "c1e3f18f1edf3d813905137eba858471f7d918a1066208fb56cfb7d7c3e0adad",
+    "bytes": 1019799,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/atlas_catalog_snapshot.json"
+  },
+  "app/src/main/assets/atlas_editorial_evidence.json": {
+    "sha256": "b3bb16abd2b67a4158ec689d735790cc9df33b7822db142abd84810b51d3aae0",
+    "bytes": 698129,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/atlas_editorial_evidence.json"
+  },
+  "app/src/main/assets/atlas_published_prices.json": {
+    "sha256": "d876bfcbcb3bc78acff8b4441ca4473aa155a3e848d78098148e00e4c2f60ca7",
+    "bytes": 91165,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/atlas_published_prices.json"
+  },
+  "app/src/main/assets/crun_models_snapshot.json": {
+    "sha256": "3147f724ff80410265910b138991e3180965f74bdcea7cb4f890e9bbe1b29405",
+    "bytes": 333948,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/crun_models_snapshot.json"
+  },
+  "app/src/main/assets/fonts/manrope_OFL.txt": {
+    "sha256": "58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b",
+    "bytes": 4387,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/fonts/manrope_OFL.txt"
+  },
+  "app/src/main/assets/fonts/space_grotesk_OFL.txt": {
+    "sha256": "564ce565c371c5e5bbf286006565a7c9aa55a9f56e7ca58d56e05d649dd61a72",
+    "bytes": 4495,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/fonts/space_grotesk_OFL.txt"
+  },
+  "app/src/main/assets/qa-black-forest-labs_flux-2-pro_edit.json": {
+    "sha256": "fb811450c30b9b53afce2354fac591120071331ff7cc944554aaa3e492ae9a91",
+    "bytes": 6526,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/qa-black-forest-labs_flux-2-pro_edit.json"
+  },
+  "app/src/main/assets/qa-bytedance_seedream-v5.0-pro_edit.json": {
+    "sha256": "d915ec3a876c7fd9fc1422331df5b110ad8249a3c2c38a452a8fc0ec4ca116aa",
+    "bytes": 9716,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/qa-bytedance_seedream-v5.0-pro_edit.json"
+  },
+  "app/src/main/assets/qa-bytedance_seedream-v5.0-pro_text-to-image.json": {
+    "sha256": "1151d197acfc0c40148075b9e4cabe3fd418fdd74aa6af2c978464a844000015",
+    "bytes": 7412,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/qa-bytedance_seedream-v5.0-pro_text-to-image.json"
+  },
+  "app/src/main/assets/qa-openai_gpt-image-2.5-sunburst_edit.json": {
+    "sha256": "30e4af2018145e0823e6616adb590e6c346179554c6bb205116c0498372238f2",
+    "bytes": 8093,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/qa-openai_gpt-image-2.5-sunburst_edit.json"
+  },
+  "app/src/main/assets/qa-youchuan_v8.2_image-to-image.json": {
+    "sha256": "44a16cd7b30bed24c62cf0c9dd622a674a84689ff52aba71c0e8bd2f48eff959",
+    "bytes": 9092,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/assets/qa-youchuan_v8.2_image-to-image.json"
+  },
+  "app/src/main/java/com/vidadomu/nexus/MainActivity.kt": {
+    "sha256": "95914dc09a5c661e917bd2bfe605bb7ccad363f4878c58a753f8954ec278349a",
+    "bytes": 10702,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/MainActivity.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/NexusApplication.kt": {
+    "sha256": "cb86d636533b69e09ace15d88c92352f761859cb1c40ea5b27503419d82cac52",
+    "bytes": 4130,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/NexusApplication.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/agent/AgentDraft.kt": {
+    "sha256": "611244474ddcc8fc03d3a9ad6a648b54ae79091b444a38502cbd72f8c74ccf4f",
+    "bytes": 1066,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/agent/AgentDraft.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/agent/AgentDraftStore.kt": {
+    "sha256": "7dc218830cd6e6f619a2f68ebd1b5d22d4d52c80fce4c7d775e9a1cea4124ef5",
+    "bytes": 1620,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/agent/AgentDraftStore.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/agent/NexusAgentProvider.kt": {
+    "sha256": "5ef45b51747b70457c646b3507062a2598713cc470036f6740844862cce51dcb",
+    "bytes": 7036,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/agent/NexusAgentProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/alexia/AlexiaBridge.kt": {
+    "sha256": "57e7cda996d3c1b77c4268e1ec28cabeaa4b47d67e8267ad1efe3b263fa1471b",
+    "bytes": 23709,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/alexia/AlexiaBridge.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/currency/CurrencyManager.kt": {
+    "sha256": "d04cd26fcb537a3e27c09389fef9daa7d6de193427a3b8d118eeff8a487513bd",
+    "bytes": 9360,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/currency/CurrencyManager.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/database/NexusDatabase.kt": {
+    "sha256": "d2f946f38c7d973cb31e3fb8a1163986b3a07a477f4ba0c81ea2e5e6e4a54db5",
+    "bytes": 13575,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/database/NexusDatabase.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/model/ComparisonRecovery.kt": {
+    "sha256": "e39048ed408a2120a75a5e949d50fc69275aae2d01e9ab3aae5e79a445d4ab3a",
+    "bytes": 570,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/model/ComparisonRecovery.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/model/CoreModels.kt": {
+    "sha256": "053ea204f68b5909474e6e98141d985f4417a76a40160f09618c87e16b05fee7",
+    "bytes": 11251,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/model/CoreModels.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/model/FormContract.kt": {
+    "sha256": "a0940f9219594d9ca5323284fc4041abd909ce06f5b63e92dc46d49e601cf0ac",
+    "bytes": 3493,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/model/FormContract.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/model/OutputFiles.kt": {
+    "sha256": "921b2211dd2c9b82918b14d4118d57bfe923b2437ba3db2c7b9552e6c8daf8e7",
+    "bytes": 854,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/model/OutputFiles.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/network/AwaitResponse.kt": {
+    "sha256": "40475b47e4001a9bb31d9c51b7891472edef1cafc6bd65f518d243027c0e3101",
+    "bytes": 875,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/network/AwaitResponse.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/network/LocalQaInterceptor.kt": {
+    "sha256": "45ed1a39f54ab01916310318caef0f795519e5e35e771eefbfe52f996451e051",
+    "bytes": 337,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/network/LocalQaInterceptor.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/network/NetworkModule.kt": {
+    "sha256": "3468bbd8c402e8c98ceb18a7244cf9d074582e19fef5612841c22891541ef559",
+    "bytes": 5484,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/network/NetworkModule.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/network/ProgressRequestBody.kt": {
+    "sha256": "098ad847f1d66209263b18acf1373c29a54e5058a41afb7bae89c48fde1aff1c",
+    "bytes": 827,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/network/ProgressRequestBody.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/security/SecureStorage.kt": {
+    "sha256": "7d6d79f943a7aa3f52899ace8e08c78f7e4efe253c3bd877362d8931e932e388",
+    "bytes": 8794,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/security/SecureStorage.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/util/BoundedCache.kt": {
+    "sha256": "d832e0ff4e7c486d10c74f85d945b627d67525370f90e01b8b0c70bea0d78735",
+    "bytes": 885,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/util/BoundedCache.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/work/GenerationPollingWorker.kt": {
+    "sha256": "295a561801ef12bb62982e17c220072357587e4c34a829dcd1223ea67f499926",
+    "bytes": 4983,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/core/work/GenerationPollingWorker.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/CatalogCacheRecovery.kt": {
+    "sha256": "d4f1246defac42159a6215235606bd417737748a8e53e140192309d4f485ff73",
+    "bytes": 455,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/data/repository/CatalogCacheRecovery.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/CatalogVisibility.kt": {
+    "sha256": "e0ccb6ba7eb1c9b1c260d7f2de1d0e9342f2d88d62036aed090885bbd36df84a",
+    "bytes": 737,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/data/repository/CatalogVisibility.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/ModelCatalogCache.kt": {
+    "sha256": "df1f17dec157a523fa3d096fcf8b5a00a284cb5f2860f731e9dede51f212d0ce",
+    "bytes": 3690,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/data/repository/ModelCatalogCache.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/Repositories.kt": {
+    "sha256": "a52897fce585ce63e2bc4d9270969025d27654fed8bd65079c56e140a6aca114",
+    "bytes": 11246,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/data/repository/Repositories.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/api/NexusProvider.kt": {
+    "sha256": "17cea7704330c9c116ae08005a872d0e2ed3272cc45cc23ae0d4eed5c3310e0b",
+    "bytes": 2516,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/api/NexusProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasBilling.kt": {
+    "sha256": "158b47f747b617907338794d193ea57cc71b0b6539787e3da375e629a465e046",
+    "bytes": 382,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasBilling.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasChatProtocol.kt": {
+    "sha256": "670b2dae18cc9d6bb675b0eb0736173872340ce0b4a2a929dbc3059a2c242e93",
+    "bytes": 963,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasChatProtocol.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasCloudProvider.kt": {
+    "sha256": "49553097326a15feb0092c7df600a49294d581fd543e2d623ab75517f173e35e",
+    "bytes": 26197,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasCloudProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasGenerationPayload.kt": {
+    "sha256": "eb1d6b01b334686c848e88584ceba37dc27444ebe170170ec1592c1c6cd4ac10",
+    "bytes": 5837,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasGenerationPayload.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasModelCatalog.kt": {
+    "sha256": "b75bd51502eacae47265dc5ae61a99be3cdb5103822cf18fd999332a383fe596",
+    "bytes": 43647,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasModelCatalog.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasModelMapper.kt": {
+    "sha256": "e993441582e42cb4b97ec8f74f667cebf542d8ee63d05ee7fdef7f6d66321fa3",
+    "bytes": 50414,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasModelMapper.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasPriceQuote.kt": {
+    "sha256": "2b9260a32e60a4652da69d6a9416d28e9d5b84fdd966f4e9502eb5ee18605907",
+    "bytes": 8051,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasPriceQuote.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasPublishedPrice.kt": {
+    "sha256": "6285f6c17d2df28c4628d518c860a79f3731eccb6b832c85e6be1b0289b8ccbb",
+    "bytes": 3856,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasPublishedPrice.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeGenerationRequest.kt": {
+    "sha256": "8985a8850cbd9f73c160fbff51b1cf396880165adeb6533014519078027f7769",
+    "bytes": 1679,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeGenerationRequest.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeImagePayload.kt": {
+    "sha256": "24d761780e2af5f8cfedd53f4851e304e5820639eb2470364070e7b4985c368c",
+    "bytes": 371,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeImagePayload.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeModelSchema.kt": {
+    "sha256": "0244e9317c7712e4d1d775ce2484d83ff3647931459589c440443707e43d9b96",
+    "bytes": 16338,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeModelSchema.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/VideoPricePreview.kt": {
+    "sha256": "c6e209901d34e746f3d8c7938a873189e420d30f928d16ac81be15a2374295b4",
+    "bytes": 3241,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/atlas/VideoPricePreview.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/crun/CrunCatalogSnapshot.kt": {
+    "sha256": "85a7d0f5ef29364f3bbc0592c548a034f35dfd6219282b9aec997ec233ab0ca6",
+    "bytes": 13891,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/crun/CrunCatalogSnapshot.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/crun/CrunModelCatalog.kt": {
+    "sha256": "2f1b56cb412ad4c1aa7fe314e440d186eabf5b6388d7d0d2a59cf2169974972c",
+    "bytes": 7567,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/crun/CrunModelCatalog.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/crun/CrunPayloadCodec.kt": {
+    "sha256": "2d4a76fc089f90a175e1ebc63e8f61c9e501c212118ec6a2ae4070d7c48b2087",
+    "bytes": 5209,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/crun/CrunPayloadCodec.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/crun/CrunProvider.kt": {
+    "sha256": "cedbfa12dd2c294e9b2abc68342cf9d1144f5ab83ec2f4943bf339bdf6d6b67f",
+    "bytes": 15332,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/crun/CrunProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/crun/CrunTextCatalog.kt": {
+    "sha256": "c55c785bf724c2058d76e9453d8349e05c9b6408e8419de7f7ff9f214b33ea95",
+    "bytes": 4450,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/crun/CrunTextCatalog.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/mock/MockNexusProvider.kt": {
+    "sha256": "61c1f7d24e0799ad6e9865a14b15e09e2a0114fc14f784a3c91db405c984fd05",
+    "bytes": 8337,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/mock/MockNexusProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/registry/ProviderRegistry.kt": {
+    "sha256": "c2fd54e184c5630303fcdcf231a8362dab645a3c6d6c91c782d0a7d3cb622dfa",
+    "bytes": 2106,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/registry/ProviderRegistry.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/runway/ContractPayload.kt": {
+    "sha256": "01f27e37e730c5c7affcf29cf6a02a0ba0723be42ab9a9bf1f4ff07b1944b24c",
+    "bytes": 3719,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/runway/ContractPayload.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayBilling.kt": {
+    "sha256": "7a18567828ce6d485febf45707b8285e4c9c59e30bb9551b861549e215c30411",
+    "bytes": 645,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayBilling.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayContracts.kt": {
+    "sha256": "c6c3283d799acc32c60fcf79ca1ee32ae8d4561eb7f56038720c8269649ce300",
+    "bytes": 114547,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayContracts.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayPricing.kt": {
+    "sha256": "facb4d68948551e1e7260db024088ed6fdc7870516ea4f3ca356345ec9e8f183",
+    "bytes": 7248,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayPricing.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayProvider.kt": {
+    "sha256": "59660b9f8bcab3727e6206f114bd5d4613d96d6e6a5b2ceccc6d903b91c6c544",
+    "bytes": 28431,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/provider/runway/RunwayProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/billing/BillingLedgerScreen.kt": {
+    "sha256": "8e4000de58e4f099bc8b19dffaecedf8ad6b6ecf0846f275b0641519663c347b",
+    "bytes": 20513,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/billing/BillingLedgerScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/AlexiaBrandAssets.kt": {
+    "sha256": "1cb52aca116f74c0785f035661aafbfe7cfee52e7e01bca8d9438c1ecf4a67e4",
+    "bytes": 2963,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/AlexiaBrandAssets.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/BrandLogo.kt": {
+    "sha256": "b0c7238082ce96e9a3479037606a632762f265c127e8c0455ca4d1bf6b9eb0a5",
+    "bytes": 4766,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/BrandLogo.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/CatalogPrice.kt": {
+    "sha256": "1643c34873216a52c8ef873e0dc445f6550ae38ec090bc8bdd5e2c3fa3fa062f",
+    "bytes": 1275,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/CatalogPrice.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/CreationSearch.kt": {
+    "sha256": "b1725435f8f4ed0cfe385a240b0dd9babca85d0f2c81d9578df159c69f734879",
+    "bytes": 583,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/CreationSearch.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt": {
+    "sha256": "d7c447e8efc359bb5e0ecea9c0ae114109e38dab821c98daf2b132a4781cbf97",
+    "bytes": 7557,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/PriceEstimate.kt": {
+    "sha256": "f7a7e585669b273132bcd7549e984ae37b7a3b1b16101f970d264b88855d9ca3",
+    "bytes": 5555,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/PriceEstimate.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/ProviderBrandRegistry.kt": {
+    "sha256": "ebc37b6f55b1e147ce3f71bc4d30f00453958ed627d6348644a19ca53a1d6444",
+    "bytes": 12301,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/ProviderBrandRegistry.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/VendorLogo.kt": {
+    "sha256": "a4431681a9e0fc7d5e8c9ed6dc843f861e7c581a425fbcc02fc226ddd26b266e",
+    "bytes": 603,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/components/VendorLogo.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/ComparisonController.kt": {
+    "sha256": "243bbf56029a34e965e0d29ec7cd58ba9650eb6f8c30172b79796deac3604ae8",
+    "bytes": 17008,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/ComparisonController.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/ComparisonPlan.kt": {
+    "sha256": "d005d04eca60bc12650048754130f48401f3a20ad131a7ef417b951ac1e9ba31",
+    "bytes": 9854,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/ComparisonPlan.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/ComparisonScreen.kt": {
+    "sha256": "6dd62f251af26d2bd05272674f9e36be415140f42bd2380f63b9e774fffbe2c4",
+    "bytes": 23335,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/ComparisonScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt": {
+    "sha256": "d571abf92ed412ead4d60fb693c721e2e981a41c284ec82554df23e36455f493",
+    "bytes": 93456,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreateViewModel.kt": {
+    "sha256": "0a375be2fcdab5ef1fb51d0706536670154b70b84f303ec8c728066246b430e8",
+    "bytes": 38379,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/CreateViewModel.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreationPreferences.kt": {
+    "sha256": "56c6e7b32206a37efa8e01bf9e7fd60ce90645fffd597e72fef5ec3a77387530",
+    "bytes": 2550,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/CreationPreferences.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreationPresetsSheet.kt": {
+    "sha256": "9d5ee5d7a584f42d6beec903d33f1d0abf911d90d741b914319df26b7a7fc4f8",
+    "bytes": 2229,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/CreationPresetsSheet.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreationProviderLabel.kt": {
+    "sha256": "6b13c132392a714f729b30863e87c4226c46b3ffe99bc3f928d12974c141d51e",
+    "bytes": 346,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/CreationProviderLabel.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreationReadiness.kt": {
+    "sha256": "0f4b3f1869649a50cbbbedfd367ed093c33943d80932845e45d1017525d5203d",
+    "bytes": 2600,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/CreationReadiness.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/GenerationDispatcher.kt": {
+    "sha256": "2a434c467e85713a4ba15f8014118210c8dd3b94aeb999d52d95b13aa6afa3f8",
+    "bytes": 2930,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/GenerationDispatcher.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/LocalMediaInspector.kt": {
+    "sha256": "0d8868a4a05c2a1810618c3b1da50ecf19a59e957125fd2e4c8d09b1c775d97e",
+    "bytes": 2447,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/LocalMediaInspector.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/LocalQaFixture.kt": {
+    "sha256": "2d303f6a1cadb6f2d1f3d7897167585b365493b3f43fe25ae804935788a117f4",
+    "bytes": 2102,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/LocalQaFixture.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/MediaSelectionSession.kt": {
+    "sha256": "0c78e20d2b36b676252ee7314bb8bda4266badf0f4e49ca564cc33ccfe58ca52",
+    "bytes": 1007,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/MediaSelectionSession.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/ParameterPresentation.kt": {
+    "sha256": "e65b54b83c272e31351d7a734baa4f8f1b50485309fcb98641a761d3d5845864",
+    "bytes": 3570,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/ParameterPresentation.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/PrivateMediaStorage.kt": {
+    "sha256": "5b68d2dd466afb0b103069a041ea1d014ea03ba8a0e380fb7b2ac88a81fc0cf5",
+    "bytes": 917,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/create/PrivateMediaStorage.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/generations/GenerationsScreen.kt": {
+    "sha256": "a0a158048a068ce9af57e5f5434b3d2846ce10bb5b25717e5771dc617fe7544e",
+    "bytes": 28761,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/generations/GenerationsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt": {
+    "sha256": "32d53cc7af0ba91c9fbfbe9ad672071219456ddb57bd5401534df3216e72b521",
+    "bytes": 12169,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogBrowser.kt": {
+    "sha256": "f4551677387e2baeca06fc6c186c337f2a173c988a885d94ada8c134f1dc7836",
+    "bytes": 3546,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogBrowser.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogFocus.kt": {
+    "sha256": "97b14133349e797138437f995a78f6bf1bd4b51bd822d059850fc237f67a3e63",
+    "bytes": 6177,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogFocus.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogGuide.kt": {
+    "sha256": "7ada2ec1239f0c7f6295205e2ad43eb2a7391cc679187e060a7fb3b39cc35a5e",
+    "bytes": 7180,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogGuide.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogHierarchy.kt": {
+    "sha256": "ffbe4c83ddf5b1bd011ee681f017d5071fbb6364035daf1be515a9ebcf728a1e",
+    "bytes": 2123,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogHierarchy.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogOrdering.kt": {
+    "sha256": "4f9330bec04f96c32215f9aa5248f3a29619b3e4ef2d130c87dd9b6d63bce742",
+    "bytes": 684,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogOrdering.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogPresentation.kt": {
+    "sha256": "f58c1ae87d7d86ad27e29e6a34744ba7971924c742bb2af797ccefb8c6c9a1e0",
+    "bytes": 13207,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogPresentation.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogSort.kt": {
+    "sha256": "420049dc0fd6c17ec68c08c848fb9b1a7e6186bac2305dadd957eb621951bb99",
+    "bytes": 1303,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogSort.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt": {
+    "sha256": "4aa4819d5187ab54ae850c969f64dfb3f7e89b92b4dc43d27f049af7c60d55b3",
+    "bytes": 25967,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogWorkflow.kt": {
+    "sha256": "a8ad0ba10f4a8460ee20d4185d72bfff33b907b27ae1298dbc5b46a2db1e547f",
+    "bytes": 6942,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/CatalogWorkflow.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/ImageModelChoices.kt": {
+    "sha256": "9f4047a6819f37ecedaca1ab45fad36b46caad8721e2f195bfd97f7c9c09ddc1",
+    "bytes": 1930,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/ImageModelChoices.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/ModelOptionsScreen.kt": {
+    "sha256": "3370b67a08a9c21d3a8a24c5dccdf1372366850f743c78ec527bb5e2a6dd2132",
+    "bytes": 13027,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/ModelOptionsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/ModelRelease.kt": {
+    "sha256": "8eb787c9e81a354a795c0713ee6813019f5f39414befb1a9b8811af33eea104a",
+    "bytes": 5041,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/ModelRelease.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/ModelsScreen.kt": {
+    "sha256": "0efec155fe5ba73e58730087446991c64a6c6e8392974d385147363b3497f932",
+    "bytes": 59501,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/ModelsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/PublishedModelNotes.kt": {
+    "sha256": "2fc165e3814c7588833a5ac5f6407aee3fb56d45ebd72cb3b6033c80fe371a44",
+    "bytes": 525,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/models/PublishedModelNotes.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/navigation/NexusBottomBar.kt": {
+    "sha256": "da2819edf7563ea459c6848791907607fcc23692887dd99d445cf5a139150d93",
+    "bytes": 5029,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/navigation/NexusBottomBar.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/navigation/Screen.kt": {
+    "sha256": "dc396662710ff0d524255c37e8ee6dd015bc05392fe102e9e02772346396ab34",
+    "bytes": 753,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/navigation/Screen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/output/OutputViewerScreen.kt": {
+    "sha256": "59657757b85f1d3d60d23b415a8875509cdd09493f4ecbf9344d6af2ecf6f5aa",
+    "bytes": 26803,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/output/OutputViewerScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/settings/SettingsScreen.kt": {
+    "sha256": "acc63110d08629c9d0d30fc92c9bcdf825bce0d9eda6cf771a7f3c397fe436f7",
+    "bytes": 51192,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/settings/SettingsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/AppearancePreferences.kt": {
+    "sha256": "950a20ffc41fa2ca14f6f2e9d5629161e8287e9e9100e2d93a6e48de51bdc290",
+    "bytes": 2607,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/theme/AppearancePreferences.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/Color.kt": {
+    "sha256": "c8a646c7cfe1bd50dd69d1215e16162a7901deeeb0975d33fdc70f9cca98571f",
+    "bytes": 3129,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/theme/Color.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/NexusShapes.kt": {
+    "sha256": "04250d5ca80b683ed190abbd9256a8a1903898823c0528ce60bbbf566255fdc2",
+    "bytes": 476,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/theme/NexusShapes.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/NexusSpacing.kt": {
+    "sha256": "923d3e863cec84aa0ba62ab28d14492b993d87b894420beb34e3fa136962a8b4",
+    "bytes": 292,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/theme/NexusSpacing.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/Theme.kt": {
+    "sha256": "df17cfe373682bb59c4ca6e115d60e0d95674c8f2ff52fc281361ed32d8cd982",
+    "bytes": 6452,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/java/com/vidadomu/nexus/ui/theme/Theme.kt"
+  },
+  "app/src/main/res/drawable/ic_launcher_background.xml": {
+    "sha256": "292a882ec6cd510f2fcd10a07cad55a9b86bb18f0cdac0252d6093d4f1b38ca7",
+    "bytes": 390,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_launcher_background.xml"
+  },
+  "app/src/main/res/drawable/ic_launcher_foreground.xml": {
+    "sha256": "724737b28976b719804e5ddeba3a207ff5e4285827d4e3932d27bcdf5f67904a",
+    "bytes": 1404,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_launcher_foreground.xml"
+  },
+  "app/src/main/res/drawable/ic_logo_anthropic.png": {
+    "sha256": "b3bfc6a5ef9127ac407d05eb5bd56d6950adf43374031fd3d452671672a8683a",
+    "bytes": 59614,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_anthropic.png"
+  },
+  "app/src/main/res/drawable/ic_logo_atlascloud.png": {
+    "sha256": "c3fa225932a844ac850eac365992a6385e353a356b42e5a08f4edd9b8ea1a9ff",
+    "bytes": 64530,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_atlascloud.png"
+  },
+  "app/src/main/res/drawable/ic_logo_bfl.png": {
+    "sha256": "35f026596af090063fd6ad53f982c6f7991416717bf28755266157e332e010ca",
+    "bytes": 65607,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_bfl.png"
+  },
+  "app/src/main/res/drawable/ic_logo_bytedance.png": {
+    "sha256": "ee687e3ef023aa4aed16dacf7a4f36efe96bd8e13488301abfd222724e813013",
+    "bytes": 42097,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_bytedance.png"
+  },
+  "app/src/main/res/drawable/ic_logo_claude.png": {
+    "sha256": "374d679bc1d5566170f61a34f97b808e490740c44945702bb013b5d607bc8adc",
+    "bytes": 199548,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_claude.png"
+  },
+  "app/src/main/res/drawable/ic_logo_deepseek.png": {
+    "sha256": "5107f73366110c30d1dbf98cb28409ea6ca9f0d6336ff61962835c08d3ff7073",
+    "bytes": 121619,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_deepseek.png"
+  },
+  "app/src/main/res/drawable/ic_logo_elevenlabs.png": {
+    "sha256": "8e6afd261256bcf03687459ff000c5273af7480adf13234b3433dda82ec09d86",
+    "bytes": 5747,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_elevenlabs.png"
+  },
+  "app/src/main/res/drawable/ic_logo_flux.png": {
+    "sha256": "4abcb6e20c670d4c7f0ab2fc5c5a3161c3986f86f92c08a89005c7c5c21b9b82",
+    "bytes": 75242,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_flux.png"
+  },
+  "app/src/main/res/drawable/ic_logo_google.png": {
+    "sha256": "300c6bc50b2240adbc03b3392eba5356fa829cd5cf0ebb9380e3243cc5874b21",
+    "bytes": 105887,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_google.png"
+  },
+  "app/src/main/res/drawable/ic_logo_ideogram.png": {
+    "sha256": "8182376ddd67498fc091b24b67705c75000712b3e769ac3be10d3ce902e0d59a",
+    "bytes": 97964,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_ideogram.png"
+  },
+  "app/src/main/res/drawable/ic_logo_kling.png": {
+    "sha256": "749380aeea7cf5eafbb16f0a267d325141300896aedc2ec69e3b76affdc62a88",
+    "bytes": 246796,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_kling.png"
+  },
+  "app/src/main/res/drawable/ic_logo_luma.png": {
+    "sha256": "b8effecfddd36baf5e807200956feae4c81a3fc8b371bb30a3bdb2330e850eca",
+    "bytes": 143833,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_luma.png"
+  },
+  "app/src/main/res/drawable/ic_logo_microsoft.png": {
+    "sha256": "441ae1b6a9f47ac6de7392015d65b76efffcda968bd123646f16e3119e836299",
+    "bytes": 7648,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_microsoft.png"
+  },
+  "app/src/main/res/drawable/ic_logo_minimax.png": {
+    "sha256": "8552e7a0281e1f4d9ba5eb5ccc093f7ff760a2621376323e28e203a38f5cdb1c",
+    "bytes": 118037,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_minimax.png"
+  },
+  "app/src/main/res/drawable/ic_logo_nvidia.png": {
+    "sha256": "782ace80bc3d28debf8a1e0fa994c9ee5e4ba23eda5f97e694c87ceb2f87e625",
+    "bytes": 118612,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_nvidia.png"
+  },
+  "app/src/main/res/drawable/ic_logo_openai.png": {
+    "sha256": "a2c86f26d1b81ca734271031f012c927b7456e35e98268a048141a8a963fa85c",
+    "bytes": 132294,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_openai.png"
+  },
+  "app/src/main/res/drawable/ic_logo_pika.png": {
+    "sha256": "1fd07f82feb74566d573e645f4d8254c0eaeb33bc77005468d4ac6e0b468bffd",
+    "bytes": 49928,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_pika.png"
+  },
+  "app/src/main/res/drawable/ic_logo_pixverse.png": {
+    "sha256": "1c677ef38e4a03864b83fbf33dfd0a9b0851b49ac1426c0ab7a19fdb5e6fda6e",
+    "bytes": 258412,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_pixverse.png"
+  },
+  "app/src/main/res/drawable/ic_logo_qwen.png": {
+    "sha256": "5c9c524cef6a7e4dbac4a2383b2ecc00ccabc6066d1457da2f09d0792159cbf0",
+    "bytes": 168417,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_qwen.png"
+  },
+  "app/src/main/res/drawable/ic_logo_runway.png": {
+    "sha256": "e9200c9830dd37f6933a3cfaeb92790b2d31f287a86d233d08fdf872da64a0f9",
+    "bytes": 64634,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_runway.png"
+  },
+  "app/src/main/res/drawable/ic_logo_stability.png": {
+    "sha256": "b837927548055baa3889d0adb73f89dd6e56275bdd5154f1562ad7a675b47430",
+    "bytes": 81913,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_stability.png"
+  },
+  "app/src/main/res/drawable/ic_logo_suno.png": {
+    "sha256": "6a80566d03d9f1cd5005ff1dfcf9353a91310c7b57402f0878eedb35881d6406",
+    "bytes": 38882,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_suno.png"
+  },
+  "app/src/main/res/drawable/ic_logo_vidu.png": {
+    "sha256": "d5f1d4bcb0ffd0a38ac192e3651ecd06dba9e20f2a683d797bc7e9a6739db006",
+    "bytes": 179829,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_vidu.png"
+  },
+  "app/src/main/res/drawable/ic_logo_wan.png": {
+    "sha256": "9adb0f026eb8dd36f1ba8231a8fa1d4dd956eae90e3aafb52e5cf2297580ba01",
+    "bytes": 82462,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_logo_wan.png"
+  },
+  "app/src/main/res/drawable/ic_vendor_3d.xml": {
+    "sha256": "362d7be6d7c092cf03507b7f74a669194b8e47971e046495fac6f754357e775a",
+    "bytes": 399,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_3d.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_anthropic.xml": {
+    "sha256": "4d76664745fbd30a5306b01e59f56a1eb3d07b2591cd06d9d8d75f0dbc73448e",
+    "bytes": 422,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_anthropic.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_blackforest.xml": {
+    "sha256": "ee5ff435fa25aa77189cda4affc5aca3f49cbd9d135dfcc8eb2892a061ad3379",
+    "bytes": 661,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_blackforest.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_bytedance.xml": {
+    "sha256": "c5d7334e5b353b37807dc61c975cdc38fbd8e53e7007b59e8af98d3b802c0046",
+    "bytes": 814,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_bytedance.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_deepseek.xml": {
+    "sha256": "5cd664eadd2a5c5801740592c87f48ac7ec7dff9bf3a5e990999492c5a4f2149",
+    "bytes": 491,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_deepseek.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_elevenlabs.xml": {
+    "sha256": "005b3241a0c473c0c4270b147c82f29886bff7d992e7d90f74ac8ec14d0cc5fa",
+    "bytes": 283,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_elevenlabs.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_google.xml": {
+    "sha256": "da5c82780413c586f28047482672f78855f5307564c26554cfa93e80ae02747a",
+    "bytes": 1069,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_google.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_ideogram.xml": {
+    "sha256": "9c97a1730f93eb9537195cd2fff9dd5cbda3f3b5eb83ce448676b4f0388f08ae",
+    "bytes": 295,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_ideogram.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_kling.xml": {
+    "sha256": "4ffea67c6867ea17ce2521f9034c5afdb1331a27795bc94a96b80120832bb0f4",
+    "bytes": 451,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_kling.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_luma.xml": {
+    "sha256": "2fc9e2dd05dddac0b0b3ac60c320c71d5666a080701bec838d1fd406da3d8ff1",
+    "bytes": 405,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_luma.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_microsoft.xml": {
+    "sha256": "459f490216b40300e9ade2e0a85cc2bca8d9394be988fcd7f90c4a7d536b256a",
+    "bytes": 514,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_microsoft.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_midjourney.xml": {
+    "sha256": "73a7d91ab6bf58089700c3f3690bf04ef810146ed7389173873f2814de9da0aa",
+    "bytes": 336,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_midjourney.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_minimax.xml": {
+    "sha256": "216d0215a272311940e25a67417543fb9f62feef6345652cd607b09c86a9a486",
+    "bytes": 396,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_minimax.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_nexus.xml": {
+    "sha256": "cab4fc488ee44acca0a96c4ddf0e945a04e826a79d5674aaa09028ff6f172f2d",
+    "bytes": 375,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_nexus.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_nvidia.xml": {
+    "sha256": "6954bdc59d78f0cf82852e5ac21eac09b80e9000e309b64fb14b5e063b53305f",
+    "bytes": 457,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_nvidia.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_openai.xml": {
+    "sha256": "bfc13f9b40887e931db75a85b1d05195925e547563bf69a974a2105f084e502a",
+    "bytes": 727,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_openai.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_pika.xml": {
+    "sha256": "249d0263d57315a9400d6b334f457f5a6599f244679fc0adfecd84095b5a0cf5",
+    "bytes": 291,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_pika.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_pixverse.xml": {
+    "sha256": "e6e58391270968f6a47a778669d7bac4c1c2144049f9addd86b9a26b6527c621",
+    "bytes": 399,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_pixverse.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_qwen.xml": {
+    "sha256": "a037a9d0b54174d583bf94b7413d35ec16e4d9b717c7380272fbd494571c4949",
+    "bytes": 390,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_qwen.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_recraft.xml": {
+    "sha256": "52b42d17f2505be4db8437fb3239e362518a3548b01707d8ef956b5aef0c1dd3",
+    "bytes": 325,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_recraft.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_runway.xml": {
+    "sha256": "baeebe4ddacd0bffef82d6f77e1fb33cc87fdcb8100fbccc6caf881e8a294957",
+    "bytes": 394,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_runway.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_stability.xml": {
+    "sha256": "f506a766a22146dca15326bd1df1e5490fff2ee46422a64d218b042f343d9a9d",
+    "bytes": 349,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_stability.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_suno.xml": {
+    "sha256": "ef8c145d8bd4b1ef63b125af15e69978cb5879ff17d19e8889896c44be5d4954",
+    "bytes": 356,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_suno.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_tencent.xml": {
+    "sha256": "50838d291e3c99f4914164e922260779c33cc70de2040187717aa82e489400a5",
+    "bytes": 364,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_tencent.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_udio.xml": {
+    "sha256": "1e5a01567527ad23a5bfef3c11f3724bceac2467130b974d4404b869297a2f61",
+    "bytes": 374,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_udio.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_vidu.xml": {
+    "sha256": "e426c6d6b020189f5e42077b65f1230f2f2d18c68d2035e68707015fd1b34e6a",
+    "bytes": 371,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_vidu.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_xai.xml": {
+    "sha256": "6636fd16673e73759c8bb98ac5b09ddacdbb5a73529efc73a790ba8c284cb79f",
+    "bytes": 462,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_xai.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_zhipu.xml": {
+    "sha256": "f1ccfcae9618d68ab76f98ebd17fb10e11729018f386fa0c9d38b57eb3014c2d",
+    "bytes": 342,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/ic_vendor_zhipu.xml"
+  },
+  "app/src/main/res/drawable/logo_bytedance_official.png": {
+    "sha256": "6a3ef63cde0a605b463026cfcfdcdcff54fd34f91bf363cdac819e9762a5dbc2",
+    "bytes": 26277,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/logo_bytedance_official.png"
+  },
+  "app/src/main/res/drawable/logo_gemini.png": {
+    "sha256": "cf001ff4eacee762acf206d9033523c7b2d550da92cbeeb98029035a84ef4ba2",
+    "bytes": 6930,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/logo_gemini.png"
+  },
+  "app/src/main/res/drawable/logo_kling_official.png": {
+    "sha256": "e33363046671dae519c75af13d290608f57bdc3fc16279375fcbd548d780ff1d",
+    "bytes": 7240,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/logo_kling_official.png"
+  },
+  "app/src/main/res/drawable/logo_minimax_official.png": {
+    "sha256": "fc1eae9adc1ab59106ebba0bf6e4a782914339b8c36ac3d6f7079367d8647ea2",
+    "bytes": 63670,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/logo_minimax_official.png"
+  },
+  "app/src/main/res/drawable/logo_wan.png": {
+    "sha256": "41e99db47656ace5ea0ae98613de384aa0f8836a4c59d62c979412ec7949b747",
+    "bytes": 103702,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable/logo_wan.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_anthropic.png": {
+    "sha256": "b3bfc6a5ef9127ac407d05eb5bd56d6950adf43374031fd3d452671672a8683a",
+    "bytes": 59614,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_anthropic.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_atlascloud.png": {
+    "sha256": "c3fa225932a844ac850eac365992a6385e353a356b42e5a08f4edd9b8ea1a9ff",
+    "bytes": 64530,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_atlascloud.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_bfl.png": {
+    "sha256": "35f026596af090063fd6ad53f982c6f7991416717bf28755266157e332e010ca",
+    "bytes": 65607,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_bfl.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_bytedance.png": {
+    "sha256": "ee687e3ef023aa4aed16dacf7a4f36efe96bd8e13488301abfd222724e813013",
+    "bytes": 42097,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_bytedance.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_claude.png": {
+    "sha256": "374d679bc1d5566170f61a34f97b808e490740c44945702bb013b5d607bc8adc",
+    "bytes": 199548,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_claude.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_deepseek.png": {
+    "sha256": "5107f73366110c30d1dbf98cb28409ea6ca9f0d6336ff61962835c08d3ff7073",
+    "bytes": 121619,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_deepseek.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_doubao.png": {
+    "sha256": "9d43c8ac8feb1fc4c89ccadd6a2ccd1f4cc12ef4d84392fd2de28d2ed9c63968",
+    "bytes": 115330,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_doubao.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_elevenlabs.png": {
+    "sha256": "8e6afd261256bcf03687459ff000c5273af7480adf13234b3433dda82ec09d86",
+    "bytes": 5747,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_elevenlabs.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_ernie.png": {
+    "sha256": "414e3f916c8fc241f7a2ca710d244bfcf572b463a9381212dc33e2b2bba98b40",
+    "bytes": 123249,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_ernie.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_flux.png": {
+    "sha256": "4abcb6e20c670d4c7f0ab2fc5c5a3161c3986f86f92c08a89005c7c5c21b9b82",
+    "bytes": 75242,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_flux.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_glm.png": {
+    "sha256": "eb4c8a28623152a3b8b25c3ff8599279e718d11d7398da8cdbaf2c9352e8aaa6",
+    "bytes": 220711,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_glm.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_google.png": {
+    "sha256": "300c6bc50b2240adbc03b3392eba5356fa829cd5cf0ebb9380e3243cc5874b21",
+    "bytes": 105887,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_google.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_grok.png": {
+    "sha256": "c0989a71bece05c74d3545dd44422d224295f1e920b9a48d827af716d40bce32",
+    "bytes": 82661,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_grok.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_hailuo.png": {
+    "sha256": "4214bd656fa8a44328c0144613c81a70e634585d392117f478e630131d408a0b",
+    "bytes": 251964,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_hailuo.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_happyhorse.png": {
+    "sha256": "8f66f0f5b521ffdd9cafca27a73d148637ddeda7d50f337ba40adda11e6dc114",
+    "bytes": 85218,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_happyhorse.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_hunyuan.png": {
+    "sha256": "e0ab050552872185f3faf72d6eb80f61fb423196b459120da3961a62143adf32",
+    "bytes": 143780,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_hunyuan.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_ideogram.png": {
+    "sha256": "8182376ddd67498fc091b24b67705c75000712b3e769ac3be10d3ce902e0d59a",
+    "bytes": 97964,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_ideogram.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_kimi.png": {
+    "sha256": "9a665f66778d05e4ba4d093afaa1149e82c0476b526e27b0922771ef883d6c4f",
+    "bytes": 47172,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_kimi.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_kling.png": {
+    "sha256": "749380aeea7cf5eafbb16f0a267d325141300896aedc2ec69e3b76affdc62a88",
+    "bytes": 246796,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_kling.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_krea.png": {
+    "sha256": "6536b0902e215139682ff8c677b68b6a589dec61e68d714cbeaac706cb2063fb",
+    "bytes": 70798,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_krea.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_longcat.png": {
+    "sha256": "153c766197710671295c11742502a1027d2686384acea7f923907b2752ce3b44",
+    "bytes": 91991,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_longcat.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_luma.png": {
+    "sha256": "b8effecfddd36baf5e807200956feae4c81a3fc8b371bb30a3bdb2330e850eca",
+    "bytes": 143833,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_luma.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_microsoft.png": {
+    "sha256": "441ae1b6a9f47ac6de7392015d65b76efffcda968bd123646f16e3119e836299",
+    "bytes": 7648,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_microsoft.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_midjourney.png": {
+    "sha256": "ef21190a4dfc4669fb47527b91fc55d2675f0baacb3e14ecfc150add0ce94ac4",
+    "bytes": 124679,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_midjourney.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_minimax.png": {
+    "sha256": "8552e7a0281e1f4d9ba5eb5ccc093f7ff760a2621376323e28e203a38f5cdb1c",
+    "bytes": 118037,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_minimax.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_moonshot.png": {
+    "sha256": "636dfa55c814a5e5861fed316f2419cd74fd7c519a911f3eba425231bb1abe24",
+    "bytes": 104610,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_moonshot.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_nanobanana.png": {
+    "sha256": "fe1bf8a297496cce77096cc35b4dd28e27efe82262a5b1ec721c6f02e3520d1e",
+    "bytes": 85211,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_nanobanana.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_nvidia.png": {
+    "sha256": "782ace80bc3d28debf8a1e0fa994c9ee5e4ba23eda5f97e694c87ceb2f87e625",
+    "bytes": 118612,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_nvidia.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_openai.png": {
+    "sha256": "a2c86f26d1b81ca734271031f012c927b7456e35e98268a048141a8a963fa85c",
+    "bytes": 132294,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_openai.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_pika.png": {
+    "sha256": "1fd07f82feb74566d573e645f4d8254c0eaeb33bc77005468d4ac6e0b468bffd",
+    "bytes": 49928,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_pika.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_pixverse.png": {
+    "sha256": "1c677ef38e4a03864b83fbf33dfd0a9b0851b49ac1426c0ab7a19fdb5e6fda6e",
+    "bytes": 258412,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_pixverse.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_qwen.png": {
+    "sha256": "5c9c524cef6a7e4dbac4a2383b2ecc00ccabc6066d1457da2f09d0792159cbf0",
+    "bytes": 168417,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_qwen.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_runway.png": {
+    "sha256": "e9200c9830dd37f6933a3cfaeb92790b2d31f287a86d233d08fdf872da64a0f9",
+    "bytes": 64634,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_runway.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_sora.png": {
+    "sha256": "efc08f4d6e4e002d81944d7b9e34ac42c5d360b95a85a526d839ff0d0c302229",
+    "bytes": 206825,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_sora.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_stability.png": {
+    "sha256": "b837927548055baa3889d0adb73f89dd6e56275bdd5154f1562ad7a675b47430",
+    "bytes": 81913,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_stability.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_suno.png": {
+    "sha256": "6a80566d03d9f1cd5005ff1dfcf9353a91310c7b57402f0878eedb35881d6406",
+    "bytes": 38882,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_suno.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_tripo.png": {
+    "sha256": "fc4ee351698da2ccc1680516abbc73064acd61c7aaa0cabfd1c7fdc0faa83205",
+    "bytes": 84660,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_tripo.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_vidu.png": {
+    "sha256": "d5f1d4bcb0ffd0a38ac192e3651ecd06dba9e20f2a683d797bc7e9a6739db006",
+    "bytes": 179829,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_vidu.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_wan.png": {
+    "sha256": "9adb0f026eb8dd36f1ba8231a8fa1d4dd956eae90e3aafb52e5cf2297580ba01",
+    "bytes": 82462,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_wan.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_xai.png": {
+    "sha256": "f104e0a298bb5a98afac122063ef44ac6aee10fb1fe6f75da1881a1a2dae0dbc",
+    "bytes": 64373,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_xai.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_zai.png": {
+    "sha256": "3edde76d257b51b33c5b92358ee72c8aeb4b6c0b7cab7b52856e23be1914da07",
+    "bytes": 47409,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_zai.png"
+  },
+  "app/src/main/res/drawable-nodpi/alexia_zimage.png": {
+    "sha256": "4507a36d9ed0e5c4c9dfe68686f2efaeb7dfb1683cf0876cf07f58477f3b6913",
+    "bytes": 515185,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/drawable-nodpi/alexia_zimage.png"
+  },
+  "app/src/main/res/font/manrope.ttf": {
+    "sha256": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
+    "bytes": 164700,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/font/manrope.ttf"
+  },
+  "app/src/main/res/font/space_grotesk.ttf": {
+    "sha256": "acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+    "bytes": 136676,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/font/space_grotesk.ttf"
+  },
+  "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": {
+    "sha256": "1c832bf194d8eecd439a92bcced0df144c9f566b934b3d7865e983d8ee8dbdeb",
+    "bytes": 273,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+  },
+  "app/src/main/res/raw/sample_audio.mp3": {
+    "sha256": "228648cf11aedfacb3b3d22166aeab616a45afbef1c1ad702140563e74e39a62",
+    "bytes": 28915,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/raw/sample_audio.mp3"
+  },
+  "app/src/main/res/raw/sample_video.mp4": {
+    "sha256": "3bb938fb70049e3e45f533b37ccae995ae96516e04c2f35b0c1142e47b2a39c1",
+    "bytes": 788493,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/raw/sample_video.mp4"
+  },
+  "app/src/main/res/values/strings.xml": {
+    "sha256": "4387ea8eb56309d9dec0076c6ba4b36a7863924afbc4a5d319c197216ee639f4",
+    "bytes": 129,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/values/strings.xml"
+  },
+  "app/src/main/res/values/themes.xml": {
+    "sha256": "55aa7b245019125c1d868d99f7f4325b9a496f8eeac115608044b7246c12bf10",
+    "bytes": 336,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/values/themes.xml"
+  },
+  "app/src/main/res/xml/file_paths.xml": {
+    "sha256": "3f426a690fd7f66ae049754591815e46fb2c8817a517e33b7fa1e522c1e887c1",
+    "bytes": 211,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/main/res/xml/file_paths.xml"
+  },
+  "app/src/offlineQa/AndroidManifest.xml": {
+    "sha256": "ebb837479f130494465e5fc56197ae22f743ad10f6693bb628a5ea165c645bf8",
+    "bytes": 278,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/offlineQa/AndroidManifest.xml"
+  },
+  "app/src/offlineQa/assets/qa-image.json": {
+    "sha256": "324dff0adb6071f6edcc6f1c7e4278db106f88cc1987268a6dcde4eae92f1c05",
+    "bytes": 7810,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/offlineQa/assets/qa-image.json"
+  },
+  "app/src/offlineQa/assets/qa-motion.json": {
+    "sha256": "cd10ba8e5239c7aa0ce27a4b9b7b9a834b0e3c05d4147e5515174383a2cb0caf",
+    "bytes": 4995,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/offlineQa/assets/qa-motion.json"
+  },
+  "app/src/test/java/com/vidadomu/nexus/AgentDraftContractTest.kt": {
+    "sha256": "a87db5de5dd5fb1f56e9d4e60c343a4f37da037a566558deeb2418afcd67f9b8",
+    "bytes": 1440,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/AgentDraftContractTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/AtlasPublishedPriceTest.kt": {
+    "sha256": "b24169b53d0fe64c231f755ab530dd18e5499b51307a991cb9b17849816f3b9f",
+    "bytes": 1688,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/AtlasPublishedPriceTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogAndChatTest.kt": {
+    "sha256": "c0a59eb2c8a70b8e80bfb4c6cdcd5705ea87566311a012d140b389086498eb4f",
+    "bytes": 2843,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogAndChatTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogBrowserTest.kt": {
+    "sha256": "724ef03767790b40914a7a02f0a0c183d23661bc50ae91978b7d9714d9386027",
+    "bytes": 3480,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogBrowserTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogFocusTest.kt": {
+    "sha256": "ba5e714a54dfa74df4d248a204a87dcd2a137a817239f52da6251a11a4914b53",
+    "bytes": 793,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogFocusTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogHierarchyTest.kt": {
+    "sha256": "fd6f275762125d91533a3648c631da243bfb5347c0fc532309597ecb965b357a",
+    "bytes": 4004,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogHierarchyTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogMediaClaimsTest.kt": {
+    "sha256": "36c3aeef70dd585309431ab5d2b39fd072afc6f77f3940cf37ffaa3fa0a7f9c8",
+    "bytes": 2370,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogMediaClaimsTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogPersonalizationTest.kt": {
+    "sha256": "e009eb2e09ddc6bb1b11ef475cafa4cb31fdfffd9e6e0e8a32ff42e7bef1baad",
+    "bytes": 2004,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogPersonalizationTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogRecoveryTest.kt": {
+    "sha256": "cd0edb82e84502a58705b140c340c0c0693d8a2c87f54b7095f486eeb06d47b5",
+    "bytes": 863,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogRecoveryTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogReleaseOrderTest.kt": {
+    "sha256": "f8595513e9cdff40ae648801a87612a5012decf286a064cadfef36b1d9eb76f0",
+    "bytes": 1312,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogReleaseOrderTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogWorkflowTest.kt": {
+    "sha256": "66466fe02e5aecc3f3ea728e2c59a5c8bc162f502e327216f5a4a43d0c2e6d17",
+    "bytes": 4081,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CatalogWorkflowTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ComparisonPlanTest.kt": {
+    "sha256": "7748809e40cbac35537ac60baec0fdcf39725e5df05f5d9a1c64e597dc537ffe",
+    "bytes": 12799,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ComparisonPlanTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CurrencyManagerTest.kt": {
+    "sha256": "10a5ebbe543073941909d7168b12c04625303ab1523717dccb7c3cc4426da2fb",
+    "bytes": 6154,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/CurrencyManagerTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/DynamicFormRegressionTest.kt": {
+    "sha256": "741dbbcaf06f9073f139063da8433fab3339c4d8c5061a5a79cb8bd759d0f877",
+    "bytes": 5890,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/DynamicFormRegressionTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/FiveSecondPriceTest.kt": {
+    "sha256": "f3be6c2b881d2672d25ee45c00fb09d01c7b86074563e6bd238d2b172d8948a2",
+    "bytes": 4767,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/FiveSecondPriceTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/InterfaceRefinementTest.kt": {
+    "sha256": "232497b9c7e44aebf6ecb41f76d54ee64794bdef3527412ffd37ad9957833f75",
+    "bytes": 1060,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/InterfaceRefinementTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/MediaSelectionSessionTest.kt": {
+    "sha256": "a272cc972c6c737fddea135ed6bef3144bc6b0d78a2ff8a353f229060cf53163",
+    "bytes": 2383,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/MediaSelectionSessionTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ModelReleaseTest.kt": {
+    "sha256": "0d6e9db508cf382c348787a5c2c82052bd23bc7240c321ec05970d20e134f585",
+    "bytes": 1634,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ModelReleaseTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/NativeSchemaTest.kt": {
+    "sha256": "498374c755257c6c6a51b3008a7e6473b9967ca7364b1f18aa0ee8f0395d0979",
+    "bytes": 4591,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/NativeSchemaTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/NetworkCancellationTest.kt": {
+    "sha256": "40e2d3ca182edd255058d4a7907908b3e87eb5e1d69239c1aee1701f0e74bb6d",
+    "bytes": 1137,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/NetworkCancellationTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/NetworkMessagesTest.kt": {
+    "sha256": "b0485d424d6ad4c93d41d4579aa60442c0d7819a5f91e808eb00f04430e301db",
+    "bytes": 1063,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/NetworkMessagesTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/NexusUnitTests.kt": {
+    "sha256": "cfe35f2b6abadfdaebc1e073cf48e9d9aba9bf6e7c2e3cb1410911a8a4b3fd36",
+    "bytes": 27836,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/NexusUnitTests.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/OutputFilesTest.kt": {
+    "sha256": "df0c1d77fefd47353a373264b522dfe0b9ce995f83ce02eb6f3a12f2e5302cdb",
+    "bytes": 1739,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/OutputFilesTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ParameterPresentationTest.kt": {
+    "sha256": "2907f1505c5ebf6fffe0fa72e79c92f13447f5074240425e346c81f6e6f7b248",
+    "bytes": 2577,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ParameterPresentationTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/PremiumContractsTest.kt": {
+    "sha256": "764f39e961ff1c30b3d1b5a283620fc56479a0f445492241f344c17839e5d61f",
+    "bytes": 9818,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/PremiumContractsTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/PriceAndMediaRegressionTest.kt": {
+    "sha256": "308bcef800b927204378e77ae7aad3a4359c818c81538fb142898402f8f7e459",
+    "bytes": 10541,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/PriceAndMediaRegressionTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/PrivateMediaStorageTest.kt": {
+    "sha256": "8e1d4f9e84d6fda0cf7261f0dc9b758b3f1888eb1e4d4feb84ad6c634dcbb131",
+    "bytes": 1093,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/PrivateMediaStorageTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ProviderBalanceParserTest.kt": {
+    "sha256": "eb3b2ee2313c39100fe22c38fc7f9bc2c20da05ae2791051d7c8c7080ccae450",
+    "bytes": 694,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ProviderBalanceParserTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/PublishedTariffTest.kt": {
+    "sha256": "cd575de396a59c144061719ea27c93d83c43c627b11afac32df805f0d9237f37",
+    "bytes": 3739,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/PublishedTariffTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ReferenceBatchTest.kt": {
+    "sha256": "6b452c26d374b96f7599fb23080c04c4c74596bd6208539b3b68d43dbb8539f0",
+    "bytes": 5098,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ReferenceBatchTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ScreenInitializationTest.kt": {
+    "sha256": "b67afd4f2f424e1e91039f8d141e7d8b03940952bcd2d103e48e5578daeb3bc7",
+    "bytes": 1914,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ScreenInitializationTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ScreenNavigationTest.kt": {
+    "sha256": "73be9c52260b1f17ced286ce252bd39c8ebcf6e3e275c606b7882170671e35ec",
+    "bytes": 450,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ScreenNavigationTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/StudioReliabilityTest.kt": {
+    "sha256": "2b3e005b2cc6b7a4ec1361ab89a70cb4a008ea923daeefb9005bf9afe0a1e7b1",
+    "bytes": 4692,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/StudioReliabilityTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/ui/theme/ProviderOrderTest.kt": {
+    "sha256": "0b31f077615e9109f16f985aa942d621a88968fe42ddec37a91f3674fe9e2542",
+    "bytes": 1229,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/java/com/vidadomu/nexus/ui/theme/ProviderOrderTest.kt"
+  },
+  "app/src/test/resources/atlas-catalog-2026-09-22.json": {
+    "sha256": "74f2bc869bf5a05821fa83b6ad4286f1026571ca23c68f1c1dd99500b7d9c431",
+    "bytes": 764634,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/atlas-catalog-2026-09-22.json"
+  },
+  "app/src/test/resources/native/alibaba_wan-3.0-prime_image-to-video.json": {
+    "sha256": "1deb72448145c1a80623662553c3e79a609c974aeb053ecaee0d2dd57bbbdb9a",
+    "bytes": 6247,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/alibaba_wan-3.0-prime_image-to-video.json"
+  },
+  "app/src/test/resources/native/alibaba_wan-3.0-prime_text-to-video.json": {
+    "sha256": "baf59d35ad13de82e1d81f28a8532af5c60c51860b8d2b0a3e34374721f4d4b7",
+    "bytes": 6039,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/alibaba_wan-3.0-prime_text-to-video.json"
+  },
+  "app/src/test/resources/native/atlas-published-prices.json": {
+    "sha256": "d876bfcbcb3bc78acff8b4441ca4473aa155a3e848d78098148e00e4c2f60ca7",
+    "bytes": 91165,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/atlas-published-prices.json"
+  },
+  "app/src/test/resources/native/black-forest-labs_flux-2-pro_edit.json": {
+    "sha256": "fb811450c30b9b53afce2354fac591120071331ff7cc944554aaa3e492ae9a91",
+    "bytes": 6526,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/black-forest-labs_flux-2-pro_edit.json"
+  },
+  "app/src/test/resources/native/bytedance_seedream-v5.0-pro_edit.json": {
+    "sha256": "d915ec3a876c7fd9fc1422331df5b110ad8249a3c2c38a452a8fc0ec4ca116aa",
+    "bytes": 9716,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/bytedance_seedream-v5.0-pro_edit.json"
+  },
+  "app/src/test/resources/native/bytedance_seedream-v5.0-pro_text-to-image.json": {
+    "sha256": "1151d197acfc0c40148075b9e4cabe3fd418fdd74aa6af2c978464a844000015",
+    "bytes": 7412,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/bytedance_seedream-v5.0-pro_text-to-image.json"
+  },
+  "app/src/test/resources/native/catalog-public.json": {
+    "sha256": "c1e3f18f1edf3d813905137eba858471f7d918a1066208fb56cfb7d7c3e0adad",
+    "bytes": 1019799,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/catalog-public.json"
+  },
+  "app/src/test/resources/native/five-second-quotes.json": {
+    "sha256": "9480361b7217bbe59dee68d992828b5de9bf66762ce1459c52bb62dfa4d881b8",
+    "bytes": 1519,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/five-second-quotes.json"
+  },
+  "app/src/test/resources/native/kling-i2v.json": {
+    "sha256": "6235158c7d16c60a642287db8cf7d7c6048e2cca8252180ad8c4f75edd97fcc1",
+    "bytes": 15141,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/kling-i2v.json"
+  },
+  "app/src/test/resources/native/kling-motion-malformed.json": {
+    "sha256": "50a00743865c84749263857205825885d280c9e3f63064fe4154d8aafc45fd68",
+    "bytes": 3304,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/kling-motion-malformed.json"
+  },
+  "app/src/test/resources/native/kling-motion-price.json": {
+    "sha256": "de060d5e44b56bd2a05a357666be0a4901ce1b4dc790fe1595594aeda164fa58",
+    "bytes": 307,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/kling-motion-price.json"
+  },
+  "app/src/test/resources/native/kling-motion-public-page.md": {
+    "sha256": "c4f3888666150bf913531f12dd9da99413d4318daa7c791bf84ed71cf6fe933d",
+    "bytes": 9230,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/kling-motion-public-page.md"
+  },
+  "app/src/test/resources/native/kling-motion.json": {
+    "sha256": "cd10ba8e5239c7aa0ce27a4b9b7b9a834b0e3c05d4147e5515174383a2cb0caf",
+    "bytes": 4995,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/kling-motion.json"
+  },
+  "app/src/test/resources/native/kling-t2v.json": {
+    "sha256": "ec29e237a06b2d983fd5d8cbabf8a52394d0e62f6cbe425f6e902e791a6316bd",
+    "bytes": 8102,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/kling-t2v.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-flare_edit.json": {
+    "sha256": "324dff0adb6071f6edcc6f1c7e4278db106f88cc1987268a6dcde4eae92f1c05",
+    "bytes": 7810,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/openai_gpt-image-2.5-flare_edit.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-flare_text-to-image.json": {
+    "sha256": "fcdb6020b5975ff677140ba5c5cba52c3914dc2cd497e4e126cc01140029d7bd",
+    "bytes": 7374,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/openai_gpt-image-2.5-flare_text-to-image.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-sunburst_edit.json": {
+    "sha256": "30e4af2018145e0823e6616adb590e6c346179554c6bb205116c0498372238f2",
+    "bytes": 8093,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/openai_gpt-image-2.5-sunburst_edit.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-sunburst_text-to-image.json": {
+    "sha256": "74c7e48983138ae8745dfe43f2d1b08cadaeb778b3bbd494e14b474d7980af63",
+    "bytes": 7139,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/openai_gpt-image-2.5-sunburst_text-to-image.json"
+  },
+  "app/src/test/resources/native/qwen-image-3.0-pro_edit.json": {
+    "sha256": "9ff463e7bb01fa6b5428f17a061a9e1d55403606637d3c74f8ee679d692563bc",
+    "bytes": 6126,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/qwen-image-3.0-pro_edit.json"
+  },
+  "app/src/test/resources/native/qwen-image-3.0-pro_text-to-image.json": {
+    "sha256": "66783809fe911ca1f2a916c70b122b1fe2147cca4e06f24fafcc654e24c44b59",
+    "bytes": 5547,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/qwen-image-3.0-pro_text-to-image.json"
+  },
+  "app/src/test/resources/native/youchuan_v8.2_blend.json": {
+    "sha256": "17022d49780b4a90b326297cfda42a9f3e14d829ca034fd8b5f3f41257aa01ac",
+    "bytes": 8875,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/youchuan_v8.2_blend.json"
+  },
+  "app/src/test/resources/native/youchuan_v8.2_image-to-image.json": {
+    "sha256": "44a16cd7b30bed24c62cf0c9dd622a674a84689ff52aba71c0e8bd2f48eff959",
+    "bytes": 9092,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/app/src/test/resources/native/youchuan_v8.2_image-to-image.json"
+  },
+  "build.gradle.kts": {
+    "sha256": "5d29e05314ca7658c9cefae848317d52331bcd7e6e2bf8909f5aa55ff6627ffa",
+    "bytes": 298,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/build.gradle.kts"
+  },
+  "gradle/wrapper/gradle-wrapper.jar": {
+    "sha256": "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17",
+    "bytes": 43504,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/gradle/wrapper/gradle-wrapper.jar"
+  },
+  "gradle/wrapper/gradle-wrapper.properties": {
+    "sha256": "3d91f0932da99885c41e9dc4e85c9f9a2d3bfef4f0ad87473014dc0827a94884",
+    "bytes": 250,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/gradle/wrapper/gradle-wrapper.properties"
+  },
+  "gradle.properties": {
+    "sha256": "15ab9fdc1a78916a937e7dfe690f1e28bb750f37d9c43d1dda8abd6c7748929f",
+    "bytes": 141,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/gradle.properties"
+  },
+  "gradlew": {
+    "sha256": "a3648413b47ef77af21d5ebc36c687c7d103aaef3e17f33de7d4f080a6f300a3",
+    "bytes": 8762,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/gradlew"
+  },
+  "gradlew.bat": {
+    "sha256": "57931b17dd228e5c24dac90e815d0bf82477e831a4618dfab4136f5446b42a9f",
+    "bytes": 2966,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/gradlew.bat"
+  },
+  "settings.gradle.kts": {
+    "sha256": "e06d247843c02043960654292c917d1933963b6a314a99c924f7d6caf89b083e",
+    "bytes": 324,
+    "source": "PIXEL-TERMUX:/data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source/settings.gradle.kts"
+  }
+}

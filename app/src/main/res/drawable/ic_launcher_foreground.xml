@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer hexagon lines -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M54,24 L80,39 L80,69 L54,84 L28,69 L28,39 Z" />
+
+    <!-- Inner convergent nexus node links -->
+    <path
+        android:strokeColor="#7C4DFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,24 L54,54 M80,69 L54,54 M28,69 L54,54" />
+
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M80,39 L54,54 M54,84 L54,54 M28,39 L54,54" />
+
+    <!-- Center core node -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M54,54m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" />
+
+    <!-- Satellite vertex nodes -->
+    <path
+        android:fillColor="#7C4DFF"
+        android:pathData="M54,24m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0 M80,39m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0 M80,69m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0 M54,84m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0 M28,69m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0 M28,39m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0" />
+</vector>

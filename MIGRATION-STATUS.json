@@ -1,0 +1,6 @@
+{
+  "name": "nexus-pixel-current-v17",
+  "status": "VARIANTE_PIXEL_RECUPERADA_PENDIENTE_RECONCILIACION",
+  "origin": "Pixel 8 Pro / Termux SSH verificado: /data/data/com.termux/files/home/.local/share/ecosystem-build/jobs/20261006T014213Z-074f859b/source",
+  "reason": "Fuente v17 recuperada directamente del Pixel. Preservar la variante y comparar antes de combinarla con la fuente Android v18. S25 privado pendiente."
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "request": {
+      "sound": false,
+      "multi_shot": false,
+      "duration": 5,
+      "aspect_ratio": "16:9",
+      "model": "kwaivgi/kling-v3.0-std/text-to-video"
+    },
+    "response": {
+      "code": 200,
+      "msg": "succeed",
+      "data": {
+        "discount": "85",
+        "origin_price": "0.42",
+        "price": "0.357"
+      }
+    }
+  },
+  {
+    "request": {
+      "sound": true,
+      "multi_shot": false,
+      "duration": 5,
+      "aspect_ratio": "16:9",
+      "model": "kwaivgi/kling-v3.0-std/text-to-video"
+    },
+    "response": {
+      "code": 200,
+      "msg": "succeed",
+      "data": {
+        "discount": "85",
+        "origin_price": "0.63",
+        "price": "0.5355"
+      }
+    }
+  },
+  {
+    "request": {
+      "resolution": "720P",
+      "sound": false,
+      "multi_shot": false,
+      "duration": 5,
+      "model": "kwaivgi/kling-v3.0-std/image-to-video"
+    },
+    "response": {
+      "code": 200,
+      "msg": "succeed",
+      "data": {
+        "discount": "85",
+        "origin_price": "0.42",
+        "price": "0.357"
+      }
+    }
+  },
+  {
+    "request": {
+      "resolution": "720P",
+      "sound": true,
+      "multi_shot": false,
+      "duration": 5,
+      "model": "kwaivgi/kling-v3.0-std/image-to-video"
+    },
+    "response": {
+      "code": 200,
+      "msg": "succeed",
+      "data": {
+        "discount": "85",
+        "origin_price": "0.63",
+        "price": "0.5355"
+      }
+    }
+  }
+]

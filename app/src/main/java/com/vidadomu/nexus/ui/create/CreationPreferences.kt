@@ -1,0 +1,36 @@
+package com.vidadomu.nexus.ui.create
+
+import android.content.Context
+import com.vidadomu.nexus.core.model.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+@Serializable data class CreationDraft(val modelId:String,val modality:Modality,val prompt:String,
+    val parameters:Map<String,String>,val media:List<AttachedMedia> = emptyList(),val negativePrompt:String = "")
+@Serializable data class CreationPreset(val name:String,val values:Map<String,String>)
+
+/** Private, bounded settings. Presets never include keys, prompts or source media. */
+class CreationPreferences(context:Context) {
+    private val prefs=context.getSharedPreferences("nexus_creation_v1",0)
+    private val json=Json {ignoreUnknownKeys=true}
+    fun rememberParameters()=prefs.getBoolean("remember_parameters",true)
+    fun setRememberParameters(value:Boolean) {prefs.edit().putBoolean("remember_parameters",value).apply()}
+    fun values(model:NexusModel):Map<String,String> {
+        val saved=if(rememberParameters()) runCatching {json.decodeFromString<Map<String,String>>(prefs.getString("last:${model.providerId}:${model.id}","{}")!!)}.getOrDefault(emptyMap()) else emptyMap()
+        return FormContract.restoredValues(model,saved)
+    }
+    fun saveDraft(draft:CreationDraft, provider:String) {
+        prefs.edit().putString("draft",json.encodeToString(draft)).apply()
+        if(rememberParameters()) prefs.edit().putString("last:$provider:${draft.modelId}",json.encodeToString(draft.parameters)).apply()
+    }
+    fun draft():CreationDraft?=runCatching {json.decodeFromString<CreationDraft>(prefs.getString("draft",null) ?: return null)}.getOrNull()
+    private fun key(model:NexusModel)="presets:${model.providerId}:${model.id}"
+    fun presets(model:NexusModel):List<CreationPreset> = runCatching {json.decodeFromString<List<CreationPreset>>(prefs.getString(key(model),"[]")!!)}.getOrDefault(emptyList())
+    fun savePreset(model:NexusModel,name:String,values:Map<String,String>) {
+        val cleanName=name.trim().take(48); if(cleanName.isEmpty()) return
+        val entry=CreationPreset(cleanName,FormContract.restoredValues(model,values))
+        prefs.edit().putString(key(model),json.encodeToString((listOf(entry)+presets(model).filterNot {it.name==cleanName}).take(12))).apply()
+    }
+    fun removePreset(model:NexusModel,name:String) {prefs.edit().putString(key(model),json.encodeToString(presets(model).filterNot {it.name==name})).apply()}
+}
