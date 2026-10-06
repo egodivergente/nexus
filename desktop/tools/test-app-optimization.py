@@ -53,12 +53,45 @@ try:
         assert page.get_by_role('dialog',name='Confirmacion QA').count()==1
         page.locator('[data-action=close]').click()
         assert page.locator('#generate').is_disabled()
+        quotes=page.evaluate("""async()=>{
+          const original=quotePlan;let resolveQuote,seen;
+          quotePlan=plan=>{seen=plan;return new Promise(resolve=>resolveQuote=resolve);};
+          try{
+            state.draft.prompt='ab';render();const pending=getQuote();
+            state.draft.prompt='cd';state.draft.values.changed='yes';
+            resolveQuote({amount:1,currency:'USD',time:Date.now()});await pending;
+            const staleBlocked=quote===null&&document.querySelector('#generate').disabled;
+            const snapshot=seen.prompt==='ab'&&!seen.values.changed;
+            const next=getQuote();view='settings';render();
+            resolveQuote({amount:2,currency:'USD',time:Date.now()});await next;
+            const navigationPreserved=!document.querySelector('#generate');
+            view='canvas';state.draft.prompt='abcd';quote=null;render();
+            return {staleBlocked,snapshot,navigationPreserved};
+          }finally{quotePlan=original;}
+        }""")
+        assert quotes=={'staleBlocked':True,'snapshot':True,'navigationPreserved':True},quotes
+        lifecycle=page.evaluate("""async()=>{
+          const original=quotePlan,resolvers=[];state.draft.prompt='ab';render();
+          quotePlan=()=>new Promise(resolve=>resolvers.push(resolve));
+          try{
+            const first=getQuote(),second=getQuote();
+            resolvers[1]({amount:2,currency:'USD',time:Date.now()});await second;
+            resolvers[0]({amount:1,currency:'USD',time:Date.now()});await first;
+            const latestWins=quote.amount===2;
+            const expired=getQuote();resolvers[2]({amount:3,currency:'USD',time:Date.now()-300001});await expired;
+            await new Promise(resolve=>setTimeout(resolve,30));
+            const expiredBlocked=quote===null&&document.querySelector('#generate').disabled;
+            state.draft.prompt='abcd';render();await getQuote();
+            return {latestWins,expiredBlocked,invalidNeverRequested:resolvers.length===3};
+          }finally{quotePlan=original;}
+        }""")
+        assert lifecycle=={'latestWins':True,'expiredBlocked':True,'invalidNeverRequested':True},lifecycle
         for width in (1360,760):
             page.set_viewport_size({'width':width,'height':900})
             page.screenshot(path=str(data/f'canvas-{width}.png'))
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         assert not errors,errors
-        print('PASS: retry preserves draft/attachments, no duplicate bubbles, length guard, 1360/760 layout')
+        print('PASS: save order, draft recovery, stale quote blocked, snapshot isolated, navigation preserved, length guard, 1360/760 layout')
         b.close()
 finally:
     subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
