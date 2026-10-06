@@ -1,4 +1,4 @@
-"""Persistent single-image jobs and recovery, registered on the native MCP."""
+"""Persistent image/video jobs, account quotes and recovery on the native MCP."""
 import argparse
 import hashlib
 import json
@@ -41,11 +41,16 @@ def verified_file(result):
     digest = hashlib.sha256(data).hexdigest()
     if result.get("sha256") and digest != result["sha256"]:
         raise ValueError("Stored result file has changed")
-    with Image.open(path) as image:
-        dimensions, image_format = image.size, image.format
-        image.verify()
+    if path.suffix.lower() == ".mp4":
+        from video_file import inspect
+        metadata = inspect(data)
+    else:
+        with Image.open(path) as image:
+            dimensions, image_format = image.size, image.format
+            image.verify()
+        metadata = {"dimensions": dimensions, "format": image_format}
     return {**result, "path": str(path), "files": [str(path)], "bytes": len(data),
-        "dimensions": dimensions, "format": image_format, "sha256": digest}
+        **metadata, "sha256": digest}
 
 def native_task(task_id):
     path = ROOT / "state" / "gflow.db"
@@ -58,7 +63,7 @@ def native_task(task_id):
     return dict(row) if row else None
 
 async def flow_get_result(request_id: str | None = None, task_id: str | None = None) -> dict[str, Any]:
-    """Read or recover an existing image job. Never submits a generation.
+    """Read or recover an existing image or video job. Never submits a generation.
 
     Pass the stable request_id used by flow_generate_image, or a native gflow
     task_id when importing an already submitted task. Returns a verified local
@@ -85,10 +90,27 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
             return {"status": "needs_reconciliation", "request_id": request_id,
                 "detail": "Submission may be in progress or its task id was not recorded. Do not resubmit."}
         task = native_task(task_id)
-        if not task or task["task_type"] != "t2i":
-            return {"status": "error", "detail": "No image task for this profile."}
+        if not task or task["task_type"] not in ("t2i", "t2v"):
+            return {"status": "error", "detail": "No supported task for this profile."}
         params = json.loads(task["payload_json"])
         checkpoint = json.loads(task.get("checkpoint_json") or "{}")
+        if not checkpoint.get("project_id") and checkpoint.get("may_have_spent"):
+            # The upstream queue can lose its project field on a parser failure.
+            # Resolve only the unique project event for this exact owned task.
+            log = ROOT / "mcp-client-stderr.log"
+            projects = set()
+            if log.exists():
+                for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+                    try:
+                        event = json.loads(line)
+                        if event.get("correlation_id") == f"wk-{task_id}" and event.get("event") == "migrated.project_created":
+                            value = event.get("project_id", "")
+                            if re.fullmatch(r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}", value):
+                                projects.add(value)
+                    except ValueError:
+                        pass
+            if len(projects) == 1:
+                checkpoint["project_id"] = projects.pop()
         request_id = request_id or f"task-{task_id}"
         original_parameters = {key: params[key] for key in ("prompt", "model", "aspect", "count")}
         connection.execute("INSERT OR IGNORE INTO jobs VALUES (?,?,?,?,?)",
@@ -102,6 +124,31 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
         return result
     if task["status"] in ("pending", "processing"):
         return {**base, "status": "in_progress"}
+    if task["task_type"] == "t2v":
+        # Completed native queue entries can be recovered from their persisted
+        # result without opening a new generation. An unknown outcome stays held.
+        for field in ("result_json", "output_json"):
+            stored = json.loads(task.get(field) or "{}")
+            files = stored.get("files") or []
+            if files:
+                result = verified_file({**base, "status": "completed", "path": files[0]})
+                save(request_id, result, task_id)
+                return result
+        from recover_video import run as recover
+        source = ROOT / "jobs" / f"{request_id}.request.json"
+        source.write_text(json.dumps(params, ensure_ascii=False), encoding="utf-8")
+        try:
+            recovered = await recover(argparse.Namespace(project=checkpoint["project_id"], request=str(source)))
+            if recovered["status"] == "recovered":
+                result = verified_file({**recovered, **base, "status":"completed", "recovery_used":True})
+            else:
+                result = {**base, "status":"needs_reconciliation", "matching_videos":recovered.get("matching_videos")}
+        except Exception as exc:
+            result = {**base, "status":"needs_reconciliation", "error_class":type(exc).__name__}
+            if isinstance(exc, ValueError) and str(exc) in {'Ambiguous video tiles','Unexpected video origin','Unexpected redirect origin','Video download failed','Player download was not MP4'}:
+                result['detail']=str(exc)
+        save(request_id, result, task_id)
+        return result
     from recover_image import run
     source = ROOT / "jobs" / f"{request_id}.request.json"
     source.write_text(json.dumps(params, ensure_ascii=False), encoding="utf-8")
@@ -177,9 +224,64 @@ async def flow_list_jobs(limit: int = 20) -> dict[str, Any]:
     return {"jobs": [{"request_id": row["request_id"], "task_id": row["task_id"], "status": row["state"],
         "files": (json.loads(row["result_json"]) if row["result_json"] else {}).get("files", [])} for row in rows]}
 
+async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9",
+                              model: str = "veo_fast") -> dict[str, Any]:
+    """Generate one Veo Fast text-to-video clip on the user's own Flow account.
+
+    Reuse the same request_id after a timeout: a reserved id never submits twice.
+    Flow selects its default duration because this account has no duration control.
+    The completed MP4 contains the actual duration and dimensions. Other models,
+    including Lite, are refused by this tool.
+    """
+    if not IDENTIFIER.fullmatch(request_id) or not prompt.strip() or model != "veo_fast" or aspect not in {"16:9", "9:16"}:
+        return {"status": "error", "detail": "Use a stable request_id, a prompt, veo_fast and 16:9 or 9:16."}
+    params = {"prompt": prompt, "model": model, "aspect": aspect, "count": 1}
+    with database() as connection:
+        try:
+            connection.execute("INSERT INTO jobs VALUES (?,?,?,?,?)",
+                (request_id, json.dumps(params), None, None, "reserved"))
+            existing = False
+        except sqlite3.IntegrityError:
+            row = connection.execute("SELECT params_json FROM jobs WHERE request_id=?", (request_id,)).fetchone()
+            if json.loads(row["params_json"]) != params:
+                return {"status": "error", "detail": "request_id already belongs to other parameters."}
+            existing = True
+    if existing:
+        return await flow_get_result(request_id=request_id)
+    from gflow_cli.mcp.tools import gflow_generate_video
+    try:
+        result = await gflow_generate_video(**params, mode="t2v", profile="nexus",
+            project_name=f"Codex {request_id}", ui_mode="classic", wait=True)
+    except Exception as exc:
+        result = {"status": "needs_reconciliation", "error_class": type(exc).__name__}
+    task_id = result.get("task_id")
+    result = {**result, "request_id": request_id, "requested_model": model, "model_confirmed": False}
+    files = result.get("files") or []
+    if result.get("status") == "completed" and files:
+        try:
+            result = verified_file({**result, "path": files[0]})
+        except (OSError, ValueError):
+            result = {"status": "needs_reconciliation", "request_id": request_id, "task_id": task_id}
+    save(request_id, result, task_id)
+    if result.get("status") != "completed" and task_id:
+        return await flow_get_result(request_id=request_id)
+    return result
+
 def install():
     from gflow_cli.mcp.server import server
     from gflow_cli.mcp import tools
     server.add_tool(flow_generate_image, structured_output=True)
+    server.add_tool(flow_generate_video, structured_output=True)
     server.add_tool(flow_get_result, structured_output=True)
     server.add_tool(flow_list_jobs, structured_output=True)
+    server.add_tool(flow_get_quote, structured_output=True)
+
+async def flow_get_quote(model: str = "nano2", aspect: str = "1:1") -> dict[str, Any]:
+    """Read this account's Flow settings price for one generation; spends no credits."""
+    if model not in {'nano2','veo_fast'} or aspect not in ({'1:1','16:9','9:16','4:3','3:4'} if model=='nano2' else {'16:9','9:16'}):
+        return {'status':'error','detail':'Unsupported model or aspect. Lite prohibited.'}
+    from flow_quote import quote
+    try:
+        return {'status':'quoted',**await quote(model,aspect)}
+    except Exception as exc:
+        return {'status':'error','error_class':type(exc).__name__,'detail':'No verified account price. No generation sent.'}

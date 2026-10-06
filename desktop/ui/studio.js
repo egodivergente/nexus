@@ -88,7 +88,7 @@ function studioDetails(id){
  const job=state.jobs.find(j=>j.id===id);if(!job)return;
  const index=outputSelection.get(id)||0,output=job.outputs?.[index],url=typeof output==='string'?output:output?.url;
  const panel=document.createElement('aside');panel.className='studio-details';panel.setAttribute('aria-label','Detalles del resultado');
- panel.innerHTML='<button class="studio-detail-close" data-studio="close-detail" aria-label="Cerrar detalles" title="Cerrar detalles">&#215;</button><h2>'+escape(job.name||job.modelId)+'</h2><p class="hint">'+escape(providers[job.providerId]||job.providerId)+' · '+escape(job.status)+'</p><h3>Prompt</h3><p class="studio-prompt">'+escape(job.prompt)+'</p><div class="studio-detail-actions"><button data-reuse="'+escape(id)+'">Reutilizar ajustes</button>'+(url&&/^https:\/\//.test(url)?'<button data-download="'+escape(url)+'">Guardar</button>':'')+(job.modality==='IMAGE'&&url&&/^https:\/\//.test(url)?'<button data-studio-reference="'+escape(id)+'">Usar como referencia</button>':'')+'</div><details><summary>Parametros</summary><dl>'+Object.entries(job.parameters||{}).map(([k,v])=>'<dt>'+escape(E.label(k))+'</dt><dd>'+escape(typeof v==='object'?JSON.stringify(v):v)+'</dd>').join('')+'</dl></details>'+(job.error?'<p class="error">'+escape(job.error)+'</p>':'');
+ panel.innerHTML='<button class="studio-detail-close" data-studio="close-detail" aria-label="Cerrar detalles" title="Cerrar detalles">&#215;</button><h2>'+escape(job.name||job.modelId)+'</h2><p class="hint">'+escape(providers[job.providerId]||job.providerId)+' · '+escape(job.status)+'</p><h3>Prompt</h3><p class="studio-prompt">'+escape(job.prompt)+'</p><div class="studio-detail-actions"><button data-reuse="'+escape(id)+'">Reutilizar ajustes</button>'+(url&&isMediaUrl(url)?'<button '+(url.startsWith('/media/')?'data-flow-save':'data-download')+'="'+escape(url)+'">Guardar</button>':'')+(job.modality==='IMAGE'&&url&&isMediaUrl(url)?'<button data-studio-reference="'+escape(id)+'">Usar como referencia</button>':'')+'</div><details><summary>Parametros</summary><dl>'+Object.entries(job.parameters||{}).map(([k,v])=>'<dt>'+escape(E.label(k))+'</dt><dd>'+escape(typeof v==='object'?JSON.stringify(v):v)+'</dd>').join('')+'</dl></details>'+(job.error?'<p class="error">'+escape(job.error)+'</p>':'');
  $('#content').append(panel);
 }
 async function studioAttach(files,fieldKey){
@@ -133,6 +133,7 @@ document.addEventListener('change',e=>{if(e.target.id==='studio-model-kind'){Stu
 document.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||b.disabled)return;
  try{
+  if(b.dataset.flowSave){const link=document.createElement('a');link.href=b.dataset.flowSave;link.download=b.dataset.flowSave.split('/').pop();link.click();}
   if(b.dataset.action==='close')Studio.reference=null;
   if(b.dataset.studio==='picker'){Studio.reference=null;studioPicker();}
   if(b.dataset.studio==='catalog'){$('#dialog').close();navigate('catalog');}
@@ -149,9 +150,9 @@ document.addEventListener('click',async e=>{
   if(b.dataset.studio==='close-detail'){Studio.detail=null;$('.studio-details')?.remove();}
   if(b.dataset.studioReference){
    const job=state.jobs.find(j=>j.id===b.dataset.studioReference),output=job.outputs[outputSelection.get(job.id)||0],url=typeof output==='string'?output:output.url;
-   Studio.reference={id:crypto.randomUUID(),name:job.name||'Resultado',mime:'image/png',size:0,url,remoteUrl:url};
+   const local=url.startsWith('/media/');
+   Studio.reference={id:local?url.split('/').pop():crypto.randomUUID(),name:job.name||'Resultado',mime:/\.jpe?g$/.test(url)?'image/jpeg':/\.webp$/.test(url)?'image/webp':'image/png',size:0,url,remoteUrl:local?null:url};
    navigate('canvas');studioPicker();
   }
  }catch(error){toast(error.message);}
 });
-

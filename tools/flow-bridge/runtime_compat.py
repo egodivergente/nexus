@@ -25,12 +25,28 @@ def install():
     from gflow_cli.auth import cookies
     from gflow_cli.profile_lease import ProfileLease
     from gflow_cli.api.transports import migrated_composer as migrated
+    from gflow_cli.api.transports import batchexecute
     from image_guard import model_problem
 
     original_launch = BrowserType.launch_persistent_context
     original_read = cookies._get_chrome_cookies_playwright
     original_problem = migrated._image_body_problem
     original_submit = migrated.MigratedComposer.submit_images_and_observe
+    original_video_submit = migrated.MigratedComposer.submit_and_observe
+    original_record = batchexecute._is_record
+    def migrated_record(node):
+        if original_record(node):
+            return True
+        # Measured 2026-10-06: the migrated video record has null instead of CAE.
+        # Accept only the same IDs, terminal-state and typed video-model structure.
+        try:
+            return (len(node) >= 8 and node[3] is None
+                and all(isinstance(node[i], str) and batchexecute._UUID_RE.fullmatch(node[i]) for i in (0,1,2))
+                and isinstance(node[5][1], str) and node[5][8][0] in (2,3,6)
+                and isinstance(node[7][0][12], str) and node[7][0][12].startswith('veo_3_1_'))
+        except (TypeError, IndexError, KeyError):
+            return False
+    batchexecute._is_record = migrated_record
 
     async def launch(browser, user_data_dir, **kwargs):
         if owned_internal(user_data_dir) and kwargs.get("channel") == "chrome":
@@ -84,4 +100,19 @@ def install():
 
     migrated._image_body_problem = image_problem
     migrated.MigratedComposer.submit_images_and_observe = guarded_submit
+    async def guarded_video_submit(composer, page, **kwargs):
+        from video_guard import model_problem as video_problem
+        def matches(url):
+            return migrated._rpcid(str(url)) in migrated.SUBMIT_RPCS
+        async def guard(route, raw_request):
+            if video_problem(migrated._post_data(raw_request)):
+                await route.abort()
+            else:
+                await route.continue_()
+        await page.route(matches, guard)
+        try:
+            return await original_video_submit(composer, page, **kwargs)
+        finally:
+            await page.unroute(matches, guard)
+    migrated.MigratedComposer.submit_and_observe = guarded_video_submit
     _installed = True

@@ -24,13 +24,13 @@ La respuesta de Google observada no atribuye un modelo al archivo generado. Se c
 
 `flow_list_jobs()` enumera los trabajos persistidos por este puente. `gflow_auth_status(profile="nexus")` consulta autenticación. `gflow_get_credits` sigue disponible para consulta, sin suponer que el endpoint funciona en una cuenta migrada.
 
-La configuración de Codex habilita estas cinco herramientas. Las herramientas nativas de generación quedan fuera de la lista habilitada para que las llamadas habituales pasen por el registro de identificadores. El proceso usa el [MCP original](https://github.com/ffroliva/gflow-cli/blob/develop/docs/MCP.md); no abre un servidor HTTP en la red.
+La configuración de Codex habilita siete herramientas, incluidas `flow_generate_video` y `flow_get_quote`. Las herramientas nativas de generación quedan fuera de la lista habilitada para que las llamadas habituales pasen por el registro de identificadores. El proceso usa el [MCP original](https://github.com/ffroliva/gflow-cli/blob/develop/docs/MCP.md); no abre un servidor HTTP en la red.
 
 ## Rutas y operación
 
 El runtime está en `$HOME/.codex/integrations/google-flow`: `venv`, `browsers`, `state/profile_nexus`, `jobs` y `results`. El perfil, la base de datos, los logs y los resultados son privados y no se versionan.
 
-La instalación registra `google-flow` en `$HOME/.codex/config.toml`, conserva las demás tablas y limita la concurrencia a uno. El navegador de generación se posiciona fuera de pantalla; la autenticación manual usa su ventana de acceso normal. La modificación local de compatibilidad se limita a seleccionar Chromium para ese perfil y a comprobar el modelo de imagen antes del envío. La validación de sesión contra Google sigue activa.
+La instalación registra `google-flow` en `$HOME/.codex/config.toml`, conserva las demás tablas y limita la concurrencia a uno. El navegador de generación se posiciona fuera de pantalla; la autenticación manual usa su ventana de acceso normal. La compatibilidad selecciona Chromium para ese perfil, comprueba los modelos antes del envío y reconoce la forma de vídeo observada. Nano Banana Lite está explícitamente prohibido. La validación de sesión contra Google sigue activa.
 
 Si el catálogo de herramientas del turno se creó antes de registrar el servidor, el agente puede usar el cliente MCP incluido:
 
@@ -52,7 +52,7 @@ La segunda llamada genera contenido y utiliza la cuota de la cuenta. El agente d
 
 La primera llamada real encontró un cambio de modelo (`NARWHAL` frente a `BELUGA`) después del envío. La recuperación lee el checkpoint nativo para localizar el proyecto y decodifica su listado `Zzl0ze`; exige una única imagen con el prompt exacto. Descarga únicamente desde dominios Google admitidos, comprueba cada redirección y solicita la versión original del handle `/asb/`, exigiendo las dimensiones que registra Google. No publica URLs firmadas ni cookies.
 
-Si falta el checkpoint o hay varias coincidencias, devuelve `needs_reconciliation`. Si un proceso se interrumpe antes de guardar su task id, el identificador permanece reservado y no permite otro envío. La recuperación automática se limita a imágenes; no presentar el puente como una API oficial ni como vídeo validado.
+Si falta el checkpoint o hay varias coincidencias, devuelve `needs_reconciliation`. Si un proceso se interrumpe antes de guardar su task id, el identificador permanece reservado y no permite otro envío. La recuperación de vídeo exige un registro con el prompt exacto del proyecto existente. La forma medida del registro lleva `null` donde upstream esperaba `CAE`. Cuando el listado entrega una miniatura, se abre el editor del activo y se descarga exclusivamente 720p de tamaño original. No se solicitan mejoras de resolución. No presentar el puente como una API oficial.
 
 ## Reproducción
 
@@ -68,4 +68,16 @@ Al repetir la autenticación con `auth login --browser internal --profile nexus`
 
 ## GitHub
 
-Al realizar esta tarea, el checkout no tenía commits ni remoto y el conector GitHub no mostraba repositorios accesibles. Se ha solicitado al usuario la URL del destino. Un commit local no equivale a publicación verificada.
+Destino identificado y acceso Git verificado: https://github.com/vidaltb94-collab/nexus. La integración se publica en `codex/google-flow-account`, partiendo de la rama de recuperación existente y conservando su historial. El perfil, las credenciales, las bases de datos y los resultados se excluyen.
+
+## Vídeo, precios y NEXUS comprobados el 2026-10-06
+
+`flow_generate_video(request_id, prompt, aspect="16:9", model="veo_fast")` genera una sola salida con Veo Fast y duración automática. No ofrece Lite. El MP4 real recuperado mide 1280 × 720, dura 8 segundos y tiene 930214 bytes. El primer envío sufrió un error del lector upstream; se recuperó el mismo clip sin volver a generar. Se comprobó el contenedor y su SHA-256.
+
+`flow_get_quote(model, aspect)` lee los ajustes de la cuenta sin generar: Nano Banana 2 mostró 0 puntos y Veo Fast 10 puntos. No se comprobó el saldo ni el descuento efectivo. Las cotizaciones de NEXUS se conservan como máximo cinco minutos y se renuevan para otro formato. No se convierten a USD. Si falla la lectura de imagen, el envío queda bloqueado; para Veo Fast existe una estimación conservadora publicada de hasta 20 créditos, claramente identificada.
+
+NEXUS integra dos modelos del proveedor `google_flow` en su catálogo y las funciones comunes de su Asistente. La prueba real pasó por `agentCallback submit`, el host local, el MCP y la biblioteca: generó una imagen Nano Banana 2 de 1024 × 1024. Las llamadas comunes de modelos, esquema y cotización se comprobaron también con el motor Java existente. No se probó una conversación nueva con el LLM ni la edición Android.
+
+El host instalado sigue en su puerto loopback y conserva los 85 trabajos anteriores. Se añadieron los dos resultados verificados: 87 trabajos después de la integración. Los procesos de generación se ejecutan ocultos y con prioridad baja; una reserva persistente evita repetir un envío. Los resultados se copian al almacén de NEXUS después de comprobar SHA-256 y se sirven mediante sus rutas locales existentes.
+
+Pruebas reproducibles: `desktop/tools/test-flow-provider.py`, `desktop/tools/test-flow-integration.py` y las pruebas `test_*.py` del puente. `desktop/tools/verify-flow-live.py` es una prueba real autorizada que crea una imagen solo cuando el coste leído es 0; preserva su identificador y no debe utilizarse como prueba offline. No se compiló ni empaquetó APK o EXE.

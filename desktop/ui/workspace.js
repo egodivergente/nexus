@@ -5,7 +5,7 @@ jobCard=function(job){
  const index=outputSelection.get(job.id)||0,output=job.outputs?.[index],url=typeof output==='string'?output:output?.url;
  const key=job.id+':'+index;
  return cardBeforePC(job).replace('<article class="result">','<article class="result" data-job="'+escape(job.id)+'">')
- .replace('<div class="body">','<div class="body">'+(url&&/^https:\/\//.test(url)?'<button class="small pc-select" data-pc-compare="'+escape(job.id)+'" aria-pressed="'+PC.selected.has(key)+'">'+(PC.selected.has(key)?'Seleccionado':'Comparar resultado')+'</button>':''));
+ .replace('<div class="body">','<div class="body">'+(url&&isMediaUrl(url)?'<button class="small pc-select" data-pc-compare="'+escape(job.id)+'" aria-pressed="'+PC.selected.has(key)+'">'+(PC.selected.has(key)?'Seleccionado':'Comparar resultado')+'</button>':''));
 };
 function pcJobs(){
  const query=PC.search.trim().toLocaleLowerCase();
@@ -38,7 +38,7 @@ poll=async function(force=false){
   for(const job of jobs){
    const before=JSON.stringify(job),schedule=pcSchedule.get(job.id)||{errors:0};
    try{const path=job.providerId==='runway'?'/v1/tasks/'+encodeURIComponent(job.remoteId):job.providerId==='crun'?'/api/v1/client/job/TaskInfo?task_id='+encodeURIComponent(job.remoteId):'/api/v1/model/prediction/'+encodeURIComponent(job.remoteId);
-    const updated={...job};parseResponse(updated,await rpc('request',{provider:job.providerId,path,method:'GET'}));Object.assign(job,updated);delete job.pollError;schedule.errors=0;
+    const updated={...job};parseResponse(updated,job.providerId==='google_flow'?await rpc('flowStatus',{request_id:job.remoteId}):await rpc('request',{provider:job.providerId,path,method:'GET'}));Object.assign(job,updated);delete job.pollError;schedule.errors=0;
    }catch{job.pollError=true;schedule.errors++;}
    schedule.last=Date.now();schedule.next=schedule.last+Math.min(120000,15000*2**schedule.errors);pcSchedule.set(job.id,schedule);
    if(before!==JSON.stringify(job))changed.push(job.id);
