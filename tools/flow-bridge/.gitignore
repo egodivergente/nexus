@@ -1,0 +1,4 @@
+upstream/
+*.log
+__pycache__/
+evidence-private/
