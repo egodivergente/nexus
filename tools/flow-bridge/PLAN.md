@@ -18,4 +18,4 @@ Pasos 1–5 completados. En el paso 6 se envió una generación real; gflow-cli 
 
 Paso 7 completado: recuperación por MCP desde una nueva conexión, respuesta estructurada con archivo local y repetición del mismo request_id sin otro trabajo nativo. Se incorporó una base SQLite de identificadores persistentes y un control previo al envío que reconoce el código observado `BELUGA`. La comprobación real de ese control se hizo abortando el RPC antes de Google.
 
-El recorrido de la última capa con una generación nueva permanece NO PROBADO; los reintentos, la persistencia y el archivo real sí están comprobados. Vídeo y NEXUS Agent quedan NO PROBADO/PENDIENTE. Publicación GitHub pendiente de identificar un destino accesible; este checkout no tiene remoto.
+El recorrido de la última capa se ha comprobado con una generación nueva: petición MCP, control de modelo, trabajo nativo completado y JPEG de 1024 × 1024 recibido sin recuperación adicional. Dos generaciones reales enviadas en total. Vídeo y NEXUS Agent quedan NO PROBADO/PENDIENTE. Publicación GitHub pendiente de identificar un destino accesible; este checkout no tiene remoto.

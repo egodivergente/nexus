@@ -10,7 +10,7 @@ Puente local basado en [gflow-cli 0.82.1](https://github.com/ffroliva/gflow-cli)
 - **PASS:** una nueva conexión MCP devuelve el mismo archivo. Repetir el identificador conserva un único trabajo nativo.
 - **PASS:** seis pruebas del control de modelo y cinco de persistencia/idempotencia. Estas pruebas usan datos locales y mocks; la generación real se comprobó por separado.
 - **PASS:** petición de inspección interceptada y abortada antes de Google; el selector mostraba Nano Banana 2 y el campo de modelo enviaba `BELUGA`. El control corregido acepta ese campo.
-- **NO PROBADO:** una nueva generación completa con la última capa de idempotencia. Se verificó contra el resultado real anterior y mediante mocks para evitar una segunda generación.
+- **PASS:** nueva generación completa con la capa final de idempotencia y control de modelo: petición MCP, trabajo nativo completado y JPEG de 1024 × 1024 descargado y verificado, sin recuperación adicional. Se enviaron dos generaciones reales en total, una antes de la corrección y otra para validar la versión final.
 - **NO PROBADO:** vídeo, imágenes de referencia, otros modelos y saldo/deducción exacta de créditos.
 - **PENDIENTE:** incorporación a NEXUS Agent. El alcance implementado es Codex en este PC.
 
