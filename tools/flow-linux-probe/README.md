@@ -70,3 +70,27 @@ dependencies were installed (11.4 MB). No Google credentials are scripted.
 Close only this task's session with `systemctl --user stop nexus-flow-login`.
 Stop its Windows SSH forwarding process separately after user handoff ends.
 Do not launch the automated probe while this profile is open interactively.
+
+## Authenticated trial and restart failure
+
+2026-10-06: the user completed Google login in the ASUS browser. PASS:
+Flow displayed the existing project gallery and signed-in account. No project
+was created, modified or generated in this check.
+
+FAIL: after closing Chromium normally and reopening the same profile,
+Flow initially showed a project-loading error. Reloading led to `/about`;
+the account chooser explicitly marked the account Signed out. The cause is
+not established. This disproves persistent unattended access in this trial.
+Do not advertise the ASUS connector as operational or ask for paid validation.
+
+Installed gflow-cli 0.82.1 from binary wheels into the isolated venv;
+`pip check` passed. `health.py` returns only a sanitized status, checks Flow
+workspace readiness plus server-attested Google authentication, and refuses
+to open a profile already held by Chromium. The busy case was tested PASS.
+The connected path is NO PROBADO. `profile_diagnostics.py` reports only
+persistence counts and preference flags, never cookie names or values.
+No cookies, profile files, account identifiers or screenshots are in Git.
+
+Next: user reauthentication is required. Investigate session persistence;
+then validate read-only bridge operations before any APK integration or
+generation. No additional public endpoint or permanent service was installed.
