@@ -204,8 +204,8 @@
     "bytes": 20139
   },
   "agent-proxy/README.md": {
-    "sha256": "f6bb474078660fd20c74aa91c49e07994f5f13df82023552d3403d63666b84e7",
-    "bytes": 2939
+    "sha256": "9942fd795540f078913456e69aee26bc46585b06b0ee192ad900cf4261e53e9e",
+    "bytes": 2857
   },
   "agent-proxy/test_nexus_proxy.py": {
     "sha256": "93f2a2c34469c4ae8ec8da384f1a96f60bf95f4b65aa302b1826bfeea8ff8b25",
@@ -1924,8 +1924,8 @@
     "bytes": 2511
   },
   "desktop/README.md": {
-    "sha256": "b403c96345c63415d1e09bd5992f36b4aff4b9e5f96b064e92bbc8e59f4c70a7",
-    "bytes": 5488
+    "sha256": "f6d6f7697ed34640196e3910c5ac82d53e99f2890696b8514f4200106b6a50a4",
+    "bytes": 1685
   },
   "desktop/run.vbs": {
     "sha256": "26931c1e2e6693b879f95695b5b5117633c17ae1bb94ef75a6a6c40693bd8a9c",
@@ -2444,7 +2444,7 @@
     "bytes": 370
   },
   "README.md": {
-    "sha256": "9cab2eb22b27d2e8e07cdc4396d33b073b99aa51b3f08055aa31997b78314b3b",
-    "bytes": 1183
+    "sha256": "21a8320834d9b2f2e060ab9eed4cef942b0cf6ab11bd9761fe2bf899182fedfb",
+    "bytes": 933
   }
 }

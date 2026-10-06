@@ -1,11 +1,10 @@
-# Proxy del asistente de Nexus (Bedrock Converse)
+# Proxy del asistente de NEXUS
 
 ```
 Nexus (APK) --HTTPS + token de dispositivo--> nexus_proxy.py --boto3/IAM--> Amazon Bedrock (Converse)
 ```
 
-La APK nunca ve credenciales de AWS. Solo guarda (cifrados en el Keystore) la URL del proxy y un
-token de dispositivo que se puede revocar quitando su hash de la configuración.
+Las credenciales de AWS permanecen en el servidor. La app guarda la URL y un token de dispositivo cifrado mediante Keystore; se puede revocar retirando su hash de la configuración.
 
 ## Puesta en marcha
 
@@ -48,7 +47,7 @@ herramientas (`max_tools`). El proxy sirve HTTP plano: para usarlo fuera de `adb
 Los registros solo llevan modelo, tokens, coste, latencia y nombres de herramientas. Nunca prompts,
 imágenes, tokens ni credenciales.
 
-Este proxy solo paga tokens del LLM. **No puede generar imágenes ni vídeos**: eso lo hace la app
+Este proxy solo paga tokens del LLM. No genera imágenes ni vídeos: eso lo hace la app
 y solo tras pulsar GENERAR en la tarjeta de cada plan.
 
 ## Pruebas
