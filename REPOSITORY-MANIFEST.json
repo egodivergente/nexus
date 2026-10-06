@@ -4,8 +4,8 @@
     "bytes": 512
   },
   "AGENTS.md": {
-    "sha256": "a7a1971109d049bf4bb71de2f557e72bb328c288f7d925b664e6a347503428a9",
-    "bytes": 3427
+    "sha256": "972cb84db8f5e478c1ddddc977758bd83e1516c01e070273040ea09c9a13f442",
+    "bytes": 4094
   },
   "app/build.gradle.kts": {
     "sha256": "ac6717ca53a8558f7660289bdaa452bad52bd1bcd09721d065ed8002dc9d447d",
@@ -1148,8 +1148,8 @@
     "bytes": 298
   },
   "CONTINUAR.md": {
-    "sha256": "b5493662332202bc1e3a6942f440849b0d8ca928be0db47dd9eeebe6326f3a20",
-    "bytes": 922
+    "sha256": "fee8da4ff5b5f385e53132964df643bf931047506389cec50a6ae53c7ea9a142",
+    "bytes": 1059
   },
   "docs/ATLAS_CLOUD_PROVIDER.md": {
     "sha256": "694631b0d624df22639f0103f7569a786c12e65c75f966e93b48991a328fa33d",
@@ -1232,7 +1232,7 @@
     "bytes": 324
   },
   "SOURCE-MANIFEST.json": {
-    "sha256": "66cdbbd10f2036b86e7707dc4c53c650c91bbd9d17eb79b3d0eb106baeec9c12",
+    "sha256": "10308c019840fe52f438e4f34176e0cdbed2ff77d813ec332f98695f3a02e1c9",
     "bytes": 94325
   },
   "tools/ecosystem-build/install.py": {
