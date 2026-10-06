@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -66,7 +67,7 @@ class AccountBalanceViewModel(application: Application) : AndroidViewModel(appli
 }
 
 @Composable
-fun AccountBalanceBar(vm: AccountBalanceViewModel = viewModel()) {
+fun AccountBalanceBar(onSettings: () -> Unit = {}, vm: AccountBalanceViewModel = viewModel()) {
     val balances by vm.balances.collectAsState()
     val busy by vm.busy.collectAsState()
     Surface(color = MaterialTheme.colorScheme.surface) {
@@ -87,6 +88,7 @@ fun AccountBalanceBar(vm: AccountBalanceViewModel = viewModel()) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.Refresh, contentDescription = "Actualizar saldos")
             }
+            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Ajustes") }
         }
     }
 }

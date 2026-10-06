@@ -87,7 +87,6 @@ fun AssistantScreen(
                 IconButton(onClick = vm::newConversation, enabled = !ui.thinking) { Icon(Icons.Default.AddComment, "Nueva conversación") }
                 IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, "Ajustes del asistente") }
             }
-            ModeRow(ui.mode, vm::setMode)
             ProjectRow(ui, vm)
             if (ui.settings.offline) {
                 Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -125,24 +124,8 @@ fun AssistantScreen(
 @Composable
 private fun EmptyHint() {
     Column(Modifier.fillMaxWidth().padding(top = 24.dp, start = 8.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Describe lo que quieres y adjunta tus keyframes. Preparo modelo, prompt y parámetros; nada se genera hasta que pulses GENERAR en la tarjeta.", color = TextMuted)
-        Text("Ejemplo: «Usa este keyframe de Mateo y Julián, crea un plano cinematográfico de 8 segundos con dolly-in lento, mantén el diseño de personajes y la iluminación.»",
-            color = TextMuted, style = MaterialTheme.typography.bodySmall)
+        Text("¿Una imagen, un vídeo o una idea por desarrollar?", color = TextMuted)
     }
-}
-
-@Composable
-private fun ModeRow(mode: AgentMode, onMode: (AgentMode) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(AgentMode.ASSISTANT to "Asistente", AgentMode.COPILOT to "Copiloto", AgentMode.AGENT to "Agente").forEach { (m, label) ->
-            FilterChip(selected = mode == m, onClick = { onMode(m) }, label = { Text(label) })
-        }
-    }
-    Text(when (mode) {
-        AgentMode.ASSISTANT -> "Recomienda y explica; no prepara ejecuciones ni cambia nada."
-        AgentMode.COPILOT -> "Prepara el plan y espera tu confirmación. Organizar archivos = propuesta."
-        AgentMode.AGENT -> "Organiza y encadena pasos. Generar sigue pidiendo tu confirmación una a una."
-    }, style = MaterialTheme.typography.bodySmall, color = TextMuted, modifier = Modifier.padding(horizontal = 14.dp))
 }
 
 @Composable

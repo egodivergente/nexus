@@ -18,6 +18,6 @@ enum class Screen(
     Settings("settings", "Ajustes", Icons.Default.Tune);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = entries
+        val bottomNavItems: List<Screen> get() = entries.filter { it != Settings }
     }
 }

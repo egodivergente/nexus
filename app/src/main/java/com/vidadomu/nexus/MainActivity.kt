@@ -72,6 +72,18 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(Unit) {
+                    if (BuildConfig.OFFLINE_QA && intent.getBooleanExtra("qa_export", false)) {
+                        val id = "qa-export-${System.currentTimeMillis()}"
+                        val media = com.vidadomu.nexus.ui.create.LocalQaFixture.media(this@MainActivity,
+                            com.vidadomu.nexus.ui.create.LocalQaFixture.model(this@MainActivity, "image")).first()
+                        val output = com.vidadomu.nexus.core.model.GenerationOutput(id, id,
+                            com.vidadomu.nexus.core.model.Modality.IMAGE, "https://example.invalid/qa.png", media.uriString, "image/png")
+                        (application as NexusApplication).database.insertOrUpdateJob(com.vidadomu.nexus.core.model.GenerationJob(
+                            id = id, providerId = "qa", modelId = "qa-export", modality = com.vidadomu.nexus.core.model.Modality.IMAGE,
+                            prompt = "Prueba local de descarga, sin generación", status = com.vidadomu.nexus.core.model.GenerationStatus.COMPLETED,
+                            outputs = listOf(output)))
+                        navController.navigate("output/$id")
+                    }
                     if(BuildConfig.OFFLINE_QA && (intent.getBooleanExtra("qa_motion",false) || intent.hasExtra("qa_fixture"))) {
                         val fixture=com.vidadomu.nexus.ui.create.LocalQaFixture.model(this@MainActivity,intent.getStringExtra("qa_fixture") ?: "motion")
                         createViewModel.loadLocalPreview(fixture,com.vidadomu.nexus.ui.create.LocalQaFixture.media(this@MainActivity,fixture,if(intent.getStringExtra("qa_fixture")=="references") 3 else 1))
@@ -101,7 +113,9 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
-                    topBar = { com.vidadomu.nexus.ui.accounts.AccountBalanceBar() },
+                    topBar = { com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings = {
+                        navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                    }) },
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)
                     }

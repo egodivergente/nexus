@@ -111,7 +111,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         region = prefs.getString("region", AssistantSettings.DEFAULT_REGION).orEmpty(),
         temperature = prefs.getString("temperature", null)?.toDoubleOrNull(),
         maxTokens = prefs.getInt("max_tokens", 4096),
-        mode = runCatching { AgentMode.valueOf(prefs.getString("mode", "COPILOT")!!) }.getOrDefault(AgentMode.COPILOT),
+        mode = AgentMode.COPILOT,
         sendImages = prefs.getBoolean("send_images", true),
         maskedToken = masked(TOKEN_ID),
         awsAccessKeyId = runCatching { secure.getProviderApiKey(AWS_ACCESS_ID) }.getOrDefault(""),

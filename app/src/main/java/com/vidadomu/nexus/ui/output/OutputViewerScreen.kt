@@ -58,6 +58,15 @@ fun OutputViewerScreen(
     val jobs by app.generationRepository.allJobs.collectAsState()
     val job = remember(jobs, jobId) { jobs.find { it.id == jobId } }
     val currencyManager = app.currencyManager
+    val exporter: OutputExportViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val export by exporter.state.collectAsState()
+    val snackbar = remember { SnackbarHostState() }
+    val savePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result -> exporter.save(if (result.resultCode == android.app.Activity.RESULT_OK) result.data?.data else null) }
+    LaunchedEffect(export.message) {
+        export.message?.let { snackbar.showSnackbar(it); exporter.dismissMessage() }
+    }
 
     val titleText = when (job?.modality) {
         Modality.IMAGE -> "IMAGEN"
@@ -73,6 +82,7 @@ fun OutputViewerScreen(
     val trustedLocal = chosenOutput?.let { OutputFiles.trustedLocalUri(it, conflicts) }
     Scaffold(
         containerColor = ScreenBackground,
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = {
@@ -97,7 +107,7 @@ fun OutputViewerScreen(
                     val outputUrl = chosenOutput?.url
                     if (outputUrl != null) {
                         IconButton(onClick = { shareMedia(context, outputUrl, job?.prompt.orEmpty()) }) {
-                            Icon(Icons.Default.Share, contentDescription = "Compartir", tint = PrimaryNeon)
+                            Icon(Icons.Default.Share, contentDescription = "Compartir enlace", tint = PrimaryNeon)
                         }
                     }
                 },
@@ -180,6 +190,28 @@ fun OutputViewerScreen(
 
             // 2. Contextual Actions Pill Row
             if (output != null) {
+                Button(
+                    enabled = !export.busy,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp),
+                    onClick = {
+                        val spec = outputExportSpec(output)
+                        exporter.prepare(output, trustedLocal)
+                        savePicker.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = spec.mimeType
+                            putExtra(Intent.EXTRA_TITLE, spec.fileName)
+                        })
+                    }
+                ) {
+                    Icon(Icons.Default.Download, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (export.busy) "Guardando archivo…" else "Descargar archivo")
+                }
+                if (export.busy) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text("${export.bytes / 1024} KB", Modifier.weight(1f).padding(horizontal = 12.dp))
+                    TextButton(onClick = exporter::cancel) { Text("Cancelar") }
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -227,7 +259,7 @@ fun OutputViewerScreen(
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Compartir", fontSize = 12.sp)
+                        Text("Compartir enlace", fontSize = 12.sp)
                     }
                 }
 
