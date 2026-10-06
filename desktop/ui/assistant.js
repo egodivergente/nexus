@@ -1,5 +1,5 @@
 'use strict';
-const Agent = {owner:crypto.randomUUID(),snapshot:null,settings:{},items:[],attachments:[],busy:false,callbacks:new Set(),draft:''};
+const Agent = {owner:crypto.randomUUID(),snapshot:null,settings:{},items:[],attachments:[],busy:false,callbacks:new Set(),draft:'',error:''};
 const agentIcons = {
  chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',send:'<path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/>',
@@ -14,7 +14,7 @@ function agentEditControl(p,value){
  const numeric=['integer','number'].includes(p.nativeType)||['INTEGER','FLOAT','SEED','SLIDER'].includes(p.type);
  return `<label>${label}<input name="${escape(name)}" type="${numeric?'number':'text'}" value="${escape(v)}" ${p.minValue!=null?`min="${p.minValue}"`:''} ${p.maxValue!=null?`max="${p.maxValue}"`:''} ${numeric?'step="any"':''}></label>`;
 }
-const aiButton=(action,title,name,disabled=false)=>`<button class="agent-icon" data-agent="${action}" title="${title}" aria-label="${title}" ${disabled?'disabled':''}>${aiIcon(name)}</button>`;
+const aiButton=(action,title,name,disabled=false)=>`<button type="button" class="agent-icon" data-agent="${action}" title="${title}" aria-label="${title}" ${disabled?'disabled':''}>${aiIcon(name)}</button>`;
 
 async function agentCall(op,args={}) {
  if(Agent.busy)throw Error('Espera a que termine el asistente.');
@@ -122,11 +122,13 @@ async function agentCallback(op,args){
   default:throw Error('Operacion desconocida.');
  }
 }
+function agentModelLabel(){return (Agent.settings.modelId||'Modelo conectado').replace(/^us\.|^eu\.|^global\./,'').replace(/^anthropic\./,'').replace(/claude-sonnet-4-6/,'Claude Sonnet 4.6').replace(/claude-opus-4-6/,'Claude Opus 4.6');}
 function renderAssistant(){
  const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),disabled=Agent.busy?'disabled':'';
  $('#content').classList.add('agent-view');
  $('#content').innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select>${aiButton('project-new','Nuevo proyecto','plus',Agent.busy)}${aiButton('memory','Memoria del proyecto','book',Agent.busy||!project)}</div></div>
- <div class="agent-session-info"><span>${s?(s.offline?'Planificador local · sin LLM':escape(Agent.settings.modelId)):'Conectando con el asistente'}</span><button class="small" data-agent="skills" ${disabled}>${s?.skills.length||0} skills</button></div>
+ <div class="agent-session-info"><span>${s?(s.offline?'Sin modelo conectado':escape(agentModelLabel())):'Conectando con el asistente'}</span><button class="small" data-agent="skills" ${disabled}>Herramientas · ${s?.skills.length||0}</button></div>
+ ${Agent.error?`<div class="agent-error" role="alert"><span>${escape(Agent.error)}</span><button type="button" data-agent="reconnect" ${disabled}>Comprobar conexión</button></div>`:''}
  <div class="agent-messages" role="log" aria-live="polite">${Agent.items.length?Agent.items.map(i=>`<article class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}</article>`).join(''):'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>'}
  ${(s?.plans||[]).filter(p=>p.state!=='DISCARDED').map(p=>`<article class="agent-plan"><div class="summary"><h3>${escape(p.plan.modelName)}</h3><span>${escape(planLabels[p.state]||p.state)}</span></div><p class="agent-text">${escape(p.plan.prompt)}</p><div class="agent-plan-meta">${Object.entries(p.plan.effectiveParams).map(([k,v])=>`<span>${escape(E.label(k))}: ${escape(v)}</span>`).join('')}</div><p>${escape(p.plan.estimate?.basis||'Coste pendiente')}</p>${p.plan.warnings.map(w=>`<p class="hint">${escape(w)}</p>`).join('')}<div class="toolbar"><button class="primary" data-agent-generate="${p.plan.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(p.state)?'disabled':''}>Revisar y generar</button><button data-agent-canvas="${p.plan.id}" ${disabled}>Abrir en lienzo</button><button data-agent-edit="${p.plan.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(p.state)?'disabled':''}>Editar</button><button data-agent-discard="${p.plan.id}" ${disabled}>Descartar</button></div></article>`).join('')}
  ${(s?.proposals||[]).map(p=>`<article class="agent-plan"><p>${escape(p.description)}</p><button data-agent-apply="${p.id}" ${disabled}>Aplicar</button> <button data-agent-reject="${p.id}" ${disabled}>Descartar</button></article>`).join('')}
@@ -148,15 +150,16 @@ render=function(){
 };
 async function sendAgent(requestText){
  const text=Agent.draft.trim();if(!text||Agent.busy)return;
+ Agent.error='';
  if(!Agent.snapshot||Agent.snapshot.offline){
-  try{await agentCall('snapshot');}catch(error){toast(error.message);return;}
+  try{await agentCall('snapshot');}catch(error){Agent.error=error.message;if(view==='assistant')renderAssistant();return;}
   if(Agent.snapshot.offline){toast('El asistente necesita una conexion LLM. Configurala en sus ajustes.');agentSettings();return;}
  }
  const attachments=Agent.attachments.slice();Agent.items.push({role:'user',text,attachments});Agent.draft='';Agent.attachments=[];
  try{const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
   Agent.items.push({role:'assistant',text:result.text,html:result.html,usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
- }catch(error){Agent.items.pop();toast(error.message);Agent.draft=text;Agent.attachments=attachments;}
- renderAssistant();
+ }catch(error){Agent.items.pop();Agent.error=error.message;Agent.draft=text;Agent.attachments=attachments;}
+ if(view==='assistant'){renderAssistant();$('#agent-input')?.focus();}
 }
 function agentSettings(){
  const s=Agent.settings;
@@ -164,6 +167,10 @@ function agentSettings(){
  $('#agent-settings [name=backend]').value=s.backend||'direct';
 }
 document.addEventListener('input',e=>{if(e.target.id==='agent-input')Agent.draft=e.target.value;});
+document.addEventListener('keydown',e=>{
+ if(e.target.id!=='agent-input'||e.key!=='Enter'||e.shiftKey||e.ctrlKey||e.altKey||e.metaKey||e.isComposing)return;
+ e.preventDefault();if(!e.repeat)sendAgent();
+});
 document.addEventListener('change',async e=>{if(e.target.id==='agent-project')try{await agentCall('project',{id:e.target.value});}catch(error){toast(error.message);}});
 document.addEventListener('submit',async e=>{
  const formId=e.target.getAttribute('id')||'';
@@ -196,6 +203,7 @@ document.addEventListener('click',async e=>{
    modal(`<h2>Confirmar generación</h2><h3>${escape(p.modelName)}</h3><p class="agent-text">${escape(p.prompt)}</p><p>Coste estimado: <strong>${amount(cost)}</strong></p><button class="primary" data-agent="confirm">Generar</button>`);
   }
   switch(b.dataset.agent){
+   case'reconnect':try{await rpc('init');await agentCall('snapshot');Agent.error='';toast('Conexión local comprobada. No se ha reenviado el mensaje.');}catch(error){Agent.error=error.message;}if(view==='assistant')renderAssistant();break;
    case'send':e.preventDefault();await sendAgent();break;
    case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();break;
    case'new':await agentCall('new');Agent.items=[];Agent.attachments=[];renderAssistant();break;

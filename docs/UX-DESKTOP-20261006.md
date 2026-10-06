@@ -42,3 +42,33 @@ NO PROBADO: live paid generation/download, provider availability, screen reader,
 complete keyboard audit, measured memory/CPU and every model configuration.
 No build was required for these source-served JavaScript changes.
 Other ongoing local Flow changes were preserved and excluded from this commit.
+
+## Assistant correction after user-reported failures
+
+The earlier verification did not cover Enter in the Nexus assistant. This was
+a real missing keyboard handler, now fixed: Enter sends, Shift+Enter inserts a
+newline, IME composition and key repeat do not submit. Icon buttons have explicit
+button types. Focus returns to the draft after a reply/error; asynchronous reply
+completion no longer forces another screen back into the assistant.
+
+Local bridge recovery now renews a rejected session once on HTTP 403 only.
+The host rejects that response before dispatch, so no executed request is
+retried. A transport disconnect is never automatically replayed. Errors explain
+uncertain delivery, remain visible in the assistant and preserve its draft.
+Connection checking does not resend the message.
+
+The assistant layout now uses the available flex height instead of a fixed
+viewport subtraction: compact header, grouped mode controls, bounded reading
+width, centered empty composer, visible send control, and contextual image review.
+The runtime is still Edge-backed; this is not a native framework migration.
+
+PASS: test-assistant-reliability.py drives actual keyboard/click events in Edge,
+checks 1536/1280/760/480px layouts, kills and restarts its own isolated loopback
+host and verifies real fetch failure plus a real 403 after token rotation.
+Reply text is a fixture, not a model response. No CSP bypass is used.
+PASS: previous optimization suite. Desktop and narrow screenshots inspected.
+PASS: live installed host /health and authenticated assistant snapshot returned
+success with offline=false and us.anthropic.claude-sonnet-4-6 configured.
+NO PROBADO: live model inference, paid generation, all causes of historical fetch
+errors, screen reader and stability over extended use. No build/restart of the
+user's active instance was performed; existing windows require a frontend reload.

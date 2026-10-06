@@ -9,7 +9,7 @@ const reviewRender=renderAssistant;
 renderAssistant=function(){
  reviewRender();
  const actions=document.querySelector('.agent-compose-actions');
- if(actions)actions.insertAdjacentHTML('afterbegin',`<button type="button" data-review="image" ${Agent.busy||Review.busy?'disabled':''}>Revisar imagen</button>`);
+ if(actions&&Agent.attachments.some(f=>f.mime?.startsWith('image/')))actions.insertAdjacentHTML('afterbegin',`<button type="button" data-review="image" ${Agent.busy||Review.busy?'disabled':''}>Revisar imagen</button>`);
  document.querySelectorAll('.agent-message.user').forEach((node,index)=>{
   const item=Agent.items.filter(i=>i.role==='user')[index];
   if(item?.text)node.insertAdjacentHTML('beforeend',`<button class="small" data-remember="${index}" ${Agent.busy?'disabled':''}>Guardar preferencia</button>`);
