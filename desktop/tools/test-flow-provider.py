@@ -40,5 +40,12 @@ class ProviderTests(unittest.TestCase):
                 flow.submit(folder,args);flow.submit(folder,args)
                 self.assertEqual(quote.call_count,1);self.assertEqual(worker.call_count,1)
             finally:flow.WORKERS.discard('upscale')
+    def test_gif_media_route_and_traversal(self):
+        import local_host as host
+        with tempfile.TemporaryDirectory() as folder,patch.object(host,'MEDIA',Path(folder)):
+            name='a'*32+'.gif';path=Path(folder)/name;path.write_bytes(b'GIF89a')
+            self.assertEqual(host.media_path(name),path)
+            for invalid in ('../'+name,'a'*32+'.exe'):
+                with self.assertRaises(ValueError):host.media_path(invalid)
 
 if __name__=='__main__':unittest.main()

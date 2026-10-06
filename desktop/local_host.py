@@ -207,7 +207,7 @@ def select_files():
 
 
 def media_path(identifier):
-    if not re.fullmatch(r'[a-f0-9]{32}\.(png|jpe?g|webp|mp4|mov|webm|mp3|wav|m4a)', identifier):
+    if not re.fullmatch(r'[a-f0-9]{32}\.(png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a)', identifier):
         raise ValueError('Archivo local no válido.')
     path = MEDIA / identifier
     if not path.is_file():
