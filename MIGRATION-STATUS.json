@@ -1,0 +1,24 @@
+{
+  "repository": "nexus",
+  "branch": "codex/archive-antigravity-20261006",
+  "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus",
+  "source_files": 162,
+  "android": [
+    {
+      "file": "app/build.gradle.kts",
+      "ids": [
+        "com.vidadomu.nexus",
+        "com.vidadomu.nexus"
+      ],
+      "versionName": [
+        "1.0.0"
+      ],
+      "versionCode": [
+        "1"
+      ]
+    }
+  ],
+  "status": "FUENTE_RECUPERADA_NO_RECOMPILADA",
+  "version_note": "Los nombres y versionCode no acreditan equivalencia binaria ni última edición. Comparar con el APK instalado y las demás fuentes antes de actualizar.",
+  "new_repository": false
+}

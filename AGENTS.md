@@ -1,0 +1,1 @@
+Leer CONTINUAR.md. No incluir credenciales, claves, datos personales, bases ni outputs. Usar ecosystem-build antes de compilar. Preservar fuentes ajenas, datos y firmas originales. Al terminar, revisar el diff, commit y push sin force-push; verificar el commit remoto.

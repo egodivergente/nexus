@@ -1,0 +1,812 @@
+{
+  "README.md": {
+    "sha256": "b984d5c53dd137497badfebf8f6f7187a2957a07731a09772aaba057715b2ee3",
+    "bytes": 3277,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\README.md"
+  },
+  "build.gradle.kts": {
+    "sha256": "5d29e05314ca7658c9cefae848317d52331bcd7e6e2bf8909f5aa55ff6627ffa",
+    "bytes": 298,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\build.gradle.kts"
+  },
+  "gradle.properties": {
+    "sha256": "15ab9fdc1a78916a937e7dfe690f1e28bb750f37d9c43d1dda8abd6c7748929f",
+    "bytes": 141,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\gradle.properties"
+  },
+  "gradlew": {
+    "sha256": "a3648413b47ef77af21d5ebc36c687c7d103aaef3e17f33de7d4f080a6f300a3",
+    "bytes": 8762,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\gradlew"
+  },
+  "gradlew.bat": {
+    "sha256": "57931b17dd228e5c24dac90e815d0bf82477e831a4618dfab4136f5446b42a9f",
+    "bytes": 2966,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\gradlew.bat"
+  },
+  "models_atlas.json": {
+    "sha256": "d71f69e4597f3adaf2820978f7988d6fc28a6c032d5890e693b3e361ac227c21",
+    "bytes": 746710,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\models_atlas.json"
+  },
+  "screen_01_lienzo_live.png": {
+    "sha256": "8bf5953a18a16b93b585d0afe53841407ae58255413c2de371b51f95cedb21ee",
+    "bytes": 176531,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_01_lienzo_live.png"
+  },
+  "screen_02_modelos.png": {
+    "sha256": "7bdb00511156800581635da65d4248c5d48967334ab7f3ea8ef38c4d6aa37c28",
+    "bytes": 252607,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_02_modelos.png"
+  },
+  "screen_03_modelos_video.png": {
+    "sha256": "e08e57616e494cdadade2098e7c1705a32407e1f364762101a4f1ec322f6873f",
+    "bytes": 244804,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_03_modelos_video.png"
+  },
+  "screen_04_modelos_audio.png": {
+    "sha256": "5c7bbce1f1615736f5d9910607e64c77a0c6f19998eff8f5ae266d53dfc509ad",
+    "bytes": 251902,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_04_modelos_audio.png"
+  },
+  "screen_05_modelos_chat.png": {
+    "sha256": "4c077d479d27d459c2895c1dd531e1328ac059cefc74d676d1adaddf7474757c",
+    "bytes": 249137,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_05_modelos_chat.png"
+  },
+  "screen_06_historial.png": {
+    "sha256": "cacde97196d58e6d8118701065fa1b43c8e164347120c5e57f714e9f131425a3",
+    "bytes": 208257,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_06_historial.png"
+  },
+  "screen_07_facturacion.png": {
+    "sha256": "58286f67de33e0f0491258aae4cce3ce853930f5c7aa1e879d91b8dfb461d6e8",
+    "bytes": 268754,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_07_facturacion.png"
+  },
+  "screen_08_ajustes.png": {
+    "sha256": "87ca317bb752165cb4322d64dbf376c64a2897ca6a9b4b91a8c7e06a71ba0d46",
+    "bytes": 261005,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_08_ajustes.png"
+  },
+  "screen_09_refresh_saldo.png": {
+    "sha256": "6198c2ee5899dd8bc06399fe1e3e4ed11cb25b3aa4fefa8bac1d04ad33580d03",
+    "bytes": 259843,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_09_refresh_saldo.png"
+  },
+  "screen_10_lienzo.png": {
+    "sha256": "ada876cc9b75f21a69713ab5b91829fe22de8b08708c944b7a0934d0d633cf7c",
+    "bytes": 176172,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_10_lienzo.png"
+  },
+  "screen_11_model_picker.png": {
+    "sha256": "a9e2cf0befbb363dde869af278c35f95467ea16edf8dd25caf0c349fee894523",
+    "bytes": 284336,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_11_model_picker.png"
+  },
+  "screen_12_seedream_selected.png": {
+    "sha256": "9d5e90253d7541b460d63a2f15ca4affa0298c8a22a24596a440c8be3aaf2fe1",
+    "bytes": 180029,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_12_seedream_selected.png"
+  },
+  "screen_13_prompt.png": {
+    "sha256": "0475fb3b1443331e8675f2807b7e7c8ee12e1232f7d5257251ca8d6f96d237d8",
+    "bytes": 190153,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_13_prompt.png"
+  },
+  "screen_14_generating.png": {
+    "sha256": "6dc08affa96e1e0cdd4f4c5dcf1c3cd3427876d9d312d703689fc7aeaef5923f",
+    "bytes": 215640,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_14_generating.png"
+  },
+  "screen_15_generation_result.png": {
+    "sha256": "74bd550e2c6244cfd141cbe8f4e2b7241f32b0f49df7967961758d065f1b7077",
+    "bytes": 112778,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_15_generation_result.png"
+  },
+  "screen_16_completed.png": {
+    "sha256": "149f654b50d9bf669571b06298acb9feedebb89b3c817f96d93594ae17143b57",
+    "bytes": 1388431,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_16_completed.png"
+  },
+  "screen_17_billing_receipt.png": {
+    "sha256": "3ff36843c3528e354d07f4e8999521d875a56273c87a12d590c6189edfbdb7bc",
+    "bytes": 323390,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_17_billing_receipt.png"
+  },
+  "screen_18_view_from_receipt.png": {
+    "sha256": "3ff36843c3528e354d07f4e8999521d875a56273c87a12d590c6189edfbdb7bc",
+    "bytes": 323390,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_18_view_from_receipt.png"
+  },
+  "screen_19_facturacion.png": {
+    "sha256": "d0cd5257353fcdf5c43979182d776df2d6c7209d0f079be769ac19285c3242e8",
+    "bytes": 269350,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_19_facturacion.png"
+  },
+  "screen_20_output_viewer.png": {
+    "sha256": "be1e4564ccb6d8ff0a33196836cd9d6443b4737b0f41db7be8737b06c96c8854",
+    "bytes": 1388730,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_20_output_viewer.png"
+  },
+  "screen_live_1.png": {
+    "sha256": "00b5cafe18b3ce9fa1bc05fc8e1157d975ec18ba2fe36b86a01f0345e14478b9",
+    "bytes": 189293,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_live_1.png"
+  },
+  "screen_live_models.png": {
+    "sha256": "3248df9051db3c51c2f32b509f183b7f1f2f6e698202c0f30dcfa0f3d89e6803",
+    "bytes": 260005,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_live_models.png"
+  },
+  "screen_s25_duration10.png": {
+    "sha256": "d8dab4b73ee487e1f068d6a9de5600a8e045a67337fbdf88df29fa08b30512fd",
+    "bytes": 199432,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_s25_duration10.png"
+  },
+  "screen_s25_inspector.png": {
+    "sha256": "0ee21bba36a15901bd47df07717989cfce4c6ebf6e16d12e4772f68a159e60e4",
+    "bytes": 238864,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_s25_inspector.png"
+  },
+  "screen_s25_models.png": {
+    "sha256": "b02db881d031d89d7d6a2ef723292d70fe0ff9fc8f09f51ae15b02b7343b3958",
+    "bytes": 370097,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_s25_models.png"
+  },
+  "screen_s25_ofertas.png": {
+    "sha256": "e0053466da19e8cf71e5c269b9f700dc96c7cfd1bb3cf3efc9ec5ad53ecdaf07",
+    "bytes": 395418,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_s25_ofertas.png"
+  },
+  "screen_s25_ultra.png": {
+    "sha256": "437aa72f7d8988e77aa291186a8cfe3111a222c75f5e798754f8d15677f66a31",
+    "bytes": 196126,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_s25_ultra.png"
+  },
+  "screen_s25_video.png": {
+    "sha256": "bf5dd3e58e2de82fe8854920d9987303e896716c45c51a062629a23fadfefbc7",
+    "bytes": 200331,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\screen_s25_video.png"
+  },
+  "settings.gradle.kts": {
+    "sha256": "e06d247843c02043960654292c917d1933963b6a314a99c924f7d6caf89b083e",
+    "bytes": 324,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\settings.gradle.kts"
+  },
+  "test_chat.json": {
+    "sha256": "116ce6de27d0244d4767064be13341b6375b1bac437c50f6770d6216591e02ca",
+    "bytes": 88,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\test_chat.json"
+  },
+  "test_img.json": {
+    "sha256": "52b96652ed8edf448cf4156bad301a8c2faeb9358982437ad12a1c3f06291cf3",
+    "bytes": 58,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\test_img.json"
+  },
+  "test_payload.json": {
+    "sha256": "3df32d5655e724003a8a7b74b279add86901ed22554e2e7105701026a4a7a1af",
+    "bytes": 63,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\test_payload.json"
+  },
+  "test_seedream.json": {
+    "sha256": "97117e821dc86eb1a9e0fa3e165a97f3bcdabc90cd2ed1df5e1f263b4ef73164",
+    "bytes": 52,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\test_seedream.json"
+  },
+  "app/build.gradle.kts": {
+    "sha256": "9bcc114a25405269a24d6ae680f09430bee7b7976c87af0065f34da455d816b9",
+    "bytes": 3411,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\build.gradle.kts"
+  },
+  "app/src/main/AndroidManifest.xml": {
+    "sha256": "708d6a904024e4661797c1b6118c9c0584d4d5834bafbcdc01f4bd697bbfadf9",
+    "bytes": 3355,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\AndroidManifest.xml"
+  },
+  "app/src/main/java/com/vidadomu/nexus/MainActivity.kt": {
+    "sha256": "995215af3fca1f4d33a543b6982b6a88f9e381fe6fed4c0e452f3072dfebdd66",
+    "bytes": 7967,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\MainActivity.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/NexusApplication.kt": {
+    "sha256": "d197bb30cbaebf137a1632926f08c67cad74cc4382421e1b89fb7789747fba19",
+    "bytes": 2950,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\NexusApplication.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/alexia/AlexiaBridge.kt": {
+    "sha256": "138aeb9fc0823f48256f9706b63418446e1ba4346c0ba05295129ca81956816f",
+    "bytes": 22353,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\alexia\\AlexiaBridge.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/currency/CurrencyManager.kt": {
+    "sha256": "3f70570cb99637c0d95ad51439871d4d6a691fbdeae8d6b752c5d06f31e53037",
+    "bytes": 8798,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\currency\\CurrencyManager.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/database/NexusDatabase.kt": {
+    "sha256": "405050fccd551714c6b8761f51db7984c711ed566903a4b641518af1d7d05626",
+    "bytes": 11227,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\database\\NexusDatabase.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/model/CoreModels.kt": {
+    "sha256": "233d653342fd4710659ae9a99609b57b527394575f091b392768e068d51dbe8d",
+    "bytes": 10275,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\model\\CoreModels.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/network/NetworkModule.kt": {
+    "sha256": "47fc488b27da03bd6a982acba56735927089e92369a5eea1c39594d97d7b1233",
+    "bytes": 5106,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\network\\NetworkModule.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/security/SecureStorage.kt": {
+    "sha256": "a4da676437f2935aa012ba4e73e141e928ffaaf6a26587f14a4703982a965197",
+    "bytes": 7119,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\security\\SecureStorage.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/core/work/GenerationPollingWorker.kt": {
+    "sha256": "295a561801ef12bb62982e17c220072357587e4c34a829dcd1223ea67f499926",
+    "bytes": 4983,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\core\\work\\GenerationPollingWorker.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/ModelCatalogCache.kt": {
+    "sha256": "b1edbacc25ff527801cf56cef163697d2346a1b999fc18672499f4a132c9f47b",
+    "bytes": 3188,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\data\\repository\\ModelCatalogCache.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/data/repository/Repositories.kt": {
+    "sha256": "2771edb117633fc3ce570570f07c4c9537ac6ee6df66875069021ee2a53957d6",
+    "bytes": 5879,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\data\\repository\\Repositories.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/api/NexusProvider.kt": {
+    "sha256": "98dc73b4f3a10d71cd1a7067502289275510e4e1eb62a2a295f83b20f575289b",
+    "bytes": 727,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\api\\NexusProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasChatProtocol.kt": {
+    "sha256": "670b2dae18cc9d6bb675b0eb0736173872340ce0b4a2a929dbc3059a2c242e93",
+    "bytes": 963,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\atlas\\AtlasChatProtocol.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasCloudProvider.kt": {
+    "sha256": "990268715596c0df752c0f9aea618709486ac7626658a1dbea08495ea0c1de2b",
+    "bytes": 26579,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\atlas\\AtlasCloudProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasModelCatalog.kt": {
+    "sha256": "d1fc502b2500e0280cf2eb0aaf617323ad2b5f90a002815f3aa87e9258536e1d",
+    "bytes": 43579,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\atlas\\AtlasModelCatalog.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/AtlasModelMapper.kt": {
+    "sha256": "721038f675dd11be157b412a86092810e032c00b98af2fd1724eec72b4b7fd02",
+    "bytes": 50210,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\atlas\\AtlasModelMapper.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/atlas/NativeModelSchema.kt": {
+    "sha256": "1b99e523baa81e72411e30873b8c7ce9d16ecf651a06672cf7836f3377290992",
+    "bytes": 10881,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\atlas\\NativeModelSchema.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/mock/MockNexusProvider.kt": {
+    "sha256": "ce9dcefb430a664e446ad67a37a38bdc5fe15faa9c997e488cc24ef419f0fc21",
+    "bytes": 7941,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\mock\\MockNexusProvider.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/provider/registry/ProviderRegistry.kt": {
+    "sha256": "fbe6af65de39b3b04faefd7aacd8e5cf5c1f1540551d773ad3d00fa9b999e0c5",
+    "bytes": 1574,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\provider\\registry\\ProviderRegistry.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/billing/BillingLedgerScreen.kt": {
+    "sha256": "b70258acbeee8d98f3428118983acb8c3ef342844fce9e35d7175567458871f5",
+    "bytes": 20943,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\billing\\BillingLedgerScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/BrandLogo.kt": {
+    "sha256": "dce5f05180dfc6c29040cf731784a3f69af2d1585eeb835569cb211074b8791f",
+    "bytes": 4194,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\components\\BrandLogo.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt": {
+    "sha256": "d7c447e8efc359bb5e0ecea9c0ae114109e38dab821c98daf2b132a4781cbf97",
+    "bytes": 7557,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\components\\GenerationProgressPanel.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/ProviderBrandRegistry.kt": {
+    "sha256": "9086d283ef617eff97f407102968eb2f6e1b02b7537fb1bdd0e23047908e4e77",
+    "bytes": 12202,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\components\\ProviderBrandRegistry.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/components/VendorLogo.kt": {
+    "sha256": "a4431681a9e0fc7d5e8c9ed6dc843f861e7c581a425fbcc02fc226ddd26b266e",
+    "bytes": 603,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\components\\VendorLogo.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt": {
+    "sha256": "70d26465a310ee4ceb20fc15901de7f6e0b07db58952800da3b91702fdbd9f77",
+    "bytes": 81358,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\create\\CreateScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/create/CreateViewModel.kt": {
+    "sha256": "21108c7d21c36593d5f75188087cd5f6d737a9048b7c16671368cda7cf290b4d",
+    "bytes": 30048,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\create\\CreateViewModel.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/generations/GenerationsScreen.kt": {
+    "sha256": "83d2697741001130c9c14582fdc70079aa05016e58ac3a2ac8fc8f58a27c9072",
+    "bytes": 22956,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\generations\\GenerationsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt": {
+    "sha256": "22799235da6c7e5ee45d9b62e3c13922c5031852084dcf4bded78d11d88941ea",
+    "bytes": 11063,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\library\\LibraryScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogPresentation.kt": {
+    "sha256": "19c08906cc51f7e68edf4375dc8c0dd542d99009df22cbbb3dcbff6d7500cd42",
+    "bytes": 4969,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\models\\CatalogPresentation.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt": {
+    "sha256": "a1210e0ee194a6da1e670d9d89e03ced54059f59f4043a598c50778ec5a4e081",
+    "bytes": 12208,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\models\\CatalogTreeScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/models/ModelsScreen.kt": {
+    "sha256": "937ae87fee7c138bda448dcefee81f3e785e6547d5805af88adb722e3679e4a5",
+    "bytes": 59484,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\models\\ModelsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/navigation/NexusBottomBar.kt": {
+    "sha256": "151c527e407452d57bce1f80f838f232b1d4733e3655ac47d96d84655da606fa",
+    "bytes": 4714,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\navigation\\NexusBottomBar.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/navigation/Screen.kt": {
+    "sha256": "c58b4e87e11c60554470d1df6d4f3397315bdd1ce29a4558951cd65a9bf5ffc1",
+    "bytes": 857,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\navigation\\Screen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/output/OutputViewerScreen.kt": {
+    "sha256": "41dbde12b1066809f95d23a194e183b01e456bbcdabb249be30ae36c6e7770f6",
+    "bytes": 23982,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\output\\OutputViewerScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/settings/SettingsScreen.kt": {
+    "sha256": "9be76ab5fc4f52e22d63021d50284bd8543fb119b1fd0319f71ca265b13c31ce",
+    "bytes": 39836,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\settings\\SettingsScreen.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/Color.kt": {
+    "sha256": "ef097479610a459eda745e491ca34cfdc166f4aca75a99a1ed34cd71cdfb15f8",
+    "bytes": 1384,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\theme\\Color.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/NexusShapes.kt": {
+    "sha256": "04250d5ca80b683ed190abbd9256a8a1903898823c0528ce60bbbf566255fdc2",
+    "bytes": 476,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\theme\\NexusShapes.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/NexusSpacing.kt": {
+    "sha256": "923d3e863cec84aa0ba62ab28d14492b993d87b894420beb34e3fa136962a8b4",
+    "bytes": 292,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\theme\\NexusSpacing.kt"
+  },
+  "app/src/main/java/com/vidadomu/nexus/ui/theme/Theme.kt": {
+    "sha256": "acf7decae10308107b935952c3c2e5fb41b10233fedbf8217cbc589604e23db6",
+    "bytes": 1779,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\java\\com\\vidadomu\\nexus\\ui\\theme\\Theme.kt"
+  },
+  "app/src/main/res/drawable/ic_launcher_background.xml": {
+    "sha256": "292a882ec6cd510f2fcd10a07cad55a9b86bb18f0cdac0252d6093d4f1b38ca7",
+    "bytes": 390,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_launcher_background.xml"
+  },
+  "app/src/main/res/drawable/ic_launcher_foreground.xml": {
+    "sha256": "724737b28976b719804e5ddeba3a207ff5e4285827d4e3932d27bcdf5f67904a",
+    "bytes": 1404,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_launcher_foreground.xml"
+  },
+  "app/src/main/res/drawable/ic_logo_anthropic.png": {
+    "sha256": "b3bfc6a5ef9127ac407d05eb5bd56d6950adf43374031fd3d452671672a8683a",
+    "bytes": 59614,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_anthropic.png"
+  },
+  "app/src/main/res/drawable/ic_logo_atlascloud.png": {
+    "sha256": "c3fa225932a844ac850eac365992a6385e353a356b42e5a08f4edd9b8ea1a9ff",
+    "bytes": 64530,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_atlascloud.png"
+  },
+  "app/src/main/res/drawable/ic_logo_bfl.png": {
+    "sha256": "35f026596af090063fd6ad53f982c6f7991416717bf28755266157e332e010ca",
+    "bytes": 65607,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_bfl.png"
+  },
+  "app/src/main/res/drawable/ic_logo_bytedance.png": {
+    "sha256": "ee687e3ef023aa4aed16dacf7a4f36efe96bd8e13488301abfd222724e813013",
+    "bytes": 42097,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_bytedance.png"
+  },
+  "app/src/main/res/drawable/ic_logo_claude.png": {
+    "sha256": "374d679bc1d5566170f61a34f97b808e490740c44945702bb013b5d607bc8adc",
+    "bytes": 199548,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_claude.png"
+  },
+  "app/src/main/res/drawable/ic_logo_deepseek.png": {
+    "sha256": "5107f73366110c30d1dbf98cb28409ea6ca9f0d6336ff61962835c08d3ff7073",
+    "bytes": 121619,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_deepseek.png"
+  },
+  "app/src/main/res/drawable/ic_logo_elevenlabs.png": {
+    "sha256": "8e6afd261256bcf03687459ff000c5273af7480adf13234b3433dda82ec09d86",
+    "bytes": 5747,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_elevenlabs.png"
+  },
+  "app/src/main/res/drawable/ic_logo_flux.png": {
+    "sha256": "4abcb6e20c670d4c7f0ab2fc5c5a3161c3986f86f92c08a89005c7c5c21b9b82",
+    "bytes": 75242,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_flux.png"
+  },
+  "app/src/main/res/drawable/ic_logo_google.png": {
+    "sha256": "300c6bc50b2240adbc03b3392eba5356fa829cd5cf0ebb9380e3243cc5874b21",
+    "bytes": 105887,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_google.png"
+  },
+  "app/src/main/res/drawable/ic_logo_ideogram.png": {
+    "sha256": "8182376ddd67498fc091b24b67705c75000712b3e769ac3be10d3ce902e0d59a",
+    "bytes": 97964,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_ideogram.png"
+  },
+  "app/src/main/res/drawable/ic_logo_kling.png": {
+    "sha256": "749380aeea7cf5eafbb16f0a267d325141300896aedc2ec69e3b76affdc62a88",
+    "bytes": 246796,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_kling.png"
+  },
+  "app/src/main/res/drawable/ic_logo_luma.png": {
+    "sha256": "b8effecfddd36baf5e807200956feae4c81a3fc8b371bb30a3bdb2330e850eca",
+    "bytes": 143833,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_luma.png"
+  },
+  "app/src/main/res/drawable/ic_logo_microsoft.png": {
+    "sha256": "441ae1b6a9f47ac6de7392015d65b76efffcda968bd123646f16e3119e836299",
+    "bytes": 7648,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_microsoft.png"
+  },
+  "app/src/main/res/drawable/ic_logo_minimax.png": {
+    "sha256": "8552e7a0281e1f4d9ba5eb5ccc093f7ff760a2621376323e28e203a38f5cdb1c",
+    "bytes": 118037,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_minimax.png"
+  },
+  "app/src/main/res/drawable/ic_logo_nvidia.png": {
+    "sha256": "782ace80bc3d28debf8a1e0fa994c9ee5e4ba23eda5f97e694c87ceb2f87e625",
+    "bytes": 118612,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_nvidia.png"
+  },
+  "app/src/main/res/drawable/ic_logo_openai.png": {
+    "sha256": "a2c86f26d1b81ca734271031f012c927b7456e35e98268a048141a8a963fa85c",
+    "bytes": 132294,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_openai.png"
+  },
+  "app/src/main/res/drawable/ic_logo_pika.png": {
+    "sha256": "1fd07f82feb74566d573e645f4d8254c0eaeb33bc77005468d4ac6e0b468bffd",
+    "bytes": 49928,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_pika.png"
+  },
+  "app/src/main/res/drawable/ic_logo_pixverse.png": {
+    "sha256": "1c677ef38e4a03864b83fbf33dfd0a9b0851b49ac1426c0ab7a19fdb5e6fda6e",
+    "bytes": 258412,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_pixverse.png"
+  },
+  "app/src/main/res/drawable/ic_logo_qwen.png": {
+    "sha256": "5c9c524cef6a7e4dbac4a2383b2ecc00ccabc6066d1457da2f09d0792159cbf0",
+    "bytes": 168417,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_qwen.png"
+  },
+  "app/src/main/res/drawable/ic_logo_runway.png": {
+    "sha256": "e9200c9830dd37f6933a3cfaeb92790b2d31f287a86d233d08fdf872da64a0f9",
+    "bytes": 64634,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_runway.png"
+  },
+  "app/src/main/res/drawable/ic_logo_stability.png": {
+    "sha256": "b837927548055baa3889d0adb73f89dd6e56275bdd5154f1562ad7a675b47430",
+    "bytes": 81913,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_stability.png"
+  },
+  "app/src/main/res/drawable/ic_logo_suno.png": {
+    "sha256": "6a80566d03d9f1cd5005ff1dfcf9353a91310c7b57402f0878eedb35881d6406",
+    "bytes": 38882,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_suno.png"
+  },
+  "app/src/main/res/drawable/ic_logo_vidu.png": {
+    "sha256": "d5f1d4bcb0ffd0a38ac192e3651ecd06dba9e20f2a683d797bc7e9a6739db006",
+    "bytes": 179829,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_vidu.png"
+  },
+  "app/src/main/res/drawable/ic_logo_wan.png": {
+    "sha256": "9adb0f026eb8dd36f1ba8231a8fa1d4dd956eae90e3aafb52e5cf2297580ba01",
+    "bytes": 82462,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_logo_wan.png"
+  },
+  "app/src/main/res/drawable/ic_vendor_3d.xml": {
+    "sha256": "362d7be6d7c092cf03507b7f74a669194b8e47971e046495fac6f754357e775a",
+    "bytes": 399,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_3d.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_anthropic.xml": {
+    "sha256": "4d76664745fbd30a5306b01e59f56a1eb3d07b2591cd06d9d8d75f0dbc73448e",
+    "bytes": 422,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_anthropic.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_blackforest.xml": {
+    "sha256": "ee5ff435fa25aa77189cda4affc5aca3f49cbd9d135dfcc8eb2892a061ad3379",
+    "bytes": 661,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_blackforest.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_bytedance.xml": {
+    "sha256": "c5d7334e5b353b37807dc61c975cdc38fbd8e53e7007b59e8af98d3b802c0046",
+    "bytes": 814,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_bytedance.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_deepseek.xml": {
+    "sha256": "5cd664eadd2a5c5801740592c87f48ac7ec7dff9bf3a5e990999492c5a4f2149",
+    "bytes": 491,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_deepseek.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_elevenlabs.xml": {
+    "sha256": "005b3241a0c473c0c4270b147c82f29886bff7d992e7d90f74ac8ec14d0cc5fa",
+    "bytes": 283,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_elevenlabs.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_google.xml": {
+    "sha256": "da5c82780413c586f28047482672f78855f5307564c26554cfa93e80ae02747a",
+    "bytes": 1069,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_google.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_ideogram.xml": {
+    "sha256": "9c97a1730f93eb9537195cd2fff9dd5cbda3f3b5eb83ce448676b4f0388f08ae",
+    "bytes": 295,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_ideogram.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_kling.xml": {
+    "sha256": "4ffea67c6867ea17ce2521f9034c5afdb1331a27795bc94a96b80120832bb0f4",
+    "bytes": 451,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_kling.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_luma.xml": {
+    "sha256": "2fc9e2dd05dddac0b0b3ac60c320c71d5666a080701bec838d1fd406da3d8ff1",
+    "bytes": 405,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_luma.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_microsoft.xml": {
+    "sha256": "459f490216b40300e9ade2e0a85cc2bca8d9394be988fcd7f90c4a7d536b256a",
+    "bytes": 514,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_microsoft.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_midjourney.xml": {
+    "sha256": "73a7d91ab6bf58089700c3f3690bf04ef810146ed7389173873f2814de9da0aa",
+    "bytes": 336,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_midjourney.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_minimax.xml": {
+    "sha256": "216d0215a272311940e25a67417543fb9f62feef6345652cd607b09c86a9a486",
+    "bytes": 396,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_minimax.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_nexus.xml": {
+    "sha256": "cab4fc488ee44acca0a96c4ddf0e945a04e826a79d5674aaa09028ff6f172f2d",
+    "bytes": 375,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_nexus.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_nvidia.xml": {
+    "sha256": "6954bdc59d78f0cf82852e5ac21eac09b80e9000e309b64fb14b5e063b53305f",
+    "bytes": 457,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_nvidia.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_openai.xml": {
+    "sha256": "bfc13f9b40887e931db75a85b1d05195925e547563bf69a974a2105f084e502a",
+    "bytes": 727,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_openai.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_pika.xml": {
+    "sha256": "249d0263d57315a9400d6b334f457f5a6599f244679fc0adfecd84095b5a0cf5",
+    "bytes": 291,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_pika.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_pixverse.xml": {
+    "sha256": "e6e58391270968f6a47a778669d7bac4c1c2144049f9addd86b9a26b6527c621",
+    "bytes": 399,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_pixverse.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_qwen.xml": {
+    "sha256": "a037a9d0b54174d583bf94b7413d35ec16e4d9b717c7380272fbd494571c4949",
+    "bytes": 390,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_qwen.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_recraft.xml": {
+    "sha256": "52b42d17f2505be4db8437fb3239e362518a3548b01707d8ef956b5aef0c1dd3",
+    "bytes": 325,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_recraft.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_runway.xml": {
+    "sha256": "baeebe4ddacd0bffef82d6f77e1fb33cc87fdcb8100fbccc6caf881e8a294957",
+    "bytes": 394,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_runway.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_stability.xml": {
+    "sha256": "f506a766a22146dca15326bd1df1e5490fff2ee46422a64d218b042f343d9a9d",
+    "bytes": 349,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_stability.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_suno.xml": {
+    "sha256": "ef8c145d8bd4b1ef63b125af15e69978cb5879ff17d19e8889896c44be5d4954",
+    "bytes": 356,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_suno.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_tencent.xml": {
+    "sha256": "50838d291e3c99f4914164e922260779c33cc70de2040187717aa82e489400a5",
+    "bytes": 364,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_tencent.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_udio.xml": {
+    "sha256": "1e5a01567527ad23a5bfef3c11f3724bceac2467130b974d4404b869297a2f61",
+    "bytes": 374,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_udio.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_vidu.xml": {
+    "sha256": "e426c6d6b020189f5e42077b65f1230f2f2d18c68d2035e68707015fd1b34e6a",
+    "bytes": 371,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_vidu.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_xai.xml": {
+    "sha256": "6636fd16673e73759c8bb98ac5b09ddacdbb5a73529efc73a790ba8c284cb79f",
+    "bytes": 462,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_xai.xml"
+  },
+  "app/src/main/res/drawable/ic_vendor_zhipu.xml": {
+    "sha256": "f1ccfcae9618d68ab76f98ebd17fb10e11729018f386fa0c9d38b57eb3014c2d",
+    "bytes": 342,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\ic_vendor_zhipu.xml"
+  },
+  "app/src/main/res/drawable/logo_bytedance_official.png": {
+    "sha256": "6a3ef63cde0a605b463026cfcfdcdcff54fd34f91bf363cdac819e9762a5dbc2",
+    "bytes": 26277,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\logo_bytedance_official.png"
+  },
+  "app/src/main/res/drawable/logo_gemini.png": {
+    "sha256": "cf001ff4eacee762acf206d9033523c7b2d550da92cbeeb98029035a84ef4ba2",
+    "bytes": 6930,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\logo_gemini.png"
+  },
+  "app/src/main/res/drawable/logo_kling_official.png": {
+    "sha256": "e33363046671dae519c75af13d290608f57bdc3fc16279375fcbd548d780ff1d",
+    "bytes": 7240,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\logo_kling_official.png"
+  },
+  "app/src/main/res/drawable/logo_minimax_official.png": {
+    "sha256": "fc1eae9adc1ab59106ebba0bf6e4a782914339b8c36ac3d6f7079367d8647ea2",
+    "bytes": 63670,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\logo_minimax_official.png"
+  },
+  "app/src/main/res/drawable/logo_wan.png": {
+    "sha256": "41e99db47656ace5ea0ae98613de384aa0f8836a4c59d62c979412ec7949b747",
+    "bytes": 103702,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\drawable\\logo_wan.png"
+  },
+  "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": {
+    "sha256": "1c832bf194d8eecd439a92bcced0df144c9f566b934b3d7865e983d8ee8dbdeb",
+    "bytes": 273,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\mipmap-anydpi-v26\\ic_launcher.xml"
+  },
+  "app/src/main/res/raw/sample_audio.mp3": {
+    "sha256": "228648cf11aedfacb3b3d22166aeab616a45afbef1c1ad702140563e74e39a62",
+    "bytes": 28915,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\raw\\sample_audio.mp3"
+  },
+  "app/src/main/res/raw/sample_video.mp4": {
+    "sha256": "3bb938fb70049e3e45f533b37ccae995ae96516e04c2f35b0c1142e47b2a39c1",
+    "bytes": 788493,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\raw\\sample_video.mp4"
+  },
+  "app/src/main/res/values/strings.xml": {
+    "sha256": "4387ea8eb56309d9dec0076c6ba4b36a7863924afbc4a5d319c197216ee639f4",
+    "bytes": 129,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\values\\strings.xml"
+  },
+  "app/src/main/res/values/themes.xml": {
+    "sha256": "55aa7b245019125c1d868d99f7f4325b9a496f8eeac115608044b7246c12bf10",
+    "bytes": 336,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\values\\themes.xml"
+  },
+  "app/src/main/res/xml/file_paths.xml": {
+    "sha256": "3f426a690fd7f66ae049754591815e46fb2c8817a517e33b7fa1e522c1e887c1",
+    "bytes": 211,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\main\\res\\xml\\file_paths.xml"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CatalogAndChatTest.kt": {
+    "sha256": "8dbb85c272ab626d0f886af5ccaf3d41d1e3dba3f6e14adab9b4a6c19e8840a8",
+    "bytes": 2970,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\java\\com\\vidadomu\\nexus\\CatalogAndChatTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/CurrencyManagerTest.kt": {
+    "sha256": "4b24d01252e3ea678e30e02bccbb9d49dcd8b567de45b7a54948c444f9d99144",
+    "bytes": 5579,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\java\\com\\vidadomu\\nexus\\CurrencyManagerTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/NativeSchemaTest.kt": {
+    "sha256": "6e2f22ad8141f4383b8270e6f4735b6ccb20f9a75af8a06e805baa2935870568",
+    "bytes": 2972,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\java\\com\\vidadomu\\nexus\\NativeSchemaTest.kt"
+  },
+  "app/src/test/java/com/vidadomu/nexus/NexusUnitTests.kt": {
+    "sha256": "25573729d1d92ae38c2337d2dd8cf91b2981472d5f7c013e76b725b383699117",
+    "bytes": 21878,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\java\\com\\vidadomu\\nexus\\NexusUnitTests.kt"
+  },
+  "app/src/test/resources/native/alibaba_wan-3.0-prime_image-to-video.json": {
+    "sha256": "1deb72448145c1a80623662553c3e79a609c974aeb053ecaee0d2dd57bbbdb9a",
+    "bytes": 6247,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\resources\\native\\alibaba_wan-3.0-prime_image-to-video.json"
+  },
+  "app/src/test/resources/native/alibaba_wan-3.0-prime_text-to-video.json": {
+    "sha256": "baf59d35ad13de82e1d81f28a8532af5c60c51860b8d2b0a3e34374721f4d4b7",
+    "bytes": 6039,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\resources\\native\\alibaba_wan-3.0-prime_text-to-video.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-flare_edit.json": {
+    "sha256": "324dff0adb6071f6edcc6f1c7e4278db106f88cc1987268a6dcde4eae92f1c05",
+    "bytes": 7810,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\resources\\native\\openai_gpt-image-2.5-flare_edit.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-flare_text-to-image.json": {
+    "sha256": "fcdb6020b5975ff677140ba5c5cba52c3914dc2cd497e4e126cc01140029d7bd",
+    "bytes": 7374,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\resources\\native\\openai_gpt-image-2.5-flare_text-to-image.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-sunburst_edit.json": {
+    "sha256": "bbe542a2f655b6a86e1dc79ab7564e0d53a886be0b344fc12fa1b4baff73b5ab",
+    "bytes": 7816,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\resources\\native\\openai_gpt-image-2.5-sunburst_edit.json"
+  },
+  "app/src/test/resources/native/openai_gpt-image-2.5-sunburst_text-to-image.json": {
+    "sha256": "74c7e48983138ae8745dfe43f2d1b08cadaeb778b3bbd494e14b474d7980af63",
+    "bytes": 7139,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\app\\src\\test\\resources\\native\\openai_gpt-image-2.5-sunburst_text-to-image.json"
+  },
+  "docs/ATLAS_CLOUD_PROVIDER.md": {
+    "sha256": "694631b0d624df22639f0103f7569a786c12e65c75f966e93b48991a328fa33d",
+    "bytes": 2492,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\docs\\ATLAS_CLOUD_PROVIDER.md"
+  },
+  "docs/NEXUS_BRIDGE.md": {
+    "sha256": "98591b9ce2e295d9dcad9aefb0d3e2dbd47f535092ab6523ba74b0c1b472fc16",
+    "bytes": 4591,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\docs\\NEXUS_BRIDGE.md"
+  },
+  "gradle/wrapper/gradle-wrapper.jar": {
+    "sha256": "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17",
+    "bytes": 43504,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\gradle\\wrapper\\gradle-wrapper.jar"
+  },
+  "gradle/wrapper/gradle-wrapper.properties": {
+    "sha256": "3d91f0932da99885c41e9dc4e85c9f9a2d3bfef4f0ad87473014dc0827a94884",
+    "bytes": 250,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\gradle\\wrapper\\gradle-wrapper.properties"
+  },
+  "mcp-server/README.md": {
+    "sha256": "16b55519a3a0bebff7dacf9e5c4df6d0e3366360872d0330b87734680a820eb4",
+    "bytes": 1694,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\mcp-server\\README.md"
+  },
+  "mcp-server/nexus_mcp_server.py": {
+    "sha256": "33b3ddeb4c61fb16e20b4a459205d70513cf01a89874c03a2aedf6e3a3b45ea6",
+    "bytes": 16347,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\mcp-server\\nexus_mcp_server.py"
+  },
+  "mcp-server/requirements.txt": {
+    "sha256": "a90c7e5f7a95eca7f6b303b6b4ddceebfa545ba7f00d9ebb9af5af5ddd9385e0",
+    "bytes": 62,
+    "source": "C:\\Users\\User\\.gemini\\antigravity\\scratch\\nexus\\mcp-server\\requirements.txt"
+  }
+}
