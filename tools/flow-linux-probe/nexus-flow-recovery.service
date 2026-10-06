@@ -1,0 +1,18 @@
+[Unit]
+Description=NEXUS private Flow recovery
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/nexus-flow-probe
+ExecStart=%h/.local/share/nexus-flow-probe/venv/bin/python %h/.local/share/nexus-flow-probe/recovery.py
+Restart=on-failure
+RestartSec=10
+MemoryMax=1400M
+CPUQuota=100%
+Nice=10
+UMask=0077
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

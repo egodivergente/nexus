@@ -150,3 +150,18 @@ The rejection branch now returns `reason=browser_rejected` and is unit-tested.
 Ordinary browser login is verified; unattended engine login is NOT operational.
 The encrypted credential expires after 24 hours and changing the password
 requires explicitly updating it. It does not grant extra Google privileges.
+
+## Private Tailscale mobile recovery (2026-10-06)
+
+Following user authorization, when Google blocks unattended reauthentication, access is restored via a private bounded remote recovery portal hosted on ASUS and reachable over Tailscale:
+
+- `recovery.py`: FastAPI server binding `100.112.57.2:8899`, requiring exact Host header and Bearer/cookie token authentication (token generated locally with 32-byte entropy, mode 0600, outside Git).
+- Sandboxed Xvfb Chromium launched with `--persistent` and CDP port 9229.
+- `recovery.html`: Mobile-optimized UI for S25/Android. Embeds noVNC over secure WebSocket proxy (`/websockify`). Allows user to complete Google sign-in directly in the ASUS Chromium instance.
+- Bounded unit `nexus-flow-recovery.service`: `MemoryMax=1400M`, `CPUQuota=100%`, `Nice=10`, `UMask=0077`, `TimeoutStopSec=15`.
+- Closing the remote view (`/lock`) disconnects the mobile client and clears session cookies, but preserves the running Chromium browser on ASUS so the bridge can reuse that authenticated session without restarting.
+- PASS: 10 unit tests in `test_recovery.py` covering private routes, host/origin validation, token checks, body limits, lock/unlock persistence, expired sessions and traversal prevention.
+- PASS: live connection from mobile browser tested over Tailscale on port 8899.
+- PASS: status check detects `auth_required` when Flow lands on `/about` and `connected` once project gallery is accessible.
+- No Google passwords, user credentials or profile data stored in Git.
+

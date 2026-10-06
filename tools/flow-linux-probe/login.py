@@ -4,6 +4,7 @@ from pathlib import Path
 import secrets
 import string
 import subprocess
+import sys
 import time
 
 
@@ -24,10 +25,11 @@ def main():
             ['websockify', '--web=/usr/share/novnc', '127.0.0.1:6099', '127.0.0.1:5909'],
             ['chromium', '--user-data-dir=' + str(root / 'profile'), '--no-first-run',
              '--disable-dev-shm-usage', '--window-size=1280,800', '--window-position=0,0',
+             '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=9229',
              'https://flow.google.com/'],
         ]:
             children.append(subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-        deadline = time.monotonic() + 1200
+        deadline = float('inf') if '--persistent' in sys.argv else time.monotonic() + 1200
         while time.monotonic() < deadline and all(child.poll() is None for child in children):
             time.sleep(1)
     finally:
