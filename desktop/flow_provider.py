@@ -40,8 +40,9 @@ def catalog():
         ('video_upscale','Escalar vídeo Flow','VIDEO',['1080p','4k']),
         ('video_gif','Exportar GIF de Flow','IMAGE',['gif'])]:
         result.append(dict(common,id='google-flow/'+identifier,providerModelId=identifier,displayName=name,
-            modelFamily='Flow',modalities=[modality],promptRequired=False,capabilities=['UPSCALE'] if 'upscale' in identifier else ['EXPORT'],
-            parameters=[{'key':'source_request_id','displayName':'Trabajo original de Flow','type':'TEXT','nativeType':'string','isRequired':True},
+            modelFamily='Flow',modalities=[modality],promptRequired=False,supportedResolutions=options,capabilities=['UPSCALE'] if 'upscale' in identifier else ['EXPORT'],
+            parameters=[{'key':'source_request_id','displayName':'Trabajo original de Flow','type':'TEXT','nativeType':'string','isRequired':True,
+                'description':'jobId del historial de NEXUS o nexus_job_id del asset, de un resultado completado google_flow. No usar asset_id ni generation_id.'},
                 {'key':'resolution','displayName':'Resolución','type':'ENUM','nativeType':'string','options':options,'defaultValue':options[0],'isRequired':True}],
             shortDescription='Mejora/exporta un resultado existente de tu cuenta Flow. Usa el jobId de su historial; conserva el original.'))
     return result

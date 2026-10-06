@@ -84,7 +84,7 @@ async function agentCallback(op,args){
   case'quote':{
    const model=await agentModel(args.ref);
    const q=await quotePlan({model,prompt:'',values:args.params,media:[]});
-   return {amountUsd:q.currency==='USD'?q.amount:null,confidence:q.currency==='USD'?'NEXUS_QUOTE':'UNKNOWN',
+   return {amountUsd:q.currency==='USD'?q.amount:null,confidence:q.currency==='USD'||model.providerId==='google_flow'&&q.currency==='flow_credits'&&Number.isFinite(q.amount)&&q.amount>=0&&!q.upperBound?'NEXUS_QUOTE':'UNKNOWN',
     basis:amount(q),notes:q.currency==='USD'?[]:[q.detail||'Precio expresado en créditos del proveedor.']};
   }
   case'history':return state.jobs.slice(0,Number(args)||30).map(j=>({jobId:j.id,providerId:j.providerId,modelId:j.modelId,

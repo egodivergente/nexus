@@ -50,7 +50,7 @@ private val TRAITS = listOf(
 
 private fun SchemaBuilder.modelRef() {
     string("model_id", "Id exacto del modelo tal como lo devuelve el registro.", required = true)
-    string("provider_id", "atlas_cloud, crun o runway. Obligatorio si el id existe en varios proveedores.")
+    string("provider_id", "Proveedor exacto del registro actual. Obligatorio si el id existe en varios proveedores.")
 }
 
 class ListModelsTool(private val d: ToolDeps) : BaseTool(
@@ -59,7 +59,7 @@ class ListModelsTool(private val d: ToolDeps) : BaseTool(
     schema {
         string("modality", "Modalidad.", enum = MODALITIES)
         string("capability", "Capacidad del registro, p. ej. IMAGE_TO_VIDEO, TEXT_TO_IMAGE, IMAGE_EDITING, REFERENCE_TO_VIDEO.")
-        string("provider_id", "atlas_cloud, crun o runway.")
+        string("provider_id", "Proveedor exacto del registro actual, incluido cualquier proveedor conectado localmente.")
         integer("offset", "Desde qué posición (0 por defecto).")
         integer("limit", "Cuántos (máx. 50, 20 por defecto).")
     },

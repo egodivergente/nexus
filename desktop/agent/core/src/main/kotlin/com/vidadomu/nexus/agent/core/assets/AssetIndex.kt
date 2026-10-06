@@ -324,7 +324,8 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
             .filter { q.modelId == null || gens[it.generationId]?.modelId?.contains(q.modelId, true) == true }
             .filter { a ->
                 if (words.isEmpty()) true else {
-                    val hay = norm(listOfNotNull(a.displayName, gens[a.generationId]?.prompt, a.tags.joinToString(" "),
+                    val hay = norm(listOfNotNull(a.displayName, gens[a.generationId]?.prompt,
+                        gens[a.generationId]?.providerId, gens[a.generationId]?.modelId, a.tags.joinToString(" "),
                         a.characterIds.mapNotNull { id -> data.characters.firstOrNull { it.id == id }?.name }.joinToString(" "),
                         data.scenes.firstOrNull { it.id == a.sceneId }?.title).joinToString(" "))
                     words.all { hay.contains(it) }

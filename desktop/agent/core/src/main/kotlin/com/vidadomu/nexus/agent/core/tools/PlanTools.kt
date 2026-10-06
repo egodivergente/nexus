@@ -47,7 +47,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
     schema {
         string("model_id", "Id exacto del registro.", required = true)
         string("provider_id", "Proveedor del modelo.")
-        string("prompt", "Prompt final, escrito para este modelo según su skill.", required = true)
+        string("prompt", "Prompt final según el schema: obligatorio solo cuando promptRequired=true; omitir para operaciones sin prompt.")
         string("negative_prompt", "Solo si el schema tiene negative_prompt.")
         freeObject("params", "Parámetros del schema (sin prompt ni medios).")
         mediaArray()
@@ -71,7 +71,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         val built = d.plans.build(
             id = AssetIndex.newId("plan"),
             model = model,
-            prompt = input.req("prompt"),
+            prompt = input.str("prompt") ?: "",
             negativePrompt = input.str("negative_prompt"),
             params = input.paramMap("params"),
             media = resolveMedia(input, session, d.assets),

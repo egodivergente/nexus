@@ -31,7 +31,14 @@ private fun AssetIndex.assetJson(a: Asset): JsonObject {
         a.shotId?.let { id -> d.shots.firstOrNull { it.id == id }?.let { put("shot", it.code) } }
         if (a.characterIds.isNotEmpty()) put("characters", strings(a.characterIds.mapNotNull { id -> d.characters.firstOrNull { it.id == id }?.name }))
         if (a.tags.isNotEmpty()) put("tags", strings(a.tags))
-        a.generationId?.let { put("generation_id", it) }
+        a.generationId?.let { id ->
+            put("generation_id", id)
+            generation(id)?.let { origin ->
+                put("provider_id", origin.providerId)
+                put("model_id", origin.modelId)
+                origin.nexusJobId?.let { put("nexus_job_id", it) }
+            }
+        }
         a.parentAssetId?.let { put("parent_asset_id", it) }
     }
 }
