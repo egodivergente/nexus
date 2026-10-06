@@ -87,6 +87,15 @@ async def flow_get_result(request_id: str | None = None, task_id: str | None = N
                         return verified_file(result)
                     except (OSError, ValueError):
                         pass
+                if result.get('operation')=='edit_video' and result.get('edited_media_id'):
+                    # Exact accepted output only; never resubmit after a timeout.
+                    try:
+                        from video_edit import recover
+                        proof=await recover(result)
+                        save(request_id,proof)
+                        return proof
+                    except Exception:
+                        return {**result,'status':'needs_reconciliation','detail':'The accepted edit could not be downloaded. No edit resubmitted.'}
             task_id = row["task_id"]
         if not task_id:
             return {"status": "needs_reconciliation", "request_id": request_id,
@@ -242,12 +251,15 @@ def install():
     server.add_tool(flow_get_quote, structured_output=True)
     server.add_tool(flow_get_result, structured_output=True)
     server.add_tool(flow_list_jobs, structured_output=True)
+    server.add_tool(flow_get_edit_options, structured_output=True)
+    server.add_tool(flow_edit_video, structured_output=True)
 
 
 async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9",
                               model: str = "veo_fast", mode: str = "t2v", duration: int | None = None,
                               resolution: str | None = None, initial_frame: str | None = None,
-                              end_frame: str | None = None, reference_images: list[str] | None = None) -> dict[str, Any]:
+                              end_frame: str | None = None, reference_images: list[str] | None = None,
+                              voice: str | None = None) -> dict[str, Any]:
     """Generate one explicitly selected video model on the user's own Flow account.
 
     Reuse the same request_id after a timeout: a reserved id never submits twice.
@@ -261,7 +273,7 @@ async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9"
     from flow_inputs import prepare
     try:
         params=prepare(normalize({"model":model,"aspect":aspect,"mode":mode,"duration":duration,"resolution":resolution,
-            "initial_frame":initial_frame,"end_frame":end_frame,"reference_images":reference_images or []}))
+            "initial_frame":initial_frame,"end_frame":end_frame,"reference_images":reference_images or [],"voice":voice}))
     except (ValueError,OSError):
         return {"status":"error","detail":"Invalid mode, duration, resolution or owned input images."}
     params.update(prompt=prompt,count=1)
@@ -278,11 +290,16 @@ async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9"
     if existing:
         return await flow_get_result(request_id=request_id)
     from gflow_cli.mcp.tools import gflow_generate_video
+    from flow_voices import install as install_voices,pending_voice
+    install_voices()
+    token=pending_voice.set(params.get('voice','').lower() or None)
     try:
-        result = await gflow_generate_video(**params, profile="nexus",
+        native={k:v for k,v in params.items() if k!='voice'}
+        result = await gflow_generate_video(**native, profile="nexus",
             project_name=f"Codex {request_id}", ui_mode="classic", wait=True)
     except Exception as exc:
         result = {"status": "needs_reconciliation", "error_class": type(exc).__name__}
+    finally:pending_voice.reset(token)
     task_id = result.get("task_id")
     result = {**result, "request_id": request_id, "requested_model": model, "model_confirmed": False}
     files = result.get("files") or []
@@ -300,16 +317,64 @@ async def flow_generate_video(request_id: str, prompt: str, aspect: str = "16:9"
 async def flow_get_quote(model: str = "nano2", aspect: str = "1:1", mode: str | None = None,
                          duration: int | None = None, resolution: str | None = None,
                          initial_frame: str | None = None, end_frame: str | None = None,
-                         reference_images: list[str] | None = None) -> dict[str, Any]:
+                         reference_images: list[str] | None = None,voice: str | None = None) -> dict[str, Any]:
     """Read the exact account settings price; never uploads or submits media."""
     from flow_quote import quote
     from flow_contract import normalize
     from flow_inputs import prepare
     try:
         args={"model":model,"aspect":aspect,"duration":duration,"resolution":resolution,
-            "initial_frame":initial_frame,"end_frame":end_frame,"reference_images":reference_images or []}
+            "initial_frame":initial_frame,"end_frame":end_frame,"reference_images":reference_images or [],"voice":voice}
         if mode is not None:args['mode']=mode
         params=prepare(normalize(args))
         return {'status':'quoted',**await quote(**params)}
     except Exception as exc:
         return {'status':'error','error_class':type(exc).__name__,'detail':'No verified account price. No generation sent.'}
+
+
+async def flow_get_edit_options(source_request_id: str) -> dict[str, Any]:
+    """Verify the owned source and native Omni edit availability, without submitting."""
+    try:
+        from flow_session import ensure
+        await ensure()
+        from video_edit import source_asset,operate
+        source=source_asset(source_request_id)
+        if source['kind']!='VIDEO':raise ValueError('Video required')
+        return await operate(source)
+    except Exception as exc:
+        return {'status':'error','error_class':type(exc).__name__,'detail':'Native Omni edit is not confirmed for this clip.'}
+
+
+async def flow_edit_video(request_id: str,source_request_id: str,prompt: str) -> dict[str, Any]:
+    """Edit one existing clip up to 10 s with Omni. Keep the original and reuse the id."""
+    if not isinstance(request_id,str) or not IDENTIFIER.fullmatch(request_id) or not isinstance(prompt,str) or not prompt.strip():
+        return {'status':'error','detail':'A stable id and an edit prompt are required.'}
+    try:
+        from video_edit import source_asset
+        source=source_asset(source_request_id)
+        if source['kind']!='VIDEO':raise ValueError()
+    except Exception:return {'status':'error','detail':'Choose a verified completed Flow video.'}
+    params={'operation':'edit_video','source_request_id':source_request_id,'prompt':prompt.strip(),
+        'source_sha256':source['source_sha256'],'model':'omni_flash'}
+    with database() as db:
+        try:
+            db.execute('INSERT INTO jobs VALUES (?,?,?,?,?)',(request_id,json.dumps(params),None,None,'reserved'))
+            existing=False
+        except sqlite3.IntegrityError:
+            row=db.execute('SELECT params_json FROM jobs WHERE request_id=?',(request_id,)).fetchone()
+            if json.loads(row['params_json'])!=params:return {'status':'error','detail':'This id belongs to another edit. No new edit submitted.'}
+            existing=True
+    if existing:return await flow_get_result(request_id=request_id)
+    try:
+        from flow_session import ensure
+        await ensure()
+        from video_edit import operate
+        result=await operate(source,prompt.strip(),request_id)
+    except Exception as exc:
+        with database() as db:
+            row=db.execute('SELECT result_json FROM jobs WHERE request_id=?',(request_id,)).fetchone()
+        result={**json.loads(row['result_json'] or '{}'),'status':'needs_reconciliation','request_id':request_id,
+            'operation':'edit_video','source_request_id':source_request_id,'error_class':type(exc).__name__,
+            'detail':'Edit outcome requires reconciliation; this id will not submit again.'}
+    save(request_id,result)
+    return result

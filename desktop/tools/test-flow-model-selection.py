@@ -16,7 +16,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(catalog[0]['providerModelId'],'nano-pro')
         self.assertTrue(catalog[0]['isFlagship'])
         for model in catalog:
-            if model['promptRequired'] is False:continue
+            if model['promptRequired'] is False or model.get('flowOperation'):continue
             image=model['providerModelId'] in {'nano2','nano-pro'}
             self.assertEqual(model['modalities'],['IMAGE' if image else 'VIDEO'])
             self.assertEqual(provider.parameters({'model':model['providerModelId']})['aspect'],'1:1' if image else '16:9')

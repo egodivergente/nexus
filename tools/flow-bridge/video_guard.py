@@ -44,7 +44,7 @@ def codes(requested, mode, duration, end, resolution):
     return base
 
 def model_problem(body, requested='veo_3_1_fast', *, mode='t2v', duration=None,
-                  resolution=None,aspect=None,start_id=None,end_id=None,reference_ids=()):
+                  resolution=None,aspect=None,start_id=None,end_id=None,reference_ids=(),voice=None):
     try:
         rpc,row=unpack(body)
         expected_rpc={'t2v':'YhhmEf','i2v':'nprQif' if end_id else 'eb1hJf','r2v':'MZZa6b'}.get(mode)
@@ -61,6 +61,9 @@ def model_problem(body, requested='veo_3_1_fast', *, mode='t2v', duration=None,
             actual=[ref[1] for ref in row[1]]
             if not reference_ids or len(actual)!=len(reference_ids) or set(actual)!=set(reference_ids):
                 return 'Requested references were not bound; submission refused.'
+            actual_voice=row[7] if len(row)>7 else None
+            if (voice is None and actual_voice not in (None,[])) or (voice is not None and actual_voice!=[[voice]]):
+                return 'The requested preset voice was not bound; submission refused.'
     except (ValueError, TypeError, IndexError, KeyError):
         return "Video model cannot be verified from its RPC structure; submission refused."
     return None

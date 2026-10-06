@@ -41,3 +41,12 @@ class VideoGuardTests(unittest.TestCase):
         row[1].append([None,'ref-two'])
         self.assertIsNone(model_problem(wire(row),'omni_flash',**args))
         self.assertIsNotNone(model_problem(wire(row),'omni_flash',**{**args,'resolution':'360p'}))
+    def test_voice_must_be_in_its_audio_slot_not_the_prompt(self):
+        row=[[[None,None,[[['charon']]]]],[[None,'reference']],'abra_r2v_8s',2,None,None,None,[['charon']]]
+        wire=lambda:'f.req='+json.dumps([[['MZZa6b',json.dumps([[row]]),None,'generic']]])
+        args=dict(mode='r2v',reference_ids=('reference',),voice='charon')
+        self.assertIsNone(model_problem(wire(),'omni_flash',**args))
+        self.assertIsNotNone(model_problem(wire(),'omni_flash',**{**args,'voice':'aoede'}))
+        self.assertIsNotNone(model_problem(wire(),'omni_flash',**{**args,'voice':None}))
+        row[7]=None
+        self.assertIsNotNone(model_problem(wire(),'omni_flash',**args))

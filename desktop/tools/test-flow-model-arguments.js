@@ -24,3 +24,11 @@ context.media=[{field:'reference_images',id:'one'},{field:'reference_images',id:
 assert.deepEqual(JSON.parse(JSON.stringify(vm.runInContext('flowArguments(model,values,media)',context))),
  {model:'veo_fast',mode:'r2v',aspect:'16:9',duration:8,resolution:'720p',reference_images:['one','two']});
 console.log('PASS: native modes, duration, resolution and input roles reach Flow without external uploads.');
+context.model={providerModelId:'video_edit',flowOperation:'edit_video',promptRequired:true};
+context.values={source_request_id:'original',duration:'8',aspect:'9:16'};
+assert.deepEqual(JSON.parse(JSON.stringify(vm.runInContext('flowArguments(model,values)',context))),
+ {model:'video_edit',source_request_id:'original'});
+console.log('PASS: native edits use the original job without inventing generation settings.');
+context.model={providerModelId:'omni_flash',flowMode:'r2v',contractMedia:[]};
+context.values={aspect:'16:9',duration:'8',resolution:'720p',voice:'Charon'};
+assert.equal(JSON.parse(JSON.stringify(vm.runInContext('flowArguments(model,values)',context))).voice,'Charon');

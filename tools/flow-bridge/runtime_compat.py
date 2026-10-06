@@ -36,6 +36,7 @@ def install():
     original_submit = migrated.MigratedComposer.submit_images_and_observe
     original_video_submit = migrated.MigratedComposer.submit_and_observe
     original_video_settings = migrated.MigratedComposer.apply_video_settings
+    original_send_prompt = migrated.MigratedComposer.send_prompt
     original_select = migrated.MigratedComposer._select
     original_record = batchexecute._is_record
     def migrated_record(node):
@@ -143,6 +144,15 @@ def install():
         composer._nexus_video_request = request
         return result
     migrated.MigratedComposer.apply_video_settings = bound_video_settings
+    async def prompt_with_voice(composer,page,prompt,*,append=False):
+        bound=getattr(composer,'_nexus_video_request',None)
+        voice=bound.reference_audio if bound else None
+        if voice:
+            if bound.model.value!='omni_flash' or bound.mode.value!='r2v':raise ValueError('Unsupported voice modality')
+            from flow_voices import attach
+            await attach(page,voice)
+        return await original_send_prompt(composer,page,prompt,append=append)
+    migrated.MigratedComposer.send_prompt = prompt_with_voice
     from video_guard import interpolation_problem
     migrated._interpolation_body_problem = interpolation_problem
     async def guarded_video_submit(composer, page, **kwargs):
@@ -154,7 +164,8 @@ def install():
             if video_problem(migrated._post_data(raw_request),getattr(composer,'_nexus_video_model',None),
                 mode=bound.mode.value if bound else None,duration=bound.duration if bound else None,
                 resolution=bound.resolution if bound else None,aspect=bound.aspect.value if bound else None,start_id=kwargs.get('expect_media_id'),
-                end_id=kwargs.get('expect_end_media_id'),reference_ids=kwargs.get('expect_reference_ids',())):
+                end_id=kwargs.get('expect_end_media_id'),reference_ids=kwargs.get('expect_reference_ids',()),
+                voice=bound.reference_audio if bound else None):
                 await route.abort()
             else:
                 await route.continue_()

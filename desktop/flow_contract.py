@@ -33,6 +33,13 @@ def normalize(args):
     if not image and mode=='r2v' and (not refs or start or end):
         raise ValueError('Añade referencias; esta modalidad no admite fotogramas.')
     result = {'model':model, 'aspect':aspect}
+    voice=args.get('voice')
+    if voice not in (None,'','Automática'):
+        names={'Achernar','Achird','Algenib','Algieba','Alnilam','Aoede','Autonoe','Callirrhoe',
+            'Charon','Despina','Enceladus','Erinome','Fenrir','Gacrux','Iapetus'}
+        if model!='omni_flash' or mode!='r2v' or voice not in names:
+            raise ValueError('La voz predefinida está disponible con referencias de Omni.')
+        result['voice']=voice
     if not image and mode!='t2v':result['mode']=mode
     if refs:result['reference_images']=refs
     if start:result['initial_frame']=start

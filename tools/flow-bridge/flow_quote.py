@@ -66,11 +66,20 @@ async def _quote(model, aspect, **options):
                     end_image=Path(params['end_frame']) if params.get('end_frame') else None,
                     reference_images=tuple(Path(p) for p in params.get('reference_images',[])))
                 await composer.apply_video_settings(page,request)
+                if params.get('voice'):
+                    from flow_voices import attach
+                    await attach(page,params['voice'].lower())
+                    # Without uploading the caller's references, Flow switches
+                    # this quote-only composer to its voice ingredient summary
+                    # and hides the price pane. Confirm access, never reuse the
+                    # pre-voice price as the price of this configuration.
+                    cost=None
             else:raise ValueError('Unsupported model; Lite prohibited')
-            if cost is None:raise ValueError('No unambiguous account price found')
+            if cost is None and not params.get('voice'):raise ValueError('No unambiguous account price found')
         finally:await ctx.close()
     result={**params,'credits':cost,'checked_at':time.time(),
-        'source':'Flow settings','generation_count':1,'new_generation_submitted':False}
+        'source':'Flow native voice availability' if params.get('voice') else 'Flow settings',
+        'native_price_exposed':cost is not None,'generation_count':1,'new_generation_submitted':False}
     prices=ROOT/'jobs/verified-prices.json'
     previous=json.loads(prices.read_text()) if prices.exists() else {}
     previous[quote_key(params)]=result

@@ -17,7 +17,7 @@ for key in ("startup_timeout_sec", "tool_timeout_sec", "enabled_tools"):
 settings = '''
 startup_timeout_sec = 30
 tool_timeout_sec = 900
-enabled_tools = ["gflow_auth_status", "flow_generate_image", "flow_get_result", "flow_list_jobs", "gflow_get_credits"]
+enabled_tools = ["gflow_auth_status", "flow_generate_image", "flow_generate_video", "flow_get_quote", "flow_get_edit_options", "flow_edit_video", "flow_get_result", "flow_list_jobs", "gflow_get_credits"]
 '''
 updated = text[:start] + settings + section.lstrip("\n") + text[end:]
 tomllib.loads(updated)

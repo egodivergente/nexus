@@ -61,6 +61,11 @@ def catalog():
     video_models=[m for m in result if m['providerModelId'] in {'veo_fast','veo_quality','veo_lite','omni_flash'}]
     field=lambda key,label,maximum=1,required=False: {'key':key,'label':label,'mime':'image/*','maximum':maximum,
         'required':required,'minItems':1 if required else 0,'encoding':'array' if key=='reference_images' else 'string'}
+    result.append(dict(common,id='google-flow/video_edit',providerModelId='video_edit',displayName='Editar vídeo · Omni 1.1',
+        modelFamily='Omni',modalities=['VIDEO'],capabilities=['VIDEO_TO_VIDEO'],flowOperation='edit_video',
+        shortDescription='Describe los cambios sobre un vídeo de Flow de hasta 10 segundos. Conserva el original.',
+        parameters=[{'key':'source_request_id','displayName':'Vídeo original de Flow','type':'TEXT','nativeType':'string',
+            'isRequired':True,'description':'Trabajo completado de la biblioteca. El original se conserva.'}]))
     for model in result:
         if model['providerModelId'] in {'nano2','nano-pro'}:
             model.update(supportsImageInput=True,inputMode='TEXT_OR_IMAGE',maxImages=10,
@@ -84,10 +89,19 @@ def catalog():
                 shortDescription={'t2v':'Crea vídeo desde texto.','i2v':'Anima un fotograma inicial; puedes fijar también el fotograma final.',
                     'r2v':'Usa hasta '+str(7 if omni else 3)+' imágenes como ingredientes.'}[mode]+' Ajustes y créditos de tu cuenta Flow.')
             if mode!='t2v':result.append(model)
+            if omni and mode=='r2v':
+                model['parameters'].append({'key':'voice','displayName':'Voz predefinida','type':'ENUM','nativeType':'string',
+                    'options':['Automática','Achernar','Achird','Algenib','Algieba','Alnilam','Aoede','Autonoe','Callirrhoe',
+                        'Charon','Despina','Enceladus','Erinome','Fenrir','Gacrux','Iapetus'],
+                    'defaultValue':'Automática','isRequired':False})
     return result
 
 def parameters(args):
     model = args.get('model')
+    if model=='video_edit':
+        source=args.get('source_request_id','')
+        if not isinstance(source,str) or not IDENTIFIER.fullmatch(source):raise ValueError('Elige un vídeo original de Flow.')
+        return {'model':model,'source_request_id':source}
     if model in {'image_upscale','video_upscale','video_gif'}:
         source=args.get('source_request_id','')
         options={'image_upscale':{'2k','4k'},'video_upscale':{'1080p','4k'},'video_gif':{'gif'}}
@@ -117,6 +131,14 @@ def quote(args, data=None):
     params = parameters(args)
     if not available():
         raise ValueError('El puente local de Flow no está instalado.')
+    if params['model']=='video_edit':
+        result=call('flow_get_edit_options',{'source_request_id':params['source_request_id']},'edit-options-'+uuid.uuid4().hex)
+        if result.get('status')!='available':raise ValueError('Flow no confirma la edición de este vídeo completo (máximo 10 s).')
+        # Availability is authoritative; the native editor hides its settings
+        # price. Null never masquerades as free or as an estimated credit cost.
+        return {'amount':None,'currency':'flow_account','time':int(time.time()*1000),
+            'detail':'Edición disponible en tu cuenta Flow. El editor no muestra un importe.',
+            'source':'Flow native edit editor'}
     if 'source_request_id' in params:
         result=call('flow_get_asset_options',{'source_request_id':params['source_request_id']},'options-'+uuid.uuid4().hex)
         required='IMAGE' if params['model']=='image_upscale' else 'VIDEO'
@@ -131,6 +153,10 @@ def quote(args, data=None):
     if prices.is_file():
         value = json.loads(prices.read_text(encoding='utf-8')).get(quote_key(params))
         if value and value.get('aspect')==params['aspect'] and time.time() - value['checked_at'] < 300:
+            if value['credits'] is None and params.get('voice'):
+                return {'amount':None,'currency':'flow_account','time':int(time.time()*1000),
+                    'detail':'Voz disponible en tu cuenta Flow. Importe no expuesto en esta comprobación.',
+                    'source':value['source']}
             return {'amount':value['credits'], 'currency':'flow_credits', 'time':int(time.time()*1000),
                 'detail':'Incluido en tu cuenta Flow.' if value['credits']==0 else 'Uso de los créditos de tu cuenta Flow.', 'source':'Flow settings'}
     verified=call('flow_get_quote',media_parameters(data,params) if any(k in params for k in INPUTS) and data else params,'quote-'+uuid.uuid4().hex)
@@ -142,6 +168,10 @@ def quote(args, data=None):
             'error':'No se ha podido renovar la sesión de Flow. Nexus lo volverá a intentar automáticamente.'}
         raise ValueError(messages.get(session_status,messages['error']))
     if verified.get('status') == 'quoted':
+        if verified.get('credits') is None and params.get('voice'):
+            return {'amount':None,'currency':'flow_account','time':int(time.time()*1000),
+                'detail':'Voz disponible en tu cuenta Flow. Importe no expuesto en esta comprobación.',
+                'source':verified['source']}
         return {'amount':verified['credits'],'currency':'flow_credits','time':int(time.time()*1000),
             'detail':'Incluido en tu cuenta Flow.' if verified['credits']==0 else 'Uso de los créditos de tu cuenta Flow.', 'source':'Flow settings'}
     if params['model'] in {'nano2','nano-pro'}:
@@ -194,6 +224,9 @@ def work(data, request_id, params, recover=False, recovery_started_at=0):
         if recover:
             tool='flow_get_result'
             arguments={}
+        elif params.get('model')=='video_edit':
+            tool='flow_edit_video'
+            arguments={k:v for k,v in params.items() if k not in {'model','expected_credits'}}
         elif 'source_request_id' in params:
             tool='flow_process_asset'
             arguments={k:v for k,v in params.items() if k!='model'}
@@ -223,9 +256,10 @@ def work(data, request_id, params, recover=False, recovery_started_at=0):
 def submit(data, args):
     params = parameters(args)
     request_id, prompt = args.get('request_id', ''), args.get('prompt', '')
-    if not IDENTIFIER.fullmatch(request_id) or not isinstance(prompt, str) or ('source_request_id' not in params and not prompt.strip()):
+    needs_prompt='source_request_id' not in params or params['model']=='video_edit'
+    if not IDENTIFIER.fullmatch(request_id) or not isinstance(prompt, str) or (needs_prompt and not prompt.strip()):
         raise ValueError('Identificador o prompt Flow no válido.')
-    if 'source_request_id' not in params:params['prompt'] = prompt.strip()
+    if needs_prompt:params['prompt'] = prompt.strip()
     # Return an existing reservation before another browser quote/profile lease.
     with LOCK:
         connection=ledger(data)
@@ -241,7 +275,7 @@ def submit(data, args):
     estimate = quote(params,data)
     if args.get('cost') != estimate['amount']:
         raise ValueError('Actualiza la estimación Flow antes del envío.')
-    if 'source_request_id' in params:params['expected_credits']=estimate['amount']
+    if 'source_request_id' in params and params['model']!='video_edit':params['expected_credits']=estimate['amount']
     with LOCK:
         connection = ledger(data)
         try:

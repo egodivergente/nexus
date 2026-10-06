@@ -1,17 +1,25 @@
 'use strict';
 function flowArguments(model,values,media=[]){
  const args={model:model.providerModelId};
+ if(model.flowOperation==='edit_video')return {...args,source_request_id:values.source_request_id};
  if(model.promptRequired===false)return {...args,source_request_id:values.source_request_id,resolution:values.resolution};
  args.aspect=values.aspect;
  if(model.flowMode)args.mode=model.flowMode;
  if(values.duration!=null&&values.duration!=='')args.duration=Number(values.duration);
  if(values.resolution)args.resolution=values.resolution;
+ if(values.voice&&values.voice!=='Automática')args.voice=values.voice;
  for(const field of model.fields||model.contractMedia||[]){const ids=media.filter(f=>f.field===field.key).map(f=>f.id);if(ids.length)args[field.key]=field.key==='reference_images'?ids:ids[0];}
  return args;
 }
 // Keep the existing providers available, while opening an owned Flow model's
 // selector on that account. Apply after the Studio wrappers have loaded.
 document.addEventListener('DOMContentLoaded',()=>{
+ const detailBefore=studioDetails;
+ studioDetails=function(id){detailBefore(id);const job=state.jobs.find(j=>j.id===id);
+  const actions=document.querySelector('.studio-detail-actions');
+  if(actions&&job?.providerId==='google_flow'&&job.status==='COMPLETED'&&job.modality==='VIDEO')
+   actions.insertAdjacentHTML('beforeend','<button data-flow-edit="'+escape(id)+'">Editar con Omni</button>');
+ };
  const listBefore=studioModelList;
  studioModelList=function(){listBefore();
   for(const row of document.querySelectorAll('[data-studio-model]')){const m=models.find(m=>m.id===row.dataset.studioModel);if(m?.providerId==='google_flow'){const price=row.querySelector('.studio-price');if(price)price.textContent='Tu cuenta Flow';}}
@@ -81,6 +89,13 @@ document.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||b.disabled)return;
  try{
   if(b.dataset.flowImprove||b.dataset.flowRequote){await flowAssetDialog(b.dataset.flowImprove||b.dataset.flowRequote);return;}
+  if(b.dataset.flowEdit){
+   const source=state.jobs.find(j=>j.id===b.dataset.flowEdit);
+   if(!source||source.providerId!=='google_flow'||source.status!=='COMPLETED'||source.modality!=='VIDEO')throw Error('Elige un vídeo completado de Flow.');
+   loaded=await configuration('google-flow/video_edit');quote=null;
+   state.draft={modelId:loaded.id,prompt:'',values:{source_request_id:source.remoteId||source.id},media:[]};
+   document.querySelector('.studio-details')?.remove();Studio.detail=null;await flush();navigate('canvas');return;
+  }
   if(b.dataset.flowProcess){
    if(!flowAssetPlan||Date.now()-flowAssetPlan.time>300000)throw Error('Actualiza las opciones de Flow antes de crear la versión.');
    b.disabled=true;const approved=structuredClone(flowAssetPlan),resolution=$('#flow-asset-resolution').value,option=approved.options.find(o=>o.resolution===resolution),source=state.jobs.find(j=>j.id===approved.sourceId);
