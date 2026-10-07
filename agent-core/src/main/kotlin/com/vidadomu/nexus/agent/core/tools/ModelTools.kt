@@ -112,8 +112,9 @@ class SearchModelsTool(private val d: ToolDeps) : BaseTool(
             if (ExternalServices.mentionsFlow(input.req("query"))) put("external_service", buildJsonObject {
                 put("name", "Google Flow")
                 put("kind", "external_creative_service")
-                put("generation_available_in_nexus", false)
-                put("authentication_status", "not_checked")
+                put("generation_available_in_nexus", true)
+                put("requires_explicit_confirmation", true)
+                put("authentication_status", "check_in_app")
                 put("information", ExternalServices.FLOW_INFO)
             })
         }

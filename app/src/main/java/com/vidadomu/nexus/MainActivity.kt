@@ -29,6 +29,7 @@ import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
 import com.vidadomu.nexus.ui.navigation.Screen
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
+import com.vidadomu.nexus.ui.settings.FlowCreateScreen
 import com.vidadomu.nexus.ui.settings.SettingsScreen
 import com.vidadomu.nexus.ui.theme.BackgroundDark
 import com.vidadomu.nexus.ui.theme.ScreenBackground
@@ -169,7 +170,15 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.Settings.route) {
-                            SettingsScreen()
+                            SettingsScreen(onCreateInFlow = {
+                                navController.navigate(Screen.Flow.route) { launchSingleTop = true }
+                            })
+                        }
+                        composable(Screen.Flow.route) {
+                            FlowCreateScreen(
+                                onBack = { navController.popBackStack() },
+                                onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") }
+                            )
                         }
                         composable(
                             route = "output/{jobId}",
@@ -180,7 +189,7 @@ class MainActivity : ComponentActivity() {
                                 jobId = jobId,
                                 onBack = { navController.popBackStack() },
                                 onReuseAsInput = { content ->
-                                    if (content.startsWith("http://") || content.startsWith("https://") || content.startsWith("content://")) {
+                                    if (content.startsWith("http://") || content.startsWith("https://") || content.startsWith("content://") || content.startsWith("file://")) {
                                         // User clicked "Animar" on an image: switch to video & attach image as input
                                         createViewModel.selectModality(com.vidadomu.nexus.core.model.Modality.VIDEO)
                                         createViewModel.setMediaInput(Uri.parse(content), "image/jpeg")

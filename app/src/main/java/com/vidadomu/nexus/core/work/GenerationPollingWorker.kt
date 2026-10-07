@@ -54,6 +54,8 @@ class GenerationPollingWorker(
                         jobId = jobId
                     )
                     return Result.failure()
+                } else if (job.status == GenerationStatus.CANCELLED) {
+                    return Result.success()
                 }
             }
 

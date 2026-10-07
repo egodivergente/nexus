@@ -15,9 +15,10 @@ enum class Screen(
     Models("models", "Modelos", Icons.Default.GridView),
     Generations("generations", "Historial", Icons.Default.Timelapse),
     Library("library", "Biblioteca", Icons.Default.Collections),
-    Settings("settings", "Ajustes", Icons.Default.Tune);
+    Settings("settings", "Ajustes", Icons.Default.Tune),
+    Flow("flow", "Crear en Flow", Icons.Default.AutoAwesome);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = entries.filter { it != Settings }
+        val bottomNavItems: List<Screen> get() = entries.filter { it != Settings && it != Flow }
     }
 }

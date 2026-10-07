@@ -211,4 +211,15 @@ The user completed mobile login and requested reuse of that session, not generat
 - PASS: 23 Python tests (17 recovery/session tests, 6 authentication tests) on ASUS, plus 9 Node portal tests locally. No Google account was accessed by unit tests.
 - PASS: live status now returns `connected` for the user's existing project. Reloading the portal twice reaches `Google Flow conectado` automatically without credential entry. The protocol smoke test still rejects anonymous requests and revokes the remote socket/cookie on close.
 - Deployment preserved Chromium PID 1150682. Only the portal main process was restarted (1150497 to 1182520) under a temporary runtime `KillMode=process` override, removed immediately afterward. `KillMode=control-group` was restored and verified; the service is active and the Google session remains connected. No APK compilation, packaging or installation was necessary.
-- NO PROBADO: persistence after Chromium/ASUS restart and Google's future session expiry. No browser restart was performed because previous trials lost authentication. If Google requires verification again, manual recovery is still needed; there is no repeated automatic password submission or bypass of verification. Flow generation remains unimplemented and disabled.
+- NO PROBADO: persistence after Chromium/ASUS restart and Google's future session expiry. No browser restart was performed because previous trials lost authentication. If Google requires verification again, manual recovery is still needed; there is no repeated automatic password submission or bypass of verification. At this historical checkpoint, Flow generation remained unimplemented and disabled.
+
+### Direct Flow bridge source (2026-10-06)
+
+The current source adds an explicit, private Flow generation bridge for the NEXUS Android app. It is intentionally narrower than a provider API: it operates only the single already-open authenticated Flow project through its visible UI, sends a text prompt only after a local confirmation, and leaves model selection, project settings and cost inside Flow.
+
+- `GET /api/flow/status` reports whether the existing project exposes the observed composer controls.
+- `POST /api/flow/jobs` requires explicit confirmation, limits prompt text to 4,000 characters locally, journals opaque idempotency metadata only, and never retries an uncertain click.
+- Results are considered available only when a new, unambiguous Flow download control appears. The Android client copies the file to ALEXIA before marking the task complete.
+- The bridge accepts only the ASUS Tailscale IP and its MagicDNS host. Tokens, prompts, browser cookies and Google credentials are never committed or emitted by the API.
+
+PASS: mocked recovery/API tests cover authentication, host checks, body validation, idempotency and conservative download detection. The updated bridge was also staged and tested with the ASUS virtual environment, then deployed while preserving Chromium; authenticated live status reported the project open, an editable composer and generation readiness. NO PROBADO: Android delivery and a real paid Flow generation. A real generation must remain an explicit user-confirmed action.

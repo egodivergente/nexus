@@ -105,7 +105,7 @@ fun OutputViewerScreen(
                 },
                 actions = {
                     val outputUrl = chosenOutput?.url
-                    if (outputUrl != null) {
+                    if (outputUrl != null && (outputUrl.startsWith("https://") || outputUrl.startsWith("http://"))) {
                         IconButton(onClick = { shareMedia(context, outputUrl, job?.prompt.orEmpty()) }) {
                             Icon(Icons.Default.Share, contentDescription = "Compartir enlace", tint = PrimaryNeon)
                         }
@@ -220,7 +220,7 @@ fun OutputViewerScreen(
                 ) {
                     if (job.modality == Modality.IMAGE) {
                         Button(
-                            onClick = { onReuseAsInput(output.url) },
+                            onClick = { onReuseAsInput(trustedLocal ?: output.url) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = SurfaceVariantDark,
                                 contentColor = PrimaryNeon
@@ -248,18 +248,20 @@ fun OutputViewerScreen(
                         Text("Remezclar", fontSize = 12.sp)
                     }
 
-                    Button(
-                        onClick = { shareMedia(context, output.url, job.prompt) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceVariantDark,
-                            contentColor = TextPrimary
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Compartir enlace", fontSize = 12.sp)
+                    if (output.url.startsWith("https://") || output.url.startsWith("http://")) {
+                        Button(
+                            onClick = { shareMedia(context, output.url, job.prompt) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SurfaceVariantDark,
+                                contentColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Compartir enlace", fontSize = 12.sp)
+                        }
                     }
                 }
 

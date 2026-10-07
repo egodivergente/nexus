@@ -32,8 +32,9 @@ class ExternalServicesTest {
             buildJsonObject { put("query", "Google Flow") }, AgentSession("s", AgentMode.AGENT))
         val service = result.result.jsonObject["external_service"]!!.jsonObject
         assertEquals("Google Flow", service["name"]!!.jsonPrimitive.content)
-        assertFalse(service["generation_available_in_nexus"]!!.jsonPrimitive.boolean)
-        assertEquals("not_checked", service["authentication_status"]!!.jsonPrimitive.content)
+        assertTrue(service["generation_available_in_nexus"]!!.jsonPrimitive.boolean)
+        assertTrue(service["requires_explicit_confirmation"]!!.jsonPrimitive.boolean)
+        assertEquals("check_in_app", service["authentication_status"]!!.jsonPrimitive.content)
         assertFalse(service.containsKey("model_id"))
     }
 
@@ -44,7 +45,7 @@ class ExternalServicesTest {
         for (text in listOf("conoces Google Flow", "genera este video con Flow", "haz un prompt para flow")) {
             val result = o.send(o.newConversation(mode=AgentMode.AGENT), text)
             assertTrue(result.text.contains("Google Flow"))
-            assertTrue(result.text.contains("todavia no estan conectadas"))
+            assertTrue(result.text.contains("Crear en Flow"))
             assertTrue(result.toolCalls.isEmpty())
             assertTrue(h.guard.plans().isEmpty())
             assertTrue(h.backend.submitted.isEmpty())
@@ -75,7 +76,7 @@ class ExternalServicesTest {
             { request ->
                 assertTrue(request.system.contains(ExternalServices.FLOW_INFO))
                 assertTrue(request.system.any { it.contains("corrige esa afirmación") })
-                ScriptedLlmProvider.text("Google Flow existe; no esta conectado como generador en esta APK.")
+                ScriptedLlmProvider.text("Google Flow existe; se envia desde Crear en Flow tras una confirmacion explicita.")
             }))
         val o = AgentOrchestrator(llm, AgentConfig(provider="scripted",modelId="test",region="-",endpoint="-"),
             NexusToolkit.all(h.deps), h.skills, h.assets)

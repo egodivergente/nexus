@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,12 +18,13 @@ import com.vidadomu.nexus.NexusApplication
 internal const val FLOW_RECOVERY_KEY = "nexus_flow_recovery"
 
 @Composable
-internal fun FlowRecoverySettings() {
+internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
     val context = LocalContext.current
     val storage = (context.applicationContext as NexusApplication).secureStorage
     var pair by remember { mutableStateOf(false) }
     var token by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var isLinked by remember { mutableStateOf(!storage.getProviderApiKey(FLOW_RECOVERY_KEY).isNullOrBlank()) }
 
     fun openRecovery() {
         val key = storage.getProviderApiKey(FLOW_RECOVERY_KEY)
@@ -30,7 +32,7 @@ internal fun FlowRecoverySettings() {
             pair = true
             return
         }
-        val uri = Uri.parse("http://100.112.57.2:8899/").buildUpon()
+        val uri = Uri.parse("http://asusvidal.tail6ac6b4.ts.net:8899/").buildUpon()
             .encodedFragment("token=" + Uri.encode(key)).build()
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -42,13 +44,22 @@ internal fun FlowRecoverySettings() {
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Google Flow", style = MaterialTheme.typography.titleLarge)
-        Text("Acceso a la cuenta del ASUS", style = MaterialTheme.typography.bodyMedium)
-        Text("Requiere Tailscale. La generaci\u00f3n desde esta APK todav\u00eda no est\u00e1 conectada.",
+        Text("Proyecto activo del ASUS", style = MaterialTheme.typography.bodyMedium)
+        Text("La creación usa los ajustes y el coste que muestre Google Flow.",
             style = MaterialTheme.typography.bodySmall)
-        Button(onClick = ::openRecovery) {
-            Icon(Icons.Default.OpenInNew, contentDescription = null)
+        Button(onClick = {
+            if (isLinked) onCreateInFlow() else pair = true
+        }) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Conectar Flow")
+            Text(if (isLinked) "Crear en Flow" else "Vincular Flow")
+        }
+        if (isLinked) {
+            OutlinedButton(onClick = ::openRecovery) {
+                Icon(Icons.Default.OpenInNew, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Abrir Flow")
+            }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
@@ -65,6 +76,7 @@ internal fun FlowRecoverySettings() {
             TextButton(enabled = token.matches(Regex("[A-Za-z0-9_-]{43}")), onClick = {
                 try {
                     storage.saveProviderApiKey(FLOW_RECOVERY_KEY, token)
+                    isLinked = true
                     token = ""; pair = false; openRecovery()
                 } catch (_: Exception) {
                     token = ""; pair = false

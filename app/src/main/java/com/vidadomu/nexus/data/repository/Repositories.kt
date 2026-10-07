@@ -155,7 +155,7 @@ class GenerationRepository(
         val currentJob = database.getJobById(jobId)
             ?: return Result.failure(ProviderError("Job $jobId not found in local database"))
 
-        if (currentJob.status == GenerationStatus.COMPLETED || currentJob.status == GenerationStatus.FAILED) {
+        if (currentJob.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
             return Result.success(currentJob)
         }
 

@@ -5,6 +5,7 @@ import com.vidadomu.nexus.provider.api.NexusProvider
 import com.vidadomu.nexus.provider.atlas.AtlasCloudProvider
 import com.vidadomu.nexus.provider.mock.MockNexusProvider
 import com.vidadomu.nexus.provider.crun.CrunProvider
+import com.vidadomu.nexus.provider.flow.FlowBridgeProvider
 import com.vidadomu.nexus.provider.runway.RunwayProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ class ProviderRegistry(
     private val atlasCloudProvider: AtlasCloudProvider,
     private val crunProvider: CrunProvider,
     private val runwayProvider: RunwayProvider,
+    private val flowBridgeProvider: FlowBridgeProvider,
     private val mockNexusProvider: MockNexusProvider,
     private val secureStorage: SecureStorage
 ) {
@@ -21,6 +23,7 @@ class ProviderRegistry(
         AtlasCloudProvider.PROVIDER_ID to atlasCloudProvider,
         CrunProvider.PROVIDER_ID to crunProvider,
         RunwayProvider.PROVIDER_ID to runwayProvider,
+        FlowBridgeProvider.PROVIDER_ID to flowBridgeProvider,
         MockNexusProvider.PROVIDER_ID to mockNexusProvider
     )
 
@@ -45,7 +48,7 @@ class ProviderRegistry(
     fun getCatalogProviders(): List<NexusProvider> = if (secureStorage.isMockModeEnabled()) {
         listOf(mockNexusProvider)
     } else {
-        providers.values.filterNot { it.id == MockNexusProvider.PROVIDER_ID }
+        providers.values.filterNot { it.id in setOf(MockNexusProvider.PROVIDER_ID, FlowBridgeProvider.PROVIDER_ID) }
     }
 
     fun setMockMode(enabled: Boolean) {

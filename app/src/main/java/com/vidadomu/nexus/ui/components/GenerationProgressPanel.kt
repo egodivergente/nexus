@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.vidadomu.nexus.core.model.GenerationJob
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.core.model.Modality
+import com.vidadomu.nexus.ui.theme.AccentCoral
 import com.vidadomu.nexus.ui.theme.AccentEmerald
 import com.vidadomu.nexus.ui.theme.BorderSubtle
 import com.vidadomu.nexus.ui.theme.PrimaryNeon
@@ -113,7 +114,7 @@ fun GenerationProgressPanel(
                     )
                     if (!compact) {
                         Text(
-                            text = "Seguimiento en vivo de Atlas Cloud",
+                            text = "Seguimiento de la tarea",
                             color = TextMuted,
                             style = MaterialTheme.typography.labelSmall
                         )
@@ -152,6 +153,14 @@ fun GenerationProgressPanel(
                 color = TextMuted,
                 style = MaterialTheme.typography.labelSmall
             )
+
+            job.error?.takeIf { it.isNotBlank() }?.let { message ->
+                Text(
+                    text = message,
+                    color = AccentCoral,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }
@@ -175,6 +184,6 @@ private fun liveStage(job: GenerationJob, progress: Float): String {
         job.modality == Modality.VIDEO && progress >= 0.78f -> "Transcodificando"
         job.modality == Modality.VIDEO -> "Renderizando fotogramas"
         job.status == GenerationStatus.GENERATING -> "Generando resultado"
-        else -> "Procesando en Atlas Cloud"
+        else -> "Procesando en el proveedor"
     }
 }

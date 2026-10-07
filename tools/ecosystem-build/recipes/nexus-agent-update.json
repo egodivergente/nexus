@@ -6,7 +6,7 @@
   "java_major": 17,
   "compile_sdk": 35,
   "source_includes": ["app", "agent-core", "agent-skills", "gradle", "gradlew", "gradlew.bat", "gradle.properties", "settings.gradle.kts", "build.gradle.kts"],
-  "tasks": [":app:testAgentPreviewUnitTest", ":app:assembleAgentPreview", ":app:assembleOfflineQa"],
+  "tasks": [":agent-core:test", ":app:testAgentPreviewUnitTest", ":app:assembleAgentPreview", ":app:assembleOfflineQa"],
   "artifacts": ["app/build/outputs/apk/agentPreview/*.apk", "app/build/outputs/apk/offlineQa/*.apk"],
   "reports": ["app/build/test-results/**/*.xml", "agent-core/build/test-results/**/*.xml"],
   "min_ram_mb": 2200,
