@@ -84,4 +84,6 @@ document.addEventListener('DOMContentLoaded',()=>{
  const batch=document.createElement('script');batch.src='studio-batch.js';document.head.append(batch);
  const telemetry=document.createElement('script');telemetry.src='studio-telemetry.js';document.head.append(telemetry);
  const flowControl=document.createElement('script');flowControl.src='studio-flow-control.js';document.head.append(flowControl);
+ const creativeStyle=document.createElement('link');creativeStyle.rel='stylesheet';creativeStyle.href='creative-engine.css';document.head.append(creativeStyle);
+ const creative=document.createElement('script');creative.src='creative-engine.js';document.head.append(creative);
 },{once:true});

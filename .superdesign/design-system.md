@@ -7,21 +7,21 @@ NEXUS Studio is a local-first creative workspace in Spanish. It lets an experien
 ## Visual foundations
 
 - Use only Segoe UI Variable Text / Display with Segoe UI fallbacks.
-- Use the existing charcoal surfaces: background `#14171c`, sidebar `#1b1e25`, panel `#20242c`, raised `#272c36`, border `#353b48`.
+- Creative Engine uses neutral near black `#0b0d10`, surfaces `#14171c` and `#1c2026`, restrained spectral background light and translucent white borders.
 - Use off-white `#f1f3f7` for primary text, `#a9b1c0` for secondary, and `#818b9e` for tertiary text.
-- Use teal `#63d4c6` only for the current primary action, selected state and input focus. Preserve the dark, restrained appearance; do not introduce gradients beyond the existing quiet accent tint.
-- Keep radii between 8 and 16 px and spacing on the 4 px rhythm. Favour flat, quiet panels with a thin border over glass effects or oversized shadows.
+- Teal `#aad9cc` marks focus and selection; a restrained ivory metallic gradient marks the creative split action. Status dots remain neutral unless actual health has been verified.
+- Use 10–12 px control radii and 18–24 px command-panel radii, subtle elevations and a single 24 px frosted creative panel. No animated atmospheric backgrounds.
 - Motion is short and optional: 120–180 ms, with a reduced-motion equivalent.
 
 ## Creation-flow rules
 
-- The model, prompt, inputs, configuration, price status and generate button must read in that order.
+- Keep prompt, motor, schema-backed quick parameters and references in one command panel; advanced parameters remain reachable through disclosure.
 - Price language remains source-aware: “coste pendiente” until a verified quote exists; the generation CTA must state its blocked reason in plain Spanish.
-- Keep a useful preview or recent-results column on wide desktop, but the working form remains the visual priority.
+- Centre the command panel with a real recent-production tray below. Use a collapsible 64 px icon dock and move balances, telemetry and Flow controls into the expandable bottom status bar.
 - Preserve the inline NEXUS mark in the sidebar; use no replacement logo, initials or generic mark.
 - Improve density through hierarchy and grouping rather than shrinking type below 11 px or hiding necessary state.
 - Every control remains keyboard reachable with an obvious focus indicator.
 
 ## Design target for this round
 
-Faithfully reproduce the existing desktop creation screen first. Any subsequent redesign should retain the above identity while making readiness, price review and the creation path more immediately legible.
+Creative Engine, requested 2026-10-08: unified creative controls, independent multi-model tasks through the split action, real media references by drag and drop, no result comparator. Keep price readiness near the action while account balances stay in the status disclosure.

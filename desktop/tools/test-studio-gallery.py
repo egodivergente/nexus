@@ -74,10 +74,12 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.locator('.gallery-select').nth(1).click()
             assert '2 seleccionados' in page.locator('.gallery-selection').inner_text()
             assert page.locator('[data-gallery=compare]').count() == 0
+            page.locator('#creative-dock-toggle').click()
             page.locator('[data-gallery=new-collection]').click()
             page.locator('#gallery-new-collection input').fill('Corto de prueba')
             page.locator('#gallery-new-collection .primary').click()
             assert page.evaluate('Object.keys(state.studioGallery.members).length') == 2
+            page.locator('#creative-dock-toggle').click()
             page.locator('[data-gallery=clear]').click()
             page.keyboard.press('Control+k')
             assert page.locator('#gallery-command-search').evaluate('(el)=>el===document.activeElement')
@@ -145,6 +147,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert page.evaluate('state.draft.prompt') == 'Mi borrador'
             page.wait_for_function('Boolean(window.NexusOrderEditor)')
             page.evaluate("navigate('canvas')")
+            page.locator('.creative-multi > summary').click()
             page.locator('[data-action=chooseCompare]').click()
             page.locator('[data-kind=VIDEO]').click()
             assert page.locator('.catalog [data-compare]').count() > 0
@@ -202,6 +205,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert page.evaluate("state.lastOrderRun.requests.every(t=>t.status==='SUBMITTED')")
             assert not page.locator('[data-pc=open-compare]').is_visible()
             page.wait_for_function('Boolean(window.NexusTelemetry)')
+            page.evaluate("document.querySelector('#creative-control').open=true")
             page.locator('#telemetry-button').click()
             page.wait_for_function("window.NexusTelemetry.snapshot().rows.some(r=>r.op==='localPing'&&r.ok)")
             page.evaluate("rpc('unsupported-qa-operation',{prompt:'PRIVATE-TELEMETRY-TEST'}).catch(()=>{})")
@@ -228,6 +232,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.reload(wait_until='domcontentloaded',timeout=30000)
             page.wait_for_function("Boolean(window.NexusOrderEditor)&&state.lastOrderRun?.requests.length===2")
             assert page.evaluate("state.lastOrderRun.requests.every(t=>t.status==='SUBMITTED')")
+            page.locator('#creative-control > summary').click()
             page.locator('#order-latest').click()
             assert page.locator('#order-run-rows tr').count()==2
             assert 'Enviado' in page.locator('#order-run-rows').inner_text()

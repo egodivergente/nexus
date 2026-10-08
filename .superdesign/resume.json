@@ -16,25 +16,29 @@
         "desktop/ui/app.js",
         "desktop/ui/studio.js",
         "desktop/ui/desktop-design.js",
-        "desktop/ui/desktop-design.css"
+        "desktop/ui/desktop-design.css",
+        "desktop/ui/creative-engine.js",
+        "desktop/ui/creative-engine.css"
       ],
       "fingerprints": {
-        ".superdesign/design-system.md": "3bb32ad0e01bb4ad70ed198f66ed08de522d2c4d8aab6ae58f2b1c3ff9b4f8fb",
+        ".superdesign/design-system.md": "9ecbdd74335126078ddae9bb6adfebf4afb8ebcacc05e8e97d6ccdba55162a5a",
         "desktop/ui/index.html": "c228740bf610d3d063185f5f0bc0e73b4bd9890d47056bb2bfa17d45a180b099",
-        "desktop/ui/app.js": "175977c1ec7e013cf5f27f2726f541be49ff66e0bccb66617c11ec5ad7f740ad",
+        "desktop/ui/app.js": "29e6627c175e1934472bc7ac0dbd307aa3f848e46aa5565d9fb717c0514a2694",
         "desktop/ui/studio.js": "247723e11f38d33da1bff45bb621ccd88972520c0ff5e14ab7324b7f26109528",
         "desktop/ui/desktop-design.js": "4ff02c3b3b1c8b67e5a9ea661dc64e0fa399537aff4f539e7a2d38a96b4ec0b5",
-        "desktop/ui/desktop-design.css": "18911c1756dba5b7f5593c7b372917e458ee4c1661e12de646f06f6446840177"
+        "desktop/ui/desktop-design.css": "18911c1756dba5b7f5593c7b372917e458ee4c1661e12de646f06f6446840177",
+        "desktop/ui/creative-engine.js": "7024a29f38c246fd959a4217761065737f4180d0fbb365fba4f40a60a4cf4dbf",
+        "desktop/ui/creative-engine.css": "83ec64dac0426b15fbc52b7b701396ba3d62abb07eaa6b731dc612e4a2d5f088"
       },
       "components": [],
       "drafts": {
         "b19c6914-0da3-44f2-9756-507195a587de": {
           "title": "NEXUS Studio — Crear",
-          "visualDirection": "reproducción fiel del flujo actual de creación en escritorio",
-          "currentVersion": 2
+          "visualDirection": "Creative Engine: dock compacto, panel creativo, produccion reciente y estado al pie",
+          "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-08T00:59:29Z"
+      "updatedAt": "2026-10-08T02:59:21.722543+00:00"
     },
     "desktop:library": {
       "targetKind": "existing-ui",

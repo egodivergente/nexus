@@ -45,6 +45,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-flow-ui-') as folder:
               parseResponse(state.jobs[0],{id:'fixture',status:'queued',outputs:[],requested_model:'nano-pro',model_confirmed:false,queue_phase:'queued',timings:{quote_ms:123}});
               render();
             }""")
+            page.wait_for_selector('#creative-control > summary');page.click('#creative-control > summary')
             page.wait_for_selector('#flow-control-button');page.click('#flow-control-button')
             page.wait_for_selector('#flow-control-rows [data-flow-cancel]');assert '123 ms' in page.locator('#flow-control-rows').inner_text()
             page.fill('[name=max_credits]','25');page.click('#flow-control-policy button[type=submit]')
