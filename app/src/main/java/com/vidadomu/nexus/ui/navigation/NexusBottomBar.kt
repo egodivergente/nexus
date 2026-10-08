@@ -78,7 +78,8 @@ fun NexusBottomBar(navController: NavController) {
                                             saveState = true
                                         }
                                         launchSingleTop = true
-                                        restoreState = screen.route != Screen.Models.route
+                                        // The activity owns the conversation; restoring its nested stack can reopen Settings.
+                                        restoreState = screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
                                     }
                                 }
                             }),

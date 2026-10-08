@@ -185,7 +185,8 @@ object NativeModelSchema {
             firstFrameField = first, inputImageField = first, lastFrameField = last,
             imagesArrayField = images, structuredImageReferences = structuredImages, videoField = video, videosArrayField = videos,
             maxImages = if(structuredImages) {
-                refers?.get("x-media-limits")?.jsonObject?.get("image")?.jsonObject?.get("maxItems")?.jsonPrimitive?.intOrNull ?: limit(images)
+                (refers?.get("x-media-limits")?.jsonObject?.get("image")?.jsonObject?.get("maxItems")?.jsonPrimitive?.intOrNull ?: limit(images))
+                    .coerceAtMost(AtlasReferenceLimits.images(model.id))
             } else if(images != null) limit(images) else if(last != null) 2 else if(first != null) 1 else 0,
             maxVideos = if(videos != null) limit(videos) else if(video != null) 1 else 0,
             isMediaRequired = media.any { it in effectiveRequired },

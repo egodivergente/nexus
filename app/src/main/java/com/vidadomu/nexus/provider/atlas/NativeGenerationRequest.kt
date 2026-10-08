@@ -5,6 +5,12 @@ import com.vidadomu.nexus.core.model.*
 object NativeGenerationRequest {
     fun build(model: NexusModel, modality: Modality, prompt: String, parameters: Map<String, String>,
         media: List<MediaInput>, jobId: String): GenerationRequest {
+        if (model.structuredImageReferences) {
+            val imageCount = media.count { it.mimeType.startsWith("image/") &&
+                (it.fieldKey == null || it.fieldKey == model.imagesArrayField) }
+            val maximum = model.maxImages.coerceAtMost(AtlasReferenceLimits.images(model.id))
+            require(imageCount <= maximum) { "Este modelo admite como máximo $maximum imágenes de referencia; has añadido $imageCount." }
+        }
         val parametersWithMeta = parameters.filter { (key, value) ->
             value.isNotBlank() && model.parameters.any { it.key == key }
         }.toMutableMap()

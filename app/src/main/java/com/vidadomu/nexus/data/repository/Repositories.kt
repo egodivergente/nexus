@@ -113,7 +113,7 @@ class GenerationRepository(
     private val comparisonRecovery = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).async {
         database.loading.first { !it }
         if(database.loadError.value == null) {
-            database.jobsFlow.value.filter { it.parameters.containsKey("__comparison_id") || it.parameters.containsKey("__assistant_plan") || it.providerId == "google_flow" }.forEach { job ->
+            database.jobsFlow.value.forEach { job ->
                 val recovered = job.recoverInterruptedComparison()
                 if(recovered != job) database.insertOrUpdateJob(recovered)
                 else if(context != null && !com.vidadomu.nexus.BuildConfig.OFFLINE_QA && !job.providerJobId.isNullOrBlank() &&

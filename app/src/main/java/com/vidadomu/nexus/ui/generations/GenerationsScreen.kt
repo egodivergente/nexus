@@ -286,7 +286,8 @@ fun GenerationsScreen(
                                     scope.launch {
                                         val result=if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED)) app.generationRepository.refreshConfirmedCost(job.id) else app.generationRepository.pollJob(job.id)
                                         android.widget.Toast.makeText(context,
-                                            if(result.isFailure) "No se pudo consultar el proveedor. Comprueba la conexión y la clave."
+                                            if(result.isFailure) "No se pudo consultar el proveedor. Se conserva el trabajo sin volver a enviarlo."
+                                            else if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED)) "Estado actualizado: " + result.getOrThrow().status.name
                                             else if(result.getOrNull()?.actualCostUsd==null && result.getOrNull()?.parameters?.get("__actual_credits")==null) "El proveedor no ha informado un importe final."
                                             else "Coste actualizado",android.widget.Toast.LENGTH_LONG).show()
                                     }
@@ -483,7 +484,7 @@ private fun GenerationJobCard(
             }
 
             // Error display if failed
-            if (job.status == GenerationStatus.FAILED && job.error != null) {
+            if (job.error != null && (job.status == GenerationStatus.FAILED || job.parameters["__tracking_poll_error"] == "true")) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = job.error ?: "Error desconocido en la generación.",

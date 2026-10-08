@@ -117,12 +117,13 @@ class GenerationPollingWorker(
             val data = workDataOf(KEY_JOB_ID to jobId)
             val request = OneTimeWorkRequestBuilder<GenerationPollingWorker>()
                 .setInputData(data)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "poll_$jobId",
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,
                 request
             )
         }

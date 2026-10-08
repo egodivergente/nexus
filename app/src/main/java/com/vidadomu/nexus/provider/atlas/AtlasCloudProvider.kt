@@ -296,6 +296,9 @@ class AtlasCloudProvider(
             okHttpClient.newCall(request).awaitResponse().use { response ->
                 val respBody = response.body?.string()
                 if (!response.isSuccessful) {
+                    AtlasPredictionFailure.decode(job, respBody)?.let {
+                        return@withContext Result.success(it)
+                    }
                     return@withContext Result.failure(
                         NetworkErrorParser.parseHttpError(response.code, respBody)
                     )
