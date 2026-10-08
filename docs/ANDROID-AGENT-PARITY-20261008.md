@@ -54,11 +54,11 @@ La entrega se distingue en código implementado, pruebas ejecutadas, APK compila
 - Núcleo JVM: 93 pruebas, 0 fallos, 0 errores, 0 omitidas.
 - Suite JVM Android: 227 pruebas, 0 fallos, 0 errores, 0 omitidas.
 - APK final corregida compilada directamente en Pixel 8 Pro, 404 archivos de fuente verificados; recompilación de arranque completada en 7 min 48 s.
-- APK firmada con el certificado de la instalación existente; SHA-256 `46e3cc8c61c75590ba525934eb465ce2354360eb01436a148c9635988786b3ea`.
+- APK firmada con el certificado de la instalación existente; SHA-256 `9769e0ccbcf0b92513968f2d309de99d08362d392368b1c64b557978afeeebe7`.
 - S25 físico SM-S938B: actualización `adb install -r` completada, versión 24 / `1.8.0-agent-preview` verificada. Apertura real de la actividad y navegación al Asistente realizadas; conversación y resultados antiguos visibles. Proceso vivo sin excepciones fatales nuevas.
 - Se detectó y corrigió un crash real de la primera actualización: la emisión síncrona de StateFlow en init ejecutaba onJobs antes de inicializar synced. synced, completedSeen y msgSeq se inicializan ahora antes de registrar colectores.
 - Datos finales: 93 trabajos, 91 resultados, SQLite `integrity_check=ok`; 38 elementos de chat, dos planes y cinco referencias de sesión recuperados. Archivo legado conservado. Las 18 entradas del almacenamiento cifrado siguen presentes; algunos valores cambian tras la consulta de proveedores. No se afirma identidad byte a byte después del arranque. Copias privadas fuera de Git.
-- Diagnóstico: almacenamiento de credenciales disponible, Flow enlazado, 34 skills sin errores, un proyecto y 93 assets.
+- Diagnóstico: almacenamiento de credenciales disponible, Flow enlazado, 34 skills sin errores, un proyecto y 97 assets.
 - Instrumentación Pixel: prueba de migración del historial superada. Las dos pruebas Compose no obtuvieron una jerarquía de UI con el Pixel bloqueado y pantalla apagada; no se cuentan como superadas. Su ejecución sigue pendiente en un entorno visible.
 - No se ejecutaron generaciones reales ni se borraron datos.
 - Selector/router: retirado de la instalación activa y del repositorio; compilación directa.

@@ -11,5 +11,6 @@
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">asusvidal.tail6ac6b4.ts.net</domain>
+        <domain includeSubdomains="false">100.112.57.2</domain>
     </domain-config>
 </network-security-config>

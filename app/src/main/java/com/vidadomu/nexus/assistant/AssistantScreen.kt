@@ -69,15 +69,22 @@ fun AssistantScreen(
 
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
+    val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
-        if(ui.items.isEmpty()) return
+        if(latestUi.items.isEmpty()) return
         automaticScroll = true
-        try { listState.scrollToItem(ui.items.size - 1 + if(ui.thinking) 1 else 0) }
+        try { listState.scrollToItem(latestUi.items.size - 1 + if(latestUi.thinking) 1 else 0) }
         finally { automaticScroll = false }
     }
     LaunchedEffect(listState) {
         snapshotFlow { Triple(listState.isScrollInProgress, listState.canScrollForward, automaticScroll) }.collect { (moving, canForward, automatic) ->
             if (moving && !automatic) following = !canForward
+        }
+    }
+    // Keyboard and reference panels resize the viewport without adding a message.
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.viewportEndOffset }.collect {
+            if (following) followLast()
         }
     }
     LaunchedEffect(ui.items.size, ui.thinking, ui.plans, ui.scrollRequest) {

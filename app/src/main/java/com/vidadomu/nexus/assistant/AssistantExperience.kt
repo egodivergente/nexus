@@ -46,8 +46,13 @@ internal fun completeModels(value: TextFieldValue, models: List<ModelSummary>): 
         val found = models.filter { model ->
             val haystack = "${model.name} ${model.family.orEmpty()} ${model.ref.modelId}".lowercase()
             terms.all { it in haystack } && model.name.lowercase() != query
-        }.sortedWith(compareByDescending<ModelSummary> { it.isFlagship }.thenBy { it.name }).take(6)
-        if(found.isNotEmpty()) return ModelCompletion(match.range.first + wordMatches[words.size - length].range.first, end, found)
+        }.sortedWith(compareByDescending<ModelSummary> { it.modalities.any { modality -> modality in setOf("IMAGE", "VIDEO") } }
+            .thenByDescending { it.name.lowercase().startsWith(terms.first()) }
+            .thenByDescending { it.isFlagship }.thenBy { it.name })
+        // Show a representative of each family before filling the remaining variant slots.
+        val representatives = found.distinctBy { it.family?.lowercase()?.takeIf(String::isNotBlank) ?: it.name.substringBefore(' ').lowercase() }
+        val suggestions = (representatives + found).distinctBy { it.ref }.take(6)
+        if(suggestions.isNotEmpty()) return ModelCompletion(match.range.first + wordMatches[words.size - length].range.first, end, suggestions)
     }
     return null
 }

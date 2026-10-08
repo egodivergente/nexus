@@ -30,4 +30,14 @@ class AssistantCompletionTest {
     @Test fun matchesFamilyVersionAndVariantFromCatalog() {
         assertEquals("Seedream 5.0 Pro",requireNotNull(completeModels(TextFieldValue("seed 5.0 pro",TextRange(12)),models)).models.single().name)
     }
+
+    @Test fun shortFamilyQueryShowsCreativeFamiliesBeforeTextVariants() {
+        val textVariants = (1..7).map { ModelSummary(ModelRef("atlas_cloud","doubao-seed-$it"),"Doubao Seed $it",family="Doubao",modalities=setOf("TEXT")) }
+        val videos = (1..7).map { ModelSummary(ModelRef("atlas_cloud","seedance-$it"),"Seedance $it",family="Seedance",modalities=setOf("VIDEO")) }
+        val image = ModelSummary(ModelRef("atlas_cloud","seedream-5-pro"),"Seedream 5.0 Pro",family="Seedream",modalities=setOf("IMAGE"))
+        val choices = requireNotNull(completeModels(TextFieldValue("seed",TextRange(4)),textVariants+videos+image)).models
+        assertTrue(choices.take(2).any { it.ref == image.ref })
+        assertTrue(choices.take(2).any { it.family == "Seedance" })
+        assertEquals(6,choices.size)
+    }
 }

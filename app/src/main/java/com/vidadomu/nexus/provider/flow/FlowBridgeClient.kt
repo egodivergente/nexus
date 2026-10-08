@@ -351,7 +351,8 @@ internal class FlowBridgeClient(
     private data class ErrorPayload(val error: String = "")
 
     companion object {
-        const val BASE_URL = "http://asusvidal.tail6ac6b4.ts.net:8899/api/flow"
+        // Verified ASUSVIDAL Tailscale address; independent of Android private DNS.
+        const val BASE_URL = "http://100.112.57.2:8899/api/flow"
         private const val DEFAULT_PROMPT_LIMIT = 4_000
         private const val MAX_PROMPT_LIMIT = 4_000
         private const val MAX_RESULT_COUNT = 12
