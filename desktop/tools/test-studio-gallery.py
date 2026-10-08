@@ -73,12 +73,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.locator('.gallery-piece').nth(1).hover()
             page.locator('.gallery-select').nth(1).click()
             assert '2 seleccionados' in page.locator('.gallery-selection').inner_text()
-            page.locator('[data-gallery=compare]').click()
-            assert page.locator('.pc-comparison-item').count() == 2
-            page.locator('[data-gallery=compare-slider]').click()
-            page.locator('#gallery-compare-slider').fill('70')
-            assert page.locator('.gallery-image-comparison').evaluate("e=>e.style.getPropertyValue('--compare-split')") == '70%'
-            page.locator('[data-action=close]').click()
+            assert page.locator('[data-gallery=compare]').count() == 0
             page.locator('[data-gallery=new-collection]').click()
             page.locator('#gallery-new-collection input').fill('Corto de prueba')
             page.locator('#gallery-new-collection .primary').click()
@@ -148,12 +143,35 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.wait_for_function('Boolean(window.NexusGallery)&&state.studioGallery?.collections.length===1')
             assert page.evaluate('state.studioGallery.favorites.length') == 1
             assert page.evaluate('state.draft.prompt') == 'Mi borrador'
+            page.wait_for_function('Boolean(window.NexusBatch)')
+            page.evaluate("navigate('canvas')")
+            page.locator('[data-action=chooseCompare]').click()
+            page.locator('[data-kind=VIDEO]').click()
+            assert page.locator('.catalog [data-compare]').count() > 0
+            # Exercise the real confirmation and batch handlers with simulated dispatch.
+            page.evaluate("""async()=>{
+              const fixture=id=>({id,providerId:'atlas_cloud',displayName:id,modalities:['IMAGE'],parameters:[],fields:[],capabilities:[]});
+              models.push(fixture('batch-a'),fixture('batch-b'));selection=new Set(['batch-a','batch-b']);
+              configuration=async id=>fixture(id);quotePlan=async()=>({amount:1,currency:'USD',time:Date.now()});
+              window.batchRequests=[];window.batchReleases=[];
+              dispatch=async(plan,id)=>{window.batchRequests.push({model:plan.model.id,batchId:id,prompt:plan.prompt});await new Promise(r=>window.batchReleases.push(r));};
+              await prepareComparison();
+            }""")
+            assert 'Encargo a varios modelos' in page.locator('#dialog').inner_text()
+            page.locator('[data-action=sendCompare]').click()
+            page.wait_for_function('window.batchRequests.length===2')
+            assert page.evaluate('new Set(window.batchRequests.map(r=>r.batchId)).size') == 1
+            assert page.evaluate("window.batchRequests.every(r=>r.prompt==='Mi borrador')")
+            page.evaluate('window.batchReleases.forEach(r=>r())')
+            page.wait_for_function('!Batch.active')
+            assert not page.locator('[data-pc=open-compare]').is_visible()
             assert not errors, errors
             assert not blocked, blocked
             report={'status':'PASS','errors':errors,'blockedOperations':blocked,'paidCalls':0,
                 'viewerAndOutputs':True,'favoritesPersisted':True,'collectionsPersisted':True,
-                'contextSelection':True,'comparisonSlider':True,'commands':True,'draftPreserved':True,
+                'contextSelection':True,'resultComparatorRemoved':True,'commands':True,'draftPreserved':True,
                 'savedView':True,'reversibleHide':True,'videoPreviewAndControls':video_checked,'prepareVideo':True,
+                'multiModelConfirmationAndParallelDispatch':True,'videoModelSelection':True,
                 'responsiveWidths':[1360,760,480,1280]}
             (OUT/'verification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
             print(json.dumps(report))

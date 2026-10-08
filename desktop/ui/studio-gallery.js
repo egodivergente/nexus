@@ -17,7 +17,7 @@
  function selectionBar(){
   document.querySelector('.gallery-selection')?.remove();if(!G.selected.size)return;
   const bar=document.createElement('section');bar.className='gallery-selection';bar.setAttribute('aria-label','Acciones de selección');
-  bar.innerHTML=`<strong>${G.selected.size} seleccionados</strong>${button('compare','Comparar',G.selected.size<2||G.selected.size>4?'disabled':'')}${button('downloads','Descargar')}${button('assign','Añadir a colección')}${button('hide','Quitar de la galería')}${button('clear','✕','aria-label="Limpiar selección"')}`;document.body.append(bar);
+  bar.innerHTML=`<strong>${G.selected.size} seleccionados</strong>${button('downloads','Descargar')}${button('assign','Añadir a colección')}${button('hide','Quitar de la galería')}${button('clear','✕','aria-label="Limpiar selección"')}`;document.body.append(bar);
  }
  function wireMedia(){
   document.querySelectorAll('.gallery-piece').forEach(c=>c.dataset.nx='1');
@@ -49,10 +49,6 @@
  const oldDetails=studioDetails;studioDetails=function(id){if(view==='library'&&Studio.tab==='results')showViewer(id);else oldDetails(id);};
  function nextViewer(step){const list=entries(),i=list.findIndex(j=>j.id===G.viewer?.id);if(list.length)showViewer(list[(i+step+list.length)%list.length].id);}
  async function download(j){const u=media(j);if(!isMediaUrl(u))return;if(u.startsWith('/media/')){const a=document.createElement('a');a.href=u;a.download=u.split('/').pop();a.click();}else await rpc('download',{url:u});}
- function comparisonSlider(){
-  const jobs=[...G.selected.values()];if(jobs.length!==2||jobs.some(j=>j.modality!=='IMAGE'||!isMediaUrl(media(j))))return;
-  modal(`<h2>Comparar imágenes</h2><div class="gallery-compare-labels"><span>${escape(name(jobs[0]))}</span><span>${escape(name(jobs[1]))}</span></div><div class="gallery-image-comparison"><img src="${escape(media(jobs[0]))}" alt="${escape(name(jobs[0]))}"><img class="gallery-compare-upper" src="${escape(media(jobs[1]))}" alt="${escape(name(jobs[1]))}"><span class="gallery-compare-line"></span></div><label class="gallery-compare-control">Desliza para comparar<input id="gallery-compare-slider" type="range" min="0" max="100" value="50" aria-label="Reparto de las imágenes"></label>${button('compare','Ver lado a lado')}`);
- }
  function commands(){
   modal('<h2>Comandos</h2><input id="gallery-command-search" type="search" aria-label="Buscar comando o modelo" placeholder="Crear, biblioteca, modelo…"><div id="gallery-command-list"></div>');commandList();$('#gallery-command-search').focus();
  }
@@ -116,8 +112,6 @@
     case 'all':G.collection='';navigate('library');break;
     case 'reset':PC.search='';PC.kind='';PC.provider='';PC.status='';G.favorites=false;G.collection='';G.limit=36;renderGallery();break;
     case 'clear':G.selected.clear();renderGallery();break;
-    case 'compare':PC.selected=new Map([...G.selected.values()].slice(0,4).map(j=>[j.id+':'+(outputSelection.get(j.id)||0),{...j,outputs:[j.outputs[outputSelection.get(j.id)||0]]}]));{const trigger=document.createElement('button');trigger.dataset.pc='open-compare';document.body.append(trigger);trigger.click();trigger.remove();if(G.selected.size===2&&[...G.selected.values()].every(j=>j.modality==='IMAGE'&&isMediaUrl(media(j))))$('#dialog').insertAdjacentHTML('beforeend',button('compare-slider','Comparar con deslizador'));}break;
-    case 'compare-slider':comparisonSlider();break;
     case 'downloads':for(const j of G.selected.values())await download(j);break;
     case 'hide':modal('<h2>Quitar de la galería</h2><p>Se ocultarán '+G.selected.size+' creaciones. Los archivos y el historial se conservan.</p>'+button('confirm-hide','Quitar de la galería'));break;
     case 'confirm-hide':prefs().hidden=[...new Set([...prefs().hidden,...G.selected.keys()])];G.selected.clear();persist();$('#dialog').close();renderGallery();toast('Creaciones ocultas. Puedes recuperarlas en Comandos.');break;
@@ -136,7 +130,6 @@
   if(e.target.id==='gallery-command-search')commandList();
   if(e.target.id==='gallery-size'){prefs().size=Number(e.target.value);$('.gallery-grid')?.style.setProperty('--gallery-size',prefs().size+'px');persist();}
   if(e.target.id==='gallery-seek'){const v=document.querySelector('.gallery-lightbox video');if(Number.isFinite(v.duration))v.currentTime=v.duration*Number(e.target.value)/100;}
-  if(e.target.id==='gallery-compare-slider')$('.gallery-image-comparison')?.style.setProperty('--compare-split',e.target.value+'%');
  });
  document.addEventListener('change',e=>{if(['pc-provider','pc-status'].includes(e.target.id)){G.limit=36;renderGallery();}if(e.target.id==='gallery-sort'){G.sort=e.target.value;renderGallery();}});
  document.addEventListener('keydown',e=>{
