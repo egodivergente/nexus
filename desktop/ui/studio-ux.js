@@ -3,6 +3,41 @@
 (()=>{
  let helpOpen=false,scheduled=false;
  const labels={saved:'Guardado',pending:'Cambios pendientes',saving:'Guardando…',error:'Sin guardar'};
+ const operations={model:'Cargando los controles del modelo…',quote:'Consultando el coste…',send:'Preparando y enviando la solicitud…',recovery:'Comprobando el trabajo existente…'};
+ function canvasFeedback(){
+  const content=$('#content');if(!content)return;
+  const active=view==='canvas',operation=active?CanvasFeedback.operation:null;
+  const ariaBusy=String(!!operation);if(content.getAttribute('aria-busy')!==ariaBusy)content.setAttribute('aria-busy',ariaBusy);
+  let error=active?CanvasFeedback.error:null;
+  if(error?.key&&error.key!==quoteKey())error=null;
+  const job=error?.jobId?state.jobs.find(j=>j.id===error.jobId):null;
+  if(job?.status==='COMPLETED')error=null;
+  let panel=$('#studio-canvas-feedback');
+  if(!operation&&!error){panel?.remove();return;}
+  if(operation==='model'&&configuring&&!error){
+   panel?.remove();const status=content.querySelector('.empty p');
+   status?.setAttribute('role','status');status?.setAttribute('aria-live','polite');return;
+  }
+  const host=$('.creative-command .sendbar')||$('.canvas .sendbar')||content;
+  if(panel&&panel.parentElement!==host){panel.remove();panel=null;}
+  if(!panel){panel=document.createElement('section');panel.id='studio-canvas-feedback';panel.setAttribute('aria-label','Estado de la creación');host.prepend(panel);}
+  const key=JSON.stringify([operation,error,job?.providerId,job?.uncertain]);if(panel.dataset.feedback===key)return;panel.dataset.feedback=key;
+  panel.replaceChildren();
+  if(operation){const progress=document.createElement('p');progress.className='studio-operation';progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');progress.textContent=operations[operation]||'Comprobando…';panel.append(progress);}
+  if(!error)return;
+  const notice=document.createElement('div');notice.className='studio-recovery-notice';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');
+  const title=document.createElement('strong');title.textContent={model:'No se pudo abrir el modelo',quote:'Coste sin confirmar',send:job?.uncertain?'Envío por comprobar':'No se pudo completar el envío'}[error.kind]||'No se pudo completar la operación';
+  const reason=document.createElement('p');reason.textContent=error.message;
+  const help=document.createElement('p');help.className='hint';help.textContent=error.kind==='model'?'Tu prompt se conserva. Reintenta cargar sus controles o elige otro modelo.':error.kind==='quote'?'Puedes consultar otra vez el coste o revisar el proveedor en Ajustes. No se ha enviado una generación.':job?'Comprueba este trabajo en Actividad antes de repetir el envío.':'Revisa los campos y la configuración del proveedor antes de volver a enviar.';
+  const actions=document.createElement('div');actions.className='studio-recovery-actions';
+  const add=(action,label)=>{const b=document.createElement('button');b.type='button';b.dataset.canvasRecovery=action;b.textContent=label;b.disabled=!!operation;actions.append(b);};
+  if(error.kind==='model')add('model','Reintentar modelo');
+  if(error.kind==='quote')add('quote','Consultar otra vez');
+  if(error.kind!=='send')add('choose','Cambiar modelo');
+  if(error.kind==='send'&&job){add('activity','Ver trabajo en Actividad');if(job.providerId==='google_flow')add('recover','Comprobar trabajo Flow');}
+  add('settings','Abrir Ajustes');add('dismiss','Cerrar aviso');
+  notice.append(title,reason,help,actions);panel.append(notice);
+ }
  function saveFeedback(){
   const output=$('#studio-save-state'),retry=$('#studio-save-retry');if(!output)return;
   const label=labels[SaveStatus.status]||labels.pending;
@@ -14,7 +49,7 @@
  }
  function guide(){
   const firstUse=initial&&!state.jobs.length&&!state.draft.prompt&&!state.studioHelp?.dismissed;
-  const show=view==='canvas'&&!$('#dialog').open&&(helpOpen||firstUse);
+  const show=view==='canvas'&&!configuring&&!$('#dialog').open&&CanvasFeedback.error?.kind!=='model'&&(helpOpen||firstUse);
   let panel=$('#studio-start-guide');
   if(!show){panel?.remove();return;}
   if(panel)return;
@@ -30,13 +65,14 @@
    group.innerHTML='<output id="studio-save-state" role="status" aria-live="polite" aria-atomic="true"></output><button type="button" id="studio-save-retry" hidden>Reintentar guardado</button><button type="button" data-studio-help="toggle" aria-controls="studio-start-guide" aria-expanded="false">Guía</button>';
    footer.insertBefore(group,footer.querySelector('.creative-shortcut'));
   }
-  saveFeedback();guide();
+  saveFeedback();canvasFeedback();guide();
   const toggle=$('[data-studio-help="toggle"]'),expanded=String(!!$('#studio-start-guide'));
   if(toggle.getAttribute('aria-expanded')!==expanded)toggle.setAttribute('aria-expanded',expanded);
  }
  function schedule(){if(!scheduled){scheduled=true;requestAnimationFrame(mount);}}
  async function saveNow(){try{await flush();}catch(error){toast('No se han guardado los cambios: '+error.message);}}
  window.addEventListener('nexus:save-status',saveFeedback);
+ window.addEventListener('nexus:canvas-status',schedule);
  new MutationObserver(schedule).observe($('main'),{childList:true,subtree:true});
  document.addEventListener('click',e=>{
   if(e.target.closest('#studio-save-retry')){saveNow();return;}
@@ -49,6 +85,23 @@
   else if(action==='results'){helpOpen=false;Studio.tab='results';navigate('library');}
   schedule();
  });
+ document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-canvas-recovery]');if(!b||b.disabled)return;
+  const error=CanvasFeedback.error;
+  try{
+   switch(b.dataset.canvasRecovery){
+    case 'model':if(error?.kind==='model')await openModel(error.id,error.reset);break;
+    case 'quote':await getQuote();break;
+    case 'choose':studioPicker();break;
+    case 'settings':navigate('settings');break;
+    case 'dismiss':setCanvasFeedback({error:null});break;
+    case 'activity':Studio.tab='activity';navigate('library');if(error?.jobId)studioDetails(error.jobId);break;
+    case 'recover':if(error?.jobId){setCanvasFeedback({operation:'recovery'});try{await recoverFlowJob(error.jobId);if(!state.jobs.find(j=>j.id===error.jobId)?.uncertain)setCanvasFeedback({error:null});}finally{setCanvasFeedback({operation:null});}}break;
+   }
+  }catch(reason){toast(reason.message);if(error)setCanvasFeedback({error:{...error,message:reason.message}});}
+ });
+ document.addEventListener('input',schedule);
+ document.addEventListener('change',schedule);
  document.addEventListener('keydown',e=>{
   if(e.isComposing||e.repeat||e.altKey||!(e.ctrlKey||e.metaKey))return;
   if(e.key.toLowerCase()==='s'){e.preventDefault();e.stopImmediatePropagation();saveNow();return;}
