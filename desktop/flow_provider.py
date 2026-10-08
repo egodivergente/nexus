@@ -412,3 +412,9 @@ def status(data, request_id):
         response['uncertain'] = True
         response['error'] = 'Revisar el trabajo existente de Flow. No se ha reintentado la generación.'
     return response
+
+
+# Keep host-owned scheduling separate from the account transport.
+import sys as _sys
+from flow_automation import install as _install_automation
+_install_automation(_sys.modules[__name__])

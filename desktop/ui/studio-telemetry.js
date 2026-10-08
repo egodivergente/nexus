@@ -1,6 +1,6 @@
 'use strict';
 function createNexusTelemetry(clock=()=>performance.now(),wall=()=>Date.now()){
- const known=new Set(['init','save','request','generate','upload','download','schema','flowSubmit','flowStatus','flowConnection','agent','agentEvents','agentReply','pick','openData','localPing']);
+ const known=new Set(['init','save','request','generate','upload','download','schema','flowSubmit','flowStatus','flowConnection','flowQuote','flowRecover','flowAssetOptions','flowConnect','flowAutomation','flowPolicy','flowCancel','agent','agentEvents','agentReply','pick','openData','localPing']);
  const providers=new Set(['atlas_cloud','runway','crun','google_flow']);
  const active=new Map(),rows=[];let serial=0,enabled=true,total=0,errors=0;
  function begin(op,args={}){
@@ -23,6 +23,7 @@ if(typeof document!=='undefined')(()=>{
  const started=performance.now(),fmt=v=>v==null?'—':v<1000?Math.round(v)+' ms':(v/1000).toFixed(2)+' s';
  const average=rows=>rows.length?rows.reduce((n,r)=>n+r.ms,0)/rows.length:null;
  const label={init:'Inicio',save:'Guardar',generate:'Enviar generación',request:'Consulta API',upload:'Subida',download:'Descarga',schema:'Esquema',flowSubmit:'Envío Flow',flowStatus:'Estado Flow',flowConnection:'Sesión Flow',agent:'Asistente',agentEvents:'Eventos',agentReply:'Respuesta al asistente',localPing:'Sonda local',pick:'Selector de archivos',openData:'Carpeta de datos'};
+ Object.assign(label,{flowQuote:'Cotización Flow',flowRecover:'Recuperación Flow',flowAssetOptions:'Opciones de mejora Flow',flowConnect:'Acceso Flow',flowAutomation:'Cola Flow',flowPolicy:'Límites Flow',flowCancel:'Cancelar pendiente Flow'});
  function mount(){
   if($('#telemetry-button')||!$('#header-actions'))return;
   const b=document.createElement('button');b.id='telemetry-button';b.type='button';b.textContent='Telemetría';b.addEventListener('click',open);$('#header-actions').append(b);

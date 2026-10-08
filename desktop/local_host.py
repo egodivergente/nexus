@@ -364,6 +364,8 @@ def dispatch(keys, operation, args):
     if operation == 'init':
         import flow_provider
         flow_models = flow_provider.catalog()
+        if flow_models and not OFFLINE_QA:
+            flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
                 'version': '1.7.0-agent-desktop', 'platform': 'HP EliteBook · Windows x64'}
     if operation in ('flowConnection', 'flowConnect'):
@@ -371,10 +373,16 @@ def dispatch(keys, operation, args):
             return {'status': 'unavailable', 'checked_at': 0}
         import flow_connection
         return flow_connection.snapshot(refresh=args.get('refresh') is True, interactive=operation=='flowConnect')
-    if operation in ('flowQuote', 'flowSubmit', 'flowStatus', 'flowAssetOptions', 'flowRecover'):
+    if operation in ('flowQuote', 'flowSubmit', 'flowStatus', 'flowAssetOptions', 'flowRecover', 'flowAutomation', 'flowPolicy', 'flowCancel'):
         if OFFLINE_QA:
             raise ValueError('Laboratorio: Flow bloqueado.')
         import flow_provider
+        if operation == 'flowAutomation':
+            return flow_provider.automation_overview(DATA)
+        if operation == 'flowPolicy':
+            return flow_provider.automation_configure(DATA, args)
+        if operation == 'flowCancel':
+            return flow_provider.automation_cancel(DATA, args.get('request_id', ''))
         if operation == 'flowRecover':
             return flow_provider.recover(DATA, args.get('request_id', ''))
         if operation == 'flowAssetOptions':

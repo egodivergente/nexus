@@ -267,6 +267,9 @@ async def flow_list_jobs(limit: int = 20) -> dict[str, Any]:
 def install():
     from gflow_cli.mcp.server import server
     from gflow_cli.mcp import tools
+    from flow_health import gflow_auth_status
+    server.remove_tool('gflow_auth_status')
+    server.add_tool(gflow_auth_status, structured_output=True)
     server.add_tool(flow_generate_image, structured_output=True)
     server.add_tool(flow_generate_video, structured_output=True)
     server.add_tool(flow_get_quote, structured_output=True)

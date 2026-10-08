@@ -83,4 +83,5 @@ document.addEventListener('DOMContentLoaded',()=>{
  const script=document.createElement('script');script.src='studio-gallery.js';document.head.append(script);
  const batch=document.createElement('script');batch.src='studio-batch.js';document.head.append(batch);
  const telemetry=document.createElement('script');telemetry.src='studio-telemetry.js';document.head.append(telemetry);
+ const flowControl=document.createElement('script');flowControl.src='studio-flow-control.js';document.head.append(flowControl);
 },{once:true});

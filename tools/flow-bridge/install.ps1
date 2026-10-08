@@ -14,6 +14,7 @@ $runtimeFiles = @('launcher.py','runtime_compat.py','image_guard.py','bridge_too
 foreach ($runtimeFile in $runtimeFiles) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $runtimeFile) -Destination $flowRuntime
 }
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'flow_health.py') -Destination $flowRuntime
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../../desktop/flow_contract.py') -Destination $flowRuntime
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $flowRuntime 'browsers'
 & $flowPython -m playwright install chromium

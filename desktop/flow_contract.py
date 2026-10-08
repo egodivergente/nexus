@@ -7,8 +7,8 @@ VIDEOS = {'veo_fast', 'veo_quality', 'veo_lite', 'omni_flash'}
 INPUTS = ('initial_frame', 'end_frame', 'reference_images')
 
 def block_counts(count):
-    if type(count) is not int or count < 1:
-        raise ValueError('La cantidad debe ser un número entero positivo.')
+    if type(count) is not int or not 1 <= count <= 120:
+        raise ValueError('La cantidad debe ser un entero entre 1 y 120.')
     while count:
         size = min(4, count)
         yield size
@@ -54,7 +54,7 @@ def normalize(args):
     if end:result['end_frame']=end
     duration = args.get('duration')
     if duration is not None:
-        if image or type(duration) is not int or duration not in ({4,6,8,10} if model=='omni_flash' else {8} if mode=='r2v' else {4,6,8}):
+        if image or type(duration) is not int or duration not in ({4,6,8,10} if model=='omni_flash' else {8} if mode=='r2v' or model=='veo_quality' else {4,6,8}):
             raise ValueError('Duración no disponible para este modelo y modalidad.')
         result['duration']=duration
     resolution = args.get('resolution')

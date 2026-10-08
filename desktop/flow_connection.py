@@ -35,7 +35,8 @@ def probe(interactive=False):
         status = value.get('status')
         return {'status': status if status in {'connected','auth_required','busy','error'} else 'error',
                 'checked_at': time.time(), 'refreshed': value.get('refreshed') is True,
-                'reason': value.get('reason') if value.get('reason') in {'browser_rejected','password_required','verification_required','account_selection_required','google_signin','page_not_ready'} else None}
+                'reason': value.get('reason') if value.get('reason') in {'browser_rejected','password_required','verification_required','account_selection_required','google_signin','page_not_ready'} else 'verification_error' if status=='error' else None,
+                'source':'flow_editor', 'cached':False}
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return {'status': 'error', 'checked_at': time.time()}
     finally:
@@ -44,7 +45,9 @@ def probe(interactive=False):
 def _refresh(interactive=False):
     global STATE, RUNNING, NEXT_CHECK
     try:
-        value = probe(interactive)
+        from flow_automation import profile_gate
+        with profile_gate(RUNTIME):
+            value = probe(interactive)
     except Exception:
         value = {'status': 'error', 'checked_at': time.time()}
     with LOCK:
@@ -61,10 +64,13 @@ def snapshot(refresh=False, interactive=False):
             from flow_provider import WORKERS
             if WORKERS:
                 NEXT_CHECK = now + 30
-                return {**STATE, 'status': 'busy'}
+                return {**STATE, 'status': 'busy', 'source':'flow_editor', 'cached':True,
+                        'age_seconds':max(0,round(time.time()-STATE['checked_at'])) if STATE['checked_at'] else None}
             RUNNING = True
             INTERACTIVE = interactive
             LAST_STARTED = now
             NEXT_CHECK = now + 15
             threading.Thread(target=_refresh, args=(interactive,), daemon=True).start()
-        return {**STATE, 'status': ('signing_in' if INTERACTIVE else 'refreshing') if RUNNING else STATE['status']}
+        return {**STATE, 'status': ('signing_in' if INTERACTIVE else 'refreshing') if RUNNING else STATE['status'],
+                'source':'flow_editor', 'cached':True,
+                'age_seconds':max(0,round(time.time()-STATE['checked_at'])) if STATE['checked_at'] else None}

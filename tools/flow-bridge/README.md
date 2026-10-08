@@ -74,3 +74,7 @@ Al realizar esta tarea, el checkout no tenía commits ni remoto y el conector Gi
 
 
 Las modalidades de texto, fotogramas y referencias, con duración y resolución explícitas, están documentadas en [FLOW-MODALIDADES.md](../../docs/FLOW-MODALIDADES.md). Nano Banana Pro conserva el acceso de la cuenta: cero se muestra como Incluido.
+
+## Actualización de automatización del 2026-10-08
+
+El estado y límites actuales están en [la entrega de automatización](../../docs/FLOW-AUTOMATIZACION-20261008.md). NEXUS utiliza cola compartida, recuperación sin reenvío y Control Flow para presupuesto y tiempos. El catálogo actual incluye 17 entradas de generación, modalidades y postprocesado: los recuentos de dos/cinco modelos de las secciones históricas no describen el catálogo actual. Veo Lite está admitido; Nano Banana Lite continúa prohibido. Quality queda limitado a 8 s. El saldo no está verificado. Las conexiones MCP nuevas usan el diagnóstico del editor; las ya abiertas requieren reconectar. No se han ejecutado nuevas generaciones en esta actualización.
