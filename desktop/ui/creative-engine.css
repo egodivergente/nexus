@@ -54,3 +54,5 @@ body.creative-engine .creative-reference-empty{padding:8px 12px;background:trans
 body.creative-engine .creative-multi{margin:0}.creative-references .drop>label{margin-bottom:4px}.creative-references .file{padding:8px}.creative-command-footer{margin-top:18px;padding-top:14px}
 body.creative-engine .creative-references>.drop:only-child:not(.creative-reference-empty)>label,body.creative-engine .creative-references>.drop:only-child:not(.creative-reference-empty)>small{display:none}
 body.creative-engine .creative-references .file{margin:0;padding:8px}
+.creative-command[data-provider=google_flow] .quote{display:none}
+body.creative-engine.nx-desktop:has(.agent-view) .sidebar{width:64px;padding:24px 8px 14px}body.creative-engine.nx-desktop.creative-dock-expanded:has(.agent-view) .sidebar{width:210px}

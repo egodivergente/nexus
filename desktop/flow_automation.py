@@ -157,6 +157,8 @@ def initialize(provider, data):
 def submit(provider, data, args):
     params = provider.parameters(args)
     count = params.get('count',1)
+    account_direct = args.get('account_direct') is True
+    if account_direct and count > 20: raise ValueError('Puedes pedir hasta 20 resultados por encargo.')
     if count > MAX_RESULTS: raise ValueError('Máximo 120 resultados por solicitud Flow.')
     identifier, prompt = args.get('request_id'), args.get('prompt','')
     if not isinstance(identifier,str) or not provider.IDENTIFIER.fullmatch(identifier) or not isinstance(prompt,str):
@@ -172,11 +174,10 @@ def submit(provider, data, args):
         return provider.status(data, identifier)
     if any(k in params for k in provider.INPUTS): provider.media_parameters(data,params)
     before = time.monotonic()
-    estimate = provider.quote(params,data)
-    credits = estimate['amount']
+    credits = None if account_direct else provider.quote(params,data)['amount']
     if credits is not None and (type(credits) not in {int,float} or not math.isfinite(credits) or credits<0):
         raise ValueError('Precio Flow no válido.')
-    if args.get('cost') != credits or type(args.get('cost')) is bool:
+    if not account_direct and (args.get('cost') != credits or type(args.get('cost')) is bool):
         raise ValueError('Actualiza la estimación Flow antes del envío.')
     if 'source_request_id' in params and params['model']!='video_edit': params['expected_credits']=credits
     with provider.LOCK, database(provider, data) as db:
@@ -187,7 +188,7 @@ def submit(provider, data, args):
         else:
             policy = policy_in(db)
             if count>policy['max_results']: raise ValueError('El encargo supera el límite de resultados Flow.')
-            if credits is None and not policy['allow_unknown_cost']:
+            if credits is None and not account_direct and not policy['allow_unknown_cost']:
                 raise ValueError('Coste Flow sin importe. Activa expresamente su autorización en Control Flow.')
             pending = db.execute("SELECT COUNT(*),COALESCE(SUM(credits),0) FROM flow_queue WHERE phase IN ('queued','running','uncertain')").fetchone()
             reserved_results=sum(json.loads(r[0]).get('count',1) for r in db.execute("SELECT jobs.params FROM jobs JOIN flow_queue q ON q.id=jobs.id WHERE q.phase IN ('queued','running','uncertain')"))
@@ -198,7 +199,7 @@ def submit(provider, data, args):
                 raise ValueError('El encargo supera el presupuesto de créditos pendientes de Flow.')
             result = {'status':'queued'}
             db.execute('INSERT INTO jobs VALUES (?,?,?)',(identifier,json.dumps(params),json.dumps(result)))
-            metrics = {'quote_ms':round((time.monotonic()-before)*1000)}
+            metrics = {'quote_ms':round((time.monotonic()-before)*1000), 'account_direct':account_direct}
             db.execute("INSERT INTO flow_queue(id,mode,phase,credits,created,metrics) VALUES (?,'submit','queued',?,?,?)",
                        (identifier,credits,time.time(),json.dumps(metrics)))
     kick(provider,data)
@@ -273,11 +274,12 @@ def consume(provider, data, key):
                                 policy=policy_in(db)
                                 reserved=db.execute("SELECT COALESCE(SUM(credits),0) FROM flow_queue WHERE phase IN ('queued','running','uncertain')").fetchone()[0]
                                 reserved_results=sum(json.loads(r[0]).get('count',1) for r in db.execute("SELECT jobs.params FROM jobs JOIN flow_queue q ON q.id=jobs.id WHERE q.phase IN ('queued','running','uncertain')"))
-                            if params.get('count',1)>policy['max_results'] or reserved_results>policy['max_total_results'] or row['credits'] is None and not policy['allow_unknown_cost'] or reserved>policy['max_credits']:
+                            direct = metrics.get('account_direct') is True
+                            if params.get('count',1)>policy['max_results'] or reserved_results>policy['max_total_results'] or row['credits'] is None and not direct and not policy['allow_unknown_cost'] or reserved>policy['max_credits']:
                                 raise ValueError('La autorización de coste o los límites han cambiado.')
                             # Never spend more than the amount reviewed, even after queue delays.
-                            latest=provider.quote(params,data)['amount']
-                            if latest!=row['credits']:
+                            latest=None if direct else provider.quote(params,data)['amount']
+                            if not direct and latest!=row['credits']:
                                 raise ValueError('El coste cambió en la cola; revisa el encargo antes de crear uno nuevo.')
                         transport_started=True
                         provider.work(data,row['id'],params,recover=row['mode']=='recover',
@@ -307,18 +309,18 @@ def consume(provider, data, key):
                         metrics['total_ms']=max(0,round((time.time()-row['created'])*1000))
                         db.execute('UPDATE flow_queue SET phase=?,finished=?,metrics=? WHERE id=?',
                                    (phase,time.time(),json.dumps(metrics),row['id']))
-                        if phase=='uncertain':
+                        if phase=='uncertain' and not metrics.get('account_direct'):
                             policy=policy_in(db);policy['paused']=True
                             db.execute('INSERT OR REPLACE INTO flow_policy VALUES(1,?)',(json.dumps(policy),))
             except RuntimeError:
                 time.sleep(.5)
     finally:
         with START_LOCK:
-            RUNNERS.pop(key,None)
             # Close the submit/exit race without busy restarting a paused queue.
             with provider.LOCK, database(provider,data) as db:
                 pending=db.execute("SELECT 1 FROM flow_queue WHERE phase='queued' "
                                    + ("AND mode='recover' " if policy_in(db)['paused'] else '') + 'LIMIT 1').fetchone()
+            RUNNERS.pop(key,None)
             if pending: kick(provider,data)
 
 

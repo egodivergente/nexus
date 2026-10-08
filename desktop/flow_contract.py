@@ -19,7 +19,7 @@ def normalize(args):
     image = model in IMAGES
     if not image and model not in VIDEOS:
         raise ValueError('Modelo Flow no admitido.')
-    aspect = args.get('aspect', '1:1' if image else '16:9')
+    aspect = args.get('aspect', '16:9')
     if aspect not in ({'1:1','16:9','9:16','4:3','3:4'} if image else {'16:9','9:16'}):
         raise ValueError('Formato Flow no admitido.')
     mode = args.get('mode', 't2i' if image else 't2v')

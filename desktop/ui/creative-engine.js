@@ -32,7 +32,7 @@
   if(view!=='canvas'||configuring||$('#creative-command'))return;
   const source=$('.canvas .sheet')||$('.studio-start'),prompt=$('#prompt');if(!source||!prompt)return;
   const canvasRoot=$('.canvas');if(canvasRoot)canvasRoot.classList.add('creative-layout');
-  const command=el('section','creative-command');command.id='creative-command';command.setAttribute('aria-label','Crear con tus modelos');
+  const command=el('section','creative-command');command.id='creative-command';command.dataset.provider=loaded?.providerId||'';command.setAttribute('aria-label','Crear con tus modelos');
   const heading=el('div','creative-heading','<h2>¿Qué quieres crear?</h2><span>Imagen, movimiento, posibilidades.</span>');
   const input=el('div','creative-input');prompt.setAttribute('aria-label','Describe tu creación');prompt.placeholder='Describe una escena. Añade tus referencias. Dale forma.';input.append(prompt);
   const chips=el('div','creative-chips');

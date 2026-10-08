@@ -29,7 +29,7 @@ def catalog():
         'inputMode':'TEXT_ONLY', 'capabilities':[], 'basePriceUsd':None, 'priceUnitVerified':False,
         'contractEndpoint':'flow', 'contractMedia':[], 'promptRequired':True, 'isFlagship':False}
     aspect = lambda options: {'key':'aspect', 'displayName':'Formato', 'type':'ENUM', 'nativeType':'string',
-        'options':options, 'defaultValue':options[0], 'isRequired':True}
+        'options':options, 'defaultValue':'16:9', 'isRequired':True}
     result = [dict(common, id='google-flow/nano-pro', providerModelId='nano-pro', displayName='Nano Banana Pro · tu cuenta Flow',
         modelFamily='Nano Banana', modalities=['IMAGE'], capabilities=['TEXT_TO_IMAGE'], isFlagship=True, parameters=[aspect(['1:1','16:9','9:16','4:3','3:4'])],
         shortDescription='Tu opción preferida: Nano Banana Pro con tu cuenta de Google Flow.'),
@@ -98,7 +98,7 @@ def catalog():
         if model['providerModelId'] in {'nano2','nano-pro','veo_fast','veo_quality','veo_lite','omni_flash'}:
             model['parameters'] = [*model['parameters'], {
                 'key':'count', 'displayName':'Cantidad de resultados', 'type':'INTEGER', 'nativeType':'integer',
-                'defaultValue':'1', 'minValue':1, 'step':1, 'isRequired':True,
+                'defaultValue':'1', 'minValue':1, 'maxValue':20, 'step':1, 'isRequired':True,
                 'description':'Se generan en bloques de hasta 4. Puedes pedir más bloques en la misma solicitud.'}]
     return result
 

@@ -18,6 +18,25 @@ import flow_health
 
 
 class QueueTests(unittest.TestCase):
+    def test_account_direct_has_no_quote_or_confirmation_gate(self):
+        with patch.object(flow,'call',side_effect=self.proof):
+            flow.submit(self.data,self.args(account_direct=True,cost=None))
+            self.settled()
+            self.assertEqual(flow.status(self.data,'one')['status'],'completed')
+            self.quote.assert_not_called()
+        with self.assertRaisesRegex(ValueError,'20'):
+            flow.submit(self.data,self.args('over',account_direct=True,count=21,cost=None))
+    def test_direct_uncertain_does_not_freeze_other_requested_jobs(self):
+        flow.automation_configure(self.data,{'paused':True})
+        flow.submit(self.data,self.args(account_direct=True,cost=None))
+        flow.submit(self.data,self.args('two',account_direct=True,cost=None));self.settled()
+        def send(op,args,key):
+            return {'status':'needs_reconciliation'} if key=='one' else self.proof(op,args,key)
+        with patch.object(flow,'call',side_effect=send) as call:
+            flow.automation_configure(self.data,{'paused':False});self.settled()
+            self.assertEqual([x.args[2] for x in call.call_args_list],['one','two'])
+        self.assertEqual(flow.status(self.data,'two')['status'],'completed')
+        self.assertFalse(flow.automation_overview(self.data)['policy']['paused'])
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
         self.data=self.root/'data';self.runtime=self.root/'runtime';(self.runtime/'results').mkdir(parents=True)

@@ -1,0 +1,7 @@
+// Bound the test JVMs as well as Gradle for the small desktop Agent build.
+allprojects {
+    tasks.withType(Test).configureEach {
+        maxHeapSize = '128m'
+        maxParallelForks = 1
+    }
+}

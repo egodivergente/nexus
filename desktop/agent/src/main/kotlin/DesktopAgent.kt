@@ -84,7 +84,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         ModelRouter(registry, skills, published, excludedFamilies = {
             settings.text("excludedFamilies", "veo").split(',', ';', '\n').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
         }), guard, GuardedExecutor(backend, guard), assets,
-        GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) })
+        GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) }, directFlow = true)
     private var deps = deps()
     private var offline = true
     private val knowledge = ExpertKnowledge(File(root, "assets/expert-guides.json"))
@@ -102,7 +102,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             provider = llm.id, modelId = settings.text("modelId", "us.anthropic.claude-sonnet-4-6"),
             region = settings.text("region", "us-east-1"), endpoint = settings.text("endpoint"),
             maxTokens = settings["maxTokens"]?.jsonPrimitive?.intOrNull?.coerceIn(256, 1800) ?: 1800,
-            maxToolRounds = 5, systemPromptOverride = ExpertPolicy.PROMPT,
+            maxToolRounds = 64, systemPromptOverride = ExpertPolicy.PROMPT,
             temperature = settings["temperature"]?.jsonPrimitive?.doubleOrNull,
             mode = mode, sendImagesToLlm = settings["sendImages"]?.jsonPrimitive?.booleanOrNull ?: true
         ), NexusToolkit.all(deps).filterNot { it.name in ExpertPolicy.retiredTools } +
@@ -135,6 +135,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 conversation.session.activeProjectId = settings.text("projectId").ifBlank { null }
             }
             "send" -> {
+                conversation.session.flowSubmittedResults = 0
                 turnModels = null; turnSchemas.clear()
                 val started = System.nanoTime()
                 val attachments = args["attachments"]?.let { json.decodeFromJsonElement<List<Attachment>>(it) } ?: emptyList()
