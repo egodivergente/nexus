@@ -21,6 +21,7 @@ import com.vidadomu.nexus.agent.core.tools.PlanEdit
 import com.vidadomu.nexus.agent.core.tools.UiEvent
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.ui.create.CreateUiState
+import com.vidadomu.nexus.ui.create.creationReadiness
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -63,6 +64,8 @@ data class PlanUi(
     val jobId: String? = null,
     val jobStatus: String? = null,
     val jobProgress: Float? = null,
+    /** Old saved cards require an explicit selection before a batch can send them. */
+    val includeInBatch: Boolean = false,
 )
 
 data class AssistantUiState(
@@ -170,7 +173,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is UiEvent.PlanReady -> _ui.update { s ->
                 val state = runtime.guard.state(ev.plan.id) ?: PlanState.PREPARED
                 val existing = s.plans[ev.plan.id]
-                val ui = (existing ?: PlanUi(ev.plan, ev.executable, state)).copy(plan = ev.plan, executable = ev.executable, state = state, issues = emptyList(), error = null)
+                val ui = (existing ?: PlanUi(ev.plan, ev.executable, state, includeInBatch = true)).copy(plan = ev.plan, executable = ev.executable, state = state, issues = emptyList(), error = null)
                 val items = if (s.items.any { it is ChatItem.PlanCard && it.planId == ev.plan.id }) s.items else s.items + ChatItem.PlanCard(newId(), ev.plan.id)
                 s.copy(plans = s.plans + (ev.plan.id to ui), items = items)
             }
@@ -302,7 +305,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun generatePending() {
-        _ui.value.plans.values.filter { it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
+        if(_ui.value.thinking || _ui.value.plans.values.any { it.busy }) return
+        _ui.value.plans.values.filter { it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
             .take(20).forEach { generate(it.plan.id, it.plan.fingerprint()) }
     }
 
@@ -321,6 +325,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             } else p.copy(busy = false)
         }
         _ui.update { it.copy(items = saved.items, plans = plans, pendingAttachments = saved.attachments) }
+        // Recheck only the old reference-validation failures; never submit restored plans.
+        viewModelScope.launch {
+            for ((id, p) in plans) {
+                if(p.state != PlanState.PREPARED || p.plan.media.isEmpty() || p.error?.startsWith("No se envió: Completa: Imágenes de referencia") != true) continue
+                val ready = runCatching { creationReadiness(runtime.backend.toCreateState(p.plan)).canSubmit }.getOrDefault(false)
+                if(ready) setPlan(id) { current ->
+                    if(current.state == PlanState.PREPARED && current.plan.fingerprint() == p.plan.fingerprint()) current.copy(error = null) else current
+                }
+            }
+        }
         conversation.session.attachments += (saved.sessionAttachments + saved.items.filterIsInstance<ChatItem.User>().flatMap { it.attachments } + saved.attachments).distinctBy { it.id }
         conversation.restoreTextHistory(saved.items.mapNotNull { item -> when(item) {
             is ChatItem.User -> "user" to item.text
@@ -377,9 +391,47 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun toggleBatchPlan(planId: String) {
+        if(_ui.value.thinking) return
+        setPlan(planId) { if(it.busy || it.state !in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) it else it.copy(includeInBatch = !it.includeInBatch) }
+    }
+
+    /** Replace image references on the existing card; no new plan and no submission. */
+    fun attachPlanImages(planId: String, uris: List<Uri>) {
+        if(uris.isEmpty() || _ui.value.thinking) return
+        val current = _ui.value.plans[planId] ?: return
+        if(current.busy || current.state !in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) return
+        setPlan(planId) { it.copy(busy = true, error = null, issues = emptyList()) }
+        viewModelScope.launch {
+            try {
+                val spec = runtime.registry.schema(current.plan.ref).media
+                val role = if(spec.imagesArrayField != null) "reference" else "first_frame"
+                check(spec.imagesArrayField != null || spec.firstFrameField != null || spec.inputImageField != null) { "Este modelo no admite imágenes de entrada." }
+                val maximum = if(role == "reference") spec.maxImages.takeIf { it > 0 } ?: 1 else 1
+                check(uris.size <= maximum) { "Este modelo admite hasta $maximum imágenes. Selecciona menos archivos." }
+                val selected = uris.map { uri ->
+                    val attachment = AgentMediaStore.persist(app, uri, null)
+                    check(attachment.mimeType.startsWith("image/")) { "Selecciona imágenes de referencia." }
+                    com.vidadomu.nexus.agent.core.tools.MediaRequest(role, attachment.uri, attachment.mimeType, attachment.assetId)
+                }
+                val keep = current.plan.media.filter { it.role !in setOf("reference", "first_frame") }
+                    .map { com.vidadomu.nexus.agent.core.tools.MediaRequest(it.role, it.uri, it.mimeType, it.assetId) }
+                when(val result = runtime.deps.plans.rebuild(current.plan, PlanEdit(media = keep + selected))) {
+                    is PlanBuild.Ready -> {
+                        runtime.guard.replace(result.plan)
+                        setPlan(planId) { it.copy(plan = result.plan, busy = false, executable = true, state = PlanState.PREPARED) }
+                    }
+                    is PlanBuild.Invalid -> setPlan(planId) { it.copy(busy = false, issues = result.issues.map { issue -> issue.message }, error = result.issues.joinToString { issue -> issue.message }) }
+                }
+            } catch(error: Exception) {
+                setPlan(planId) { it.copy(busy = false, error = Redactor.redact(error.message ?: "No se pudieron adjuntar las referencias.")) }
+            }
+        }
+    }
+
     fun discardPlan(planId: String) {
         val p = _ui.value.plans[planId] ?: return
-        if (p.state == PlanState.SUBMITTED || p.state == PlanState.UNCERTAIN) return
+        if (p.busy || p.state == PlanState.SUBMITTED || p.state == PlanState.UNCERTAIN) return
         runtime.guard.discard(planId)
         setPlan(planId) { it.copy(state = PlanState.DISCARDED) }
     }

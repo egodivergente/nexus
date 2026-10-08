@@ -21,6 +21,8 @@ data class PlanEdit(
     val negativePrompt: String? = null,
     /** Valor null o «–» = quitar el parámetro. */
     val params: Map<String, String?> = emptyMap(),
+    /** null preserves current inputs; an explicit list replaces them. */
+    val media: List<MediaRequest>? = null,
 )
 
 sealed interface PlanBuild {
@@ -134,7 +136,7 @@ class PlanBuilder(
             prompt = edit.prompt ?: plan.prompt,
             negativePrompt = edit.negativePrompt ?: params["negative_prompt"],
             params = params,
-            media = plan.media.map { MediaRequest(it.role, it.uri, it.mimeType, it.assetId) },
+            media = edit.media ?: plan.media.map { MediaRequest(it.role, it.uri, it.mimeType, it.assetId) },
             task = plan.task, rationale = plan.rationale, alternatives = plan.alternatives,
             projectId = plan.projectId, sceneCode = plan.sceneCode, shotCode = plan.shotCode,
             characters = plan.characters, parentGenerationId = plan.parentGenerationId,

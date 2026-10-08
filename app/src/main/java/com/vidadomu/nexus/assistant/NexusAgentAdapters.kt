@@ -184,21 +184,7 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
         val media = plan.media.map { m ->
             // Assets del índice que no sean copia privada (content://, galería): se copian ahora.
             val local = if (Uri.parse(m.uri).scheme == "file") m.uri else AgentMediaStore.persist(app, Uri.parse(m.uri), m.mimeType).uri
-            val slot = when (m.role) {
-                "first_frame" -> MediaSlotType.PRIMARY_IMAGE
-                "last_frame" -> MediaSlotType.LAST_FRAME
-                "reference" -> MediaSlotType.REFERENCE_IMAGE
-                "video" -> if (model.videoField != null) MediaSlotType.VIDEO_INPUT else MediaSlotType.VIDEO_REFERENCE
-                else -> error("Rol de medio desconocido: ${m.role}")
-            }
-            AttachedMedia(uriString = local, mimeType = m.mimeType ?: "image/*", slotType = slot, fileName = Uri.parse(local).lastPathSegment,
-                fieldKey = when(m.role) {
-                    "first_frame" -> model.firstFrameField ?: model.inputImageField
-                    "last_frame" -> model.lastFrameField
-                    "reference" -> model.imagesArrayField ?: model.inputImageField
-                    "video" -> model.videoField ?: model.videosArrayField
-                    else -> null
-                })
+            assistantMediaInput(model, m.copy(uri = local))
         }
         return CreateUiState(
             selectedModality = Modality.valueOf(plan.modality), selectedModel = model, prompt = plan.prompt,

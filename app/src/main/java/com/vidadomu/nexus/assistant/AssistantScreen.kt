@@ -126,7 +126,7 @@ fun AssistantScreen(
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (ui.items.isEmpty()) item { EmptyHint() }
-                items(ui.items, key = { it.id }) { item ->
+                items(ui.items.filterNot { it is ChatItem.PlanCard && ui.plans[it.planId]?.state == PlanState.DISCARDED }, key = { it.id }) { item ->
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item)
@@ -135,6 +135,8 @@ fun AssistantScreen(
                         is ChatItem.PlanCard -> ui.plans[item.planId]?.let { p ->
                             CompactGeneration(p, vm.outputs(p.jobId),
                                 onOpenOutput = { p.jobId?.let(onNavigateToOutput) },
+                                onAttach = { vm.attachPlanImages(p.plan.id, it) }, onDiscard = { vm.discardPlan(p.plan.id) },
+                                onToggleBatch = { vm.toggleBatchPlan(p.plan.id) }, assistantBusy = ui.thinking,
                                 details = { PlanCardView(p,
                                 onEdit = { vm.editPlan(p.plan.id, it) },
                                 onDiscard = { vm.discardPlan(p.plan.id) },

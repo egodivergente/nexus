@@ -67,6 +67,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         string("negative_prompt", "Solo si el schema tiene negative_prompt.")
         freeObject("params", "Parámetros del schema (sin prompt ni medios).")
         boolean("execute", "Google Flow: true cuando el usuario ha pedido generar; envía directamente con su cuenta.")
+        boolean("new_copy", "Solo true si el usuario pide otra generación idéntica; normalmente se reutiliza el encargo pendiente.")
         mediaArray()
         string("task", "Tarea (image_to_video…).")
         string("rationale", "Por qué este modelo y esta configuración, en 1–3 frases para el usuario.")
@@ -104,15 +105,22 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         return when (built) {
             is PlanBuild.Invalid -> fail("El plan no es válido; corrige y vuelve a prepararlo.") { put("issues", built.issues.toJson()) }
             is PlanBuild.Ready -> {
-                val plan = built.plan.let { p ->
+                val candidate = built.plan.let { p ->
                     if (projectName != null && project == null) p.copy(warnings = p.warnings + "El proyecto «$projectName» no existe todavía: créalo para que la generación quede asociada.") else p
                 }
-                d.guard.register(plan)
+                val existing = if(input["new_copy"]?.toString() == "true") null else d.guard.plans().firstOrNull { p ->
+                    d.guard.state(p.id) in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) &&
+                        p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
+                        p.sceneCode == candidate.sceneCode && p.shotCode == candidate.shotCode &&
+                        p.characters == candidate.characters && p.parentGenerationId == candidate.parentGenerationId && p.task == candidate.task
+                }
+                val plan = existing ?: candidate.also { d.guard.register(it) }
                 if (d.directFlow && plan.ref.providerId == "google_flow" && input["execute"]?.toString() == "true")
                     return submitAccountFlow(d, plan, session)
                 ok(
                     buildJsonObject {
-                        put("plan", plan.cardJson(PlanState.PREPARED))
+                        put("plan", plan.cardJson(d.guard.state(plan.id)))
+                        put("reused", existing != null)
                         put("next", if (d.directFlow && plan.ref.providerId == "google_flow") "Si el usuario pidió generar, llama a submit_generation: Flow se envía directamente sin confirmación." else "Tarjeta mostrada. Si el usuario quiere generar, llama a submit_generation con este plan_id; el envío real solo ocurre cuando el usuario pulsa GENERAR.")
                     },
                     listOf(UiEvent.PlanReady(plan, executable = true)),
@@ -124,12 +132,13 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
 
 class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
     "update_plan", ToolCategory.PLAN,
-    "Modifica prompt, prompt negativo o parámetros de un plan ya preparado y lo revalida. Cualquier confirmación previa queda anulada.",
+    "Modifica prompt, parámetros o archivos de un encargo pendiente sin duplicarlo. Para añadir/cambiar referencias envía media con todos los archivos que debe conservar. Revalida y anula cualquier confirmación previa.",
     schema {
         string("plan_id", "Plan a modificar.", required = true)
         string("prompt", "Nuevo prompt.")
         string("negative_prompt", "Nuevo prompt negativo.")
         freeObject("params", "Parámetros a cambiar; null o «–» para quitar uno.")
+        mediaArray()
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
@@ -141,7 +150,8 @@ class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
             PlanState.UNCERTAIN -> throw ToolInputException("Ese plan pudo enviarse; pide al usuario que lo compruebe en Historial.")
             else -> Unit
         }
-        return when (val r = d.plans.rebuild(plan, PlanEdit(input.str("prompt"), input.str("negative_prompt"), input.paramMap("params")))) {
+        return when (val r = d.plans.rebuild(plan, PlanEdit(input.str("prompt"), input.str("negative_prompt"), input.paramMap("params"),
+            media = if(input.containsKey("media")) resolveMedia(input, session, d.assets) else null))) {
             is PlanBuild.Invalid -> fail("El cambio no es válido; el plan sigue como estaba.") { put("issues", r.issues.toJson()) }
             is PlanBuild.Ready -> {
                 d.guard.replace(r.plan)

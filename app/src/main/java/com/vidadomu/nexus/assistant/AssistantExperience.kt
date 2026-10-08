@@ -97,24 +97,27 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
 
 @Composable
 internal fun PendingGenerations(ui: AssistantUiState, onGenerate: () -> Unit) {
-    val pending = ui.plans.values.filter { it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
-    if(pending.isEmpty()) return
+    val prepared = ui.plans.values.filter { it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
+    if(prepared.isEmpty()) return
+    val pending = prepared.filter { it.includeInBatch }
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("${pending.size} encargos preparados", style = MaterialTheme.typography.labelLarge)
+                Text(if(pending.isEmpty()) "Selecciona los encargos" else "${pending.size} de ${prepared.size} seleccionados", style = MaterialTheme.typography.labelLarge)
                 val estimated = pending.mapNotNull { it.plan.estimate?.amountUsd }
-                Text(if(estimated.size == pending.size) "≈ %.3f USD".format(estimated.sum()) else "Incluye coste sin estimación",
+                Text(if(pending.isEmpty()) "Marca «Incluir en lote» en las tarjetas" else if(estimated.size == pending.size) "≈ %.3f USD".format(estimated.sum()) else "Incluye coste sin estimación",
                     style = MaterialTheme.typography.labelSmall)
             }
-            Button(onClick = onGenerate, enabled = !ui.thinking) { Text("Generar ${minOf(pending.size,20)}") }
+            Button(onClick = onGenerate, enabled = pending.isNotEmpty() && !ui.thinking && ui.plans.values.none { it.busy }) { Text("Generar ${minOf(pending.size,20)}") }
         }
     }
 }
 
 @Composable
-internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit, details: @Composable () -> Unit) {
+internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
+    onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
     var expanded by rememberSaveable(p.plan.id) { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), onAttach)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -124,6 +127,24 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
             TextButton(onClick = { expanded = !expanded }) { Text(if(expanded) "Ocultar" else "Detalles") }
         }
         p.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(p.includeInBatch, { onToggleBatch() }, enabled = !p.busy && !assistantBusy)
+                Text("Incluir en lote", Modifier.clickable(enabled = !p.busy && !assistantBusy, onClick = onToggleBatch), style = MaterialTheme.typography.bodySmall)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TextButton(onClick = { picker.launch(arrayOf("image/*")) }, enabled = !p.busy && !assistantBusy) {
+                    Icon(Icons.Default.AttachFile, null, Modifier.size(16.dp))
+                    Text(if(p.plan.media.isEmpty()) "Adjuntar referencias" else "Cambiar referencias · ${p.plan.media.size}")
+                }
+                TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy) { Text("Descartar") }
+            }
+        }
+        if(p.plan.media.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(p.plan.media) { media ->
+                if(media.mimeType?.startsWith("image/") == true) AsyncImage(media.uri, "Referencia adjunta", Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+            }
+        }
         if(p.busy || p.jobStatus in listOf("PENDING", "PROCESSING")) LinearProgressIndicator(Modifier.fillMaxWidth())
         if(outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(outputs) { uri ->
