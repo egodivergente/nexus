@@ -23,7 +23,7 @@ Resultados del 8 de octubre de 2026:
 - PASS: actualización del Samsung SM-S938B a `1.8.1-agent-preview` (código 25) por ADB sobre Tailscale, con el certificado de la instalación anterior.
 - PASS: comprobación del chat real: se conservan los ocho encargos y sus entradas; las dos referencias distintas son legibles. Los seis errores antiguos de referencias se retiran tras la revalidación. Las 12 preferencias existentes permanecen idénticas tras instalar.
 - PASS: tarjetas con miniaturas y controles de referencias visibles; lote sin selección inicial y botón de generación deshabilitado.
-- PENDIENTE: ejecutar las cuatro pruebas Compose en el Samsung. El teléfono perdió la conexión de Tailscale después de la comprobación visual.
+- PASS: las cuatro pruebas Compose de `AssistantReferenceUiTest` ejecutadas en el Samsung SM-S938B mediante `offlineQa`, usuario Android 0. Resultado: `OK (4 tests)`. Comprueban acceso a referencias y descarte, recuento de adjuntos, bloqueo del lote durante una edición y exclusión de tarjetas antiguas sin selección.
 - NO EJECUTADO: envío de generaciones reales o pruebas con coste.
 
 SHA-256 del APK firmado del agente: `e8f31b484ece23f4ae5844bcf1ff7069777c866d95c23d889a96b3b8204f137d`.
