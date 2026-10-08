@@ -143,27 +143,63 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.wait_for_function('Boolean(window.NexusGallery)&&state.studioGallery?.collections.length===1')
             assert page.evaluate('state.studioGallery.favorites.length') == 1
             assert page.evaluate('state.draft.prompt') == 'Mi borrador'
-            page.wait_for_function('Boolean(window.NexusBatch)')
+            page.wait_for_function('Boolean(window.NexusOrderEditor)')
             page.evaluate("navigate('canvas')")
             page.locator('[data-action=chooseCompare]').click()
             page.locator('[data-kind=VIDEO]').click()
             assert page.locator('.catalog [data-compare]').count() > 0
             # Exercise the real confirmation and batch handlers with simulated dispatch.
             page.evaluate("""async()=>{
-              const fixture=id=>({id,providerId:'atlas_cloud',displayName:id,modalities:['IMAGE'],parameters:[],fields:[],capabilities:[]});
+              const fixture=id=>({id,providerId:'atlas_cloud',displayName:id,modalities:['IMAGE'],parameters:[
+                {key:'duration',displayName:'Duración',nativeType:'integer',defaultValue:'3',minValue:1,maxValue:10},
+                {key:'aspect_ratio',displayName:'Proporción',options:['1:1','16:9'],defaultValue:'1:1'}],
+                fields:[{key:'images',label:'Imágenes',mime:'image/*',maximum:2,required:false,encoding:'array'}],capabilities:[]});
               models.push(fixture('batch-a'),fixture('batch-b'));selection=new Set(['batch-a','batch-b']);
               configuration=async id=>fixture(id);quotePlan=async()=>({amount:1,currency:'USD',time:Date.now()});
               window.batchRequests=[];window.batchReleases=[];
-              dispatch=async(plan,id)=>{window.batchRequests.push({model:plan.model.id,batchId:id,prompt:plan.prompt});await new Promise(r=>window.batchReleases.push(r));};
+              dispatch=async(plan,id)=>{window.batchRequests.push({model:plan.model.id,batchId:id,prompt:plan.prompt,values:plan.values,media:plan.media});await new Promise(r=>window.batchReleases.push(r));return {id:'job-'+plan.model.id};};
+              const realRPC=rpc;rpc=async(op,args)=>op==='pick'?[{id:'a'.repeat(32)+'.png',name:'Referencia QA',mime:'image/png',url:'/media/'+'a'.repeat(32)+'.png',size:100}]:realRPC(op,args);
               await prepareComparison();
             }""")
             assert 'Encargo a varios modelos' in page.locator('#dialog').inner_text()
+            page.locator('[data-order-index="0"] [data-order-prompt]').fill('Prompt del modelo A')
+            page.locator('[data-order-index="1"] [data-order-prompt]').fill('Prompt del modelo B')
+            page.locator('[data-order-index="0"] [data-order-param=duration]').fill('99')
+            assert page.locator('#order-send').is_disabled()
+            page.locator('[data-order-index="0"] [data-order-param=duration]').fill('5')
+            page.locator('[data-order-index="1"] [data-order-param=duration]').fill('2')
+            page.locator('[data-order-index="1"] [data-order-param=aspect_ratio]').select_option('16:9')
+            page.locator('[data-order-index="0"] [data-order-pick=images]').click()
+            assert page.evaluate('comparePlans[0].media.length') == 1
+            assert page.evaluate('comparePlans[1].media.length') == 0
+            assert page.evaluate('state.draft.media.length') == 0
+            page.keyboard.press('Escape')
+            page.evaluate('prepareComparison()')
+            assert page.locator('[data-order-index="0"] [data-order-prompt]').input_value()=='Prompt del modelo A'
+            assert page.evaluate('comparePlans[0].media.length') == 1
+            page.locator('[data-order-index="0"] [data-order-param=duration]').fill('6')
+            assert page.locator('#order-send').is_disabled()
+            page.locator('#order-quote').click()
+            page.wait_for_function('!document.querySelector("#order-send").disabled')
+            for width in [1360,480]:
+                page.set_viewport_size({'width':width,'height':850})
+                assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')
+                page.screenshot(path=str(OUT/f'order-editor-{width}.png'))
             page.locator('[data-action=sendCompare]').click()
             page.wait_for_function('window.batchRequests.length===2')
             assert page.evaluate('new Set(window.batchRequests.map(r=>r.batchId)).size') == 1
-            assert page.evaluate("window.batchRequests.every(r=>r.prompt==='Mi borrador')")
+            assert page.evaluate("window.batchRequests.map(r=>r.prompt)") == ['Prompt del modelo A','Prompt del modelo B']
+            assert page.evaluate("window.batchRequests.map(r=>r.values.duration)") == ['6','2']
+            assert page.evaluate('window.batchRequests.map(r=>r.media.length)') == [1,0]
+            assert page.evaluate('state.draft.prompt') == 'Mi borrador'
+            page.locator('[data-order-action=run]').click()
+            assert 'Enviándose' in page.locator('#order-run-rows').inner_text()
             page.evaluate('window.batchReleases.forEach(r=>r())')
             page.wait_for_function('!Batch.active')
+            page.wait_for_function("document.querySelector('#order-run-rows').textContent.includes('Enviado')")
+            page.keyboard.press('Escape')
+            page.evaluate('flush()')
+            assert page.evaluate("state.lastOrderRun.requests.every(t=>t.status==='SUBMITTED')")
             assert not page.locator('[data-pc=open-compare]').is_visible()
             page.wait_for_function('Boolean(window.NexusTelemetry)')
             page.locator('#telemetry-button').click()
@@ -189,6 +225,13 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert page.evaluate('window.NexusTelemetry.snapshot().total') == 0
             page.keyboard.press('Escape')
             assert page.locator('#telemetry-panel').count()==0
+            page.reload(wait_until='domcontentloaded',timeout=30000)
+            page.wait_for_function("Boolean(window.NexusOrderEditor)&&state.lastOrderRun?.requests.length===2")
+            assert page.evaluate("state.lastOrderRun.requests.every(t=>t.status==='SUBMITTED')")
+            page.locator('#order-latest').click()
+            assert page.locator('#order-run-rows tr').count()==2
+            assert 'Enviado' in page.locator('#order-run-rows').inner_text()
+            page.keyboard.press('Escape')
             assert not errors, errors
             assert not blocked, blocked
             report={'status':'PASS','errors':errors,'blockedOperations':blocked,'paidCalls':0,
@@ -197,6 +240,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
                 'savedView':True,'reversibleHide':True,'videoPreviewAndControls':video_checked,'prepareVideo':True,
                 'multiModelConfirmationAndParallelDispatch':True,'videoModelSelection':True,
                 'telemetryPanelLatencyErrorsPauseClearExport':True,
+                'individualPromptsParametersCostsAndRequestStates':True,
                 'responsiveWidths':[1360,760,480,1280]}
             (OUT/'verification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
             print(json.dumps(report))
