@@ -102,6 +102,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private val chatStore = AssistantChatStore(app)
     private val submitSlots = kotlinx.coroutines.sync.Semaphore(3)
     private val flowLane = kotlinx.coroutines.sync.Mutex()
+    // StateFlow can emit synchronously in init; callbacks need initialized state.
+    private val synced = mutableSetOf<String>()
+    private var completedSeen = -1
+    private var msgSeq = 0L
 
     init {
         val s = runtime.settings.load()
@@ -431,9 +435,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         s.copy(plans = s.plans + (planId to f(p)))
     }
 
-    private val synced = mutableSetOf<String>()
 
-    private var completedSeen = -1
 
     private fun onJobs(jobs: List<com.vidadomu.nexus.core.model.GenerationJob>) {
         // Generaciones hechas a mano (fuera del asistente): se indexan y heredan el proyecto activo de ese momento.
@@ -487,7 +489,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun notice(text: String, error: Boolean = false) = _ui.update { it.copy(items = it.items + ChatItem.Notice(newId(), text, error)) }
 
-    private var msgSeq = 0L
     private fun msg(text: String) = (++msgSeq) to text
 
     private fun newId() = UUID.randomUUID().toString()

@@ -51,13 +51,14 @@ La entrega se distingue en código implementado, pruebas ejecutadas, APK compila
 
 ## Validación y entrega (2026-10-08)
 
-- Núcleo JVM: 93 pruebas, 0 fallos, 0 errores, 0 omitidas; incluye límite Flow por turno.
-- APK `agentPreview` final compilada directamente en Pixel 8 Pro (404 archivos de fuente verificados).
-- APK recuperada: SHA-256 `a141a9f674faa19a7028290d38d3e83eef5f41199d65b8cd72f18ba1cd1d4565`, coincide con el artefacto del Pixel.
-- APK firmada con el certificado de la instalación existente; SHA-256 `564805815e72b8234c909d49f71a8efa3211bf6c599a1bca73188d52061ef807`.
-- S25 físico SM-S938B: actualización `adb install -r` completada y versión 24 / `1.8.0-agent-preview` verificada en Package Manager y proveedor de diagnóstico.
-- Datos antes y después: 93 trabajos, 91 resultados, SQLite `integrity_check=ok`; archivos del asistente y archivo de credenciales conservados sin cambios. Copias privadas fuera de Git.
+- Núcleo JVM: 93 pruebas, 0 fallos, 0 errores, 0 omitidas.
+- Suite JVM Android: 227 pruebas, 0 fallos, 0 errores, 0 omitidas.
+- APK final corregida compilada directamente en Pixel 8 Pro, 404 archivos de fuente verificados; recompilación de arranque completada en 7 min 48 s.
+- APK firmada con el certificado de la instalación existente; SHA-256 `46e3cc8c61c75590ba525934eb465ce2354360eb01436a148c9635988786b3ea`.
+- S25 físico SM-S938B: actualización `adb install -r` completada, versión 24 / `1.8.0-agent-preview` verificada. Apertura real de la actividad y navegación al Asistente realizadas; conversación y resultados antiguos visibles. Proceso vivo sin excepciones fatales nuevas.
+- Se detectó y corrigió un crash real de la primera actualización: la emisión síncrona de StateFlow en init ejecutaba onJobs antes de inicializar synced. synced, completedSeen y msgSeq se inicializan ahora antes de registrar colectores.
+- Datos finales: 93 trabajos, 91 resultados, SQLite `integrity_check=ok`; 38 elementos de chat, dos planes y cinco referencias de sesión recuperados. Archivo legado conservado. Las 18 entradas del almacenamiento cifrado siguen presentes; algunos valores cambian tras la consulta de proveedores. No se afirma identidad byte a byte después del arranque. Copias privadas fuera de Git.
 - Diagnóstico: almacenamiento de credenciales disponible, Flow enlazado, 34 skills sin errores, un proyecto y 93 assets.
-- Suite JVM Android e instrumentación física: en curso; no se afirma que estén superadas. La ejecución anterior obtuvo 225 pruebas con dos fallos corregidos (expectativa antigua de bloqueo por coste desconocido y cursor de fixture situado al inicio).
-- UX visual del S25: no probada en esta entrega; se conserva la app que el usuario tenía en primer plano. No se ejecutaron generaciones reales.
-- Selector/router: retirado de la instalación activa y del repositorio por petición del usuario; compilación directa.
+- Instrumentación Pixel: prueba de migración del historial superada. Las dos pruebas Compose no obtuvieron una jerarquía de UI con el Pixel bloqueado y pantalla apagada; no se cuentan como superadas. Su ejecución sigue pendiente en un entorno visible.
+- No se ejecutaron generaciones reales ni se borraron datos.
+- Selector/router: retirado de la instalación activa y del repositorio; compilación directa.
