@@ -68,7 +68,9 @@ with tempfile.TemporaryDirectory(prefix='nexus-flow-direct-') as folder:
                 assert box['y']+box['height']<=compose['y']+1
                 assert compose['y']+compose['height']<=height+1
                 assert page.locator('.agent-messages').evaluate('n=>n.scrollHeight>n.clientHeight')
-                page.locator('.agent-messages').evaluate('n=>n.scrollTop=80')
+                page.mouse.move(box['x']+40,box['y']+min(60,box['height']/2))
+                page.mouse.wheel(0,80-page.locator('.agent-messages').evaluate('n=>n.scrollTop'))
+                page.wait_for_timeout(200)
                 page.evaluate('renderAssistant()')
                 scroll=page.locator('.agent-messages').evaluate('n=>n.scrollTop')
                 assert abs(scroll-80)<2,(width,scroll,page.locator('.agent-messages').evaluate('n=>[n.scrollHeight,n.clientHeight]'))

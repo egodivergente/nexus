@@ -17,7 +17,7 @@ function flowArguments(model,values,media=[]){
 document.addEventListener('DOMContentLoaded',()=>{
  const refreshBefore=refreshJobViews;
  refreshJobViews=function(ids){refreshBefore(ids);
-  if(view==='assistant'&&!Agent.busy&&state.jobs.some(j=>j.agentPlanId&&ids.includes(j.id)))renderAssistant();
+  if(view==='assistant'&&state.jobs.some(j=>j.agentPlanId&&ids.includes(j.id)))renderAssistant();
  };
  const detailBefore=studioDetails;
  studioDetails=function(id){detailBefore(id);const job=state.jobs.find(j=>j.id===id);

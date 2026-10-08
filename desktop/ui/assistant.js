@@ -1,5 +1,86 @@
 'use strict';
 const Agent = {owner:crypto.randomUUID(),snapshot:null,settings:{},items:[],attachments:[],busy:false,callbacks:new Set(),draft:'',error:'',cardAnchors:new Map(),expandedBatches:new Set()};
+// Keep the editor and unchanged messages alive across job/status updates.
+const agentMarkup=new WeakMap();
+function agentNodeKey(node){return node.dataset.agentMessage||node.dataset.agentCard||node.id||node.className;}
+function agentPatchChildren(parent,incoming){
+ const existing=new Map([...parent.children].map(node=>[agentNodeKey(node),node]));
+ let cursor=parent.firstElementChild;
+ for(const fresh of [...incoming.children]){
+  const key=agentNodeKey(fresh),old=existing.get(key),markup=fresh.outerHTML;
+  let node=fresh.agentRetained||fresh;
+  if(old&&agentMarkup.get(old)===markup)node=old;
+  else if(old&&!fresh.agentRetained){
+   // Preserve playback and decoded images when a result's status/count changes.
+   const media=new Map([...old.querySelectorAll('img,video,audio')].map(m=>[m.tagName+':'+m.getAttribute('src'),m]));
+   for(const m of fresh.querySelectorAll('img,video,audio')){
+    const retained=media.get(m.tagName+':'+m.getAttribute('src'));
+    if(retained){media.delete(m.tagName+':'+m.getAttribute('src'));m.replaceWith(retained);}
+   }
+  }
+  agentMarkup.set(node,markup);existing.delete(key);
+  if(node!==cursor)parent.insertBefore(node,cursor);
+  if(old&&old!==node)old.remove();
+  cursor=node.nextElementSibling;
+ }
+ for(const node of existing.values())node.remove();
+}
+const AgentViewport={
+ node:null,following:true,top:0,anchor:null,frame:0,force:false,height:0,extent:0,userUntil:0,
+ layoutChanged(){return this.node&&(this.node.clientHeight!==this.height||this.node.scrollHeight!==this.extent);},
+ remember(){
+  const n=this.node;if(!n?.isConnected)return;
+  this.top=n.scrollTop;
+  const edge=n.getBoundingClientRect().top;
+  const visible=[...n.children].find(c=>c.getBoundingClientRect().bottom>edge+1);
+  this.anchor=visible?{key:agentNodeKey(visible),offset:visible.getBoundingClientRect().top-edge}:null;
+ },
+ capture(n){
+  if(!n)return;
+  if(this.layoutChanged()){this.schedule();return;}
+  if(!this.force&&Math.abs(n.scrollTop-this.top)>1)this.following=n.scrollHeight-n.scrollTop-n.clientHeight<72;
+  this.remember();
+ },
+ latest(){this.following=true;this.force=true;this.userUntil=0;this.schedule();},
+ schedule(){if(!this.frame)this.frame=requestAnimationFrame(()=>{this.frame=0;this.apply();});},
+ apply(){
+  const n=this.node;if(!n?.isConnected||view!=='assistant')return;
+  if(this.following)n.scrollTop=n.scrollHeight;
+  else{
+   const anchor=this.anchor&&[...n.children].find(c=>agentNodeKey(c)===this.anchor.key);
+   n.scrollTop=anchor?n.scrollTop+anchor.getBoundingClientRect().top-n.getBoundingClientRect().top-this.anchor.offset:this.top;
+  }
+  this.top=n.scrollTop;this.height=n.clientHeight;this.extent=n.scrollHeight;this.force=false;
+  const compose=$('#agent-compose');if(compose)$('#content').style.setProperty('--agent-compose-height',compose.offsetHeight+'px');
+  const jump=$('[data-agent-latest]');if(jump)jump.hidden=this.following||n.scrollHeight-n.scrollTop-n.clientHeight<72;
+ },
+ mount(n){
+  if(this.node!==n){
+   this.resize?.disconnect();this.mutations?.disconnect();this.node=n;this.following=true;this.anchor=null;
+   n.addEventListener('scroll',()=>{
+    if(Math.abs(n.scrollTop-this.top)<1)return;
+    if(performance.now()>this.userUntil||this.layoutChanged()){this.schedule();return;}
+    this.following=n.scrollHeight-n.scrollTop-n.clientHeight<72;this.remember();this.schedule();
+   },{passive:true});
+   n.addEventListener('wheel',e=>{this.userUntil=performance.now()+600;if(e.deltaY<0){this.following=false;this.remember();}},{passive:true});
+   n.addEventListener('touchmove',()=>{this.userUntil=performance.now()+1000;},{passive:true});
+   n.addEventListener('pointerdown',e=>{if(e.clientX>=n.getBoundingClientRect().right-20)this.userUntil=performance.now()+1000;},{passive:true});
+   n.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(e.key))this.userUntil=performance.now()+600;});
+   this.resize=new ResizeObserver(()=>this.schedule());
+   this.mutations=new MutationObserver(()=>this.schedule());
+   this.mutations.observe(n,{childList:true,subtree:true,characterData:true});
+   n.addEventListener('load',()=>this.schedule(),true);
+   n.addEventListener('loadedmetadata',()=>this.schedule(),true);
+  }
+  this.resize.disconnect();this.resize.observe(n);
+  for(const child of n.children)this.resize.observe(child);
+  this.resize.observe($('#agent-compose'));this.schedule();
+ }
+};
+function agentSizeInput(){
+ const input=$('#agent-input');if(!input)return;
+ input.style.height='auto';input.style.height=Math.min(170,input.scrollHeight)+'px';AgentViewport.schedule();
+}
 const agentIcons = {
  chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',send:'<path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/>',
@@ -211,20 +292,23 @@ async function prepareBatchConfirmation(batch){
 }
 function renderAssistant(){
  if(!Agent.restored){Agent.restored=true;const saved=state.agentConversation;Agent.draft=saved?.draft||Agent.draft;if(saved?.items?.length){Agent.items=saved.items;for(const [key,index] of Object.entries(saved.anchors||{}))if(Agent.items[index])Agent.cardAnchors.set(key,Agent.items[index]);}}
- const oldMessages=$('.agent-messages'),oldScroll=oldMessages?.scrollTop||0,stick=!oldMessages||oldMessages.scrollHeight-oldMessages.scrollTop-oldMessages.clientHeight<72;
+ const content=$('#content'),oldMessages=$('.agent-messages'),oldCompose=$('#agent-compose');
+ AgentViewport.capture(oldMessages);
  const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),disabled=Agent.busy?'disabled':'';
  const generationMarkup=renderGenerationPlans(s,disabled),proposalMarkup=(s?.proposals||[]).map(p=>`<article class="agent-plan" data-agent-card="proposal:${escape(p.id)}"><p>${escape(p.description)}</p><button data-agent-apply="${p.id}" ${disabled}>Aplicar</button> <button data-agent-reject="${p.id}" ${disabled}>Descartar</button></article>`).join('');
- const messageMarkup=Agent.items.length?Agent.items.map(i=>`<article class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}</article>`).join(''):(!generationMarkup&&!proposalMarkup?'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>':'');
+ const messageMarkup=Agent.items.length?Agent.items.map(i=>`<article data-agent-message="${i.id||=crypto.randomUUID()}" class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}${i.failed?'<small class="hint">Envío no confirmado. Tu mensaje se conserva.</small>':''}</article>`).join(''):(!generationMarkup&&!proposalMarkup?'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>':'');
  $('#content').classList.add('agent-view');
- $('#content').innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select>${aiButton('project-new','Nuevo proyecto','plus',Agent.busy)}${aiButton('memory','Memoria del proyecto','book',Agent.busy||!project)}<button type="button" data-project-references ${disabled}>Archivos de referencia</button></div></div>
+ const template=document.createElement('template');
+ template.innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select>${aiButton('project-new','Nuevo proyecto','plus',Agent.busy)}${aiButton('memory','Memoria del proyecto','book',Agent.busy||!project)}<button type="button" data-project-references ${disabled}>Archivos de referencia</button></div></div>
  <div class="agent-session-info"><span>${s?(s.offline?'Sin modelo conectado':escape(agentModelLabel())):'Conectando con el asistente'}</span><button class="small" data-agent="skills" ${disabled}>Herramientas · ${s?.skills.length||0}</button></div>
  ${Agent.error?`<div class="agent-error" role="alert"><span>${escape(Agent.error)}</span><button type="button" data-agent="reconnect" ${disabled}>Comprobar conexión</button></div>`:''}
- <div class="agent-messages" role="log" aria-live="polite">${messageMarkup}
+ <div class="agent-messages" role="log" aria-label="Conversación" aria-live="polite" aria-relevant="additions text" tabindex="0">${messageMarkup}
  ${generationMarkup}
  ${proposalMarkup}
  ${Agent.busy?'<div class="agent-thinking"><span class="loading"></span> Preparando…</div>':''}</div>
- <form id="agent-compose"><div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…" ${disabled}>${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${aiButton('attach','Adjuntar imagen o vídeo','clip',Agent.busy)}${aiButton('send','Enviar mensaje','send',Agent.busy)}</div></form>`;
- const messages=$('.agent-messages');
+ <div class="agent-scroll-tools"><button type="button" data-agent-latest hidden aria-label="Ir al último mensaje">↓ Últimos mensajes</button></div>
+ <form id="agent-compose"><div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…">${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${aiButton('attach','Adjuntar imagen o vídeo','clip',Agent.busy)}${aiButton('send','Enviar mensaje','send',Agent.busy)}</div></form>`;
+ const messages=template.content.querySelector('.agent-messages');
  const messageNodes=[...messages.querySelectorAll('.agent-message')];
  // Anchor each card to the message present when it first appeared. Updates to
  // its status/results do not move it beneath later turns.
@@ -241,7 +325,20 @@ function renderAssistant(){
   const anchor=Agent.cardAnchors.get(card.dataset.agentCard),index=Agent.items.indexOf(anchor);
   if(index>=0&&messageNodes[index])messageNodes[index].after(card);else messages.prepend(card);
  }
- messages.scrollTop=stick?messages.scrollHeight:oldScroll;
+ if(oldMessages){agentPatchChildren(oldMessages,messages);messages.agentRetained=oldMessages;}
+ else for(const child of messages.children)agentMarkup.set(child,child.outerHTML);
+ if(oldCompose){
+  const fresh=template.content.querySelector('#agent-compose');
+  for(const selector of ['.agent-attachments','.agent-compose-actions']){
+   const old=oldCompose.querySelector(selector),next=fresh.querySelector(selector),markup=next.outerHTML;
+   if(agentMarkup.get(old)!==markup){old.replaceWith(next);agentMarkup.set(next,markup);}
+  }
+  const input=oldCompose.querySelector('#agent-input');
+  if(input.value!==Agent.draft)input.value=Agent.draft;
+  input.disabled=false;fresh.agentRetained=oldCompose;
+ }
+ agentPatchChildren(content,template.content);
+ AgentViewport.mount($('.agent-messages'));agentSizeInput();
  const currentFlow=(s?.plans||[]).filter(e=>e.plan.ref.providerId==='google_flow'&&jobsForPlan(e.plan.id).length);
  const previousFlow=(state.agentConversation?.flowPlans||[]).filter(e=>!currentFlow.some(c=>c.plan.id===e.plan.id));
  state.agentConversation={draft:Agent.draft,items:Agent.items,flowPlans:[...previousFlow,...currentFlow],anchors:Object.fromEntries([...Agent.cardAnchors].map(([key,item])=>[key,Agent.items.indexOf(item)]))};persist();
@@ -265,20 +362,21 @@ async function sendAgent(requestText){
   try{await agentCall('snapshot');}catch(error){Agent.error=error.message;if(view==='assistant')renderAssistant();return;}
   if(Agent.snapshot.offline){toast('El asistente necesita una conexion LLM. Configurala en sus ajustes.');agentSettings();return;}
  }
- const attachments=Agent.attachments.slice();Agent.items.push({role:'user',text,attachments});Agent.draft='';Agent.attachments=[];
+ const attachments=Agent.attachments.slice(),sent={role:'user',text,attachments};Agent.items.push(sent);Agent.draft='';Agent.attachments=[];AgentViewport.latest();
+ $('#agent-input')?.focus({preventScroll:true});
  try{const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
   Agent.items.push({role:'assistant',text:result.text,html:result.html,usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
- }catch(error){Agent.items.pop();Agent.error=error.message;Agent.draft=text;Agent.attachments=attachments;}
- if(view==='assistant'){renderAssistant();$('#agent-input')?.focus();}
+ }catch(error){sent.failed=true;Agent.error=error.message;if(!Agent.draft){Agent.draft=text;Agent.attachments=attachments;}}
+ if(view==='assistant')renderAssistant();
 }
 function agentSettings(){
  const s=Agent.settings;
  modal(`<h2>Ajustes del asistente</h2><form id="agent-settings"><div class="fields"><label>Conexión<select name="backend"><option value="direct">Bedrock directo</option><option value="proxy">Proxy Bedrock</option></select></label><label>Modelo<input name="modelId" value="${escape(s.modelId||'')}" required></label><label>Región<input name="region" value="${escape(s.region||'us-east-1')}" required></label><label>Máximo de tokens<input name="maxTokens" type="number" min="256" max="32000" value="${s.maxTokens||4096}"></label><label>URL del proxy<input name="endpoint" value="${escape(s.endpoint||'')}"></label><label>Familias excluidas<input name="excludedFamilies" value="${escape(s.excludedFamilies||'')}"></label>${[['accessKey','AWS Access Key'],['secretKey','AWS Secret Key'],['sessionToken','AWS Session Token'],['token','Token del proxy']].map(([id,label])=>`<label>${label}<input name="${id}" type="password" autocomplete="new-password" placeholder="${s.configured?.includes(id)?'Configurado':'Sin configurar'}"></label>`).join('')}</div><label class="agent-check"><input name="sendImages" type="checkbox" ${s.sendImages?'checked':''}> Enviar imágenes al asistente</label><button class="primary" type="submit">Guardar</button></form>`);
  $('#agent-settings [name=backend]').value=s.backend||'direct';
 }
-document.addEventListener('input',e=>{if(e.target.id==='agent-input')Agent.draft=e.target.value;});
+document.addEventListener('input',e=>{if(e.target.id==='agent-input'){Agent.draft=e.target.value;agentSizeInput();}});
 document.addEventListener('keydown',e=>{
- if(e.target.id!=='agent-input'||e.key!=='Enter'||e.shiftKey||e.ctrlKey||e.altKey||e.metaKey||e.isComposing)return;
+ if(e.target.id!=='agent-input'||e.key!=='Enter'||e.shiftKey||e.altKey||e.metaKey||e.isComposing)return;
  e.preventDefault();if(!e.repeat)sendAgent();
 });
 document.addEventListener('change',async e=>{if(e.target.id==='agent-project')try{await agentCall('project',{id:e.target.value});}catch(error){toast(error.message);}});
@@ -298,6 +396,7 @@ document.addEventListener('submit',async e=>{
 });
 document.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.hasAttribute('data-agent-latest')){AgentViewport.latest();return;}
  try{
   if(b.dataset.nav==='assistant'&&!Agent.busy){const first=!Agent.snapshot;await agentCall('snapshot');if(first)await agentCall('importHistory');}
   if(b.dataset.agentMode)await agentCall('mode',{mode:b.dataset.agentMode});
@@ -320,8 +419,8 @@ document.addEventListener('click',async e=>{
   switch(b.dataset.agent){
    case'reconnect':try{await rpc('init');await agentCall('snapshot');Agent.error='';toast('Conexión local comprobada. No se ha reenviado el mensaje.');}catch(error){Agent.error=error.message;}if(view==='assistant')renderAssistant();break;
    case'send':e.preventDefault();await sendAgent();break;
-   case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();break;
-   case'new':await agentCall('new');Agent.items=[];Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();state.agentConversation=null;renderAssistant();break;
+   case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
+   case'new':await agentCall('new');Agent.items=[];Agent.draft='';Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();state.agentConversation=null;AgentViewport.latest();renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
    case'settings':agentSettings();break;
    case'project-new':modal('<h2>Nuevo proyecto</h2><form id="agent-project-form"><label>Nombre<input name="name" maxlength="80" required></label><button class="primary">Crear proyecto</button></form>');break;
    case'memory':{const p=Agent.snapshot.index.projects.find(p=>p.id===Agent.snapshot.projectId),m=p.memory;
