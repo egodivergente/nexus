@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "desktop:create": {
+      "targetKind": "existing-ui",
+      "projectId": "02eb2bbd-8ec0-43f6-9d09-eaef293ae377",
+      "baselineDraftId": "b19c6914-0da3-44f2-9756-507195a587de",
+      "activeDraftId": "b19c6914-0da3-44f2-9756-507195a587de",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "1b14f54f-e9f1-447b-a34f-6359982c43aa"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "desktop/ui/index.html",
+        "desktop/ui/app.js",
+        "desktop/ui/studio.js",
+        "desktop/ui/desktop-design.js",
+        "desktop/ui/desktop-design.css"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "3bb32ad0e01bb4ad70ed198f66ed08de522d2c4d8aab6ae58f2b1c3ff9b4f8fb",
+        "desktop/ui/index.html": "c228740bf610d3d063185f5f0bc0e73b4bd9890d47056bb2bfa17d45a180b099",
+        "desktop/ui/app.js": "175977c1ec7e013cf5f27f2726f541be49ff66e0bccb66617c11ec5ad7f740ad",
+        "desktop/ui/studio.js": "247723e11f38d33da1bff45bb621ccd88972520c0ff5e14ab7324b7f26109528",
+        "desktop/ui/desktop-design.js": "4ff02c3b3b1c8b67e5a9ea661dc64e0fa399537aff4f539e7a2d38a96b4ec0b5",
+        "desktop/ui/desktop-design.css": "18911c1756dba5b7f5593c7b372917e458ee4c1661e12de646f06f6446840177"
+      },
+      "components": [],
+      "drafts": {
+        "b19c6914-0da3-44f2-9756-507195a587de": {
+          "title": "NEXUS Studio — Crear",
+          "visualDirection": "reproducción fiel del flujo actual de creación en escritorio",
+          "currentVersion": 2
+        }
+      },
+      "updatedAt": "2026-10-08T00:59:29Z"
+    },
+    "desktop:library": {
+      "targetKind": "existing-ui",
+      "projectId": "02eb2bbd-8ec0-43f6-9d09-eaef293ae377",
+      "activeDraftId": "46750b49-be6f-4cf9-8b70-b1f7fac5c6c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "3a7e1e41-4a96-408a-9378-d575646a162e"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "desktop/ui/index.html",
+        "desktop/ui/app.js",
+        "desktop/ui/studio.js",
+        "desktop/ui/workspace.js",
+        "desktop/ui/workspace.css",
+        "desktop/ui/desktop-design.js",
+        "desktop/ui/desktop-design.css"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "3bb32ad0e01bb4ad70ed198f66ed08de522d2c4d8aab6ae58f2b1c3ff9b4f8fb",
+        "desktop/ui/index.html": "c228740bf610d3d063185f5f0bc0e73b4bd9890d47056bb2bfa17d45a180b099",
+        "desktop/ui/app.js": "175977c1ec7e013cf5f27f2726f541be49ff66e0bccb66617c11ec5ad7f740ad",
+        "desktop/ui/studio.js": "247723e11f38d33da1bff45bb621ccd88972520c0ff5e14ab7324b7f26109528",
+        "desktop/ui/workspace.js": "2359dd80f5d2a2c021fe656716a06c365de8b8949fb045b7e14267da7ae617b5",
+        "desktop/ui/workspace.css": "a646ed641c86b4d93d3eaa1e4373a149bd8e7395e9bed00ba2ceab596ee83609",
+        "desktop/ui/desktop-design.js": "4ff02c3b3b1c8b67e5a9ea661dc64e0fa399537aff4f539e7a2d38a96b4ec0b5",
+        "desktop/ui/desktop-design.css": "18911c1756dba5b7f5593c7b372917e458ee4c1661e12de646f06f6446840177"
+      },
+      "components": [],
+      "drafts": {
+        "46750b49-be6f-4cf9-8b70-b1f7fac5c6c9": {
+          "title": "NEXUS Studio — Biblioteca galería",
+          "visualDirection": "galería de medios de alto nivel con selección contextual, proyectos y estado compacto",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-08T01:07:24Z"
+    }
+  }
+}
