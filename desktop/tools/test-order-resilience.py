@@ -155,12 +155,32 @@ runpy.run_path(sys.argv[0],run_name='__main__')
             assert native['prompt']==rewrite and native['originalPrompt']==original_prompt.strip(), native
             assert result['snapshot']['plans'][0]['state']=='PREPARED'
             assert len(llm_requests)==5, len(llm_requests)
+            # The inline action crosses the real Kotlin ticket/callback protocol once,
+            # including an unavailable price; dispatch remains a local simulation.
+            page.evaluate("""()=>{
+              document.querySelector('#dialog').close();
+              Agent.items=[{role:'user',text:'Una imagen de Mateo'},{role:'assistant',text:'Encargo preparado'}];
+              quotePlan=async()=>({amount:null,currency:'unknown',status:'unavailable',time:Date.now()});
+              dispatch=async(p,batchId,meta)=>{
+               attempts.push({id:p.model.id,prompt:p.prompt,original:p.originalPrompt,cost:p.cost,meta});
+               const job={id:'native-chat-result',name:p.model.displayName,modelId:p.model.id,providerId:p.model.providerId,
+                modality:'IMAGE',status:'PROCESSING',outputs:[],prompt:p.prompt,originalPrompt:p.originalPrompt,...meta};
+               state.jobs.push(job);return job;
+              };
+              navigate('assistant');
+            }""")
+            page.locator('[data-agent=generate-ready]').click()
+            page.wait_for_function("!Agent.generating&&!Agent.busy&&Agent.snapshot.plans[0].state==='SUBMITTED'")
+            assert page.evaluate('attempts.length')==23
+            assert page.evaluate("attempts.at(-1).original===originalPrompt.trim() && attempts.at(-1).cost.currency==='unknown'"),page.evaluate('attempts.at(-1)')
+            assert page.evaluate('!document.querySelector("#dialog").open')
+            assert page.locator('[data-agent=generate-ready]').count()==0
             assert not errors, errors
             assert not forbidden, forbidden
             report = {'status':'PASS','nativeSemanticRewrite':True,'chatPlanRewrite':True,'originalPreserved':True,'unknownLimitsUntouched':True,
                       'parameterAdaptation':True,'partialReadiness':True,'unknownPriceDoesNotBlock':True,
                       'automaticQuotes':True,'staleQuotesRefreshed':True,'rewriteEditRace':True,'failureIsolation':True,'max20PerModel':True,
-                      'paidCalls':0,'simulatedSubmissions':22}
+                      'nativeSingleClickGeneration':True,'paidCalls':0,'simulatedSubmissions':23}
             (OUT/'verification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
             print(json.dumps(report)); browser.close()
     finally:

@@ -6,10 +6,10 @@ object SystemPrompt {
 
     /** Reglas que se añaden SIEMPRE, también con systemPromptOverride. */
     const val SPEND_RULES = """ENVÍO DE GENERACIONES:
-1. Los proveedores de pago distintos de Google Flow requieren revisión: nunca se lanza una generación sin que el usuario pulse GENERAR en la tarjeta de ESA generación. Tú no puedes pulsarlo ni hay herramienta que lo haga.
+1. Los proveedores de pago distintos de Google Flow se envían cuando el usuario pulse GENERAR en el encargo mostrado. Un solo clic puede autorizar todas las peticiones concretas de un lote, incluso de modelos distintos; no pidas otra confirmación ni obligues a pulsar una tarjeta por petición. Tú no puedes pulsar ese botón.
 2. Google Flow con acceso directo usa la cuenta del usuario: si pide generar, ejecuta prepare_generation con execute=true, sin tarjeta, confirmación ni cotización adicional. Puede pedir hasta 20 resultados en un encargo, con prompts distintos si lo solicita. Los demás proveedores mantienen revisión de coste.
 3. Para Flow, formato por defecto 16:9, personalizable: respeta el formato que pida el usuario. Envía todos los trabajos solicitados, no solo el primero. Consulta el estado; no repitas automáticamente un envío incierto.
-4. Para proveedores de pago distintos de Flow, muestra modelo, modalidad, duración/resolución y coste estimado antes de pedir confirmación.
+4. Para proveedores de pago distintos de Flow, prepara todos los encargos solicitados y muestra modelo, modalidad, duración/resolución y coste estimado junto al botón GENERAR. No limites el lote a una generación ni añadas un segundo diálogo. Cada petición conserva su identidad y parámetros; un fallo no cancela las demás.
 5. Si el coste es desconocido u orientativo, dilo claramente.
 6. Si recommend_models indica «familia excluida en tus ajustes», no propongas esa familia (el usuario la tiene gratis en otro sitio) salvo que la pida por su nombre."""
 

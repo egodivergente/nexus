@@ -1,0 +1,19 @@
+.interface-themes{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:18px}
+body.nx-desktop .interface-themes button{display:flex;align-items:center;gap:10px;flex-wrap:wrap;text-align:left;padding:12px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.theme-preview{display:flex;align-items:flex-end;gap:6px;width:100%;height:68px;border-radius:8px;background:var(--swatch-bg);padding:12px;border:1px solid #ffffff18}
+.theme-preview i{display:block;height:32px;width:32%;border-radius:5px;background:var(--swatch-panel)}.theme-preview i:first-child{width:12%;height:44px}.theme-preview i:last-child{background:var(--swatch-accent);height:22px;width:20%}
+body.nx-desktop .interface-themes button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.theme-selected{margin-left:auto;color:var(--accent);visibility:hidden}[aria-pressed=true] .theme-selected{visibility:visible}
+/* Theme tokens also cover presentation layers that originally used literal colors. */
+body[data-interface-theme].nx-desktop.creative-engine{background:radial-gradient(ellipse at 62% 8%,color-mix(in srgb,var(--accent) 6%,transparent),transparent 46%),var(--bg)}
+body[data-interface-theme=oled].nx-desktop.creative-engine{background:var(--bg)}
+body[data-interface-theme].nx-desktop.creative-engine .sidebar{background:var(--nx-sidebar);border-color:var(--line)}
+body[data-interface-theme].nx-desktop.creative-engine :is(#navigation button.active,.sidebar button.active){color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+body[data-interface-theme].creative-engine .sidebar button.active:before{background:var(--accent);box-shadow:0 0 12px color-mix(in srgb,var(--accent) 40%,transparent)}
+body[data-interface-theme].nx-desktop :is(.creative-control-panel,.creative-multi>div,.select-popup,#toast){background:var(--surface);color:var(--text);border-color:var(--line)}
+body[data-interface-theme].creative-engine :is(.creative-status,.creative-piece){background:var(--bg);color:var(--muted);border-color:var(--line)}
+body[data-interface-theme].creative-engine .creative-command{background:linear-gradient(125deg,var(--surface),var(--panel) 55%);border-color:var(--line)}
+body[data-interface-theme].creative-engine .creative-command:focus-within{border-color:var(--accent);box-shadow:0 22px 70px #0005,0 0 28px color-mix(in srgb,var(--accent) 8%,transparent)}
+body[data-interface-theme].creative-engine :is(.creative-split #generate,.creative-multi>summary){background:linear-gradient(125deg,var(--accent),color-mix(in srgb,var(--accent) 80%,white));border-color:var(--accent);color:#121921}
+body[data-interface-theme].nx-desktop :is(.creative-heading span,.creative-tray-heading h2,.creative-chip label,.creative-control-panel p,.creative-shortcut,.creative-motor:after){color:var(--muted)}
+body[data-interface-theme].nx-desktop :is(.creative-motor,.creative-command .quote strong){color:var(--text)}
+body[data-interface-theme].nx-desktop .agent-flow-media img{background:var(--panel)}
