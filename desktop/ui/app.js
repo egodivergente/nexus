@@ -70,3 +70,9 @@ document.addEventListener('change',e=>{const t=e.target;if(t.id==='provider'){pr
 document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();navigate('catalog');$('#search')?.focus();}if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();navigate('canvas');}});
 async function boot(){try{initial=await rpc('init');if(initial.state)state={...state,...initial.state,draft:{...state.draft,...initial.state.draft}};models=await fetch('catalog.json').then(r=>r.json());models.push(...(initial.flowModels||[]));if(forbiddenModel({id:state.draft.modelId}))state.draft.modelId=null;const seen=new Set();models=models.filter(m=>{if(forbiddenModel(m))return false;const key=JSON.stringify([m.id,m.providerId]);if(seen.has(key))return false;seen.add(key);return true;});$('#connection').textContent=initial.qa?'Laboratorio sin conexión':initial.configured.length+' proveedores configurados';for(const j of state.jobs)if(j.status==='SENDING'){j.status='FAILED';j.error='La aplicación se cerró durante el envío. Comprueba el proveedor antes de repetir.';j.uncertain=true;}render();setInterval(()=>{if(!document.hidden)poll();},15000);window.nexusQA={state,models,engine:E,rpc,configuration,openModel,render,getQuote,navigate};}catch(e){$('#content').innerHTML='<div class="empty"><h2>No se pudo abrir el estudio</h2><p>'+escape(e.message)+'</p></div>';}}
 document.addEventListener('DOMContentLoaded',boot,{once:true});
+// Load after the desktop helpers have registered their render functions.
+document.addEventListener('DOMContentLoaded',()=>{
+ if(typeof Studio==='undefined'||typeof renderPC==='undefined')return;
+ const style=document.createElement('link');style.rel='stylesheet';style.href='studio-gallery.css';document.head.append(style);
+ const script=document.createElement('script');script.src='studio-gallery.js';document.head.append(script);
+},{once:true});

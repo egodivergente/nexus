@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import socketserver
 import subprocess
 import tempfile
 import threading
@@ -614,9 +615,17 @@ def main():
         kernel.CloseHandle(mutex)
 
 
+class LoopbackHTTPServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # The address is explicitly loopback; startup does not need reverse DNS.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = 'localhost'
+        self.server_port = self.server_address[1]
+
+
 def run_server(options):
     keys = {} if OFFLINE_QA else windows_keys(KEY_FILE)
-    server = ThreadingHTTPServer(('127.0.0.1', options.port), Handler)
+    server = LoopbackHTTPServer(('127.0.0.1', options.port), Handler)
     server.token = secrets.token_urlsafe(32)
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
@@ -643,7 +652,8 @@ def open_window(url):
         profile = DATA / 'EdgeProfile'
         profile.mkdir(parents=True, exist_ok=True)
         subprocess.Popen([edge, '--app=' + url, '--user-data-dir=' + str(profile),
-                          '--no-first-run', '--no-default-browser-check', '--window-size=1280,840'],
+                          '--no-first-run', '--no-default-browser-check', '--force-dark-mode',
+                          '--window-size=1280,840'],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         os.startfile(url)
