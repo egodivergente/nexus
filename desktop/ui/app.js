@@ -17,11 +17,20 @@ const icon=name=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const money=v=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'USD',maximumFractionDigits:4}).format(v);
 const amount=q=>q?q.currency==='unknown'?'Coste no disponible':q.currency==='flow_account'?'Disponible en tu cuenta':q.currency==='flow_credits'?q.amount===0?'Incluido':`${q.upperBound?'Hasta ':''}${q.amount.toLocaleString('es-ES')} créditos Flow`:q.currency==='credits'?`${q.amount.toLocaleString('es-ES')} créditos Crun`:money(q.amount):'Coste pendiente';
 function toast(text){$('#toast').textContent=text;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),5500);}
-let saveQueue=Promise.resolve(),saveRevision=0,savedRevision=0;
-function saveState(){const revision=++saveRevision,snapshot=structuredClone(state);const operation=saveQueue.catch(()=>{}).then(()=>rpc('save',snapshot)).then(()=>{savedRevision=revision;});saveQueue=operation;return operation;}
-function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=null;saveState().catch(e=>toast('No se han guardado los cambios: '+e.message));},250);}
+let saveQueue=Promise.resolve(),saveRevision=0,savedRevision=0,dirtyVersion=0;
+const SaveStatus={status:'saved',error:''};
+function updateSaveStatus(status,error=''){SaveStatus.status=status;SaveStatus.error=error;window.dispatchEvent(new CustomEvent('nexus:save-status',{detail:{...SaveStatus}}));}
+function saveState(){
+ const revision=++saveRevision,version=dirtyVersion,snapshot=structuredClone(state);updateSaveStatus('saving');
+ const operation=saveQueue.catch(()=>{}).then(()=>rpc('save',snapshot)).then(()=>{
+  savedRevision=revision;
+  if(revision===saveRevision&&version===dirtyVersion&&!saveTimer)updateSaveStatus('saved');
+ }).catch(error=>{if(revision===saveRevision&&version===dirtyVersion&&!saveTimer)updateSaveStatus('error',error.message);throw error;});
+ saveQueue=operation;return operation;
+}
+function persist(){dirtyVersion++;updateSaveStatus('pending');clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=null;saveState().catch(e=>toast('No se han guardado los cambios: '+e.message));},250);}
 async function flush(){clearTimeout(saveTimer);saveTimer=null;await saveState();}
-window.addEventListener('beforeunload',e=>{if(saveTimer||savedRevision<saveRevision){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(saveTimer||savedRevision<saveRevision||SaveStatus.status!=='saved'){e.preventDefault();e.returnValue='';}});
 function applyTheme(){document.body.classList.toggle('oled',state.theme==='oled');for(const accent of ['turquoise','amber','violet'])document.body.classList.toggle(accent,state.accent===accent);window.NexusThemes?.apply();}
 function logo(m){const s=(m.organization+' '+m.id).toLowerCase();const pairs=[['seedream','bytedance'],['seedance','bytedance'],['nano-banana','google'],['gemini','google'],['gpt','openai'],['kling','kling'],['flux','flux'],['wan','wan'],['qwen','qwen'],['minimax','minimax'],['runway','runway']];const found=pairs.find(([key])=>s.includes(key));return found?`<img class="logo" src="logos/${found[1]}.png" alt="">`:`<span class="initial">${escape(m.organization?.slice(0,1)||'N')}</span>`;}
 function description(m){if(m.shortDescription&&/[áéíóúñ]|para|imagen|vídeo/i.test(m.shortDescription))return m.shortDescription;const c=m.capabilities||[];if(c.includes('MOTION_CONTROL'))return 'Transfiere el movimiento de un vídeo a un personaje de referencia.';if(c.includes('UPSCALE'))return 'Mejora la resolución del archivo original.';if(m.modalities.includes('CHAT'))return 'Redacta, analiza y desarrolla ideas mediante conversación.';if(m.modalities.includes('AUDIO'))return 'Crea o transforma audio según sus entradas y opciones.';if(m.modalities.includes('VIDEO'))return m.supportsVideoInput?'Transforma un vídeo con instrucciones y controles específicos.':m.supportsImageInput?'Anima tus imágenes y dirige el movimiento de la escena.':'Crea una escena de vídeo a partir de una descripción.';return m.supportsImageInput||m.contractMedia?.length?'Crea y edita imágenes con tus referencias visuales.':'Explora una interpretación visual de tu prompt.';}
@@ -124,6 +133,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 },{once:true});
 
 document.addEventListener('DOMContentLoaded',()=>{const script=document.createElement('script');script.src='project-references.js';document.body.append(script);},{once:true});
+document.addEventListener('DOMContentLoaded',()=>{
+ const style=document.createElement('link');style.rel='stylesheet';style.href='studio-ux.css';document.head.append(style);
+ const script=document.createElement('script');script.src='studio-ux.js';document.body.append(script);
+},{once:true});
 document.addEventListener('DOMContentLoaded',()=>{
  for(const file of ['interface-themes','chat-model-suggestions']){
   const style=document.createElement('link');style.rel='stylesheet';style.href=file+'.css';document.head.append(style);
