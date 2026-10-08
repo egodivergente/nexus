@@ -43,4 +43,10 @@ La fuente sincronizada más reciente disponible corresponde a 1.8.1 (versionCode
 - `:agent-core:test` y `:app:testOfflineQaUnitTest`: 337 pruebas, cero fallos y cero errores.
 - El empaquetado en ASUS se detuvo tras verificar presión de memoria, uso de swap y esperas de E/S sostenidas; se detuvo exclusivamente el daemon de esta copia aislada. Los informes unitarios se recuperaron.
 - Fallback de empaquetado en AXELPC: Java 17, SDK 35, un trabajador, sin paralelismo y prioridad BelowNormal.
-- Compilación APK OfflineQa y prueba de navegación física: pendientes de completar en este informe.
+- `:app:assembleOfflineQa` y `:app:assembleOfflineQaAndroidTest`: BUILD SUCCESSFUL en Windows (18m 56s). Se comprobó que las 412 entradas del manifiesto remoto y las fuentes locales no tienen diferencias semánticas; dos ficheros solo difieren en finales de línea.
+- APK QA y paquete de pruebas instalados mediante actualización, conservando datos. Identidad `com.vidadomu.nexus.qa`, versionCode 25; firma verificada y SHA-256 del APK instalado coincidente con el compilado.
+- APK QA SHA-256: `c23d3c77dbe1bdf315b1f1711b35a7d422188b72f78f8d4bc67ec412959b0c19`.
+- APK de pruebas SHA-256: `2e781fc8186352c13469035249e5a9ba586b2a2bc85fb6244febca124b191e89`.
+- Prueba Compose de navegación en S25 desbloqueado: PASS, `OK (1 test)`, Agente → Ajustes → Modelos → Agente vuelve a la conversación. El intento previo con el dispositivo bloqueado falló con `No compose hierarchies found`; se repitió tras desbloqueo confirmado por el usuario.
+- En una verificación posterior, la base ya tenía 106 trabajos (85 completados, 21 fallidos) y el modelo seleccionado figuraba como Opus 4.6. Se conservaron esas modificaciones posteriores: los tres trabajos recuperados continúan FAILED y SQLite íntegra. La selección inicial de Sonnet quedó verificada entonces, sin sobrescribir después la preferencia nueva.
+- Se retiró la instrumentación temporal de diagnóstico de Flow y la copia transitoria de la base en `/data/local/tmp`; los respaldos originales siguen conservados fuera de Git.
