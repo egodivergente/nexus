@@ -173,9 +173,21 @@ class AgentHost:
             op = args.get('op', 'snapshot')
             body = dict(args.get('args') or {})
             allowed = {'snapshot', 'send', 'new', 'mode', 'project', 'createProject', 'memory',
-                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory'}
+                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference'}
             if op not in allowed:
                 raise ValueError('Operacion no admitida.')
+            if op == 'importReferences':
+                import re
+                files = body.get('files')
+                if not isinstance(files, list) or not files:
+                    raise ValueError('Selecciona los archivos que quieres importar.')
+                for file in files:
+                    uri = str(file.get('uri', ''))
+                    if not re.fullmatch(r'/media/[a-f0-9]{32}\.(png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a)', uri):
+                        raise ValueError('Referencia local no válida.')
+                    path = self.data.parent / uri.lstrip('/')
+                    if not path.is_file():
+                        raise ValueError('El archivo importado ya no está disponible.')
             if op == 'settings':
                 body = {'settings': self.save_settings(body),
                         'secrets': self.read_secret(self.data / 'credentials.dpapi')}

@@ -99,3 +99,5 @@ document.addEventListener('DOMContentLoaded',()=>{
  const creativeStyle=document.createElement('link');creativeStyle.rel='stylesheet';creativeStyle.href='creative-engine.css';document.head.append(creativeStyle);
  const creative=document.createElement('script');creative.src='creative-engine.js';document.head.append(creative);
 },{once:true});
+
+document.addEventListener('DOMContentLoaded',()=>{const script=document.createElement('script');script.src='project-references.js';document.body.append(script);},{once:true});
