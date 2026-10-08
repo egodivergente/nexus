@@ -165,6 +165,30 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.evaluate('window.batchReleases.forEach(r=>r())')
             page.wait_for_function('!Batch.active')
             assert not page.locator('[data-pc=open-compare]').is_visible()
+            page.wait_for_function('Boolean(window.NexusTelemetry)')
+            page.locator('#telemetry-button').click()
+            page.wait_for_function("window.NexusTelemetry.snapshot().rows.some(r=>r.op==='localPing'&&r.ok)")
+            page.evaluate("rpc('unsupported-qa-operation',{prompt:'PRIVATE-TELEMETRY-TEST'}).catch(()=>{})")
+            page.wait_for_function('window.NexusTelemetry.snapshot().errors>0')
+            page.wait_for_function("document.querySelector('#telemetry-rows').textContent.includes('Error')")
+            assert 'PRIVATE-TELEMETRY-TEST' not in page.evaluate('JSON.stringify(window.NexusTelemetry.snapshot())')
+            page.locator('#telemetry-toggle').click()
+            recorded=page.evaluate('window.NexusTelemetry.snapshot().total')
+            page.evaluate("rpc('init')")
+            assert page.evaluate('window.NexusTelemetry.snapshot().total') == recorded
+            with page.expect_download() as download:
+                page.locator('#telemetry-export').click()
+            download.value.save_as(str(OUT/'telemetry-export.json'))
+            exported=json.loads((OUT/'telemetry-export.json').read_text())
+            assert exported['version']==1 and exported['rows']
+            for width in [1360,480]:
+                page.set_viewport_size({'width':width,'height':850})
+                assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')
+                page.screenshot(path=str(OUT/f'telemetry-{width}.png'))
+            page.locator('#telemetry-clear').click()
+            assert page.evaluate('window.NexusTelemetry.snapshot().total') == 0
+            page.keyboard.press('Escape')
+            assert page.locator('#telemetry-panel').count()==0
             assert not errors, errors
             assert not blocked, blocked
             report={'status':'PASS','errors':errors,'blockedOperations':blocked,'paidCalls':0,
@@ -172,6 +196,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
                 'contextSelection':True,'resultComparatorRemoved':True,'commands':True,'draftPreserved':True,
                 'savedView':True,'reversibleHide':True,'videoPreviewAndControls':video_checked,'prepareVideo':True,
                 'multiModelConfirmationAndParallelDispatch':True,'videoModelSelection':True,
+                'telemetryPanelLatencyErrorsPauseClearExport':True,
                 'responsiveWidths':[1360,760,480,1280]}
             (OUT/'verification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
             print(json.dumps(report))

@@ -1,7 +1,13 @@
 'use strict';
 const E=window.NexusEngine,$=s=>document.querySelector(s),escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pending=new Map();let sequence=0;
-function rpc(op,args={}){return new Promise((resolve,reject)=>{const id=String(++sequence);const timer=setTimeout(()=>{pending.delete(id);reject(Error('La operación está tardando demasiado. Comprueba el historial antes de repetir un envío.'));},180000);pending.set(id,{resolve,reject,timer});window.chrome.webview.postMessage({id,op,args});});}
+function rpc(op,args={}){return new Promise((resolve,reject)=>{
+ const id=String(++sequence),telemetry=window.NexusTelemetry,trace=telemetry?.begin(op,args);
+ const finish=(ok,code)=>telemetry?.finish(trace,ok,code);
+ const timer=setTimeout(()=>{pending.delete(id);finish(false,'timeout');reject(Error('La operación está tardando demasiado. Comprueba el historial antes de repetir un envío.'));},180000);
+ pending.set(id,{resolve:value=>{finish(true);resolve(value);},reject:error=>{finish(false,'rpc_error');reject(error);},timer});
+ try{window.chrome.webview.postMessage({id,op,args});}catch(error){clearTimeout(timer);pending.delete(id);finish(false,'bridge_error');reject(error);}
+});}
 window.chrome.webview.addEventListener('message',e=>{const p=pending.get(e.data.id);if(!p)return;clearTimeout(p.timer);pending.delete(e.data.id);e.data.ok?p.resolve(e.data.value):p.reject(Error(e.data.error));});
 let models=[],initial,view='catalog',kind='IMAGE',query='',provider='',sort='recommended',onlyFavorites=false,onlyDated=false,showHidden=false,familyFilter='',limit=60,loaded=null,configuring=false,busy=false,quote=null,comparePlans=[],selection=new Set(),saveTimer,polling=false;
 let state={favorites:[],hidden:[],compact:false,theme:'dark',accent:'turquoise',draft:{modelId:'',prompt:'',values:{},media:[]},presets:{},jobs:[],recent:[]};
@@ -76,4 +82,5 @@ document.addEventListener('DOMContentLoaded',()=>{
  const style=document.createElement('link');style.rel='stylesheet';style.href='studio-gallery.css';document.head.append(style);
  const script=document.createElement('script');script.src='studio-gallery.js';document.head.append(script);
  const batch=document.createElement('script');batch.src='studio-batch.js';document.head.append(batch);
+ const telemetry=document.createElement('script');telemetry.src='studio-telemetry.js';document.head.append(telemetry);
 },{once:true});
