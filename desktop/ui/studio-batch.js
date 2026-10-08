@@ -3,7 +3,7 @@
 async function nexusRunBatch(queue,options){
  const pending=queue.map(p=>structuredClone(p)),sleep=()=>new Promise(r=>setTimeout(r,40));
  let sent=0,failed=0,inFlight=0,flowInFlight=0,error=null;
- const stopped=()=>!!error||options.isStopped();
+ const stopped=()=>options.isStopped();
  const update=()=>options.onUpdate({sent,failed,inFlight,pending:pending.length});
  async function worker(){
   while(pending.length&&!stopped()){

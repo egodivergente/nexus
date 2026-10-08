@@ -84,9 +84,12 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         ModelRouter(registry, skills, published, excludedFamilies = {
             settings.text("excludedFamilies", "veo").split(',', ';', '\n').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
         }), guard, GuardedExecutor(backend, guard), assets,
-        GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) }, directFlow = true)
+            GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) }, directFlow = true,
+            adaptPrompt = { prompt, schema, target -> promptAdapter.adapt(prompt, schema.textLimits["prompt"], target) })
     private var deps = deps()
     private var offline = true
+    private lateinit var llmProvider: LlmProvider
+    private val promptAdapter = PromptAdapter({ llmProvider }, { settings.text("modelId", "us.anthropic.claude-sonnet-4-6") })
     private val knowledge = ExpertKnowledge(File(root, "assets/expert-guides.json"))
     private fun makeOrchestrator(): AgentOrchestrator {
         val direct = settings.text("backend", "direct") != "proxy"
@@ -98,6 +101,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             BedrockProxyProvider(settings.text("endpoint"), { secrets.text("token") })
         } else OfflinePlannerProvider()
         offline = llm is OfflinePlannerProvider
+        llmProvider = llm
         return AgentOrchestrator(ExpertProvider(llm) { registry.list() }, AgentConfig(
             provider = llm.id, modelId = settings.text("modelId", "us.anthropic.claude-sonnet-4-6"),
             region = settings.text("region", "us-east-1"), endpoint = settings.text("endpoint"),
@@ -133,6 +137,11 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 orchestrator = makeOrchestrator()
                 conversation.session.mode = mode
                 conversation.session.activeProjectId = settings.text("projectId").ifBlank { null }
+            }
+            "rewritePrompt" -> {
+                val limit = json.decodeFromJsonElement<TextLimit>(args["limit"] ?: error("Falta el límite del modelo."))
+                val rewritten = promptAdapter.adapt(args.text("prompt"), limit, args.text("target"))
+                return obj("prompt" to JsonPrimitive(rewritten), "snapshot" to snapshot())
             }
             "send" -> {
                 conversation.session.flowSubmittedResults = 0

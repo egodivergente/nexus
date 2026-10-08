@@ -446,8 +446,9 @@ def dispatch(keys, operation, args):
             if re.search(r'nano[_ -]?banana.*lite|nano[_ -]?lite', str(body.get(field, '')), re.I):
                 raise ValueError('Nano Banana Lite está desactivado. Elige otro modelo.')
         cost = args.get('cost')
-        if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0:
-            raise ValueError('Primero confirma un coste válido.')
+        unavailable = cost is None and args.get('estimate_status') == 'unavailable'
+        if not unavailable and (isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0):
+            raise ValueError('Estimación no válida.')
         return provider_request(keys, args['provider'], args['path'], 'POST', args['body'], paid=True)
     if operation == 'upload':
         if OFFLINE_QA:

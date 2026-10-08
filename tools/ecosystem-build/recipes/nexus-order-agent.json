@@ -1,0 +1,27 @@
+{
+  "name": "NEXUS order agent JVM tests and runtime, 768 MiB bounded profile",
+  "kind": "command",
+  "host_os": ["linux", "windows"],
+  "host_arch": ["x86_64", "amd64", "aarch64"],
+  "source_includes": [
+    "desktop/agent/src", "desktop/agent/core/src",
+    "desktop/agent/build.gradle.kts", "desktop/agent/settings.gradle.kts",
+    "desktop/agent/gradle.properties", "desktop/agent/gradle-agent-low-memory.init.gradle",
+    "desktop/agent/core/build.gradle.kts", "desktop/agent/agent-skills",
+    "desktop/agent/assets", "gradlew", "gradle/wrapper"
+  ],
+  "requires_tools": ["java"],
+  "command": [
+    "java", "-classpath", "gradle/wrapper/gradle-wrapper.jar", "org.gradle.wrapper.GradleWrapperMain",
+    "-p", "desktop/agent", "-I", "gradle-agent-low-memory.init.gradle",
+    "test", ":core:test", "runtime", "--no-daemon", "--no-parallel", "--max-workers=1", "--stacktrace",
+    "-Dorg.gradle.jvmargs=-Xmx192m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -Xss512k -Dfile.encoding=UTF-8",
+    "-Pkotlin.compiler.execution.strategy=in-process"
+  ],
+  "artifacts": ["desktop/agent/build/runtime/*.jar"],
+  "reports": ["desktop/agent/build/test-results/**/*.xml", "desktop/agent/core/build/test-results/**/*.xml"],
+  "min_ram_mb": 768,
+  "min_disk_mb": 1500,
+  "max_memory_mb": 768,
+  "low_impact": true
+}

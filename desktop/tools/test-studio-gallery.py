@@ -168,7 +168,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.locator('[data-order-index="0"] [data-order-prompt]').fill('Prompt del modelo A')
             page.locator('[data-order-index="1"] [data-order-prompt]').fill('Prompt del modelo B')
             page.locator('[data-order-index="0"] [data-order-param=duration]').fill('99')
-            assert page.locator('#order-send').is_disabled()
+            page.wait_for_function("!document.querySelector('#order-send').disabled&&document.querySelector('#order-summary').textContent.includes('pendientes')")
             page.locator('[data-order-index="0"] [data-order-param=duration]').fill('5')
             page.locator('[data-order-index="1"] [data-order-param=duration]').fill('2')
             page.locator('[data-order-index="1"] [data-order-param=aspect_ratio]').select_option('16:9')
@@ -181,9 +181,8 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert page.locator('[data-order-index="0"] [data-order-prompt]').input_value()=='Prompt del modelo A'
             assert page.evaluate('comparePlans[0].media.length') == 1
             page.locator('[data-order-index="0"] [data-order-param=duration]').fill('6')
-            assert page.locator('#order-send').is_disabled()
-            page.locator('#order-quote').click()
-            page.wait_for_function('!document.querySelector("#order-send").disabled')
+            assert page.evaluate('comparePlans[0].cost===null')
+            page.wait_for_function('comparePlans[0].cost&&!document.querySelector("#order-send").disabled')
             for width in [1360,480]:
                 page.set_viewport_size({'width':width,'height':850})
                 assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')

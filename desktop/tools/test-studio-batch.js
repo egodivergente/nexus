@@ -28,7 +28,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  let attempted=[];
  const failed=await nexusRunBatch([plan('fail'),plan('b'),plan('c'),plan('d')],{
   isPaused:()=>false,isStopped:()=>false,onUpdate:()=>{},dispatch:async p=>{attempted.push(p.model.id);if(p.model.id==='fail')throw Error('unconfirmed');await wait(5);}
- });assert.equal(failed.failed,1);assert.equal(failed.sent,2);assert.equal(failed.pending,1);assert(!attempted.includes('d'));
+ });assert.equal(failed.failed,1);assert.equal(failed.sent,3);assert.equal(failed.pending,0);assert(attempted.includes('d'));
  assert.equal(new Set(attempted).size,attempted.length);
- console.log('PASS: concurrent submissions, cap 3, immutable plans, Flow lane, pause/stop, settle in-flight after failure and no retry. Zero network.');
+ console.log('PASS: concurrent submissions, cap 3, immutable plans, Flow lane, pause/stop, failure isolation and no retry. Zero network.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

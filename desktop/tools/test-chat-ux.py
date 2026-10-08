@@ -73,12 +73,8 @@ with tempfile.TemporaryDirectory(prefix='nexus-chat-ux-') as folder:
                 assert page.evaluate(quote_script)['amount'] == float(value)
             for value in ['', None, False, '-1', 'unknown']:
                 estimate['data']['price'] = value
-                try:
-                    page.evaluate(quote_script)
-                except Exception as error:
-                    assert 'El proveedor no devolvió una estimación' in str(error)
-                else:
-                    raise AssertionError('Invalid quote accepted: ' + repr(value))
+                result = page.evaluate(quote_script)
+                assert result['amount'] is None and result['currency']=='unknown' and result['status']=='unavailable', result
             page.evaluate(r"""s=>{
               Agent.snapshot=s;Agent.restored=true;Agent.items=[];Agent.cardAnchors.clear();
               for(let i=0;i<24;i++)Agent.items.push({role:'user',text:'Escena '+i},

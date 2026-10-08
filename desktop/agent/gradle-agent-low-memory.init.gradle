@@ -1,0 +1,7 @@
+// Small JVM-only build: one compiler in process, one 64 MiB test JVM at a time.
+allprojects {
+    tasks.withType(Test).configureEach {
+        maxHeapSize = '64m'
+        maxParallelForks = 1
+    }
+}

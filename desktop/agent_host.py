@@ -126,7 +126,7 @@ class AgentHost:
     def exchange(self, op, args):
         self.process.stdin.write(json.dumps({'op': op, 'args': args}) + '\n')
         self.process.stdin.flush()
-        deadline = time.monotonic() + (600 if op == 'send' else 170)
+        deadline = time.monotonic() + (600 if op in {'send', 'rewritePrompt'} else 170)
         while True:
             try:
                 line = self.lines.get(timeout=max(0.1, deadline - time.monotonic()))
@@ -173,7 +173,7 @@ class AgentHost:
             op = args.get('op', 'snapshot')
             body = dict(args.get('args') or {})
             allowed = {'snapshot', 'send', 'new', 'mode', 'project', 'createProject', 'memory',
-                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference'}
+                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference', 'rewritePrompt'}
             if op not in allowed:
                 raise ValueError('Operacion no admitida.')
             if op == 'importReferences':
