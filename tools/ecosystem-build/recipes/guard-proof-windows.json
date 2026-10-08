@@ -1,9 +1,0 @@
-{
-  "name":"Windows resource guard proof",
-  "kind":"command", "host_os":["windows"], "host_arch":["amd64","x86_64"],
-  "requires_tools":["python"],
-  "command":["python","tools/ecosystem-build/guard-proof.py"],
-  "source_includes":["tools/ecosystem-build/guard-proof.py","tools/ecosystem-build/guard.py","tools/ecosystem-build/probe.py"],
-  "artifacts":["guard-proof-result.json"], "min_ram_mb":128,"min_disk_mb":32,
-  "low_impact":true,"max_memory_mb":512
-}
