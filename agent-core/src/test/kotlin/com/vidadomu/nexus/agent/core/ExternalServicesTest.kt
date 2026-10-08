@@ -33,7 +33,7 @@ class ExternalServicesTest {
         val service = result.result.jsonObject["external_service"]!!.jsonObject
         assertEquals("Google Flow", service["name"]!!.jsonPrimitive.content)
         assertTrue(service["generation_available_in_nexus"]!!.jsonPrimitive.boolean)
-        assertTrue(service["requires_explicit_confirmation"]!!.jsonPrimitive.boolean)
+        assertFalse(service["requires_explicit_confirmation"]!!.jsonPrimitive.boolean)
         assertEquals("check_in_app", service["authentication_status"]!!.jsonPrimitive.content)
         assertFalse(service.containsKey("model_id"))
     }
@@ -76,7 +76,7 @@ class ExternalServicesTest {
             { request ->
                 assertTrue(request.system.contains(ExternalServices.FLOW_INFO))
                 assertTrue(request.system.any { it.contains("corrige esa afirmación") })
-                ScriptedLlmProvider.text("Google Flow existe; se envia desde Crear en Flow tras una confirmacion explicita.")
+                ScriptedLlmProvider.text("Google Flow existe; se envia directamente desde Crear en Flow.")
             }))
         val o = AgentOrchestrator(llm, AgentConfig(provider="scripted",modelId="test",region="-",endpoint="-"),
             NexusToolkit.all(h.deps), h.skills, h.assets)

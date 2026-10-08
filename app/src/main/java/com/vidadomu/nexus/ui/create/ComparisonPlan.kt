@@ -43,7 +43,7 @@ object ComparisonPlan {
     }
 
     fun adapt(source: CreateUiState, target: NexusModel): PreparedComparison {
-        require(eligible(target)) { "Este modelo no admite comparación de imágenes con prompt." }
+        require(eligible(target)) { "Este modelo no admite encargos de imágenes con prompt." }
         require(source.prompt.isNotBlank()) { "Escribe un prompt en el lienzo." }
         val model = target.copy(parameters = FormContract.normalize(target.parameters))
         val notes = mutableListOf<String>()
@@ -79,7 +79,7 @@ object ComparisonPlan {
         source.parameters.filter { (key,value) -> value.isNotBlank() && !key.startsWith("__") && key !in used && key !in counts }
             .keys.forEach { key -> notes += "Sin ${source.selectedModel?.parameters?.find { it.key == key }?.displayName ?: key}." }
 
-        require(source.attachedMedia.all { it.mimeType.startsWith("image/") }) { "Esta comparativa admite referencias de imagen; hay otro tipo de archivo en el lienzo." }
+        require(source.attachedMedia.all { it.mimeType.startsWith("image/") }) { "Este lote admite referencias de imagen; hay otro tipo de archivo en el lienzo." }
         val media = mapImages(model, source.attachedMedia)
         val state = CreateUiState(selectedModel = model, selectedModality = Modality.IMAGE,
             prompt = source.prompt, parameters = values, attachedMedia = media, schemaReady = true)
@@ -134,7 +134,7 @@ object ComparisonPlan {
 
 data class ComparisonTask(val entryIndex: Int, val number: Int)
 
-data class PreparedComparison(val state: CreateUiState, val changes: List<String>)
+data class PreparedComparison(val state: CreateUiState, val changes: List<String>, val originalPrompt: String = state.prompt)
 enum class ComparisonCurrency { USD, CRUN_CREDITS }
 data class ComparisonCost(val amount: Double, val currency: ComparisonCurrency, val detail: String) {
     init { require(amount.isFinite() && amount >= 0) }
@@ -151,12 +151,12 @@ class ComparisonQueue {
     private var started = false
     fun stop() { stopRequested = true }
     suspend fun <T> run(items: List<T>, dispatch: suspend (Int,T) -> Unit) {
-        check(!started) { "Esta comparativa ya se ha enviado." }
+        check(!started) { "Este lote ya se ha enviado." }
         require(items.size in 1..ComparisonPlan.MAX_REQUESTS)
         started = true
         for((index,item) in items.withIndex()) {
             if(stopRequested) break
-            // Fail closed: a failed or uncertain submission never retries or starts more paid work.
+            // Each accepted request keeps its own identity; controller isolates errors by model.
             dispatch(index,item)
         }
     }

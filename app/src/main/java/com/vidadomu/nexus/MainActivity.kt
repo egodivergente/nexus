@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             NexusTheme {
                 val navController = rememberNavController()
+                val activeEntry by navController.currentBackStackEntryAsState()
                 val createViewModel: CreateViewModel = viewModel()
                 // Ligado a la actividad (como el Lienzo): la conversación y el plan pendiente sobreviven a «Atrás» y al cambio de pestaña.
                 val assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel = viewModel()
@@ -114,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
-                    topBar = { com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings = {
+                    topBar = { if(activeEntry?.destination?.route != Screen.Assistant.route) com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings = {
                         navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                     }) },
                     bottomBar = {
@@ -133,6 +134,7 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(Screen.Create.route) { launchSingleTop = true }
                                 },
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
+                                onOpenSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
                                 vm = assistantViewModel
                             )
                         }

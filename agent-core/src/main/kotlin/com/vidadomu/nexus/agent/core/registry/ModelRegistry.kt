@@ -74,6 +74,15 @@ data class MediaSpec(
 
 /** Schema REAL ya configurado por Nexus (NativeModelSchema para Atlas, contratos para Crun/Runway). */
 @Serializable
+data class TextLimit(
+    val unit: String,
+    val minimum: Int? = null,
+    val maximum: Int? = null,
+    val source: String? = null,
+    val description: String? = null,
+)
+
+@Serializable
 data class ModelSchema(
     val ref: ModelRef,
     val parameters: List<ParamSpec>,
@@ -83,6 +92,7 @@ data class ModelSchema(
     val unsupportedRequired: List<String> = emptyList(),
     /** Origen del schema, p. ej. la schemaUrl oficial. */
     val source: String? = null,
+    val textLimits: Map<String, TextLimit> = emptyMap(),
 ) {
     fun param(key: String): ParamSpec? = parameters.firstOrNull { it.key == key }
 }

@@ -37,6 +37,7 @@ class PlanBuilder(
     private val cost: CostEstimator,
     private val assets: AssetIndex,
     private val clock: () -> Long,
+    private val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
 ) {
 
     suspend fun build(
@@ -54,6 +55,7 @@ class PlanBuilder(
         shotCode: String? = null,
         characters: List<String> = emptyList(),
         parentGenerationId: String? = null,
+        originalPrompt: String? = null,
     ): PlanBuild {
         val schema = runCatching { registry.schema(model.ref) }.getOrElse {
             return PlanBuild.Invalid(listOf(ValidationIssue("schema", "Nexus no pudo cargar el schema de ${model.ref.modelId}: ${it.message ?: it.javaClass.simpleName}. Sin schema no se prepara la generación.")))
@@ -70,9 +72,14 @@ class PlanBuilder(
                 params
             } else params + ("negative_prompt" to (params["negative_prompt"]?.takeUnless { ParameterValidator.isBlankLike(it) } ?: negative))
         } else params
-        val v = ParameterValidator.validate(schema, allParams)
+        val aspect = schema.parameters.firstOrNull { it.uiType == "ASPECT_RATIO" || it.key == "aspect_ratio" }
+        val preferred = if (aspect != null && "16:9" in aspect.options && allParams[aspect.key].isNullOrBlank()) allParams + (aspect.key to "16:9") else allParams
+        val v = ParameterValidator.validate(schema, preferred)
         issues += v.issues
         if (issues.any { it.severity == ValidationIssue.Severity.ERROR }) return PlanBuild.Invalid(issues)
+
+        val fittedPrompt = try { adaptPrompt?.invoke(prompt, schema, model.name) ?: prompt.trim() }
+        catch (e: Exception) { return PlanBuild.Invalid(listOf(ValidationIssue("prompt", e.message ?: "No se pudo adaptar el prompt; el original se conserva."))) }
 
         val effective = ParameterValidator.effective(schema, v.normalized)
         val estimate = runCatching { cost.estimate(model, effective) }.getOrNull()
@@ -95,7 +102,8 @@ class PlanBuilder(
                 modelName = model.name,
                 modality = model.modalities.firstOrNull() ?: "UNKNOWN",
                 task = task,
-                prompt = prompt.trim(),
+                prompt = fittedPrompt,
+                originalPrompt = if (fittedPrompt != prompt.trim()) prompt else originalPrompt,
                 negativePrompt = v.normalized["negative_prompt"],
                 params = v.normalized,
                 effectiveParams = effective,
@@ -130,6 +138,7 @@ class PlanBuilder(
             task = plan.task, rationale = plan.rationale, alternatives = plan.alternatives,
             projectId = plan.projectId, sceneCode = plan.sceneCode, shotCode = plan.shotCode,
             characters = plan.characters, parentGenerationId = plan.parentGenerationId,
+            originalPrompt = if (edit.prompt == null || edit.prompt == plan.prompt) plan.originalPrompt else null,
         )
     }
 

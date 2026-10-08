@@ -4,6 +4,7 @@ import com.vidadomu.nexus.agent.core.assets.AssetIndex
 import com.vidadomu.nexus.agent.core.cost.CostEstimator
 import com.vidadomu.nexus.agent.core.registry.ModelRegistry
 import com.vidadomu.nexus.agent.core.registry.ModelSummary
+import com.vidadomu.nexus.agent.core.registry.ModelSchema
 import com.vidadomu.nexus.agent.core.router.ModelRouter
 import com.vidadomu.nexus.agent.core.skills.SkillStore
 import com.vidadomu.nexus.agent.core.spend.GuardedExecutor
@@ -40,8 +41,10 @@ class ToolDeps(
     val assets: AssetIndex,
     val history: GenerationHistorySource? = null,
     val clock: () -> Long = System::currentTimeMillis,
+    val directFlow: Boolean = false,
+    val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
 ) {
-    val plans = PlanBuilder(registry, cost, assets, clock)
+    val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock)
 
     /** Resuelve provider_id + model_id contra el registro ACTUAL. Nunca acepta un modelo inventado. */

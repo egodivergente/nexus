@@ -30,6 +30,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    maxHeapSize = "64m"
     // Las pruebas de skills leen la carpeta real del repositorio.
     systemProperty("nexus.skills.dir", rootProject.file("agent-skills/skills").absolutePath)
 }

@@ -148,7 +148,7 @@ class OrchestratorTest {
 
     @Test fun `reglas de gasto siempre en el sistema`() = runTest {
         val h = Harness()
-        val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.system.any { it.contains("REGLAS DE GASTO") }); assertEquals("solo esto", r.system.first()); text("ok") }))
+        val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.system.any { it.contains(SystemPrompt.SPEND_RULES) }); assertEquals("solo esto", r.system.first()); text("ok") }))
         orchestrator(h, llm, config.copy(systemPromptOverride = "solo esto")).let { it.send(it.newConversation(), "hola") }
         assertTrue(SystemPrompt.build(AgentMode.AGENT, null, "", null, "x").joinToString().contains("pulse GENERAR"))
     }

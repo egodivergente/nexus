@@ -52,43 +52,66 @@ import kotlinx.coroutines.launch
 fun AssistantScreen(
     onOpenInCanvas: (CreateUiState) -> Unit,
     onNavigateToOutput: (String) -> Unit,
+    onOpenSettings: () -> Unit = {},
     vm: AssistantViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480
+    var showContext by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    var input by rememberSaveable { mutableStateOf("") }
+    val draftPrefs = LocalContext.current.getSharedPreferences("assistant_draft_v1", android.content.Context.MODE_PRIVATE)
+    var input by rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString("text", "").orEmpty())) }
     var showSettings by remember { mutableStateOf(false) }
-    // (planId, huella del plan mostrado): si el plan cambia con el diálogo abierto, se cierra sin generar.
-    var confirmTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var showHistory by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(6)) { uris: List<Uri> -> vm.attach(uris) }
 
-    LaunchedEffect(ui.items.size, ui.thinking) { if (ui.items.isNotEmpty()) listState.animateScrollToItem(ui.items.size - 1 + if (ui.thinking) 1 else 0) }
-    LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
-
-    confirmTarget?.let { (id, fp) ->
-        val p = ui.plans[id]
-        when {
-            p == null -> confirmTarget = null
-            p.plan.fingerprint() != fp || ui.thinking -> {
-                confirmTarget = null
-                scope.launch { snackbar.showSnackbar("El plan cambió mientras confirmabas. Revísalo y vuelve a pulsar GENERAR.") }
-            }
-            else -> ConfirmSpendDialog(p.plan, onConfirm = { confirmTarget = null; vm.generate(id, fp) }, onDismiss = { confirmTarget = null })
+    var following by rememberSaveable { mutableStateOf(true) }
+    var automaticScroll by remember { mutableStateOf(false) }
+    suspend fun followLast() {
+        if(ui.items.isEmpty()) return
+        automaticScroll = true
+        try { listState.scrollToItem(ui.items.size - 1 + if(ui.thinking) 1 else 0) }
+        finally { automaticScroll = false }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { Triple(listState.isScrollInProgress, listState.canScrollForward, automaticScroll) }.collect { (moving, canForward, automatic) ->
+            if (moving && !automatic) following = !canForward
         }
     }
+    LaunchedEffect(ui.items.size, ui.thinking, ui.plans, ui.scrollRequest) {
+        if (following) followLast()
+    }
+    LaunchedEffect(ui.scrollRequest) {
+        if (ui.scrollRequest > 0) { following = true; followLast() }
+    }
+    LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
+
     if (showSettings) AssistantSettingsDialog(ui, vm, onDismiss = { showSettings = false })
 
     Scaffold(containerColor = ScreenBackground, snackbarHost = { SnackbarHost(snackbar) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad)) {
+        Column(Modifier.fillMaxSize().padding(pad).imePadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("¿Qué quieres crear?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary, modifier = Modifier.weight(1f))
+                if(compact) IconButton(onClick = { showContext = !showContext }) { Icon(Icons.Default.Tune, "Proyecto y modo") }
+                Box {
+                    IconButton(onClick = { showHistory = true }, enabled = !ui.thinking) { Icon(Icons.Default.History, "Conversaciones") }
+                    DropdownMenu(expanded = showHistory, onDismissRequest = { showHistory = false }) {
+                        val entries = remember(showHistory) { vm.conversations() }
+                        if(entries.isEmpty()) DropdownMenuItem(text = { Text("Aún no hay conversaciones guardadas") }, onClick = { showHistory = false })
+                        entries.forEach { entry -> DropdownMenuItem(text = { Text(entry.title, maxLines = 2) }, onClick = { showHistory = false; vm.openConversation(entry.id) }) }
+                    }
+                }
                 IconButton(onClick = vm::newConversation, enabled = !ui.thinking) { Icon(Icons.Default.AddComment, "Nueva conversación") }
                 IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, "Ajustes del asistente") }
             }
-            ProjectRow(ui, vm)
-            if (ui.settings.offline) {
+            if (!compact || showContext) {
+                AgentModeSelector(ui.mode, vm::setMode)
+                ProjectRow(ui, vm)
+                ProjectReferences(ui, vm)
+            }
+            if (ui.settings.offline && (!compact || showContext)) {
                 Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
                     Text("Sin LLM configurado: planificador local (elige modelo y prepara el plan, sin razonamiento). Configura Bedrock en ⚙.",
                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(10.dp), color = MaterialTheme.colorScheme.onTertiaryContainer)
@@ -103,20 +126,25 @@ fun AssistantScreen(
                         is ChatItem.Notice -> NoticeRow(item)
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> ui.plans[item.planId]?.let { p ->
-                            PlanCardView(p,
+                            CompactGeneration(p, vm.outputs(p.jobId),
+                                onOpenOutput = { p.jobId?.let(onNavigateToOutput) },
+                                details = { PlanCardView(p,
                                 onEdit = { vm.editPlan(p.plan.id, it) },
                                 onDiscard = { vm.discardPlan(p.plan.id) },
-                                onGenerate = { confirmTarget = p.plan.id to p.plan.fingerprint() },
+                                onGenerate = { vm.generate(p.plan.id, p.plan.fingerprint()) },
                                 assistantBusy = ui.thinking,
                                 onOpenCanvas = { scope.launch { vm.canvasState(p.plan.id)?.let(onOpenInCanvas) } },
-                                onOpenOutput = { p.jobId?.let(onNavigateToOutput) })
+                                onOpenOutput = { p.jobId?.let(onNavigateToOutput) }) })
                         }
                     }
                 }
                 if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("Pensando…", color = TextMuted) } }
             }
-            InputBar(ui, input, onInput = { input = it }, onAttach = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
-                onSend = { vm.send(input); input = "" }, onStop = vm::stop, onRemove = vm::removeAttachment)
+            if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
+            PendingGenerations(ui, vm::generatePending)
+            AgentStatus(ui, onOpenSettings)
+            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
+                onSend = { vm.send(input.text); draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("") }, onStop = vm::stop, onRemove = vm::removeAttachment)
         }
     }
 }
@@ -341,6 +369,11 @@ private fun PlanCardView(
                 plan.media.forEach { m -> Text("${roleLabel(m.role)}: ${Uri.parse(m.uri).lastPathSegment ?: m.uri}", style = MaterialTheme.typography.bodySmall) }
             }
 
+            plan.originalPrompt?.takeIf { it != plan.prompt }?.let { original ->
+                var showOriginal by remember(plan.id) { mutableStateOf(false) }
+                TextButton(onClick = { showOriginal = !showOriginal }) { Text(if(showOriginal) "Ocultar original" else "Ver prompt original") }
+                if(showOriginal) androidx.compose.foundation.text.selection.SelectionContainer { Text(original, style = MaterialTheme.typography.bodySmall) }
+            }
             Section("Prompt optimizado")
             OutlinedTextField(prompt, { prompt = it }, enabled = editable && !p.busy, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 12, textStyle = MaterialTheme.typography.bodySmall)
             if (changedUnderEdit && dirty) Text("El asistente cambió el prompt mientras editabas. «Deshacer» carga su versión; «Aplicar» guarda la tuya.", style = MaterialTheme.typography.labelSmall, color = AccentAmber)
@@ -411,28 +444,6 @@ private fun ParamEditDialog(key: String, value: String, onSave: (String) -> Unit
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
 }
 
-/** Confirmación explícita POR generación: muestra exactamente lo que se va a pagar. */
-@Composable
-private fun ConfirmSpendDialog(plan: GenerationPlan, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val ep = plan.effectiveParams
-    fun first(vararg keys: String) = keys.firstNotNullOfOrNull { k -> ep[k]?.takeIf { !ParameterValidator.isBlankLike(it) } }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Confirmar generación de pago") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Modelo: ${plan.modelName}")
-                Text("Modalidad: ${modalityLabel(plan.modality)}")
-                first("duration", "duration_seconds", "seconds")?.let { Text("Duración: $it s") }
-                first("resolution", "size", "quality")?.let { Text("Resolución: $it") }
-                first("aspect_ratio", "ratio")?.let { Text("Proporción: $it") }
-                if (plan.media.isNotEmpty()) Text("Medios: " + plan.media.joinToString { roleLabel(it.role).lowercase() })
-                Text("Coste estimado: " + costLine(plan.estimate), fontWeight = FontWeight.SemiBold)
-                Text("Una pulsación = una generación. No se repetirá sola.", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            }
-        },
-        confirmButton = { Button(onClick = onConfirm) { Text("GENERAR", fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
-}
-
 // ---- entrada ---------------------------------------------------------------------------------
 
 @Composable
@@ -442,27 +453,6 @@ private fun AttachmentThumb(a: Attachment, onRemove: (() -> Unit)? = null) {
         else Surface(color = SurfaceVariantDark, modifier = Modifier.fillMaxSize()) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Movie, a.name) } }
         if (onRemove != null) IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(24.dp)) {
             Icon(Icons.Default.Close, "Quitar", tint = MediaForeground)
-        }
-    }
-}
-
-@Composable
-private fun InputBar(ui: AssistantUiState, text: String, onInput: (String) -> Unit, onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit) {
-    Surface(color = SurfaceDark, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxWidth().padding(8.dp)) {
-            if (ui.pendingAttachments.isNotEmpty() || ui.attaching) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
-                items(ui.pendingAttachments, key = { it.id }) { a -> AttachmentThumb(a) { onRemove(a.id) } }
-                if (ui.attaching) item { CircularProgressIndicator(Modifier.size(24.dp)) }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar imagen o vídeo") }
-                OutlinedTextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Describe el plano, la escena…") }, maxLines = 5,
-                    enabled = !ui.thinking,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (!ui.thinking && !ui.attaching && (text.isNotBlank() || ui.pendingAttachments.isNotEmpty())) onSend() }))
-                if (ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar") }
-                else IconButton(onClick = onSend, enabled = !ui.attaching && (text.isNotBlank() || ui.pendingAttachments.isNotEmpty())) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar") }
-            }
         }
     }
 }

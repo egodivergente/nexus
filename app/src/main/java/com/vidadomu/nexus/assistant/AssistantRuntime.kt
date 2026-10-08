@@ -49,7 +49,7 @@ data class AssistantSettings(
     val region: String = DEFAULT_REGION,
     val temperature: Double? = null,
     val maxTokens: Int = 4096,
-    val mode: AgentMode = AgentMode.COPILOT,
+    val mode: AgentMode = AgentMode.AGENT,
     val sendImages: Boolean = true,
     val maskedToken: String = "",
     val awsAccessKeyId: String = "",
@@ -67,7 +67,7 @@ data class AssistantSettings(
     fun toConfig() = AgentConfig(
         provider = when { offline -> "offline"; direct -> "bedrock-direct"; else -> "bedrock-proxy" },
         modelId = modelId.ifBlank { "offline" }, region = region,
-        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, mode = mode, sendImagesToLlm = sendImages && !offline,
+        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 40, mode = mode, sendImagesToLlm = sendImages && !offline,
     )
 
     companion object {
@@ -111,7 +111,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         region = prefs.getString("region", AssistantSettings.DEFAULT_REGION).orEmpty(),
         temperature = prefs.getString("temperature", null)?.toDoubleOrNull(),
         maxTokens = prefs.getInt("max_tokens", 4096),
-        mode = AgentMode.COPILOT,
+        mode = runCatching { AgentMode.valueOf(prefs.getString("mode", "AGENT")!!) }.getOrDefault(AgentMode.AGENT),
         sendImages = prefs.getBoolean("send_images", true),
         maskedToken = masked(TOKEN_ID),
         awsAccessKeyId = runCatching { secure.getProviderApiKey(AWS_ACCESS_ID) }.getOrDefault(""),
@@ -197,7 +197,12 @@ class AssistantRuntime(private val app: NexusApplication) {
         cost = ChainedCostEstimator(listOf(NexusQuoteEstimator(registry), published)),
         // El router ordena con la tabla publicada (sin llamadas de red por candidato); el plan usa la calculadora.
         router = ModelRouter(registry, skills, published, excludedFamilies = { settings.excludedFamilies() }),
-        guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app),
+        guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app), directFlow = true,
+        adaptPrompt = { text, schema, target ->
+            val current = settings.load()
+            com.vidadomu.nexus.agent.core.llm.PromptAdapter({ llm(current) }, { current.modelId })
+                .adapt(text, schema.textLimits["prompt"], target)
+        },
     )
 
     /** Relee skills (assets + files/skills + Documents/ALEXIA/Nexus/Skills) sin recompilar. */

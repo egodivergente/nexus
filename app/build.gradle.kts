@@ -15,8 +15,8 @@ android {
         applicationId = "com.vidadomu.nexus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.7.5-agent"
+        versionCode = 24
+        versionName = "1.8.0-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -89,6 +89,7 @@ android {
     testBuildType = "offlineQa"
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.all { it.maxHeapSize = "64m" }
     }
 }
 

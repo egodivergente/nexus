@@ -57,10 +57,10 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
     private suspend fun models(): List<NexusModel> =
         withTimeoutOrNull(15_000) { app.modelCatalogRepository.models.first { it.isNotEmpty() } } ?: app.modelCatalogRepository.models.value
 
-    override suspend fun list(): List<ModelSummary> = models().map(::summary)
+    override suspend fun list(): List<ModelSummary> = (models() + app.flowBridgeProvider.getModels()).distinctBy { "${it.providerId}:${it.id}" }.map(::summary)
 
     private suspend fun find(ref: ModelRef): NexusModel =
-        models().firstOrNull { it.id == ref.modelId && it.providerId == ref.providerId }
+        (models() + app.flowBridgeProvider.getModels()).firstOrNull { it.id == ref.modelId && it.providerId == ref.providerId }
             ?: throw IllegalArgumentException("${ref.modelId} no está visible en el catálogo de Nexus.")
 
     override suspend fun schema(ref: ModelRef): ModelSchema {
@@ -68,9 +68,10 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
         val (cfg, unsupported, source) = if (model.providerId == AtlasCloudProvider.PROVIDER_ID) {
             val c = NativeModelSchema.load(model)
             Triple(c.model, c.unsupportedRequired, model.schemaUrl)
-        } else Triple(model.copy(parameters = FormContract.normalize(model.parameters)), emptyList(), "contrato de ${model.providerId} en Nexus")
+        } else Triple(agentMediaContract(model).copy(parameters = FormContract.normalize(model.parameters)), emptyList(), "contrato de ${model.providerId} en Nexus")
         configured["${ref.providerId}:${ref.modelId}"] = cfg
-        return toSchema(ref, cfg, unsupported, source)
+        return toSchema(ref, cfg, unsupported, source).copy(textLimits =
+            ProviderPromptLimits.forModel(model)?.let { mapOf("prompt" to it) }.orEmpty())
     }
 
     /** Modelo ya configurado con su schema (el mismo objeto que usaría el Lienzo). */
@@ -78,7 +79,8 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
         configured["${ref.providerId}:${ref.modelId}"] ?: run { schema(ref); configured.getValue("${ref.providerId}:${ref.modelId}") }
 
     companion object {
-        fun summary(m: NexusModel): ModelSummary {
+        fun summary(original: NexusModel): ModelSummary {
+            val m = agentMediaContract(original)
             val guide = runCatching { modelGuide(m) }.getOrNull()
             return ModelSummary(
                 ref = ModelRef(m.providerId, m.id), name = m.displayName, organization = m.organization,
@@ -92,6 +94,28 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
                 catalogDurations = m.supportedDurations, catalogResolutions = m.supportedResolutions,
                 basePriceUsd = m.basePriceUsd, priceUnit = m.priceUnit, priceUnitVerified = m.priceUnitVerified,
             )
+        }
+
+        /** Map unambiguous image/video inputs from the provider contract, without guessing field names. */
+        internal fun agentMediaContract(m: NexusModel): NexusModel {
+            val images = m.contractMedia.filter { it.mime.startsWith("image/") }
+            val videos = m.contractMedia.filter { it.mime.startsWith("video/") }
+            if (images.size == 1 && videos.isEmpty() && m.contractMedia.size == 1) {
+                val field = images.single()
+                val array = field.encoding in setOf("array", "object-array")
+                return m.copy(inputMode = if(array) com.vidadomu.nexus.core.model.ModelInputMode.MULTI_IMAGE else com.vidadomu.nexus.core.model.ModelInputMode.SINGLE_IMAGE,
+                    inputImageField = if(array) null else field.key, firstFrameField = if(array) null else field.key,
+                    imagesArrayField = if(array) field.key else null, maxImages = field.maximum,
+                    supportsImageInput = true, supportsFirstFrame = !array, supportsReferenceImages = array, isMediaRequired = field.required)
+            }
+            if(videos.size == 1 && images.isEmpty() && m.contractMedia.size == 1) {
+                val field = videos.single()
+                return m.copy(inputMode = com.vidadomu.nexus.core.model.ModelInputMode.VIDEO_INPUT,
+                    videoField = if(field.encoding !in setOf("array", "object-array")) field.key else null,
+                    videosArrayField = if(field.encoding !in setOf("array", "object-array")) null else field.key,
+                    maxVideos = field.maximum, supportsVideoInput = true, isMediaRequired = field.required)
+            }
+            return m
         }
 
         private val MEDIA_TYPES = setOf(ParameterType.IMAGE, ParameterType.VIDEO, ParameterType.AUDIO, ParameterType.FILE,
@@ -120,7 +144,7 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
             ),
             promptRequired = m.promptRequired,
             // Medios extra (máscaras, audio) obligatorios: el asistente aún no los adjunta.
-            unsupportedRequired = unsupported + m.contractMedia.filter { it.required }.map { it.key },
+            unsupportedRequired = unsupported + m.contractMedia.filter { it.required && it.key !in setOf(m.inputImageField, m.firstFrameField, m.lastFrameField, m.imagesArrayField, m.videoField, m.videosArrayField) }.map { it.key },
             source = source,
         )
     }
@@ -167,7 +191,14 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
                 "video" -> if (model.videoField != null) MediaSlotType.VIDEO_INPUT else MediaSlotType.VIDEO_REFERENCE
                 else -> error("Rol de medio desconocido: ${m.role}")
             }
-            AttachedMedia(uriString = local, mimeType = m.mimeType ?: "image/*", slotType = slot, fileName = Uri.parse(local).lastPathSegment)
+            AttachedMedia(uriString = local, mimeType = m.mimeType ?: "image/*", slotType = slot, fileName = Uri.parse(local).lastPathSegment,
+                fieldKey = when(m.role) {
+                    "first_frame" -> model.firstFrameField ?: model.inputImageField
+                    "last_frame" -> model.lastFrameField
+                    "reference" -> model.imagesArrayField ?: model.inputImageField
+                    "video" -> model.videoField ?: model.videosArrayField
+                    else -> null
+                })
         }
         return CreateUiState(
             selectedModality = Modality.valueOf(plan.modality), selectedModel = model, prompt = plan.prompt,
@@ -176,13 +207,24 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
     }
 
     override suspend fun submit(plan: GenerationPlan): SubmitResult {
+        if (plan.ref.providerId == "google_flow") {
+            val jobId = "job_${UUID.randomUUID()}"
+            val request = com.vidadomu.nexus.core.model.GenerationRequest(id = jobId,
+                providerId = "google_flow", modelId = plan.ref.modelId, modality = Modality.valueOf(plan.modality), prompt = plan.prompt,
+                parameters = plan.params + mapOf(com.vidadomu.nexus.provider.flow.FlowBridgeProvider.EXPECTED_OUTPUT_KEY to plan.modality.lowercase()))
+            val job = app.generationRepository.submitGeneration(request, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt))).getOrThrow()
+            if (job.status == GenerationStatus.FAILED) error(job.error ?: "Flow no aceptó el envío.")
+            if (job.parameters["__submission_uncertain"] == "true") throw SubmissionUncertain("Envío Flow pendiente de comprobar.", job.id)
+            if (job.status != GenerationStatus.COMPLETED) com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(app, job.id)
+            return SubmitResult(job.id)
+        }
         val state = toCreateState(plan)
         val ready = creationReadiness(state)
         check(ready.canSubmit) { ready.message ?: "La configuración no está lista." }
         // Id conocido de antemano: si el envío falla, se mira en nexus.db si pudo llegar al proveedor.
         val jobId = "job_${UUID.randomUUID()}"
         try {
-            GenerationDispatcher(app).submit(state, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id), jobId = jobId)
+            GenerationDispatcher(app).submit(state, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt)), jobId = jobId)
         } catch (e: Exception) {
             val job = withContext(NonCancellable) { runCatching { app.generationRepository.getJob(jobId) }.getOrNull() }
             // Sin registro = falló antes de enviar (subida de medios, validación). Con «uncertain» = pudo cobrarse.

@@ -54,7 +54,21 @@ class NexusAgentProvider:ContentProvider() {
             put("ok",true);put("appVersion",BuildConfig.VERSION_NAME);put("protocol",1)
             put("catalogReady",app.modelCatalogRepository.models.value.isNotEmpty())
             put("paidExecutionEnabled",false);put("profile",0)
+            put("credentialStorageAvailable",app.secureStorage.credentialStorageAvailable)
+            put("flowLinked",app.secureStorage.hasProviderApiKey(com.vidadomu.nexus.ui.settings.FLOW_RECOVERY_KEY))
+            put("jobs",app.generationRepository.allJobs.value.size)
+            put("historyLoading",app.generationRepository.historyLoading.value)
+            put("historyError",app.generationRepository.historyError.value != null)
+            val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            put("agentMode",runtime.settings.load().mode.name)
+            put("skills",runtime.skills.all().size)
+            put("skillErrors",runtime.skills.errors.size)
+            put("projects",runtime.assets.projects().size)
+            put("assets",runtime.assets.snapshot().assets.size)
         }
+        if(method=="flow_status") return app.flowBridgeProvider.bridgeStatus().fold(
+            onSuccess = { status -> buildJsonObject { put("ok",true);put("connected",status.connected);put("ready",status.generationEnabled);put("promptLimit",status.promptLimit) } },
+            onFailure = { buildJsonObject { put("ok",false);put("error",it.message.orEmpty()) } })
         if(method=="discard_draft") return buildJsonObject {put("ok",AgentDraftStore.discard(app,text("draftId")))}
         if(method=="list_drafts") return buildJsonObject {put("ok",true);put("drafts",JsonArray(AgentDraftStore.list(app).map {draft ->
             buildJsonObject {put("draftId",draft.id);put("modelId",draft.modelId);put("providerId",draft.providerId);put("createdAt",draft.createdAt)}

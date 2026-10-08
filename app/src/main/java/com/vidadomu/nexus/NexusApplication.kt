@@ -74,7 +74,7 @@ class NexusApplication : Application() {
         atlasProvider = AtlasCloudProvider(okHttpClient, secureStorage)
         crunProvider = CrunProvider(this, okHttpClient, secureStorage)
         runwayProvider = RunwayProvider(okHttpClient, secureStorage)
-        flowBridgeProvider = FlowBridgeProvider(okHttpClient, secureStorage)
+        flowBridgeProvider = FlowBridgeProvider(okHttpClient, secureStorage, this)
         val mockProvider = MockNexusProvider()
 
         providerRegistry = ProviderRegistry(

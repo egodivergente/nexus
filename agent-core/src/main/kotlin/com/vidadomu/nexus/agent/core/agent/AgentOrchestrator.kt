@@ -38,6 +38,13 @@ class AgentConversation(val session: AgentSession) {
     internal val messages = mutableListOf<LlmMessage>()
     internal val mutex = Mutex()
     fun history(): List<LlmMessage> = messages.toList()
+    /** Restore completed text turns; never replay old tool calls or submissions. */
+    fun restoreTextHistory(turns: List<Pair<String, String>>) {
+        check(messages.isEmpty())
+        turns.takeLast(80).forEach { (role, text) ->
+            messages += LlmMessage(if (role == "user") Role.USER else Role.ASSISTANT, listOf(ContentBlock.Text(text)))
+        }
+    }
 }
 
 data class TurnResult(
@@ -91,6 +98,7 @@ class AgentOrchestrator(
         onEvent: (UiEvent) -> Unit = {},
     ): TurnResult = conv.mutex.withLock {
         val session = conv.session
+        session.flowSubmittedResults = 0
         val start = conv.messages.size
         newAttachments.forEach { a -> if (session.attachment(a.id) == null) session.attachments += a }
 

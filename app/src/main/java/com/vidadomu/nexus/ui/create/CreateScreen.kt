@@ -361,7 +361,7 @@ fun CreateScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Icon(Icons.Default.Compare, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote en curso" else "Crear lote o comparar")
+                    Text(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote en curso" else "Encargar a varios modelos")
                 }
             }
 

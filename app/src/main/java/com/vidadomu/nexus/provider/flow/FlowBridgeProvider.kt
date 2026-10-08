@@ -14,6 +14,7 @@ import com.vidadomu.nexus.provider.api.NexusProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import java.io.File
 
@@ -24,9 +25,13 @@ import java.io.File
  */
 class FlowBridgeProvider(
     client: OkHttpClient,
-    secureStorage: SecureStorage
+    secureStorage: SecureStorage,
+    context: android.content.Context? = null
 ) : NexusProvider {
+    private val appContext = context?.applicationContext
     private val bridge = FlowBridgeClient(client, secureStorage)
+    private val queue = context?.getSharedPreferences("flow_queue_v1", android.content.Context.MODE_PRIVATE)
+    private val queueLock = kotlinx.coroutines.sync.Mutex()
 
     override val id: String = PROVIDER_ID
     override val displayName: String = "Google Flow"
@@ -34,7 +39,12 @@ class FlowBridgeProvider(
 
     suspend fun bridgeStatus(): Result<FlowBridgeStatus> = bridge.status()
 
-    override suspend fun getModels(): List<NexusModel> = emptyList()
+    override suspend fun getModels(): List<NexusModel> = listOf(Modality.IMAGE, Modality.VIDEO).map { modality ->
+        NexusModel(id = "current_project_${modality.name.lowercase()}", displayName = "Google Flow · ${if(modality == Modality.IMAGE) "Imagen" else "Vídeo"} · proyecto activo",
+            providerId = PROVIDER_ID, organization = "Google", modalities = listOf(modality), capabilities = listOf(if(modality == Modality.IMAGE) com.vidadomu.nexus.core.model.ModelCapability.TEXT_TO_IMAGE else com.vidadomu.nexus.core.model.ModelCapability.TEXT_TO_VIDEO), parameters = listOf(com.vidadomu.nexus.core.model.ModelParameter("count", "Resultados solicitados", com.vidadomu.nexus.core.model.ParameterType.INTEGER, "1", minValue = 1f, maxValue = 20f, nativeType = "integer")),
+            description = "Usa el modelo y ajustes del proyecto abierto en Flow. El puente actual recibe texto.",
+            inputMode = com.vidadomu.nexus.core.model.ModelInputMode.TEXT_ONLY)
+    }
 
     override suspend fun testConnection(apiKey: String): Result<Boolean> =
         bridgeStatus().map { it.isReady }
@@ -48,18 +58,50 @@ class FlowBridgeProvider(
         if (request.modality !in setOf(Modality.IMAGE, Modality.VIDEO)) {
             return@withContext Result.failure(ProviderError("Flow solo puede recibir una salida de imagen o vídeo desde esta pantalla."))
         }
+        val requestedCount = request.parameters["count"]?.toIntOrNull() ?: 1
+        if(requestedCount !in 1..20) return@withContext Result.failure(ProviderError("Elige de 1 a 20 resultados."))
         val expectedOutput = request.parameters[EXPECTED_OUTPUT_KEY]?.lowercase()
             ?: modalityName(request.modality)
         if (expectedOutput != modalityName(request.modality)) {
             return@withContext Result.failure(ProviderError("El tipo de salida esperado no coincide con la tarea de Flow."))
         }
 
+        if (queue != null) return@withContext queueLock.withLock {
+            val previous = queue.getString("tail", null)?.takeUnless { it == request.id }
+            queue.edit().putString("tail", request.id).commit()
+            Result.success(GenerationJob(id = request.id, providerId = id, modelId = request.modelId,
+                modality = request.modality, prompt = request.prompt, negativePrompt = request.negativePrompt,
+                providerJobId = "queue_${request.id}", status = GenerationStatus.QUEUED,
+                parameters = request.parameters + mapOf("__flow_queue_previous" to previous.orEmpty()),
+                technicalDetails = "En cola de Flow; se enviará automáticamente sin una segunda confirmación."))
+        }
         bridge.submit(request.prompt, expectedOutput, request.id).map { remote ->
             initialJob(request, remote)
         }
     }
 
     override suspend fun pollJobStatus(job: GenerationJob): Result<GenerationJob> = withContext(Dispatchers.IO) {
+        if (job.providerJobId?.startsWith("queue_") == true && queue != null) return@withContext queueLock.withLock {
+            val previous = job.parameters["__flow_queue_previous"].orEmpty()
+            if (previous.isNotBlank() && queue.getString("state_$previous", "") !in setOf("completed", "failed")) {
+                val previousJob = (appContext as? com.vidadomu.nexus.NexusApplication)?.generationRepository?.getJob(previous)
+                val hasRemote = queue.contains("remote_${previous}_0")
+                if(!FlowQueueDependency.canProceed(previousJob,hasRemote))
+                    return@withLock Result.success(job.copy(status = GenerationStatus.QUEUED, error = "Esperando al encargo anterior de Flow; su seguimiento sigue activo."))
+                queue.edit().putString("state_$previous", "completed").commit()
+            }
+            val block = job.parameters["__flow_block"]?.toIntOrNull() ?: 0
+            val requestId = "${job.id}_$block"
+            val recovered = queue.getString("remote_$requestId", null)
+            val remote = if(recovered != null) bridge.job(recovered) else
+                bridge.submit(job.prompt, modalityName(job.modality), requestId)
+            remote.map { submitted ->
+                queue.edit().putString("remote_$requestId", submitted.id).putString("state_${job.id}", if(submitted.state == "failed") "failed" else "active").commit()
+                job.copy(providerJobId = submitted.id, status = statusFor(submitted.state),
+                    completedAt = if(submitted.state == "failed") System.currentTimeMillis() else null,
+                    error = if(submitted.state == "failed") flowFailureMessage(submitted.error) else pendingMessage(submitted))
+            }
+        }
         val bridgeJobId = job.providerJobId
             ?: return@withContext Result.failure(ProviderError("La tarea de Flow no contiene un identificador de seguimiento."))
         val remoteResult = bridge.job(bridgeJobId)
@@ -67,9 +109,22 @@ class FlowBridgeProvider(
             return@withContext Result.failure(remoteResult.exceptionOrNull()!!)
         }
         val remote = remoteResult.getOrThrow()
+        if(remote.state == "failed") queue?.edit()?.putString("state_${job.id}", "failed")?.apply()
         try {
             when (remote.state) {
-                "completed" -> copyCompletedResult(job, remote)
+                "completed" -> copyCompletedResult(job, remote).map { copied ->
+                    val goal = job.parameters["count"]?.toIntOrNull() ?: 1
+                    if(copied.status == GenerationStatus.COMPLETED && copied.outputs.size < goal) {
+                        val block = job.parameters["__flow_block"]?.toIntOrNull() ?: 0
+                        copied.copy(providerJobId = "queue_${job.id}", status = GenerationStatus.QUEUED, completedAt = null,
+                            parameters = copied.parameters + ("__flow_block" to (block + 1).toString()),
+                            progress = copied.outputs.size.toFloat() / goal,
+                            technicalDetails = "${copied.outputs.size} de $goal resultados recuperados. Continuando automáticamente.")
+                    } else {
+                        if(copied.status == GenerationStatus.COMPLETED) queue?.edit()?.putString("state_${job.id}", "completed")?.apply()
+                        copied
+                    }
+                }
                 "failed" -> Result.success(
                     job.copy(
                         status = GenerationStatus.FAILED,
@@ -141,7 +196,7 @@ class FlowBridgeProvider(
         val outputs = job.outputs.toMutableList()
         var copyError: Throwable? = null
         for (index in 0 until remote.resultCount) {
-            val outputId = "${job.id}_flow_$index"
+            val outputId = "${job.id}_flow_${job.parameters["__flow_block"] ?: "0"}_$index"
             val existing = outputs.firstOrNull { it.id == outputId }
             if (existing?.localUri?.let(::hasUsableLocalFile) == true) continue
 

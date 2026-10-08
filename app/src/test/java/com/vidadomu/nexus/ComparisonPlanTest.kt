@@ -86,12 +86,12 @@ class ComparisonPlanTest {
         assertNull(comparisonTotal(emptyList()))
         assertThrows(IllegalArgumentException::class.java) { ComparisonCost(Double.NaN, ComparisonCurrency.USD, "invalid") }
     }
-    @Test fun noReadyStateWithMissingCostOrDuplicateModels() {
+    @Test fun unknownCostAllowsSendingButDuplicateModelsDoNot() {
         val plan = ComparisonPlan.adapt(source(), model())
         val priced = ComparisonEntry(model(), plan, ComparisonCost(.1, ComparisonCurrency.USD, "fixture"))
         val second = priced.copy(model = model("second"))
         assertTrue(ComparisonState(phase = ComparisonPhase.REVIEW, entries = listOf(priced)).canSend)
-        assertFalse(ComparisonState(phase = ComparisonPhase.REVIEW, entries = listOf(priced, second.copy(cost = null))).canSend)
+        assertTrue(ComparisonState(phase = ComparisonPhase.REVIEW, entries = listOf(priced, second.copy(cost = null))).canSend)
         assertFalse(ComparisonState(phase = ComparisonPhase.REVIEW, entries = listOf(priced, priced)).canSend)
         assertTrue(ComparisonState(phase = ComparisonPhase.REVIEW, entries = listOf(priced, second)).canSend)
     }

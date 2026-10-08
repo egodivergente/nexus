@@ -113,7 +113,7 @@ class GenerationRepository(
     private val comparisonRecovery = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).async {
         database.loading.first { !it }
         if(database.loadError.value == null) {
-            database.jobsFlow.value.filter { it.parameters.containsKey("__comparison_id") }.forEach { job ->
+            database.jobsFlow.value.filter { it.parameters.containsKey("__comparison_id") || it.parameters.containsKey("__assistant_plan") || it.providerId == "google_flow" }.forEach { job ->
                 val recovered = job.recoverInterruptedComparison()
                 if(recovered != job) database.insertOrUpdateJob(recovered)
                 else if(context != null && !com.vidadomu.nexus.BuildConfig.OFFLINE_QA && !job.providerJobId.isNullOrBlank() &&
@@ -164,7 +164,10 @@ class GenerationRepository(
 
         val pollResult = provider.pollJobStatus(currentJob)
         if (pollResult.isSuccess) {
-            val updated = pollResult.getOrThrow()
+            val remote = pollResult.getOrThrow()
+            val updated = if(currentJob.parameters["__tracking_poll_error"] == "true") remote.copy(
+                error = remote.error.takeUnless { it == currentJob.error },
+                parameters = remote.parameters - "__tracking_poll_error") else remote
             database.insertOrUpdateJob(updated)
             if (updated.status == GenerationStatus.COMPLETED && context != null) {
                 try {
@@ -175,6 +178,10 @@ class GenerationRepository(
             }
             return Result.success(updated)
         }
+        val problem = pollResult.exceptionOrNull()
+        val detail = (problem as? ProviderError)?.humanReadableMessage ?: "No se pudo consultar el estado. Se reintentará sin volver a enviar la generación."
+        database.insertOrUpdateJob(currentJob.copy(error = detail,
+            parameters = currentJob.parameters + ("__tracking_poll_error" to "true")))
         return pollResult
     }
 

@@ -20,6 +20,14 @@ object NativeModelSchema {
     private val cached = com.vidadomu.nexus.core.util.BoundedCache<String, NativeConfiguration>(96)
     private val schemas = com.vidadomu.nexus.core.util.BoundedCache<String, JsonObject>(128)
 
+    fun promptLimit(modelId: String): com.vidadomu.nexus.agent.core.registry.TextLimit? {
+        val prompt = schemas[modelId]?.get("properties")?.jsonObject?.get("prompt")?.jsonObject ?: return null
+        val minimum = prompt["minLength"]?.jsonPrimitive?.intOrNull
+        val maximum = prompt["maxLength"]?.jsonPrimitive?.intOrNull
+        if (minimum == null && maximum == null) return null
+        return com.vidadomu.nexus.agent.core.registry.TextLimit("unicode_code_points", minimum, maximum, "Atlas Input schema")
+    }
+
     suspend fun load(model: NexusModel): NativeConfiguration = withContext(Dispatchers.IO) {
         if(Modality.CHAT in model.modalities) return@withContext NativeConfiguration(model.copy(
             parameters = model.chatSamplingParameters.mapNotNull { key ->

@@ -30,9 +30,9 @@ private fun brandFont(resource: Int): FontFamily = FontFamily(
 private fun palette(theme: NexusAppearance): ColorScheme {
     val light = theme == NexusAppearance.LIGHT
     val quartz = theme == NexusAppearance.QUARTZ
-    val accent = Color(if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF63DCCB)
-    val bg = Color(if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF7F5EF else if (quartz) 0xFF14110F else 0xFF0C0E13)
-    val surface = Color(if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF161A22)
+    val accent = Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF63DCCB)
+    val bg = Color(if(theme == NexusAppearance.OCEAN) 0xFF0A1420 else if(theme == NexusAppearance.FOREST) 0xFF0D1712 else if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF7F5EF else if (quartz) 0xFF14110F else 0xFF0C0E13)
+    val surface = Color(if(theme == NexusAppearance.OCEAN) 0xFF122437 else if(theme == NexusAppearance.FOREST) 0xFF182A20 else if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF161A22)
     val variant = Color(if (light) 0xFFEAE9E5 else if (quartz) 0xFF302820 else 0xFF242A35)
     val ink = Color(if (light) 0xFF191C23 else if (quartz) 0xFFF6EDE0 else 0xFFF0F3F8)
     val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)

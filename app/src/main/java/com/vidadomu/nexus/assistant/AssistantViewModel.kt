@@ -29,25 +29,35 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.withLock
 
 /** Elementos del chat. Las tarjetas de plan se pintan a partir de [AssistantUiState.plans]. */
+@kotlinx.serialization.Serializable
 sealed interface ChatItem {
     val id: String
+    @kotlinx.serialization.Serializable
     data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
+    @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String) : ChatItem
+    @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String) : ChatItem
+    @kotlinx.serialization.Serializable
     data class Proposal(override val id: String, val actionId: String, val description: String, val state: ProposalState = ProposalState.PENDING, val result: String? = null) : ChatItem
+    @kotlinx.serialization.Serializable
     data class Notice(override val id: String, val text: String, val error: Boolean = false) : ChatItem
 }
 
 enum class ProposalState { PENDING, APPLYING, APPLIED, REJECTED, FAILED }
 
 /** Estado de una tarjeta de plan. [plan] es siempre la versión registrada en el SpendGuard. */
+@kotlinx.serialization.Serializable
 data class PlanUi(
     val plan: GenerationPlan,
     val executable: Boolean,
     val state: PlanState,
     val busy: Boolean = false,
+    val submitting: Boolean = false,
     val error: String? = null,
     val issues: List<String> = emptyList(),
     val jobId: String? = null,
@@ -59,6 +69,10 @@ data class AssistantUiState(
     val items: List<ChatItem> = emptyList(),
     val plans: Map<String, PlanUi> = emptyMap(),
     val thinking: Boolean = false,
+    val scrollRequest: Long = 0,
+    val lastLatencyMs: Long? = null,
+    val catalog: List<com.vidadomu.nexus.agent.core.registry.ModelSummary> = emptyList(),
+    val projectAssets: List<com.vidadomu.nexus.agent.core.assets.Asset> = emptyList(),
     val settings: AssistantSettings = AssistantSettings(),
     val mode: AgentMode = AgentMode.COPILOT,
     val projects: List<Project> = emptyList(),
@@ -72,8 +86,8 @@ data class AssistantUiState(
 )
 
 /**
- * Pantalla «¿Qué quieres crear?». Regla de gasto: el único camino a [GenerationLifecycle.confirmAndSubmit]
- * es [generate], que solo se llama desde el botón GENERAR del diálogo de confirmación de ESA tarjeta.
+ * Chat de creación con planes individuales, envíos por bloque y Flow directo.
+ * La recuperación de historial no repite herramientas ni envíos.
  */
 class AssistantViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as NexusApplication
@@ -85,6 +99,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var orchestrator: AgentOrchestrator
     private var conversation: AgentConversation
     private var turnJob: Job? = null
+    private val chatStore = AssistantChatStore(app)
+    private val submitSlots = kotlinx.coroutines.sync.Semaphore(3)
+    private val flowLane = kotlinx.coroutines.sync.Mutex()
 
     init {
         val s = runtime.settings.load()
@@ -93,6 +110,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         conversation = orchestrator.newConversation(mode = s.mode, activeProjectId = savedProject)
         _ui.update { it.copy(settings = s, mode = s.mode, skillsCount = runtime.skills.all().size, skillErrors = runtime.skills.errors, projects = runtime.assets.projects(), activeProjectId = savedProject) }
         viewModelScope.launch { runCatching { runtime.assets.startProjectSession(savedProject); runtime.importHistory() }; refreshProjects() }
+        restoreChat()
+        viewModelScope.launch { app.modelCatalogRepository.models.collect { models ->
+            _ui.update { it.copy(catalog = (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary)) }
+        } }
+        viewModelScope.launch { ui.collect { state -> chatStore.save(state) } }
         viewModelScope.launch { app.generationRepository.allJobs.collect { jobs -> onJobs(jobs) } }
     }
 
@@ -103,10 +125,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val atts = _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking) return
         val shown = clean.ifEmpty { "(adjuntos)" }
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = emptyList(), thinking = true) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = emptyList(), thinking = true, scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
+        val started = android.os.SystemClock.elapsedRealtime()
         turnJob = viewModelScope.launch {
             try {
                 val r = orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
@@ -122,7 +145,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: Exception) {
                 notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
             } finally {
-                _ui.update { it.copy(thinking = false) }
+                _ui.update { state ->
+                    val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
+                        state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
+                    }
+                    state.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
+                        items = state.items.filterNot { it in cards } + cards)
+                }
                 refreshProjects()
                 // El asistente puede haber entrado en otro proyecto (open_project / create_project).
                 conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }?.let { selectProject(it) }
@@ -146,16 +175,35 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 s.copy(plans = s.plans + (ev.planId to p.copy(state = runtime.guard.state(ev.planId) ?: p.state)))
             }
             is UiEvent.ProposedAction -> _ui.update { it.copy(items = it.items + ChatItem.Proposal(newId(), ev.id, ev.description)) }
+            is UiEvent.GenerationSubmitted -> _ui.update { state ->
+                state.copy(plans = state.plans + (ev.plan.id to PlanUi(ev.plan, false, PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING")),
+                    items = state.items + ChatItem.PlanCard(newId(), ev.plan.id))
+            }
             is UiEvent.Info -> notice(ev.text)
         }
     }
 
-    fun newConversation() {
-        if (_ui.value.thinking) return
-        // Los planes sin enviar de la conversación anterior dejan de ser ejecutables.
-        _ui.value.plans.keys.forEach { runtime.guard.discard(it) }
-        conversation = orchestrator.newConversation(mode = _ui.value.mode, activeProjectId = _ui.value.activeProjectId)
-        _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList()) }
+    fun newConversation() = switchConversation(null)
+
+    internal fun conversations(): List<AssistantChatEntry> = chatStore.conversations()
+    internal fun openConversation(id: String) = switchConversation(id)
+
+    private fun switchConversation(id: String?) {
+        val current = _ui.value
+        if(current.thinking || current.plans.values.any { it.busy }) return
+        _ui.update { it.copy(thinking = true) }
+        viewModelScope.launch {
+            try {
+                chatStore.archive(current)
+                current.plans.filterValues { it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED) }.keys.forEach { runtime.guard.discard(it) }
+                val saved = if(id == null) null else chatStore.conversation(id) ?: error("No se pudo abrir la conversación.")
+                conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = current.activeProjectId)
+                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, scrollRequest = it.scrollRequest + 1) }
+                if(saved != null) restoreSavedChat(saved)
+            } catch(error: Exception) {
+                _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
+            }
+        }
     }
 
     fun setMode(mode: AgentMode) {
@@ -171,7 +219,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         _ui.update { it.copy(attaching = true) }
         viewModelScope.launch {
             val added = mutableListOf<Attachment>()
-            for (u in uris.take(6)) {
+            for (u in uris) {
                 runCatching { AgentMediaStore.persist(app, u, null) }
                     .onSuccess { added += it }
                     .onFailure { notice("No se pudo adjuntar: ${it.message?.take(160)}", error = true) }
@@ -184,7 +232,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun selectProject(id: String?) {
         conversation.session.activeProjectId = id
-        _ui.update { it.copy(activeProjectId = id) }
+        _ui.update { it.copy(activeProjectId = id, projectAssets = runtime.assets.snapshot().assets.filter { asset -> asset.projectId == id && id != null }) }
         runtime.settings.setActiveProject(id)
         viewModelScope.launch { runCatching { runtime.assets.startProjectSession(id) } }
     }
@@ -218,7 +266,64 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun refreshProjects() = _ui.update { it.copy(projects = runtime.assets.projects()) }
+    private fun refreshProjects() = _ui.update { state -> state.copy(projects = runtime.assets.projects(),
+        projectAssets = runtime.assets.snapshot().assets.filter { it.projectId == state.activeProjectId && state.activeProjectId != null }) }
+
+    fun importProjectFiles(uris: List<Uri>) {
+        val projectId = _ui.value.activeProjectId ?: return
+        _ui.update { it.copy(attaching = true) }
+        viewModelScope.launch {
+            try {
+                for (uri in uris) runCatching {
+                    val att = AgentMediaStore.persist(app, uri, null)
+                    runtime.assets.addAsset(com.vidadomu.nexus.agent.core.assets.Asset(att.id, att.uri,
+                        if (att.mimeType.startsWith("image/")) com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE else com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO,
+                        role = com.vidadomu.nexus.agent.core.assets.AssetRole.REFERENCE, displayName = att.name ?: "Referencia",
+                        mimeType = att.mimeType, width = att.width, height = att.height, projectId = projectId, createdAt = System.currentTimeMillis()))
+                }.onFailure { notice("No se pudo importar: ${it.message}", true) }
+            } finally { _ui.update { it.copy(attaching = false) }; refreshProjects() }
+        }
+    }
+
+    fun reuseAsset(id: String) {
+        val asset = runtime.assets.asset(id) ?: return
+        val att = Attachment(asset.id, asset.uri, asset.mimeType ?: "image/*", asset.displayName, asset.width, asset.height, assetId = asset.id)
+        _ui.update { state -> state.copy(pendingAttachments = (state.pendingAttachments + att).distinctBy { it.id }) }
+    }
+
+    fun renameReference(id: String, name: String) = viewModelScope.launch {
+        val asset = runtime.assets.asset(id) ?: return@launch
+        if (name.isNotBlank()) runtime.assets.updateAsset(id) { it.copy(displayName = name.trim()) }
+        refreshProjects()
+    }
+
+    fun generatePending() {
+        _ui.value.plans.values.filter { it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
+            .take(20).forEach { generate(it.plan.id, it.plan.fingerprint()) }
+    }
+
+    fun outputs(jobId: String?): List<String> = app.generationRepository.allJobs.value.firstOrNull { it.id == jobId }?.outputs?.map { it.localUri ?: it.url }.orEmpty()
+
+    private fun restoreChat() {
+        val saved = chatStore.load() ?: return
+        restoreSavedChat(saved)
+    }
+
+    private fun restoreSavedChat(saved: SavedAssistantChat) {
+        val plans = saved.plans.mapValues { (_, p) ->
+            if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, error = "La app se cerró durante el envío. Comprueba Historial antes de repetir.")
+            else if (p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) {
+                runtime.guard.register(p.plan); p.copy(state = PlanState.PREPARED, busy = false)
+            } else p.copy(busy = false)
+        }
+        _ui.update { it.copy(items = saved.items, plans = plans, pendingAttachments = saved.attachments) }
+        conversation.session.attachments += (saved.sessionAttachments + saved.items.filterIsInstance<ChatItem.User>().flatMap { it.attachments } + saved.attachments).distinctBy { it.id }
+        conversation.restoreTextHistory(saved.items.mapNotNull { item -> when(item) {
+            is ChatItem.User -> "user" to item.text
+            is ChatItem.Assistant -> "assistant" to item.text
+            else -> null
+        } })
+    }
 
     // ---- propuestas (Copiloto) ----------------------------------------------------------------
 
@@ -276,8 +381,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * ÚNICO punto de gasto del asistente. Llamar solo desde el botón GENERAR del diálogo de confirmación
-     * de esta tarjeta, con la huella del plan que mostraba ese diálogo. Una pulsación = una generación.
+     * Envía un plan revisado desde la acción individual o la acción del bloque.
+     * La huella evita enviar parámetros distintos de los mostrados.
      */
     fun generate(planId: String, shownFingerprint: String) {
         val p = _ui.value.plans[planId] ?: return
@@ -286,20 +391,29 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         setPlan(planId) { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
-                val r = runtime.deps.lifecycle.confirmAndSubmit(planId, shownFingerprint)
+                chatStore.save(_ui.value)
+                val r = submitSlots.withPermit {
+                    suspend fun submitNow(): com.vidadomu.nexus.agent.core.spend.SubmitResult {
+                        setPlan(planId) { it.copy(submitting = true) }
+                        chatStore.save(_ui.value)
+                        return runtime.deps.lifecycle.confirmAndSubmit(planId, shownFingerprint)
+                    }
+                    if (p.plan.ref.providerId == "google_flow") flowLane.withLock { submitNow() }
+                    else submitNow()
+                }
                 val sent = runtime.guard.plan(planId) ?: p.plan
-                setPlan(planId) { it.copy(plan = sent, busy = false, state = PlanState.SUBMITTED, jobId = r.jobId, jobStatus = "PENDING") }
+                setPlan(planId) { it.copy(plan = sent, busy = false, submitting = false, state = PlanState.SUBMITTED, jobId = r.jobId, jobStatus = "PENDING") }
                 notice("Enviado a ${sent.modelName}. Lo verás en Historial; aquí se actualiza el estado." + (r.note?.takeIf { "lineage" in it }?.let { " $it" } ?: ""))
                 onJobs(app.generationRepository.allJobs.value)
             } catch (e: SubmissionUncertain) {
-                setPlan(planId) { it.copy(busy = false, state = PlanState.UNCERTAIN, jobId = e.jobId, error = e.message) }
+                setPlan(planId) { it.copy(busy = false, submitting = false, state = PlanState.UNCERTAIN, jobId = e.jobId, error = e.message) }
             } catch (e: SpendViolation) {
                 val current = runtime.guard.plan(planId)
-                setPlan(planId) { it.copy(plan = current ?: it.plan, busy = false, state = runtime.guard.state(planId) ?: it.state, error = e.message) }
+                setPlan(planId) { it.copy(plan = current ?: it.plan, busy = false, submitting = false, state = runtime.guard.state(planId) ?: it.state, error = e.message) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                setPlan(planId) { it.copy(busy = false, state = runtime.guard.state(planId) ?: PlanState.PREPARED, error = "No se envió: " + Redactor.redact(e.message?.take(200) ?: e.javaClass.simpleName)) }
+                setPlan(planId) { it.copy(busy = false, submitting = false, state = runtime.guard.state(planId) ?: PlanState.PREPARED, error = "No se envió: " + Redactor.redact(e.message?.take(200) ?: e.javaClass.simpleName)) }
             }
         }
     }
@@ -326,6 +440,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val completed = jobs.count { it.status == GenerationStatus.COMPLETED }
         if (completedSeen >= 0 && completed > completedSeen) viewModelScope.launch { runCatching { runtime.importHistory() }; refreshProjects() }
         completedSeen = completed
+        for(job in jobs) {
+            val planId = job.parameters[NexusGenerationBackend.PLAN_KEY] ?: continue
+            val plan = _ui.value.plans[planId] ?: continue
+            if(plan.jobId == null && job.providerJobId != null) setPlan(planId) { it.copy(jobId = job.id, state = PlanState.SUBMITTED, busy = false, submitting = false) }
+        }
         val tracked = _ui.value.plans.values.filter { it.jobId != null }
         if (tracked.isEmpty()) return
         val byId = jobs.associateBy { it.id }
@@ -335,7 +454,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 GenerationStatus.COMPLETED -> "COMPLETED"; GenerationStatus.FAILED -> "FAILED"; GenerationStatus.CANCELLED -> "CANCELLED"
                 GenerationStatus.UPLOADING, GenerationStatus.QUEUED -> "PENDING"; else -> "PROCESSING"
             }
-            if (st != p.jobStatus || job.progress != p.jobProgress) setPlan(p.plan.id) { it.copy(jobStatus = st, jobProgress = job.progress, error = job.error ?: it.error) }
+            if (st != p.jobStatus || job.progress != p.jobProgress || job.error != p.error) setPlan(p.plan.id) { it.copy(jobStatus = st, jobProgress = job.progress, error = job.error) }
             if (st == "COMPLETED" || st == "FAILED" || st == "CANCELLED") {
                 val jid = p.jobId!!
                 if (synced.add(jid)) viewModelScope.launch { runCatching { runtime.deps.lifecycle.sync(jid) } }

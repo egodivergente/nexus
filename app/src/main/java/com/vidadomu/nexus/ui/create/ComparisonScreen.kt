@@ -51,7 +51,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
         Scaffold(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
             topBar = {
                 TopAppBar(title = { Column {
-                    Text("Comparar y crear lotes", style = MaterialTheme.typography.titleLarge)
+                    Text("Encargos a varios modelos", style = MaterialTheme.typography.titleLarge)
                     Text(when(state.phase) {
                         ComparisonPhase.CHOOSE -> "1 · Elige modelos y cantidades"
                         ComparisonPhase.PREPARING -> "Comprobando compatibilidad y costes"
@@ -67,7 +67,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         if(state.phase in setOf(ComparisonPhase.REVIEW, ComparisonPhase.PREPARING)) {
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text("Total estimado", style = MaterialTheme.typography.labelMedium)
-                                Text(if(total != null) "≈ $total" else "Pendiente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text(if(total != null) "≈ $total" else "Coste sin estimación", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             }
                         }
                         when(state.phase) {
@@ -82,7 +82,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                 TextButton(onClick = controller::edit, modifier = Modifier.fillMaxWidth()) { Text("Volver a la selección") }
                             }
                             ComparisonPhase.REVIEW -> {
-                                if(!state.canSend || state.quotedAt == 0L) Text("Todos los modelos necesitan un coste y una configuración válidos.", style = MaterialTheme.typography.bodySmall)
+                                if(!state.canSend || state.quotedAt == 0L) Text("Se enviarán los modelos listos; los que tengan errores quedan pendientes.", style = MaterialTheme.typography.bodySmall)
                                 Button(onClick = controller::send, enabled = state.canSend && state.quotedAt != 0L,
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if(BuildConfig.OFFLINE_QA) "Validar sin enviar" else "Generar lote · ${state.requestCount} generaciones") }
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -95,7 +95,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                 TextButton(onClick = controller::stop, enabled = !state.stopped, modifier = Modifier.fillMaxWidth()) { Text("Detener pendientes") }
                             }
                             ComparisonPhase.RESULTS -> Button(onClick = { results = true },
-                                enabled = jobs.any { it.parameters[ComparisonPlan.ID] == state.batchId }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Ver comparativa") }
+                                enabled = jobs.any { it.parameters[ComparisonPlan.ID] == state.batchId }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Ver resultados") }
                         }
                     }
                 }
@@ -230,7 +230,7 @@ fun ComparisonResultsDialog(batchId: String, onDismiss: () -> Unit, onOpenOutput
         dragHandle = null, shape = androidx.compose.ui.graphics.RectangleShape, contentWindowInsets = { WindowInsets(0) }) {
         com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
         Scaffold(Modifier.fillMaxSize().safeDrawingPadding(), topBar = {
-            TopAppBar(title = { Text("Comparativa") }, navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Cerrar comparativa") } })
+            TopAppBar(title = { Text("Resultados del lote") }, navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Cerrar resultados del lote") } })
         }) { padding ->
             LazyVerticalGrid(GridCells.Adaptive(152.dp), Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

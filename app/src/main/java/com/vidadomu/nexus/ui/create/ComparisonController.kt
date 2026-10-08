@@ -36,7 +36,7 @@ data class ComparisonState(val source: CreateUiState = CreateUiState(), val cata
     val total get() = comparisonTotal(entries.map { it.subtotal })
     val canSend get() = phase == ComparisonPhase.REVIEW && entries.size in 1..ComparisonPlan.MAX_MODELS &&
         entries.map { ComparisonPlan.key(it.model) }.distinct().size == entries.size &&
-        entries.all { it.prepared != null && it.error == null && it.quantity in 1..ComparisonPlan.MAX_GENERATIONS_PER_MODEL } && total != null
+        entries.any { it.prepared != null && it.error == null && it.quantity in 1..ComparisonPlan.MAX_GENERATIONS_PER_MODEL }
 }
 
 class ComparisonController(private val app: NexusApplication, private val scope: CoroutineScope) {
@@ -163,10 +163,14 @@ class ComparisonController(private val app: NexusApplication, private val scope:
                         require(native.unsupportedRequired.isEmpty()) { "El esquema requiere entradas que todavía no admite Nexus." }
                         native.model
                     } else target
-                    val plan = ComparisonPlan.adapt(current.source, model)
+                    val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+                    val settings = runtime.settings.load()
+                    val fitted = com.vidadomu.nexus.agent.core.llm.PromptAdapter({ runtime.llm(settings) }, { settings.modelId })
+                        .adapt(current.source.prompt, com.vidadomu.nexus.assistant.ProviderPromptLimits.forModel(model), model.displayName)
+                    val plan = ComparisonPlan.adapt(current.source.copy(prompt = fitted), model).copy(originalPrompt = current.source.prompt)
                     update(index) { it.copy(prepared = plan, status = "Calculando coste…") }
-                    val cost = quote(plan)
-                    update(index) { it.copy(model = model, cost = cost, status = "Listo") }
+                    val cost = runCatching { quote(plan) }.getOrNull()
+                    update(index) { it.copy(model = model, cost = cost, status = if(cost == null) "Listo · coste sin estimación" else "Listo") }
                 } catch(cancelled: CancellationException) { throw cancelled }
                 catch(error: Exception) {
                     update(index) { it.copy(error = friendlyError(error), status = "Revisar") }
@@ -201,9 +205,6 @@ class ComparisonController(private val app: NexusApplication, private val scope:
     fun send() {
         val s = state.value
         if(!s.canSend) return
-        if(System.currentTimeMillis()-s.quotedAt > 5*60_000) {
-            mutable.update { it.copy(message = "La estimación ha caducado. Actualiza los costes antes de enviar.", quotedAt = 0) }; return
-        }
         if(BuildConfig.OFFLINE_QA) {
             mutable.update { it.copy(message = "Validación correcta. NEXUS Lab bloquea todos los envíos: 0 generaciones, 0 saldo consumido.") }; return
         }
@@ -215,20 +216,21 @@ class ComparisonController(private val app: NexusApplication, private val scope:
                 run.run(ComparisonPlan.requests(s.entries.map { it.quantity })) { _, task ->
                     val index = task.entryIndex
                     val entry = s.entries[index]
+                    if(entry.prepared == null || state.value.entries[index].error != null) return@run
                     update(index) { it.copy(status = "Enviando ${task.number} de ${entry.quantity}…") }
                     try {
                         val jobId = GenerationDispatcher(app).submit(requireNotNull(entry.prepared).state,
                             mapOf(ComparisonPlan.ID to batchId, ComparisonPlan.SIZE to s.requestCount.toString(),
                                 ComparisonPlan.NAME to entry.model.displayName,
                                 ComparisonPlan.NUMBER to task.number.toString(),
-                                ComparisonPlan.MODEL_SIZE to entry.quantity.toString())) { uploading,progress ->
+                                ComparisonPlan.MODEL_SIZE to entry.quantity.toString(), "__comparison_original_prompt" to requireNotNull(entry.prepared).originalPrompt)) { uploading,progress ->
                             update(index) { it.copy(status = if(uploading) "Subiendo referencias · ${task.number}/${entry.quantity}…" else "Enviando ${task.number} de ${entry.quantity}…", progress = progress) }
                         }
                         update(index) { it.copy(jobId = jobId, sentCount = it.sentCount + 1, status = "${it.sentCount + 1} de ${it.quantity} enviadas", progress = null) }
                     } catch(cancelled: CancellationException) { throw cancelled }
                     catch(error: Exception) {
                         update(index) { it.copy(error = friendlyError(error), status = "Envío no confirmado", progress = null) }
-                        throw error
+                        // Keep the failed model pending; independent models continue.
                     }
                 }
             } catch(cancelled: CancellationException) { throw cancelled }

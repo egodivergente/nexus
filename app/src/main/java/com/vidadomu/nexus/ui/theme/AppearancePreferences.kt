@@ -9,6 +9,8 @@ enum class NexusAppearance(val label: String, val description: String) {
     AURORA("Aurora", "Oscuro neutro · turquesa · contraste equilibrado"),
     OLED("Negro OLED", "Negro puro · turquesa · mínimo brillo"),
     QUARTZ("Cuarzo negro", "Oscuro cálido · champán · títulos editoriales"),
+    OCEAN("Océano", "Azul noche · cian"),
+    FOREST("Bosque", "Verde profundo · salvia"),
     LIGHT("Claro", "Marfil · azul tinta · tarjetas blancas")
 }
 

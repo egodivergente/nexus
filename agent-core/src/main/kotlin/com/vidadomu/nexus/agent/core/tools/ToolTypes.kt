@@ -32,6 +32,7 @@ data class Attachment(
 /** Eventos para la UI: tarjetas de plan, propuestas a aplicar, etc. */
 sealed interface UiEvent {
     data class PlanReady(val plan: GenerationPlan, val executable: Boolean) : UiEvent
+    data class GenerationSubmitted(val plan: GenerationPlan, val jobId: String) : UiEvent
     data class AwaitingConfirmation(val planId: String) : UiEvent
     data class ProposedAction(val id: String, val description: String) : UiEvent
     data class Info(val text: String) : UiEvent
@@ -48,6 +49,7 @@ class AgentSession(
     val attachments = mutableListOf<Attachment>()
     /** Acciones de organización propuestas en modo Copiloto, pendientes de que el usuario las aplique. */
     val pendingActions = linkedMapOf<String, PendingAction>()
+    var flowSubmittedResults = 0
 
     fun attachment(id: String): Attachment? = attachments.firstOrNull { it.id == id }
 }

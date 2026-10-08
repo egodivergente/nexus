@@ -105,7 +105,6 @@ fun FlowCreateScreen(
     var prompt by rememberSaveable { mutableStateOf("") }
     var expectedOutput by rememberSaveable { mutableStateOf(Modality.IMAGE) }
     var connection by remember { mutableStateOf<FlowConnectionState>(FlowConnectionState.Checking) }
-    var showConfirmation by rememberSaveable { mutableStateOf(false) }
     var showPromptValidation by rememberSaveable { mutableStateOf(false) }
     var pendingRequestId by rememberSaveable { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
@@ -148,6 +147,73 @@ fun FlowCreateScreen(
         }
     }
 
+    fun submitFlow() {
+                    scope.launch {
+                        isSubmitting = true
+                        val currentStatus = app.flowBridgeProvider.bridgeStatus()
+                        val ready = currentStatus.getOrNull()?.isReady == true
+                        if (!ready) {
+                            isSubmitting = false
+                            refreshConnection()
+                            snackbarHost.showSnackbar(
+                                currentStatus.exceptionOrNull()?.message
+                                    ?: "Flow ya no está listo. Ábrelo desde Ajustes y vuelve a intentarlo."
+                            )
+                            return@launch
+                        }
+
+                        val requestId = pendingRequestId ?: UUID.randomUUID().toString().also {
+                            pendingRequestId = it
+                        }
+                        try {
+                        val request = GenerationRequest(
+                            id = requestId,
+                            providerId = FlowBridgeProvider.PROVIDER_ID,
+                            modelId = FlowBridgeProvider.CURRENT_PROJECT_MODEL,
+                            modality = expectedOutput,
+                            prompt = com.vidadomu.nexus.agent.core.llm.PromptAdapter(
+                                { com.vidadomu.nexus.assistant.AssistantRuntime.get(app).llm(com.vidadomu.nexus.assistant.AssistantRuntime.get(app).settings.load()) },
+                                { com.vidadomu.nexus.assistant.AssistantRuntime.get(app).settings.load().modelId })
+                                .adapt(prompt.trim(), com.vidadomu.nexus.agent.core.registry.TextLimit("utf16_code_units", maximum=4000), "Google Flow"),
+                            parameters = mapOf(
+                                FlowBridgeProvider.EXPECTED_OUTPUT_KEY to if (expectedOutput == Modality.IMAGE) "image" else "video"
+                            )
+                        )
+                        val result = app.generationRepository.submitGeneration(request, mapOf("__assistant_original_prompt" to prompt))
+                        isSubmitting = false
+                        if (result.isSuccess) {
+                            val job = result.getOrThrow()
+                            if (job.status == GenerationStatus.FAILED) {
+                                pendingRequestId = null
+                                snackbarHost.showSnackbar(
+                                    job.error?.takeIf { it.isNotBlank() }
+                                        ?: "Flow no pudo iniciar la generación."
+                                )
+                            } else {
+                                pendingRequestId = null
+                                prompt = ""
+                                if (job.status != GenerationStatus.COMPLETED) {
+                                    GenerationPollingWorker.enqueue(context.applicationContext, job.id)
+                                }
+                                onNavigateToOutput(job.id)
+                            }
+                        } else {
+                            val error = result.exceptionOrNull()
+                            snackbarHost.showSnackbar(
+                                error?.message?.takeIf { it.isNotBlank() }
+                                    ?: "No se pudo confirmar el envío a Flow."
+                            )
+                        }
+                        } catch(error: kotlinx.coroutines.CancellationException) {
+                            isSubmitting = false
+                            throw error
+                        } catch(error: Exception) {
+                            isSubmitting = false
+                            snackbarHost.showSnackbar(error.message ?: "No se pudo preparar el envío. El original se conserva.")
+                        }
+                    }
+    }
+
     val isReady = connection is FlowConnectionState.Ready
     val outputSupported = when (expectedOutput) {
         Modality.IMAGE -> imageAvailable
@@ -160,7 +226,7 @@ fun FlowCreateScreen(
             showPromptValidation = true
         } else if (canSubmit) {
             focusManager.clearFocus(force = true)
-            showConfirmation = true
+            submitFlow()
         }
     }
 
@@ -246,7 +312,7 @@ fun FlowCreateScreen(
                 OutlinedTextField(
                     value = prompt,
                     onValueChange = {
-                        val nextPrompt = it.take(promptLimit)
+                        val nextPrompt = it
                         if (nextPrompt != prompt) pendingRequestId = null
                         prompt = nextPrompt
                         if (nextPrompt.isNotBlank()) showPromptValidation = false
@@ -341,91 +407,7 @@ fun FlowCreateScreen(
         }
     }
 
-    if (showConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showConfirmation = false },
-            title = { Text("Confirmar envío a Flow") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "Se enviará el prompt al proyecto activo de Google Flow con sus ajustes actuales.",
-                        color = TextPrimary
-                    )
-                    Text(
-                        "Flow determina los créditos o el coste. NEXUS no puede confirmarlo antes del envío.",
-                        color = TextMuted,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        "Salida esperada: ${if (expectedOutput == Modality.IMAGE) "Imagen" else "Vídeo"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    showConfirmation = false
-                    scope.launch {
-                        isSubmitting = true
-                        val currentStatus = app.flowBridgeProvider.bridgeStatus()
-                        val ready = currentStatus.getOrNull()?.isReady == true
-                        if (!ready) {
-                            isSubmitting = false
-                            refreshConnection()
-                            snackbarHost.showSnackbar(
-                                currentStatus.exceptionOrNull()?.message
-                                    ?: "Flow ya no está listo. Ábrelo desde Ajustes y vuelve a intentarlo."
-                            )
-                            return@launch
-                        }
 
-                        val requestId = pendingRequestId ?: UUID.randomUUID().toString().also {
-                            pendingRequestId = it
-                        }
-                        val request = GenerationRequest(
-                            id = requestId,
-                            providerId = FlowBridgeProvider.PROVIDER_ID,
-                            modelId = FlowBridgeProvider.CURRENT_PROJECT_MODEL,
-                            modality = expectedOutput,
-                            prompt = prompt.trim(),
-                            parameters = mapOf(
-                                FlowBridgeProvider.EXPECTED_OUTPUT_KEY to if (expectedOutput == Modality.IMAGE) "image" else "video"
-                            )
-                        )
-                        val result = app.generationRepository.submitGeneration(request)
-                        isSubmitting = false
-                        if (result.isSuccess) {
-                            val job = result.getOrThrow()
-                            if (job.status == GenerationStatus.FAILED) {
-                                pendingRequestId = null
-                                snackbarHost.showSnackbar(
-                                    job.error?.takeIf { it.isNotBlank() }
-                                        ?: "Flow no pudo iniciar la generación."
-                                )
-                            } else {
-                                pendingRequestId = null
-                                prompt = ""
-                                if (job.status != GenerationStatus.COMPLETED) {
-                                    GenerationPollingWorker.enqueue(context.applicationContext, job.id)
-                                }
-                                onNavigateToOutput(job.id)
-                            }
-                        } else {
-                            val error = result.exceptionOrNull()
-                            snackbarHost.showSnackbar(
-                                error?.message?.takeIf { it.isNotBlank() }
-                                    ?: "No se pudo confirmar el envío a Flow."
-                            )
-                        }
-                    }
-                }) { Text("Generar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmation = false }) { Text("Cancelar") }
-            }
-        )
-    }
 }
 
 @Composable
