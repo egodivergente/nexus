@@ -1,6 +1,12 @@
 package com.vidadomu.nexus.ui.settings
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
+import com.vidadomu.nexus.ui.components.InlineNotice
+import com.vidadomu.nexus.ui.components.noticeMessage
+import com.vidadomu.nexus.ui.theme.*
+import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,7 +50,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -109,6 +114,7 @@ fun FlowCreateScreen(
     var showPromptValidation by rememberSaveable { mutableStateOf(false) }
     var pendingRequestId by rememberSaveable { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var costDetails by remember {mutableStateOf(false)}
 
     suspend fun refreshConnection() {
         connection = FlowConnectionState.Checking
@@ -234,21 +240,13 @@ fun FlowCreateScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = ScreenBackground,
-        snackbarHost = { SnackbarHost(snackbarHost) },
+        snackbarHost = { SnackbarHost(snackbarHost) {data->InlineNotice(noticeMessage(data.visuals.message,"No se pudo completar la acción en Flow."),technicalDetails=data.visuals.message,actionLabel="Cerrar",onAction={data.dismiss()})} },
         topBar = {
             TopAppBar(
                 title = { Text("Flow", style=MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { scope.launch { refreshConnection() } },
-                        enabled = connection !is FlowConnectionState.Checking && !isSubmitting
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar estado de Flow")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -265,9 +263,9 @@ fun FlowCreateScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp)
+                        .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
+                        .heightIn(min=NexusTokens.minimumTouch),
+                    shape = NexusTokens.field
                 ) {
                     if (isSubmitting) {
                         CircularProgressIndicator(
@@ -275,11 +273,11 @@ fun FlowCreateScreen(
                             strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(NexusTokens.space8))
                         Text("Enviando a Flow…")
                     } else {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(NexusTokens.space8))
                         Text("Generar en Flow")
                     }
                 }
@@ -292,14 +290,14 @@ fun FlowCreateScreen(
                 .padding(innerPadding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(PaddingValues(horizontal = 16.dp, vertical = 20.dp)),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(PaddingValues(horizontal = NexusTokens.space16, vertical = NexusTokens.space16)),
+            verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
             FlowConnectionCard(connection = connection, onRefresh = {
                 scope.launch { refreshConnection() }
             })
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Text("Prompt", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                 OutlinedTextField(
                     value = prompt,
@@ -333,12 +331,12 @@ fun FlowCreateScreen(
                         Text("${prompt.length}/$promptLimit")
                     },
                     isError = showPromptValidation && prompt.isBlank()
-                )
+                , shape=NexusTokens.field)
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Text("Salida esperada", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     FilterChip(
                         selected = expectedOutput == Modality.IMAGE,
                         onClick = {
@@ -371,15 +369,16 @@ fun FlowCreateScreen(
                 )
             }
 
-            Surface(
+            TextButton(onClick={costDetails=!costDetails},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Text(if(costDetails) "Ocultar detalles" else "Ajustes y coste · Detalles")}
+            if(costDetails) Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = SurfaceDark,
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                shape = RoundedCornerShape(12.dp)
+                shape = NexusTokens.field
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(NexusTokens.space16),
+                    verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     Text("Ajustes y coste", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
                     Text(
@@ -403,54 +402,15 @@ fun FlowCreateScreen(
 }
 
 @Composable
-private fun FlowConnectionCard(
-    connection: FlowConnectionState,
-    onRefresh: () -> Unit
-) {
-    val (title, detail, available) = when (connection) {
-        FlowConnectionState.Checking -> Triple("Comprobando Flow", "Conectando con el puente privado…", null)
-        is FlowConnectionState.Ready -> Triple(
-            "Flow listo",
-            connection.status.projectName?.takeIf { it.isNotBlank() }
-                ?: connection.status.detail?.takeIf { it.isNotBlank() }
-                ?: "Proyecto activo disponible.",
-            true
-        )
-        is FlowConnectionState.Unavailable -> Triple("Flow no está listo", connection.message, false)
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            when (available) {
-                true -> AccentEmerald.copy(alpha = 0.7f)
-                false -> AccentCoral.copy(alpha = 0.7f)
-                null -> BorderSubtle
-            }
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when (available) {
-                true -> Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AccentEmerald)
-                false -> Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = AccentCoral)
-                null -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            if (connection !is FlowConnectionState.Checking) {
-                OutlinedButton(onClick = onRefresh, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Reintentar", modifier = Modifier.size(18.dp))
-                }
-            }
+private fun FlowConnectionCard(connection:FlowConnectionState,onRefresh:()->Unit) {
+    when(connection) {
+        FlowConnectionState.Checking -> Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            CircularProgressIndicator(Modifier.size(NexusTokens.space24),strokeWidth=2.dp)
+            Text("Comprobando Flow…",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         }
+        is FlowConnectionState.Ready -> InlineNotice("Flow listo"+(connection.status.projectName?.takeIf {it.isNotBlank()}?.let {" · $it"} ?: ""),
+            technicalDetails=connection.status.detail,actionLabel="Actualizar",onAction=onRefresh,isError=false)
+        is FlowConnectionState.Unavailable -> InlineNotice(noticeMessage(connection.message,"Flow no está listo. Abre el proyecto desde Ajustes y comprueba la conexión."),
+            technicalDetails=connection.message,actionLabel="Actualizar",onAction=onRefresh)
     }
 }

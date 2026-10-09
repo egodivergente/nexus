@@ -22,7 +22,7 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | 5 | Modelos | ASUS: 105 núcleo + 259 app, cero fallos; APK offline. Emulador: catálogo, filtros directos y dos capturas 1.3 | Completada |
 | 6 | Biblioteca y visor | ASUS: 105 núcleo + 259 app, cero fallos; emulador: seis pruebas de resultados, vídeo y audio y dos capturas 1.3 | Completada |
 | 7 | Asistente y proyecto | ASUS: 105 núcleo + 259 app, cero fallos; emulador: nueve pruebas y dos capturas 1.3 | Completada |
-| 8 | Ajustes y Flow | Pendiente | Pendiente |
+| 8 | Ajustes y Flow | ASUS: 105 núcleo + 259 app, cero fallos; emulador: dos pruebas y capturas 1.3 | Completada |
 | 9 | QA visual, accesibilidad y regresión | Pendiente | Pendiente |
 
 Las capturas antes del S25 se realizan con la APK original vc28, a escalas 1.0 y 1.3. Se restaura la escala original al terminar cada captura. Las imágenes privadas están fuera de Git en `outputs/ui-minimal-20261009/before` del workspace original.
@@ -76,3 +76,7 @@ La compilación de la app y los 364 tests JVM terminaron correctamente; la nueva
 - La separación de la galería es un token específico de 2 dp, conforme a la petición de cuadrícula a sangre. El margen en tablet conserva su token de 20 dp.
 - Los controles de detalle pueden crecer con la fuente. No se impone un alto fijo que recorte texto para aparentar compactación.
 - Las capturas publicables se prepararán con fixtures locales de QA, sin prompts, claves ni fotos personales.
+
+La fase 8 agrupa Ajustes por secciones y abre Apariencia, Moneda y Diagnóstico en hojas desplazables. Mantiene los seis temas, restauración, tasa BCE, claves enmascaradas, pruebas de conexión y modo Mock. Los importes Atlas se presentan con el formateador común y el detalle conserva USD. Flow mantiene su identificador de envío, validación, seguimiento y bloqueo; solo cambia la presentación. La pantalla dedicada conserva el prompt del proyecto activo; las referencias existentes siguen en Lienzo/Asistente. No se ha enviado nada a Flow.
+
+ASUS: BUILD SUCCESSFUL, 438 fuentes verificadas, 105 tests del núcleo y 259 de la app sin fallos. La instrumentación necesitó concretar el selector de Euros, repetido en pantalla y hoja. La repetición de SettingsMinimalUiTest verifica Apariencia, Moneda, Diagnóstico, tipo de salida Flow y generación deshabilitada. UiAuditScreenshotsTest: OK (1 test), 26,632 s; Ajustes y Flow a 1.3 revisados visualmente.

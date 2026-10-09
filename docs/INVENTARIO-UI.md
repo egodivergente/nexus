@@ -127,21 +127,21 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Apariencia: seis temas / restaurar predeterminado | Sección y pulsación | Sección Apariencia y menú | 1–2 | Pendiente |
-| Moneda / restaurar / tasa BCE / fecha / ejemplo / actualizar | Sección Moneda | Sección Moneda | 1–2 | Pendiente |
-| Atlas: saldo efectivo/bonos/congelado / actualizar | Tarjeta cuenta | Sección Cuenta y hoja saldo | 1 | Pendiente |
-| Atlas: modificar clave / probar conexión / feedback | Sección proveedor | Sección Proveedores | 1–2 | Pendiente |
-| Crun/Runway: clave enmascarada / modificar / saldo / prueba | Tarjetas proveedor | Sección Proveedores | 1–2 | Pendiente |
-| Modo Mock | Switch | Sección Pruebas | 1 | Pendiente |
-| Diagnóstico sistema/dispositivo | Desplegable inline | Subpantalla Diagnóstico | 1 | Pendiente |
-| Flow: vincular ASUS / cancelar / abrir portal autenticado | FlowRecoverySettings | Sección Google Flow | 1–2 | Pendiente |
-| Crear en Flow | Botón Ajustes | Sección Flow → Crear | 1 | Pendiente |
-| Flow: prompt / validación vacío / contador y límite | FlowCreateScreen | Campo principal | 1 | Pendiente |
-| Flow: Imagen/Vídeo según capacidades / disponibilidad | Chips | Chips | 1 | Pendiente |
-| Flow: estado de conexión / detalle / actualizar | Tarjeta y cabecera | Aviso y Actualizar | 1–2 | Pendiente |
-| Flow: avisos de ajustes/coste del proyecto | Tarjeta inferior | Detalles plegables | 1 | Pendiente |
-| Flow: Generar / enviando / bloqueo / volver / ver resultado | Pie fijo y navegación | Pie fijo, mismas condiciones | 1 | Pendiente |
-| Referencias Flow del agente y Lienzo / identificación y bloqueo de errores | Medios del plan / formulario MULTI_IMAGE | Mismos medios reubicados | 1–2 | Pendiente |
+| Apariencia: seis temas / restaurar predeterminado | Sección y pulsación | Personalización → Apariencia (hoja) | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Moneda / restaurar / tasa BCE / fecha / ejemplo / actualizar | Personalización → Moneda (hoja) | Personalización → Moneda (hoja) | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Atlas: saldo efectivo/bonos/congelado / actualizar | Tarjeta cuenta | Cuenta Atlas → Detalles / hoja saldo | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Atlas: modificar clave / probar conexión / feedback | Sección proveedor | Sección Proveedores | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Crun/Runway: clave enmascarada / modificar / saldo / prueba | Tarjetas proveedor | Sección Proveedores | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Modo Mock | Switch | Sección Pruebas | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Diagnóstico sistema/dispositivo | Desplegable inline | Sistema → Diagnóstico (hoja completa) | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Flow: vincular ASUS / cancelar / abrir portal autenticado | FlowRecoverySettings | Sección Google Flow | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Crear en Flow | Botón Ajustes | Sección Flow → Crear | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Flow: prompt / validación vacío / contador y límite | FlowCreateScreen | Campo principal | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Flow: Imagen/Vídeo según capacidades / disponibilidad | Chips | Chips | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Flow: estado de conexión / detalle / actualizar | Tarjeta y cabecera | Aviso y Actualizar | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Flow: avisos de ajustes/coste del proyecto | Tarjeta inferior | Detalles plegables | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Flow: Generar / enviando / bloqueo / volver / ver resultado | Pie fijo y navegación | Pie fijo, mismas condiciones | 1 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
+| Referencias Flow del agente y Lienzo / identificación y bloqueo de errores | Medios del plan / formulario MULTI_IMAGE | Mismos medios reubicados | 1–2 | Destino y callbacks revisados; SettingsMinimalUiTest y capturas 1.3 |
 
 ## Global
 

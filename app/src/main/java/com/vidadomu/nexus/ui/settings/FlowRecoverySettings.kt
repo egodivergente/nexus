@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.theme.*
+import com.vidadomu.nexus.ui.components.InlineNotice
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -42,26 +44,26 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Google Flow", style = MaterialTheme.typography.titleLarge)
         Text("Proyecto activo del ASUS", style = MaterialTheme.typography.bodyMedium)
         Text("La creación usa los ajustes y el coste que muestre Google Flow.",
             style = MaterialTheme.typography.bodySmall)
-        Button(onClick = {
+        FilledTonalButton(onClick = {
             if (isLinked) onCreateInFlow() else pair = true
         }) {
             Icon(Icons.Default.AutoAwesome, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(NexusTokens.space8))
             Text(if (isLinked) "Crear en Flow" else "Vincular Flow")
         }
         if (isLinked) {
             OutlinedButton(onClick = ::openRecovery) {
                 Icon(Icons.Default.OpenInNew, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(NexusTokens.space8))
                 Text("Abrir Flow")
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        error?.let {InlineNotice(it)}
     }
     if (pair) AlertDialog(
         onDismissRequest = { pair = false; token = "" },
@@ -70,7 +72,7 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
             OutlinedTextField(value = token, onValueChange = { token = it.trim() },
                 label = { Text("Clave privada del ASUS") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth())
+                modifier = Modifier.fillMaxWidth(), shape=NexusTokens.field)
         },
         confirmButton = {
             TextButton(enabled = token.matches(Regex("[A-Za-z0-9_-]{43}")), onClick = {

@@ -1,6 +1,13 @@
 package com.vidadomu.nexus.ui.settings
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.vidadomu.nexus.ui.components.InlineNotice
+import com.vidadomu.nexus.ui.components.noticeMessage
+import com.vidadomu.nexus.ui.components.presentBalance
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -33,7 +40,7 @@ import java.util.Locale
 import com.vidadomu.nexus.ui.theme.*
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     val context = LocalContext.current
@@ -88,660 +95,114 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     var isMockMode by remember { mutableStateOf(settingsRepo.isMockModeEnabled()) }
     var showDiagnostics by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = ScreenBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text("Ajustes", style=MaterialTheme.typography.titleLarge) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 112.dp)
-        ) {
-            item { FlowRecoverySettings(onCreateInFlow = onCreateInFlow) }
-            item {
-                Text("Apariencia", modifier=Modifier.fillMaxWidth().combinedClickable(onClick={defaultSetting="Apariencia"},onLongClick={defaultSetting="Apariencia"}).padding(vertical=8.dp), style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.height(8.dp))
-                Surface(color=SurfaceDark, shape=RoundedCornerShape(20.dp), shadowElevation=1.dp) {
-                    Column(Modifier.selectableGroup()) {
-                        NexusAppearance.entries.forEach { option ->
-                            Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)}).padding(12.dp),
-                                verticalAlignment=Alignment.CenterVertically) {
-                                RadioButton(selectedTheme==option, onClick=null)
-                                Column(Modifier.padding(start=8.dp)) {
-                                    Text(option.label, style=MaterialTheme.typography.titleMedium)
-                                    Text(option.description, style=MaterialTheme.typography.bodySmall, color=TextSecondary)
-                                }
-                            }
-                        }
-                    }
+    var appearanceOpen by remember {mutableStateOf(false)}
+    var currencyOpen by remember {mutableStateOf(false)}
+    var currencyDetails by remember {mutableStateOf(false)}
+    var accountDetails by remember {mutableStateOf(false)}
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=MaterialTheme.typography.titleLarge)})}) {padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+            item {Text("Personalización",style=MaterialTheme.typography.titleMedium)}
+            item {SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true},{defaultSetting="Apariencia"})}
+            item {SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true},{defaultSetting="Moneda"})}
+            item {HorizontalDivider();FlowRecoverySettings(onCreateInFlow)}
+            item {HorizontalDivider();Text("Cuenta Atlas",style=MaterialTheme.typography.titleMedium)}
+            item {Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Text(accountBalance?.let {currencyManager.formatBalance(it.availableUsd)} ?: "Saldo sin consultar",style=MaterialTheme.typography.titleMedium.tabularMoney(),modifier=Modifier.weight(1f))
+                    IconButton(onClick={refreshBalance()},enabled=!isRefreshingBalance) {Icon(Icons.Default.Refresh,"Actualizar saldo Atlas")}
                 }
-            }
-            // Sección 0: Cuenta y Saldo Atlas Cloud
-            item {
-                Text(
-                    text = "CUENTA Y SALDO ATLAS CLOUD",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = CyanNeon,
-                        letterSpacing = 1.sp
-                    )
-                )
-            }
-
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(CyanNeon.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.AccountBalanceWallet,
-                                    contentDescription = null,
-                                    tint = CyanNeon,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Saldo Disponible Real",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                )
-                                Text(
-                                    text = "Consumo oficial por uso en Atlas Cloud",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                                )
-                            }
-                        }
-
-                        val availUsd = accountBalance?.availableUsd ?: 0.0
-                        val availEurStr = currencyManager.formatBalance(availUsd)
-                        val availUsdStr = "(\$" + String.format(Locale.US, "%.2f", availUsd) + " USD)"
-
-                        Row(
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = availEurStr,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = TextPrimary
-                                )
-                            )
-                            Text(
-                                text = availUsdStr,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = TextSecondary
-                                ),
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                        }
-
-                        HorizontalDivider(color = BorderSubtle, thickness = 0.5.dp)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text("Efectivo (Cash)", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                                Text(currencyManager.formatBalance(accountBalance?.cashUsd ?: 0.0), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            }
-                            Column {
-                                Text("Bonos", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                                Text(currencyManager.formatBalance(accountBalance?.bonusUsd ?: 0.0), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            }
-                            Column {
-                                Text("Congelado", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                                Text(currencyManager.formatBalance(accountBalance?.frozenUsd ?: 0.0), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            }
-                        }
-
-                        Button(
-                            onClick = { refreshBalance() },
-                            colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (isRefreshingBalance) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Consultando saldo...", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                            } else {
-                                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Actualizar Saldo en Vivo", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+                TextButton(onClick={accountDetails=!accountDetails},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Text(if(accountDetails) "Ocultar cuenta" else "Detalles de cuenta")}
+                if(accountDetails) accountBalance?.let {balance ->
+                    Text(currencyManager.formatUsdDetails(balance.availableUsd),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
+                    AccountAmount("Efectivo",currencyManager.formatBalance(balance.cashUsd))
+                    AccountAmount("Bonos",currencyManager.formatBalance(balance.bonusUsd))
+                    AccountAmount("Congelado",currencyManager.formatBalance(balance.frozenUsd))
+                    Text("Consumo oficial por uso en Atlas Cloud",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
-            }
-
-            // Sección 1: Moneda y Tipo de Cambio
-            item {
-                Text(
-                    text = "MONEDA Y TIPO DE CAMBIO",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryNeon,
-                        letterSpacing = 1.sp
-                    )
-                )
-            }
-
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(PrimaryNeon.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Euro,
-                                    contentDescription = null,
-                                    tint = PrimaryNeon,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Divisa de Visualización",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                )
-                                Text(
-                                    text = currencyState.rateSummaryText,
-                                    style = MaterialTheme.typography.bodySmall.copy(color = AccentEmerald)
-                                )
-                            }
+            }}
+            item {HorizontalDivider();Text("Proveedores",style=MaterialTheme.typography.titleMedium)}
+            item {Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Text("Atlas Cloud",style=MaterialTheme.typography.titleMedium)
+                Text("URL base: https://api.atlascloud.ai",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                Text(if(maskedApiKey=="Not configured") "Sin configurar · Clave API (Keystore)" else "Clave API guardada (Keystore)",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                Text(maskedApiKey.takeUnless {it=="Not configured"} ?: "Sin configurar",style=MaterialTheme.typography.bodyMedium)
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    OutlinedButton(onClick={apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text("Modificar clave Atlas")}
+                    OutlinedButton(enabled=!isTestingConnection,onClick={
+                        isTestingConnection=true;connectionStatusMessage=null
+                        scope.launch {
+                            val key=settingsRepo.getAtlasApiKey()
+                            val result=settingsRepo.testConnection(key)
+                            isTestingConnection=false
+                            if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud."}
+                            else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión."}
                         }
-
-                        Text(
-                            text = "Preferencia de visualización:",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = TextMuted,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-
-                        // Selector de tipo de divisa
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CurrencyPreference.values().forEach { pref ->
-                                val isSelected = currencyState.preference == pref
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .combinedClickable(onClick={currencyManager.setPreference(pref)},onLongClick={defaultSetting="Moneda"}),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) PrimaryNeon.copy(alpha = 0.12f) else SurfaceVariantDark,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (isSelected) PrimaryNeon else BorderSubtle
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = isSelected,
-                                            onClick = { currencyManager.setPreference(pref) },
-                                            colors = RadioButtonDefaults.colors(
-                                                selectedColor = PrimaryNeon,
-                                                unselectedColor = TextMuted
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text(
-                                                text = pref.displayName,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSelected) PrimaryNeon else TextPrimary
-                                                )
-                                            )
-                                            Text(
-                                                text = pref.description,
-                                                style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Detalle del tipo de cambio y botón de actualización
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "Fuente: Banco Central Europeo (BCE)",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                color = TextSecondary,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        )
-                                        Text(
-                                            text = "Última sincronización: ${currencyState.formattedLastUpdated}",
-                                            style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Ejemplo: \$0.015 USD → ${currencyManager.formatUsd(0.015)}",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = PrimaryNeon,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    )
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            scope.launch {
-                                                currencyManager.refreshRate()
-                                            }
-                                        },
-                                        enabled = !currencyState.isUpdating,
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryNeon),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        if (currencyState.isUpdating) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(14.dp),
-                                                strokeWidth = 2.dp,
-                                                color = PrimaryNeon
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Sincronizando...", style = MaterialTheme.typography.labelSmall)
-                                        } else {
-                                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Actualizar Tasa", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    },colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text(if(isTestingConnection) "Probando…" else "Probar conexión Atlas")}
                 }
-            }
-
-            // Sección 2: Proveedor Principal (Atlas Cloud)
-            item {
-                Text(
-                    text = "PROVEEDOR PRINCIPAL",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryNeon,
-                        letterSpacing = 1.sp
-                    )
-                )
-            }
-
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(PrimaryNeon.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.CloudQueue,
-                                    contentDescription = null,
-                                    tint = PrimaryNeon,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Atlas Cloud",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                )
-                                Text(
-                                    text = "URL base: https://api.atlascloud.ai",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                                )
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = AccentEmerald.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "Activo",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = AccentEmerald,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-
-                        Divider(color = BorderSubtle, thickness = 0.8.dp)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Clave API (Seguridad Keystore)",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
-                                )
-                                Text(
-                                    text = maskedApiKey,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                        color = if (maskedApiKey == "Not configured" || maskedApiKey == "No configurada") AccentCoral else TextPrimary,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                            }
-                            Button(
-                                onClick = {
-                                    apiKeyInput = settingsRepo.getAtlasApiKey()
-                                    showEditKeyDialog = true
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = SurfaceVariantDark,
-                                    contentColor = PrimaryNeon
-                                )
-                            ) {
-                                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Modificar Clave")
-                            }
-                        }
-
-                        // Botón Probar Conexión
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    isTestingConnection = true
-                                    connectionStatusMessage = null
-                                    scope.launch {
-                                        val key = settingsRepo.getAtlasApiKey()
-                                        val result = settingsRepo.testConnection(key)
-                                        isTestingConnection = false
-                                        if (result.isSuccess) {
-                                            isConnectionSuccess = true
-                                            connectionStatusMessage = "Conexión exitosa con Atlas Cloud."
-                                        } else {
-                                            isConnectionSuccess = false
-                                            connectionStatusMessage = result.exceptionOrNull()?.message
-                                                ?: "Fallo de conexión."
-                                        }
-                                    }
-                                },
-                                enabled = !isTestingConnection,
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryNeon)
-                            ) {
-                                if (isTestingConnection) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = PrimaryNeon
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Probando...")
-                                } else {
-                                    Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Probar Conexión")
-                                }
-                            }
-                        }
-
-                        connectionStatusMessage?.let { status ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isConnectionSuccess) AccentEmerald.copy(alpha = 0.15f) else AccentCoral.copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (isConnectionSuccess) AccentEmerald else AccentCoral
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (isConnectionSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
-                                        contentDescription = null,
-                                        tint = if (isConnectionSuccess) AccentEmerald else AccentCoral,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = status,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = if (isConnectionSuccess) AccentEmerald else AccentCoral
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                Text(
-                    text = "PROVEEDORES DE VÍDEO",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryNeon,
-                        letterSpacing = 1.sp
-                    )
-                )
-            }
-
+                connectionStatusMessage?.let {status->InlineNotice(if(isConnectionSuccess) "Conexión correcta." else noticeMessage(status,"No se pudo conectar con Atlas."),technicalDetails=if(isConnectionSuccess) null else status,isError=!isConnectionSuccess)}
+            }}
             item {
                 @Suppress("UNUSED_EXPRESSION")
                 providerKeyRevision
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    app.providerRegistry.getAllProviders()
-                        .filter { it.id in setOf("crun", "runway") }
-                        .forEach { provider ->
-                            ProviderCredentialCard(
-                                provider = provider,
-                                maskedKey = app.secureStorage.getMaskedProviderApiKey(provider.id),
-                                apiKey = { app.secureStorage.getProviderApiKey(provider.id) },
-                                onEdit = {
-                                    providerKeyDialogId = provider.id
-                                    providerKeyInput = app.secureStorage.getProviderApiKey(provider.id)
-                                }
-                            )
-                        }
-                }
-            }
-
-            // Sección 3: Pruebas y Modo Simulación
-            item {
-                Text(
-                    text = "PRUEBAS Y CONTROL DE COSTES",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = SecondaryVioletLight,
-                        letterSpacing = 1.sp
-                    )
-                )
-            }
-
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Modo Proveedor Simulado (Mock)",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                )
-                                Text(
-                                    text = "Simula generaciones completas de imagen/vídeo de forma local sin consumir créditos de Atlas Cloud.",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                                )
-                            }
-                            Switch(
-                                checked = isMockMode,
-                                onCheckedChange = { checked ->
-                                    isMockMode = checked
-                                    settingsRepo.setMockMode(checked)
-                                    app.modelCatalogRepository.refreshModels()
-                                }
-                            )
-                        }
-
-                        Divider(color = BorderSubtle, thickness = 0.8.dp)
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showDiagnostics = !showDiagnostics },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Diagnóstico del Sistema y Dispositivo",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    color = TextSecondary
-                                )
-                            )
-                            Icon(
-                                imageVector = if (showDiagnostics) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = TextSecondary
-                            )
-                        }
-
-                        AnimatedVisibility(visible = showDiagnostics) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SurfaceVariantDark)
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text("Aplicación: Nexus v1.0.0 (Compilación Nativa)", style = MaterialTheme.typography.labelSmall, color = PrimaryNeon)
-                                Text("Dispositivo: ${Build.MANUFACTURER} ${Build.MODEL}", style = MaterialTheme.typography.labelSmall, color = TextPrimary)
-                                Text("Versión Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                                Text("Cifrado Keystore: Activo (AES256-GCM Hardware)", style = MaterialTheme.typography.labelSmall, color = AccentEmerald)
-                                Text("Motor Multimedia: Media3 ExoPlayer v1.4.1", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                                Text("Gestión de Fondo: Android WorkManager 2.9", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                                Text("Servicio de Divisas: BCE / Frankfurter API", style = MaterialTheme.typography.labelSmall, color = PrimaryNeon)
-                            }
-                        }
+                Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                    app.providerRegistry.getAllProviders().filter {it.id in setOf("crun","runway")}.forEach {provider->
+                        ProviderCredentialCard(provider,app.secureStorage.getMaskedProviderApiKey(provider.id),{app.secureStorage.getProviderApiKey(provider.id)},
+                            {providerKeyDialogId=provider.id;providerKeyInput=app.secureStorage.getProviderApiKey(provider.id)})
                     }
                 }
             }
+            item {HorizontalDivider();Text("Pruebas y sistema",style=MaterialTheme.typography.titleMedium)}
+            item {Row(verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos de Atlas.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
+                Switch(isMockMode,{checked->isMockMode=checked;settingsRepo.setMockMode(checked);app.modelCatalogRepository.refreshModels()},modifier=Modifier.semantics {contentDescription="Proveedor simulado"})
+            }}
+            item {SettingRow("Diagnóstico del sistema","Aplicación y dispositivo",{showDiagnostics=true})}
+        }
+    }
+    if(appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Text("Apariencia",style=MaterialTheme.typography.titleLarge)
+            NexusAppearance.entries.forEach {option->Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)})
+                .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
+                RadioButton(selectedTheme==option,null)
+                Column(Modifier.weight(1f)) {Text(option.label,style=MaterialTheme.typography.bodyLarge);Text(option.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
+            }}
+            TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado",color=TextSecondary)}
+            TextButton(onClick={appearanceOpen=false}) {Text("Cerrar apariencia",color=TextSecondary)}
+        }
+    }
+    if(currencyOpen) ModalBottomSheet(onDismissRequest={currencyOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Text("Moneda",style=MaterialTheme.typography.titleLarge)
+            CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth().combinedClickable(onClick={currencyManager.setPreference(pref)},onLongClick={defaultSetting="Moneda"})
+                .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
+                RadioButton(currencyState.preference==pref,{currencyManager.setPreference(pref)})
+                Column(Modifier.weight(1f)) {Text(pref.displayName,style=MaterialTheme.typography.bodyLarge);Text(pref.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
+            }}
+            Text(currencyState.rateSummaryText,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            Text("Fuente: BCE / Frankfurter",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+            Text("Última sincronización: ${currencyState.formattedLastUpdated}",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+            TextButton(onClick={currencyDetails=!currencyDetails}) {Text("Detalles de conversión",color=TextSecondary)}
+            if(currencyDetails) Text("Ejemplo: ${currencyManager.formatUsdDetails(.015)} → ${currencyManager.formatCost(.015)}",style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
+            currencyState.error?.let {InlineNotice(noticeMessage(it,"No se pudo actualizar la tasa. Se conserva la guardada."),technicalDetails=it)}
+            OutlinedButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
+            TextButton(onClick={currencyManager.setPreference(CurrencyPreference.EUR_SMART)}) {Text("Restaurar predeterminado",color=TextSecondary)}
+            TextButton(onClick={currencyOpen=false}) {Text("Cerrar moneda",color=TextSecondary)}
+        }
+    }
+    if(showDiagnostics) ModalBottomSheet(onDismissRequest={showDiagnostics=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Text("Diagnóstico del sistema",style=MaterialTheme.typography.titleLarge)
+            Text("Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",style=MaterialTheme.typography.bodyMedium)
+            Text("Dispositivo: ${Build.MANUFACTURER} ${Build.MODEL}",style=MaterialTheme.typography.bodyMedium)
+            Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",style=MaterialTheme.typography.bodyMedium)
+            Text(if(app.secureStorage.credentialStorageAvailable) "Almacenamiento cifrado disponible" else "Almacenamiento cifrado no disponible",style=MaterialTheme.typography.bodyMedium)
+            Text("Media3 ExoPlayer 1.4.1 · WorkManager 2.9",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            Text("Divisas: BCE / Frankfurter",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            TextButton(onClick={showDiagnostics=false}) {Text("Cerrar diagnóstico",color=TextSecondary)}
         }
     }
 
@@ -756,9 +217,9 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     Text(
-                        text = "Tu clave API se almacena cifrada con AES256-GCM respaldada por el Keystore de Android. Nunca se expone en registros ni trazas de red.",
+                        text = "Tu clave API se almacena cifrada con AES256-GCM respaldada por el Keystore de Android.",
                         style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
                     )
                     OutlinedTextField(
@@ -775,7 +236,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         )
-                    )
+                    , shape=NexusTokens.field)
                 }
             },
             confirmButton = {
@@ -791,7 +252,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) {
-                    Text("Guardar Clave", fontWeight = FontWeight.Bold)
+                    Text("Guardar clave", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -801,7 +262,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             },
             containerColor = SurfaceDark,
             tonalElevation = 8.dp,
-            shape = RoundedCornerShape(16.dp)
+            shape = NexusTokens.card
         )
     }
 
@@ -811,7 +272,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             onDismissRequest = { providerKeyDialogId = null },
             title = { Text("Configurar clave de ${provider?.displayName ?: providerId}", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     Text("La clave se guarda cifrada en el Keystore de Android.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = providerKeyInput,
@@ -820,7 +281,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    , shape=NexusTokens.field)
                 }
             },
             confirmButton = {
@@ -836,7 +297,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             },
             dismissButton = { TextButton(onClick = { providerKeyDialogId = null }) { Text("Cancelar") } },
             containerColor = SurfaceDark,
-            shape = RoundedCornerShape(16.dp)
+            shape = NexusTokens.card
         )
     }
 }
@@ -873,12 +334,12 @@ private fun ProviderCredentialCard(
         modifier = Modifier.fillMaxWidth(),
         color = SurfaceDark,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-        shape = RoundedCornerShape(14.dp)
+        shape = NexusTokens.card
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CloudQueue, contentDescription = null, tint = PrimaryNeon)
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(NexusTokens.space8))
                 Column(Modifier.weight(1f)) {
                     Text(provider.displayName, color = TextPrimary, fontWeight = FontWeight.Bold)
                     Text(provider.description, color = TextMuted, style = MaterialTheme.typography.bodySmall)
@@ -886,28 +347,28 @@ private fun ProviderCredentialCard(
             }
             Divider(color = BorderSubtle)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(maskedKey, modifier = Modifier.weight(1f), color = if (maskedKey == "Not configured") AccentCoral else TextPrimary,
+                Text(maskedKey.takeUnless {it=="Not configured"} ?: "Sin configurar", modifier = Modifier.weight(1f), color = if (maskedKey == "Not configured") AccentCoral else TextPrimary,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                 TextButton(onClick = onEdit) { Text("Modificar") }
             }
             if(accountStatus != null || loadingBalance) {
-                Surface(color = PrimaryNeon.copy(alpha = 0.08f), shape = RoundedCornerShape(10.dp),
+                Surface(color = PrimaryNeon.copy(alpha = 0.08f), shape = NexusTokens.field,
                     border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.28f))) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                         verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = PrimaryNeon,
                             modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(NexusTokens.space8))
                         Column(Modifier.weight(1f)) {
                             Text("Saldo", color = TextMuted, style = MaterialTheme.typography.labelSmall)
-                            Text(accountStatus?.balanceLabel ?: "Consultando…", color = TextPrimary,
+                            Text(accountStatus?.balanceLabel?.let {presentBalance(it,(LocalContext.current.applicationContext as NexusApplication).currencyManager)} ?: "Consultando…", color = TextPrimary,
                                 fontWeight = FontWeight.Bold)
                         }
                         if(loadingBalance) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     }
                 }
             }
-            balanceError?.let { Text("Saldo: $it", color = AccentAmber, style = MaterialTheme.typography.bodySmall) }
+            balanceError?.let {InlineNotice(noticeMessage(it,"No se pudo consultar el saldo."),technicalDetails=it)}
             OutlinedButton(
                 onClick = {
                     testing = true
@@ -924,10 +385,28 @@ private fun ProviderCredentialCard(
             ) {
                 if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(NexusTokens.space4))
                 Text(if (testing) "Probando…" else "Probar conexión")
             }
-            resultText?.let { Text(it, color = if (success) AccentEmerald else AccentCoral, style = MaterialTheme.typography.bodySmall) }
+            resultText?.let {InlineNotice(if(success) "Conexión correcta." else noticeMessage(it,"No se pudo conectar con el proveedor."),technicalDetails=if(success) null else it,isError=!success)}
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SettingRow(title:String,subtitle:String,onClick:()->Unit,onLongClick:(()->Unit)?=null) {
+    Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).combinedClickable(role=Role.Button,onClick=onClick,onLongClick=onLongClick)
+        .padding(vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+        Column(Modifier.weight(1f)) {Text(title,style=MaterialTheme.typography.bodyLarge);Text(subtitle,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
+        Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)
+    }
+}
+
+@Composable
+private fun AccountAmount(label:String,amount:String) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+        Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+        Text(amount,style=MaterialTheme.typography.bodyMedium.tabularMoney())
     }
 }
