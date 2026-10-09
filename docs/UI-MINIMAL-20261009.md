@@ -20,7 +20,7 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | 3 | Lienzo | ASUS: 105 núcleo + 254 app, cero fallos; APK offline. Emulador: CanvasMinimalUiTest y navegación, dos tests; cuatro capturas | Completada |
 | 4 | Historial | ASUS: 105 núcleo + 257 app, cero fallos; APK offline. Emulador: dos tests y dos capturas 1.3 | Completada |
 | 5 | Modelos | ASUS: 105 núcleo + 259 app, cero fallos; APK offline. Emulador: catálogo, filtros directos y dos capturas 1.3 | Completada |
-| 6 | Biblioteca y visor | Pendiente | Pendiente |
+| 6 | Biblioteca y visor | ASUS: 105 núcleo + 259 app, cero fallos; emulador: seis pruebas de resultados, vídeo y audio y dos capturas 1.3 | Completada |
 | 7 | Asistente y proyecto | Pendiente | Pendiente |
 | 8 | Ajustes y Flow | Pendiente | Pendiente |
 | 9 | QA visual, accesibilidad y regresión | Pendiente | Pendiente |
@@ -60,6 +60,10 @@ ASUS: BUILD SUCCESSFUL en 7m 5s, 431 fuentes verificadas. 105 tests del núcleo 
 La fase 5 compacta familias y modelos con logos de 32 dp, nombre, descripción breve y precio alineado. Conserva la vista amplia, cuadrícula, todos los tipos, búsqueda, favoritos, orden, arrastre, ocultación, restauración, variantes y fuentes de tarifas. Orden y proveedor se eligen directamente en la hoja Filtros: abrirla y elegir requiere dos pulsaciones. Las opciones del modelo mantienen sus selecciones y callbacks originales. El precio de referencia de la lista conserva el cálculo existente; la unidad se indica una vez por modalidad. Los importes positivos menores de un céntimo se muestran como «<0,01 €»; los saldos siguen con dos decimales y no se convierten unidades de audio desconocidas a minutos. Son cambios de presentación, cubiertos por dos nuevos tests.
 
 ASUS: BUILD SUCCESSFUL en 7m 19s en la revisión final, 432 fuentes verificadas; 105 tests del núcleo y 259 de la app sin fallos ni errores. CatalogMinimalUiTest: OK (1 test), 31,233 s; verifica ocultos, búsqueda, selección de orden en dos pulsaciones, uso del modelo y conservación de los ids de trabajos. La captura anterior de la misma fase cubre lista y opciones a 1.3: OK (1 test), 26,275 s; se revisó visualmente. La matriz final también cubrirá la hoja de filtros. Ninguna prueba pulsa Generar.
+
+La fase 6 muestra todos los resultados en una cuadrícula de tres columnas sin etiquetas inferiores, agrupada por día. Cada miniatura abre su resultado concreto; la ruta opcional index solo selecciona la salida visible. Búsqueda, filtros, contadores y Alexia conservan sus callbacks. Coil VideoFrameDecoder extrae la portada del vídeo, con memoria limitada y dos decodificaciones simultáneas. Audio y vídeo muestran duración cuando el proveedor la declara; no se inventan tiempos. El Visor usa el ancho disponible, acciones secundarias con etiqueta, descarga primaria y metadatos plegados. Conserva compartir, guardar/cancelar, zoom, copia de texto y reproductores. Los errores de reproducción ofrecen reintento y diagnóstico plegado.
+
+ASUS: BUILD SUCCESSFUL en 15m 41s, 433 fuentes verificadas, 105 tests del núcleo y 259 de la app sin fallos. LibraryMinimalUiTest y MultiOutputTest: OK (4 tests), 50,058 s. Biblioteca y Visor a 1.3: OK (1 test), 26,086 s. Se añadieron un MP4 y un WAV sintéticos locales: compilación de tests en 2m 20s, 436 fuentes verificadas. MediaPreviewUiTest: OK (2 tests), 33,881 s; comprueba el fotograma decodificado mediante píxeles, la duración 0:02 y el control accesible de audio. No se comprobó la salida de sonido ni se generó contenido de pago.
 
 ## Decisiones
 

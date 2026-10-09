@@ -1,163 +1,94 @@
 package com.vidadomu.nexus.ui.library
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import coil.ImageLoader
 import coil.compose.AsyncImage
-import androidx.compose.runtime.saveable.rememberSaveable
-import com.vidadomu.nexus.ui.components.matchesCreationSearch
+import coil.decode.VideoFrameDecoder
+import coil.request.ImageRequest
 import com.vidadomu.nexus.NexusApplication
-import com.vidadomu.nexus.core.model.GenerationJob
-import com.vidadomu.nexus.core.model.GenerationStatus
-import com.vidadomu.nexus.core.model.Modality
+import com.vidadomu.nexus.core.model.*
+import com.vidadomu.nexus.ui.components.matchesCreationSearch
 import com.vidadomu.nexus.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinite() && it>=0}?.toLong()?.let {
+    "%d:%02d".format(Locale.ROOT,it/60,it%60)
+}
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Composable
-fun LibraryScreen(
-    onNavigateToOutput: (String) -> Unit
-) {
-    val context = LocalContext.current
-    val app = context.applicationContext as NexusApplication
+fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null) {
+    val context=LocalContext.current
+    val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
-    var searchQuery by rememberSaveable {mutableStateOf("")}
-
-    var selectedFilter by remember { mutableStateOf<Modality?>(null) }
-
-    val completedJobs = remember(jobs, selectedFilter,searchQuery) {
-        jobs.filter { it.status == GenerationStatus.COMPLETED && it.outputs.isNotEmpty() }
-            .filter { selectedFilter == null || it.modality == selectedFilter }
-            .filter {matchesCreationSearch(it,searchQuery)}
-    }
-
-    Scaffold(
-        containerColor = ScreenBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text("Biblioteca", style=MaterialTheme.typography.titleLarge) },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            try {
-                                val launchIntent = context.packageManager.getLaunchIntentForPackage("com.axel.library")
-                                    ?: android.content.Intent().apply {
-                                        component = android.content.ComponentName("com.axel.library", "com.axel.library.MainActivity")
-                                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                context.startActivity(launchIntent)
-                            } catch (_: Exception) {}
+    var query by rememberSaveable {mutableStateOf("")}
+    var searchVisible by rememberSaveable {mutableStateOf(false)}
+    var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
+    val completed=remember(jobs,filter,query) {jobs.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
+        .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}}
+    val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
+    val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
+    val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
+        .decoderDispatcher(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(2))
+        .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.08).build()}.build()}
+    DisposableEffect(imageLoader) {onDispose {imageLoader.shutdown()}}
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Biblioteca",style=MaterialTheme.typography.titleLarge)},actions={
+        IconButton(onClick={try {
+            val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
+                component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")
+                flags=Intent.FLAG_ACTIVITY_NEW_TASK
+            };context.startActivity(intent)
+        } catch (_:Exception) {}}) {Icon(Icons.Default.FolderSpecial,"Abrir Alexia",tint=TextSecondary)}
+    })}) {padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalAlignment=Alignment.CenterVertically) {
+                Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.weight(1f))
+                IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca")}
+            }
+            if(searchVisible || query.isNotBlank()) OutlinedTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),singleLine=true,
+                placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
+                trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
+            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                item {FilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
+                items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
+                    FilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
+                }
+            }
+            if(completed.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
+                Text(if(query.isNotBlank()) "No hay resultados." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
+            } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
+                horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
+                contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
+                groups.forEach {(day,entries) ->
+                    item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                        modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
+                    entries.forEach {job ->
+                        items(job.outputs.size,key={index->"${job.id}:${job.outputs[index].id}:$index"}) {index ->
+                            LibraryTile(job,job.outputs[index],conflicts,imageLoader) {
+                                if(onNavigateToResult!=null) onNavigateToResult(job.id,index) else onNavigateToOutput(job.id)
+                            }
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FolderSpecial,
-                            contentDescription = "Abrir Alexia",
-                            tint = PrimaryNeon
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            Text("${completedJobs.sumOf { it.outputs.size }} archivos · ${completedJobs.size} creaciones",
-                style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space4))
-            OutlinedTextField(searchQuery,{searchQuery=it},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=4.dp),singleLine=true,
-                placeholder={Text("Buscar por modelo o descripción")},leadingIcon={Icon(Icons.Default.Search,null)},
-                trailingIcon={if(searchQuery.isNotEmpty()) IconButton(onClick={searchQuery=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}},shape=RoundedCornerShape(16.dp))
-            // Filter Pills
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    LibraryFilterPill(
-                        text = "TODOS",
-                        isSelected = selectedFilter == null,
-                        onClick = { selectedFilter = null }
-                    )
-                }
-                items(listOf(Modality.IMAGE, Modality.VIDEO, Modality.AUDIO)) { mod ->
-                    val label = when (mod) {
-                        Modality.IMAGE -> "IMAGEN"
-                        Modality.VIDEO -> "VÍDEO"
-                        Modality.AUDIO -> "AUDIO"
-                        Modality.CHAT -> "CHAT"
-                    }
-                    LibraryFilterPill(
-                        text = label,
-                        isSelected = selectedFilter == mod,
-                        onClick = { selectedFilter = mod }
-                    )
-                }
-            }
-
-            if (completedJobs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.CollectionsBookmark,
-                            contentDescription = null,
-                            modifier = Modifier.size(54.dp),
-                            tint = TextMuted
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if(searchQuery.isNotBlank()) "No hay resultados" else "No hay archivos con este filtro",
-                            style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
-                        )
-                        Text(
-                            text = "Las creaciones generadas aparecerán aquí.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                        )
-                    }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(vertical = 12.dp)
-                ) {
-                    items(completedJobs, key = { it.id }) { job ->
-                        LibraryItemCard(
-                            job = job,
-                            onClick = { onNavigateToOutput(job.id) }
-                        )
                     }
                 }
             }
@@ -166,108 +97,27 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryFilterPill(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = if (isSelected) PrimaryNeon else SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) PrimaryNeon else BorderSubtle),
-        modifier = Modifier.clickable { onClick() }
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) BackgroundDark else TextSecondary
-            )
-        )
-    }
-}
-
-@Composable
-private fun LibraryItemCard(
-    job: GenerationJob,
-    onClick: () -> Unit
-) {
-    val firstOutput = job.outputs.firstOrNull()
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() },
-        color = SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .background(SurfaceVariantDark),
-                contentAlignment = Alignment.Center
-            ) {
-                if (firstOutput != null && job.modality == Modality.IMAGE) {
-                    AsyncImage(
-                        model = firstOutput.url,
-                        contentDescription = job.prompt,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else if (job.modality == Modality.VIDEO) {
-                    Icon(
-                        imageVector = Icons.Default.PlayCircle,
-                        contentDescription = "Video",
-                        tint = PrimaryNeon,
-                        modifier = Modifier.size(44.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Audiotrack,
-                        contentDescription = "Audio",
-                        tint = SecondaryVioletLight,
-                        modifier = Modifier.size(44.dp)
-                    )
-                }
-
-                // Modality tag
-                val modalityLabel = when (job.modality) {
-                    Modality.IMAGE -> "IMAGEN"
-                    Modality.VIDEO -> "VÍDEO"
-                    Modality.AUDIO -> "AUDIO"
-                    Modality.CHAT -> "CHAT"
-                }
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = modalityLabel,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize, color = TextPrimary)
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = job.prompt.ifBlank { "Archivo multimedia" },
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium, color = TextPrimary),
-                    maxLines = 1
-                )
-                Text(
-                    text = job.modelId.substringAfter("/"),
-                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted),
-                    maxLines = 1
-                )
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,onOpen:()->Unit) {
+    val context=LocalContext.current
+    val duration=mediaDuration(output.durationSeconds)
+    val type=when(output.type) {Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.IMAGE->"Imagen";else->"Texto"}
+    Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainer)
+        .clickable(role=Role.Button,onClickLabel="Ver resultado",onClick=onOpen)
+        .semantics(mergeDescendants=true) {contentDescription="$type · ${job.prompt.ifBlank {"Creación"}}${duration?.let {" · $it"}.orEmpty()}"},
+        contentAlignment=Alignment.Center) {
+        val local=OutputFiles.trustedLocalUri(output,conflicts)
+        if(output.type in listOf(Modality.IMAGE,Modality.VIDEO)) {
+            var failed by remember(output.id,local,output.url) {mutableStateOf(false)}
+            if(!failed) AsyncImage(model=remember(output.id,local,output.url) {ImageRequest.Builder(context)
+                .data(local ?: output.url).apply {if(output.type==Modality.VIDEO) decoderFactory {result,options,_->VideoFrameDecoder(result.source,options)}}.build()},
+                imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
+            if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
+        } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
+        if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.78f),contentColor=MediaForeground,
+            shape=NexusTokens.thumbnail,modifier=Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space4)) {
+            Row(Modifier.padding(NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                Icon(if(output.type==Modality.VIDEO) Icons.Default.PlayArrow else Icons.Default.GraphicEq,null,Modifier.size(NexusTokens.space16))
+                if(duration!=null) Text(duration,style=MaterialTheme.typography.labelMedium.tabularMoney())
             }
         }
     }

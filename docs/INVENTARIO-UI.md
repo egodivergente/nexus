@@ -73,25 +73,25 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Cuadrícula de resultados / abrir visor | Tarjetas con texto | Cuadrícula de medios, 3 columnas | 1 | Pendiente |
-| Buscar prompt/modelo | Campo fijo | Icono Buscar → campo | 1 | Pendiente |
-| Todos/Imagen/Vídeo/Audio | Chips | Chips | 1 | Pendiente |
-| Contador de archivos y creaciones | Subtítulo | Texto secundario bajo filtros | 0 | Pendiente |
-| Abrir Alexia | Icono | Icono de cabecera | 1 | Pendiente |
+| Cuadrícula de resultados / abrir visor | Tarjetas con texto | Cuadrícula de medios, 3 columnas | 1 | Código y LibraryMinimalUiTest / MultiOutputTest |
+| Buscar prompt/modelo | Campo fijo | Icono Buscar → campo | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Todos/Imagen/Vídeo/Audio | Chips | Chips | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Contador de archivos y creaciones | Subtítulo | Texto secundario junto a búsqueda | 0 | Revisado en código; pruebas de Biblioteca/Visor |
+| Abrir Alexia | Icono | Icono de cabecera | 1 | Revisado en código; pruebas de Biblioteca/Visor |
 
 ## Visor
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Elegir entre varios resultados | Chips | Chips sobre medio | 1 | Pendiente |
-| Imagen con zoom / vídeo / audio con tiempos | Visor | Medio a todo el ancho | 1 | Pendiente |
-| Error de carga y reintento | Aviso bajo imagen | Aviso y Reintentar | 1 | Pendiente |
-| Animar / Remezclar / Compartir enlace | Botones bajo medio | Fila de acciones con icono/etiqueta | 1 | Pendiente |
-| Descargar/guardar copia / cancelar transferencia / progreso | Acción de exportación | Menú o fila de acciones | 1–2 | Pendiente |
-| Abrir Alexia | Botón bajo medio | Acción secundaria | 1 | Pendiente |
-| Copiar texto de respuesta | Botón Copiar | Botón Copiar | 1 | Pendiente |
-| Metadatos: modelo/proveedor/coste/id | Tarjeta visible | Detalles plegables | 1 | Pendiente |
-| Volver | Flecha | Flecha | 1 | Pendiente |
+| Elegir entre varios resultados | Chips | Chips sobre medio | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Imagen con zoom / vídeo / audio con tiempos | Visor | Medio a todo el ancho | 1 | MultiOutputTest + MediaPreviewUiTest; sonido no probado |
+| Error de carga y reintento | Aviso bajo imagen | Aviso y Reintentar | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Animar / Remezclar / Compartir enlace | Botones bajo medio | Fila de acciones con icono/etiqueta | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Descargar/guardar copia / cancelar transferencia / progreso | Acción de exportación | Botón Descargar y progreso con Cancelar | 1–2 | Revisado en código; pruebas de Biblioteca/Visor |
+| Abrir Alexia | Botón bajo medio | Acción secundaria | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Copiar texto de respuesta | Botón Copiar | Botón Copiar | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Metadatos: modelo/proveedor/coste/id | Tarjeta visible | Detalles plegables | 1 | Revisado en código; pruebas de Biblioteca/Visor |
+| Volver | Flecha | Flecha | 1 | Revisado en código; pruebas de Biblioteca/Visor |
 
 ## Asistente y proyecto
 

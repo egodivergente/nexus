@@ -169,9 +169,8 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Library.route) {
                             LibraryScreen(
-                                onNavigateToOutput = { jobId ->
-                                    navController.navigate("output/$jobId")
-                                }
+                                onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
+                                onNavigateToResult = { jobId, index -> navController.navigate("output/$jobId?index=$index") }
                             )
                         }
                         composable(Screen.Settings.route) {
@@ -186,12 +185,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(
-                            route = "output/{jobId}",
-                            arguments = listOf(navArgument("jobId") { type = NavType.StringType })
+                            route = "output/{jobId}?index={index}",
+                            arguments = listOf(navArgument("jobId") { type = NavType.StringType }, navArgument("index") {type=NavType.IntType;defaultValue=0})
                         ) { backStackEntry ->
                             val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
                             OutputViewerScreen(
                                 jobId = jobId,
+                                initialOutputIndex = backStackEntry.arguments?.getInt("index") ?: 0,
                                 onBack = { navController.popBackStack() },
                                 onReuseAsInput = { content ->
                                     if (content.startsWith("http://") || content.startsWith("https://") || content.startsWith("content://") || content.startsWith("file://")) {

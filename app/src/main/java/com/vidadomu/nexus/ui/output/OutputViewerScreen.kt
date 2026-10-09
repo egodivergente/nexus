@@ -6,6 +6,10 @@ import android.content.Intent
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.media3.common.PlaybackException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -48,382 +52,106 @@ import com.vidadomu.nexus.ui.components.GenerationProgressPanel
 import com.vidadomu.nexus.ui.theme.*
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OutputViewerScreen(
-    jobId: String,
-    onBack: () -> Unit,
-    onReuseAsInput: (String) -> Unit
-) {
-    val context = LocalContext.current
-    val app = context.applicationContext as NexusApplication
+fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Unit,initialOutputIndex:Int=0) {
+    val context=LocalContext.current
+    val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
-    val job = remember(jobs, jobId) { jobs.find { it.id == jobId } }
-    val currencyManager = app.currencyManager
-    val exporter: OutputExportViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val job=remember(jobs,jobId) {jobs.find {it.id==jobId}}
+    val currencyManager=app.currencyManager
+    val currencyState by currencyManager.state.collectAsState()
+    val exporter:OutputExportViewModel=androidx.lifecycle.viewmodel.compose.viewModel()
     val export by exporter.state.collectAsState()
-    val snackbar = remember { SnackbarHostState() }
-    val savePicker = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-    ) { result -> exporter.save(if (result.resultCode == android.app.Activity.RESULT_OK) result.data?.data else null) }
-    LaunchedEffect(export.message) {
-        export.message?.let { snackbar.showSnackbar(it); exporter.dismissMessage() }
+    val snackbar=remember {SnackbarHostState()}
+    val savePicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+        result->exporter.save(if(result.resultCode==android.app.Activity.RESULT_OK) result.data?.data else null)
     }
-
-    val titleText = when (job?.modality) {
-        Modality.IMAGE -> "IMAGEN"
-        Modality.VIDEO -> "VÍDEO"
-        Modality.AUDIO -> "AUDIO"
-        Modality.CHAT -> "CHAT"
-        null -> "GENERACIÓN"
-    }
-
-    var selectedOutput by remember(job?.id) { mutableStateOf(0) }
+    LaunchedEffect(export.message) {export.message?.let {snackbar.showSnackbar(it);exporter.dismissMessage()}}
+    var selectedOutput by remember(job?.id,initialOutputIndex) {mutableIntStateOf(initialOutputIndex.coerceAtLeast(0))}
+    var details by remember(jobId) {mutableStateOf(false)}
     val chosenOutput=job?.outputs?.getOrNull(selectedOutput) ?: job?.outputs?.firstOrNull()
-    val conflicts = remember(job?.outputs) { OutputFiles.conflictingLocalUris(job?.outputs.orEmpty()) }
-    val trustedLocal = chosenOutput?.let { OutputFiles.trustedLocalUri(it, conflicts) }
-    Scaffold(
-        containerColor = ScreenBackground,
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = titleText,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás",
-                            tint = TextPrimary
-                        )
+    val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
+    val trustedLocal=chosenOutput?.let {OutputFiles.trustedLocalUri(it,conflicts)}
+    val title=when(job?.modality) {Modality.IMAGE->"Imagen";Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.CHAT->"Texto";else->"Resultado"}
+    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(
+        title={Text(title,style=MaterialTheme.typography.titleLarge)},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
+    }) {padding ->
+        if(job==null) {Box(Modifier.fillMaxSize().padding(padding),contentAlignment=Alignment.Center) {Text("Generación no encontrada",color=TextSecondary)};return@Scaffold}
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            val output=chosenOutput
+            if(job.outputs.size>1) androidx.compose.foundation.lazy.LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                items(job.outputs.size) {index->FilterChip(selectedOutput==index,{selectedOutput=index},label={Text("Resultado ${index+1}")},shape=NexusTokens.filter)}
+            }
+            val ratio=output?.let {o->if(o.width!=null && o.height!=null && o.width>0 && o.height>0) o.width.toFloat()/o.height else null}
+            Box(Modifier.fillMaxWidth().aspectRatio((ratio ?: if(job.modality==Modality.VIDEO) 16f/9f else 1f).coerceIn(.55f,2f)).background(SurfaceDark),contentAlignment=Alignment.Center) {
+                if(output!=null) key(output.id) {when(job.modality) {
+                    Modality.IMAGE->ZoomableImageViewer(output.url,trustedLocal)
+                    Modality.VIDEO->NativeVideoPlayer(trustedLocal ?: output.url)
+                    Modality.AUDIO->NativeAudioPlayer(trustedLocal ?: output.url)
+                    Modality.CHAT->TextOutputViewer(output.url)
+                }} else if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) {
+                    GenerationProgressPanel(job,Modifier.fillMaxWidth().padding(NexusTokens.screenMargin))
+                } else com.vidadomu.nexus.ui.components.InlineNotice("No hay un resultado disponible.",Modifier.padding(NexusTokens.screenMargin),job.error)
+            }
+            if(output!=null) {
+                Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    if(job.modality==Modality.IMAGE) ViewerAction(Icons.Default.MovieFilter,"Animar",Modifier.weight(1f)) {onReuseAsInput(trustedLocal ?: output.url)}
+                    ViewerAction(Icons.Default.Replay,"Remezclar",Modifier.weight(1f)) {onReuseAsInput(job.prompt)}
+                    if(output.url.startsWith("https://") || output.url.startsWith("http://")) ViewerAction(Icons.Default.Share,"Compartir",Modifier.weight(1f)) {shareMedia(context,output.url,job.prompt)}
+                    ViewerAction(Icons.Default.FolderSpecial,"Alexia",Modifier.weight(1f),"Abrir Alexia") {
+                        try {val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
+                            component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity");flags=Intent.FLAG_ACTIVITY_NEW_TASK
+                        };context.startActivity(intent)} catch (_:Exception) {}
                     }
-                },
-                actions = {
-                    val outputUrl = chosenOutput?.url
-                    if (outputUrl != null && (outputUrl.startsWith("https://") || outputUrl.startsWith("http://"))) {
-                        IconButton(onClick = { shareMedia(context, outputUrl, job?.prompt.orEmpty()) }) {
-                            Icon(Icons.Default.Share, contentDescription = "Compartir enlace", tint = PrimaryNeon)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
+                }
+                Button(enabled=!export.busy,modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field,
+                    onClick={val spec=outputExportSpec(output);exporter.prepare(output,trustedLocal);savePicker.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE);type=spec.mimeType;putExtra(Intent.EXTRA_TITLE,spec.fileName)
+                    })}) {Icon(Icons.Default.Download,null);Spacer(Modifier.width(NexusTokens.space8));Text(if(export.busy) "Guardando archivo…" else "Descargar archivo")}
+                if(export.busy) Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalAlignment=Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(NexusTokens.space24),strokeWidth=2.dp)
+                    Text("${export.bytes/1024} KB",Modifier.weight(1f).padding(horizontal=NexusTokens.space12))
+                    TextButton(onClick=exporter::cancel) {Text("Cancelar",color=TextSecondary)}
+                }
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                TextButton(onClick={details=!details},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {
+                    Text(if(details) "Ocultar detalles" else "Detalles");Icon(if(details) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
+                }
+                if(details) {
+                    Text(job.prompt.ifBlank {"Sin instrucción textual"},style=MaterialTheme.typography.bodyLarge)
+                    ViewerDetail("Modelo",app.modelCatalogRepository.getModelById(job.modelId)?.displayName ?: job.modelId)
+                    ViewerDetail("Proveedor",job.providerId)
+                    val cost=remember(job,currencyState) {com.vidadomu.nexus.ui.components.confirmedJobCost(job,currencyManager)}
+                    ViewerDetail("Coste",cost)
+                    job.actualCostUsd?.let {ViewerDetail("Importe original",currencyManager.formatUsdDetails(it))}
+                    ViewerDetail("Disponibilidad",if(trustedLocal!=null) "Copia local registrada. Consulta su disponibilidad en Alexia." else "El resultado depende del enlace del proveedor.")
+                    job.parameters.filterKeys {!it.startsWith("__")}.forEach {(key,value)->ViewerDetail(key,value)}
+                    ViewerDetail("ID",job.id)
+                    job.providerJobId?.let {ViewerDetail("ID del proveedor",it)}
+                }
+            }
+            Spacer(Modifier.height(NexusTokens.space24))
         }
-    ) { innerPadding ->
-        if (job == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Generación no encontrada", color = TextSecondary)
-            }
-            return@Scaffold
-        }
+    }
+}
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            val output = chosenOutput
-            if(job.outputs.size>1) {
-                androidx.compose.foundation.lazy.LazyRow(
-                    contentPadding=PaddingValues(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    items(job.outputs.size) { index ->
-                        FilterChip(selected=selectedOutput==index,onClick={selectedOutput=index},label={Text("Resultado ${index+1}")})
-                    }
-                }
-            }
+@Composable
+private fun ViewerAction(icon:androidx.compose.ui.graphics.vector.ImageVector,label:String,modifier:Modifier=Modifier,description:String=label,onClick:()->Unit) {
+    Column(modifier.clickable(role=androidx.compose.ui.semantics.Role.Button,onClick=onClick)
+        .semantics(mergeDescendants=true) {contentDescription=description}.heightIn(min=NexusTokens.minimumTouch)
+        .padding(vertical=NexusTokens.space8),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+        Icon(icon,null,tint=TextSecondary)
+        Text(label,style=MaterialTheme.typography.labelMedium,color=TextSecondary,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
 
-            // 1. Output Media Canvas Viewer
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(380.dp)
-                    .background(SurfaceDark),
-                contentAlignment = Alignment.Center
-            ) {
-                if (output != null) {
-                    key(output.id) { when (job.modality) {
-                        Modality.IMAGE -> {
-                            ZoomableImageViewer(imageUrl = output.url, localUri = trustedLocal)
-                        }
-                        Modality.VIDEO -> {
-                            NativeVideoPlayer(videoUrl = trustedLocal ?: output.url)
-                        }
-                        Modality.AUDIO -> {
-                            NativeAudioPlayer(audioUrl = trustedLocal ?: output.url)
-                        }
-                        Modality.CHAT -> {
-                            TextOutputViewer(text = output.url)
-                        }
-                    }
-                    }
-                } else if (job.status !in setOf(
-                        GenerationStatus.COMPLETED,
-                        GenerationStatus.FAILED,
-                        GenerationStatus.CANCELLED
-                    )) {
-                    GenerationProgressPanel(
-                        job = job,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp)
-                    )
-                } else {
-                    Text(
-                        text = job.error ?: "Generación completada sin resultado",
-                        color = AccentCoral,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            // 2. Contextual Actions Pill Row
-            if (output != null) {
-                Button(
-                    enabled = !export.busy,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp),
-                    onClick = {
-                        val spec = outputExportSpec(output)
-                        exporter.prepare(output, trustedLocal)
-                        savePicker.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = spec.mimeType
-                            putExtra(Intent.EXTRA_TITLE, spec.fileName)
-                        })
-                    }
-                ) {
-                    Icon(Icons.Default.Download, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (export.busy) "Guardando archivo…" else "Descargar archivo")
-                }
-                if (export.busy) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text("${export.bytes / 1024} KB", Modifier.weight(1f).padding(horizontal = 12.dp))
-                    TextButton(onClick = exporter::cancel) { Text("Cancelar") }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (job.modality == Modality.IMAGE) {
-                        Button(
-                            onClick = { onReuseAsInput(trustedLocal ?: output.url) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SurfaceVariantDark,
-                                contentColor = PrimaryNeon
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.MovieFilter, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Animar", fontSize = MaterialTheme.typography.labelMedium.fontSize)
-                        }
-                    }
-
-                    Button(
-                        onClick = { onReuseAsInput(job.prompt) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceVariantDark,
-                            contentColor = SecondaryVioletLight
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Remezclar", fontSize = MaterialTheme.typography.labelMedium.fontSize)
-                    }
-
-                    if (output.url.startsWith("https://") || output.url.startsWith("http://")) {
-                        Button(
-                            onClick = { shareMedia(context, output.url, job.prompt) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SurfaceVariantDark,
-                                contentColor = TextPrimary
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Compartir enlace", fontSize = MaterialTheme.typography.labelMedium.fontSize)
-                        }
-                    }
-                }
-
-                // Alexia Classification Badge
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.45f)),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FolderSpecial,
-                                contentDescription = null,
-                                tint = PrimaryNeon,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = if(trustedLocal != null) "Copia local registrada" else "Sin copia local confirmada",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                )
-                                val subfolder = when (job.modality) {
-                                    Modality.IMAGE -> "Nexus / Imágenes"
-                                    Modality.VIDEO -> "Nexus / Vídeos"
-                                    Modality.AUDIO -> "Nexus / Audio"
-                                    Modality.CHAT -> "Nexus / Chat"
-                                }
-                                Text(
-                                    text = if(trustedLocal != null) "Consulta su disponibilidad en Alexia" else "El resultado depende del enlace del proveedor",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = PrimaryNeon, fontSize = MaterialTheme.typography.labelMedium.fontSize)
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                try {
-                                    val launchIntent = context.packageManager.getLaunchIntentForPackage("com.axel.library")
-                                        ?: android.content.Intent().apply {
-                                            component = android.content.ComponentName("com.axel.library", "com.axel.library.MainActivity")
-                                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                        }
-                                    context.startActivity(launchIntent)
-                                } catch (_: Exception) {}
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = PrimaryNeon.copy(alpha = 0.15f),
-                                contentColor = PrimaryNeon
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(13.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Abrir Alexia", fontSize = MaterialTheme.typography.labelMedium.fontSize, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            // 3. Metadata & Details Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                color = SurfaceDark,
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "METADATOS Y PARÁMETROS",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = PrimaryNeon,
-                            letterSpacing = 1.sp
-                        )
-                    )
-
-                    Text(
-                        text = job.prompt.ifBlank { "Sin instrucción / prompt" },
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
-                        )
-                    )
-
-                    Divider(color = BorderSubtle, thickness = 0.8.dp)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Modelo", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                        Text(job.modelId, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Proveedor", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                        Text(job.providerId, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
-                    }
-
-                    // Price info if available
-                    val costText = job.actualCostUsd?.takeIf { it.isFinite() && it>=0 }?.let(currencyManager::formatCost)
-                        ?: job.parameters["__actual_credits"]?.let { "$it créditos Crun" }
-                    if (costText != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Coste de generación", style = MaterialTheme.typography.bodySmall, color = AccentEmerald)
-                            Text(costText, style = MaterialTheme.typography.bodySmall, color = AccentEmerald, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    for ((k, v) in job.parameters.filterKeys { !it.startsWith("__") }) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(k, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                            Text(v, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
-                        }
-                    }
-
-                    job.providerJobId?.let { pId ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("ID de Tarea", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                            Text(pId.take(16), style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-        }
+@Composable
+private fun ViewerDetail(label:String,value:String) {
+    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+        Text(label,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+        androidx.compose.foundation.text.selection.SelectionContainer {Text(value,style=MaterialTheme.typography.bodyMedium)}
     }
 }
 
@@ -462,7 +190,7 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null) {
                 onError={if(useLocal){useLocal=false}else{loading=false;failed=true}})
         }
         if(loading && !failed) CircularProgressIndicator(Modifier.testTag("output_loading"))
-        if(failed) Column(Modifier.padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        if(failed) Column(Modifier.padding(NexusTokens.space24),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.BrokenImage,null,modifier=Modifier.size(40.dp),tint=TextSecondary)
             Text("No se puede cargar la imagen",style=MaterialTheme.typography.titleMedium)
             Text("El enlace puede haber caducado o no estar disponible. La tarea sigue guardada en tu historial.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
@@ -474,12 +202,14 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null) {
 @Composable
 private fun NativeVideoPlayer(videoUrl: String) {
     val context = LocalContext.current
+    var playbackError by remember(videoUrl) {mutableStateOf<String?>(null)}
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
             prepare()
             playWhenReady = true
             repeatMode = Player.REPEAT_MODE_ONE
+            addListener(object:Player.Listener {override fun onPlayerError(error:PlaybackException) {playbackError=error.message ?: error.errorCodeName}})
         }
     }
 
@@ -489,6 +219,7 @@ private fun NativeVideoPlayer(videoUrl: String) {
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     AndroidView(
         factory = { ctx ->
             PlayerView(ctx).apply {
@@ -503,11 +234,14 @@ private fun NativeVideoPlayer(videoUrl: String) {
         update = { it.player = exoPlayer },
         modifier = Modifier.fillMaxSize()
     )
+    playbackError?.let {com.vidadomu.nexus.ui.components.InlineNotice("No se puede reproducir el vídeo.",Modifier.align(Alignment.BottomCenter).padding(NexusTokens.screenMargin),it,"Reintentar",{playbackError=null;exoPlayer.prepare()})}
+    }
 }
 
 @Composable
 private fun NativeAudioPlayer(audioUrl: String) {
     val context = LocalContext.current
+    var playbackError by remember(audioUrl) {mutableStateOf<String?>(null)}
     var isPlaying by remember(audioUrl) { mutableStateOf(false) }
     var currentPosition by remember(audioUrl) { mutableStateOf(0L) }
     var duration by remember(audioUrl) { mutableStateOf(1L) }
@@ -517,6 +251,7 @@ private fun NativeAudioPlayer(audioUrl: String) {
             setMediaItem(MediaItem.fromUri(Uri.parse(audioUrl)))
             prepare()
             addListener(object : Player.Listener {
+                override fun onPlayerError(error:PlaybackException) {playbackError=error.message ?: error.errorCodeName}
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
                 }
@@ -545,7 +280,7 @@ private fun NativeAudioPlayer(audioUrl: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(NexusTokens.space24),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -559,7 +294,8 @@ private fun NativeAudioPlayer(audioUrl: String) {
             Icon(Icons.Default.GraphicEq, contentDescription = null, tint = SecondaryVioletLight, modifier = Modifier.size(36.dp))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        playbackError?.let {com.vidadomu.nexus.ui.components.InlineNotice("No se puede reproducir el audio.",technicalDetails=it,actionLabel="Reintentar",onAction={playbackError=null;exoPlayer.prepare()})}
+        Spacer(modifier = Modifier.height(NexusTokens.space16))
 
         Slider(
             value = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f),
@@ -575,11 +311,11 @@ private fun NativeAudioPlayer(audioUrl: String) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("${currentPosition / 1000}s", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-            Text("${duration / 1000}s", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            Text(com.vidadomu.nexus.ui.library.mediaDuration(currentPosition/1000f).orEmpty(), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            Text(com.vidadomu.nexus.ui.library.mediaDuration(duration/1000f).orEmpty(), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(NexusTokens.space12))
 
         IconButton(
             onClick = {
@@ -592,7 +328,7 @@ private fun NativeAudioPlayer(audioUrl: String) {
         ) {
             Icon(
                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = null,
+                contentDescription = if(isPlaying) "Pausar audio" else "Reproducir audio",
                 tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(32.dp)
             )
@@ -606,7 +342,7 @@ private fun TextOutputViewer(text: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(NexusTokens.space16),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
@@ -620,7 +356,7 @@ private fun TextOutputViewer(text: String) {
         ) {
             OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(text)) }) {
                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(NexusTokens.space8))
                 Text("Copiar")
             }
         }
