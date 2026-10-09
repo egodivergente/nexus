@@ -38,7 +38,8 @@ android {
     buildTypes {
         create("offlineQa") {
             initWith(getByName("debug"))
-            applicationIdSuffix = ".qa"
+            // UI audit runs in its own sandbox, preserving earlier QA installations.
+            applicationIdSuffix = if (project.hasProperty("nexusUiQa")) ".uiqa" else ".qa"
             isDebuggable = true
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "OFFLINE_QA", "true")
