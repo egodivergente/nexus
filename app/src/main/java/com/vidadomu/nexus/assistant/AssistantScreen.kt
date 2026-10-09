@@ -101,6 +101,7 @@ fun AssistantScreen(
         Column(Modifier.fillMaxSize().padding(pad).imePadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("¿Qué quieres crear?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary, modifier = Modifier.weight(1f))
+                com.vidadomu.nexus.ui.components.NexusBalanceChip()
                 if(compact) IconButton(onClick = { showContext = !showContext }) { Icon(Icons.Default.Tune, "Proyecto y modo") }
                 Box {
                     IconButton(onClick = { showHistory = true }, enabled = !ui.thinking) { Icon(Icons.Default.History, "Conversaciones") }

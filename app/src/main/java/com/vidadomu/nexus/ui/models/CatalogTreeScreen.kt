@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.models
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable

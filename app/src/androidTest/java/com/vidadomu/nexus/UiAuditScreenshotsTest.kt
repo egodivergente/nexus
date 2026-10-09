@@ -81,14 +81,17 @@ class UiAuditScreenshotsTest {
         val originalTheme = preferences.theme()
         val args = InstrumentationRegistry.getArguments()
         val phase = args.getString("audit_phase") ?: "before"
-        val themes = if(phase=="before") listOf(NexusAppearance.LIGHT)
-            else listOf(NexusAppearance.AURORA,NexusAppearance.OLED,NexusAppearance.LIGHT,NexusAppearance.QUARTZ)
-        val scales = if(phase=="before") listOf(1f,1.3f) else listOf(1f,1.3f,1.5f)
+        val themes = if(phase=="after") listOf(NexusAppearance.AURORA,NexusAppearance.OLED,NexusAppearance.LIGHT,NexusAppearance.QUARTZ)
+            else listOf(NexusAppearance.LIGHT)
+        val scales = when(phase) { "before" -> listOf(1f,1.3f); "after" -> listOf(1f,1.3f,1.5f); else -> listOf(1.3f) }
+        val scenes=args.getString("audit_scenes")?.split(",")
+            ?: listOf("lienzo","historial","modelos","modelo-opciones","biblioteca","visor","asistente","proyecto","ajustes","flow","comparacion","costes")
         val folder = File(app.getExternalFilesDir(null),"ui-audit/$phase").apply { mkdirs() }
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,scale.floatValue)) {
                 NexusTheme {
+                    com.vidadomu.nexus.ui.components.NexusChrome({}, {}, settingsVisible=scene.value!="ajustes") {
                     Box(Modifier.fillMaxSize()) {
                         when(scene.value) {
                             "lienzo" -> CreateScreen({}, {}, canvas)
@@ -104,13 +107,14 @@ class UiAuditScreenshotsTest {
                             "costes" -> BillingLedgerScreen(app.generationRepository.allJobs.value,null,app.currencyManager,{}, {},Modifier.fillMaxSize())
                         }
                     }
+                    }
                 }
             }
         }
         try {
             for(theme in themes) for(fontScale in scales) {
                 compose.runOnIdle { preferences.setTheme(theme); scale.floatValue=fontScale }
-                for(name in listOf("lienzo","historial","modelos","modelo-opciones","biblioteca","visor","asistente","proyecto","ajustes","flow","comparacion","costes")) {
+                for(name in scenes) {
                     compose.runOnIdle { scene.value=name }
                     compose.waitForIdle()
                     if(name=="proyecto") {

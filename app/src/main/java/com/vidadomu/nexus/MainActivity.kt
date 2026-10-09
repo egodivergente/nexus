@@ -112,12 +112,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                com.vidadomu.nexus.ui.components.NexusChrome(
+                    onSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
+                    onNavigateToOutput = { id -> navController.navigate("output/$id") },
+                    settingsVisible = activeEntry?.destination?.route != Screen.Settings.route
+                ) {
                 Scaffold(
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
-                    topBar = { if(activeEntry?.destination?.route != Screen.Assistant.route) com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings = {
-                        navController.navigate(Screen.Settings.route) { launchSingleTop = true }
-                    }) },
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)
                     }
@@ -204,6 +207,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                }
                 }
             }
         }

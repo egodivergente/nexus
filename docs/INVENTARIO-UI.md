@@ -147,11 +147,11 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Ver saldo Atlas/Crun y estados sin configurar/no disponible | Cabecera global doble | Chip saldo → hoja | 1 | Pendiente |
-| Hora consulta / último dato desactualizado | Subtítulo por proveedor | Hoja saldo | 1 | Pendiente |
-| Actualizar saldos | Icono de cabecera | Hoja saldo → Actualizar | 2 | Pendiente |
-| Abrir Ajustes | Cabecera global o asistente | Icono de barra superior | 1 | Pendiente |
-| Cinco destinos y conservar borradores/conversación | Barra inferior | Barra inferior con indicador en píldora | 1 | Pendiente |
+| Ver saldo Atlas/Crun y estados sin configurar/no disponible | Cabecera global doble | Chip saldo → hoja | 1 | Código + BalanceSheetUiTest; formatos USD/créditos en BalancePresentationTest |
+| Hora consulta / último dato desactualizado | Subtítulo por proveedor | Hoja saldo | 1 | Ubicación verificada en código; matriz con saldos ficticios pendiente |
+| Actualizar saldos | Icono de cabecera | Hoja saldo → Actualizar | 2 | BalanceSheetUiTest, sin cambios de ids de trabajos |
+| Abrir Ajustes | Cabecera global o asistente | Icono de barra superior | 1 | BalanceSheetUiTest; cabecera específica de Asistente pendiente de fase 7 |
+| Cinco destinos y conservar borradores/conversación | Barra inferior | Barra inferior con indicador en píldora | 1 | Cinco destinos en código; regresión Asistente→Ajustes→Modelos→Asistente verificada en emulador |
 
 ## Decisiones que preservan funciones
 

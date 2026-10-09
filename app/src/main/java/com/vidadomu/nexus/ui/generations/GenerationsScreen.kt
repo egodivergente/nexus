@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.generations
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,22 +95,7 @@ fun GenerationsScreen(
         containerColor = ScreenBackground,
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = if (currentSection == "TASKS") "Historial" else "Costes",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.sp,
-                                color = TextPrimary
-                            )
-                        )
-                        Text(
-                            text = if (currentSection == "TASKS") "${jobs.size} tareas registradas" else "Auditoría de costes y saldo en vivo",
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
-                        )
-                    }
-                },
+                title = { Text(if (currentSection == "TASKS") "Historial" else "Costes", style=MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
             )
         }

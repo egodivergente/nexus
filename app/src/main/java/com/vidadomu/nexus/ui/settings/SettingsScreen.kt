@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -91,22 +92,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
         containerColor = ScreenBackground,
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Ajustes",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.sp,
-                                color = TextPrimary
-                            )
-                        )
-                        Text(
-                            text = "Apariencia, cuentas y preferencias",
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
-                        )
-                    }
-                },
+                title = { Text("Ajustes", style=MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
             )
         }

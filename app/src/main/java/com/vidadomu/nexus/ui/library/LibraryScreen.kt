@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.library
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,22 +53,7 @@ fun LibraryScreen(
         containerColor = ScreenBackground,
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Biblioteca",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.sp,
-                                color = TextPrimary
-                            )
-                        )
-                        Text(
-                            text = "${completedJobs.sumOf { it.outputs.size }} archivos · ${completedJobs.size} creaciones",
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
-                        )
-                    }
-                },
+                title = { Text("Biblioteca", style=MaterialTheme.typography.titleLarge) },
                 actions = {
                     IconButton(
                         onClick = {
@@ -97,6 +83,9 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            Text("${completedJobs.sumOf { it.outputs.size }} archivos · ${completedJobs.size} creaciones",
+                style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space4))
             OutlinedTextField(searchQuery,{searchQuery=it},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=4.dp),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},leadingIcon={Icon(Icons.Default.Search,null)},
                 trailingIcon={if(searchQuery.isNotEmpty()) IconButton(onClick={searchQuery=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}},shape=RoundedCornerShape(16.dp))

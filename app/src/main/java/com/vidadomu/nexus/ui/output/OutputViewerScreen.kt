@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.output
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import android.content.Context
 import android.content.Intent
 import android.net.Uri

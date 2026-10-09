@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.create
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.runtime.saveable.rememberSaveable
 
 import android.net.Uri
@@ -274,7 +275,6 @@ fun CreateScreen(
         containerColor = ScreenBackground,
         topBar = {
             if(!compactTyping) TopAppBar(
-                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -302,33 +302,7 @@ fun CreateScreen(
                         )
                     }
 
-                    val balanceStr = accountBalance?.availableUsd?.let {currencyManager.formatBalance(it)}
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = SurfaceDark,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier.padding(end = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(AccentEmerald)
-                            )
-                            Text(
-                                text = creationProviderLabel(state.selectedModel?.providerId, balanceStr),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
-                            )
-                        }
-                    }
+
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
             )

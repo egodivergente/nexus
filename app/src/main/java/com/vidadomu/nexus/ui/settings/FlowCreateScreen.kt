@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -236,16 +237,7 @@ fun FlowCreateScreen(
         snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text("Crear en Flow", color = TextPrimary)
-                        Text(
-                            "Proyecto activo de Google Flow",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
-                        )
-                    }
-                },
+                title = { Text("Flow", style=MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
