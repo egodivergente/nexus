@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.model.NexusModel
 import com.vidadomu.nexus.provider.atlas.AtlasPublishedPrice
+import com.vidadomu.nexus.ui.theme.*
 import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.components.rememberPriceEstimate
 
@@ -58,9 +59,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
 
     Scaffold(modifier=modifier,containerColor=colors.background,contentWindowInsets=WindowInsets(0,0,0,0),bottomBar={
         Surface(color=colors.background) {
-            Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(top=12.dp,bottom=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 HorizontalDivider(color=colors.outlineVariant.copy(alpha=.5f))
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                     Column(Modifier.weight(1f)) {
                         Text(if(estimate.hasPrice) estimate.amount else if(estimate.retry==null) "Consultando precio…" else "Tarifa no disponible",style=MaterialTheme.typography.titleMedium,
                             fontWeight=FontWeight.SemiBold,color=if(estimate.hasPrice) colors.onSurface else colors.onSurfaceVariant)
@@ -68,7 +69,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     }
                     if(!estimate.hasPrice) estimate.retry?.let {retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Volver a consultar el precio")}}
                 }
-                Button(onClick={onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=RoundedCornerShape(14.dp)) {
+                Button(onClick={onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
                     Text("Usar ${group.title}",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
                 }
@@ -76,11 +77,11 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         }
     }) {padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-            .padding(horizontal=20.dp).padding(top=12.dp,bottom=20.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=36.dp,containerSize=52.dp)
-                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                    Text(creator(selected),style=MaterialTheme.typography.titleSmall,color=colors.onSurface)
+            .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space24)) {
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=NexusTokens.space32,containerSize=NexusTokens.space32)
+                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                    Text(group.title,style=MaterialTheme.typography.titleMedium,color=colors.onSurface)
                     release?.let {Text(it.label,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)}
                 }
                 IconToggleButton(checked=modelBookmark(selected) in favorites,onCheckedChange={toggleFavorite(selected)}) {
@@ -88,32 +89,32 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                         if(modelBookmark(selected) in favorites) "Quitar de favoritos" else "Añadir a favoritos",tint=if(modelBookmark(selected) in favorites) colors.primary else colors.onSurfaceVariant)
                 }
             }
-            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                if(workflows.size>1) FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                if(workflows.size>1) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     workflows.keys.forEach {task ->
                         val checked=task==workflow
-                        Surface(shape=RoundedCornerShape(10.dp),color=if(checked) colors.primary.copy(alpha=.12f) else colors.surface,
+                        Surface(shape=NexusTokens.field,color=if(checked) colors.primary.copy(alpha=.12f) else colors.surface,
                             modifier=Modifier.selectable(selected=checked,role=Role.Tab,onClick={taskKey=task.name;choices.edit().putString("task:${group.key}",task.name).apply()})) {
-                            Text(task.label,Modifier.heightIn(min=48.dp).padding(horizontal=16.dp,vertical=13.dp),style=MaterialTheme.typography.labelLarge,
+                            Text(task.label,Modifier.heightIn(min=48.dp).padding(horizontal=NexusTokens.space16,vertical=NexusTokens.space12),style=MaterialTheme.typography.labelLarge,
                                 fontWeight=if(checked) FontWeight.SemiBold else FontWeight.Normal,color=if(checked) colors.primary else colors.onSurfaceVariant)
                         }
                     }
                 }
-                Text(workflow.summary,style=MaterialTheme.typography.titleLarge.copy(fontSize = MaterialTheme.typography.titleLarge.fontSize,lineHeight=29.sp),fontWeight=FontWeight.Medium)
+                Text(workflow.summary,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Medium)
                 guide.strength.takeUnless {it.startsWith("Uso:") || it.contains("varias imágenes") && workflow==CatalogWorkflow.CREATE_IMAGE}?.let {
-                    Text(it,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant,lineHeight=22.sp)
+                    Text(it,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                 }
                 focusAdvice?.let { advice ->
                     Text("Bueno para: ${advice.good}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurface)
                     Text("Evítalo si: ${advice.avoid}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
             }
-            Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                Text("VARIANTE Y PROVEEDOR",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,letterSpacing=1.sp)
-                Surface(color=colors.surface,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth()
+            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Text("Variante y proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                Surface(color=colors.surface,shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
                     .clickable(enabled=routes.size>1,role=Role.Button,onClickLabel="Cambiar variante y proveedor") {variantsOpen=true}) {
-                    Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.padding(NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                             Text(optionVariantLabel(selected,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                             Text(providerName(selected.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                         }
@@ -121,7 +122,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     }
                 }
             }
-            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clickable(role=Role.Button) {details=!details},verticalAlignment=Alignment.CenterVertically) {
                     Text("Detalles del modelo",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                     Icon(if(details) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null,tint=colors.onSurfaceVariant)
@@ -131,27 +132,27 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     if(estimate.details.isNotBlank()) Text(estimate.details,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     Text(guide.note,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     Text(selected.id,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}) {Text("Fuente del lanzamiento")}}
-                    guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}) {Text("Ficha y tarifas del proveedor")}}
+                    release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}) {Text("Fuente del lanzamiento",color=colors.onSurfaceVariant)}}
+                    guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}) {Text("Ficha y tarifas del proveedor",color=colors.onSurfaceVariant)}}
                 }
-                onHide?.let {action -> TextButton(onClick={action(selected)}) {Text("Quitar esta variante")}}
+                onHide?.let {action -> TextButton(onClick={action(selected)}) {Text("Quitar esta variante",color=colors.onSurfaceVariant)}}
             }
         }
     }
     if(variantsOpen) ModalBottomSheet(onDismissRequest={variantsOpen=false},containerColor=colors.surface,
         sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
             Text("Elige una variante",style=MaterialTheme.typography.headlineSmall)
             Text("${group.title} · ${workflow.label.lowercase()}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
         }
-        LazyColumn(Modifier.fillMaxWidth().weight(1f,false),contentPadding=PaddingValues(horizontal=20.dp,vertical=16.dp)) {
+        LazyColumn(Modifier.fillMaxWidth().weight(1f,false),contentPadding=PaddingValues(horizontal=NexusTokens.space16,vertical=NexusTokens.space16)) {
             items(routes.sortedWith(compareBy<NexusModel> {providerName(it.providerId)}.thenByDescending {it.variantRank}.thenBy {it.id}),key=::modelBookmark) {route ->
                 val checked=modelBookmark(route)==modelBookmark(selected)
                 Column {
                     Row(Modifier.fillMaxWidth().selectable(selected=checked,role=Role.RadioButton,onClick={
                         savedRoute=modelBookmark(route);choices.edit().putString("task-route:${group.key}:${workflow.name}",savedRoute).apply();variantsOpen=false
-                    }).padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    }).padding(vertical=NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                             Text(optionVariantLabel(route,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Medium)
                             Text(providerName(route.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                             AtlasPublishedPrice.cached(route)?.let {price ->

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.R
 import com.vidadomu.nexus.ui.theme.BorderSubtle
 
@@ -43,8 +44,8 @@ fun BrandLogo(
         )
     }
 
-    val actualContainerSize = containerSize ?: size
-    val actualShape = shape ?: RoundedCornerShape(actualContainerSize / 3.5f)
+    val actualContainerSize = if(asset is BrandAsset.Monogram) maxOf(containerSize ?: size,NexusTokens.space32) else containerSize ?: size
+    val actualShape = shape ?: NexusTokens.thumbnail
     // White official artwork stays white in every theme. Only its contrast backing is fixed.
     val needsContrastBacking = asset is BrandAsset.Resource &&
         (asset.tint == Color.White || asset.resId in setOf(R.drawable.ic_logo_openai,

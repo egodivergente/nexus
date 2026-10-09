@@ -244,14 +244,14 @@ fun LegacyModelsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 90.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(bottom = NexusTokens.space32),
+            verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
             // ==========================================
             // SECCIÓN 2: BUSCADOR
             // ==========================================
             item {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Box(modifier = Modifier.padding(horizontal = NexusTokens.space16)) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -284,7 +284,7 @@ fun LegacyModelsScreen(
                             }
                         },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = NexusTokens.field,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = SurfaceDark,
                             unfocusedContainerColor = SurfaceDark,
@@ -303,8 +303,8 @@ fun LegacyModelsScreen(
             // ==========================================
             item {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                    verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     Text(
                         text = "ORDENAR POR",
@@ -317,27 +317,27 @@ fun LegacyModelsScreen(
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                     ) {
                         EscaparateSort.entries.forEach { sort ->
                             val isSelected = activeSort == sort
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(NexusTokens.field)
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         activeSort = sort
                                     },
                                 color = if (isSelected) PrimaryNeon.copy(alpha = 0.14f) else SurfaceDark,
-                                shape = RoundedCornerShape(10.dp),
+                                shape = NexusTokens.field,
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
                                     if (isSelected) PrimaryNeon else BorderSubtle
                                 )
                             ) {
                                 Box(
-                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    modifier = Modifier.padding(vertical = NexusTokens.space8),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -361,11 +361,11 @@ fun LegacyModelsScreen(
             // SECCIÓN 4: FILTROS (TIPO PRESELECCIONADO "IMAGEN Y VÍDEO" + PROVEEDOR)
             // ==========================================
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     // Filtro por Tipo
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                        verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
                         Text(
                             text = "TIPO DE MODELO",
@@ -377,19 +377,19 @@ fun LegacyModelsScreen(
                             )
                         )
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                         ) {
                             items(EscaparateTypeFilter.entries) { filter ->
                                 val isSelected = activeTypeFilter == filter
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(NexusTokens.field)
                                         .clickable {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             activeTypeFilter = filter
                                         },
                                     color = if (isSelected) PrimaryNeon.copy(alpha = 0.14f) else SurfaceDark,
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = NexusTokens.field,
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
                                         if (isSelected) PrimaryNeon else BorderSubtle
@@ -397,7 +397,7 @@ fun LegacyModelsScreen(
                                 ) {
                                     Text(
                                         text = filter.displayName,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4),
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             color = if (isSelected) PrimaryNeon else TextSecondary,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
@@ -411,22 +411,22 @@ fun LegacyModelsScreen(
                             item {
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(NexusTokens.field)
                                         .clickable {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             filterDiscountOnly = !filterDiscountOnly
                                         },
                                     color = if (filterDiscountOnly) AccentCoral.copy(alpha = 0.15f) else SurfaceDark,
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = NexusTokens.field,
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
                                         if (filterDiscountOnly) AccentCoral else BorderSubtle
                                     )
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.LocalOffer,
@@ -450,8 +450,8 @@ fun LegacyModelsScreen(
 
                     // Filtro por Proveedor
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                        verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
                         Text(
                             text = "PROVEEDORES DESTACADOS",
@@ -463,29 +463,29 @@ fun LegacyModelsScreen(
                             )
                         )
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                         ) {
                             items(priorityProviders) { provider ->
                                 val isSelected = (selectedProvider == null && provider == "Todos") ||
                                         (selectedProvider.equals(provider, ignoreCase = true))
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(NexusTokens.field)
                                         .clickable {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             selectedProvider = if (provider == "Todos") null else provider
                                         },
                                     color = if (isSelected) SecondaryViolet.copy(alpha = 0.18f) else SurfaceDark,
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = NexusTokens.field,
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
                                         if (isSelected) SecondaryViolet else BorderSubtle
                                     )
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                        modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space8),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                                     ) {
                                         if (provider == "Todos") {
                                             Icon(
@@ -524,14 +524,14 @@ fun LegacyModelsScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .padding(horizontal = NexusTokens.space16)
+                            .clip(NexusTokens.field)
                             .clickable { isFullListView = false },
                         color = SurfaceVariantDark,
                         border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.5f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -551,7 +551,7 @@ fun LegacyModelsScreen(
                 }
 
                 items(filteredModels, key = { it.id }) { model ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = NexusTokens.space16)) {
                         FullCatalogModelRow(
                             model = model,
                             currencyManager = currencyManager,
@@ -569,8 +569,8 @@ fun LegacyModelsScreen(
                 // ==========================================
                 item {
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                        verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -598,7 +598,7 @@ fun LegacyModelsScreen(
 
                         if (newReleases.isNotEmpty()) {
                             LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)
                             ) {
                                 items(newReleases) { model ->
                                     NewReleaseHeroCard(
@@ -612,14 +612,14 @@ fun LegacyModelsScreen(
                             // Estado alternativo explicativo si no hay novedades en el filtro
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = NexusTokens.field,
                                 color = SurfaceDark,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space12),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Info,
@@ -646,8 +646,8 @@ fun LegacyModelsScreen(
                 if (imageAndVideoModels.isNotEmpty()) {
                     item {
                         Column(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                            verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                         ) {
                             Text(
                                 text = "IMAGEN Y VÍDEO",
@@ -673,8 +673,8 @@ fun LegacyModelsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                .padding(horizontal = NexusTokens.space16),
+                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 EscaparateMediaCard(
@@ -704,8 +704,8 @@ fun LegacyModelsScreen(
                 if (secondaryModels.isNotEmpty()) {
                     item {
                         Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space4),
+                            verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                         ) {
                             Text(
                                 text = "CHAT, AUDIO Y OTROS SERVICIOS",
@@ -727,7 +727,7 @@ fun LegacyModelsScreen(
                     }
 
                     items(secondaryModels) { model ->
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Box(modifier = Modifier.padding(horizontal = NexusTokens.space16)) {
                             SecondaryCompactModelRow(
                                 model = model,
                                 currencyManager = currencyManager,
@@ -744,12 +744,12 @@ fun LegacyModelsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
                     ) {
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(NexusTokens.field)
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     isFullListView = true
@@ -758,7 +758,7 @@ fun LegacyModelsScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.4f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                modifier = Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
@@ -768,7 +768,7 @@ fun LegacyModelsScreen(
                                     tint = PrimaryNeon,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(NexusTokens.space8))
                                 Text(
                                     text = "Ver los ${filteredModels.size} modelos del catálogo completo",
                                     style = MaterialTheme.typography.labelMedium.copy(
@@ -812,16 +812,16 @@ private fun NewReleaseHeroCard(
         modifier = Modifier
             .width(260.dp)
             .height(148.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(NexusTokens.field)
             .clickable { onClick() },
         color = SurfaceDark,
-        shape = RoundedCornerShape(14.dp),
+        shape = NexusTokens.field,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(NexusTokens.space12),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Header: Proveedor + Badge Temporal
@@ -832,7 +832,7 @@ private fun NewReleaseHeroCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                 ) {
                     BrandLogo(
                         organization = model.organization,
@@ -852,13 +852,13 @@ private fun NewReleaseHeroCard(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
+                    shape = NexusTokens.thumbnail,
                     color = AccentEmerald.copy(alpha = 0.15f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = daysAgo,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = AccentEmerald,
                             fontWeight = FontWeight.Bold,
@@ -869,7 +869,7 @@ private fun NewReleaseHeroCard(
             }
 
             // Cuerpo: Nombre + Frase de Uso
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                 Text(
                     text = model.displayName,
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -908,13 +908,13 @@ private fun NewReleaseHeroCard(
                 )
 
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
+                    shape = NexusTokens.thumbnail,
                     color = PrimaryNeon.copy(alpha = 0.12f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.35f))
                 ) {
                     Text(
                         text = "Probar ↗",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = PrimaryNeon,
                             fontWeight = FontWeight.Bold,
@@ -952,16 +952,16 @@ private fun EscaparateMediaCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(178.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(NexusTokens.field)
             .clickable { onClick() },
         color = SurfaceDark,
-        shape = RoundedCornerShape(12.dp),
+        shape = NexusTokens.field,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(NexusTokens.space12),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Header: Proveedor + Etiqueta de Velocidad/Calidad
@@ -972,7 +972,7 @@ private fun EscaparateMediaCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4),
                     modifier = Modifier.weight(1f)
                 ) {
                     BrandLogo(
@@ -993,13 +993,13 @@ private fun EscaparateMediaCard(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(4.dp),
+                    shape = NexusTokens.thumbnail,
                     color = tagColor.copy(alpha = 0.12f),
                     border = androidx.compose.foundation.BorderStroke(0.5.dp, tagColor.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = speedTag,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = tagColor,
                             fontWeight = FontWeight.Bold,
@@ -1010,7 +1010,7 @@ private fun EscaparateMediaCard(
             }
 
             // Cuerpo: Nombre + Frase Corta Orientada a Uso ("Ideal para...")
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                 Text(
                     text = model.displayName,
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -1078,23 +1078,23 @@ private fun SecondaryCompactModelRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(NexusTokens.thumbnail)
             .clickable { onClick() },
         color = SurfaceDark, // Tratamiento secundario en gris apagado
-        shape = RoundedCornerShape(8.dp),
+        shape = NexusTokens.thumbnail,
         border = androidx.compose.foundation.BorderStroke(0.5.dp, BorderSubtle)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+                .padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // Icono + Nombre + Proveedor
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 modifier = Modifier.weight(1f)
             ) {
                 BrandLogo(
@@ -1126,7 +1126,7 @@ private fun SecondaryCompactModelRow(
             // Precio apagado + Chevron
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
             ) {
                 Text(
                     text = formattedPrice,
@@ -1166,17 +1166,17 @@ private fun FullCatalogModelRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(NexusTokens.field)
             .clickable { onToggleExpand() },
         color = SurfaceDark,
-        shape = RoundedCornerShape(10.dp),
+        shape = NexusTokens.field,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(NexusTokens.space12),
+            verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1185,7 +1185,7 @@ private fun FullCatalogModelRow(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                     modifier = Modifier.weight(1f)
                 ) {
                     BrandLogo(
@@ -1216,7 +1216,7 @@ private fun FullCatalogModelRow(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     Text(
                         text = formattedPrice,
@@ -1237,8 +1237,8 @@ private fun FullCatalogModelRow(
 
             AnimatedVisibility(visible = isExpanded) {
                 Column(
-                    modifier = Modifier.padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(top = NexusTokens.space4),
+                    verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     HorizontalDivider(color = BorderSubtle, thickness = 0.5.dp)
 
@@ -1254,13 +1254,13 @@ private fun FullCatalogModelRow(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(NexusTokens.thumbnail)
                             .background(BackgroundDark)
                             .clickable {
                                 clipboardManager.setText(AnnotatedString(model.id))
                                 Toast.makeText(context, "ID copiado: ${model.id}", Toast.LENGTH_SHORT).show()
                             }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                            .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1290,8 +1290,8 @@ private fun FullCatalogModelRow(
                         Button(
                             onClick = onUseModel,
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                            shape = NexusTokens.thumbnail,
+                            contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space4)
                         ) {
                             Text(
                                 text = "Usar en Lienzo ↗",

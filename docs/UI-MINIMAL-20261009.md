@@ -19,7 +19,7 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | 2 | Cabecera, saldo y navegación | ASUS: 105 tests del núcleo y 254 de la app, cero fallos; APK offline y tests compilados. Emulador: hoja de saldo, regresión de navegación y seis capturas 1.3, cero fallos | Completada |
 | 3 | Lienzo | ASUS: 105 núcleo + 254 app, cero fallos; APK offline. Emulador: CanvasMinimalUiTest y navegación, dos tests; cuatro capturas | Completada |
 | 4 | Historial | ASUS: 105 núcleo + 257 app, cero fallos; APK offline. Emulador: dos tests y dos capturas 1.3 | Completada |
-| 5 | Modelos | Pendiente | Pendiente |
+| 5 | Modelos | ASUS: 105 núcleo + 259 app, cero fallos; APK offline. Emulador: catálogo, filtros directos y dos capturas 1.3 | Completada |
 | 6 | Biblioteca y visor | Pendiente | Pendiente |
 | 7 | Asistente y proyecto | Pendiente | Pendiente |
 | 8 | Ajustes y Flow | Pendiente | Pendiente |
@@ -56,6 +56,10 @@ La fase 4 sustituye las tarjetas de tarea por filas con miniatura o estado, resu
 BillingLedgerScreen mantiene literalmente sus cálculos de gasto acumulado, coste medio y filtros. La hoja de saldo evita repetir su tarjeta de saldo; la vista independiente sigue permitiendo saldo, actualización y USD de detalle. Los recibos muestran coste confirmado, créditos con el formateador común o Por confirmar cuando falta información. Un fallo por sí solo deja de presentarse como prueba de cargo cero. Se trata de presentación: no cambia ningún importe, asiento ni estado guardado. El progreso de una tarea sigue disponible en el diagnóstico.
 
 ASUS: BUILD SUCCESSFUL en 7m 5s, 431 fuentes verificadas. 105 tests del núcleo y 257 de la app, cero fallos/errores, incluidos tres tests sobre importe desconocido, formato de créditos y estados inciertos. HistoryMinimalUiTest y BalanceSheetUiTest: OK (2 tests), 42,818 s. Verifican búsqueda, preparación y diagnóstico en dos pulsaciones, acceso al saldo y conservación de trabajos. UiAuditScreenshotsTest: OK (1 test), 25,579 s, Historial y Costes a 1.3. La vista aislada de Costes necesita los insets del harness final; en la app se integra dentro de la hoja. Los fixtures actuales no representan aún un catálogo completo ni todos los estados de cobro; se ampliarán en el QA final.
+
+La fase 5 compacta familias y modelos con logos de 32 dp, nombre, descripción breve y precio alineado. Conserva la vista amplia, cuadrícula, todos los tipos, búsqueda, favoritos, orden, arrastre, ocultación, restauración, variantes y fuentes de tarifas. Orden y proveedor se eligen directamente en la hoja Filtros: abrirla y elegir requiere dos pulsaciones. Las opciones del modelo mantienen sus selecciones y callbacks originales. El precio de referencia de la lista conserva el cálculo existente; la unidad se indica una vez por modalidad. Los importes positivos menores de un céntimo se muestran como «<0,01 €»; los saldos siguen con dos decimales y no se convierten unidades de audio desconocidas a minutos. Son cambios de presentación, cubiertos por dos nuevos tests.
+
+ASUS: BUILD SUCCESSFUL en 7m 19s en la revisión final, 432 fuentes verificadas; 105 tests del núcleo y 259 de la app sin fallos ni errores. CatalogMinimalUiTest: OK (1 test), 31,233 s; verifica ocultos, búsqueda, selección de orden en dos pulsaciones, uso del modelo y conservación de los ids de trabajos. La captura anterior de la misma fase cubre lista y opciones a 1.3: OK (1 test), 26,275 s; se revisó visualmente. La matriz final también cubrirá la hoja de filtros. Ninguna prueba pulsa Generar.
 
 ## Decisiones
 

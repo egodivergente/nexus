@@ -50,24 +50,24 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Explorar familias → modelos → variantes/tareas | Catálogo jerárquico | Misma jerarquía compacta | 1–2 | Pendiente |
-| Imagen/Vídeo/Audio/Texto y Más | Chips de tipo | Chips de tipo | 1–2 | Pendiente |
-| Buscar modelo o función | Campo fijo | Búsqueda compacta | 1 | Pendiente |
-| Favoritos: ver / añadir / quitar | Cabecera y tarjetas/menú | Icono y menú de tarjeta | 1–2 | Pendiente |
-| Con referencias / todos los usos de imagen | Chip | Chip | 1 | Pendiente |
-| Más nuevos / solo fecha verificada | Chips | Filtros compactos | 1–2 | Pendiente |
-| Orden personal / lanzamiento / otros órdenes | Filtros → menú | Filtros → menú | 2 | Pendiente |
-| Filtrar proveedor y uso | Filtros | Hoja Filtros | 1–2 | Pendiente |
-| Quitar filtros activos | Texto bajo filtros | Hoja Filtros | 1–2 | Pendiente |
-| Personalizar / ordenar arrastrando o pulsación larga | Menú y asa de tarjeta | Menú y asa | 2 | Pendiente |
-| Ocultar variante / familia, confirmar / cancelar | Menú contextual y diálogo | Mismos menús | 1–2 | Pendiente |
-| Gestionar / restaurar modelos ocultos | Menú → Modelos ocultos | Menú → Modelos ocultos | 2 | Pendiente |
-| Lista/cuadrícula y tamaño compacto/amplio | Menú catálogo | Mismo menú | 2 | Pendiente |
-| Actualizar catálogo/tarifas | Menú y filtros | Menú → Actualizar | 2 | Pendiente |
-| Aviso de catálogo sin conexión | Línea en lista | Aviso de una frase, expansible | 0–1 | Pendiente |
-| Ver precio y reintentar cotización | Tarjetas y pie de opciones | Precio alineado y detalle | 1–2 | Pendiente |
-| Elegir tarea/variante/proveedor y Usar modelo | ModelOptionsScreen | Opciones compactas, misma selección | 1–2 | Pendiente |
-| Detalles, consejos de uso/evitar, fuentes de lanzamiento y tarifas | Ficha de opciones | Detalles plegables | 1–2 | Pendiente |
+| Explorar familias → modelos → variantes/tareas | Catálogo jerárquico | Misma jerarquía compacta | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Imagen/Vídeo/Audio/Texto y Más | Chips de tipo | Chips de tipo | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Buscar modelo o función | Campo fijo | Búsqueda compacta | 1 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Favoritos: ver / añadir / quitar | Cabecera y tarjetas/menú | Chip Favoritos y estrella en opciones | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Con referencias / todos los usos de imagen | Chip | Chip | 1 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Más nuevos / solo fecha verificada | Chips | Filtros compactos | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Orden personal / lanzamiento / otros órdenes | Filtros → menú | Hoja Filtros → elección directa | 2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Filtrar proveedor y uso | Filtros | Hoja Filtros | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Quitar filtros activos | Texto bajo filtros | Hoja Filtros | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Personalizar / ordenar arrastrando o pulsación larga | Menú y asa de tarjeta | Menú y asa | 2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Ocultar variante / familia, confirmar / cancelar | Menú contextual y diálogo | Mismos menús | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Gestionar / restaurar modelos ocultos | Menú → Modelos ocultos | Menú → Modelos ocultos | 2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Lista/cuadrícula y tamaño compacto/amplio | Menú catálogo | Mismo menú | 2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Actualizar catálogo/tarifas | Menú y filtros | Menú → Actualizar | 2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Aviso de catálogo sin conexión | Línea en lista | Aviso de una frase que ajusta las líneas | 0–1 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Ver precio y reintentar cotización | Tarjetas y pie de opciones | Precio alineado y detalle | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Elegir tarea/variante/proveedor y Usar modelo | ModelOptionsScreen | Opciones compactas, misma selección | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
+| Detalles, consejos de uso/evitar, fuentes de lanzamiento y tarifas | Ficha de opciones | Detalles plegables | 1–2 | Ubicación verificada en código; búsqueda, filtros, ocultos y selección probados en emulador |
 
 ## Biblioteca
 

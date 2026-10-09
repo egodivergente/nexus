@@ -107,6 +107,17 @@ class CurrencyManagerTest {
             assertEquals("8,27 €",currencyManager.formatBalance(9.543))
         } finally { java.util.Locale.setDefault(original) }
     }
+    @Test fun smallPositiveCostIsNotPresentedAsFree() {
+        assertEquals("<0,01 €",currencyManager.formatCost(.001))
+        assertEquals("<0,01 €",currencyManager.formatUnitPrice(.001))
+        assertEquals("0,00 €",currencyManager.formatCost(0.0))
+        assertEquals("0,00 €",currencyManager.formatBalance(.001))
+        currencyManager.setPreference(CurrencyPreference.USD)
+        assertEquals("<0,01 US$",currencyManager.formatCost(.001))
+    }
+    @Test fun unknownAudioUnitIsNotAssumedToBeMinutes() {
+        assertEquals("0,12 € / audio",currencyManager.formatModelPricing(.14,"audio","unused"))
+    }
     @Test fun testOfflineFallbackRate() {
         assertEquals(.8666,CurrencyManager(FakeSecureStorage(rate=0.0)).state.value.rate,.00001)
     }

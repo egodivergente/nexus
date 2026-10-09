@@ -128,16 +128,19 @@ class CurrencyManager(
         return DecimalFormat(pattern, DecimalFormatSymbols(Locale("es", "ES"))).format(value)
     }
 
-    fun formatUsd(usdAmount: Double): String {
+    private fun displayAmount(usdAmount: Double, smallCost: Boolean): String {
         if (!usdAmount.isFinite()) return "—"
-        val current = _state.value
-        return if(current.preference == CurrencyPreference.USD) "${number(usdAmount, 2)} US$"
-            else "${number(usdAmount * current.rate, 2)} €"
+        val current=_state.value
+        val dollars=current.preference==CurrencyPreference.USD
+        val amount=if(dollars) usdAmount else usdAmount*current.rate
+        val unit=if(dollars) "US$" else "€"
+        return if(smallCost && amount>0 && number(amount,2)=="0,00") "<0,01 $unit"
+            else "${number(amount,2)} $unit"
     }
-
-    fun formatBalance(usdAmount: Double): String = formatUsd(usdAmount)
-    fun formatCost(usdAmount: Double): String = formatUsd(usdAmount)
-    fun formatUnitPrice(usdAmount: Double): String = formatUsd(usdAmount)
+    fun formatUsd(usdAmount: Double): String = displayAmount(usdAmount,true)
+    fun formatBalance(usdAmount: Double): String = displayAmount(usdAmount,false)
+    fun formatCost(usdAmount: Double): String = displayAmount(usdAmount,true)
+    fun formatUnitPrice(usdAmount: Double): String = displayAmount(usdAmount,true)
     fun formatCredits(credits: Double): String = if(credits.isFinite()) "${number(credits, 0)} créditos" else "—"
     /** Original USD precision is reserved for expanded details. */
     fun formatUsdDetails(usdAmount: Double): String = if(usdAmount.isFinite()) "${number(usdAmount, 4)} USD" else "—"
@@ -147,7 +150,8 @@ class CurrencyManager(
         val unitLabel = when (unit?.lowercase()) {
             "img", "image" -> "imagen"
             "clip", "video" -> "clip"
-            "audio", "min" -> "min"
+            "audio" -> "audio"
+            "min" -> "min"
             "tokens", "1m tokens" -> "1M tokens"
             else -> unit ?: "solicitud"
         }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.*
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,7 +35,7 @@ import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.components.rememberPriceEstimate
 import com.vidadomu.nexus.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
     val app = LocalContext.current.applicationContext as NexusApplication
@@ -56,6 +57,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
     var family by rememberSaveable { mutableStateOf<String?>(null) }
     var groupKey by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
+    var searchVisible by rememberSaveable {mutableStateOf(false)}
     var favorites by remember { mutableStateOf(prefs.getStringSet("model_favorites", emptySet())!!.toSet()) }
     var favoritesOnly by rememberSaveable { mutableStateOf(false) }
     var filters by rememberSaveable { mutableStateOf(false) }
@@ -100,16 +102,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         prefs.edit().putStringSet("model_favorites", favorites).apply()
     }
     Scaffold(containerColor = BackgroundDark, topBar = {
-        TopAppBar(title = { Text(activeGroup?.title ?: family ?: "Modelos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold) },
+        TopAppBar(title = { Text("Modelos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold) },
             navigationIcon = { if(family != null || groupKey != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
             actions = {
-                if(personalizing) IconButton(onClick={personalizing=false}) {Icon(Icons.Default.Check,"Terminar personalización")}
-                else if(groupKey==null) IconButton(onClick={favoritesOnly=!favoritesOnly;family=null}) {
-                    Icon(if(favoritesOnly) Icons.Default.Star else Icons.Default.StarBorder,"Mis favoritos",tint=if(favoritesOnly) PrimaryNeon else TextSecondary)
-                }
                 Box {
                     IconButton(onClick={moreMenu=true}) {Icon(Icons.Default.MoreVert,"Opciones del catálogo")}
                     DropdownMenu(expanded=moreMenu,onDismissRequest={moreMenu=false}) {
+                        if(personalizing) DropdownMenuItem(text={Text("Terminar personalización")},onClick={personalizing=false;moreMenu=false})
                         DropdownMenuItem(text={Text("Personalizar y ordenar")},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
                         DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},onClick={manageHidden=true;moreMenu=false})
                         if(groupKey==null) DropdownMenuItem(text={Text(if(filters) "Ocultar filtros" else "Filtros y orden")},onClick={filters=!filters;moreMenu=false})
@@ -126,16 +125,17 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 modifier=Modifier.fillMaxSize().padding(padding))
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
-                Text(if(family != null) "Elige el modelo. Las variantes están dentro."
+                Text(if(family != null) family.orEmpty()
                     else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
                 Text("Arrastra el asa para ordenar o mantén pulsada una tarjeta. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
             }
                 if(family == null) item(span={GridItemSpan(maxLineSpan)}) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        item {FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly;family=null},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.StarBorder,null)})}
                         items(listOf(Modality.VIDEO to "Vídeo", Modality.IMAGE to "Imagen") + if(showSecondary || modality in listOf(Modality.AUDIO,Modality.CHAT)) listOf(Modality.AUDIO to "Audio",Modality.CHAT to "Texto") else emptyList()) { (value,label) ->
                             FilterChip(modality == value, { modality=value; family=null; groupKey=null; use=null; query=""; prefs.edit().putString("browser_modality",value.name).apply() }, label={Text(label)})
                         }
@@ -143,49 +143,15 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     }
                 }
                 item(span={GridItemSpan(maxLineSpan)}) {
-                    OutlinedTextField(query, { query=it }, Modifier.fillMaxWidth(), singleLine=true,
+                    if(searchVisible || query.isNotBlank()) OutlinedTextField(query, { query=it }, Modifier.fillMaxWidth(), singleLine=true,
                         placeholder={Text("Buscar modelo o función")}, leadingIcon={Icon(Icons.Default.Search,null)},
-                        trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}}, shape=RoundedCornerShape(16.dp))
-                }
-                if(family==null && query.isBlank()) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text("Todas las familias siguen aquí. Busca una tarea o abre una familia; las fichas explican cuándo usar cada modelo.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
+                        trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}}, shape=NexusTokens.field)
                 }
                 item(span={GridItemSpan(maxLineSpan)}) {
-                    LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        item {IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar modelos")}}
                         if(modality == Modality.IMAGE) item { FilterChip(imageReferences, { imageReferences = !imageReferences; use = null; groupKey = null }, label = { Text(if(imageReferences) "Con referencias" else "Todos los usos") }) }
-                        item {FilterChip(catalogSort==CatalogSort.RELEASE,{
-                            catalogSort=if(catalogSort==CatalogSort.RELEASE) CatalogSort.PERSONAL else CatalogSort.RELEASE
-                            personalizing=false
-                            prefs.edit().putString("sort",catalogSort.name).apply()
-                        },label={Text("Más nuevos")},leadingIcon={Icon(Icons.Default.NewReleases,null,Modifier.size(16.dp))})}
-                        if(catalogSort==CatalogSort.RELEASE) item {FilterChip(onlyDated,{
-                            onlyDated=!onlyDated;prefs.edit().putBoolean("release_only_dated",onlyDated).apply()
-                        },label={Text("Solo con fecha")})}
                         item {FilterChip(filters,{filters=!filters},label={Text("Filtros")},leadingIcon={Icon(Icons.Default.Tune,null,Modifier.size(16.dp))})}
-                    }
-                }
-                if(catalogSort==CatalogSort.RELEASE) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
-                }
-                if(filters) item(span={GridItemSpan(maxLineSpan)}) {
-                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                        var sortMenu by remember {mutableStateOf(false)}
-                        var providerMenu by remember {mutableStateOf(false)}
-                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Box {OutlinedButton(onClick={sortMenu=true}) {Text(catalogSort.label)}
-                                DropdownMenu(sortMenu,{sortMenu=false}) {CatalogSort.entries.forEach {entry -> DropdownMenuItem(text={Text(entry.label)},onClick={catalogSort=entry;prefs.edit().putString("sort",entry.name).apply();sortMenu=false})}}}
-                            Box {OutlinedButton(onClick={providerMenu=true}) {Text(providerFilter?.let(::providerName) ?: "Proveedores")}
-                                DropdownMenu(providerMenu,{providerMenu=false}) {
-                                    DropdownMenuItem(text={Text("Todos")},onClick={providerFilter=null;providerMenu=false})
-                                    models.map {it.providerId}.distinct().forEach {id -> DropdownMenuItem(text={Text(providerName(id))},onClick={providerFilter=id;providerMenu=false})}
-                                }}
-                        }
-                        FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Mis favoritos")})
-                        LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            item { FilterChip(use==null,{use=null},label={Text("Todos los usos")}) }
-                            items(CreationUse.entries.filter {it.modality==modality}) { value -> FilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
-                        }
-                        TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
                     }
                 }
                 if(use != null || favoritesOnly || providerFilter!=null) item(span={GridItemSpan(maxLineSpan)}) {
@@ -193,6 +159,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
                 if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
+                if(modality in listOf(Modality.VIDEO,Modality.IMAGE)) item(span={GridItemSpan(maxLineSpan)}) {
+                    Text(if(modality==Modality.VIDEO) "Precios desde · por 5 s" else "Precios desde · por imagen",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                }
                 if(rootLevel) {
                     val prioritySections = sections.filter { it.family in ImageModelChoices.families || it.models.any { m -> modelBookmark(m) in favorites } || it.family in savedOrder }
                     val shownSections = if(modality != Modality.IMAGE || allImageFamilies || personalizing || prioritySections.isEmpty()) sections else prioritySections
@@ -230,9 +199,53 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     TextButton(onClick={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()}) {Text("Limpiar filtros")}
                 }
             item(span={GridItemSpan(maxLineSpan)}) {Text("Precios base orientativos. El total se calcula al configurar.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
-            item(span={GridItemSpan(maxLineSpan)}) {Spacer(Modifier.height(24.dp))}
+            item(span={GridItemSpan(maxLineSpan)}) {Spacer(Modifier.height(NexusTokens.space24))}
         }
         }
+        }
+    }
+    if(filters && activeGroup==null) ModalBottomSheet(onDismissRequest={filters=false},shape=NexusTokens.sheet,
+        sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Text("Filtros",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
+                IconButton(onClick={filters=false}) {Icon(Icons.Default.Close,"Cerrar filtros")}
+            }
+            LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        item {FilterChip(catalogSort==CatalogSort.RELEASE,{
+                            catalogSort=if(catalogSort==CatalogSort.RELEASE) CatalogSort.PERSONAL else CatalogSort.RELEASE
+                            personalizing=false
+                            prefs.edit().putString("sort",catalogSort.name).apply()
+                        },label={Text("Más nuevos")},leadingIcon={Icon(Icons.Default.NewReleases,null,Modifier.size(16.dp))})}
+                        if(catalogSort==CatalogSort.RELEASE) item {FilterChip(onlyDated,{
+                            onlyDated=!onlyDated;prefs.edit().putBoolean("release_only_dated",onlyDated).apply()
+                        },label={Text("Solo con fecha")})}
+            }
+            if(catalogSort==CatalogSort.RELEASE) {
+                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
+            }
+                    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            CatalogSort.entries.forEach {entry -> FilterChip(catalogSort==entry,{
+                                catalogSort=entry;prefs.edit().putString("sort",entry.name).apply()
+                            },label={Text(entry.label)},shape=NexusTokens.filter)}
+                        }
+                        Text("Proveedor",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            FilterChip(providerFilter==null,{providerFilter=null},label={Text("Todos")},shape=NexusTokens.filter)
+                            models.map {it.providerId}.distinct().forEach {id -> FilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
+                        }
+                        FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Mis favoritos")})
+                        LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            item { FilterChip(use==null,{use=null},label={Text("Todos los usos")}) }
+                            items(CreationUse.entries.filter {it.modality==modality}) { value -> FilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
+                        }
+                        TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
+                    }
         }
     }
     contextTarget?.let { (key,label,model) ->
@@ -255,7 +268,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             dismissButton={TextButton(onClick={pendingHide=null}) {Text("Cancelar")}})
     }
     if(manageHidden) AlertDialog(onDismissRequest={manageHidden=false},title={Text("Modelos ocultos")},
-        text={LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        text={LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(hiddenEntries.isEmpty()) item {Text("No has ocultado ningún modelo.")}
             items(hiddenEntries.toList(),key={it.first}) { (key,label) ->
                 Column {
@@ -274,34 +287,26 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
     val price=routes.mapNotNull(::referencePrice).minOrNull()
-    Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,onLongClick=onLongClick),shape=RoundedCornerShape(20.dp),color=SurfaceDark) {
-        Column(Modifier.padding(if(compact) 14.dp else 16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                BrandLogo(family=family,size=if(compact) 34.dp else 40.dp,containerSize=if(compact) 44.dp else 52.dp)
-                if(!grid) Column(Modifier.weight(1f).padding(horizontal=12.dp)) {
-                    Text(title,fontSize = MaterialTheme.typography.titleLarge.fontSize,fontWeight=FontWeight.SemiBold,color=TextPrimary)
-                    releaseLabel?.let {Text(it,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)}
-                    Text(subtitle,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    if(compact) Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)} / ${if(modality==Modality.VIDEO) "5 s" else "imagen"}" } ?: "Coste en opciones",fontSize = MaterialTheme.typography.bodyMedium.fontSize,fontWeight=FontWeight.Medium,color=PrimaryNeon)
+    val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
+    Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
+        Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                BrandLogo(family=family,size=NexusTokens.space32,containerSize=NexusTokens.space32)
+                Column(Modifier.weight(1f)) {
+                    Text(title,style=MaterialTheme.typography.titleMedium,color=TextPrimary)
+                    Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                        maxLines=if(compact) 1 else 4,overflow=TextOverflow.Ellipsis)
+                    releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
                 }
-                if(grid) Spacer(Modifier.weight(1f))
-                if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=PrimaryNeon)}
-                else Icon(Icons.Default.ChevronRight,"Abrir $title",tint=PrimaryNeon)
+                if(!grid) Text(displayPrice ?: "Ver coste",
+                    Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
+                if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=TextSecondary)}
+                else Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)
             }
-            if(grid) {
-                Text(title,fontSize = MaterialTheme.typography.titleMedium.fontSize,fontWeight=FontWeight.SemiBold,color=TextPrimary)
-                releaseLabel?.let {Text(it,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)}
-                    Text(subtitle,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary,maxLines=if(compact) 3 else 5,overflow=TextOverflow.Ellipsis)
-            }
-            highlight?.takeIf {!grid || !compact}?.let { Text(it,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis) }
-            currency.preference
-            if(!compact || grid) {
-                Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)}" } ?: "Coste en opciones",color=PrimaryNeon,fontSize = MaterialTheme.typography.bodyMedium.fontSize,fontWeight=FontWeight.Medium)
-                if(price!=null) Text(if(modality==Modality.VIDEO) "por 5 s" else "por imagen",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)
-            }
-
-            onHide?.let { action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(if(grid) "Quitar" else "Quitar de mi catálogo")} }
+            if(grid) Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",
+                style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
+            highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+            onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
         }
     }
 }
-

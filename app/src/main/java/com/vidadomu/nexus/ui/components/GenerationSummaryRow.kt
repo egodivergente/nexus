@@ -52,9 +52,12 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
     menu:@Composable (close:()->Unit)->Unit) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
+    val currencyState by currency.state.collectAsState()
+    val costText=remember(job,currencyState) {confirmedJobCost(job,currency)}
     val jobs by app.generationRepository.allJobs.collectAsState()
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
-    val model=models.firstOrNull {it.id==job.modelId}?.displayName ?: job.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')
+    val model=remember(job.modelId,models) {app.modelCatalogRepository.getModelById(job.modelId)?.displayName
+        ?: job.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')}
     val type=when(job.modality) {Modality.IMAGE->"Imagen";Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.CHAT->"Texto"}
     val time=remember(job.startedAt) {SimpleDateFormat("HH:mm",Locale("es","ES")).format(Date(job.startedAt))}
     val finished=job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)
@@ -80,7 +83,7 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
             if(!finished || job.status==GenerationStatus.FAILED) Text(generationStatusLabel(job),style=MaterialTheme.typography.labelMedium,
                 color=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary)
         }
-        Text(confirmedJobCost(job,currency),modifier=Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
+        Text(costText,modifier=Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
         Box {
             IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de creación ${job.id}",tint=TextSecondary)}
             DropdownMenu(menuOpen,{menuOpen=false}) { menu {menuOpen=false} }
