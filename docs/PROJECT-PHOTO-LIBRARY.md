@@ -13,4 +13,6 @@ La solicitud del selector se conserva si Android recrea la pantalla. El proyecto
 - `ProjectMediaLibraryTest`: aislamiento por proyecto, MIME, búsqueda, orden y deduplicación de URI.
 - `ProjectMediaPickerTest`: copia privada que sobrevive al borrado del original sintético, reutilización sin otra copia, lectura del índice desde disco y selección de una foto guardada.
 
+Comprobación del 09-10-2026: compilación en ASUSVIDAL con un worker y prioridad baja, `BUILD SUCCESSFUL`; 263 tests de la app, cero fallos, errores u omisiones. Los APK AgentPreview, OfflineQa y de instrumentación contienen el selector nuevo. En el Pixel 8 Pro, la prueba `importedPhotoSurvivesOriginalRemovalAndReusingDoesNotCopyAgain` terminó con `OK (1 test)` en el paquete aislado `com.vidadomu.nexus.uiqa`. La prueba visual de selección no se ejecutó porque el Pixel seguía bloqueado. No se instaló AgentPreview en el S25.
+
 Este cambio se publica aparte de los retoques de fase 9 que ya estaban sin commit en el worktree. Esos retoques se conservan. La APK de comprobación se construye con el estado completo del worktree; el manifiesto de fuentes y los resultados quedan fuera de Git, en los outputs del encargo.
