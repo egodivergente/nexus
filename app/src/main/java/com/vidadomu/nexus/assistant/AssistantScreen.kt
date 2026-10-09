@@ -74,7 +74,7 @@ fun AssistantScreen(
     val primaryPlanId=ui.items.filterIsInstance<ChatItem.PlanCard>().lastOrNull {ui.plans[it.planId]?.let {p->p.executable && p.state !in setOf(PlanState.SUBMITTED,PlanState.DISCARDED,PlanState.UNCERTAIN)}==true}?.planId
     val activeProject=ui.projects.firstOrNull {it.id==ui.activeProjectId}
     val listState = rememberLazyListState()
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(6)) { uris: List<Uri> -> vm.attach(uris) }
+    val picker = rememberProjectMediaPicker { uris -> vm.attach(uris) }
 
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
@@ -153,7 +153,7 @@ fun AssistantScreen(
             }
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
-            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
+            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*"), maxSelection = 6) },
                 onSend = { vm.send(input.text); draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("") }, onStop = vm::stop, onRemove = vm::removeAttachment)
         }
     }

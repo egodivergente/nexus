@@ -4,6 +4,8 @@ import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.runtime.saveable.rememberSaveable
 
 import android.net.Uri
+import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
+import com.vidadomu.nexus.assistant.projectMediaMimeType
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -188,30 +190,26 @@ fun CreateScreen(
     val readiness=creationReadiness(if(comparisonState.phase == ComparisonPhase.SENDING) state.copy(isSubmitting = true) else state)
     val screenMargin = if(horizontalActions) NexusTokens.tabletMargin else NexusTokens.screenMargin
 
-    val primaryImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
+    val primaryImageLauncher = rememberProjectMediaPicker { uris ->
+        val uri = uris.firstOrNull()
         if (uri != null) {
-            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val mime = projectMediaMimeType(context, uri) ?: "image/jpeg"
             viewModel.setPrimaryImage(uri, mime)
         }
     }
 
-    val lastFrameLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
+    val lastFrameLauncher = rememberProjectMediaPicker { uris ->
+        val uri = uris.firstOrNull()
         if (uri != null) {
-            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val mime = projectMediaMimeType(context, uri) ?: "image/jpeg"
             viewModel.setLastFrameImage(uri, mime)
         }
     }
 
-    val multiImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris: List<Uri> ->
+    val multiImageLauncher = rememberProjectMediaPicker { uris ->
         if (uris.isNotEmpty()) {
             val items = uris.map { uri ->
-                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val mime = projectMediaMimeType(context, uri) ?: "image/jpeg"
                 uri to mime
             }
             viewModel.addReferenceImages(items)
@@ -222,24 +220,24 @@ fun CreateScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            val mime = context.contentResolver.getType(uri) ?: "video/mp4"
+            val mime = projectMediaMimeType(context, uri) ?: "video/mp4"
             viewModel.setVideoInput(uri, mime)
         }
     }
 
     var contractField by remember { mutableStateOf<ContractMediaField?>(null) }
-    val contractPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val contractPicker=rememberProjectMediaPicker { uris ->
+        val uri = uris.firstOrNull()
         val field=contractField
-        if(uri!=null && field!=null) viewModel.setContractMedia(field,uri,context.contentResolver.getType(uri) ?: field.mime)
+        if(uri!=null && field!=null) viewModel.setContractMedia(field,uri,projectMediaMimeType(context, uri) ?: field.mime)
         contractField=null
     }
 
     var activeFileSlotType by remember { mutableStateOf(MediaSlotType.PRIMARY_IMAGE) }
-    val universalFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
+    val universalFileLauncher = rememberProjectMediaPicker { uris ->
+        val uri = uris.firstOrNull()
         if (uri != null) {
-            val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val mime = projectMediaMimeType(context, uri) ?: "application/octet-stream"
             when (activeFileSlotType) {
                 MediaSlotType.PRIMARY_IMAGE -> viewModel.setPrimaryImage(uri, mime)
                 MediaSlotType.LAST_FRAME -> viewModel.setLastFrameImage(uri, mime)
@@ -406,26 +404,26 @@ fun CreateScreen(
     if(showMedia) CanvasSheet("Medios de entrada",{showMedia=false}) {
                 state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
                     if(model.contractEndpoint==null && model.contractMedia.isNotEmpty()) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(field.mime)},viewModel::removeMedia)
+                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia)
                     }
                     if(model.contractEndpoint!=null) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(field.mime)},viewModel::removeMedia)
+                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia)
                     } else AdaptiveModelMediaInput(
                         model = model,
                         attachedMedia = state.attachedMedia.filter { it.fieldKey==null },
                         isMediaRequired = viewModel.isMediaInputRequired(),
                         onPickPrimary = {
                             primaryImageLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                arrayOf("image/*"), maxSelection = 1
                             )
                         },
                         onPickLastFrame = {
                             lastFrameLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                arrayOf("image/*"), maxSelection = 1
                             )
                         },
                         onPickMultipleImages = {
-                            multiImageLauncher.launch("image/*")
+                            multiImageLauncher.launch(arrayOf("image/*"))
                         },
                         onPickVideo = {
                             videoLauncher.launch(
@@ -434,7 +432,7 @@ fun CreateScreen(
                         },
                         onPickFile = { slot, mime ->
                             activeFileSlotType = slot
-                            universalFileLauncher.launch(mime)
+                            universalFileLauncher.launch(arrayOf(mime), maxSelection = 1)
                         },
                         onSwitchToEdit = {
                             viewModel.switchToEditModel()

@@ -249,7 +249,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     .onSuccess { added += it }
                     .onFailure { notice("No se pudo adjuntar: ${it.message?.take(160)}", error = true) }
             }
-            _ui.update { it.copy(pendingAttachments = it.pendingAttachments + added, attaching = false) }
+            _ui.update { it.copy(pendingAttachments = (it.pendingAttachments + added).distinctBy { attachment -> attachment.id }, attaching = false) }
+            refreshProjects()
         }
     }
 
@@ -443,7 +444,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } catch(error: Exception) {
                 setPlan(planId) { it.copy(busy = false, error = Redactor.redact(error.message ?: "No se pudieron adjuntar las referencias.")) }
-            }
+            } finally { refreshProjects() }
         }
     }
 

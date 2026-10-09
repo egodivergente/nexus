@@ -130,7 +130,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
 @Composable
 internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
-    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(),onAttach)
+    val picker=rememberProjectMediaPicker(onAttach)
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
@@ -182,7 +182,7 @@ internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel, exp
     var open by remember(ui.activeProjectId) {mutableStateOf(expandedByDefault)}
     var renaming by remember { mutableStateOf<Asset?>(null) }
     var name by remember { mutableStateOf("") }
-    val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.importProjectFiles(it) }
+    val import = rememberProjectMediaPicker { vm.importProjectFiles(it) }
     FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         TextButton(onClick = { import.launch(arrayOf("image/*", "video/*")) }, enabled = !ui.attaching) { Icon(Icons.Default.AddPhotoAlternate, null); Text("Importar archivos") }
         TextButton(onClick = { open = !open }) { Text("Referencias · ${ui.projectAssets.size}") }

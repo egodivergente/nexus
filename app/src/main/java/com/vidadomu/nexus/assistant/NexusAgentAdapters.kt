@@ -284,7 +284,13 @@ class AssetSkillSource(private val assets: AssetManager, private val root: Strin
 object AgentMediaStore {
     private const val MAX_BYTES = 512L * 1024 * 1024
 
-    suspend fun persist(context: Context, uri: Uri, mime: String?): Attachment = withContext(Dispatchers.IO) {
+    suspend fun persist(context: Context, uri: Uri, mime: String?, projectId: String? = null): Attachment = withContext(Dispatchers.IO) {
+        val runtime = AssistantRuntime.get(context.applicationContext as com.vidadomu.nexus.NexusApplication)
+        val existing = runtime.assets.assetByUri(uri.toString())
+        if (existing != null && (projectId == null || existing.projectId == projectId) && uri.scheme == "file" && File(uri.path.orEmpty()).isFile) {
+            return@withContext Attachment(existing.id, existing.uri, existing.mimeType ?: mime ?: "image/*",
+                existing.displayName, existing.width, existing.height, assetId = existing.id)
+        }
         val resolved = mime?.takeIf { it.isNotBlank() && it != "application/octet-stream" } ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
         require(resolved.startsWith("image/") || resolved.startsWith("video/")) { "Adjunta una imagen o un vídeo." }
         val name = runCatching {
@@ -313,7 +319,16 @@ object AgentMediaStore {
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(target.path, o); w = o.outWidth.takeIf { it > 0 }; h = o.outHeight.takeIf { it > 0 }
         }
-        Attachment("att_" + UUID.randomUUID().toString().take(8), Uri.fromFile(target).toString(), resolved, name, w, h)
+        val attachment = Attachment("att_" + UUID.randomUUID().toString().take(8), Uri.fromFile(target).toString(), resolved, name, w, h)
+        if (projectId == null) return@withContext attachment
+        val saved = runtime.assets.addAsset(com.vidadomu.nexus.agent.core.assets.Asset(
+            id = attachment.id, uri = attachment.uri,
+            type = if (resolved.startsWith("image/")) com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE else com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO,
+            role = com.vidadomu.nexus.agent.core.assets.AssetRole.REFERENCE,
+            displayName = name, mimeType = resolved, width = w, height = h,
+            projectId = projectId, createdAt = System.currentTimeMillis(),
+        ))
+        attachment.copy(id = saved.id, assetId = saved.id)
     }
 
     /** Miniatura JPEG ≤1024 px para que el LLM vea el keyframe (solo si el usuario lo permite). */
