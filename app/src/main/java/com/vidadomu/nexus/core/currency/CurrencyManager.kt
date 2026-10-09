@@ -22,8 +22,8 @@ import java.util.Date
 import java.util.Locale
 
 enum class CurrencyPreference(val displayName: String, val description: String) {
-    EUR_SMART("Euros (€ / céntimos inteligentes)", "Muestra microprecios (< 1 €) en céntimos y precios mayores en euros"),
-    EUR_STRICT("Euros (€ estricto)", "Muestra todos los importes exclusivamente en euros (€)"),
+    EUR_SMART("Euros (€)", "Importes en euros con dos decimales"),
+    EUR_STRICT("Euros (€ · preferencia guardada)", "Importes en euros con dos decimales"),
     USD("Dólares ($ USD)", "Muestra los importes originales en dólares estadounidenses")
 }
 
@@ -121,99 +121,45 @@ class CurrencyManager(
         }
     }
 
-    /**
-     * Formatea un valor en dólares (USD) según las preferencias activas.
-     */
+    /** Presentation only: exchange-rate retrieval and persisted preferences are unchanged. */
+    private fun number(value: Double, decimals: Int): String {
+        if (!value.isFinite()) return "—"
+        val pattern = if(decimals == 0) "#,##0" else "#,##0." + "0".repeat(decimals)
+        return DecimalFormat(pattern, DecimalFormatSymbols(Locale("es", "ES"))).format(value)
+    }
+
     fun formatUsd(usdAmount: Double): String {
-        val currentState = _state.value
-        val symbols = DecimalFormatSymbols(Locale("es", "ES"))
-
-        return when (currentState.preference) {
-            CurrencyPreference.USD -> {
-                val pattern = if (usdAmount < 0.10) "0.000" else "0.00"
-                val df = DecimalFormat(pattern, symbols)
-                "$" + df.format(usdAmount)
-            }
-            CurrencyPreference.EUR_STRICT -> {
-                val eur = usdAmount * currentState.rate
-                val pattern = if (eur < 0.10) "0.000" else "0.00"
-                val df = DecimalFormat(pattern, symbols)
-                "${df.format(eur)} €"
-            }
-            CurrencyPreference.EUR_SMART -> {
-                val eur = usdAmount * currentState.rate
-                if (eur < 1.0) {
-                    val cents = eur * 100.0
-                    val pattern = if (cents < 10.0) "0.00" else "0.0"
-                    val df = DecimalFormat(pattern, symbols)
-                    "${df.format(cents)} cént."
-                } else {
-                    val df = DecimalFormat("0.00", symbols)
-                    "${df.format(eur)} €"
-                }
-            }
-        }
-    }
-
-    /**
-     * Formatea el saldo disponible de la cuenta (en EUR o USD según preferencia).
-     */
-    fun formatBalance(usdAmount: Double): String {
-        val currentState = _state.value
-        val symbols = DecimalFormatSymbols(Locale("es", "ES"))
-        return when (currentState.preference) {
-            CurrencyPreference.USD -> {
-                val df = DecimalFormat("0.00", symbols)
-                "$" + df.format(usdAmount)
-            }
-            else -> {
-                val eur = usdAmount * currentState.rate
-                val df = DecimalFormat("0.00", symbols)
-                "${df.format(eur)} €"
-            }
-        }
-    }
-
-    /**
-     * Alias de formateo de coste para salidas y recibos.
-     */
-    fun formatCost(usdAmount: Double): String = formatUsd(usdAmount)
-
-    /**
-     * Formatea el precio unitario de un modelo (ej. "~1,3 cént. / img" o "~0,13 € / clip").
-     */
-    fun formatUnitPrice(usdAmount: Double): String {
+        if (!usdAmount.isFinite()) return "—"
         val current = _state.value
-        val df = DecimalFormat("0.####", DecimalFormatSymbols(Locale("es", "ES")))
-        return if(current.preference == CurrencyPreference.USD) "$" + df.format(usdAmount)
-            else df.format(usdAmount * current.rate) + " €"
+        return if(current.preference == CurrencyPreference.USD) "${number(usdAmount, 2)} US$"
+            else "${number(usdAmount * current.rate, 2)} €"
     }
+
+    fun formatBalance(usdAmount: Double): String = formatUsd(usdAmount)
+    fun formatCost(usdAmount: Double): String = formatUsd(usdAmount)
+    fun formatUnitPrice(usdAmount: Double): String = formatUsd(usdAmount)
+    fun formatCredits(credits: Double): String = if(credits.isFinite()) "${number(credits, 0)} créditos" else "—"
+    /** Original USD precision is reserved for expanded details. */
+    fun formatUsdDetails(usdAmount: Double): String = if(usdAmount.isFinite()) "${number(usdAmount, 4)} USD" else "—"
 
     fun formatModelPricing(basePriceUsd: Double?, unit: String?, fallbackStr: String): String {
-        if (basePriceUsd == null || basePriceUsd <= 0.0) return fallbackStr
-        val formattedCost = formatUsd(basePriceUsd)
+        if (basePriceUsd == null || !basePriceUsd.isFinite() || basePriceUsd <= 0.0) return fallbackStr
         val unitLabel = when (unit?.lowercase()) {
-            "img", "image" -> "img"
+            "img", "image" -> "imagen"
             "clip", "video" -> "clip"
             "audio", "min" -> "min"
             "tokens", "1m tokens" -> "1M tokens"
-            else -> unit ?: "req"
+            else -> unit ?: "solicitud"
         }
-        return "~$formattedCost / $unitLabel"
+        return "${formatUsd(basePriceUsd)} / $unitLabel"
     }
 
-    /**
-     * Parsea y formatea un string de precio que devuelve la API de Atlas (ej. "0.14" -> "12,1 cént.").
-     */
     fun formatAtlasApiPrice(rawPrice: String?): String {
-        if (rawPrice.isNullOrBlank()) return "Sin coste reportado"
-        val usdVal = rawPrice.toDoubleOrNull() ?: return rawPrice
-        return formatUsd(usdVal)
+        if(rawPrice.isNullOrBlank()) return "Sin coste reportado"
+        val usd = rawPrice.toDoubleOrNull() ?: return "Coste no disponible"
+        return formatUsd(usd)
     }
-
-    fun formatAtlasApiPrice(usdVal: Double): String {
-        return formatUsd(usdVal)
-    }
+    fun formatAtlasApiPrice(usdVal: Double): String = formatUsd(usdVal)
 
     private fun parsePreference(prefStr: String): CurrencyPreference {
         return try {

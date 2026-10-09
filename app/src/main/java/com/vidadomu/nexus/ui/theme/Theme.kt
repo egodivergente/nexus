@@ -27,7 +27,7 @@ private fun brandFont(resource: Int): FontFamily = FontFamily(
     }
 )
 
-private fun palette(theme: NexusAppearance): ColorScheme {
+internal fun palette(theme: NexusAppearance): ColorScheme {
     val light = theme == NexusAppearance.LIGHT
     val quartz = theme == NexusAppearance.QUARTZ
     val accent = Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF63DCCB)
@@ -61,12 +61,7 @@ fun NexusTheme(content: @Composable () -> Unit) {
     val typography = remember(theme) {
         val heading = if(theme==NexusAppearance.QUARTZ) FontFamily.Serif else brandFont(R.font.space_grotesk)
         val body = brandFont(R.font.manrope)
-        val base=Typography()
-        base.copy(displayLarge=base.displayLarge.copy(fontFamily=heading), displayMedium=base.displayMedium.copy(fontFamily=heading), displaySmall=base.displaySmall.copy(fontFamily=heading),
-            headlineLarge=base.headlineLarge.copy(fontFamily=heading), headlineMedium=base.headlineMedium.copy(fontFamily=heading), headlineSmall=base.headlineSmall.copy(fontFamily=heading),
-            titleLarge=base.titleLarge.copy(fontFamily=heading), titleMedium=base.titleMedium.copy(fontFamily=heading), titleSmall=base.titleSmall.copy(fontFamily=heading),
-            bodyLarge=base.bodyLarge.copy(fontFamily=body), bodyMedium=base.bodyMedium.copy(fontFamily=body), bodySmall=base.bodySmall.copy(fontFamily=body),
-            labelLarge=base.labelLarge.copy(fontFamily=body), labelMedium=base.labelMedium.copy(fontFamily=body), labelSmall=base.labelSmall.copy(fontFamily=body))
+        nexusTypography(heading, body)
     }
     val view=LocalView.current
     SideEffect {
@@ -79,7 +74,7 @@ fun NexusTheme(content: @Composable () -> Unit) {
             }
         }
     }
-    MaterialTheme(colorScheme=scheme, typography=typography) {
+    MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
         Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
             // Static background avoids motion distraction and continuous rendering.
             content()

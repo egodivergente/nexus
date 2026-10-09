@@ -99,7 +99,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                         }
                     }
                 }
-                Text(workflow.summary,style=MaterialTheme.typography.titleLarge.copy(fontSize=22.sp,lineHeight=29.sp),fontWeight=FontWeight.Medium)
+                Text(workflow.summary,style=MaterialTheme.typography.titleLarge.copy(fontSize = MaterialTheme.typography.titleLarge.fontSize,lineHeight=29.sp),fontWeight=FontWeight.Medium)
                 guide.strength.takeUnless {it.startsWith("Uso:") || it.contains("varias imágenes") && workflow==CatalogWorkflow.CREATE_IMAGE}?.let {
                     Text(it,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant,lineHeight=22.sp)
                 }

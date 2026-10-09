@@ -55,79 +55,59 @@ class CurrencyManagerTest {
         currencyManager = CurrencyManager(fakeStorage)
     }
 
-    @Test
-    fun testSmartEurFormatting_SmallAmountInCentimos() {
-        // 0.012 USD * 0.86663 = 0.01039956 EUR (< 1.00 EUR) -> ~1,04 cént.
-        val result = currencyManager.formatUsd(0.012)
-        assertTrue("Sub-euro amounts should format with cént.", result.contains("cént."))
-        assertTrue("Expected ~1,04 cént, got: $result", result.contains("1,04") || result.contains("1.04"))
+    @Test fun smallAmountsUseEurosWithTwoDecimals() {
+        assertEquals("0,01 €", currencyManager.formatUsd(0.012))
+        assertEquals("0,12 €", currencyManager.formatUsd(0.14))
+        assertEquals("2,17 €", currencyManager.formatUsd(2.50))
     }
-
-    @Test
-    fun testSmartEurFormatting_SubEuroCostInCentimos() {
-        // 0.14 USD * 0.86663 = 0.1213 EUR -> ~12,1 cént.
-        val result = currencyManager.formatUsd(0.14)
-        assertTrue("0.14 USD should format with cént.", result.contains("cént."))
-        assertTrue("Expected ~12,1 cént, got: $result", result.contains("12,1") || result.contains("12.1"))
+    @Test fun allPresentationAliasesAgree() {
+        val amount = 9.543
+        assertEquals(currencyManager.formatUsd(amount), currencyManager.formatBalance(amount))
+        assertEquals(currencyManager.formatUsd(amount), currencyManager.formatCost(amount))
+        assertEquals(currencyManager.formatUsd(amount), currencyManager.formatUnitPrice(amount))
     }
-
-    @Test
-    fun testSmartEurFormatting_LargeAmountInEuros() {
-        // 2.50 USD * 0.86663 = 2.166 EUR (>= 1.00 EUR) -> ~2,17 €
-        val result = currencyManager.formatUsd(2.50)
-        assertTrue("Amounts >= 1.00 EUR should show euro symbol (€)", result.contains("€"))
-        assertFalse("Amounts >= 1.00 EUR should not contain cént.", result.contains("cént."))
-        assertTrue("Expected ~2,17 €, got: $result", result.contains("2,17") || result.contains("2.17"))
+    @Test fun modelPriceRetainsTheActualUnit() {
+        assertEquals("0,01 € / imagen", currencyManager.formatModelPricing(.012,"img","unused"))
+        assertEquals("0,12 € / 5 s", currencyManager.formatModelPricing(.14,"5 s","unused"))
+        assertEquals("Gratuito", currencyManager.formatModelPricing(null,null,"Gratuito"))
     }
-
-    @Test
-    fun testFormatModelPricing_WithBasePrice() {
-        val formatted = currencyManager.formatModelPricing(0.012, "img", "$0.012 / image")
-        assertTrue("Formatted pricing should contain img", formatted.contains("/ img"))
-        assertTrue("Formatted pricing should be in céntimos", formatted.contains("cént."))
-        assertTrue("Formatted pricing should start with ~", formatted.startsWith("~"))
+    @Test fun atlasValuesUseTheSamePresentation() {
+        assertEquals("0,12 €", currencyManager.formatAtlasApiPrice("0.14"))
+        assertEquals(currencyManager.formatAtlasApiPrice("0.14"), currencyManager.formatAtlasApiPrice(.14))
+        assertEquals("Coste no disponible", currencyManager.formatAtlasApiPrice("bad"))
     }
-
-    @Test
-    fun testFormatModelPricing_NullFallback() {
-        val fallback = "Gratuito"
-        val formatted = currencyManager.formatModelPricing(null, null, fallback)
-        assertEquals(fallback, formatted)
-    }
-
-    @Test
-    fun testFormatAtlasApiPrice() {
-        val formatted = currencyManager.formatAtlasApiPrice("0.14")
-        assertTrue("Atlas API price should show céntimos", formatted.contains("cént."))
-
-        val formattedDouble = currencyManager.formatAtlasApiPrice(0.14)
-        assertEquals(formatted, formattedDouble)
-    }
-
-    @Test
-    fun testUsdPreferenceMode() {
+    @Test fun selectedUsdCurrencyUsesTwoDecimals() {
         currencyManager.setPreference(CurrencyPreference.USD)
-        val result = currencyManager.formatUsd(0.012)
-        assertTrue("Should start with $, got: $result", result.startsWith("$"))
-        assertTrue("Should contain 0,012 or 0.012, got: $result", result.contains("0,012") || result.contains("0.012"))
-
-        val resultLarge = currencyManager.formatUsd(1.50)
-        assertTrue("Should start with $, got: $resultLarge", resultLarge.startsWith("$"))
-        assertTrue("Should contain 1,50 or 1.50, got: $resultLarge", resultLarge.contains("1,50") || resultLarge.contains("1.50"))
+        assertEquals("0,01 US$",currencyManager.formatUsd(.012))
+        assertEquals("1.622,28 US$",currencyManager.formatBalance(1622.28))
     }
-
-    @Test
-    fun testStrictEurPreferenceMode() {
+    @Test fun savedEuroPreferencesRemainCompatible() {
         currencyManager.setPreference(CurrencyPreference.EUR_STRICT)
-        val result = currencyManager.formatUsd(0.012)
-        assertTrue("Strict mode should always show €", result.contains("€"))
-        assertFalse("Strict mode should never show cént.", result.contains("cént."))
+        assertEquals("0,01 €",currencyManager.formatUsd(.012))
+        assertEquals("EUR_STRICT",fakeStorage.preference)
     }
-
-    @Test
-    fun testOfflineFallbackRate() {
-        val emptyStorage = FakeSecureStorage(rate = 0.0)
-        val fallbackManager = CurrencyManager(emptyStorage)
-        assertEquals(0.8666, fallbackManager.state.value.rate, 0.001)
+    @Test fun creditPrecisionAndGrouping() {
+        assertEquals("1.622 créditos",currencyManager.formatCredits(1622.28))
+        assertEquals("0 créditos",currencyManager.formatCredits(0.0))
+    }
+    @Test fun detailsKeepUsdPrecision() {
+        assertEquals("0,0600 USD",currencyManager.formatUsdDetails(.06))
+    }
+    @Test fun invalidValuesDoNotBecomeZeroOrInfinity() {
+        for(value in listOf(Double.NaN,Double.POSITIVE_INFINITY,Double.NEGATIVE_INFINITY)) {
+            assertEquals("—",currencyManager.formatUsd(value))
+            assertEquals("—",currencyManager.formatCredits(value))
+            assertEquals("—",currencyManager.formatUsdDetails(value))
+        }
+    }
+    @Test fun formattingIsIndependentOfDeviceLocale() {
+        val original=java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.US)
+            assertEquals("8,27 €",currencyManager.formatBalance(9.543))
+        } finally { java.util.Locale.setDefault(original) }
+    }
+    @Test fun testOfflineFallbackRate() {
+        assertEquals(.8666,CurrencyManager(FakeSecureStorage(rate=0.0)).state.value.rate,.00001)
     }
 }

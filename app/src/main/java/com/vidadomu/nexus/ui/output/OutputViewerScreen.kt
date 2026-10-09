@@ -230,7 +230,7 @@ fun OutputViewerScreen(
                         ) {
                             Icon(Icons.Default.MovieFilter, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Animar", fontSize = 12.sp)
+                            Text("Animar", fontSize = MaterialTheme.typography.labelMedium.fontSize)
                         }
                     }
 
@@ -245,7 +245,7 @@ fun OutputViewerScreen(
                     ) {
                         Icon(Icons.Default.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Remezclar", fontSize = 12.sp)
+                        Text("Remezclar", fontSize = MaterialTheme.typography.labelMedium.fontSize)
                     }
 
                     if (output.url.startsWith("https://") || output.url.startsWith("http://")) {
@@ -260,7 +260,7 @@ fun OutputViewerScreen(
                         ) {
                             Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Compartir enlace", fontSize = 12.sp)
+                            Text("Compartir enlace", fontSize = MaterialTheme.typography.labelMedium.fontSize)
                         }
                     }
                 }
@@ -308,7 +308,7 @@ fun OutputViewerScreen(
                                 }
                                 Text(
                                     text = if(trustedLocal != null) "Consulta su disponibilidad en Alexia" else "El resultado depende del enlace del proveedor",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = PrimaryNeon, fontSize = 11.sp)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = PrimaryNeon, fontSize = MaterialTheme.typography.labelMedium.fontSize)
                                 )
                             }
                         }
@@ -333,7 +333,7 @@ fun OutputViewerScreen(
                         ) {
                             Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(13.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Abrir Alexia", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Abrir Alexia", fontSize = MaterialTheme.typography.labelMedium.fontSize, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

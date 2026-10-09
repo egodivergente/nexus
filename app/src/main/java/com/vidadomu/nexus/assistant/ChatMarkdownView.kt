@@ -47,15 +47,15 @@ private fun mdStyles(): MdStyles {
     val cs = MaterialTheme.colorScheme
     val ty = MaterialTheme.typography
     return MdStyles(
-        body = ty.bodyMedium.copy(fontSize = 15.sp, lineHeight = 23.sp, letterSpacing = 0.1.sp),
+        body = ty.bodyMedium.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize, lineHeight = 23.sp, letterSpacing = 0.1.sp),
         ink = cs.onSurface,
         soft = cs.onSurface.copy(alpha = 0.86f),
         muted = cs.onSurfaceVariant,
         accent = cs.primary,
         codeBg = cs.background.copy(alpha = 0.72f),
         line = cs.outlineVariant,
-        heading = ty.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.1).sp),
-        label = ty.labelMedium.copy(fontSize = 11.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp),
+        heading = ty.titleMedium.copy(fontSize = MaterialTheme.typography.titleMedium.fontSize, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.1).sp),
+        label = ty.labelMedium.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize, lineHeight = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp),
     )
 }
 
@@ -71,7 +71,7 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
             fontWeight = if (sp.bold) FontWeight.SemiBold else null,
             fontStyle = if (sp.italic) FontStyle.Italic else null,
             fontFamily = if (sp.code) FontFamily.Monospace else null,
-            fontSize = if (sp.code) 13.5.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
+            fontSize = if (sp.code) st.body.fontSize else androidx.compose.ui.unit.TextUnit.Unspecified,
             background = if (sp.code) st.accent.copy(alpha = 0.12f) else Color.Unspecified,
             textDecoration = when {
                 sp.strike -> TextDecoration.LineThrough
@@ -133,7 +133,7 @@ private fun MdBlockView(b: MdBlock, st: MdStyles) {
 private fun MdListRow(item: ListItem, st: MdStyles) {
     Row(Modifier.padding(start = (item.depth * 16).dp)) {
         if (item.number != null) {
-            Text(item.number!!, style = st.body.copy(fontFamily = MaterialTheme.typography.titleMedium.fontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+            Text(item.number!!, style = st.body.copy(fontFamily = MaterialTheme.typography.titleMedium.fontFamily, fontWeight = FontWeight.SemiBold, fontSize = MaterialTheme.typography.bodyMedium.fontSize),
                 color = st.accent, modifier = Modifier.widthIn(min = 20.dp))
             Spacer(Modifier.width(6.dp))
         } else {
@@ -158,7 +158,7 @@ private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
     Surface(color = st.codeBg, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, st.accent.copy(alpha = 0.22f)), modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = st.label.copy(fontSize = 10.5.sp), color = st.accent.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
+                Text(label, style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
                 TextButton(onClick = { clipboard.setText(AnnotatedString(b.code)); copied = true }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) {
                     Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, null, Modifier.size(15.dp), tint = st.accent)
                     Spacer(Modifier.width(6.dp))
@@ -166,7 +166,7 @@ private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
                 }
             }
             HorizontalDivider(thickness = 1.dp, color = st.accent.copy(alpha = 0.12f))
-            Text(b.code, style = st.body.copy(fontFamily = FontFamily.Monospace, fontSize = 13.5.sp, lineHeight = 21.sp), color = st.ink,
+            Text(b.code, style = st.body.copy(fontFamily = FontFamily.Monospace, fontSize = MaterialTheme.typography.bodyMedium.fontSize, lineHeight = 21.sp), color = st.ink,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp))
         }
     }
@@ -179,12 +179,12 @@ private fun MdTable(t: MdBlock.Table, st: MdStyles) {
         Column {
             Row(Modifier.fillMaxWidth().background(st.accent.copy(alpha = 0.08f)).padding(horizontal = 12.dp, vertical = 9.dp)) {
                 for (c in 0 until cols) Text(annotated(t.header.getOrElse(c) { emptyList() }.map { it.copy(text = it.text.uppercase()) }, st),
-                    style = st.label.copy(fontSize = 10.5.sp), color = st.accent, modifier = Modifier.weight(1f))
+                    style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent, modifier = Modifier.weight(1f))
             }
             t.rows.forEachIndexed { r, row ->
                 if (r > 0) HorizontalDivider(thickness = 1.dp, color = st.line)
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp)) {
-                    for (c in 0 until cols) Text(annotated(row.getOrElse(c) { emptyList() }, st), style = st.body.copy(fontSize = 14.sp, lineHeight = 20.sp),
+                    for (c in 0 until cols) Text(annotated(row.getOrElse(c) { emptyList() }, st), style = st.body.copy(fontSize = MaterialTheme.typography.bodyMedium.fontSize, lineHeight = 20.sp),
                         color = if (c == 0) st.ink else st.soft, modifier = Modifier.weight(1f).padding(end = 8.dp))
                 }
             }

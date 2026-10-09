@@ -419,7 +419,7 @@ private fun GenerationJobCard(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = statusColor,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             ),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
@@ -427,13 +427,13 @@ private fun GenerationJobCard(
 
                     Text(
                         text = modalitySpanish,
-                        style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 12.sp)
+                        style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = MaterialTheme.typography.labelMedium.fontSize)
                     )
                 }
 
                 Text(
                     text = formattedTime,
-                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 12.sp)
+                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = MaterialTheme.typography.labelMedium.fontSize)
                 )
             }
 

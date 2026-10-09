@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.components
 
+import androidx.compose.material3.MaterialTheme
 import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -96,7 +97,7 @@ fun BrandLogo(
             }
         }
         is BrandAsset.Monogram -> {
-            val textSizeSp = (actualContainerSize.value * 0.42f).sp
+            val textSizeSp = MaterialTheme.typography.labelMedium.fontSize
             Box(
                 modifier = modifier
                     .size(actualContainerSize)

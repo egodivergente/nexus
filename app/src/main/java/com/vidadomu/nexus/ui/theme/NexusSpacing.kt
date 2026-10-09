@@ -1,14 +1,11 @@
 package com.vidadomu.nexus.ui.theme
 
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-
 object NexusSpacing {
-    val xxs: Dp = 2.dp
-    val xs: Dp = 4.dp
-    val sm: Dp = 8.dp
-    val md: Dp = 12.dp
-    val lg: Dp = 16.dp
-    val xl: Dp = 20.dp
-    val xxl: Dp = 24.dp
+    val xxs = NexusTokens.space4
+    val xs = NexusTokens.space4
+    val sm = NexusTokens.space8
+    val md = NexusTokens.space12
+    val lg = NexusTokens.space16
+    val xl = NexusTokens.space24
+    val xxl = NexusTokens.space32
 }

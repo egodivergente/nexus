@@ -217,7 +217,7 @@ fun LegacyModelsScreen(
                             text = "${models.size} modelos de ${availableProviders.size} proveedores líderes",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
-                                fontSize = 11.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         )
                     }
@@ -260,7 +260,7 @@ fun LegacyModelsScreen(
                             Text(
                                 text = "Buscar por nombre, tarea o proveedor...",
                                 color = TextMuted,
-                                fontSize = 14.sp
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize
                             )
                         },
                         leadingIcon = {
@@ -310,7 +310,7 @@ fun LegacyModelsScreen(
                         text = "ORDENAR POR",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextMuted,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
@@ -345,7 +345,7 @@ fun LegacyModelsScreen(
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             color = if (isSelected) PrimaryNeon else TextSecondary,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 11.sp
+                                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                                         ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -371,7 +371,7 @@ fun LegacyModelsScreen(
                             text = "TIPO DE MODELO",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
-                                fontSize = 10.sp,
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
                             )
@@ -401,7 +401,7 @@ fun LegacyModelsScreen(
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             color = if (isSelected) PrimaryNeon else TextSecondary,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 11.sp
+                                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                                         )
                                     )
                                 }
@@ -439,7 +439,7 @@ fun LegacyModelsScreen(
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 color = if (filterDiscountOnly) AccentCoral else TextSecondary,
                                                 fontWeight = if (filterDiscountOnly) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 11.sp
+                                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                                             )
                                         )
                                     }
@@ -457,7 +457,7 @@ fun LegacyModelsScreen(
                             text = "PROVEEDORES DESTACADOS",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
-                                fontSize = 10.sp,
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
                             )
@@ -507,7 +507,7 @@ fun LegacyModelsScreen(
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 color = if (isSelected) TextPrimary else TextSecondary,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 11.sp
+                                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                                             )
                                         )
                                     }
@@ -581,7 +581,7 @@ fun LegacyModelsScreen(
                                 text = "NOVEDADES RECIENTES",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = TextMuted,
-                                    fontSize = 10.sp,
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.sp
                                 )
@@ -590,7 +590,7 @@ fun LegacyModelsScreen(
                                 text = "Últimos 30 días",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = AccentEmerald,
-                                    fontSize = 10.sp,
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             )
@@ -631,7 +631,7 @@ fun LegacyModelsScreen(
                                         text = "Sin novedades esta semana · Todos los modelos se encuentran en sus versiones oficiales estables.",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             color = TextSecondary,
-                                            fontSize = 12.sp
+                                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                                         )
                                     )
                                 }
@@ -653,7 +653,7 @@ fun LegacyModelsScreen(
                                 text = "IMAGEN Y VÍDEO",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = TextMuted,
-                                    fontSize = 10.sp,
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.sp
                                 )
@@ -662,7 +662,7 @@ fun LegacyModelsScreen(
                                 text = "Generación y edición con los motores insignia líderes de la industria",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = TextSecondary,
-                                    fontSize = 12.sp
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize
                                 )
                             )
                         }
@@ -711,7 +711,7 @@ fun LegacyModelsScreen(
                                 text = "CHAT, AUDIO Y OTROS SERVICIOS",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = TextMuted,
-                                    fontSize = 10.sp,
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.sp
                                 )
@@ -720,7 +720,7 @@ fun LegacyModelsScreen(
                                 text = "Modelos complementarios de lenguaje conversacional y síntesis musical",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = TextMuted,
-                                    fontSize = 11.sp
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize
                                 )
                             )
                         }
@@ -774,7 +774,7 @@ fun LegacyModelsScreen(
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         color = PrimaryNeon,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
+                                        fontSize = MaterialTheme.typography.bodyMedium.fontSize
                                     )
                                 )
                             }
@@ -844,7 +844,7 @@ private fun NewReleaseHeroCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextSecondary,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -862,7 +862,7 @@ private fun NewReleaseHeroCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = AccentEmerald,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                 }
@@ -875,7 +875,7 @@ private fun NewReleaseHeroCard(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = MaterialTheme.typography.bodyMedium.fontSize
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -884,7 +884,7 @@ private fun NewReleaseHeroCard(
                     text = model.shortDescription.ifBlank { "Modelo generativo insignia de alta fidelidad." },
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
                         lineHeight = 14.sp
                     ),
                     maxLines = 2,
@@ -903,7 +903,7 @@ private fun NewReleaseHeroCard(
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = AccentEmerald,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
                 )
 
@@ -918,7 +918,7 @@ private fun NewReleaseHeroCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = PrimaryNeon,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                 }
@@ -985,7 +985,7 @@ private fun EscaparateMediaCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextSecondary,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1003,7 +1003,7 @@ private fun EscaparateMediaCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = tagColor,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                 }
@@ -1016,7 +1016,7 @@ private fun EscaparateMediaCard(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = MaterialTheme.typography.bodyMedium.fontSize
                     ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -1025,7 +1025,7 @@ private fun EscaparateMediaCard(
                     text = model.shortDescription.ifBlank { "Generación visual de alta resolución y consistencia." },
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
                         lineHeight = 14.sp
                     ),
                     maxLines = 2,
@@ -1044,7 +1044,7 @@ private fun EscaparateMediaCard(
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = AccentEmerald,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1107,7 +1107,7 @@ private fun SecondaryCompactModelRow(
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1116,7 +1116,7 @@ private fun SecondaryCompactModelRow(
                     text = "• ${model.organization}",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = TextMuted,
-                        fontSize = 10.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1132,7 +1132,7 @@ private fun SecondaryCompactModelRow(
                     text = formattedPrice,
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = TextMuted,
-                        fontSize = 10.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
                 )
                 Icon(
@@ -1199,7 +1199,7 @@ private fun FullCatalogModelRow(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary,
-                                fontSize = 13.sp
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1208,7 +1208,7 @@ private fun FullCatalogModelRow(
                             text = "${model.organization} • ${model.modalities.joinToString { it.name }}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
-                                fontSize = 10.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         )
                     }
@@ -1223,7 +1223,7 @@ private fun FullCatalogModelRow(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = AccentEmerald,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                     Icon(
@@ -1246,7 +1246,7 @@ private fun FullCatalogModelRow(
                         text = model.description.ifBlank { model.shortDescription },
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = TextSecondary,
-                            fontSize = 12.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
 
@@ -1269,7 +1269,7 @@ private fun FullCatalogModelRow(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = FontFamily.Monospace,
                                 color = TextSecondary,
-                                fontSize = 10.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1297,7 +1297,7 @@ private fun FullCatalogModelRow(
                                 text = "Usar en Lienzo ↗",
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         }
                     }

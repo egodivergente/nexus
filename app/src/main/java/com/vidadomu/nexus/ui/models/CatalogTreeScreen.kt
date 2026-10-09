@@ -128,10 +128,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
                 Text(if(family != null) "Elige el modelo. Las variantes están dentro."
-                    else "Tus favoritos", color = TextSecondary, fontSize = 13.sp)
+                    else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
-                Text("Arrastra el asa para ordenar o mantén pulsada una tarjeta. Tu orden se guarda.",color=TextSecondary,fontSize=13.sp)
+                Text("Arrastra el asa para ordenar o mantén pulsada una tarjeta. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
             }
                 if(family == null) item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,7 +147,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}}, shape=RoundedCornerShape(16.dp))
                 }
                 if(family==null && query.isBlank()) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text("Todas las familias siguen aquí. Busca una tarea o abre una familia; las fichas explican cuándo usar cada modelo.",fontSize=12.sp,color=TextSecondary)
+                    Text("Todas las familias siguen aquí. Busca una tarea o abre una familia; las fichas explican cuándo usar cada modelo.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
                 }
                 item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -164,7 +164,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     }
                 }
                 if(catalogSort==CatalogSort.RELEASE) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize=12.sp,color=TextSecondary)
+                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
                 }
                 if(filters) item(span={GridItemSpan(maxLineSpan)}) {
                     Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -191,7 +191,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     TextButton(onClick={use=null;favoritesOnly=false;providerFilter=null}) {Text("Quitar filtros activos")}
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
-                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize=12.sp)}
+                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
                 if(rootLevel) {
                     val prioritySections = sections.filter { it.family in ImageModelChoices.families || it.models.any { m -> modelBookmark(m) in favorites } || it.family in savedOrder }
                     val shownSections = if(modality != Modality.IMAGE || allImageFamilies || personalizing || prioritySections.isEmpty()) sections else prioritySections
@@ -228,7 +228,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     Text(if(loading && models.isEmpty()) "Preparando tu catálogo…" else if(favoritesOnly) "No hay favoritos en esta sección." else "No hay resultados con estos filtros.",color=TextSecondary)
                     TextButton(onClick={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()}) {Text("Limpiar filtros")}
                 }
-            item(span={GridItemSpan(maxLineSpan)}) {Text("Precios base orientativos. El total se calcula al configurar.",color=TextSecondary,fontSize=11.sp)}
+            item(span={GridItemSpan(maxLineSpan)}) {Text("Precios base orientativos. El total se calcula al configurar.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
             item(span={GridItemSpan(maxLineSpan)}) {Spacer(Modifier.height(24.dp))}
         }
         }
@@ -259,7 +259,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             items(hiddenEntries.toList(),key={it.first}) { (key,label) ->
                 Column {
                     Text(label,fontWeight=FontWeight.SemiBold)
-                    Text(when {key.startsWith("family:")->"Familia completa";key.startsWith("group:")->"Modelo y todas sus variantes";else->"Variante concreta"},fontSize=12.sp,color=TextSecondary)
+                    Text(when {key.startsWith("family:")->"Familia completa";key.startsWith("group:")->"Modelo y todas sus variantes";else->"Variante concreta"},fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
                     TextButton(onClick={app.modelCatalogRepository.setCatalogHidden(key,label,false)}) {Text("Recuperar")}
                 }
             }
@@ -278,25 +278,25 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
             Row(verticalAlignment=Alignment.CenterVertically) {
                 BrandLogo(family=family,size=if(compact) 34.dp else 40.dp,containerSize=if(compact) 44.dp else 52.dp)
                 if(!grid) Column(Modifier.weight(1f).padding(horizontal=12.dp)) {
-                    Text(title,fontSize=if(compact) 18.sp else 20.sp,fontWeight=FontWeight.SemiBold,color=TextPrimary)
-                    releaseLabel?.let {Text(it,fontSize=11.sp,color=TextSecondary)}
-                    Text(subtitle,fontSize=12.sp,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    if(compact) Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)} / ${if(modality==Modality.VIDEO) "5 s" else "imagen"}" } ?: "Coste en opciones",fontSize=13.sp,fontWeight=FontWeight.Medium,color=PrimaryNeon)
+                    Text(title,fontSize = MaterialTheme.typography.titleLarge.fontSize,fontWeight=FontWeight.SemiBold,color=TextPrimary)
+                    releaseLabel?.let {Text(it,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)}
+                    Text(subtitle,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis)
+                    if(compact) Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)} / ${if(modality==Modality.VIDEO) "5 s" else "imagen"}" } ?: "Coste en opciones",fontSize = MaterialTheme.typography.bodyMedium.fontSize,fontWeight=FontWeight.Medium,color=PrimaryNeon)
                 }
                 if(grid) Spacer(Modifier.weight(1f))
                 if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=PrimaryNeon)}
                 else Icon(Icons.Default.ChevronRight,"Abrir $title",tint=PrimaryNeon)
             }
             if(grid) {
-                Text(title,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=TextPrimary)
-                releaseLabel?.let {Text(it,fontSize=11.sp,color=TextSecondary)}
-                    Text(subtitle,fontSize=12.sp,color=TextSecondary,maxLines=if(compact) 3 else 5,overflow=TextOverflow.Ellipsis)
+                Text(title,fontSize = MaterialTheme.typography.titleMedium.fontSize,fontWeight=FontWeight.SemiBold,color=TextPrimary)
+                releaseLabel?.let {Text(it,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)}
+                    Text(subtitle,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary,maxLines=if(compact) 3 else 5,overflow=TextOverflow.Ellipsis)
             }
-            highlight?.takeIf {!grid || !compact}?.let { Text(it,fontSize=12.sp,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis) }
+            highlight?.takeIf {!grid || !compact}?.let { Text(it,fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis) }
             currency.preference
             if(!compact || grid) {
-                Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)}" } ?: "Coste en opciones",color=PrimaryNeon,fontSize=14.sp,fontWeight=FontWeight.Medium)
-                if(price!=null) Text(if(modality==Modality.VIDEO) "por 5 s" else "por imagen",color=TextSecondary,fontSize=11.sp)
+                Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)}" } ?: "Coste en opciones",color=PrimaryNeon,fontSize = MaterialTheme.typography.bodyMedium.fontSize,fontWeight=FontWeight.Medium)
+                if(price!=null) Text(if(modality==Modality.VIDEO) "por 5 s" else "por imagen",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)
             }
 
             onHide?.let { action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(if(grid) "Quitar" else "Quitar de mi catálogo")} }

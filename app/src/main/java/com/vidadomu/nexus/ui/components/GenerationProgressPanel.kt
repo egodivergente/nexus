@@ -123,7 +123,7 @@ fun GenerationProgressPanel(
                 Text(
                     text = "$percentage%",
                     color = TextPrimary,
-                    fontSize = if (compact) 22.sp else 36.sp,
+                    fontSize = MaterialTheme.typography.titleLarge.fontSize,
                     fontWeight = FontWeight.Black
                 )
             }

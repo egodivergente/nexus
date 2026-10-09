@@ -263,7 +263,7 @@ private fun LibraryItemCard(
                     Text(
                         text = modalityLabel,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, color = TextPrimary)
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize, color = TextPrimary)
                     )
                 }
             }

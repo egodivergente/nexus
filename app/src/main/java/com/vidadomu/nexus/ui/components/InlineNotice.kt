@@ -1,0 +1,54 @@
+package com.vidadomu.nexus.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
+/** Maps transport failures to a useful message, leaving diagnostics available on demand. */
+internal fun noticeMessage(raw: String?, fallback: String = "No se ha podido completar la acción."): String {
+    val text = raw.orEmpty().lowercase()
+    return when {
+        listOf("unable to resolve host", "unknownhost", "network", "connection", "sin conexión").any(text::contains) ->
+            "No hay conexión. Comprueba la red y vuelve a intentarlo."
+        listOf("timeout", "timed out", "tiempo de espera").any(text::contains) ->
+            "La consulta tarda demasiado. Comprueba el estado antes de reintentar."
+        listOf("401", "403", "unauthorized", "api key", "clave api").any(text::contains) ->
+            "No se pudo acceder al proveedor. Revisa la conexión en Ajustes."
+        listOf("insufficient", "saldo insuficiente", "credits", "balance").any(text::contains) ->
+            "El proveedor no confirma saldo suficiente. Revisa el saldo y el coste."
+        else -> fallback
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+fun InlineNotice(message: String, modifier: Modifier = Modifier, technicalDetails: String? = null,
+    actionLabel: String? = null, onAction: (() -> Unit)? = null, isError: Boolean = true) {
+    var expanded by remember(technicalDetails) { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    Surface(modifier=modifier.fillMaxWidth(), shape=NexusTokens.field,
+        color=if(isError) colors.errorContainer else colors.surfaceContainer,
+        contentColor=if(isError) colors.onErrorContainer else colors.onSurfaceVariant) {
+        Column(Modifier.padding(NexusTokens.space12)) {
+            Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Icon(Icons.Outlined.Info, contentDescription=null, modifier=Modifier.size(NexusTokens.space24))
+                Text(message, style=MaterialTheme.typography.bodyMedium, modifier=Modifier.weight(1f))
+            }
+            if(onAction != null || !technicalDetails.isNullOrBlank()) {
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    if(onAction != null && actionLabel != null) TextButton(onClick=onAction) {
+                        Text(actionLabel, color=if(isError) colors.error else colors.onSurface)
+                    }
+                    if(!technicalDetails.isNullOrBlank()) TextButton(onClick={ expanded=!expanded }) {
+                        Text(if(expanded) "Ocultar detalles" else "Detalles", color=colors.onSurfaceVariant)
+                    }
+                }
+            }
+            if(expanded) Text(technicalDetails.orEmpty(), style=MaterialTheme.typography.labelMedium)
+        }
+    }
+}

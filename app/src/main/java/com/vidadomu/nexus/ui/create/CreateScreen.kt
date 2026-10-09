@@ -260,9 +260,9 @@ fun CreateScreen(
             ) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    readiness.message?.let { Text(it, color = TextSecondary, fontSize = 12.sp) }
+                    readiness.message?.let { Text(it, color = TextSecondary, fontSize = MaterialTheme.typography.labelMedium.fontSize) }
                     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Text(estimate.amount, Modifier.weight(1f), color = TextPrimary, fontSize = 14.sp)
+                        Text(estimate.amount, Modifier.weight(1f), color = TextPrimary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
                         if(estimate.details.isNotBlank()) IconButton(onClick={showPriceDetails=true}) {Icon(Icons.Default.Info,"Detalle del precio",Modifier.size(20.dp),tint=TextSecondary)}
                         estimate.retry?.let { retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Reintentar precio")} }
                         if(horizontalActions) GenerateActionButton(readiness.canSubmit,generateAction,Modifier.width(160.dp))
@@ -450,7 +450,7 @@ fun CreateScreen(
                         Text(
                             text = if(state.selectedModality == Modality.CHAT) "Escribe tu consulta..." else "Describe lo que quieres cambiar o crear...",
                             color = TextMuted,
-                            fontSize = 15.sp
+                            fontSize = MaterialTheme.typography.bodyLarge.fontSize
                         )
                     },
                     minLines = 3,
@@ -496,7 +496,7 @@ fun CreateScreen(
                     else {
                         var showCompatibility by remember(state.selectedModel?.id) { mutableStateOf(false) }
                         TextButton(onClick = { showCompatibility = !showCompatibility }) { Text("Ver avisos de compatibilidad", color = AccentAmber) }
-                        if(showCompatibility) Text(message, color = TextSecondary, fontSize = 12.sp)
+                        if(showCompatibility) Text(message, color = TextSecondary, fontSize = MaterialTheme.typography.labelMedium.fontSize)
                     }
                 }
                 if(state.schemaReady) {
@@ -685,7 +685,7 @@ private fun RequestInspectorSheet(
             // Payload Preview
             Text(
                 text = "Payload sin prompt ni rutas privadas",
-                style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 1.sp)
+                style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = MaterialTheme.typography.labelMedium.fontSize, letterSpacing = 1.sp)
             )
             Surface(
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -695,7 +695,7 @@ private fun RequestInspectorSheet(
             ) {
                 Text(
                     text = simulatedPayload,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontFamily = FontFamily.Monospace, fontSize = MaterialTheme.typography.labelMedium.fontSize),
                     modifier = Modifier.padding(12.dp)
                 )
             }
@@ -810,7 +810,7 @@ private fun CompactModelSelectionCard(
                     text = "Modelo seleccionado",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = TextMuted,
-                        fontSize = 10.sp,
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
                         letterSpacing = 0.8.sp
                     )
                 )
@@ -828,7 +828,7 @@ private fun CompactModelSelectionCard(
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = AccentEmerald,
                         fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -931,7 +931,7 @@ private fun AdaptiveModelMediaInput(
                                 text = "Este modelo crea desde texto",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = TextMuted,
-                                    fontSize = 11.sp
+                                    fontSize = MaterialTheme.typography.labelMedium.fontSize
                                 )
                             )
                         }
@@ -940,7 +940,7 @@ private fun AdaptiveModelMediaInput(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = PrimaryNeon,
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         )
                     }
@@ -981,7 +981,7 @@ private fun AdaptiveModelMediaInput(
                         text = "Imágenes del clip",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextMuted,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
@@ -990,7 +990,7 @@ private fun AdaptiveModelMediaInput(
                         text = "Final opcional",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = PrimaryNeon,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.SemiBold
                         )
                     )
@@ -1040,7 +1040,7 @@ private fun AdaptiveModelMediaInput(
                         text = "Imágenes de referencia",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextMuted,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
@@ -1059,7 +1059,7 @@ private fun AdaptiveModelMediaInput(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = if (refImages.isNotEmpty()) AccentEmerald else TextSecondary,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         )
                     }
@@ -1118,7 +1118,7 @@ private fun AdaptiveModelMediaInput(
                         text = "Archivos de referencia",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextMuted,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
@@ -1127,7 +1127,7 @@ private fun AdaptiveModelMediaInput(
                         text = if(model.maxImages==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size}/${model.maxImages} imágenes",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = PrimaryNeon,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.SemiBold
                         )
                     )
@@ -1215,7 +1215,7 @@ private fun SingleMediaSlotCard(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = AccentEmerald,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 letterSpacing = 0.8.sp
                             )
                         )
@@ -1234,7 +1234,7 @@ private fun SingleMediaSlotCard(
                         text = "Toca para reemplazar",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = TextMuted,
-                            fontSize = 11.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                 }
@@ -1272,7 +1272,7 @@ private fun SingleMediaSlotCard(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = if (isRequired) TextSecondary else TextSecondary,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 letterSpacing = 0.8.sp
                             )
                         )
@@ -1286,7 +1286,7 @@ private fun SingleMediaSlotCard(
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = TextSecondary,
-                                        fontSize = 9.sp,
+                                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
@@ -1375,7 +1375,7 @@ private fun DualFrameSlotCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = AccentEmerald,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                 }
@@ -1420,14 +1420,14 @@ private fun DualFrameSlotCard(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
-                        fontSize = 11.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
                 )
                 Text(
                     text = subLabel,
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = if (isRequired) TextSecondary.copy(alpha = 0.7f) else TextMuted,
-                        fontSize = 10.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
                 )
             }
@@ -1510,7 +1510,7 @@ private fun AddReferenceButton(
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = TextSecondary,
-                    fontSize = 10.sp
+                    fontSize = MaterialTheme.typography.labelMedium.fontSize
                 )
             )
         }
@@ -1529,7 +1529,7 @@ private fun CompactChipSelector(
             text = title,
             style = MaterialTheme.typography.labelSmall.copy(
                 color = TextMuted,
-                fontSize = 11.sp
+                fontSize = MaterialTheme.typography.labelMedium.fontSize
             ),
             modifier = Modifier.padding(bottom = 6.dp)
         )
@@ -1553,7 +1553,7 @@ private fun CompactChipSelector(
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) PrimaryNeon else TextSecondary,
-                            fontSize = 12.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     )
                 }
@@ -1573,7 +1573,7 @@ private fun VisualAspectRatioSelector(
             text = "RELACIÓN DE ASPECTO",
             style = MaterialTheme.typography.labelSmall.copy(
                 color = TextMuted,
-                fontSize = 10.sp,
+                fontSize = MaterialTheme.typography.labelMedium.fontSize,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             ),
@@ -1624,7 +1624,7 @@ private fun VisualAspectRatioSelector(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) PrimaryNeon else TextSecondary,
-                                fontSize = 11.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         )
                     }
@@ -1657,7 +1657,7 @@ private fun CreativePresetsRow(
             text = "ESTILOS CREATIVOS",
             style = MaterialTheme.typography.labelSmall.copy(
                 color = TextMuted,
-                fontSize = 10.sp,
+                fontSize = MaterialTheme.typography.labelMedium.fontSize,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             ),
@@ -1692,13 +1692,13 @@ private fun CreativePresetsRow(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(text = preset.icon, fontSize = 11.sp)
+                        Text(text = preset.icon, fontSize = MaterialTheme.typography.labelMedium.fontSize)
                         Text(
                             text = preset.label,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = if (isApplied) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isApplied) SecondaryVioletLight else TextSecondary,
-                                fontSize = 11.sp
+                                fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
                         )
                     }
@@ -1800,7 +1800,7 @@ private fun ModelPickerSheet(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Buscar modelo...", color = TextMuted, fontSize = 13.sp) },
+                        placeholder = { Text("Buscar modelo...", color = TextMuted, fontSize = MaterialTheme.typography.bodyMedium.fontSize) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -1926,7 +1926,7 @@ private fun ModelPickerSheet(
                                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                                                 style = MaterialTheme.typography.labelSmall.copy(
                                                     color = PrimaryNeon,
-                                                    fontSize = 9.sp
+                                                    fontSize = MaterialTheme.typography.labelMedium.fontSize
                                                 )
                                             )
                                         }
@@ -1936,7 +1936,7 @@ private fun ModelPickerSheet(
                                     text = "${model.organization} • $formattedPrice",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = AccentEmerald,
-                                        fontSize = 11.sp
+                                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                                     )
                                 )
                             }
@@ -1987,7 +1987,7 @@ private fun MediaFactsLabel(media:AttachedMedia) {
     LaunchedEffect(media.uriString) {facts=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         runCatching {LocalMediaInspector.inspect(context,Uri.parse(media.uriString),media.mimeType).summary}.getOrNull()
     }}
-    facts?.let {Text(it,color=TextSecondary,fontSize=11.sp)}
+    facts?.let {Text(it,color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
 }
 
 @Composable

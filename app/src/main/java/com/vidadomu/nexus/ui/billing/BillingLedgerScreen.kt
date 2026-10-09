@@ -363,7 +363,7 @@ fun BilledOutputReceiptCard(
                             text = "$vendorName • $formattedDate",
                             style = MaterialTheme.typography.bodySmall,
                             color = NexusTextSecondary,
-                            fontSize = 11.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     }
                 }
@@ -386,7 +386,7 @@ fun BilledOutputReceiptCard(
                         fontWeight = FontWeight.Bold,
                         color = statusColor,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontSize = 10.sp
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
                 }
             }
@@ -448,7 +448,7 @@ fun BilledOutputReceiptCard(
                             text = costUsdLabel,
                             style = MaterialTheme.typography.labelSmall,
                             color = NexusTextSecondary,
-                            fontSize = 10.sp
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
                     }
                 }

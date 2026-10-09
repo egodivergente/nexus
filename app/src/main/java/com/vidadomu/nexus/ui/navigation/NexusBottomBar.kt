@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.navigation
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -95,7 +96,7 @@ fun NexusBottomBar(navController: NavController) {
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = screen.title,
-                            fontSize = 10.sp,
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = itemColor,
                             letterSpacing = 0.2.sp

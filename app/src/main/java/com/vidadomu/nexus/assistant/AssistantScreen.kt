@@ -258,7 +258,7 @@ private fun UserBubble(item: ChatItem.User) {
         if (item.attachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(item.attachments, key = { it.id }) { AttachmentThumb(it) } }
         Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 6.dp, bottomEnd = 20.dp, bottomStart = 20.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)), modifier = Modifier.widthIn(max = 320.dp).padding(top = 4.dp, start = 40.dp)) {
-            Text(item.text, Modifier.padding(horizontal = 16.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp), color = TextPrimary)
+            Text(item.text, Modifier.padding(horizontal = 16.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyMedium.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize, lineHeight = 22.sp), color = TextPrimary)
         }
     }
 }

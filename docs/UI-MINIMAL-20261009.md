@@ -15,7 +15,7 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | Fase | Contenido | Compilación y pruebas | Estado |
 |---|---|---|---|
 | 0 | Inventario y capturas antes | ASUS: 105 tests del núcleo y 245 de la app, cero fallos; ambos APK compilados. Emulador: prueba visual, 24 capturas, cero fallos | Completada |
-| 1 | Tokens, tipografía, moneda, InlineNotice | Pendiente | Pendiente |
+| 1 | Tokens, tipografía, moneda, InlineNotice | ASUS: 105 tests del núcleo y 252 de la app, cero fallos; APK offline y tests compilados. Emulador: 5 regresiones de referencias y navegación, cero fallos | Completada |
 | 2 | Cabecera, saldo y navegación | Pendiente | Pendiente |
 | 3 | Lienzo | Pendiente | Pendiente |
 | 4 | Historial | Pendiente | Pendiente |
@@ -31,9 +31,13 @@ La compilación se realiza en una copia exclusiva `/home/vidal/.cache/nexus-ui-m
 
 La opción `-PnexusUiQa` solo cambia el identificador del paquete offline de pruebas a `com.vidadomu.nexus.uiqa`. Mantiene el bloqueo existente de envíos y permite capturar los composables con fixtures locales sin sustituir Nexus Agent ni el paquete QA anterior. La prueba visual no envía mensajes al LLM ni pulsa Generar.
 
-Las [24 capturas publicadas](ui-minimal/before) utilizan datos ficticios en un emulador API 35 con perfil Pixel 6a de 6,1 pulgadas, a escalas 1.0 y 1.3. Cubren Lienzo, Historial, Modelos, opciones de modelo, Biblioteca, Visor, Asistente, Proyecto, Ajustes, Flow, Comparación y Costes. Se renderiza el composable real de cada pantalla, sin la navegación y cabecera externas de MainActivity. La captura incluye las ventanas de diálogo. `UiAuditScreenshotsTest` terminó con `OK (1 test)` en 39,756 s. Las capturas privadas del S25 aportan la referencia adicional de la cabecera global; no se publican.
+Las [24 capturas publicadas](ui-minimal/before) utilizan datos ficticios en un emulador API 35 con perfil Pixel 6a de 6,1 pulgadas, a escalas 1.0 y 1.3. Cubren Lienzo, Historial, Modelos, opciones de modelo, Biblioteca, Visor, Asistente, Proyecto, Ajustes, Flow, Comparación y Costes. Se renderiza el composable real de cada pantalla, sin la navegación y cabecera externas de MainActivity. La captura incluye las ventanas de diálogo y espera a que el emulador presente el fotograma. `UiAuditScreenshotsTest` terminó con `OK (1 test)` en 56,914 s. Las capturas privadas del S25 aportan la referencia adicional de la cabecera global; no se publican.
 
 El inventario inicial está completo; la columna de comprobación de destinos queda pendiente hasta implementar y verificar cada fase. El Pixel físico permanece bloqueado. La evidencia de esta fase corresponde al emulador y a las capturas iniciales disponibles del S25, no a pruebas completas en un dispositivo físico.
+
+La fase 1 define cinco tamaños tipográficos (24, 17, 16, 14 y 12 sp), sin tamaños de letra literales en pantallas. Los nombres de espaciado y formas existentes remiten a los tokens; los literales restantes de geometría se revisarán al reorganizar cada pantalla. El formateador conserva los valores guardados de las preferencias EUR_SMART/EUR_STRICT, ahora con la misma presentación de dos decimales solicitada. No cambia la consulta de divisas ni su persistencia. Los tests verifican valores pequeños, agrupación, créditos, USD de detalle, valores no finitos y la independencia del idioma del dispositivo. Las seis paletas superan 4,5:1 en los pares de texto evaluados. El componente InlineNotice reserva las excepciones para Detalles; su integración se hará con cada pantalla.
+
+Compilación de fase 1: BUILD SUCCESSFUL en 10m 36s. Se verificaron 424 hashes de fuentes copiadas y se recuperaron los APK offline. El APK agentPreview presente en esta carpeta procede de la compilación anterior; no se presenta como un artefacto nuevo de esta fase.
 
 ## Decisiones
 
