@@ -150,6 +150,16 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         }
     }
 
+    /** Whitelisted settings only: never rewrites SecureStorage credentials. */
+    fun updateOperational(model: String?, tokens: Int?, images: Boolean?, excluded: String?) {
+        val edit = prefs.edit()
+        model?.let { require(AssistantSettings.KNOWN_MODELS.any { pair -> pair.first == it }); edit.putString("model_id", it) }
+        tokens?.let { require(it in 256..32000); edit.putInt("max_tokens", it) }
+        images?.let { edit.putBoolean("send_images", it) }
+        excluded?.let { edit.putString("excluded_families", AssistantSettings.parseFamilies(it).joinToString(", ")) }
+        check(edit.commit()) { "No se pudieron guardar los ajustes." }
+    }
+
     fun setMode(mode: AgentMode) = prefs.edit().putString("mode", mode.name).apply()
 
     fun excludedFamilies(): Set<String> =
@@ -198,6 +208,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         // El router ordena con la tabla publicada (sin llamadas de red por candidato); el plan usa la calculadora.
         router = ModelRouter(registry, skills, published, excludedFamilies = { settings.excludedFamilies() }),
         guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app), directFlow = true,
+        nativeOperations = NexusNativeOperations(app, this),
         adaptPrompt = { text, schema, target ->
             val current = settings.load()
             com.vidadomu.nexus.agent.core.llm.PromptAdapter({ llm(current) }, { current.modelId })

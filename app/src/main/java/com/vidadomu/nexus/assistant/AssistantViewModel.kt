@@ -47,6 +47,9 @@ sealed interface ChatItem {
     data class Proposal(override val id: String, val actionId: String, val description: String, val state: ProposalState = ProposalState.PENDING, val result: String? = null) : ChatItem
     @kotlinx.serialization.Serializable
     data class Notice(override val id: String, val text: String, val error: Boolean = false) : ChatItem
+    /** Persisted by 1.8.2; opening history never changes the current mode. */
+    @kotlinx.serialization.Serializable
+    data class ModeSwitch(override val id: String, val text: String, val resolved: Boolean = false) : ChatItem
 }
 
 enum class ProposalState { PENDING, APPLYING, APPLIED, REJECTED, FAILED }
@@ -131,6 +134,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val clean = text.trim()
         val atts = _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking) return
+        val latestSettings = runtime.settings.load()
+        if (latestSettings != _ui.value.settings) {
+            // Native settings tools affect the next request without dropping conversation, plans or proposals.
+            orchestrator = runtime.orchestrator(latestSettings)
+            _ui.update { it.copy(settings = latestSettings) }
+        }
         val shown = clean.ifEmpty { "(adjuntos)" }
         _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = emptyList(), thinking = true, scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
@@ -217,6 +226,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         runtime.settings.setMode(mode)
         conversation.session.mode = mode
         _ui.update { it.copy(mode = mode) }
+    }
+
+    fun resolveModeSwitch(id: String) {
+        val item = _ui.value.items.firstOrNull { it.id == id } as? ChatItem.ModeSwitch ?: return
+        if (item.resolved) return
+        setMode(AgentMode.AGENT)
+        _ui.update { state -> state.copy(items = state.items.map {
+            if (it.id == id && it is ChatItem.ModeSwitch) it.copy(resolved = true) else it
+        }) }
     }
 
     // ---- adjuntos y proyectos -----------------------------------------------------------------

@@ -43,6 +43,7 @@ class ToolDeps(
     val clock: () -> Long = System::currentTimeMillis,
     val directFlow: Boolean = false,
     val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
+    val nativeOperations: NativeOperations? = null,
 ) {
     val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock)

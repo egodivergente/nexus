@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.first
 
 import android.util.Log
@@ -151,16 +152,24 @@ class GenerationRepository(
         return result
     }
 
-    suspend fun pollJob(jobId: String): Result<GenerationJob> {
+    private val pollLocks = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+
+    suspend fun pollJob(jobId: String, refreshFailed: Boolean = false): Result<GenerationJob> =
+        pollLocks.getOrPut(jobId) { kotlinx.coroutines.sync.Mutex() }.withLock {
+            pollJobLocked(jobId, refreshFailed)
+        }
+
+    private suspend fun pollJobLocked(jobId: String, refreshFailed: Boolean): Result<GenerationJob> {
         val currentJob = database.getJobById(jobId)
             ?: return Result.failure(ProviderError("Job $jobId not found in local database"))
 
-        if (currentJob.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
+        if (currentJob.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.CANCELLED) ||
+            (currentJob.status == GenerationStatus.FAILED && !refreshFailed)) {
             return Result.success(currentJob)
         }
 
         val provider = providerRegistry.getProviderById(currentJob.providerId)
-            ?: providerRegistry.getActiveProvider()
+            ?: return Result.failure(ProviderError("Proveedor no disponible para consultar este trabajo."))
 
         val pollResult = provider.pollJobStatus(currentJob)
         if (pollResult.isSuccess) {

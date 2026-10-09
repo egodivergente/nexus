@@ -12,7 +12,7 @@ enum class ToolCategory {
     READ,
     /** Prepara planes (no gasta, no cambia Nexus). */
     PLAN,
-    /** Cambia metadatos (proyectos, asociaciones, nombres lógicos) o cancela jobs. */
+    /** Modifica Nexus: metadatos, archivos, ajustes o seguimiento; Copiloto propone, Agente aplica. */
     ORGANIZE,
 }
 

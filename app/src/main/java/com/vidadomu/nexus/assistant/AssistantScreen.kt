@@ -131,6 +131,12 @@ fun AssistantScreen(
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item)
                         is ChatItem.Notice -> NoticeRow(item)
+                        is ChatItem.ModeSwitch -> OutlinedCard(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(item.text, style = MaterialTheme.typography.bodyMedium)
+                                if (!item.resolved) TextButton(onClick = { vm.resolveModeSwitch(item.id) }, enabled = !ui.thinking) { Text("Activar Agente") }
+                            }
+                        }
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> ui.plans[item.planId]?.let { p ->
                             CompactGeneration(p, vm.outputs(p.jobId),

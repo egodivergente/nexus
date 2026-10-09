@@ -154,17 +154,27 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
+        persist(next)
         data = next
-        persist()
         result
     }
 
-    private fun persist() {
+    private fun persist(snapshot: IndexData) {
         val f = file ?: return
         f.parentFile?.mkdirs()
         val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(JSON.encodeToString(IndexData.serializer(), data))
-        if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+        try {
+            java.io.FileOutputStream(tmp).use { output ->
+                output.write(JSON.encodeToString(IndexData.serializer(), snapshot).toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            try {
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally { tmp.delete() }
     }
 
     // ---------- proyectos y estructura ----------
@@ -304,6 +314,16 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     suspend fun updateAsset(id: String, change: (Asset) -> Asset): Asset = edit { d ->
         val cur = d.assets.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Asset desconocido: $id")
         val next = change(cur).copy(id = cur.id, uri = cur.uri, createdAt = cur.createdAt)
+        d.copy(assets = d.assets.map { if (it.id == id) next else it }) to next
+    }
+
+    /** Native file operations use this only after preserving the previous URI on disk. */
+    suspend fun relocateAsset(id: String, expectedUri: String, uri: String, displayName: String): Asset = edit { d ->
+        val current = d.assets.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Asset desconocido: $id")
+        require(current.uri == expectedUri) { "El archivo cambió durante la operación." }
+        require(uri.isNotBlank() && displayName.isNotBlank())
+        require(d.assets.none { it.id != id && it.uri == uri }) { "La nueva ruta ya está indexada." }
+        val next = current.copy(uri = uri, displayName = displayName)
         d.copy(assets = d.assets.map { if (it.id == id) next else it }) to next
     }
 

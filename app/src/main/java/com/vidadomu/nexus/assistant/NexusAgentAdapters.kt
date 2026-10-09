@@ -223,7 +223,11 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
     }
 
     override suspend fun status(jobId: String): JobStatus {
-        val job = app.generationRepository.getJob(jobId) ?: return JobStatus(jobId, "FAILED", error = "Nexus no conoce ese trabajo.")
+        val current = app.generationRepository.getJob(jobId) ?: return JobStatus(jobId, "FAILED", error = "Nexus no conoce ese trabajo.")
+        // A status inquiry queries existing remote work. Flow queue placeholders must never submit here.
+        val job = if (current.status in NexusNativeOperations.ACTIVE && NexusNativeOperations.canQueryExisting(current))
+            app.generationRepository.pollJob(jobId).getOrNull() ?: app.generationRepository.getJob(jobId) ?: current
+        else current
         val status = when (job.status) {
             GenerationStatus.COMPLETED -> "COMPLETED"
             GenerationStatus.FAILED -> "FAILED"
