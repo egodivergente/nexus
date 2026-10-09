@@ -24,6 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.vidadomu.nexus.ui.components.InlineNotice
+import com.vidadomu.nexus.ui.components.noticeMessage
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,11 +69,12 @@ import com.vidadomu.nexus.ui.theme.*
 @Composable
 private fun NativeParameterControl(param: com.vidadomu.nexus.core.model.ModelParameter, value: String, onChange: (String) -> Unit) {
     var showDefaults by remember(param.key) { mutableStateOf(false) }
-    Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth().combinedClickable(onClick={showDefaults=true},onLongClick={showDefaults=true}).padding(vertical=8.dp),
+    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+        Row(Modifier.fillMaxWidth().combinedClickable(onClick={showDefaults=true},onLongClick={showDefaults=true}).padding(vertical=NexusTokens.space8),
             verticalAlignment=Alignment.CenterVertically) {
             Text(ParameterPresentation.title(param) + if(param.isRequired) " *" else "",Modifier.weight(1f),color=TextPrimary)
-            Icon(Icons.Default.MoreVert,"Ajustes de ${param.displayName}",Modifier.size(20.dp),tint=TextSecondary)
+            IconButton(onClick={onChange(param.defaultValue)}) { Icon(Icons.Default.Restore,"Restaurar ${ParameterPresentation.title(param)}",tint=TextSecondary) }
+            IconButton(onClick={showDefaults=true}) { Icon(Icons.Default.MoreVert,"Ajustes de ${param.displayName}",tint=TextSecondary) }
         }
         NativeParameterValue(param,value,onChange)
     }
@@ -92,7 +97,7 @@ private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParam
             OutlinedTextField(value = if(value.isBlank()) "Seleccionar" else label.primary, onValueChange = {}, readOnly = true,
                 supportingText = if(label.secondary == null) null else { { Text(label.secondary.orEmpty()) } },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+                modifier = Modifier.menuAnchor().fillMaxWidth(), shape = NexusTokens.field)
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 if(!param.isRequired) DropdownMenuItem(text = { Text("Usar valor del proveedor") }, onClick = { onChange(""); expanded = false })
                 choices.forEach { option ->
@@ -117,7 +122,7 @@ private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParam
     } else {
         OutlinedTextField(value, onChange, modifier = Modifier.fillMaxWidth(),
             supportingText = { if(param.minValue != null || param.maxValue != null) Text("Rango: " + (param.minValue ?: "—") + " – " + (param.maxValue ?: "—")) },
-            shape = RoundedCornerShape(14.dp))
+            shape = NexusTokens.field)
     }
 }
 
@@ -171,22 +176,17 @@ fun CreateScreen(
 
 
     var showPriceDetails by remember { mutableStateOf(false) }
-    if(showPriceDetails) AlertDialog(onDismissRequest={showPriceDetails=false},title={Text(estimate.amount)},text={Text(estimate.details.ifBlank {"El coste depende de la configuración elegida."})},confirmButton={TextButton(onClick={showPriceDetails=false}) {Text("Cerrar")}})
     var showModelPickerSheet by remember { mutableStateOf(false) }
     var showRequestInspector by remember { mutableStateOf(false) }
-    var showPersonalPresets by remember {mutableStateOf(false)}
-    if(showPersonalPresets) CreationPresetsSheet(state,viewModel) {showPersonalPresets=false}
+    var showPersonalPresets by remember { mutableStateOf(false) }
+    var showParameters by remember { mutableStateOf(false) }
+    var showMedia by remember { mutableStateOf(false) }
+    var showInspiration by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    if(showPersonalPresets) CreationPresetsSheet(state,viewModel) { showPersonalPresets=false }
     val readiness=creationReadiness(if(comparisonState.phase == ComparisonPhase.SENDING) state.copy(isSubmitting = true) else state)
-    val snackbar=remember {SnackbarHostState()}
-    LaunchedEffect(state.errorMessage) {state.errorMessage?.let {snackbar.showSnackbar(it,withDismissAction=true,duration=SnackbarDuration.Long)}}
-    var accountBalance by remember { mutableStateOf<AccountBalance?>(app.secureStorage.getCachedBalance()) }
-
-    LaunchedEffect(Unit) {
-        val res = app.atlasProvider.fetchBalance()
-        if (res.isSuccess) {
-            accountBalance = res.getOrNull()
-        }
-    }
+    val screenMargin = if(horizontalActions) NexusTokens.tabletMargin else NexusTokens.screenMargin
 
     val primaryImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -252,91 +252,75 @@ fun CreateScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = {SnackbarHost(snackbar)},
         bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = BackgroundDark,
-                shadowElevation = 8.dp
-            ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    readiness.message?.let { Text(it, color = TextSecondary, fontSize = MaterialTheme.typography.labelMedium.fontSize) }
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Text(estimate.amount, Modifier.weight(1f), color = TextPrimary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
-                        if(estimate.details.isNotBlank()) IconButton(onClick={showPriceDetails=true}) {Icon(Icons.Default.Info,"Detalle del precio",Modifier.size(20.dp),tint=TextSecondary)}
-                        estimate.retry?.let { retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Reintentar precio")} }
-                        if(horizontalActions) GenerateActionButton(readiness.canSubmit,generateAction,Modifier.width(160.dp))
+            Surface(color=MaterialTheme.colorScheme.surface) {
+                Column(Modifier.fillMaxWidth().padding(horizontal=screenMargin, vertical=NexusTokens.space8),
+                    verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                        TextButton(onClick={showPriceDetails=true}, modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(estimate.amount, style=MaterialTheme.typography.bodyMedium.tabularMoney(), color=TextPrimary)
+                                Text("Coste estimado · Detalles", style=MaterialTheme.typography.labelMedium, color=TextSecondary)
+                            }
+                        }
+                        GenerateActionButton(readiness.canSubmit,generateAction,Modifier.widthIn(min=128.dp))
                     }
-                    if(!horizontalActions) GenerateActionButton(readiness.canSubmit,generateAction,Modifier.fillMaxWidth())
+                    readiness.message?.let { Text(it, color=TextSecondary, style=MaterialTheme.typography.labelMedium) }
                 }
             }
         },
-        containerColor = ScreenBackground,
-        topBar = {
-            if(!compactTyping) TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) "Lienzo · Lab" else "Lienzo",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.sp,
-                                color = TextPrimary
-                            )
-                        )
-
+        containerColor=ScreenBackground,
+        topBar={
+            if(!compactTyping) TopAppBar(title={Text("Lienzo", style=MaterialTheme.typography.titleLarge)},
+                actions={
+                    Box {
+                        IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
+                        DropdownMenu(expanded=showMenu,onDismissRequest={showMenu=false}) {
+                            DropdownMenuItem(text={Text("Todos los modelos")}, onClick={showMenu=false;onBrowseModels()})
+                            if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality != Modality.CHAT) {
+                                DropdownMenuItem(text={Text("Diagnóstico local")}, onClick={showMenu=false;showRequestInspector=true})
+                                DropdownMenuItem(text={Text("Copiar diagnóstico")}, onClick={
+                                    showMenu=false
+                                    clipboard.setText(AnnotatedString(maskedRequestPreview(state)))
+                                    Toast.makeText(context,"Diagnóstico copiado",Toast.LENGTH_SHORT).show()
+                                })
+                            }
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick={showPersonalPresets=true},enabled=state.schemaReady && !state.isSubmitting) {Icon(Icons.Default.Tune,"Mis ajustes",tint=TextSecondary)}
-                    if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality != Modality.CHAT) IconButton(onClick = { showRequestInspector = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Terminal,
-                            contentDescription = "Inspector de Solicitud (DEBUG)",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
+                }, colors=TopAppBarDefaults.topAppBarColors(containerColor=BackgroundDark))
         }
     ) { innerPadding ->
-        LazyColumn(
-            state = canvasScroll,
-            contentPadding = PaddingValues(bottom = 20.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // 2. Tarjeta Compacta del Modelo Seleccionado (72-80dp)
+        LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=NexusTokens.space24),
+            modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+            item { CompactModelSelectionCard(state.selectedModel,currencyManager) { showModelPickerSheet=true } }
             item {
-                CompactModelSelectionCard(
-                    selectedModel = state.selectedModel,
-                    currencyManager = currencyManager,
-                    onClick = onBrowseModels
+                OutlinedTextField(
+                    value = state.prompt,
+                    onValueChange = { viewModel.updatePrompt(it) },
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Prompt de creación" },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = {
+                        Text(
+                            text = if(state.selectedModality == Modality.CHAT) "Escribe tu consulta..." else "Describe lo que quieres cambiar o crear...",
+                            color = TextMuted,
+                            fontSize = MaterialTheme.typography.bodyLarge.fontSize
+                        )
+                    },
+                    minLines = 3,
+                    maxLines = 6,
+                    shape = NexusTokens.field,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = SurfaceDark,
+                        unfocusedContainerColor = SurfaceDark,
+                        focusedBorderColor = PrimaryNeon.copy(alpha = 0.7f),
+                        unfocusedBorderColor = BorderSubtle,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = PrimaryNeon
+                    )
                 )
-            }
-
-            if(state.selectedModality == Modality.IMAGE) item {
-                TextButton(onClick = {
-                    viewModel.comparison.open(state)
-                    showComparison = true
-                }, enabled = !state.isSubmitting && !state.isPreparingMedia,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Icon(Icons.Default.Compare, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote en curso" else "Encargar a varios modelos")
-                }
             }
 
             // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
@@ -344,14 +328,14 @@ fun CreateScreen(
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = NexusTokens.thumbnail,
                         color = PrimaryNeon.copy(alpha = 0.08f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.4f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)
                         ) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
@@ -371,8 +355,55 @@ fun CreateScreen(
                 }
             }
 
-            // 4. Entrada de Medios Nativos Adaptativa al Modelo (1:1 según OpenAPI Schema)
+
+            state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
+                if(model.contractMedia.isNotEmpty() || model.supportsImageInput || model.supportsVideoInput ||
+                    model.inputMode != ModelInputMode.TEXT_ONLY || model.pairedEditModelId != null || state.attachedMedia.isNotEmpty()) {
+                    item {
+                        LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8), verticalAlignment=Alignment.CenterVertically) {
+                            items(state.attachedMedia, key={it.id}) { media ->
+                                CanvasMediaThumbnail(media) { viewModel.removeMedia(media.id) }
+                            }
+                            item {
+                                OutlinedButton(onClick={showMedia=true}, modifier=Modifier.heightIn(min=NexusTokens.minimumTouch), shape=NexusTokens.field,
+                                    colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {
+                                    Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.space24))
+                                    Text(if(state.attachedMedia.isEmpty()) "Medios" else "Añadir")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             item {
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    item { CanvasChip("Inspirar") {showInspiration=true} }
+                    item { CanvasChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true} }
+                    if(state.selectedModality == Modality.IMAGE) item {
+                        CanvasChip(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Comparar",
+                            enabled=!state.isSubmitting && !state.isPreparingMedia) {
+                            viewModel.comparison.open(state);showComparison=true
+                        }
+                    }
+                    item { CanvasChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true} }
+                }
+            }
+            if(state.isLoadingSchema) item {
+                Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text("Cargando opciones del modelo…",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                }
+            }
+            if(!state.schemaReady) state.schemaMessage?.let { raw -> item {
+                InlineNotice(noticeMessage(raw,"No se han podido cargar las opciones del modelo."),technicalDetails=raw,
+                    actionLabel="Reintentar",onAction=if(state.isLoadingSchema) null else viewModel::retryConfiguration)
+            } }
+            state.errorMessage?.let { raw -> item {
+                InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa sus detalles antes de volver a generar."),technicalDetails=raw)
+            } }
+        }
+    }
+    if(showMedia) CanvasSheet("Medios de entrada",{showMedia=false}) {
                 state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
                     if(model.contractEndpoint==null && model.contractMedia.isNotEmpty()) {
                         ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(field.mime)},viewModel::removeMedia)
@@ -412,117 +443,33 @@ fun CreateScreen(
                         onClearSlot = { slot -> viewModel.clearSlot(slot) }
                     )
                 }
-            }
 
-            // 5. Campo de Instrucción / Prompt (Dominante y limpio)
-            item {
-                OutlinedTextField(
-                    value = state.prompt,
-                    onValueChange = { viewModel.updatePrompt(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = if(state.selectedModality == Modality.CHAT) "Escribe tu consulta..." else "Describe lo que quieres cambiar o crear...",
-                            color = TextMuted,
-                            fontSize = MaterialTheme.typography.bodyLarge.fontSize
-                        )
-                    },
-                    minLines = 3,
-                    maxLines = 6,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceDark,
-                        unfocusedContainerColor = SurfaceDark,
-                        focusedBorderColor = PrimaryNeon.copy(alpha = 0.7f),
-                        unfocusedBorderColor = BorderSubtle,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = PrimaryNeon
-                    )
-                )
-            }
-
-            // 6. Carrusel de Presets Creativos (1 toque con haptic feedback)
-            item {
-                var showPresets by remember { mutableStateOf(false) }
-                TextButton(onClick = { showPresets = !showPresets }) { Text("Inspiración creativa") }
-                if(showPresets) CreativePresetsRow(
-                    currentPrompt = state.prompt,
-                    onApplyPreset = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        viewModel.updatePrompt(it)
-                    }
-                )
-            }
-
-            item {
-                if(state.isLoadingSchema) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = PrimaryNeon)
-                    Text("Cargando opciones del modelo…", color = TextSecondary)
-                }
-                state.schemaMessage?.let { message ->
-                    if(!state.schemaReady) {
-                        Text(message, color = AccentAmber)
-                        TextButton(onClick = viewModel::retryConfiguration, enabled = !state.isLoadingSchema) {
-                            Text("Reintentar carga de opciones")
-                        }
-                    }
-                    else {
-                        var showCompatibility by remember(state.selectedModel?.id) { mutableStateOf(false) }
-                        TextButton(onClick = { showCompatibility = !showCompatibility }) { Text("Ver avisos de compatibilidad", color = AccentAmber) }
-                        if(showCompatibility) Text(message, color = TextSecondary, fontSize = MaterialTheme.typography.labelMedium.fontSize)
-                    }
-                }
-                if(state.schemaReady) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize)?.filter { !it.isAdvanced }?.forEach { param ->
-                            key(state.selectedModel?.id,param.key) {
-                                NativeParameterControl(param, state.parameters[param.key] ?: param.defaultValue) { viewModel.updateParameter(param.key, it) }
-                            }
-                        }
-                        val advanced = state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize)?.filter { it.isAdvanced }.orEmpty()
-                        if(advanced.isNotEmpty()) {
-                            TextButton(onClick = { viewModel.toggleAdvanced() }) {
-                                Text(if(state.showAdvanced) "Ocultar opciones adicionales" else "Más opciones · " + advanced.size)
-                            }
-                            AnimatedVisibility(state.showAdvanced) {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    advanced.forEach { param ->
-                                        key(state.selectedModel?.id,param.key) {
-                                        NativeParameterControl(param, state.parameters[param.key] ?: param.defaultValue) { viewModel.updateParameter(param.key, it) }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Mensaje de Error si aplica
-            if (state.errorMessage != null) {
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = AccentCoral.copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentCoral)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = AccentCoral, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = state.errorMessage ?: "", color = AccentCoral, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-
-
+    }
+    if(showParameters) CanvasSheet("Parámetros",{showParameters=false}) {
+        if(state.isLoadingSchema) LinearProgressIndicator(Modifier.fillMaxWidth())
+        state.schemaMessage?.let { raw ->
+            InlineNotice(if(state.schemaReady) "Revisa la compatibilidad de estas opciones." else noticeMessage(raw,"Las opciones aún no están disponibles."),
+                technicalDetails=raw,isError=!state.schemaReady,
+                actionLabel=if(state.schemaReady) null else "Reintentar",onAction=if(!state.schemaReady && !state.isLoadingSchema) viewModel::retryConfiguration else null)
         }
+        if(state.schemaReady) {
+            val params=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty()
+            params.filter { !it.isAdvanced }.forEach { param ->
+                key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
+            }
+            if(params.any {it.isAdvanced}) Text("Opciones adicionales",style=MaterialTheme.typography.titleMedium)
+            params.filter {it.isAdvanced}.forEach { param ->
+                key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
+            }
+        }
+    }
+    if(showInspiration) CanvasSheet("Inspiración",{showInspiration=false}) {
+        CreativePresetsRow(state.prompt) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);viewModel.updatePrompt(it) }
+    }
+    if(showPriceDetails) CanvasSheet("Coste estimado",{showPriceDetails=false}) {
+        Text(estimate.amount,style=MaterialTheme.typography.titleMedium.tabularMoney())
+        Text(estimate.details.ifBlank {"El coste depende de la configuración elegida."},style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+        estimate.retry?.let { retry -> TextButton(onClick=retry) {Text("Reintentar precio",color=TextSecondary)} }
     }
 
     // Modal Bottom Sheet para Seleccionar Modelo
@@ -548,6 +495,29 @@ fun CreateScreen(
     }
 }
 
+private fun maskedRequestPreview(state: CreateUiState): String {
+    val model=state.selectedModel
+    val rawPreview = model?.let { selected ->
+        val media = state.attachedMedia.map { item ->
+            com.vidadomu.nexus.core.model.MediaInput(
+                type = when {item.mimeType.startsWith("video/")->Modality.VIDEO;item.mimeType.startsWith("audio/")->Modality.AUDIO;else->Modality.IMAGE},
+                uriString = "local://omitted", mimeType = item.mimeType, slotType = item.slotType,fieldKey=item.fieldKey,
+                remoteUrl = "https://example.invalid/pending-upload/${item.slotType.name.lowercase()}")
+        }
+        runCatching {
+            val previewRequest = com.vidadomu.nexus.provider.atlas.NativeGenerationRequest.build(
+                selected, state.selectedModality, "[Prompt omitido: ${state.prompt.length} caracteres]", com.vidadomu.nexus.core.model.FormContract.previewValues(selected,state.parameters), media, "preview")
+            when (selected.providerId) {
+                "crun" -> com.vidadomu.nexus.provider.crun.CrunPayloadCodec.encode(selected, previewRequest).toString()
+                "runway" -> com.vidadomu.nexus.provider.runway.RunwayPayloadCodec.encode(previewRequest).toString()
+                else -> com.vidadomu.nexus.provider.atlas.AtlasGenerationPayload.build(previewRequest).toString()
+            }
+        }.getOrElse { "Revisa los valores: ${it.message}" }
+    } ?: "Selecciona un modelo."
+
+    return com.vidadomu.nexus.core.security.SecureStorage.sanitizeForLogging(rawPreview)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RequestInspectorSheet(
@@ -568,25 +538,7 @@ private fun RequestInspectorSheet(
             Modality.CHAT -> "POST /v1/chat/completions"
         }
     }
-    val rawPreview = model?.let { selected ->
-        val media = state.attachedMedia.map { item ->
-            com.vidadomu.nexus.core.model.MediaInput(
-                type = when {item.mimeType.startsWith("video/")->Modality.VIDEO;item.mimeType.startsWith("audio/")->Modality.AUDIO;else->Modality.IMAGE},
-                uriString = "local://omitted", mimeType = item.mimeType, slotType = item.slotType,fieldKey=item.fieldKey,
-                remoteUrl = "https://example.invalid/pending-upload/${item.slotType.name.lowercase()}")
-        }
-        runCatching {
-            val previewRequest = com.vidadomu.nexus.provider.atlas.NativeGenerationRequest.build(
-                selected, state.selectedModality, "[Prompt omitido: ${state.prompt.length} caracteres]", com.vidadomu.nexus.core.model.FormContract.previewValues(selected,state.parameters), media, "preview")
-            when (selected.providerId) {
-                "crun" -> com.vidadomu.nexus.provider.crun.CrunPayloadCodec.encode(selected, previewRequest).toString()
-                "runway" -> com.vidadomu.nexus.provider.runway.RunwayPayloadCodec.encode(previewRequest).toString()
-                else -> com.vidadomu.nexus.provider.atlas.AtlasGenerationPayload.build(previewRequest).toString()
-            }
-        }.getOrElse { "Revisa los valores: ${it.message}" }
-    } ?: "Selecciona un modelo."
-
-    val simulatedPayload=com.vidadomu.nexus.core.security.SecureStorage.sanitizeForLogging(rawPreview)
+    val simulatedPayload=maskedRequestPreview(state)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
@@ -596,9 +548,9 @@ private fun RequestInspectorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max=560.dp).verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = NexusTokens.space16)
+                .padding(bottom = NexusTokens.space32),
+            verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -607,7 +559,7 @@ private fun RequestInspectorSheet(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     Icon(Icons.Default.Terminal, contentDescription = null, tint = PrimaryNeon, modifier = Modifier.size(20.dp))
                     Text(
@@ -615,7 +567,7 @@ private fun RequestInspectorSheet(
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
                     )
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onDismiss, modifier = Modifier.size(NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary, modifier = Modifier.size(18.dp))
                 }
             }
@@ -623,11 +575,11 @@ private fun RequestInspectorSheet(
             // Endpoint & Routing Info
             Surface(
                 color = SurfaceVariantDark,
-                shape = RoundedCornerShape(8.dp),
+                shape = NexusTokens.thumbnail,
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(modifier = Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Endpoint", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                         Text(endpoint, style = MaterialTheme.typography.bodySmall, color = PrimaryNeon, fontFamily = FontFamily.Monospace)
@@ -663,14 +615,14 @@ private fun RequestInspectorSheet(
             )
             Surface(
                 color = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(8.dp),
+                shape = NexusTokens.thumbnail,
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = simulatedPayload,
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontFamily = FontFamily.Monospace, fontSize = MaterialTheme.typography.labelMedium.fontSize),
-                    modifier = Modifier.padding(12.dp)
+                    modifier = Modifier.padding(NexusTokens.space12)
                 )
             }
 
@@ -681,12 +633,12 @@ private fun RequestInspectorSheet(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
-                shape = RoundedCornerShape(8.dp),
+                    .heightIn(min=NexusTokens.minimumTouch),
+                shape = NexusTokens.thumbnail,
                 colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariantDark, contentColor = PrimaryNeon)
             ) {
                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(NexusTokens.space8))
                 Text("Copiar Payload JSON", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold))
             }
         }
@@ -708,7 +660,7 @@ private fun ModalityTabsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = NexusTokens.space4),
         horizontalArrangement = Arrangement.SpaceAround
     ) {
         modalities.forEach { (modality, label) ->
@@ -720,9 +672,9 @@ private fun ModalityTabsRow(
 
             Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(NexusTokens.thumbnail)
                     .clickable { onModalitySelected(modality) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -732,12 +684,12 @@ private fun ModalityTabsRow(
                         color = textColor
                     )
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(NexusTokens.space4))
                 Box(
                     modifier = Modifier
                         .width(20.dp)
                         .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp))
+                        .clip(NexusTokens.thumbnail)
                         .background(if (isSelected) PrimaryNeon else Color.Transparent)
                 )
             }
@@ -751,69 +703,17 @@ private fun CompactModelSelectionCard(
     currencyManager: CurrencyManager,
     onClick: () -> Unit
 ) {
-    val formattedPrice = "Coste confirmado tras generar"
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() },
-        color = SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BrandLogo(
-                organization = selectedModel?.organization,
-                family = selectedModel?.family,
-                modelId = selectedModel?.id,
-                size = 54.dp
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Modelo seleccionado",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = TextMuted,
-                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                        letterSpacing = 0.8.sp
-                    )
-                )
-                Text(
-                    text = selectedModel?.displayName ?: "Seleccionar Modelo",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = selectedModel?.let { com.vidadomu.nexus.ui.models.modelUse(it).label } ?: "Selecciona un modelo",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = AccentEmerald,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = MaterialTheme.typography.labelMedium.fontSize
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+    Surface(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription="Elegir modelo"}.clickable(onClick=onClick),
+        color=MaterialTheme.colorScheme.surface, shape=NexusTokens.field) {
+        Row(Modifier.padding(vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            BrandLogo(organization=selectedModel?.organization,family=selectedModel?.family,modelId=selectedModel?.id,size=NexusTokens.space32)
+            Column(Modifier.weight(1f)) {
+                Text(selectedModel?.displayName ?: "Seleccionar modelo",style=MaterialTheme.typography.titleMedium,color=TextPrimary)
+                Text(selectedModel?.let {com.vidadomu.nexus.ui.models.modelUse(it).label} ?: "Elige qué quieres crear",
+                    style=MaterialTheme.typography.labelMedium,color=TextSecondary)
             }
-            Icon(
-                imageVector = Icons.Default.UnfoldMore,
-                contentDescription = null,
-                tint = TextSecondary,
-                modifier = Modifier.size(18.dp)
-            )
+            Icon(Icons.Default.ExpandMore,null,tint=TextSecondary)
         }
     }
 }
@@ -833,7 +733,7 @@ private fun AdaptiveModelMediaInput(
     onClearSlot: (MediaSlotType) -> Unit
 ) {
     if (model.supportsImageInput || model.supportsVideoInput) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             fun required(field: String?) = field in model.nativeRequiredFields
             if (model.firstFrameField != null) {
                 val media = attachedMedia.find { it.slotType == MediaSlotType.PRIMARY_IMAGE }
@@ -850,7 +750,7 @@ private fun AdaptiveModelMediaInput(
             if (model.imagesArrayField != null) {
                 val refs = attachedMedia.filter { it.slotType == MediaSlotType.REFERENCE_IMAGE }
                 Text("Imágenes de referencia", color = TextSecondary)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     items(refs, key = { it.id }) { media -> ReferenceImageThumbnail(media) { onRemoveMedia(media.id) } }
                     if (refs.size < model.maxImages) item {
                         AddReferenceButton(model.maxImages - refs.size, required(model.imagesArrayField), onPickMultipleImages)
@@ -880,19 +780,19 @@ private fun AdaptiveModelMediaInput(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(NexusTokens.field)
                         .clickable { onSwitchToEdit() },
                     color = SurfaceDark.copy(alpha = 0.5f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
@@ -945,7 +845,7 @@ private fun AdaptiveModelMediaInput(
             val firstFrame = attachedMedia.find { it.slotType == MediaSlotType.PRIMARY_IMAGE } ?: attachedMedia.firstOrNull()
             val lastFrame = attachedMedia.find { it.slotType == MediaSlotType.LAST_FRAME } ?: attachedMedia.drop(1).firstOrNull()
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -972,7 +872,7 @@ private fun AdaptiveModelMediaInput(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     Box(modifier = Modifier.weight(1f)) {
                         DualFrameSlotCard(
@@ -1004,7 +904,7 @@ private fun AdaptiveModelMediaInput(
             val refImages = attachedMedia.filter { it.slotType in listOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE) }
             val maxAllowed = model.maxImages
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1020,7 +920,7 @@ private fun AdaptiveModelMediaInput(
                         )
                     )
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = NexusTokens.thumbnail,
                         color = if (refImages.isNotEmpty()) AccentEmerald.copy(alpha = 0.15f) else SurfaceVariantDark,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
@@ -1029,7 +929,7 @@ private fun AdaptiveModelMediaInput(
                     ) {
                         Text(
                             text = if(maxAllowed==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size} / $maxAllowed imágenes",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = if (refImages.isNotEmpty()) AccentEmerald else TextSecondary,
                                 fontWeight = FontWeight.Bold,
@@ -1040,7 +940,7 @@ private fun AdaptiveModelMediaInput(
                 }
 
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     items(refImages,key={it.id}) { img ->
@@ -1082,7 +982,7 @@ private fun AdaptiveModelMediaInput(
             val refImages = attachedMedia.filter { it.slotType in listOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE) }
             val refVideos = attachedMedia.filter { it.slotType in listOf(MediaSlotType.VIDEO_REFERENCE, MediaSlotType.VIDEO_INPUT) }
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1108,7 +1008,7 @@ private fun AdaptiveModelMediaInput(
                 }
 
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     items(refImages,key={it.id}) { img ->
@@ -1159,30 +1059,30 @@ private fun SingleMediaSlotCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(NexusTokens.field)
             .clickable { onClick() },
         color = bgColor,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-        shape = RoundedCornerShape(12.dp)
+        shape = NexusTokens.field
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
+                .padding(NexusTokens.space8),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (media != null) {
                 if(media.mimeType.startsWith("image/")) AsyncImage(
                     model = Uri.parse(media.uriString), contentDescription = title,
-                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(8.dp)),contentScale = ContentScale.Crop)
-                else Box(Modifier.size(54.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceVariantDark),contentAlignment=Alignment.Center) {
+                    modifier = Modifier.size(54.dp).clip(NexusTokens.thumbnail),contentScale = ContentScale.Crop)
+                else Box(Modifier.size(54.dp).clip(NexusTokens.thumbnail).background(SurfaceVariantDark),contentAlignment=Alignment.Center) {
                     Icon(if(media.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Movie,title,tint=TextSecondary)
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(NexusTokens.space12))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
                         Text(
                             text = title,
@@ -1224,7 +1124,7 @@ private fun SingleMediaSlotCard(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(NexusTokens.thumbnail)
                         .background(SurfaceVariantDark),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1235,11 +1135,11 @@ private fun SingleMediaSlotCard(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(NexusTokens.space12))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
                         Text(
                             text = title,
@@ -1252,12 +1152,12 @@ private fun SingleMediaSlotCard(
                         )
                         if (badge != null) {
                             Surface(
-                                shape = RoundedCornerShape(4.dp),
+                                shape = NexusTokens.thumbnail,
                                 color = SurfaceVariantDark
                             ) {
                                 Text(
                                     text = badge,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = TextSecondary,
                                         fontSize = MaterialTheme.typography.labelMedium.fontSize,
@@ -1319,11 +1219,11 @@ private fun DualFrameSlotCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(100.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(NexusTokens.field)
             .clickable { onClick() },
         color = SurfaceDark,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-        shape = RoundedCornerShape(12.dp)
+        shape = NexusTokens.field
     ) {
         if (media != null) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1345,7 +1245,7 @@ private fun DualFrameSlotCard(
                 ) {
                     Text(
                         text = label,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = AccentEmerald,
                             fontWeight = FontWeight.Bold,
@@ -1356,9 +1256,9 @@ private fun DualFrameSlotCard(
                 IconButton(
                     onClick = onRemove,
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(NexusTokens.minimumTouch)
                         .align(Alignment.TopEnd)
-                        .padding(2.dp)
+                        .padding(NexusTokens.space4)
                 ) {
                     Surface(
                         shape = CircleShape,
@@ -1369,7 +1269,7 @@ private fun DualFrameSlotCard(
                             Icons.Default.Close,
                             contentDescription = "Quitar",
                             tint = MediaForeground,
-                            modifier = Modifier.padding(4.dp)
+                            modifier = Modifier.padding(NexusTokens.space4)
                         )
                     }
                 }
@@ -1378,7 +1278,7 @@ private fun DualFrameSlotCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp),
+                    .padding(NexusTokens.space8),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -1388,7 +1288,7 @@ private fun DualFrameSlotCard(
                     tint = TextSecondary,
                     modifier = Modifier.size(24.dp)
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(NexusTokens.space4))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall.copy(
@@ -1417,8 +1317,8 @@ private fun ReferenceImageThumbnail(
     Box(
         modifier = Modifier
             .size(72.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+            .clip(NexusTokens.field)
+            .border(1.dp, BorderSubtle, NexusTokens.field)
     ) {
         AsyncImage(
             model = Uri.parse(media.uriString),
@@ -1429,9 +1329,9 @@ private fun ReferenceImageThumbnail(
         IconButton(
             onClick = onRemove,
             modifier = Modifier
-                .size(24.dp)
+                .size(NexusTokens.minimumTouch)
                 .align(Alignment.TopEnd)
-                .padding(2.dp)
+                .padding(NexusTokens.space4)
         ) {
             Surface(
                 shape = CircleShape,
@@ -1442,7 +1342,7 @@ private fun ReferenceImageThumbnail(
                     Icons.Default.Close,
                     contentDescription = "Quitar",
                     tint = MediaForeground,
-                    modifier = Modifier.padding(3.dp)
+                    modifier = Modifier.padding(NexusTokens.space4)
                 )
             }
         }
@@ -1458,14 +1358,14 @@ private fun AddReferenceButton(
     Surface(
         modifier = Modifier
             .size(72.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(NexusTokens.field)
             .clickable { onClick() },
         color = SurfaceDark,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             TextSecondary.copy(alpha = 0.4f)
         ),
-        shape = RoundedCornerShape(10.dp)
+        shape = NexusTokens.field
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -1478,7 +1378,7 @@ private fun AddReferenceButton(
                 tint = TextSecondary,
                 modifier = Modifier.size(22.dp)
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(NexusTokens.space4))
             Text(
                 text = "Añadir",
                 style = MaterialTheme.typography.labelSmall.copy(
@@ -1505,22 +1405,22 @@ private fun CompactChipSelector(
                 color = TextMuted,
                 fontSize = MaterialTheme.typography.labelMedium.fontSize
             ),
-            modifier = Modifier.padding(bottom = 6.dp)
+            modifier = Modifier.padding(bottom = NexusTokens.space4)
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
             items(options) { option ->
                 val isSelected = option == selected
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(NexusTokens.thumbnail)
                         .background(if (isSelected) PrimaryNeon.copy(alpha = 0.12f) else SurfaceDark)
                         .border(
                             width = 1.dp,
                             color = if (isSelected) PrimaryNeon else BorderSubtle,
-                            shape = RoundedCornerShape(8.dp)
+                            shape = NexusTokens.thumbnail
                         )
                         .clickable { onSelect(option) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
                 ) {
                     Text(
                         text = option,
@@ -1551,9 +1451,9 @@ private fun VisualAspectRatioSelector(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             ),
-            modifier = Modifier.padding(bottom = 6.dp)
+            modifier = Modifier.padding(bottom = NexusTokens.space4)
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(options) { option ->
                 val isSelected = option == selected
                 val (boxW, boxH) = when (option.trim()) {
@@ -1567,7 +1467,7 @@ private fun VisualAspectRatioSelector(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = NexusTokens.thumbnail,
                     color = if (isSelected) PrimaryNeon.copy(alpha = 0.15f) else SurfaceDark,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
@@ -1576,9 +1476,9 @@ private fun VisualAspectRatioSelector(
                     modifier = Modifier.clickable { onSelect(option) }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space8),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                     ) {
                         Box(
                             modifier = Modifier
@@ -1587,7 +1487,7 @@ private fun VisualAspectRatioSelector(
                                 .border(
                                     1.2.dp,
                                     if (isSelected) PrimaryNeon else TextMuted,
-                                    RoundedCornerShape(2.dp)
+                                    NexusTokens.thumbnail
                                 )
                                 .background(
                                     if (isSelected) PrimaryNeon.copy(alpha = 0.35f) else Color.Transparent
@@ -1628,20 +1528,20 @@ private fun CreativePresetsRow(
 
     Column {
         Text(
-            text = "ESTILOS CREATIVOS",
+            text = "Estilos creativos",
             style = MaterialTheme.typography.labelSmall.copy(
                 color = TextMuted,
                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             ),
-            modifier = Modifier.padding(bottom = 6.dp)
+            modifier = Modifier.padding(bottom = NexusTokens.space4)
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
             items(presets) { preset ->
                 val isApplied = currentPrompt.contains(preset.promptSuffix.take(15), ignoreCase = true)
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = NexusTokens.card,
                     color = if (isApplied) SecondaryVioletLight.copy(alpha = 0.2f) else SurfaceDark,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
@@ -1662,11 +1562,11 @@ private fun CreativePresetsRow(
                     }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
-                        Text(text = preset.icon, fontSize = MaterialTheme.typography.labelMedium.fontSize)
+                        Icon(Icons.Default.AutoAwesome, null, Modifier.size(NexusTokens.space24), tint=if(isApplied) PrimaryNeon else TextSecondary)
                         Text(
                             text = preset.label,
                             style = MaterialTheme.typography.labelSmall.copy(
@@ -1723,13 +1623,13 @@ private fun ModelPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = NexusTokens.space16)
+                .padding(bottom = NexusTokens.space24)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 10.dp),
+                    .padding(bottom = NexusTokens.space8),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1753,15 +1653,15 @@ private fun ModelPickerSheet(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 10.dp),
-                shape = RoundedCornerShape(8.dp),
+                    .padding(bottom = NexusTokens.space8),
+                shape = NexusTokens.thumbnail,
                 color = MaterialTheme.colorScheme.onPrimary,
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 2.dp),
+                        .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -1770,7 +1670,7 @@ private fun ModelPickerSheet(
                         tint = TextMuted,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(NexusTokens.space8))
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -1801,18 +1701,18 @@ private fun ModelPickerSheet(
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .padding(bottom = NexusTokens.space8),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                 ) {
                     item {
                         val isAll = selectedOrg == null
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(NexusTokens.thumbnail)
                                 .background(if (isAll) PrimaryNeon.copy(alpha = 0.15f) else SurfaceVariantDark)
-                                .border(1.dp, if (isAll) PrimaryNeon else BorderSubtle, RoundedCornerShape(8.dp))
+                                .border(1.dp, if (isAll) PrimaryNeon else BorderSubtle, NexusTokens.thumbnail)
                                 .clickable { selectedOrg = null }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
                         ) {
                             Text(
                                 text = "Todos",
@@ -1827,11 +1727,11 @@ private fun ModelPickerSheet(
                         val isSelected = selectedOrg == org
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(NexusTokens.thumbnail)
                                 .background(if (isSelected) PrimaryNeon.copy(alpha = 0.15f) else SurfaceVariantDark)
-                                .border(1.dp, if (isSelected) PrimaryNeon else BorderSubtle, RoundedCornerShape(8.dp))
+                                .border(1.dp, if (isSelected) PrimaryNeon else BorderSubtle, NexusTokens.thumbnail)
                                 .clickable { selectedOrg = if (isSelected) null else org }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
                         ) {
                             Text(
                                 text = org,
@@ -1847,7 +1747,7 @@ private fun ModelPickerSheet(
 
             // Models List
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(NexusTokens.space4),
                 modifier = Modifier.heightIn(max = 420.dp)
             ) {
                 items(filteredModels, key = { it.id }) { model ->
@@ -1857,17 +1757,17 @@ private fun ModelPickerSheet(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(NexusTokens.field)
                             .clickable { onSelectModel(model) },
                         color = if (isSelected) SurfaceVariantDark else SurfaceDark,
                         border = androidx.compose.foundation.BorderStroke(
                             width = 1.dp,
                             color = if (isSelected) PrimaryNeon.copy(alpha = 0.6f) else BorderSubtle
                         ),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = NexusTokens.field
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
+                            modifier = Modifier.padding(NexusTokens.space8),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             BrandLogo(
@@ -1877,7 +1777,7 @@ private fun ModelPickerSheet(
                                 size = 18.dp,
                                 containerSize = 34.dp
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(NexusTokens.space8))
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -1890,14 +1790,14 @@ private fun ModelPickerSheet(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     model.badge?.let { badge ->
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Spacer(modifier = Modifier.width(NexusTokens.space4))
                                         Surface(
-                                            shape = RoundedCornerShape(4.dp),
+                                            shape = NexusTokens.thumbnail,
                                             color = PrimaryNeon.copy(alpha = 0.12f)
                                         ) {
                                             Text(
                                                 text = badge,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                                modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
                                                 style = MaterialTheme.typography.labelSmall.copy(
                                                     color = PrimaryNeon,
                                                     fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1932,11 +1832,11 @@ private fun ModelPickerSheet(
 
 @Composable
 private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit) {
-    Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         model.contractMedia.forEach { field ->
             val selected=media.filter { it.fieldKey==field.key }
             OutlinedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     Text(field.label+(if(field.required) " · obligatorio" else " · opcional"),style=MaterialTheme.typography.titleSmall)
                     selected.forEachIndexed { index,item ->
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -1966,7 +1866,55 @@ private fun MediaFactsLabel(media:AttachedMedia) {
 
 @Composable
 private fun GenerateActionButton(enabled:Boolean,onClick:()->Unit,modifier:Modifier=Modifier) {
-    Button(onClick=onClick,enabled=enabled,modifier=modifier.height(52.dp),shape=RoundedCornerShape(10.dp),
+    Button(onClick=onClick,enabled=enabled,modifier=modifier.heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field,
         colors=ButtonDefaults.buttonColors(containerColor=PrimaryNeon,contentColor=MaterialTheme.colorScheme.onPrimary,
             disabledContainerColor=SurfaceVariantDark,disabledContentColor=TextSecondary)) {Text("Generar",fontWeight=FontWeight.Bold)}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable ColumnScope.()->Unit) {
+    ModalBottomSheet(onDismissRequest=onDismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
+        shape=NexusTokens.sheet,containerColor=MaterialTheme.colorScheme.surface) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.88f).verticalScroll(rememberScrollState())
+            .padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Text(title,style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
+                IconButton(onClick=onDismiss) {Icon(Icons.Default.Close,"Cerrar $title")}
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun CanvasChip(label:String,description:String=label,enabled:Boolean=true,onClick:()->Unit) {
+    OutlinedButton(onClick=onClick,enabled=enabled,shape=NexusTokens.field,
+        modifier=Modifier.heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription=description},
+        contentPadding=PaddingValues(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),
+        colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {
+        Text(label,style=MaterialTheme.typography.labelMedium)
+    }
+}
+
+private fun parameterSummary(state:CreateUiState):String {
+    val values=listOf("duration","resolution","aspect_ratio").mapNotNull { key ->
+        state.parameters[key]?.takeIf {it.isNotBlank()}?.let {if(key=="duration") "$it s" else it}
+    }
+    return values.joinToString(" · ").ifBlank {"Parámetros"}
+}
+
+@Composable
+private fun CanvasMediaThumbnail(media:AttachedMedia,onRemove:()->Unit) {
+    Box(Modifier.size(80.dp).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer)) {
+        if(media.mimeType.startsWith("image/")) AsyncImage(Uri.parse(media.uriString),"Medio adjunto",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+        else Icon(if(media.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Movie,
+            "Medio adjunto",Modifier.align(Alignment.Center),tint=TextSecondary)
+        IconButton(onClick=onRemove,modifier=Modifier.align(Alignment.TopEnd)) {
+            Surface(color=MediaScrim.copy(alpha=.75f),shape=NexusTokens.thumbnail) {
+                Icon(Icons.Default.Close,"Quitar medio adjunto",Modifier.padding(NexusTokens.space4),tint=MediaForeground)
+            }
+        }
+    }
 }

@@ -8,27 +8,27 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Elegir modelo con búsqueda/filtros | Tarjeta abre Modelos; hoja local existente | Fila de modelo → hoja | 1 | Pendiente |
-| Explorar catálogo completo | Tarjeta de modelo | Hoja → Todos los modelos | 2 | Pendiente |
-| Comparar varios modelos y ver lote en curso | Botón bajo modelo | Chip Comparar | 1 | Pendiente |
-| Editar prompt | Campo bajo medios | Campo principal bajo modelo | 1 | Pendiente |
-| Inspiración y presets creativos | Desplegable Inspiración creativa | Chip Inspirar → presets | 2 | Pendiente |
-| Estilos creativos | Parámetros según schema | Hoja Parámetros | 1 | Pendiente |
-| Imagen de entrada / quitar / cambiar a edición | Adaptador de medios | Fila de medios | 1 | Pendiente |
-| Último fotograma / quitar | Adaptador de medios duales | Fila de medios | 1 | Pendiente |
-| Añadir / quitar imágenes de referencia | Adaptador MULTI_IMAGE | Fila de miniaturas y + | 1 | Pendiente |
-| Vídeo / audio de entrada y archivos dinámicos | Selectores del contrato | Fila de medios, conserva slots | 1 | Pendiente |
-| Ver metadatos locales de medios | Etiquetas bajo archivo | Detalles del medio | 1 | Pendiente |
-| Parámetros dinámicos y booleanos | Lista siempre visible | Chip resumen → hoja | 1 | Pendiente |
-| Predeterminado / restaurar / menú por parámetro | Pulsación sobre título del parámetro | Hoja → título o menú | 2 | Pendiente |
-| Relación de aspecto | Control dinámico / selector existente | Hoja Parámetros | 1 | Pendiente |
-| Opciones avanzadas | Más opciones | Hoja Parámetros → sección | 2 | Pendiente |
-| Avisos de compatibilidad | Ver avisos | Hoja Parámetros | 1 | Pendiente |
-| Reintentar opciones | Texto y botón | Aviso con Reintentar | 1 | Pendiente |
-| Diagnóstico local DEBUG / copiar JSON | Icono Terminal | Menú ··· → Diagnóstico | 2 | Pendiente |
-| Mis ajustes: guardar/aplicar/borrar presets | Icono Tune → hoja | Chip Mis ajustes → hoja | 1 | Pendiente |
-| Precio: detalle / reintento | Barra inferior con iconos | Coste tocable → detalle y reintento | 2 | Pendiente |
-| Generar / motivo de bloqueo | Barra inferior | Barra inferior fija | 1 | Pendiente |
+| Elegir modelo con búsqueda/filtros | Tarjeta abre Modelos; hoja local existente | Fila de modelo → hoja | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Explorar catálogo completo | Tarjeta de modelo | Menú ··· → Todos los modelos | 2 | Código y captura 1.3; regresiones de formulario en verde |
+| Comparar varios modelos y ver lote en curso | Botón bajo modelo | Chip Comparar | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Editar prompt | Campo bajo medios | Campo principal bajo modelo | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Inspiración y presets creativos | Desplegable Inspiración creativa | Chip Inspirar → presets | 2 | Código y captura 1.3; regresiones de formulario en verde |
+| Estilos creativos | Presets y parámetros según schema | Inspirar → estilos; parámetros en su hoja | 1–2 | Código y captura; valores de prompt conservados |
+| Imagen de entrada / quitar / cambiar a edición | Adaptador de medios | Medios → selector; quitar en miniatura | 1–2 | Código; editor original y callbacks conservados |
+| Último fotograma / quitar | Adaptador de medios duales | Medios → selector; quitar en miniatura | 1–2 | Código; editor original y callbacks conservados |
+| Añadir / quitar imágenes de referencia | Adaptador MULTI_IMAGE | Miniaturas para quitar; Añadir → editor | 1–2 | CanvasMinimalUiTest: tres referencias conservadas |
+| Vídeo / audio de entrada y archivos dinámicos | Selectores del contrato | Medios → editor del contrato con sus slots | 2 | Código; máscara opcional visible en captura |
+| Ver metadatos locales de medios | Etiquetas bajo archivo | Medios → ficha con metadatos locales | 1 | Código; mismo inspector local |
+| Parámetros dinámicos y booleanos | Lista siempre visible | Chip resumen → hoja | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Predeterminado / restaurar / menú por parámetro | Pulsación sobre título del parámetro | Hoja → restaurar directo o menú | 2 | CanvasMinimalUiTest: restaura 42 desde 99 |
+| Relación de aspecto | Control dinámico / selector existente | Hoja Parámetros | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Opciones avanzadas | Más opciones | Hoja Parámetros, sección visible | 1 | CanvasMinimalUiTest: opción avanzada existe |
+| Avisos de compatibilidad | Ver avisos | Hoja Parámetros | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Reintentar opciones | Texto y botón | Aviso con Reintentar | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Diagnóstico local DEBUG / copiar JSON | Icono Terminal | Menú ··· → Diagnóstico o Copiar diagnóstico | 2 | Código; mismo JSON sanitizado sin prompt ni rutas |
+| Mis ajustes: guardar/aplicar/borrar presets | Icono Tune → hoja | Chip Mis ajustes → hoja | 1 | Código y captura 1.3; regresiones de formulario en verde |
+| Precio: detalle / reintento | Barra inferior con iconos | Coste tocable → detalle y reintento | 2 | Código y captura 1.3; regresiones de formulario en verde |
+| Generar / motivo de bloqueo | Barra inferior | Barra inferior fija | 1 | Captura 1.3; CreationReadiness y envío sin cambios |
 
 ## Historial y costes
 

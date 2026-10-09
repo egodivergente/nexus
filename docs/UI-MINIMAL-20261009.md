@@ -17,7 +17,7 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | 0 | Inventario y capturas antes | ASUS: 105 tests del núcleo y 245 de la app, cero fallos; ambos APK compilados. Emulador: prueba visual, 24 capturas, cero fallos | Completada |
 | 1 | Tokens, tipografía, moneda, InlineNotice | ASUS: 105 tests del núcleo y 252 de la app, cero fallos; APK offline y tests compilados. Emulador: 5 regresiones de referencias y navegación, cero fallos | Completada |
 | 2 | Cabecera, saldo y navegación | ASUS: 105 tests del núcleo y 254 de la app, cero fallos; APK offline y tests compilados. Emulador: hoja de saldo, regresión de navegación y seis capturas 1.3, cero fallos | Completada |
-| 3 | Lienzo | Pendiente | Pendiente |
+| 3 | Lienzo | ASUS: 105 núcleo + 254 app, cero fallos; APK offline. Emulador: CanvasMinimalUiTest y navegación, dos tests; cuatro capturas | Completada |
 | 4 | Historial | Pendiente | Pendiente |
 | 5 | Modelos | Pendiente | Pendiente |
 | 6 | Biblioteca y visor | Pendiente | Pendiente |
@@ -44,6 +44,12 @@ La fase 2 retira AccountBalanceBar de la cabecera externa y conserva su ViewMode
 Compilación final de fase 2: BUILD SUCCESSFUL en 9m 18s; 427 hashes verificados. BalanceSheetUiTest y AgentNavigationTest terminaron con OK (2 tests), en 32,759 s, en el emulador. La consulta de saldo queda bloqueada en el paquete offline y la prueba comprueba que los ids de trabajos no cambian al actualizar. Los estados de hora/último dato conservan el código original de AccountReading y se presentan en la hoja; aún falta su matriz visual con saldos ficticios.
 
 La prueba visual de fase 2 terminó con OK (1 test), en 32,369 s: seis capturas de Lienzo, Historial, Modelos, Biblioteca, Ajustes y Flow a escala 1.3. Se revisaron la cabecera única y el chip; la densidad del contenido sigue pendiente de cada fase específica. El harness aislado no incluye la barra inferior externa; sus insets y su apariencia se revisarán también en MainActivity durante el QA final.
+
+La fase 3 coloca el modelo y el prompt antes de los medios. Los chips abren inspiración, parámetros, comparación y presets personales; la barra fija contiene el precio tocable y Generar. Los editores originales de archivos, slots y contrato pasan a Medios, incluyendo la máscara opcional. El control de restauración está directamente en cada parámetro para mantener dos pulsaciones. Las opciones avanzadas se muestran dentro de la misma hoja. El menú incorpora el catálogo completo y, solo en DEBUG, el diagnóstico y su copia sanitizada.
+
+La estimación, CreationReadiness, los callbacks de edición/adjuntos y el envío siguen usando sus contratos originales. Los errores principales pasan a InlineNotice con diagnóstico plegado. Se retira la consulta de saldo duplicada que aún estaba dentro del composable; la cabecera continúa usando AccountBalanceViewModel, sin cambios en sus reglas o almacenamiento.
+
+ASUS: BUILD SUCCESSFUL en 9m 1s, 428 fuentes verificadas, 105 tests del núcleo y 254 de la app sin fallos ni errores. La nueva prueba detectó que el fixture tenía identificadores distintos del borrador ya restaurado en QA; se corrigió para comparar exactamente el estado restaurado antes y después, sin borrar datos. La compilación del APK de tests terminó en 2m 9s. CanvasMinimalUiTest y AgentNavigationTest: OK (2 tests), 39,920 s. Se verifican restaurar parámetro, acceso a opciones avanzadas/medios/catálogo y conservación de adjuntos e ids de trabajos. UiAuditScreenshotsTest: OK (1 test), 28,812 s; Lienzo y Comparación a escala 1.3, más capturas de parámetros y medios. No se pulsa Generar. Las capturas de esta fase están en la carpeta privada de outputs; la matriz publicable final sigue pendiente.
 
 ## Decisiones
 
