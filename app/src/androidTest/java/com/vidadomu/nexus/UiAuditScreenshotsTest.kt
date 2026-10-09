@@ -119,6 +119,10 @@ class UiAuditScreenshotsTest {
                         else compose.onNodeWithContentDescription("Abrir proyecto").performClick()
                         compose.waitForIdle()
                     }
+                    // UiAutomation captures the presented frame, not Compose's next draw.
+                    // Give the emulator compositor time to present the settled screen.
+                    android.os.SystemClock.sleep(1000)
+                    instrumentation.waitForIdleSync()
                     // Capture the full display, including a dialog/sheet in a separate window.
                     val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
                     File(folder,"${theme.name}-${fontScale}-$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
