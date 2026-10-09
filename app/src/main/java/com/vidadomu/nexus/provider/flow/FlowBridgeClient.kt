@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
@@ -54,7 +55,8 @@ internal class FlowBridgeClient(
     suspend fun submit(
         prompt: String,
         expectedOutput: String,
-        clientRequestId: String
+        clientRequestId: String,
+        referenceIds: List<String> = emptyList()
     ): Result<FlowBridgeJob> {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) return Result.failure(ProviderError("Escribe una instrucción para Flow."))
@@ -74,7 +76,8 @@ internal class FlowBridgeClient(
                 prompt = cleanPrompt,
                 expectedOutput = expectedOutput,
                 clientRequestId = clientRequestId,
-                confirmed = true
+                confirmed = true,
+                referenceIds = referenceIds
             )
         ).toRequestBody(JSON_MEDIA_TYPE)
         return guarded {
@@ -84,6 +87,22 @@ internal class FlowBridgeClient(
             )
         }
     }
+
+    suspend fun uploadReference(file: File, mimeType: String): Result<String> {
+        if (mimeType !in FlowReferences.MIME_TYPES || !file.isFile || file.length() !in 1..FlowReferences.MAX_BYTES)
+            return Result.failure(ProviderError("Adjunta PNG, JPEG o WebP de hasta 16 MB.", httpStatusCode = 400))
+        return guarded {
+            requestJson(authorizedRequest("$BASE_URL/references")
+                .post(file.asRequestBody(mimeType.toMediaType())).build()) { raw ->
+                val id = json.decodeFromString<ReferencePayload>(raw).referenceId
+                require(FlowReferences.ID.matches(id))
+                id
+            }
+        }
+    }
+
+    @Serializable
+    private data class ReferencePayload(@SerialName("reference_id") val referenceId: String)
 
     suspend fun job(jobId: String): Result<FlowBridgeJob> {
         if (!JOB_ID.matches(jobId)) return Result.failure(ProviderError("El identificador del trabajo de Flow no es válido."))
@@ -274,7 +293,7 @@ internal class FlowBridgeClient(
         val errorCode = runCatching {
             json.decodeFromString<ErrorPayload>(raw).error.takeIf { it.isNotBlank() }
         }.getOrNull()
-        val message = when (status) {
+        val message = referenceErrorMessage(errorCode) ?: when (status) {
             400 -> "Flow no aceptó la solicitud. Revisa la instrucción y el tipo de salida."
             401, 403 -> "La vinculación privada con Flow ya no es válida. Vuelve a conectarla en Ajustes."
             404 -> "El trabajo o el proyecto de Flow ya no está disponible."
@@ -289,6 +308,18 @@ internal class FlowBridgeClient(
             httpStatusCode = status,
             errorCode = errorCode ?: "FLOW_HTTP_$status"
         )
+    }
+
+    private fun referenceErrorMessage(code: String?): String? = when (code) {
+        "reference_too_large" -> "La referencia supera 16 MB. Reduce su tamaño y vuelve a adjuntarla."
+        "invalid_reference_type", "invalid_reference_image" -> "Adjunta una imagen PNG, JPEG o WebP válida."
+        "reference_not_found", "reference_integrity_failed", "invalid_reference_ids" -> "La copia privada de una referencia ya no está disponible. Vuelve a adjuntarla."
+        "duplicate_reference" -> "La misma referencia aparece dos veces. Selecciónala una sola vez."
+        "flow_references_not_empty" -> "Hay ingredientes pendientes en el compositor de Flow. Revísalos antes de enviar."
+        "flow_reference_controls_unavailable", "flow_reference_multiple_unavailable" -> "No se pudo usar el selector de ingredientes del proyecto Flow. Revisa el compositor; no se ha generado nada."
+        "flow_reference_upload_failed", "flow_references_unconfirmed" -> "Flow no confirmó todas las referencias. Revisa los ingredientes en el proyecto; no se ha generado solo con texto."
+        "client_request_conflict" -> "Este identificador ya pertenece a otro encargo de Flow. Revisa su historial antes de repetir."
+        else -> null
     }
 
     private fun fallbackMimeType(expectedOutput: String): String =
@@ -333,7 +364,8 @@ internal class FlowBridgeClient(
         val prompt: String,
         @SerialName("expected_output") val expectedOutput: String,
         @SerialName("client_request_id") val clientRequestId: String,
-        val confirmed: Boolean
+        val confirmed: Boolean,
+        @SerialName("reference_ids") val referenceIds: List<String> = emptyList()
     )
 
     @Serializable

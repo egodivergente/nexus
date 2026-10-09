@@ -19,7 +19,7 @@ import okhttp3.OkHttpClient
 import java.io.File
 
 /**
- * Executes text-only work in the already open Google Flow project through the private bridge.
+ * Executes text and image-reference work in the already open Google Flow project through the private bridge.
  * This is deliberately not part of the public model catalog: Flow owns its active model,
  * configuration and cost, and Nexus must not present invented metadata for them.
  */
@@ -39,21 +39,14 @@ class FlowBridgeProvider(
 
     suspend fun bridgeStatus(): Result<FlowBridgeStatus> = bridge.status()
 
-    override suspend fun getModels(): List<NexusModel> = listOf(Modality.IMAGE, Modality.VIDEO).map { modality ->
-        NexusModel(id = "current_project_${modality.name.lowercase()}", displayName = "Google Flow · ${if(modality == Modality.IMAGE) "Imagen" else "Vídeo"} · proyecto activo",
-            providerId = PROVIDER_ID, organization = "Google", modalities = listOf(modality), capabilities = listOf(if(modality == Modality.IMAGE) com.vidadomu.nexus.core.model.ModelCapability.TEXT_TO_IMAGE else com.vidadomu.nexus.core.model.ModelCapability.TEXT_TO_VIDEO), parameters = listOf(com.vidadomu.nexus.core.model.ModelParameter("count", "Resultados solicitados", com.vidadomu.nexus.core.model.ParameterType.INTEGER, "1", minValue = 1f, maxValue = 20f, nativeType = "integer")),
-            description = "Usa el modelo y ajustes del proyecto abierto en Flow. El puente actual recibe texto.",
-            inputMode = com.vidadomu.nexus.core.model.ModelInputMode.TEXT_ONLY)
-    }
+    override suspend fun getModels(): List<NexusModel> = listOf(Modality.IMAGE, Modality.VIDEO).map(FlowReferences::model)
 
     override suspend fun testConnection(apiKey: String): Result<Boolean> =
         bridgeStatus().map { it.isReady }
 
     override suspend fun submitGeneration(request: GenerationRequest): Result<GenerationJob> = withContext(Dispatchers.IO) {
-        if (request.mediaInputs.isNotEmpty()) {
-            return@withContext Result.failure(
-                ProviderError("La creación directa en Flow todavía admite solo texto. Quita los archivos adjuntos para continuar.")
-            )
+        val references = try { FlowReferences.ids(request.mediaInputs) } catch (error: IllegalArgumentException) {
+            return@withContext Result.failure(ProviderError(error.message ?: "Revisa las referencias de Flow.", httpStatusCode = 400))
         }
         if (request.modality !in setOf(Modality.IMAGE, Modality.VIDEO)) {
             return@withContext Result.failure(ProviderError("Flow solo puede recibir una salida de imagen o vídeo desde esta pantalla."))
@@ -72,10 +65,12 @@ class FlowBridgeProvider(
             Result.success(GenerationJob(id = request.id, providerId = id, modelId = request.modelId,
                 modality = request.modality, prompt = request.prompt, negativePrompt = request.negativePrompt,
                 providerJobId = "queue_${request.id}", status = GenerationStatus.QUEUED,
-                parameters = request.parameters + mapOf("__flow_queue_previous" to previous.orEmpty()),
+                parameters = request.parameters + mapOf("__flow_queue_previous" to previous.orEmpty(),
+                    FlowReferences.PARAMETER to references.joinToString(",")),
+                inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
                 technicalDetails = "En cola de Flow; se enviará automáticamente sin una segunda confirmación."))
         }
-        bridge.submit(request.prompt, expectedOutput, request.id).map { remote ->
+        bridge.submit(request.prompt, expectedOutput, request.id, references).map { remote ->
             initialJob(request, remote)
         }
     }
@@ -94,7 +89,16 @@ class FlowBridgeProvider(
             val requestId = "${job.id}_$block"
             val recovered = queue.getString("remote_$requestId", null)
             val remote = if(recovered != null) bridge.job(recovered) else
-                bridge.submit(job.prompt, modalityName(job.modality), requestId)
+                bridge.submit(job.prompt, modalityName(job.modality), requestId, FlowReferences.savedIds(job.parameters))
+            val submissionError = remote.exceptionOrNull() as? ProviderError
+            if (submissionError?.errorCode in setOf("invalid_reference_ids", "invalid_reference_image",
+                "reference_not_found", "reference_integrity_failed", "duplicate_reference",
+                "flow_references_not_empty", "flow_reference_controls_unavailable",
+                "flow_reference_multiple_unavailable", "flow_reference_upload_failed", "flow_references_unconfirmed")) {
+                queue.edit().putString("state_${job.id}", "failed").commit()
+                return@withLock Result.success(job.copy(status = GenerationStatus.FAILED,
+                    completedAt = System.currentTimeMillis(), error = submissionError?.humanReadableMessage))
+            }
             remote.map { submitted ->
                 queue.edit().putString("remote_$requestId", submitted.id).putString("state_${job.id}", if(submitted.state == "failed") "failed" else "active").commit()
                 job.copy(providerJobId = submitted.id, status = statusFor(submitted.state),
@@ -152,13 +156,11 @@ class FlowBridgeProvider(
     /** Flow does not expose a reliable cancellation action through this private bridge. */
     override suspend fun cancelJob(jobId: String): Result<Boolean> = Result.success(false)
 
-    override suspend fun uploadMedia(
-        fileBytes: ByteArray,
-        fileName: String,
-        mimeType: String
-    ): Result<String> = Result.failure(
-        ProviderError("La creación directa en Flow todavía no admite archivos adjuntos desde Nexus.")
-    )
+    override suspend fun uploadFile(file: File, fileName: String, mimeType: String,
+        onProgress: (Long, Long) -> Unit): Result<String> = bridge.uploadReference(file, mimeType)
+
+    override suspend fun uploadMedia(fileBytes: ByteArray, fileName: String, mimeType: String): Result<String> =
+        Result.failure(ProviderError("Usa la copia local del archivo para subir la referencia sin cargarla entera en memoria."))
 
     private suspend fun copyCompletedResult(job: GenerationJob, remote: FlowBridgeJob): Result<GenerationJob> {
         if (remote.expectedOutput != modalityName(job.modality)) {
@@ -253,7 +255,8 @@ class FlowBridgeProvider(
         modality = request.modality,
         prompt = request.prompt,
         negativePrompt = request.negativePrompt,
-        parameters = request.parameters,
+        parameters = request.parameters + (FlowReferences.PARAMETER to FlowReferences.ids(request.mediaInputs).joinToString(",")),
+        inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
         status = statusFor(remote.state),
         progress = progressFor(remote.state, null),
         completedAt = if (remote.state == "failed") System.currentTimeMillis() else null,

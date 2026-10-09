@@ -194,10 +194,20 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
 
     override suspend fun submit(plan: GenerationPlan): SubmitResult {
         if (plan.ref.providerId == "google_flow") {
+            val media = plan.media.map { m ->
+                require(m.role == "reference") { "Flow recibe ingredientes con rol reference; no fotogramas de inicio/final." }
+                val mime = requireNotNull(m.mimeType) { "Falta el tipo de la referencia." }
+                val local = if (Uri.parse(m.uri).scheme == "file") m.uri else AgentMediaStore.persist(app, Uri.parse(m.uri), mime).uri
+                val file = File(requireNotNull(Uri.parse(local).path))
+                val remote = app.flowBridgeProvider.uploadFile(file, file.name, mime).getOrThrow()
+                com.vidadomu.nexus.core.model.MediaInput(type = Modality.IMAGE, uriString = local,
+                    mimeType = mime, fileName = file.name, remoteUrl = remote, slotType = MediaSlotType.REFERENCE_IMAGE)
+            }
             val jobId = "job_${UUID.randomUUID()}"
             val request = com.vidadomu.nexus.core.model.GenerationRequest(id = jobId,
                 providerId = "google_flow", modelId = plan.ref.modelId, modality = Modality.valueOf(plan.modality), prompt = plan.prompt,
-                parameters = plan.params + mapOf(com.vidadomu.nexus.provider.flow.FlowBridgeProvider.EXPECTED_OUTPUT_KEY to plan.modality.lowercase()))
+                parameters = plan.params + mapOf(com.vidadomu.nexus.provider.flow.FlowBridgeProvider.EXPECTED_OUTPUT_KEY to plan.modality.lowercase()),
+                mediaInputs = media)
             val job = app.generationRepository.submitGeneration(request, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt))).getOrThrow()
             if (job.status == GenerationStatus.FAILED) error(job.error ?: "Flow no aceptó el envío.")
             if (job.parameters["__submission_uncertain"] == "true") throw SubmissionUncertain("Envío Flow pendiente de comprobar.", job.id)

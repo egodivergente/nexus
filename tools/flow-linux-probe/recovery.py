@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
+from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES
 
 ROOT = Path.home() / '.local/share/nexus-flow-probe'
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -148,6 +149,7 @@ def persisted_flow_job(job):
         'baseline_downloads': list(job.get('baseline_downloads', [])),
         'new_downloads': list(job.get('new_downloads', [])),
         'error': job.get('error'),
+        'intent_hash': job.get('intent_hash'),
     }
 
 
@@ -320,6 +322,8 @@ async def flow_api_status():
         'prompt_limit': FLOW_PROMPT_LIMIT,
         'expected_outputs': sorted(FLOW_OUTPUTS),
         'cost_source': 'flow_current_project',
+        'reference_images': True,
+        'reference_limit': MAX_IMAGES,
     }
     if current.get('status') != 'connected':
         response['reason'] = 'flow_not_connected'
@@ -398,7 +402,7 @@ def download_control_matches(expected, current_controls):
                for control in current_controls)
 
 
-async def drive_flow_submission(prompt):
+async def drive_flow_submission(prompt, references=None):
     """Fill and click once. Any failure after click start becomes uncertain."""
     async with FLOW_UI_LOCK:
         async def submit(page):
@@ -413,6 +417,7 @@ async def drive_flow_submission(prompt):
             filled = False
             click_started = False
             try:
+                await attach_references(page, references or [])
                 await composer.fill(prompt, timeout=10000)
                 filled = True
                 if not await submit_button.is_enabled():
@@ -421,6 +426,8 @@ async def drive_flow_submission(prompt):
                 await submit_button.click(timeout=10000)
                 await page.wait_for_timeout(250)
                 return [item['signature'] for item in baseline]
+            except ReferenceError as error:
+                raise FlowError(error.code, error.status_code) from error
             except FlowError:
                 if filled and not click_started:
                     with suppress(Exception):
@@ -436,12 +443,16 @@ async def drive_flow_submission(prompt):
         return await with_flow_project_page(submit)
 
 
-async def submit_flow_generation(prompt, expected_output, client_request_id):
+async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None):
     """Reserve an idempotent job before the sole UI click, never storing prompt."""
+    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or []],
+        ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
     async with FLOW_JOB_LOCK:
         existing = next((job for job in FLOW_JOBS.values()
                          if job['client_request_id'] == client_request_id), None)
         if existing:
+            if existing.get('intent_hash') and existing['intent_hash'] != intent_hash:
+                raise FlowError('client_request_conflict', 409)
             return dict(existing), True
         now = time.time()
         job_id = secrets.token_urlsafe(18)
@@ -453,13 +464,18 @@ async def submit_flow_generation(prompt, expected_output, client_request_id):
             'created_at': now,
             'updated_at': now,
             'baseline_downloads': [],
+            'intent_hash': intent_hash,
             'new_downloads': [],
             'error': None,
         }
         FLOW_JOBS[job_id] = job
         save_flow_jobs()
     try:
-        baseline = await drive_flow_submission(prompt)
+        paths = reference_paths(ROOT, reference_ids or [])
+        baseline = await drive_flow_submission(prompt, paths) if paths else await drive_flow_submission(prompt)
+    except ReferenceError as error:
+        await update_flow_job(job_id, state='failed', error=error.code)
+        raise FlowError(error.code, error.status_code) from error
     except FlowClickUncertain:
         return await update_flow_job(job_id, state='uncertain', error='submit_uncertain'), False
     except FlowError as error:
@@ -710,11 +726,24 @@ async def get_flow_status():
 @app.post('/api/flow/jobs')
 async def create_flow_job(request: Request):
     try:
-        prompt, expected_output, client_request_id = validate_flow_submission(await read_limited_json(request))
-        job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id)
+        data = await read_limited_json(request)
+        prompt, expected_output, client_request_id = validate_flow_submission(data)
+        references = data.get('reference_ids', [])
+        reference_paths(ROOT, references)
+        job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references) if references else await submit_flow_generation(prompt, expected_output, client_request_id)
         return JSONResponse(public_flow_job(job, replayed=replayed), status_code=200 if replayed else 201)
+    except ReferenceError as error:
+        return JSONResponse({'error': error.code}, status_code=error.status_code)
     except FlowError as error:
         return flow_error_response(error)
+
+
+@app.post('/api/flow/references')
+async def upload_flow_reference(request: Request):
+    try:
+        return await receive_reference(request, ROOT)
+    except ReferenceError as error:
+        return JSONResponse({'error': error.code}, status_code=error.status_code)
 
 
 @app.get('/api/flow/jobs/{job_id}')
