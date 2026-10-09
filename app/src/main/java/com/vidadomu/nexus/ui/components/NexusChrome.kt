@@ -89,7 +89,7 @@ fun NexusChrome(onSettings: () -> Unit, onNavigateToOutput: (String) -> Unit,
                 }
             }
             BillingLedgerScreen(jobs,cached,app.currencyManager,vm::refresh,
-                {sheet=false;onNavigateToOutput(it)},Modifier.weight(1f))
+                {sheet=false;onNavigateToOutput(it)},Modifier.weight(1f),showBalance=false)
         }
     }
 }

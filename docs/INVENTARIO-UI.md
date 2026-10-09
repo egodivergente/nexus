@@ -34,17 +34,17 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Buscar por prompt/modelo | Campo fijo | Icono Buscar → campo | 1 | Pendiente |
-| Todos / En curso / Completados / Fallidos / Comparativas, contadores | Chips | Chips compactos | 1 | Pendiente |
-| Abrir resultados | Botón Ver | Tocar fila | 1 | Pendiente |
-| Preparar de nuevo | Botón de tarjeta | Menú de fila → Preparar | 2 | Pendiente |
-| Consultar estado/coste | Icono Refresh de tarjeta | Menú de fila → Actualizar | 2 | Pendiente |
-| Diagnóstico: ids/proveedor/modelo/USD/error/traza | Botón Diagnóstico → diálogo | Menú de fila → Diagnóstico | 2 | Pendiente |
-| Lotes y Ver comparativa | Tarjeta de lote | Grupo plegable → Ver comparativa | 2 | Pendiente |
-| Recargar historial fallido | Texto y Reintentar | Aviso con Reintentar | 1 | Pendiente |
-| Costes / saldo / actualizar / recibos por resultado / filtros | Pestaña Costes | Chip saldo → hoja Saldo y gasto | 1 | Pendiente |
-| Abrir resultado desde recibo | Ver en recibo | Hoja saldo → recibo | 2 | Pendiente |
-| Costes como acceso desde Historial | Pestaña | Entrada secundaria Costes | 1 | Pendiente |
+| Buscar por prompt/modelo | Campo fijo | Icono Buscar → campo | 1 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Todos / En curso / Completados / Fallidos / Comparativas, contadores | Chips | Chips compactos | 1 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Abrir resultados | Botón Ver | Tocar fila completada; tarea pendiente abre diagnóstico | 1 | Código; conserva disponibilidad original de resultados |
+| Preparar de nuevo | Botón de tarjeta | Menú de fila → Preparar | 2 | HistoryMinimalUiTest: devuelve la misma tarea sin crear trabajos |
+| Consultar estado/coste | Icono Refresh de tarjeta | Menú de fila → Actualizar | 2 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Diagnóstico: ids/proveedor/modelo/USD/error/traza | Botón Diagnóstico → diálogo | Menú de fila → Diagnóstico | 2 | HistoryMinimalUiTest: diálogo e ID de tarea visibles |
+| Lotes y Ver comparativa | Tarjeta de lote | Grupo plegable → Ver comparativa | 2 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Recargar historial fallido | Texto y Reintentar | Aviso con Reintentar | 1 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Costes / saldo / actualizar / recibos por resultado / filtros | Pestaña Costes | Chip saldo → hoja Saldo y gasto | 1 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Abrir resultado desde recibo | Ver en recibo | Hoja saldo → recibo | 2 | Código y capturas 1.3; consulta y filtros originales conservados |
+| Costes como acceso desde Historial | Pestaña | Chip Saldo y gasto de la cabecera | 1 | BalanceSheetUiTest; ledger accesible desde la hoja |
 
 ## Modelos, familias y opciones
 

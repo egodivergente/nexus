@@ -18,7 +18,7 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | 1 | Tokens, tipografía, moneda, InlineNotice | ASUS: 105 tests del núcleo y 252 de la app, cero fallos; APK offline y tests compilados. Emulador: 5 regresiones de referencias y navegación, cero fallos | Completada |
 | 2 | Cabecera, saldo y navegación | ASUS: 105 tests del núcleo y 254 de la app, cero fallos; APK offline y tests compilados. Emulador: hoja de saldo, regresión de navegación y seis capturas 1.3, cero fallos | Completada |
 | 3 | Lienzo | ASUS: 105 núcleo + 254 app, cero fallos; APK offline. Emulador: CanvasMinimalUiTest y navegación, dos tests; cuatro capturas | Completada |
-| 4 | Historial | Pendiente | Pendiente |
+| 4 | Historial | ASUS: 105 núcleo + 257 app, cero fallos; APK offline. Emulador: dos tests y dos capturas 1.3 | Completada |
 | 5 | Modelos | Pendiente | Pendiente |
 | 6 | Biblioteca y visor | Pendiente | Pendiente |
 | 7 | Asistente y proyecto | Pendiente | Pendiente |
@@ -50,6 +50,12 @@ La fase 3 coloca el modelo y el prompt antes de los medios. Los chips abren insp
 La estimación, CreationReadiness, los callbacks de edición/adjuntos y el envío siguen usando sus contratos originales. Los errores principales pasan a InlineNotice con diagnóstico plegado. Se retira la consulta de saldo duplicada que aún estaba dentro del composable; la cabecera continúa usando AccountBalanceViewModel, sin cambios en sus reglas o almacenamiento.
 
 ASUS: BUILD SUCCESSFUL en 9m 1s, 428 fuentes verificadas, 105 tests del núcleo y 254 de la app sin fallos ni errores. La nueva prueba detectó que el fixture tenía identificadores distintos del borrador ya restaurado en QA; se corrigió para comparar exactamente el estado restaurado antes y después, sin borrar datos. La compilación del APK de tests terminó en 2m 9s. CanvasMinimalUiTest y AgentNavigationTest: OK (2 tests), 39,920 s. Se verifican restaurar parámetro, acceso a opciones avanzadas/medios/catálogo y conservación de adjuntos e ids de trabajos. UiAuditScreenshotsTest: OK (1 test), 28,812 s; Lienzo y Comparación a escala 1.3, más capturas de parámetros y medios. No se pulsa Generar. Las capturas de esta fase están en la carpeta privada de outputs; la matriz publicable final sigue pendiente.
+
+La fase 4 sustituye las tarjetas de tarea por filas con miniatura o estado, resumen, modelo, tipo, hora y coste. Se agrupan por día y crecen con la fuente cuando hace falta; no se fuerza un alto de 72 dp que recorte metadatos. La búsqueda se expande desde la cabecera. Los cinco filtros y sus contadores conservan sus condiciones originales. Preparar, consulta de coste/estado, diagnóstico y comparativa pasan al menú de la fila. Los lotes conservan su diálogo de resultados detrás de un grupo plegable. La fila completada abre el visor; las tareas sin resultados abren el diagnóstico.
+
+BillingLedgerScreen mantiene literalmente sus cálculos de gasto acumulado, coste medio y filtros. La hoja de saldo evita repetir su tarjeta de saldo; la vista independiente sigue permitiendo saldo, actualización y USD de detalle. Los recibos muestran coste confirmado, créditos con el formateador común o Por confirmar cuando falta información. Un fallo por sí solo deja de presentarse como prueba de cargo cero. Se trata de presentación: no cambia ningún importe, asiento ni estado guardado. El progreso de una tarea sigue disponible en el diagnóstico.
+
+ASUS: BUILD SUCCESSFUL en 7m 5s, 431 fuentes verificadas. 105 tests del núcleo y 257 de la app, cero fallos/errores, incluidos tres tests sobre importe desconocido, formato de créditos y estados inciertos. HistoryMinimalUiTest y BalanceSheetUiTest: OK (2 tests), 42,818 s. Verifican búsqueda, preparación y diagnóstico en dos pulsaciones, acceso al saldo y conservación de trabajos. UiAuditScreenshotsTest: OK (1 test), 25,579 s, Historial y Costes a 1.3. La vista aislada de Costes necesita los insets del harness final; en la app se integra dentro de la hoja. Los fixtures actuales no representan aún un catálogo completo ni todos los estados de cobro; se ampliarán en el QA final.
 
 ## Decisiones
 
