@@ -97,31 +97,31 @@ Cada número cuenta las pulsaciones para llegar al control desde su pantalla, si
 
 | Función | Dónde está hoy | Dónde estará | Toques | Comprobación |
 |---|---|---|---:|---|
-| Cambiar proyecto / Sin proyecto / crear proyecto | Chip y menú | Proyecto → hoja completa | 1–2 | Pendiente |
-| Descripción/sinopsis/tono/estilo/reglas/modelos preferidos | AlertDialog Memoria | Proyecto → hoja completa | 1 | Pendiente |
-| Personajes / notas / borrar notas / guardar memoria | AlertDialog Memoria | Proyecto → hoja completa | 1–2 | Pendiente |
-| Importar archivos de proyecto | Botón bajo proyecto | Proyecto → Importar | 2 | Pendiente |
-| Ver/reusar/renombrar referencias | Carrusel desplegable | Proyecto → referencias | 1–2 | Pendiente |
-| Asistente/Copiloto/Agente | Chips | Selector compacto | 1 | Pendiente |
-| Explicación de modo / aviso de planificador local | Texto fijo | Ayuda de modo / aviso plegable | 1 | Pendiente |
-| Nueva conversación | Icono | Menú → Nueva conversación | 2 | Pendiente |
-| Conversaciones guardadas / abrir | Icono → menú | Menú → Conversaciones | 2 | Pendiente |
-| Ajustes LLM: proveedor/modelo/clave/URL/temperatura/tokens/imágenes/exclusiones | Diálogo de ajustes | Menú → ajustes LLM | 2 | Pendiente |
-| Skills: recargar/errores/indexar historial | Diálogo de ajustes | Ajustes LLM | 2 | Pendiente |
-| Mensajes propios / respuestas / contexto de escena/skill disponible | Burbujas | Burbuja propia, respuesta limpia | 0 | Pendiente |
-| Adjuntar/quitar/enviar/detener respuesta y sugerencias de modelo | Barra de entrada | Barra inferior tipo píldora | 1 | Pendiente |
-| Seguir último mensaje | Botón inferior | Botón inferior cuando procede | 1 | Pendiente |
-| Propuestas de organización: aplicar/descartar/resultado | Tarjeta | Tarjeta compacta | 1 | Pendiente |
-| Plan: estado/modelo/coste | Tarjeta compacta y detalle | Resumen del plan | 0 | Pendiente |
-| Plan: prompt editable/aplicar/deshacer/conflicto de edición | Detalles → tarjeta completa | Nivel 2 del plan | 1 | Pendiente |
-| Plan: prompt original | Tarjeta detallada | Detalles → Original | 2 | Pendiente |
-| Plan: justificación/alternativas/medios/parámetros editables/notas | Tarjeta detallada | Detalles plegables | 1–2 | Pendiente |
-| Plan: adjuntar/cambiar referencias | Tarjeta compacta | Acción del plan | 1 | Pendiente |
-| Plan: incluir/quitar del lote | Checkbox | Selector del plan | 1 | Pendiente |
-| Plan: Generar individual / lote seleccionado | Detalles y barra de lote | Generar individual y barra fija de lote | 1 | Pendiente |
-| Protecciones: aplicar/deshacer, asistente ocupado, envío incierto y anti doble pago | Estados habilitados y avisos | Mismas condiciones y avisos | 0 | Pendiente |
-| Abrir en Lienzo / Descartar / Ver resultado | Tarjeta detallada y compacta | Acciones secundarias | 1–2 | Pendiente |
-| Agente: estado/latencia/trabajos/herramientas/diagnóstico | Barra de estado | Estado compacto → detalles | 1 | Pendiente |
+| Cambiar proyecto / Sin proyecto / crear proyecto | Chip y menú | Proyecto → hoja completa | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Descripción/sinopsis/tono/estilo/reglas/modelos preferidos | AlertDialog Memoria | Proyecto → hoja completa | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Personajes / notas / borrar notas / guardar memoria | AlertDialog Memoria | Proyecto → hoja completa | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Importar archivos de proyecto | Botón bajo proyecto | Proyecto → Importar | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Ver/reusar/renombrar referencias | Carrusel desplegable | Proyecto → referencias | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Asistente/Copiloto/Agente | Chips | Selector compacto | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Explicación de modo / aviso de planificador local | Texto fijo | Ayuda de modo / aviso plegable | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Nueva conversación | Icono | Proyecto → Nueva conversación | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Conversaciones guardadas / abrir | Icono → menú | Proyecto → conversaciones | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Ajustes LLM: proveedor/modelo/clave/URL/temperatura/tokens/imágenes/exclusiones | Diálogo de ajustes | Icono Ajustes del asistente → hoja | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Skills: recargar/errores/indexar historial | Diálogo de ajustes | Ajustes LLM | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Mensajes propios / respuestas / contexto de escena/skill disponible | Burbujas | Burbuja propia, respuesta limpia | 0 | Destino y callback revisados; nueve regresiones del Asistente |
+| Adjuntar/quitar/enviar/detener respuesta y sugerencias de modelo | Barra de entrada | Barra inferior tipo píldora | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Seguir último mensaje | Botón inferior | Botón inferior cuando procede | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Propuestas de organización: aplicar/descartar/resultado | Tarjeta | Tarjeta compacta | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: estado/modelo/coste | Tarjeta compacta y detalle | Resumen del plan | 0 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: prompt editable/aplicar/deshacer/conflicto de edición | Detalles → tarjeta completa | Nivel 2 del plan | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: prompt original | Tarjeta detallada | Detalles → Original | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: justificación/alternativas/medios/parámetros editables/notas | Tarjeta detallada | Detalles plegables | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: adjuntar/cambiar referencias | Tarjeta compacta | Acción del plan | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: incluir/quitar del lote | Checkbox | Selector del plan | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Plan: Generar individual / lote seleccionado | Detalles y barra de lote | Generar individual y barra fija de lote | 1 | Destino y callback revisados; nueve regresiones del Asistente |
+| Protecciones: aplicar/deshacer, asistente ocupado, envío incierto y anti doble pago | Estados habilitados y avisos | Mismas condiciones y avisos | 0 | Destino y callback revisados; nueve regresiones del Asistente |
+| Abrir en Lienzo / Descartar / Ver resultado | Tarjeta detallada y compacta | Acciones secundarias | 1–2 | Destino y callback revisados; nueve regresiones del Asistente |
+| Agente: estado/latencia/trabajos/herramientas/diagnóstico | Barra de estado | Ajustes del asistente → estado y métricas | 1 | Destino y callback revisados; nueve regresiones del Asistente |
 
 ## Ajustes y Flow
 

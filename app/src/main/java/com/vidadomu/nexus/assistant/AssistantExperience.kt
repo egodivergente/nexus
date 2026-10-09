@@ -1,5 +1,12 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class,androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.theme.*
+import com.vidadomu.nexus.ui.components.InlineNotice
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -67,16 +74,16 @@ internal fun insertModel(value: TextFieldValue, completion: ModelCompletion, mod
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
-    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxWidth().padding(8.dp)) {
+    Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8)) {
+        Column(Modifier.fillMaxWidth().padding(NexusTokens.space8)) {
             completion?.let { suggestions ->
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     items(suggestions.models, key = { it.ref.toString() }) { model ->
                         AssistChip(onClick = { onInput(insertModel(text, suggestions, model)) }, label = { Text(model.name) })
                     }
                 }
             }
-            if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 items(ui.pendingAttachments, key = { it.id }) { att ->
                     InputChip(selected = true, onClick = { onRemove(att.id) }, label = { Text(att.name ?: "Referencia") },
                         trailingIcon = { Icon(Icons.Default.Close, "Quitar referencia") })
@@ -85,7 +92,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar") }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
-                OutlinedTextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Cuéntame qué quieres crear…") },
+                TextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Cuéntame qué quieres crear…") },
+                    textStyle=MaterialTheme.typography.bodyLarge,shape=NexusTokens.field,colors=TextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surfaceVariant,unfocusedContainerColor=MaterialTheme.colorScheme.surfaceVariant,focusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent,unfocusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent),
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }))
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta") }
@@ -96,43 +104,41 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
 }
 
 @Composable
-internal fun PendingGenerations(ui: AssistantUiState, onGenerate: () -> Unit) {
+internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=false, onGenerate: () -> Unit) {
     val prepared = ui.plans.values.filter { it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
     if(prepared.isEmpty()) return
     val pending = prepared.filter { it.includeInBatch }
+    val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val currencyState by app.currencyManager.state.collectAsState()
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(if(pending.isEmpty()) "Selecciona los encargos" else "${pending.size} de ${prepared.size} seleccionados", style = MaterialTheme.typography.labelLarge)
+                if(blockedByDraft) Text("Aplica o deshaz los cambios antes de generar el lote.",style=MaterialTheme.typography.labelMedium)
                 val estimated = pending.mapNotNull { it.plan.estimate?.amountUsd }
-                Text(if(pending.isEmpty()) "Marca «Incluir en lote» en las tarjetas" else if(estimated.size == pending.size) "≈ %.3f USD".format(estimated.sum()) else "Incluye coste sin estimación",
+                Text(if(pending.isEmpty()) "Marca «Incluir en lote» en las tarjetas" else if(estimated.size == pending.size) remember(estimated,currencyState) {app.currencyManager.formatCost(estimated.sum())} else "Incluye coste sin estimación",
                     style = MaterialTheme.typography.labelSmall)
             }
-            Button(onClick = onGenerate, enabled = pending.isNotEmpty() && !ui.thinking && ui.plans.values.none { it.busy }) { Text("Generar ${minOf(pending.size,20)}") }
+            val enabled=pending.isNotEmpty() && !ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
+            if(pending.size>=2) Button(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar ${minOf(pending.size,20)}")}
+            else FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar ${minOf(pending.size,20)}")}
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
-    var expanded by rememberSaveable(p.plan.id) { mutableStateOf(false) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), onAttach)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(p.plan.modelName, style = MaterialTheme.typography.titleSmall)
-                Text(p.jobStatus ?: if(p.busy) "Enviando…" else p.state.name, style = MaterialTheme.typography.labelSmall)
-            }
-            TextButton(onClick = { expanded = !expanded }) { Text(if(expanded) "Ocultar" else "Detalles") }
-        }
-        p.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(),onAttach)
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(p.includeInBatch, { onToggleBatch() }, enabled = !p.busy && !assistantBusy)
                 Text("Incluir en lote", Modifier.clickable(enabled = !p.busy && !assistantBusy, onClick = onToggleBatch), style = MaterialTheme.typography.bodySmall)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 TextButton(onClick = { picker.launch(arrayOf("image/*")) }, enabled = !p.busy && !assistantBusy) {
                     Icon(Icons.Default.AttachFile, null, Modifier.size(16.dp))
                     Text(if(p.plan.media.isEmpty()) "Adjuntar referencias" else "Cambiar referencias · ${p.plan.media.size}")
@@ -140,46 +146,51 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
                 TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy) { Text("Descartar") }
             }
         }
-        if(p.plan.media.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(p.plan.media) { media ->
-                if(media.mimeType?.startsWith("image/") == true) AsyncImage(media.uri, "Referencia adjunta", Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
-            }
-        }
         if(p.busy || p.jobStatus in listOf("PENDING", "PROCESSING")) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if(outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if(outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(outputs) { uri ->
                 if(p.plan.modality == "IMAGE") AsyncImage(uri, "Resultado generado", Modifier.width(240.dp).aspectRatio(16f/9f)
-                    .clip(RoundedCornerShape(12.dp)).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
+                    .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
                 else OutlinedButton(onClick = onOpenOutput) { Icon(Icons.Default.PlayArrow, null); Text("Abrir vídeo") }
             }
         }
-        if(expanded) details()
+
     }
 }
 
 @Composable
-internal fun AgentModeSelector(mode: AgentMode, onMode: (AgentMode) -> Unit) {
-    LazyRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        items(AgentMode.entries) { value -> FilterChip(selected = value == mode, onClick = { onMode(value) },
-            label = { Text(when(value) { AgentMode.ASSISTANT -> "Asistente"; AgentMode.COPILOT -> "Copiloto"; AgentMode.AGENT -> "Agente" }) }) }
+internal fun AgentModeSelector(mode:AgentMode,onMode:(AgentMode)->Unit) {
+    var help by remember {mutableStateOf(false)}
+    LazyRow(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        items(AgentMode.entries) {value->FilterChip(value==mode,{onMode(value)},label={Text(when(value) {AgentMode.ASSISTANT->"Asistente";AgentMode.COPILOT->"Copiloto";AgentMode.AGENT->"Agente"})},shape=NexusTokens.filter)}
+        item {IconButton(onClick={help=true}) {Icon(Icons.Default.HelpOutline,"Ayuda de los modos")}}
+    }
+    if(help) ModalBottomSheet(onDismissRequest={help=false},shape=NexusTokens.sheet) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().padding(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Text("Modos del asistente",style=MaterialTheme.typography.titleMedium)
+            Text("Asistente conversa sobre tu idea. Copiloto y Agente preparan propuestas según las herramientas disponibles. Revisa el plan y pulsa Generar para enviarlo.",style=MaterialTheme.typography.bodyMedium)
+            TextButton(onClick={help=false}) {Text("Cerrar",color=TextSecondary)}
+        }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel) {
+internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel, expandedByDefault:Boolean=false) {
     if(ui.activeProjectId == null) return
-    var open by remember { mutableStateOf(false) }
+    var open by remember(ui.activeProjectId) {mutableStateOf(expandedByDefault)}
     var renaming by remember { mutableStateOf<Asset?>(null) }
     var name by remember { mutableStateOf("") }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.importProjectFiles(it) }
-    Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         TextButton(onClick = { import.launch(arrayOf("image/*", "video/*")) }, enabled = !ui.attaching) { Icon(Icons.Default.AddPhotoAlternate, null); Text("Importar archivos") }
         TextButton(onClick = { open = !open }) { Text("Referencias · ${ui.projectAssets.size}") }
     }
-    if(open) LazyRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    if(open) LazyRow(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         items(ui.projectAssets, key = { it.id }) { asset ->
             Column(Modifier.width(120.dp)) {
-                AsyncImage(asset.uri, asset.displayName, Modifier.size(112.dp,64.dp).clip(RoundedCornerShape(8.dp))
+                AsyncImage(asset.uri, "Usar referencia ${asset.displayName}", Modifier.size(112.dp,64.dp).clip(NexusTokens.thumbnail)
                     .clickable { vm.reuseAsset(asset.id) }, contentScale = ContentScale.Crop)
                 Text(asset.displayName, maxLines = 1, style = MaterialTheme.typography.labelSmall)
                 TextButton(onClick = { renaming = asset; name = asset.displayName }) { Text("Renombrar") }
@@ -187,23 +198,16 @@ internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel) {
         }
     }
     renaming?.let { asset -> AlertDialog(onDismissRequest = { renaming = null }, title = { Text("Nombre de referencia") },
-        text = { OutlinedTextField(name, { name = it }, singleLine = true) },
+        text = { OutlinedTextField(name, { name = it }, shape=NexusTokens.field, singleLine = true) },
         confirmButton = { TextButton(onClick = { vm.renameReference(asset.id,name); renaming = null }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancelar") } }) }
 }
 
 @Composable
 internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val active = ui.plans.values.count { it.busy || it.jobStatus in listOf("PENDING", "PROCESSING") }
-    Column(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 12.dp, vertical = 4.dp)) {
-        Text("${if(ui.thinking) "Agente trabajando" else "Agente listo"} · $active en curso" +
-            (ui.lastLatencyMs?.let { " · Último turno ${it / 1000.0}s" } ?: ""), style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if(expanded) {
-            com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings)
-            Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills · ${ui.skillErrors.size} errores de skills. La latencia mide el turno completo, incluyendo herramientas.",
-            style = MaterialTheme.typography.bodySmall)
-        }
+    val active=ui.plans.values.count {it.busy || it.jobStatus in listOf("PENDING","PROCESSING")}
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        Text("${if(ui.thinking) "Agente trabajando" else "Agente listo"} · $active en curso"+(ui.lastLatencyMs?.let {" · Último turno ${it/1000.0}s"} ?: ""),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+        Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills · ${ui.skillErrors.size} errores de skills. La latencia incluye herramientas.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
     }
 }
