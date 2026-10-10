@@ -3,6 +3,8 @@ package com.vidadomu.nexus.agent.core.assets
 import java.io.File
 import java.text.Normalizer
 import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -84,6 +86,8 @@ data class Asset(
     val tags: List<String> = emptyList(),
     val generationId: String? = null,
     val parentAssetId: String? = null,
+    /** Removed from library; history and existing references retain the file and asset identity. */
+    val libraryDeleted: Boolean = false,
     val version: Int = 1,
     val createdAt: Long,
 )
@@ -150,12 +154,16 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     private val mutex = Mutex()
     private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
 
+    private val mutableChanges = MutableStateFlow(data)
+    val changes = mutableChanges.asStateFlow()
+
     fun snapshot(): IndexData = data
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
         persist(next)
         data = next
+        mutableChanges.value = next
         result
     }
 
@@ -311,6 +319,12 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         d.copy(assets = d.assets + a) to a
     }
 
+    /** One atomic, project-scoped library removal. Never invalidates historical file references. */
+    suspend fun deleteFromLibrary(projectId: String, ids: Set<String>): Int = edit { d ->
+        val targets = d.assets.filter { it.id in ids && it.projectId == projectId && !it.libraryDeleted }.map { it.id }.toSet()
+        d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = true) else it }) to targets.size
+    }
+
     suspend fun updateAsset(id: String, change: (Asset) -> Asset): Asset = edit { d ->
         val cur = d.assets.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Asset desconocido: $id")
         val next = change(cur).copy(id = cur.id, uri = cur.uri, createdAt = cur.createdAt)
@@ -335,6 +349,7 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         val gens = data.generations.associateBy { it.id }
         val words = q.text?.let { norm(it).split(' ').filter { w -> w.length > 1 } }.orEmpty()
         return data.assets.asSequence()
+            .filter { !it.libraryDeleted }
             .filter { project == null || it.projectId == project.id }
             .filter { q.type == null || it.type == q.type }
             .filter { q.role == null || it.role == q.role }

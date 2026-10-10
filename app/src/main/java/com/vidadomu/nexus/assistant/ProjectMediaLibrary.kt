@@ -4,9 +4,9 @@ import com.vidadomu.nexus.agent.core.assets.Asset
 import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 
-/** Only imported media from this project; generated results remain in Biblioteca. */
+/** Import fields show saved references; management also includes the project's generated images. */
 internal fun projectMediaChoices(
-    assets: List<Asset>, projectId: String?, mimeTypes: List<String>, query: String = "",
+    assets: List<Asset>, projectId: String?, mimeTypes: List<String>, query: String = "", includeGenerated: Boolean = false,
 ): List<Asset> {
     if (projectId == null) return emptyList()
     return assets.asSequence().filter { asset ->
@@ -15,7 +15,7 @@ internal fun projectMediaChoices(
             AssetType.VIDEO -> "video/*"
             else -> "application/octet-stream"
         }
-        asset.projectId == projectId && asset.source != AssetSource.GENERATED &&
+        asset.projectId == projectId && !asset.libraryDeleted && (includeGenerated || asset.source != AssetSource.GENERATED) &&
             mimeTypes.any { allowed -> allowed == "*/*" || allowed == mime ||
                 (allowed.endsWith("/*") && mime.startsWith(allowed.substringBefore('/') + "/")) } &&
             asset.displayName.contains(query.trim(), ignoreCase = true)

@@ -2,6 +2,8 @@ package com.vidadomu.nexus.ui.library
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import android.content.Intent
+import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -42,10 +44,15 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
+    val runtime=remember(app) {AssistantRuntime.get(app)}
+    val index by runtime.assets.changes.collectAsState()
+    val projectLibrary=rememberProjectMediaPicker(managementOnly=true) {}
+    LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
+    val removed=remember(index) {index.assets.filter {it.libraryDeleted}.map {it.uri}.toSet()}
     var query by rememberSaveable {mutableStateOf("")}
     var searchVisible by rememberSaveable {mutableStateOf(false)}
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
-    val completed=remember(jobs,filter,query) {jobs.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
+    val completed=remember(jobs,filter,query,removed) {jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
         .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}}
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
@@ -62,6 +69,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         } catch (_:Exception) {}}) {Icon(Icons.Default.FolderSpecial,"Abrir Alexia",tint=TextSecondary)}
     })}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            OutlinedButton(onClick={projectLibrary.launch(arrayOf("image/*"))},modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin)) {
+                Icon(Icons.Default.PhotoLibrary,null)
+                Spacer(Modifier.width(NexusTokens.space8))
+                Text("Imágenes del proyecto · Gestionar")
+            }
             Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalAlignment=Alignment.CenterVertically) {
                 Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.weight(1f))
                 IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca")}
@@ -86,7 +98,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     entries.forEach {job ->
                         items(job.outputs.size,key={index->"${job.id}:${job.outputs[index].id}:$index"}) {index ->
                             LibraryTile(job,job.outputs[index],conflicts,imageLoader) {
-                                if(onNavigateToResult!=null) onNavigateToResult(job.id,index) else onNavigateToOutput(job.id)
+                                if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(job.outputs[index])) else onNavigateToOutput(job.id)
                             }
                         }
                     }

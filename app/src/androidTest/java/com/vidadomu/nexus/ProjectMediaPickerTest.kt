@@ -59,4 +59,33 @@ class ProjectMediaPickerTest {
         compose.onNodeWithText("Importar desde el dispositivo").performClick()
         compose.runOnIdle { assertTrue(imported) }
     }
+
+    @Test fun managementExportsAllDespiteSearchAndConfirmsDeletionOfSelection() {
+        check(BuildConfig.OFFLINE_QA)
+        val photos = (1..3).map { Asset("$it", "file:///$it.png", AssetType.IMAGE, displayName = "Imagen $it",
+            mimeType = "image/png", projectId = "p", createdAt = it.toLong()) }
+        var exported = emptyList<Asset>()
+        var deleted = emptyList<Asset>()
+        compose.setContent { MaterialTheme {
+            ProjectMediaPickerSheet(photos, "p", "Proyecto QA", listOf("image/*"), 1, false, {}, {}, {},
+                managementOnly = true, onDelete = { deleted = it }, onExport = { exported = it })
+        } }
+        compose.onNodeWithText("Seleccionar todas").performClick()
+        compose.onNodeWithText("ZIP de seleccionadas · 3").performClick()
+        compose.runOnIdle { assertEquals(3, exported.size) }
+        compose.onNodeWithText("Desmarcar todas").performClick()
+        compose.onNodeWithContentDescription("Imagen 1").performClick()
+        compose.onNodeWithText("ZIP de seleccionadas · 1").performClick()
+        compose.runOnIdle { assertEquals(listOf(photos[0]), exported) }
+        compose.onNodeWithText("Buscar guardadas").performTextInput("Imagen 1")
+        compose.onNodeWithText("ZIP de todas las imágenes · 3").performClick()
+        compose.runOnIdle { assertEquals(3, exported.size) }
+        compose.onNodeWithText("Borrar · 1").performClick()
+        compose.runOnIdle { assertTrue(deleted.isEmpty()) }
+        compose.onNodeWithText("Cancelar").performClick()
+        compose.runOnIdle { assertTrue(deleted.isEmpty()) }
+        compose.onNodeWithText("Borrar · 1").performClick()
+        compose.onNodeWithText("Borrar", useUnmergedTree = true).performClick()
+        compose.runOnIdle { assertEquals(listOf(photos[0]), deleted) }
+    }
 }

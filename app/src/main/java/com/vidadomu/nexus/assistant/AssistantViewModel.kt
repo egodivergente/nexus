@@ -121,6 +121,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         _ui.update { it.copy(settings = s, mode = s.mode, skillsCount = runtime.skills.all().size, skillErrors = runtime.skills.errors, projects = runtime.assets.projects(), activeProjectId = savedProject) }
         viewModelScope.launch { runCatching { runtime.assets.startProjectSession(savedProject); runtime.importHistory() }; refreshProjects() }
         restoreChat()
+        viewModelScope.launch { runtime.assets.changes.collect { refreshProjects() } }
         viewModelScope.launch { app.modelCatalogRepository.models.collect { models ->
             _ui.update { it.copy(catalog = (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary)) }
         } }
@@ -258,7 +259,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun selectProject(id: String?) {
         conversation.session.activeProjectId = id
-        _ui.update { it.copy(activeProjectId = id, projectAssets = runtime.assets.snapshot().assets.filter { asset -> asset.projectId == id && id != null }) }
+        _ui.update { it.copy(activeProjectId = id, projectAssets = runtime.assets.snapshot().assets.filter { asset -> asset.projectId == id && id != null && !asset.libraryDeleted }) }
         runtime.settings.setActiveProject(id)
         viewModelScope.launch { runCatching { runtime.assets.startProjectSession(id) } }
     }
@@ -281,7 +282,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun projectCharacters(projectId: String) = runtime.assets.snapshot().characters.filter { it.projectId == projectId }
-    fun projectAssetCount(projectId: String) = runtime.assets.snapshot().assets.count { it.projectId == projectId }
+    fun projectAssetCount(projectId: String) = runtime.assets.snapshot().assets.count { it.projectId == projectId && !it.libraryDeleted }
 
     fun createProject(name: String) {
         val clean = name.trim().take(80)
@@ -293,7 +294,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun refreshProjects() = _ui.update { state -> state.copy(projects = runtime.assets.projects(),
-        projectAssets = runtime.assets.snapshot().assets.filter { it.projectId == state.activeProjectId && state.activeProjectId != null }) }
+        projectAssets = runtime.assets.snapshot().assets.filter { it.projectId == state.activeProjectId && state.activeProjectId != null && !it.libraryDeleted }) }
 
     fun importProjectFiles(uris: List<Uri>) {
         val projectId = _ui.value.activeProjectId ?: return

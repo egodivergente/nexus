@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.agent.core.assets.Asset
+import com.vidadomu.nexus.agent.core.assets.Project
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -41,7 +42,11 @@ private data class MediaPickerRequest(val projectId: String?, val projectName: S
 
 /** Keeps a private copy before returning to the caller, without uploading or generating anything. */
 @Composable
-internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectMediaPicker {
+internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectMediaPicker =
+    rememberProjectMediaPicker(false, onResult)
+
+@Composable
+internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List<Uri>) -> Unit): ProjectMediaPicker {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val runtime = remember(app) { AssistantRuntime.get(app) }
@@ -49,12 +54,21 @@ internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectM
     val deliver by rememberUpdatedState(onResult)
     var request by rememberSaveable { mutableStateOf<MediaPickerRequest?>(null) }
     var visible by rememberSaveable { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var assets by remember { mutableStateOf(runtime.assets.snapshot().assets) }
+    var importing by remember { mutableStateOf(false) }
+    val operationKey = rememberSaveable { java.util.UUID.randomUUID().toString() }
+    val library: ProjectLibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel(key = "project-library-$operationKey")
+    val operation by library.state.collectAsState()
+    val busy = importing || operation.busy
+    val index by runtime.assets.changes.collectAsState()
+    val assets = index.assets
+    LaunchedEffect(operation.message) {
+        operation.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show(); library.clearMessage() }
+    }
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip"), library::export)
     val documents = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         val current = request
         if (current != null && uris.isNotEmpty()) {
-            busy = true
+            importing = true
             scope.launch {
                 try {
                     val selected = mutableListOf<Uri>()
@@ -75,8 +89,7 @@ internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectM
                         if (runtime.settings.activeProjectId() == current.projectId) deliver(selected)
                         else Toast.makeText(context, "Archivos guardados en el proyecto de origen. Ábrelo para seleccionarlos.", Toast.LENGTH_LONG).show()
                     }
-                    assets = runtime.assets.snapshot().assets
-                } finally { busy = false }
+                } finally { importing = false }
             }
         }
     }
@@ -86,6 +99,17 @@ internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectM
             mimeTypes = current.types, maximum = current.maximum, busy = busy,
             onDismiss = { if (!busy) visible = false },
             onImport = { documents.launch(current.types.toTypedArray()) },
+            managementOnly = managementOnly,
+            projects = index.projects.filter { !it.archived },
+            onProjectChange = { project -> request = current.copy(projectId = project.id, projectName = project.name) },
+            progress = operation.progress,
+            onCancel = library::cancel,
+            onDelete = { chosen -> current.projectId?.let { library.delete(it, chosen) } },
+            onExport = { chosen -> current.projectId?.let {
+                library.prepareExport(it, chosen)
+                val name = current.projectName.orEmpty().replace(Regex("[^\\p{L}\\p{N} _-]"), "_").take(60).ifBlank { "proyecto" }
+                export.launch("$name-imagenes.zip")
+            } },
             onUse = { chosen ->
                 visible = false
                 if (runtime.settings.activeProjectId() == current.projectId) deliver(chosen.map { Uri.parse(it.uri) })
@@ -96,7 +120,6 @@ internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectM
         if (!busy) {
             val projectId = runtime.settings.activeProjectId()
             request = MediaPickerRequest(projectId, projectId?.let { runtime.assets.findProject(it)?.name }, types.toList(), maximum.coerceAtLeast(1))
-            assets = runtime.assets.snapshot().assets
             visible = true
         }
     }
@@ -107,32 +130,72 @@ internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectM
 internal fun ProjectMediaPickerSheet(
     assets: List<Asset>, projectId: String?, projectName: String?, mimeTypes: List<String>, maximum: Int,
     busy: Boolean, onDismiss: () -> Unit, onImport: () -> Unit, onUse: (List<Asset>) -> Unit,
+    managementOnly: Boolean = false, progress: String? = null, onCancel: () -> Unit = {},
+    onDelete: (List<Asset>) -> Unit = {}, onExport: (List<Asset>) -> Unit = {},
+    projects: List<Project> = emptyList(), onProjectChange: (Project) -> Unit = {},
 ) {
     var query by remember(projectId) { mutableStateOf("") }
     var selected by remember(projectId) { mutableStateOf(emptyList<String>()) }
-    val all = remember(assets, projectId, mimeTypes) { projectMediaChoices(assets, projectId, mimeTypes) }
+    var managing by remember(projectId, managementOnly) { mutableStateOf(managementOnly) }
+    var confirmDelete by remember(projectId) { mutableStateOf<List<Asset>?>(null) }
+    var projectMenu by remember { mutableStateOf(false) }
+    val all = remember(assets, projectId, mimeTypes, managing) { projectMediaChoices(assets, projectId, if (managing) listOf("image/*") else mimeTypes, includeGenerated = managing) }
+    val chosen = all.filter { it.id in selected }
+    LaunchedEffect(all) { selected = selected.filter { id -> all.any { it.id == id } } }
+    confirmDelete?.let { toDelete ->
+        AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text("¿Borrar ${toDelete.size} de la biblioteca?") },
+            text = { Text("Dejarán de aparecer en la biblioteca. Se conservarán los archivos para no romper las conversaciones ni los trabajos anteriores.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = null; onDelete(toDelete); selected = emptyList() }) { Text("Borrar") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } })
+    }
     val filtered = remember(all, query) { all.filter { it.displayName.contains(query.trim(), ignoreCase = true) } }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(horizontal = NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Importar fotografías y archivos", style = MaterialTheme.typography.titleMedium)
-            Text(projectName?.let { "Guardadas en $it" } ?: "Selecciona un proyecto para conservar aquí tus fotografías.", style = MaterialTheme.typography.bodyMedium)
-            FilledTonalButton(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+            Text(if (managing) "Biblioteca del proyecto" else "Importar fotografías y archivos", style = MaterialTheme.typography.titleMedium)
+            if (managementOnly) Box {
+                TextButton(onClick = { projectMenu = true }, enabled = !busy && projects.isNotEmpty()) {
+                    Text(projectName?.let { "Proyecto: $it ▾" } ?: "Elegir proyecto ▾")
+                }
+                DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
+                    projects.forEach { project -> DropdownMenuItem(text = { Text(project.name) }, onClick = {
+                        projectMenu = false; onProjectChange(project)
+                    }) }
+                }
+            } else Text(projectName?.let { "Guardadas en $it" } ?: "Selecciona un proyecto para conservar aquí tus fotografías.", style = MaterialTheme.typography.bodyMedium)
+            if (!managementOnly) TextButton(onClick = { managing = !managing; selected = emptyList() }, enabled = !busy) {
+                Text(if (managing) "Volver a importar" else "Gestionar biblioteca")
+            }
+            if (!managing) FilledTonalButton(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.AddPhotoAlternate, null)
                 Spacer(Modifier.width(NexusTokens.space8))
                 Text("Importar desde el dispositivo")
             }
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (busy) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                progress?.let { Row(Modifier.fillMaxWidth()) {
+                    Text(it, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onCancel) { Text("Cancelar") }
+                } }
+            }
+            if (managing && all.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { selected = if (chosen.size == all.size) emptyList() else all.map { it.id } }, enabled = !busy) {
+                        Text(if (chosen.size == all.size) "Desmarcar todas" else "Seleccionar todas")
+                    }
+                    TextButton(onClick = { confirmDelete = chosen }, enabled = chosen.isNotEmpty() && !busy) { Text("Borrar · ${chosen.size}") }
+                }
+            }
             OutlinedTextField(query, { query = it }, label = { Text("Buscar guardadas") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             if (filtered.isEmpty()) {
-                Text(if (projectId == null) "Importa un archivo desde el dispositivo." else if (all.isEmpty()) "Las fotografías que importes a este proyecto aparecerán aquí." else "No hay fotografías con ese nombre.", style = MaterialTheme.typography.bodyMedium)
+                Text(if (projectId == null && managing) "Elige un proyecto para gestionar sus imágenes." else if (projectId == null) "Importa un archivo desde el dispositivo." else if (all.isEmpty()) "Este proyecto todavía no tiene imágenes guardadas." else "No hay fotografías con ese nombre.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
             } else LazyVerticalGrid(columns = GridCells.Adaptive(104.dp), modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 items(filtered, key = { it.id }) { asset ->
                     val checked = asset.id in selected
                     Column(Modifier.clip(NexusTokens.field).toggleable(value = checked, role = Role.Checkbox,
-                        enabled = !busy && (checked || maximum == 1 || selected.size < maximum),
-                        onValueChange = { select -> selected = if (!select) selected - asset.id else if (maximum == 1) listOf(asset.id) else selected + asset.id })) {
+                        enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum),
+                        onValueChange = { select -> selected = if (!select) selected - asset.id else if (!managing && maximum == 1) listOf(asset.id) else selected + asset.id })) {
                         AsyncImage(asset.uri, asset.displayName, Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Crop)
                         Row {
                             Checkbox(checked, null)
@@ -141,8 +204,15 @@ internal fun ProjectMediaPickerSheet(
                     }
                 }
             }
-            Button(onClick = { onUse(selected.mapNotNull { id -> all.firstOrNull { it.id == id } }) }, enabled = selected.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
-                Text("Usar seleccionadas · ${selected.size}")
+            if (managing) {
+                Button(onClick = { onExport(chosen) }, enabled = chosen.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("ZIP de seleccionadas · ${chosen.size}")
+                }
+                OutlinedButton(onClick = { onExport(all) }, enabled = all.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("ZIP de todas las imágenes · ${all.size}")
+                }
+            } else Button(onClick = { onUse(chosen) }, enabled = chosen.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
+                Text("Usar seleccionadas · ${chosen.size}")
             }
             Spacer(Modifier.height(NexusTokens.space8))
         }
