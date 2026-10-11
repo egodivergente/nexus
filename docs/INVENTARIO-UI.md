@@ -1,5 +1,7 @@
 # Inventario de interfaz Android
 
+> Inventario histórico del rediseño 1.8.4/vc28: sus capturas y resultados corresponden a esa fuente. La versión Studio 1.8.9/vc33 conserva cuatro destinos y modo Agente; la adaptación y reverificación actuales se registran en [STUDIO-ACCESSIBILITY-20261011.md](STUDIO-ACCESSIBILITY-20261011.md). No se interpretan las comprobaciones de esta tabla como QA de la versión vigente.
+
 Fuente: worktree android-agent-references/NEXUS, base `4c16a1a`, versión 1.8.4-agent, vc28. Rama del rediseño: `codex/ui-minimal-20261009`.
 
 Cada número cuenta las pulsaciones para llegar al control desde su pantalla, sin contar escribir, desplazarse, elegir un archivo en Android ni confirmar una acción. **Pendiente** no significa verificado: la columna de comprobación se completa durante cada fase con evidencia de código y de dispositivo. No se ejecutan generaciones ni operaciones de pago para verificar controles.
