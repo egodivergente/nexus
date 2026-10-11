@@ -1,6 +1,6 @@
 # NEXUS Agent 1.9.0: edición y Whisper en el teléfono
 
-Estado: compilación final, pruebas físicas e instalación de 1.9.0 verificadas. El modelo Whisper está preparado en la app principal. Nexus guarda las credenciales originales del CSV por petición del usuario; la última inspección conserva su selección actual de Opus 4.6 en `us-east-1`. El formulario de primer uso de Anthropic y los acuerdos 5.5 y 4.6 están completados; la consulta nativa anterior confirma acceso autorizado y disponibilidad para Sonnet y Opus 5.5. El usuario sigue comunicando fallo del chat. Se corrige de nuevo el secreto guardado, pero la conversación real continúa pendiente de prueba y no se ha ejecutado inferencia de pago; véase [la corrección final de cuenta](AGENT-CLAUDE-55-20261011.md#corrección-final-de-cuenta-y-requisitos-de-anthropic).
+Estado: compilación final, pruebas físicas e instalación de 1.9.0 verificadas. El modelo Whisper está preparado en la app principal. Nexus guarda las credenciales originales del CSV por petición del usuario y queda con Sonnet 4.6 seleccionado en `us-east-1`: una llamada mínima autorizada desde el proveedor instalado en el S25 responde «OK.» (18 tokens de entrada, 5 de salida). Sonnet 5.5 falla en una llamada real por restricción de cuenta AWS, aunque el formulario y los acuerdos están completados. No se ha probado un turno completo del agente con herramientas ni se ha generado multimedia de pago; véase [la prueba real](AGENT-CLAUDE-55-20261011.md#prueba-de-respuesta-real-y-modelo-operativo).
 
 ## Procedencia y alcance
 
