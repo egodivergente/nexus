@@ -80,7 +80,7 @@ data class AssistantUiState(
     val catalog: List<com.vidadomu.nexus.agent.core.registry.ModelSummary> = emptyList(),
     val projectAssets: List<com.vidadomu.nexus.agent.core.assets.Asset> = emptyList(),
     val settings: AssistantSettings = AssistantSettings(),
-    val mode: AgentMode = AgentMode.COPILOT,
+    val mode: AgentMode = AgentMode.AGENT,
     val projects: List<Project> = emptyList(),
     val activeProjectId: String? = null,
     val pendingAttachments: List<Attachment> = emptyList(),
@@ -224,9 +224,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setMode(mode: AgentMode) {
-        runtime.settings.setMode(mode)
-        conversation.session.mode = mode
-        _ui.update { it.copy(mode = mode) }
+        runtime.settings.setMode(AgentMode.AGENT)
+        conversation.session.mode = AgentMode.AGENT
+        _ui.update { it.copy(mode = AgentMode.AGENT) }
     }
 
     fun resolveModeSwitch(id: String) {

@@ -158,22 +158,6 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
     }
 }
 
-@Composable
-internal fun AgentModeSelector(mode:AgentMode,onMode:(AgentMode)->Unit) {
-    var help by remember {mutableStateOf(false)}
-    LazyRow(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        items(AgentMode.entries) {value->FilterChip(value==mode,{onMode(value)},label={Text(when(value) {AgentMode.ASSISTANT->"Asistente";AgentMode.COPILOT->"Copiloto";AgentMode.AGENT->"Agente"})},shape=NexusTokens.filter)}
-        item {IconButton(onClick={help=true}) {Icon(Icons.Default.HelpOutline,"Ayuda de los modos")}}
-    }
-    if(help) ModalBottomSheet(onDismissRequest={help=false},shape=NexusTokens.sheet) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().padding(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Modos del asistente",style=MaterialTheme.typography.titleMedium)
-            Text("Asistente conversa sobre tu idea. Copiloto y Agente preparan propuestas según las herramientas disponibles. Revisa el plan y pulsa Generar para enviarlo.",style=MaterialTheme.typography.bodyMedium)
-            TextButton(onClick={help=false}) {Text("Cerrar",color=TextSecondary)}
-        }
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

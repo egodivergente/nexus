@@ -23,7 +23,7 @@ fun NexusBottomBar(navController: NavController) {
     val currentRoute=entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
     Surface(color=MaterialTheme.colorScheme.surface) {
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=NexusTokens.space8),
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=0.dp),
             verticalAlignment=Alignment.CenterVertically) {
             Screen.bottomNavItems.forEach { screen ->
                 val selected=currentRoute==screen.route
@@ -37,7 +37,7 @@ fun NexusBottomBar(navController: NavController) {
                             restoreState=screen.route !in setOf(Screen.Models.route,Screen.Assistant.route)
                         }
                     }),horizontalAlignment=Alignment.CenterHorizontally,
-                    verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                    verticalArrangement=Arrangement.spacedBy(0.dp)) {
                     Box(Modifier.width(56.dp).height(32.dp).clip(NexusTokens.filter)
                         .background(if(selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
                         contentAlignment=Alignment.Center) {

@@ -10,7 +10,7 @@ enum class Screen(
     val title: String,
     val icon: ImageVector
 ) {
-    Assistant("assistant", "Asistente", Icons.Default.Assistant),
+    Assistant("assistant", "Agente", Icons.Default.Assistant),
     Create("create", "Lienzo", Icons.Default.AutoAwesome),
     Models("models", "Modelos", Icons.Default.GridView),
     Generations("generations", "Historial", Icons.Default.Timelapse),
@@ -19,6 +19,6 @@ enum class Screen(
     Flow("flow", "Crear en Flow", Icons.Default.AutoAwesome);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = entries.filter { it != Settings && it != Flow }
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Create, Models, Library)
     }
 }

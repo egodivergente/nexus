@@ -109,12 +109,11 @@ fun AssistantScreen(
 
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={
         NexusTopAppBar(title={Column(Modifier.clickable {showProject=true}.semantics {contentDescription="Abrir proyecto"}) {
-            Text(activeProject?.name ?: "Asistente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Text(listOfNotNull(ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
         }},actions={IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
-        Column(Modifier.fillMaxSize().padding(pad).imePadding()) {
-            AgentModeSelector(ui.mode,vm::setMode)
+        Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {

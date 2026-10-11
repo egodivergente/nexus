@@ -67,7 +67,7 @@ data class AssistantSettings(
     fun toConfig() = AgentConfig(
         provider = when { offline -> "offline"; direct -> "bedrock-direct"; else -> "bedrock-proxy" },
         modelId = modelId.ifBlank { "offline" }, region = region,
-        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 40, mode = mode, sendImagesToLlm = sendImages && !offline,
+        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 40, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
     )
 
     companion object {
@@ -111,7 +111,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         region = prefs.getString("region", AssistantSettings.DEFAULT_REGION).orEmpty(),
         temperature = prefs.getString("temperature", null)?.toDoubleOrNull(),
         maxTokens = prefs.getInt("max_tokens", 4096),
-        mode = runCatching { AgentMode.valueOf(prefs.getString("mode", "AGENT")!!) }.getOrDefault(AgentMode.AGENT),
+        mode = AgentMode.AGENT,
         sendImages = prefs.getBoolean("send_images", true),
         maskedToken = masked(TOKEN_ID),
         awsAccessKeyId = runCatching { secure.getProviderApiKey(AWS_ACCESS_ID) }.getOrDefault(""),

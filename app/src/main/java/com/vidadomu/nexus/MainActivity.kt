@@ -14,6 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import kotlin.math.abs
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -59,6 +65,7 @@ class MainActivity : ComponentActivity() {
             NexusTheme {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
+                val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
                 val createViewModel: CreateViewModel = viewModel()
                 // Ligado a la actividad (como el Lienzo): la conversación y el plan pendiente sobreviven a «Atrás» y al cambio de pestaña.
                 val assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel = viewModel()
@@ -127,8 +134,30 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Models.route,
+                        startDestination = Screen.Assistant.route,
                         modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
+                            .pointerInput(activeEntry?.destination?.route, swipeThreshold) {
+                                val index = Screen.bottomNavItems.indexOfFirst { it.route == activeEntry?.destination?.route }
+                                if(index >= 0) {
+                                    var distance = 0f
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { distance = 0f },
+                                        onHorizontalDrag = { _, delta -> distance += delta },
+                                        onDragCancel = { distance = 0f },
+                                        onDragEnd = {
+                                            if(abs(distance) >= swipeThreshold) {
+                                                val target = Screen.bottomNavItems.getOrNull(index + if(distance < 0) 1 else -1)
+                                                target?.let { screen -> navController.navigate(screen.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
+                                                } }
+                                            }
+                                            distance = 0f
+                                        }
+                                    )
+                                }
+                            }
                     ) {
                         composable(Screen.Assistant.route) {
                             com.vidadomu.nexus.assistant.AssistantScreen(
