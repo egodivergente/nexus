@@ -2,12 +2,7 @@ package com.vidadomu.nexus.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /** Shared visual scale. Geometry of icons, borders and media is not spacing. */
 object NexusTokens {
@@ -23,28 +18,14 @@ object NexusTokens {
     val minimumTouch = 48.dp
     val topBarHeight = 48.dp
     val thumbnail = RoundedCornerShape(8.dp)
-    val field = RoundedCornerShape(12.dp)
+    val field = RoundedCornerShape(16.dp)
     val card = RoundedCornerShape(16.dp)
     val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    val prompt = RoundedCornerShape(16.dp)
+    val action = RoundedCornerShape(28.dp)
+    const val pressDuration = 120
+    const val contentDuration = 180
     val filter = RoundedCornerShape(50)
     val shapes = Shapes(extraSmall = thumbnail, small = thumbnail, medium = field,
         large = card, extraLarge = RoundedCornerShape(24.dp))
 }
-
-fun nexusTypography(heading: FontFamily, body: FontFamily): Typography {
-    val title = TextStyle(fontFamily=heading, fontWeight=FontWeight.Medium,
-        fontSize=24.sp, lineHeight=32.sp)
-    val section = TextStyle(fontFamily=heading, fontWeight=FontWeight.Medium,
-        fontSize=17.sp, lineHeight=24.sp)
-    val main = TextStyle(fontFamily=body, fontSize=16.sp, lineHeight=24.sp)
-    val secondary = TextStyle(fontFamily=body, fontSize=14.sp, lineHeight=20.sp)
-    val metadata = TextStyle(fontFamily=body, fontWeight=FontWeight.Medium,
-        fontSize=12.sp, lineHeight=18.sp)
-    return Typography(displayLarge=title, displayMedium=title, displaySmall=title,
-        headlineLarge=title, headlineMedium=title, headlineSmall=title,
-        titleLarge=title, titleMedium=section, titleSmall=section,
-        bodyLarge=main, bodyMedium=secondary, bodySmall=secondary,
-        labelLarge=secondary, labelMedium=metadata, labelSmall=metadata)
-}
-
-fun TextStyle.tabularMoney(): TextStyle = copy(fontFeatureSettings="tnum")

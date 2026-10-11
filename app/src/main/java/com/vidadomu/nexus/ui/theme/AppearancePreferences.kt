@@ -6,8 +6,8 @@ import androidx.compose.ui.platform.LocalContext
 import org.json.JSONArray
 
 enum class NexusAppearance(val label: String, val description: String) {
-    AURORA("Aurora", "Oscuro neutro · turquesa · contraste equilibrado"),
-    OLED("Negro OLED", "Negro puro · turquesa · mínimo brillo"),
+    AURORA("Aurora", "Estudio oscuro · cian suave · capas tonales"),
+    OLED("Negro OLED", "Negro puro · cian suave · mínimo brillo"),
     QUARTZ("Cuarzo negro", "Oscuro cálido · champán · títulos editoriales"),
     OCEAN("Océano", "Azul noche · cian"),
     FOREST("Bosque", "Verde profundo · salvia"),

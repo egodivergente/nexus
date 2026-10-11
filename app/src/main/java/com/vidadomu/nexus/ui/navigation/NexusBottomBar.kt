@@ -1,5 +1,11 @@
 package com.vidadomu.nexus.ui.navigation
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.vidadomu.nexus.ui.components.StudioChrome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
@@ -22,24 +28,29 @@ fun NexusBottomBar(navController: NavController) {
     val entry by navController.currentBackStackEntryAsState()
     val currentRoute=entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
-    Surface(color=MaterialTheme.colorScheme.surface) {
+    val haptic = LocalHapticFeedback.current
+    StudioChrome(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=0.dp),
             verticalAlignment=Alignment.CenterVertically) {
             Screen.bottomNavItems.forEach { screen ->
                 val selected=currentRoute==screen.route
+                val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
                 Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
                     .semantics { contentDescription=screen.title }
                     .selectable(selected=selected,role=Role.Tab,onClick={
-                        if(currentRoute!=screen.route) navController.navigate(screen.route) {
+                        if(currentRoute!=screen.route) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        navController.navigate(screen.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState=true }
                             launchSingleTop=true
                             // Preserve the fix preventing a return to Assistant from reopening Settings.
                             restoreState=screen.route !in setOf(Screen.Models.route,Screen.Assistant.route)
                         }
+                        }
                     }),horizontalAlignment=Alignment.CenterHorizontally,
                     verticalArrangement=Arrangement.spacedBy(0.dp)) {
                     Box(Modifier.width(56.dp).height(32.dp).clip(NexusTokens.filter)
-                        .background(if(selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
+                        .background(tone),
                         contentAlignment=Alignment.Center) {
                         Icon(screen.icon,contentDescription=null,
                             tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,

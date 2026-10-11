@@ -27,31 +27,6 @@ private fun brandFont(resource: Int): FontFamily = FontFamily(
     }
 )
 
-internal fun palette(theme: NexusAppearance): ColorScheme {
-    val light = theme == NexusAppearance.LIGHT
-    val quartz = theme == NexusAppearance.QUARTZ
-    val accent = Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF63DCCB)
-    val bg = Color(if(theme == NexusAppearance.OCEAN) 0xFF0A1420 else if(theme == NexusAppearance.FOREST) 0xFF0D1712 else if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF7F5EF else if (quartz) 0xFF14110F else 0xFF0C0E13)
-    val surface = Color(if(theme == NexusAppearance.OCEAN) 0xFF122437 else if(theme == NexusAppearance.FOREST) 0xFF182A20 else if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF161A22)
-    val variant = Color(if (light) 0xFFEAE9E5 else if (quartz) 0xFF302820 else 0xFF242A35)
-    val ink = Color(if (light) 0xFF191C23 else if (quartz) 0xFFF6EDE0 else 0xFFF0F3F8)
-    val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)
-    val base = if (light) lightColorScheme() else darkColorScheme()
-    return base.copy(primary=accent, onPrimary=if(light) Color.White else bg,
-        primaryContainer=variant, onPrimaryContainer=accent, secondary=accent,
-        onSecondary=if(light) Color.White else bg, secondaryContainer=variant, onSecondaryContainer=ink,
-        tertiary=accent, onTertiary=if(light) Color.White else bg,
-        tertiaryContainer=variant, onTertiaryContainer=ink,
-        inverseSurface=ink, inverseOnSurface=bg, inversePrimary=accent,
-        surfaceDim=bg, surfaceBright=variant, scrim=Color.Black,
-        background=bg, onBackground=ink, surface=surface, onSurface=ink,
-        surfaceVariant=variant, onSurfaceVariant=muted,
-        outline=muted.copy(alpha=.6f), outlineVariant=muted.copy(alpha=.22f),
-        error=Color(if(light) 0xFF9C3E42 else 0xFFE6A5AA), onError=if(light) Color.White else bg,
-        errorContainer=Color(if(light) 0xFFF8E5E5 else 0xFF35262B), onErrorContainer=ink, surfaceTint=accent,
-        surfaceContainerLowest=bg, surfaceContainerLow=surface,
-        surfaceContainer=surface, surfaceContainerHigh=variant, surfaceContainerHighest=variant)
-}
 
 @Composable
 fun NexusTheme(content: @Composable () -> Unit) {

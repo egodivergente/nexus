@@ -1,6 +1,6 @@
 package com.vidadomu.nexus.ui.theme
 
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 // Transparent screen containers expose the theme aura without painting over brand assets.
@@ -28,8 +28,8 @@ val ErrorRed: Color @Composable get() = MaterialTheme.colorScheme.error
 val TextPrimary: Color @Composable get() = MaterialTheme.colorScheme.onSurface
 val TextSecondary: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 val TextMuted: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
-val BorderSubtle: Color @Composable get() = MaterialTheme.colorScheme.outlineVariant
-val BorderHighlight: Color @Composable get() = MaterialTheme.colorScheme.outline
+val BorderSubtle: Color @Composable get() = Color.Transparent
+val BorderHighlight: Color @Composable get() = Color.Transparent
 val BorderActive: Color @Composable get() = MaterialTheme.colorScheme.primary
 val CyanNeon: Color @Composable get() = MaterialTheme.colorScheme.primary
 val NexusBackground: Color @Composable get() = MaterialTheme.colorScheme.background
@@ -42,3 +42,39 @@ val NexusAmber: Color @Composable get() = MaterialTheme.colorScheme.tertiary
 val NexusTextPrimary: Color @Composable get() = MaterialTheme.colorScheme.onSurface
 val NexusTextSecondary: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 val SurfaceHighlight: Color @Composable get() = MaterialTheme.colorScheme.outline
+
+
+/** Studio foundation: elevation is tonal rather than a perimeter stroke. */
+object StudioPalette {
+    val Background = Color(0xFF0A0D12)
+    val Surface = Color(0xFF131922)
+    val Interactive = Color(0xFF1C2533)
+    val Accent = Color(0xFF4EBAE8)
+    val Glass = Color(0xE60A0D12)
+}
+
+internal fun palette(theme: NexusAppearance): ColorScheme {
+    val light = theme == NexusAppearance.LIGHT
+    val quartz = theme == NexusAppearance.QUARTZ
+    val accent = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Accent else Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF4EBAE8)
+    val bg = if(theme == NexusAppearance.AURORA) StudioPalette.Background else Color(if(theme == NexusAppearance.OCEAN) 0xFF0A1420 else if(theme == NexusAppearance.FOREST) 0xFF0D1712 else if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF7F5EF else if (quartz) 0xFF14110F else 0xFF0A0D12)
+    val surface = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Surface else Color(if(theme == NexusAppearance.OCEAN) 0xFF122437 else if(theme == NexusAppearance.FOREST) 0xFF182A20 else if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF131922)
+    val variant = if(!light && !quartz) StudioPalette.Interactive else Color(if (light) 0xFFEAE9E5 else if (quartz) 0xFF302820 else 0xFF1C2533)
+    val ink = Color(if (light) 0xFF191C23 else if (quartz) 0xFFF6EDE0 else 0xFFF0F3F8)
+    val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)
+    val base = if (light) lightColorScheme() else darkColorScheme()
+    return base.copy(primary=accent, onPrimary=if(light) Color.White else bg,
+        primaryContainer=variant, onPrimaryContainer=accent, secondary=accent,
+        onSecondary=if(light) Color.White else bg, secondaryContainer=variant, onSecondaryContainer=ink,
+        tertiary=accent, onTertiary=if(light) Color.White else bg,
+        tertiaryContainer=variant, onTertiaryContainer=ink,
+        inverseSurface=ink, inverseOnSurface=bg, inversePrimary=accent,
+        surfaceDim=bg, surfaceBright=variant, scrim=Color.Black,
+        background=bg, onBackground=ink, surface=surface, onSurface=ink,
+        surfaceVariant=variant, onSurfaceVariant=muted,
+        outline=muted.copy(alpha=.6f), outlineVariant=muted.copy(alpha=.22f),
+        error=Color(if(light) 0xFF9C3E42 else 0xFFE6A5AA), onError=if(light) Color.White else bg,
+        errorContainer=Color(if(light) 0xFFF8E5E5 else 0xFF35262B), onErrorContainer=ink, surfaceTint=accent,
+        surfaceContainerLowest=bg, surfaceContainerLow=surface,
+        surfaceContainer=surface, surfaceContainerHigh=variant, surfaceContainerHighest=variant)
+}

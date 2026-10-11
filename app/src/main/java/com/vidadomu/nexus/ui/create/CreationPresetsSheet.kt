@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.create
 import androidx.compose.foundation.layout.*
+import com.vidadomu.nexus.ui.components.StudioTextField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -18,7 +19,7 @@ import androidx.compose.ui.unit.dp
         LazyColumn(Modifier.fillMaxWidth().imePadding(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item {Text("Mis ajustes",style=MaterialTheme.typography.headlineSmall);Text(model.displayName,style=MaterialTheme.typography.bodyMedium)}
             item {Row {Text("Recordar últimos parámetros",Modifier.weight(1f));Switch(rememberValues,{rememberValues=it;prefs.setRememberParameters(it)})}}
-            item {OutlinedTextField(name,{name=it.take(48)},label={Text("Nombre del preset")},singleLine=true,modifier=Modifier.fillMaxWidth())}
+            item {StudioTextField(name,{name=it.take(48)},label={Text("Nombre del preset")},singleLine=true,modifier=Modifier.fillMaxWidth())}
             item {Button(onClick={prefs.savePreset(model,name,state.parameters);entries=prefs.presets(model);name=""},enabled=name.isNotBlank(),modifier=Modifier.fillMaxWidth()) {Text("Guardar opciones actuales")}}
             items(entries,key={it.name}) {entry -> Row {
                 TextButton(onClick={vm.applyPreset(entry);onDismiss()},modifier=Modifier.weight(1f)) {Text(entry.name)}

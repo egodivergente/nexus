@@ -64,6 +64,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import com.vidadomu.nexus.core.model.ParameterType
+import com.vidadomu.nexus.ui.components.StudioChrome
+import com.vidadomu.nexus.ui.components.StudioTextField
+import com.vidadomu.nexus.ui.components.StudioToolChip
+import com.vidadomu.nexus.ui.components.StudioRemoveMediaButton
 import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.theme.*
 
@@ -96,7 +100,7 @@ private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParam
         var expanded by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
             val label = ParameterPresentation.label(param,value)
-            OutlinedTextField(value = if(value.isBlank()) "Seleccionar" else label.primary, onValueChange = {}, readOnly = true,
+            StudioTextField(value = if(value.isBlank()) "Seleccionar" else label.primary, onValueChange = {}, readOnly = true,
                 supportingText = if(label.secondary == null) null else { { Text(label.secondary.orEmpty()) } },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                 modifier = Modifier.menuAnchor().fillMaxWidth(), shape = NexusTokens.field)
@@ -122,7 +126,7 @@ private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParam
             }
         }
     } else {
-        OutlinedTextField(value, onChange, modifier = Modifier.fillMaxWidth(),
+        StudioTextField(value, onChange, modifier = Modifier.fillMaxWidth(),
             supportingText = { if(param.minValue != null || param.maxValue != null) Text("Rango: " + (param.minValue ?: "—") + " – " + (param.maxValue ?: "—")) },
             shape = NexusTokens.field)
     }
@@ -150,7 +154,7 @@ fun CreateScreen(
     val configuration = LocalConfiguration.current
     val horizontalActions = configuration.screenWidthDp >= 600
     val compactTyping = configuration.screenHeightDp < 500 && WindowInsets.isImeVisible
-    val generateAction = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.submitGeneration(onNavigateToOutput) }
+    val generateAction = { viewModel.submitGeneration(onNavigateToOutput) }
     val canvasScroll = rememberLazyListState()
     LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollToItem(0) }
     val inputVideo = state.attachedMedia.singleOrNull { it.mimeType.startsWith("video/") }
@@ -251,20 +255,17 @@ fun CreateScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            Surface(color=MaterialTheme.colorScheme.surface) {
-                Column(Modifier.fillMaxWidth().padding(horizontal=screenMargin, vertical=NexusTokens.space8),
-                    verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.CenterVertically,
-                        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                        TextButton(onClick={showPriceDetails=true}, modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)) {
-                            Column(Modifier.fillMaxWidth()) {
-                                Text(estimate.amount, style=MaterialTheme.typography.bodyMedium.tabularMoney(), color=TextPrimary)
-                                Text("Coste estimado · Detalles", style=MaterialTheme.typography.labelMedium, color=TextSecondary)
-                            }
-                        }
-                        GenerateActionButton(readiness.canSubmit,generateAction,Modifier.widthIn(min=128.dp))
+            StudioChrome(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal=screenMargin, vertical=8.dp),
+                    verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
+                    StudioGenerateButton(estimate.amount, readiness.canSubmit, busy,
+                        if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
+                        generateAction)
+                    if(!busy) readiness.message?.let {
+                        Text(it, color=TextSecondary, style=MaterialTheme.typography.labelSmall,
+                            modifier=Modifier.padding(horizontal=12.dp))
                     }
-                    readiness.message?.let { Text(it, color=TextSecondary, style=MaterialTheme.typography.labelMedium) }
                 }
             }
         },
@@ -294,31 +295,8 @@ fun CreateScreen(
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             item { CompactModelSelectionCard(state.selectedModel,currencyManager) { showModelPickerSheet=true } }
             item {
-                OutlinedTextField(
-                    value = state.prompt,
-                    onValueChange = { viewModel.updatePrompt(it) },
-                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Prompt de creación" },
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    placeholder = {
-                        Text(
-                            text = if(state.selectedModality == Modality.CHAT) "Escribe tu consulta..." else "Describe lo que quieres cambiar o crear...",
-                            color = TextMuted,
-                            fontSize = MaterialTheme.typography.bodyLarge.fontSize
-                        )
-                    },
-                    minLines = 3,
-                    maxLines = 6,
-                    shape = NexusTokens.field,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceDark,
-                        unfocusedContainerColor = SurfaceDark,
-                        focusedBorderColor = PrimaryNeon.copy(alpha = 0.7f),
-                        unfocusedBorderColor = BorderSubtle,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = PrimaryNeon
-                    )
-                )
+                StudioPromptField(state.prompt, viewModel::updatePrompt,
+                    if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…")
             }
 
             // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
@@ -328,7 +306,7 @@ fun CreateScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = NexusTokens.thumbnail,
                         color = PrimaryNeon.copy(alpha = 0.08f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.4f))
+                        border = null
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
@@ -363,8 +341,8 @@ fun CreateScreen(
                                 CanvasMediaThumbnail(media) { viewModel.removeMedia(media.id) }
                             }
                             item {
-                                OutlinedButton(onClick={showMedia=true}, modifier=Modifier.heightIn(min=NexusTokens.minimumTouch), shape=NexusTokens.field,
-                                    colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {
+                                FilledTonalButton(onClick={showMedia=true}, modifier=Modifier.heightIn(min=NexusTokens.minimumTouch), shape=NexusTokens.field,
+                                    colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {
                                     Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.space24))
                                     Text(if(state.attachedMedia.isEmpty()) "Medios" else "Añadir")
                                 }
@@ -375,15 +353,16 @@ fun CreateScreen(
             }
             item {
                 LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    item { CanvasChip("Inspirar") {showInspiration=true} }
-                    item { CanvasChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true} }
+                    item { StudioToolChip("Inspirar") {showInspiration=true} }
+                    item { StudioToolChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true} }
                     if(state.selectedModality == Modality.IMAGE) item {
-                        CanvasChip(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Comparar",
+                        StudioToolChip(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Varios modelos",
                             enabled=!state.isSubmitting && !state.isPreparingMedia) {
                             viewModel.comparison.open(state);showComparison=true
                         }
                     }
-                    item { CanvasChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true} }
+                    item { StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true} }
+                    item { StudioToolChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true} }
                 }
             }
             if(state.isLoadingSchema) item {
@@ -574,7 +553,7 @@ private fun RequestInspectorSheet(
             Surface(
                 color = SurfaceVariantDark,
                 shape = NexusTokens.thumbnail,
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                border = null,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
@@ -614,7 +593,7 @@ private fun RequestInspectorSheet(
             Surface(
                 color = MaterialTheme.colorScheme.onPrimary,
                 shape = NexusTokens.thumbnail,
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                border = null,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
@@ -703,11 +682,11 @@ private fun CompactModelSelectionCard(
 ) {
     Surface(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription="Elegir modelo"}.clickable(onClick=onClick),
         color=MaterialTheme.colorScheme.surface, shape=NexusTokens.field) {
-        Row(Modifier.padding(vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,
+        Row(Modifier.padding(horizontal=12.dp,vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             BrandLogo(organization=selectedModel?.organization,family=selectedModel?.family,modelId=selectedModel?.id,size=NexusTokens.space32)
             Column(Modifier.weight(1f)) {
-                Text(selectedModel?.displayName ?: "Seleccionar modelo",style=MaterialTheme.typography.titleMedium,color=TextPrimary)
+                Text(selectedModel?.displayName ?: "Seleccionar modelo",style=MaterialTheme.typography.titleMedium,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
                 Text(selectedModel?.let {com.vidadomu.nexus.ui.models.modelUse(it).label} ?: "Elige qué quieres crear",
                     style=MaterialTheme.typography.labelMedium,color=TextSecondary)
             }
@@ -781,7 +760,7 @@ private fun AdaptiveModelMediaInput(
                         .clip(NexusTokens.field)
                         .clickable { onSwitchToEdit() },
                     color = SurfaceDark.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
+                    border = null
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
@@ -920,10 +899,7 @@ private fun AdaptiveModelMediaInput(
                     Surface(
                         shape = NexusTokens.thumbnail,
                         color = if (refImages.isNotEmpty()) AccentEmerald.copy(alpha = 0.15f) else SurfaceVariantDark,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (refImages.isNotEmpty()) AccentEmerald.copy(alpha = 0.5f) else BorderSubtle
-                        )
+                        border = null
                     ) {
                         Text(
                             text = if(maxAllowed==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size} / $maxAllowed imágenes",
@@ -1060,7 +1036,7 @@ private fun SingleMediaSlotCard(
             .clip(NexusTokens.field)
             .clickable { onClick() },
         color = bgColor,
-        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        border = null,
         shape = NexusTokens.field
     ) {
         Row(
@@ -1220,7 +1196,7 @@ private fun DualFrameSlotCard(
             .clip(NexusTokens.field)
             .clickable { onClick() },
         color = SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        border = null,
         shape = NexusTokens.field
     ) {
         if (media != null) {
@@ -1251,26 +1227,7 @@ private fun DualFrameSlotCard(
                         )
                     )
                 }
-                IconButton(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .size(NexusTokens.minimumTouch)
-                        .align(Alignment.TopEnd)
-                        .padding(NexusTokens.space4)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MediaScrim.copy(alpha = 0.7f),
-                        modifier = Modifier.size(22.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Quitar",
-                            tint = MediaForeground,
-                            modifier = Modifier.padding(NexusTokens.space4)
-                        )
-                    }
-                }
+        StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
             }
         } else {
             Column(
@@ -1316,7 +1273,7 @@ private fun ReferenceImageThumbnail(
         modifier = Modifier
             .size(72.dp)
             .clip(NexusTokens.field)
-            .border(1.dp, BorderSubtle, NexusTokens.field)
+
     ) {
         AsyncImage(
             model = Uri.parse(media.uriString),
@@ -1324,26 +1281,7 @@ private fun ReferenceImageThumbnail(
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier
-                .size(NexusTokens.minimumTouch)
-                .align(Alignment.TopEnd)
-                .padding(NexusTokens.space4)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MediaScrim.copy(alpha = 0.75f),
-                modifier = Modifier.size(20.dp)
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Quitar",
-                    tint = MediaForeground,
-                    modifier = Modifier.padding(NexusTokens.space4)
-                )
-            }
-        }
+        StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
     }
 }
 
@@ -1359,10 +1297,7 @@ private fun AddReferenceButton(
             .clip(NexusTokens.field)
             .clickable { onClick() },
         color = SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            TextSecondary.copy(alpha = 0.4f)
-        ),
+        border = null,
         shape = NexusTokens.field
     ) {
         Column(
@@ -1412,11 +1347,7 @@ private fun CompactChipSelector(
                     modifier = Modifier
                         .clip(NexusTokens.thumbnail)
                         .background(if (isSelected) PrimaryNeon.copy(alpha = 0.12f) else SurfaceDark)
-                        .border(
-                            width = 1.dp,
-                            color = if (isSelected) PrimaryNeon else BorderSubtle,
-                            shape = NexusTokens.thumbnail
-                        )
+
                         .clickable { onSelect(option) }
                         .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
                 ) {
@@ -1467,10 +1398,7 @@ private fun VisualAspectRatioSelector(
                 Surface(
                     shape = NexusTokens.thumbnail,
                     color = if (isSelected) PrimaryNeon.copy(alpha = 0.15f) else SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (isSelected) PrimaryNeon else BorderSubtle
-                    ),
+                    border = null,
                     modifier = Modifier.clickable { onSelect(option) }
                 ) {
                     Row(
@@ -1482,11 +1410,7 @@ private fun VisualAspectRatioSelector(
                             modifier = Modifier
                                 .width(boxW)
                                 .height(boxH)
-                                .border(
-                                    1.2.dp,
-                                    if (isSelected) PrimaryNeon else TextMuted,
-                                    NexusTokens.thumbnail
-                                )
+
                                 .background(
                                     if (isSelected) PrimaryNeon.copy(alpha = 0.35f) else Color.Transparent
                                 )
@@ -1541,10 +1465,7 @@ private fun CreativePresetsRow(
                 Surface(
                     shape = NexusTokens.card,
                     color = if (isApplied) SecondaryVioletLight.copy(alpha = 0.2f) else SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (isApplied) SecondaryVioletLight else BorderSubtle
-                    ),
+                    border = null,
                     modifier = Modifier.clickable {
                         val nextPrompt = if (isApplied) {
                             currentPrompt.replace(preset.promptSuffix, "").replace(" , ", " ").trim(' ', ',')
@@ -1654,7 +1575,7 @@ private fun ModelPickerSheet(
                     .padding(bottom = NexusTokens.space8),
                 shape = NexusTokens.thumbnail,
                 color = MaterialTheme.colorScheme.onPrimary,
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
+                border = null
             ) {
                 Row(
                     modifier = Modifier
@@ -1669,19 +1590,13 @@ private fun ModelPickerSheet(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(NexusTokens.space8))
-                    OutlinedTextField(
+                    StudioTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         placeholder = { Text("Buscar modelo...", color = TextMuted, fontSize = MaterialTheme.typography.bodyMedium.fontSize) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            cursorColor = PrimaryNeon
-                        )
+
                     )
                     if (searchQuery.isNotEmpty()) {
                         IconButton(
@@ -1708,7 +1623,7 @@ private fun ModelPickerSheet(
                             modifier = Modifier
                                 .clip(NexusTokens.thumbnail)
                                 .background(if (isAll) PrimaryNeon.copy(alpha = 0.15f) else SurfaceVariantDark)
-                                .border(1.dp, if (isAll) PrimaryNeon else BorderSubtle, NexusTokens.thumbnail)
+
                                 .clickable { selectedOrg = null }
                                 .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
                         ) {
@@ -1727,7 +1642,7 @@ private fun ModelPickerSheet(
                             modifier = Modifier
                                 .clip(NexusTokens.thumbnail)
                                 .background(if (isSelected) PrimaryNeon.copy(alpha = 0.15f) else SurfaceVariantDark)
-                                .border(1.dp, if (isSelected) PrimaryNeon else BorderSubtle, NexusTokens.thumbnail)
+
                                 .clickable { selectedOrg = if (isSelected) null else org }
                                 .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
                         ) {
@@ -1758,10 +1673,7 @@ private fun ModelPickerSheet(
                             .clip(NexusTokens.field)
                             .clickable { onSelectModel(model) },
                         color = if (isSelected) SurfaceVariantDark else SurfaceDark,
-                        border = androidx.compose.foundation.BorderStroke(
-                            width = 1.dp,
-                            color = if (isSelected) PrimaryNeon.copy(alpha = 0.6f) else BorderSubtle
-                        ),
+                        border = null,
                         shape = NexusTokens.field
                     ) {
                         Row(
@@ -1833,7 +1745,7 @@ private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPic
     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         model.contractMedia.forEach { field ->
             val selected=media.filter { it.fieldKey==field.key }
-            OutlinedCard(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     Text(field.label+(if(field.required) " · obligatorio" else " · opcional"),style=MaterialTheme.typography.titleSmall)
                     selected.forEachIndexed { index,item ->
@@ -1842,7 +1754,7 @@ private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPic
                             IconButton(onClick={onRemove(item.id)}) {Icon(Icons.Default.Close,"Quitar ${field.label} ${index+1}")}
                         }
                     }
-                    if(selected.size<field.maximum || field.maximum==1) OutlinedButton(onClick={onPick(field)},modifier=Modifier.heightIn(min=48.dp)) {
+                    if(selected.size<field.maximum || field.maximum==1) FilledTonalButton(onClick={onPick(field)},modifier=Modifier.heightIn(min=48.dp)) {
                         Text(if(selected.isNotEmpty() && field.maximum==1) "Cambiar archivo" else "Añadir archivo")
                     }
                     if(field.maximum>1) Text("${selected.size} de ${field.maximum} archivos",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
@@ -1862,13 +1774,6 @@ private fun MediaFactsLabel(media:AttachedMedia) {
     facts?.let {Text(it,color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
 }
 
-@Composable
-private fun GenerateActionButton(enabled:Boolean,onClick:()->Unit,modifier:Modifier=Modifier) {
-    Button(onClick=onClick,enabled=enabled,modifier=modifier.heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field,
-        colors=ButtonDefaults.buttonColors(containerColor=PrimaryNeon,contentColor=MaterialTheme.colorScheme.onPrimary,
-            disabledContainerColor=SurfaceVariantDark,disabledContentColor=TextSecondary)) {Text("Generar",fontWeight=FontWeight.Bold)}
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable ColumnScope.()->Unit) {
@@ -1886,16 +1791,6 @@ private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable Colu
     }
 }
 
-@Composable
-private fun CanvasChip(label:String,description:String=label,enabled:Boolean=true,onClick:()->Unit) {
-    OutlinedButton(onClick=onClick,enabled=enabled,shape=NexusTokens.field,
-        modifier=Modifier.heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription=description},
-        contentPadding=PaddingValues(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),
-        colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {
-        Text(label,style=MaterialTheme.typography.labelMedium)
-    }
-}
-
 private fun parameterSummary(state:CreateUiState):String {
     val values=listOf("duration","resolution","aspect_ratio").mapNotNull { key ->
         state.parameters[key]?.takeIf {it.isNotBlank()}?.let {if(key=="duration") "$it s" else it}
@@ -1905,14 +1800,10 @@ private fun parameterSummary(state:CreateUiState):String {
 
 @Composable
 private fun CanvasMediaThumbnail(media:AttachedMedia,onRemove:()->Unit) {
-    Box(Modifier.size(80.dp).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer)) {
-        if(media.mimeType.startsWith("image/")) AsyncImage(Uri.parse(media.uriString),"Medio adjunto",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+    Box(Modifier.size(88.dp).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer)) {
+        if(media.mimeType.startsWith("image/")) AsyncImage(Uri.parse(media.uriString),media.fileName ?: "Referencia",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
         else Icon(if(media.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Movie,
             "Medio adjunto",Modifier.align(Alignment.Center),tint=TextSecondary)
-        IconButton(onClick=onRemove,modifier=Modifier.align(Alignment.TopEnd)) {
-            Surface(color=MediaScrim.copy(alpha=.75f),shape=NexusTokens.thumbnail) {
-                Icon(Icons.Default.Close,"Quitar medio adjunto",Modifier.padding(NexusTokens.space4),tint=MediaForeground)
-            }
-        }
+        StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
     }
 }

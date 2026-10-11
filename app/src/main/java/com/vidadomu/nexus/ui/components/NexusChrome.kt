@@ -6,6 +6,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -102,7 +103,8 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
     scrollBehavior: TopAppBarScrollBehavior? = null) {
     val chrome=LocalChrome.current
-    TopAppBar(title=title,modifier=modifier,navigationIcon=navigationIcon,colors=colors,
+    StudioChrome(modifier.fillMaxWidth()) {
+    TopAppBar(title=title,modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
         windowInsets=windowInsets,scrollBehavior=scrollBehavior,expandedHeight=NexusTokens.topBarHeight,
         actions={
             actions()
@@ -113,6 +115,7 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
                 } }
             }
         })
+    }
 }
 
 @Composable
