@@ -54,6 +54,10 @@ APK `com.vidadomu.nexus.agent`, `1.8.9-agent-preview`, versionCode 33; conserva 
 
 SHA-256 de `nexus-studio-accessibility-vc33-review.apk`: `a197d3ccb30e3e9cf302cbef0bc79b5db7edd58cac8c932d1dfd4545a50fd1b0`.
 
+### Instalación posterior autorizada
+
+Tras la petición explícita de instalar, se comprobó que el S25 seguía en vc33 y que el certificado de su APK coincidía. Se conservó una copia privada de la APK previa y se instaló con `adb install -r`, sin desinstalar ni borrar datos. Resultado `Success`; el SHA-256 de la APK instalada coincide con el artefacto de revisión anterior. Se mantiene `1.8.9-agent-preview`/vc33. La actividad principal respondió `Status: ok` y el proceso siguió activo. Esta comprobación de instalación y arranque no sustituye la matriz física ni el QA manual de TalkBack pendientes. Las filas anteriores describen la validación previa a la instalación.
+
 La APK y los logs completos permanecen en los outputs privados del encargo; no se publican claves, firmas, cachés ni datos del usuario. Esta adaptación no certifica el cumplimiento total del antiguo prompt maestro: quedan pendientes la inspección física con TalkBack, un antes/después sobre la misma base y una verificación exhaustiva de todos los elementos del inventario histórico.
 
 ### Capturas de ejemplo después
