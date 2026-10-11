@@ -14,3 +14,9 @@ ASUSVIDAL: 128 pruebas de agent-core superadas en la versión integrada (114 en 
 ## Integración con la versión instalada
 
 La primera APK 1.9.0 (34) compiló correctamente, pero Android rechazó su instalación porque el S25 ya tenía 1.9.2 (36). Se integró la rama `codex/aki-attachments-20261011` (fbae847) conservando Sol/AKI, adjuntos visuales, edición local, Whisper, reparación de CountTokens y mejoras de presentación. La actualización conjunta usa 1.9.3 (37). No se forzó ninguna instalación de versión inferior.
+
+## Instalación final
+
+Compilación AgentPreview en ASUS: BUILD SUCCESSFUL. Fuentes: 509 archivos verificados. APK 1.9.3-agent-preview (37), SHA-256 `b95f88354fff953d8f7cbd805db94c478c22cbd0ce02e4d523741e7310853cd3`, firmada con el certificado existente e instalada con actualización sobre 1.9.2: Success. Inicio en frío: Status ok, 1868 ms. No se desinstaló ni borraron datos.
+
+La comprobación visual posterior coincidió con el uso del teléfono por el usuario (Drive en primer plano). No se operó esa pantalla ni se afirma una prueba manual del gesto del visor. Tampoco se ejecutó una lectura de PDF contra el LLM real ni una generación de pago.
