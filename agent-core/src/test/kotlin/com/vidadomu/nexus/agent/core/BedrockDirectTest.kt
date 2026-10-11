@@ -72,10 +72,48 @@ class BedrockDirectTest {
             url=it.url.toString();body=Buffer().also {b -> it.body!!.writeTo(b)}.readUtf8()
         },now={at})
         assertEquals(123,p.countInputTokens(req))
-        assertTrue(url.endsWith("/count-tokens"))
+        assertEquals("https://bedrock-runtime.us-east-1.amazonaws.com/model/anthropic.claude-sonnet-4-6/count-tokens", url)
         val converse=Json.parseToJsonElement(body).jsonObject["input"]!!.jsonObject["converse"]!!.jsonObject
         assertTrue("messages" in converse)
         assertFalse("inferenceConfig" in converse)
+    }
+
+    @Test fun `conteo resuelve perfiles Anthropic sin modificar otros identificadores`() = runTest {
+        val base = "anthropic.claude-haiku-4-5-20251001-v1:0"
+        val identifiers = listOf(base) + listOf("us", "eu", "apac", "au", "jp", "global").map { "$it.$base" }
+        for (model in identifiers + listOf("custom-profile", "arn:aws:bedrock:us-east-1::foundation-model/$base")) {
+            var path = ""
+            val provider = BedrockDirectProvider("us-east-1", { creds }, client(200, """{"inputTokens":25}""") {
+                path = it.url.encodedPath
+            }, now = { at })
+            assertEquals(25, provider.countInputTokens(req.copy(modelId = model)))
+            val expected = if (model in identifiers) base else model
+            assertEquals("/model/${SigV4.encode(expected)}/count-tokens", path)
+        }
+    }
+
+    @Test fun `agente usa conteo real cuando la reserva por bytes superaria limite diario`() = runTest {
+        val paths = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            val path = chain.request().url.encodedPath
+            paths += path
+            val reply = if (path == "/model/anthropic.claude-sonnet-4-6/count-tokens") {
+                """{"inputTokens":25}"""
+            } else if (path == "/model/us.anthropic.claude-sonnet-4-6/converse") {
+                """{"output":{"message":{"role":"assistant","content":[{"text":"ok"}]}},"stopReason":"end_turn","usage":{"inputTokens":25,"outputTokens":1}}"""
+            } else """{"message":"The provided model doesn't support counting tokens."}"""
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(if (path.contains("/us.") && path.endsWith("/count-tokens")) 400 else 200).message("test")
+                .body(reply.toResponseBody("application/json".toMediaType())).build()
+        }.build()
+        val ledger = com.vidadomu.nexus.agent.core.llm.LlmBudgetLedger(java.nio.file.Files.createTempDirectory("count-budget").resolve("usage.json").toFile())
+        val limits = com.vidadomu.nexus.agent.core.llm.LlmLimits(dailyTokens = 500)
+        ledger.reserve("previous", 0.001, 400, limits)
+        val provider = com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
+            BedrockDirectProvider("us-east-1", { creds }, http, now = { at }), ledger) { limits }
+        assertEquals("ok", provider.complete(req.copy(system = listOf("context ".repeat(500)), turnId = "current")).message.text())
+        assertEquals(listOf("/model/anthropic.claude-sonnet-4-6/count-tokens", "/model/us.anthropic.claude-sonnet-4-6/converse"), paths)
+        assertTrue(ledger.spentToday() > 0.001)
     }
 
     @Test fun `modelo no habilitado se explica`() = runTest {
