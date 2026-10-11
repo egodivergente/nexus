@@ -43,10 +43,10 @@ queda pendiente: una captura de request no demuestra una respuesta del agente.
 El usuario cambió después la elección a GPT-5.6 Sol mediante su acceso existente
 de AKI. Una llamada CLI a `openai.gpt-5.6-sol`, sin variables de credenciales AWS,
 respondió `OK` (2991 tokens de entrada, 5 de salida, ninguna herramienta).
-Esto no demuestra integración con Nexus: `BudgetedLlmProvider.rates` todavía
-rechaza ese identificador por falta de tarifa, y el protocolo del puente AKI
-existente no implementa el intercambio de herramientas de Converse. No se ha
-sustituido el modelo real por un alias Claude ni desactivado el presupuesto.
+Esa llamada aislada no demuestra integración con Nexus. La investigación posterior
+confirmó que `BudgetedLlmProvider.rates` sólo se aplica al backend directo: el proxy
+no necesita una tarifa Claude en Android. La integración y la prueba real del
+puente nuevo se documentan en [AGENT-AKI-SOL.md](AGENT-AKI-SOL.md).
 
 Por petición expresa posterior del usuario, se repitió una única llamada mínima
 Converse por AWS CLI desde el S25, con las credenciales existentes, región
