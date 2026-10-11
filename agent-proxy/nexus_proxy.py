@@ -279,6 +279,20 @@ class NexusProxy:
                 if not raw or len(raw) > int(self.cfg["max_document_bytes"]):
                     raise ProxyError(413, "too_large", "Documento vacio o superior a 4,5 MB.")
                 content.append({"document": {"format": doc["format"], "name": name, "source": {"bytes": raw}}})
+            elif isinstance(block, dict) and "reasoningContent" in block:
+                reasoning = block["reasoningContent"]
+                if m["role"] != "assistant" or not isinstance(reasoning, dict):
+                    raise ProxyError(400, "bad_request", "Contexto de razonamiento no válido.")
+                if set(reasoning) == {"redactedContent"}:
+                    try:
+                        decoded = base64.b64decode(reasoning["redactedContent"], validate=True)
+                    except (ValueError, TypeError):
+                        raise ProxyError(400, "bad_request", "Contexto de razonamiento mal codificado.")
+                    content.append({"reasoningContent": {"redactedContent": decoded}})
+                elif set(reasoning) == {"reasoningText"} and isinstance(reasoning["reasoningText"], dict) and all(isinstance(reasoning["reasoningText"].get(key), str) for key in ("text", "signature")):
+                    content.append(block)
+                else:
+                    raise ProxyError(400, "bad_request", "Contexto de razonamiento incompleto.")
             else:
                 content.append(block)
         if documents and not any(isinstance(b, dict) and isinstance(b.get("text"), str) and b["text"].strip() for b in content):
@@ -333,7 +347,13 @@ class NexusProxy:
         LOG.info("converse model=%s dev=%s in=%d out=%d usd=%s day_usd=%.4f stop=%s tools=%s ms=%d",
                  req["modelId"], who, inp, out, "?" if usd is None else f"{usd:.4f}", day["usd"],
                  resp.get("stopReason"), ",".join(tools) or "-", int((time.monotonic() - started) * 1000))
-        return {"output": resp.get("output"), "stopReason": resp.get("stopReason"), "usage": usage}
+        result = {"output": resp.get("output"), "stopReason": resp.get("stopReason"), "usage": usage}
+        # boto3 returns this blob as bytes; JSON/Android use the original base64 representation.
+        for block in (result.get("output") or {}).get("message", {}).get("content", []):
+            reasoning = block.get("reasoningContent", {})
+            if isinstance(reasoning.get("redactedContent"), bytes):
+                reasoning["redactedContent"] = base64.b64encode(reasoning["redactedContent"]).decode("ascii")
+        return result
 
     @staticmethod
     def _map_aws_error(e: Exception) -> ProxyError:

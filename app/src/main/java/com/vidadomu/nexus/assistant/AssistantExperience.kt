@@ -164,7 +164,7 @@ internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel, exp
     var name by remember { mutableStateOf("") }
     val import = rememberProjectMediaPicker { vm.importProjectFiles(it) }
     FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        TextButton(onClick = { import.launch(arrayOf("image/*", "video/*")) }, enabled = !ui.attaching) { Icon(Icons.Default.AddPhotoAlternate, null); Text("Importar archivos") }
+        TextButton(onClick = { import.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types) }, enabled = !ui.attaching) { Icon(Icons.Default.AddPhotoAlternate, null); Text("Importar archivos") }
         TextButton(onClick = { open = !open }) { Text("Referencias · ${ui.projectAssets.size}") }
     }
     if(open) LazyRow(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {

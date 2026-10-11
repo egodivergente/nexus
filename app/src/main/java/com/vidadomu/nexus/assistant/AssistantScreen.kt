@@ -182,7 +182,7 @@ fun AssistantScreen(
             }
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
-            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*") + AgentDocuments.types, maxSelection = 20) },
+            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
                 onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment)
         }
     }
@@ -532,6 +532,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
                 AgentStatus(ui,{})
                 AgentBudgetSettings()
+                MediaEditingSettings()
                 AgentInternetSettings()
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock",AssistantSettings.BACKEND_PROXY to "Proxy").forEachIndexed { index, (value,label) ->
@@ -558,14 +559,12 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     }
                 }
                 StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, label = { Text("Model ID / inference profile") }, singleLine = true)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    AssistantSettings.KNOWN_MODELS.forEachIndexed { index, (id,name) ->
-                        SegmentedButton(modelId==id,{modelId=id},shape=SegmentedButtonDefaults.itemShape(index,AssistantSettings.KNOWN_MODELS.size),
-                            border=BorderStroke(0.dp,androidx.compose.ui.graphics.Color.Transparent)) {
-                            Text(name.substringBefore(" "),maxLines=1,style=MaterialTheme.typography.labelMedium)
-                        }
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    AssistantSettings.KNOWN_MODELS.forEach { (id,name) ->
+                        FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)})
                     }
                 }
+                if(modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                     StudioTextField(temperature, { temperature = it }, shape=NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))

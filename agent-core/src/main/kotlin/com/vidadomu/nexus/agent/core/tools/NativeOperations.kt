@@ -41,7 +41,7 @@ object NativeOperationTools {
         NativeTool(operations, "update_nexus_settings", ToolCategory.ORGANIZE,
             "Cambia ajustes reales; el modelo se aplica en el siguiente mensaje. No cambia claves ni conexiones.",
             schema {
-                string("agent_model", "Modelo del agente.", enum = listOf("sonnet-4.6", "opus-4.6", "haiku-4.5"))
+                string("agent_model", "Modelo del agente. La disponibilidad depende de la cuenta Bedrock.", enum = listOf("sonnet-5.5", "opus-5.5", "sonnet-4.6", "opus-4.6", "haiku-4.5"))
                 integer("max_tokens", "De 256 a 32000.")
                 boolean("send_images", "Permitir enviar adjuntos visuales al agente.")
                 string("excluded_families", "Familias que no se recomiendan, separadas por comas.")
@@ -60,6 +60,39 @@ object NativeOperationTools {
                 integer("max_dimension", "Lado máximo, 64 a 4096; no amplía.")
                 string("aspect_ratio", "Recorte al centro opcional.", enum = listOf("16:9", "9:16", "1:1", "4:3", "3:4"))
             }),
+        NativeTool(operations,"inspect_media_asset",ToolCategory.READ,
+            "Inspecciona un vídeo/audio indexado local: duración, pistas, codecs y dimensiones reales. Consulta antes de decidir cortes.",
+            schema {string("asset_id","Id de archivo obtenido de search_assets.",required=true)}),
+        NativeTool(operations,"get_whisper_status",ToolCategory.READ,
+            "Consulta si Whisper Base multilingüe está descargado y verificado en este teléfono y el progreso de descarga. No procesa ni sube audio.",schema {}),
+        NativeTool(operations,"prepare_whisper_model",ToolCategory.ORGANIZE,
+            "Descarga el modelo Whisper Base local de 148 MB por HTTPS y verifica su SHA-256. Sólo descarga pesos; no sube audio, no usa API de pago ni borra otros modelos. Úsalo cuando el usuario pida habilitar Whisper local y falte el modelo.",schema {}),
+        NativeTool(operations,"edit_video_assets",ToolCategory.ORGANIZE,
+            "Edita medios locales sin coste de proveedor: recorta, une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Conserva originales. Devuelve edit_job_id: consulta get_media_edit_job hasta finalizar, sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
+            schema {
+                string("action","Operación.",required=true,enum=listOf("trim","concat","remove_audio","replace_audio","mix_audio","extract_audio"))
+                stringArray("asset_ids","Ids indexados, de 1 a 12; concat conserva este orden.",required=true)
+                integer("start_ms","Inicio del recorte en milisegundos.")
+                integer("end_ms","Final del recorte en milisegundos, obligatorio para trim.")
+                string("audio_asset_id","Pista adicional para replace_audio o mix_audio.")
+            }),
+        NativeTool(operations,"extract_video_frames",ToolCategory.ORGANIZE,
+            "Extrae de 1 a 12 fotogramas JPEG a los tiempos solicitados, sin alterar el vídeo. Indexa los resultados. Devuelve edit_job_id para consultar su estado.",
+            schema {
+                string("asset_id","Id del vídeo local.",required=true)
+                integerArray("timestamps_ms","Tiempos exactos solicitados en milisegundos.",required=true)
+                integer("max_dimension","Tamaño máximo de fotograma: 320 a 3840; defecto 1920.")
+            }),
+        NativeTool(operations,"transcribe_media_asset",ToolCategory.ORGANIZE,
+            "Transcribe hasta 15 minutos de un vídeo/audio local con Whisper EN ESTE TELÉFONO y el modelo descargado. No sube audio ni usa una API de pago. Produce TXT y SRT indexados; devuelve edit_job_id para consultar estado. Si falta el modelo, indica Ajustes del agente → Edición y Whisper. No inventes una transcripción si falla.",
+            schema {
+                string("asset_id","Id del audio/vídeo local.",required=true)
+                integer("start_ms","Inicio opcional en milisegundos.")
+                integer("end_ms","Final opcional en milisegundos.")
+            }),
+        NativeTool(operations,"get_media_edit_job",ToolCategory.READ,
+            "Consulta estado, progreso y archivos resultantes de UN encargo local de edición o transcripción. No crea ni repite la edición.",
+            schema {string("edit_job_id","Id devuelto por la herramienta de edición.",required=true);integer("wait_seconds","Espera hasta 20 segundos por un resultado; defecto 5. Usa 20 para evitar consultas inmediatas repetidas.")}),
         NativeTool(operations, "atlas_get_balance", ToolCategory.READ,
             "Consulta saldo disponible, efectivo, bono y fondos retenidos en la API oficial de Atlas. No genera ni estima un saldo local.",
             schema {}),

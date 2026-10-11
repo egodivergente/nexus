@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.*
 import androidx.compose.ui.graphics.graphicsLayer
 import android.content.Intent
 import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.assistant.LocalMediaEditsSheet
 import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,6 +65,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val snackbar=remember {SnackbarHostState()}
     val haptic=LocalHapticFeedback.current
     val runtime=remember(app) {AssistantRuntime.get(app)}
+    var showLocalEdits by rememberSaveable {mutableStateOf(false)}
+    if(showLocalEdits) LocalMediaEditsSheet {showLocalEdits=false}
     val index by runtime.assets.changes.collectAsState()
     val projectLibrary=rememberProjectMediaPicker(managementOnly=true) {}
     LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
@@ -98,6 +101,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             },onError={message -> scope.launch {snackbar.showSnackbar(message)}})
     }
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
+        IconButton(onClick={showLocalEdits=true}) {Icon(Icons.Default.Movie,"Ediciones locales",tint=TextSecondary)}
         IconButton(onClick={try {
             val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
                 component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")

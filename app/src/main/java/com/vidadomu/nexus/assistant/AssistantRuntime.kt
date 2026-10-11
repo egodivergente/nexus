@@ -76,8 +76,10 @@ data class AssistantSettings(
         const val DEFAULT_MODEL = "us.anthropic.claude-sonnet-4-6"
         const val DEFAULT_REGION = "us-east-1"
         const val DEFAULT_EXCLUDED = "veo"
-        /** Modelos que respondieron en la cuenta del usuario el 02-10 (los 5.x y Opus 4.7/4.8 dan AccessDenied). */
+        /** Official Bedrock profiles; account availability is separate from catalog support. */
         val KNOWN_MODELS = listOf(
+            "us.anthropic.claude-sonnet-5-5" to "Sonnet 5.5",
+            "us.anthropic.claude-opus-5-5" to "Opus 5.5",
             "us.anthropic.claude-sonnet-4-6" to "Sonnet 4.6",
             "us.anthropic.claude-opus-4-6-v1" to "Opus 4.6",
             "us.anthropic.claude-haiku-4-5-20251001-v1:0" to "Haiku 4.5",
