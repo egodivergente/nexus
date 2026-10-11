@@ -10,13 +10,16 @@ plugins {
 android {
     namespace = "com.vidadomu.nexus"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.vidadomu.nexus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "1.8.9-agent"
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
+        versionCode = 34
+        versionName = "1.9.0-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -39,7 +42,7 @@ android {
         create("offlineQa") {
             initWith(getByName("debug"))
             // UI audit runs in its own sandbox, preserving earlier QA installations.
-            applicationIdSuffix = if (project.hasProperty("nexusUiQa")) ".uiqa" else ".qa"
+            applicationIdSuffix = when {project.hasProperty("nexusMediaQa") -> ".mediaqa";project.hasProperty("nexusUiQa") -> ".uiqa";else -> ".qa"}
             isDebuggable = true
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "OFFLINE_QA", "true")
@@ -79,6 +82,7 @@ android {
         compose = true
         buildConfig = true
     }
+    externalNativeBuild {cmake {path = file("src/main/cpp/CMakeLists.txt");version = "3.22.1"}}
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -128,6 +132,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+    implementation("androidx.media3:media3-transformer:1.4.1")
 
     // Security Crypto for Keystore backed storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")

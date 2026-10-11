@@ -12,6 +12,10 @@ enum class Role { USER, ASSISTANT }
 
 sealed interface ContentBlock {
     data class Text(val text: String) : ContentBlock
+    /** Opaque, signed provider context. Never display or log its contents. */
+    class Reasoning(val content: JsonObject) : ContentBlock {
+        override fun toString() = "Reasoning([private provider context])"
+    }
     class Document(val format: String, val name: String, val bytes: ByteArray) : ContentBlock {
         override fun toString() = "Document($format, ${bytes.size} bytes)"
     }

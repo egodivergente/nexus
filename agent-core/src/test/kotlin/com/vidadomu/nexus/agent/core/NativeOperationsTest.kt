@@ -14,6 +14,18 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 
 class NativeOperationsTest {
+    @Test fun localEditingIsAnOrganizeCapabilityAndDoesNotSubmitPaidGenerations() = runTest {
+        val calls=mutableListOf<String>()
+        val tools=NativeOperationTools.all(NativeOperations {name,_,_ ->calls+=name;buildJsonObject {put("edit_job_id","local");put("provider_charge",false)}})
+        val edit=tools.single {it.name=="edit_video_assets"}
+        assertEquals(ToolCategory.ORGANIZE,edit.category)
+        assertEquals(ToolCategory.READ,tools.single {it.name=="get_media_edit_job"}.category)
+        val schema=tools.single {it.name=="extract_video_frames"}.inputSchema["properties"]!!.jsonObject["timestamps_ms"]!!.jsonObject
+        assertEquals("integer",schema["items"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        edit.run(Json.parseToJsonElement("""{"action":"remove_audio","asset_ids":["video"]}""").jsonObject,AgentSession("local",AgentMode.AGENT))
+        assertEquals(listOf("edit_video_assets"),calls)
+        assertTrue(tools.single {it.name=="transcribe_media_asset"}.description.contains("EN ESTE TELÉFONO"))
+    }
     @Test fun agentRepairsDirectlyAndCopilotProposesOnce() = runTest {
         for (mode in listOf(AgentMode.AGENT, AgentMode.COPILOT)) {
             val h = Harness()

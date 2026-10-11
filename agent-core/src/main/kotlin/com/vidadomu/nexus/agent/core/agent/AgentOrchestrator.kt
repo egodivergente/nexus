@@ -39,6 +39,7 @@ fun interface AttachmentDocumentLoader {
 
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
 class AgentConversation(val session: AgentSession) {
+    internal var reasoningModelId: String? = null
     internal val messages = mutableListOf<LlmMessage>()
     internal val mutex = Mutex()
     fun history(): List<LlmMessage> = messages.toList()
@@ -102,6 +103,10 @@ class AgentOrchestrator(
         newAttachments: List<Attachment> = emptyList(),
         onEvent: (UiEvent) -> Unit = {},
     ): TurnResult = conv.mutex.withLock { kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(AssetIndex.newId("turn"))) {
+        if (conv.reasoningModelId != null && conv.reasoningModelId != config.modelId)
+            throw LlmException(LlmException.Kind.BAD_REQUEST, "Has cambiado el modelo. Abre una nueva conversación para usarlo; este chat se conserva.")
+        if (conv.reasoningModelId != null && conv.messages.size > MAX_MESSAGES)
+            throw LlmException(LlmException.Kind.BAD_REQUEST, "Este chat ha alcanzado su límite de contexto. Abre una nueva conversación; el proyecto y sus archivos se conservan.")
         val session = conv.session
         session.flowSubmittedResults = 0
         val start = conv.messages.size
@@ -116,7 +121,7 @@ class AgentOrchestrator(
             }
         }
         documents?.let { loader ->
-            val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") }
+            val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") && !it.mimeType.startsWith("audio/") }
             require(docs.size <= 5) { "Bedrock admite hasta 5 documentos por mensaje. Envía los demás en el siguiente." }
             for (attachment in docs) loader.load(attachment)?.let { blocks += it }
         }
@@ -157,8 +162,11 @@ class AgentOrchestrator(
             input += response.usage.inputTokens; output += response.usage.outputTokens
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
             conv.messages += msg
+            if (msg.content.any { it is ContentBlock.Reasoning }) conv.reasoningModelId = config.modelId
             msg.text().takeIf { it.isNotBlank() }?.let { turnTexts += it }
             if (readingDocuments) {
+                // Do not replace a document that belongs to signed reasoning context.
+                if (conv.reasoningModelId != null) { stop = response.stopReason.name; break }
                 conv.messages.indices.forEach { i ->
                     conv.messages[i] = conv.messages[i].copy(content = conv.messages[i].content.map {
                         if(it is ContentBlock.Document) ContentBlock.Text("[Documento ${it.name}: lectura resumida en el siguiente mensaje; el original sigue en referencias.]") else it
@@ -257,6 +265,12 @@ class AgentOrchestrator(
 
     private fun trimHistory(conv: AgentConversation) {
         val m = conv.messages
+        // Signed reasoning is tied to the exact conversation. Do not rewrite preceding
+        // images, documents or tool results. A new chat handles the bounded context limit.
+        if (m.any { message -> message.content.any { it is ContentBlock.Reasoning } }) {
+            conv.reasoningModelId = config.modelId
+            return
+        }
         // Imágenes solo en los dos últimos mensajes de usuario: ahorra tokens sin perder el contexto textual.
         val userIdx = m.indices.filter { m[it].role == Role.USER }
         userIdx.dropLast(2).forEach { i ->

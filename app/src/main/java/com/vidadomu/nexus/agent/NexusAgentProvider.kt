@@ -43,6 +43,16 @@ class NexusAgentProvider:ContentProvider() {
     private suspend fun execute(method:String,input:JsonObject):JsonObject {
         val app=context!!.applicationContext as NexusApplication
         app.ready.await() // arranque en frío: no tocar los lateinit antes de Application.onCreate
+        if(method=="agent_model_availability") {
+            require(input.keys==setOf("modelId")) {"La consulta solo admite modelId."}
+            return com.vidadomu.nexus.assistant.agentModelAvailability(app,input["modelId"]!!.jsonPrimitive.content)
+        }
+        if(method in setOf("local_whisper_prepare","local_whisper_status")) {
+            require(input.isEmpty()) {"Este método no admite rutas ni modelos externos."}
+            val store=com.vidadomu.nexus.assistant.WhisperModelStore(app)
+            val state=if(method=="local_whisper_prepare" && !store.verifyExisting()) store.enqueue() else store.status()
+            return buildJsonObject {put("ok",true);put("whisper",state)}
+        }
         fun text(key:String)=input[key]?.jsonPrimitive?.contentOrNull.orEmpty()
         if(method=="flow_recovery_pair") {
             val token=text("token")
@@ -61,6 +71,8 @@ class NexusAgentProvider:ContentProvider() {
             put("historyError",app.generationRepository.historyError.value != null)
             val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
             put("agentMode",runtime.settings.load().mode.name)
+            put("agentModel",runtime.settings.load().modelId)
+            put("agentBackend",runtime.settings.load().backend)
             put("skills",runtime.skills.all().size)
             put("skillErrors",runtime.skills.errors.size)
             put("projects",runtime.assets.projects().size)

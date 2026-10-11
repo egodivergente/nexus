@@ -41,6 +41,13 @@ class NexusNativeOperations(
                 "update_nexus_settings" -> updateSettings(input)
                 "rename_asset_file" -> media.rename(input, session)
                 "convert_image_asset" -> media.convert(input)
+                "inspect_media_asset" -> AgentVideoOperations(app).inspect(input.requiredText("asset_id"))
+                "get_whisper_status" -> WhisperModelStore(app).status()
+                "prepare_whisper_model" -> WhisperModelStore(app).enqueue()
+                "edit_video_assets" -> MediaEditJobs(app).start(input.requiredText("action"),input,session)
+                "extract_video_frames" -> MediaEditJobs(app).start("frames",input,session)
+                "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
+                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20))
                 "atlas_get_balance" -> atlasBalance()
                 else -> throw ToolInputException("Operación desconocida.")
             }
@@ -156,7 +163,8 @@ class NexusNativeOperations(
 
     companion object {
         val ACTIVE = setOf(GenerationStatus.QUEUED, GenerationStatus.UPLOADING, GenerationStatus.GENERATING, GenerationStatus.PROCESSING, GenerationStatus.RENDERING)
-        val MODEL_IDS = mapOf("sonnet-4.6" to "us.anthropic.claude-sonnet-4-6",
+        val MODEL_IDS = mapOf("sonnet-5.5" to "us.anthropic.claude-sonnet-5-5",
+            "opus-5.5" to "us.anthropic.claude-opus-5-5", "sonnet-4.6" to "us.anthropic.claude-sonnet-4-6",
             "opus-4.6" to "us.anthropic.claude-opus-4-6-v1", "haiku-4.5" to "us.anthropic.claude-haiku-4-5-20251001-v1:0")
         fun canQueryExisting(job: GenerationJob): Boolean = !job.providerJobId.isNullOrBlank() &&
             !job.providerJobId.startsWith("queue_") && job.status !in setOf(GenerationStatus.COMPLETED, GenerationStatus.CANCELLED)
