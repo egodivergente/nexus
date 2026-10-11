@@ -1,7 +1,7 @@
 """Authenticated loopback Converse adapter for the user's existing AKI session.
 
-Text and Nexus tool calls only. Attachments and signed reasoning fail explicitly.
-AKI host tools are denied by the dedicated profile. No AWS fallback or model alias.
+Text, Nexus tools, images and PDF through a restricted attachment-view profile.
+Other AKI host tools are denied. No AWS fallback or model alias.
 """
 from __future__ import annotations
 import argparse
@@ -11,8 +11,10 @@ import os
 from pathlib import Path
 import subprocess
 import threading
+import time
 from http.server import ThreadingHTTPServer
 from nexus_proxy import NexusProxy, ProxyError, load_config, make_handler
+from aki_media import prepare
 
 MODEL = "openai.gpt-5.6-sol"
 
@@ -25,25 +27,23 @@ class AkiClient:
     def converse(self, **request):
         if request.get("modelId") != MODEL:
             raise ProxyError(422, "model_not_allowed", "Este puente solo admite GPT-5.6 Sol.")
-        for message in request["messages"]:
-            for block in message["content"]:
-                if not isinstance(block, dict) or not set(block) <= {"text", "toolUse", "toolResult"}:
-                    raise ProxyError(422, "unsupported_content", "El puente AKI admite texto y herramientas; los adjuntos y el contexto firmado requieren otro backend o una conversación nueva.")
         env = dict(os.environ)
         for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_BEARER_TOKEN_BEDROCK",
                     "AWS_PROFILE", "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
                     "AWS_CONTAINER_CREDENTIALS_FULL_URI"):
             env.pop(key, None)
         env.update(AWS_SHARED_CREDENTIALS_FILE="/dev/null", AWS_CONFIG_FILE="/dev/null", AWS_EC2_METADATA_DISABLED="true")
-        prompt = "Continue this Nexus request. Return only the specified response JSON:\n" + json.dumps(request, ensure_ascii=False, separators=(",", ":"))
         if not self.lock.acquire(blocking=False):
             raise ProxyError(429, "busy", "AKI está atendiendo otra petición de Nexus.")
         try:
             try:
-                result = self.runner([self.binary, "--profile", "nexus-bridge", "--model", MODEL,
-                                      "--output-format", "stream-json"],
-                                     input=prompt, text=True, capture_output=True, cwd=self.workspace,
-                                     env=env, timeout=150)
+                started = time.monotonic()
+                with prepare(request) as (converted, profile, allowed_views):
+                    prompt = "Continue this Nexus request. Return only the specified response JSON:\n" + json.dumps(converted, ensure_ascii=False, separators=(",", ":"))
+                    result = self.runner([self.binary, "--profile", profile, "--model", MODEL,
+                                          "--output-format", "stream-json"],
+                                         input=prompt, text=True, capture_output=True, cwd=self.workspace,
+                                         env=env, timeout=max(1, 150 - (time.monotonic() - started)))
             except subprocess.TimeoutExpired:
                 raise ProxyError(504, "aki_timeout", "AKI no terminó dentro del plazo; no se reintentó automáticamente.")
         finally:
@@ -51,7 +51,7 @@ class AkiClient:
         if result.returncode:
             # Never forward CLI stderr: it may contain account information.
             raise ProxyError(502, "aki_failed", "AKI rechazó la petición. Comprueba su sesión y el modelo; no se utilizó AWS directo.")
-        chunks, usage = [], None
+        chunks, usage, viewed, host_calls = [], None, set(), 0
         for line in result.stdout.splitlines():
             try:
                 event = json.loads(line)
@@ -61,8 +61,18 @@ class AkiClient:
                 chunks.append(event.get("content", ""))
             elif event.get("type") == "done":
                 usage = event
-        if not usage or usage.get("total_tools", 0):
-            raise ProxyError(502, "aki_tools", "AKI debe responder sin ejecutar herramientas propias.")
+            elif event.get("type") == "tool_use" and event.get("input"):
+                tool_input = event["input"]
+                command = tool_input.get("command") if isinstance(tool_input, dict) else None
+                if event.get("name") != "Bash" or command not in allowed_views:
+                    raise ProxyError(502, "aki_tools", "AKI intentó una operación fuera de los adjuntos autorizados.")
+                viewed.add(command)
+            elif event.get("type") == "tool_result":
+                host_calls += 1
+                if event.get("name") != "Bash" or event.get("status") != "done" or event.get("output"):
+                    raise ProxyError(502, "aki_media", "No se pudo verificar la lectura visual del adjunto.")
+        if not usage or usage.get("total_tools", 0) != host_calls or (host_calls and not allowed_views) or viewed != allowed_views:
+            raise ProxyError(502, "aki_tools", "AKI no completó la lectura autorizada de todos los adjuntos.")
         try:
             answer = json.loads("".join(chunks))
             content = answer["content"]

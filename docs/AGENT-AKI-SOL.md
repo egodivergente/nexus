@@ -63,14 +63,14 @@ directo `Arrancar Nexus Sol` permite arrancarlo si Android lo detiene. No es un
 servicio Android integrado ni se garantiza supervivencia a reinicios del móvil.
 Requiere una sesión AKI válida.
 
-Este primer puente admite **texto y herramientas**, pero rechaza explícitamente
-adjuntos y bloques de razonamiento firmado; no los descarta ni simula haberlos
-leído. Para conversaciones previas firmadas, usar una nueva conversación sin
-borrar el historial. No se declara recuperado el soporte completo de PDF/imagen.
+La versión inicial de este puente admitía **texto y herramientas**. La ampliación
+de adjuntos se documenta en [AGENT-AKI-ATTACHMENTS.md](AGENT-AKI-ATTACHMENTS.md).
+Los bloques de razonamiento firmado siguen rechazándose explícitamente. Para
+conversaciones previas firmadas, usar una nueva conversación sin borrar el historial.
 La CLI no expone un maxTokens nativo: la brevedad se pide al modelo; la cuota del
 servicio AKI sigue siendo externa. No usar este adaptador como límite de gasto
 garantizado para un servicio facturado por token.
 
-Pruebas Python: 28 aprobadas (proxy y adaptador); las 396 pruebas Android de la
+Pruebas Python de la versión inicial: 28 aprobadas (proxy y adaptador); las 396 pruebas Android de la
 corrección previa siguen correspondiendo a la APK instalada. Secretos, helpers,
 firmas, conversaciones y evidencia privada quedan fuera de Git.

@@ -37,6 +37,11 @@ fun interface AttachmentDocumentLoader {
     suspend fun load(attachment: Attachment): ContentBlock.Document?
 }
 
+/** Sampled visual frames and their timestamps; never audio or the original video. */
+fun interface AttachmentVideoLoader {
+    suspend fun load(attachment: Attachment): List<ContentBlock>
+}
+
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
 class AgentConversation(val session: AgentSession) {
     internal var reasoningModelId: String? = null
@@ -80,6 +85,7 @@ class AgentOrchestrator(
     private val images: AttachmentImageLoader? = null,
     private val today: () -> String = { LocalDate.now().toString() },
     private val documents: AttachmentDocumentLoader? = null,
+    private val videos: AttachmentVideoLoader? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -118,6 +124,26 @@ class AgentOrchestrator(
         if (config.sendImagesToLlm && loader != null) {
             newAttachments.filter { it.mimeType.startsWith("image/") }.take(MAX_IMAGES_PER_TURN).forEach { a ->
                 runCatching { loader.load(a) }.getOrNull()?.let { blocks += it }
+            }
+        }
+        val videoAttachments = newAttachments.filter { it.mimeType.startsWith("video/") }
+        if (videoAttachments.isNotEmpty()) {
+            val videoLoader = videos
+            if (config.sendImagesToLlm && videoLoader != null) {
+                require(videoAttachments.size <= MAX_VIDEOS_PER_TURN) {
+                    "Puedes analizar hasta 2 vídeos por mensaje. Envía los demás en otro turno; los originales se conservan."
+                }
+                for (attachment in videoAttachments) {
+                    val frames = videoLoader.load(attachment)
+                    require(frames.count { it is ContentBlock.Image } == VIDEO_FRAMES_PER_ATTACHMENT &&
+                        frames.all { it is ContentBlock.Image || it is ContentBlock.Text }) {
+                        "No se pudieron obtener los 6 fotogramas del vídeo. No se ha analizado su contenido."
+                    }
+                    blocks += ContentBlock.Text("Vídeo ${attachment.name ?: attachment.id}: análisis visual muestreado de 6 fotogramas. SIN audio; no es una lectura completa del vídeo y puede omitir acciones entre muestras.")
+                    blocks += frames
+                }
+            } else {
+                blocks += ContentBlock.Text("Los vídeos adjuntos NO se han leído: el análisis visual está desactivado o no disponible. No se han enviado fotogramas ni audio; no afirmes haber visto su contenido.")
             }
         }
         documents?.let { loader ->
@@ -302,6 +328,8 @@ class AgentOrchestrator(
     companion object {
         const val MAX_MESSAGES = 60
         const val MAX_IMAGES_PER_TURN = 4
+        const val MAX_VIDEOS_PER_TURN = 2
+        const val VIDEO_FRAMES_PER_ATTACHMENT = 6
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

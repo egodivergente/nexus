@@ -242,6 +242,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { AgentDocuments.load(it) },
         images = if (s.sendImages && !s.offline) AttachmentImageLoader { AgentMediaStore.thumbnail(it) } else null,
+        videos = if (s.sendImages && !s.offline) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
     )
 
     /** Indexa (sin tocar nexus.db ni archivos) las creaciones ya terminadas, para buscarlas por prompt/modelo. */
