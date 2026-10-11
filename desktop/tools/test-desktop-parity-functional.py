@@ -53,6 +53,12 @@ try:
         page.locator('[data-agent-canvas="archived-qa-plan"]').click()
         page.wait_for_function("()=>view==='canvas'&&!configuring")
         assert page.evaluate("state.draft.prompt==='Archivado QA'");report['archived_plan_reuse']=True
+        page.evaluate("navigate('assistant')");page.locator('[data-agent-discard="archived-qa-plan"]').click()
+        page.wait_for_function("()=>!document.querySelector('[data-agent-card=\"plan:archived-qa-plan\"]')")
+        report['archived_plan_discard']=True
+        page.evaluate("uri=>{state.jobs.push({id:'qa-text-history',modality:'CHAT',providerId:'local_media',modelId:'whisper-local',prompt:'Texto QA',status:'COMPLETED',outputs:[uri],startedAt:1});navigate('history');studioDetails('qa-text-history');}",'/media/'+text.name)
+        page.wait_for_function("()=>document.querySelector('#gallery-document')?.textContent.includes('Texto QA Studio')")
+        page.locator('[data-gallery=close-viewer]').click();report['text_history_viewer']=True
         for theme in ['aurora','oled','quartz','ocean','forest','light']:
             page.evaluate("theme=>{state.interfaceTheme=theme;NexusThemes.apply();navigate('assistant');}",theme);page.wait_for_timeout(150);page.screenshot(path=str(out/(theme+'.png')))
         if args.sol:

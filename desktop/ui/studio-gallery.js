@@ -81,7 +81,7 @@
   if(j.modality==='CHAT'&&valid&&u.startsWith('/media/'))fetch(u).then(r=>{if(!r.ok)throw Error('No se pudo cargar el texto.');return r.text();}).then(text=>{if(dlg.isConnected)dlg.querySelector('#gallery-document').textContent=text.slice(0,100000);}).catch(e=>{if(dlg.isConnected)dlg.querySelector('#gallery-document').textContent=e.message;});
   const v=dlg.querySelector('video');if(v)v.addEventListener('timeupdate',()=>{if(Number.isFinite(v.duration)&&v.duration>0)dlg.querySelector('#gallery-seek').value=String(100*v.currentTime/v.duration);});
  }
- const oldDetails=studioDetails;studioDetails=function(id){if(view==='library'&&Studio.tab==='results')showViewer(id);else oldDetails(id);};
+ const oldDetails=studioDetails;studioDetails=function(id){const job=state.jobs.find(j=>j.id===id);if(view==='library'&&Studio.tab==='results'||job?.modality==='CHAT'&&media(job)?.startsWith('/media/'))showViewer(id);else oldDetails(id);};
  function nextViewer(step){const list=entries(),i=list.findIndex(j=>j.id===G.viewer?.id);if(list.length)showViewer(list[(i+step+list.length)%list.length].id);}
  async function download(j){const u=media(j);if(!isMediaUrl(u))return;if(u.startsWith('/media/')){const a=document.createElement('a');a.href=u;a.download=u.split('/').pop();a.click();}else await rpc('download',{url:u});}
  function commands(){
