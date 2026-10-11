@@ -28,3 +28,12 @@ La búsqueda pública devolvió HTTP 200 y siete resultados en una comprobación
 - Incluye las doce skills Crun adaptadas al pipeline Android y su licencia original.
 
 - Proxy: documentos usan CountTokens con mensajes, sistema y herramientas para reservar presupuesto por tokens reales, no por bytes base64. Si no esta disponible conserva la reserva anterior e informa el motivo cuando supera el limite. Fuentes: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_CountTokens.html y https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseTokensRequest.html .
+
+## Entrega verificada en S25 (2026-10-11)
+- ASUS: assembleAgentPreview correcto en 6 min 54 s, un worker, prioridad nice 15.
+- APK transferido con SHA256 coincidente; firmado con la clave existente. SHA256 del APK firmado: 625d0149cf71b70dbc3adc53fcb23946f069c1e72a32116a28945ecafa0e57db.
+- Instalacion adb install --no-streaming -r: Success. Samsung S25: versionCode 32, versionName 1.8.8-agent-preview. Arranque en frio Status ok.
+- Ajustes del agente: 736 modelos, 46 skills, cero errores de skills. Backend activo: Bedrock directo.
+- Comprobacion manual por ADB: Biblioteca muestra 149 archivos / 138 creaciones; pulsacion larga abre Abrir, Marcar favorito, Copiar prompt, Compartir archivo y Ocultar. Proyecto Mateo conserva 176 referencias.
+- Proxy: 18 pruebas locales con Bedrock simulado correctas. No se desplego un proxy remoto (el S25 usa directo).
+- Sin generaciones ni inferencia pagadas para validar. Pendientes de prueba real: lectura de documentos por el LLM, recorrido web/MCP del agente y rendimiento a 120 Hz. No se afirma validacion completa de accesibilidad ni de todos los gestos.
