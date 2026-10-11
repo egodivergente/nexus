@@ -1,6 +1,6 @@
 # NEXUS Agent 1.9.0: edición y Whisper en el teléfono
 
-Estado: compilación final, pruebas físicas e instalación de 1.9.0 verificadas. El modelo Whisper está preparado en la app principal. Los acuerdos Claude 5.5 están activados en la cuenta del CSV proporcionado posteriormente; su consulta desde las credenciales existentes de Nexus sigue sin confirmar ese acceso. La conversación real con 5.5 está pendiente; véase [el resultado de activación](AGENT-CLAUDE-55-20261011.md#activación-de-acuerdos-autorizada-posteriormente).
+Estado: compilación final, pruebas físicas e instalación de 1.9.0 verificadas. El modelo Whisper está preparado en la app principal. Nexus guarda las credenciales originales del CSV por petición del usuario, con Sonnet 5.5 seleccionado en `us-east-1`. El formulario de primer uso de Anthropic y los acuerdos 5.5 están completados; la propia app confirma acceso autorizado y disponibilidad para Sonnet y Opus 5.5. La conversación real está pendiente y no se ha ejecutado inferencia de pago; véase [la corrección final de cuenta](AGENT-CLAUDE-55-20261011.md#corrección-final-de-cuenta-y-requisitos-de-anthropic).
 
 ## Procedencia y alcance
 
