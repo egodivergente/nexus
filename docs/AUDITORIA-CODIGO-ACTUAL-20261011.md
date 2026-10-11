@@ -42,7 +42,15 @@ Nuevo límite reproducido: con `daily_token_budget=2.000.000` predeterminado, un
 
 La copia probada del proxy tiene SHA-256 `1c6af66fb3169046459edc0357014a67df5180f06e1e9644ecf22871be6522b0`. Las **16 pruebas** de la suite copiada terminaron en **OK**, en 0,689 s. Evidencia privada adicional: `outputs/ui-minimal-20261009/current-code-audit/recheck-20261011-0351/results.json`. Sin llamadas externas, operaciones de pago ni instalación.
 
-## Fuentes técnicas
+## Revisión de recuperación en curso: 11 de octubre, 04:21 UTC
+
+La 1.8.8-agent-preview/vc32 se comprobó instalada mediante ADB en el seguimiento anterior. La base publicada ahora es `0db0813d03726998ffa1d382e38825cda6e0147a`; el hilo está desarrollando recuperación de tareas y presupuesto persistente para AWS directo. Las siguientes observaciones corresponden a cambios locales pendientes, no a una corrección ya instalada.
+
+**P2 — Recuperación fallida pierde la marca de seguimiento pausado.** En `data/repository/Repositories.kt:171`, `pollJobLocked(refreshFailed=true)` elimina `__tracking_paused` antes de consultar, conservando `status=FAILED`. Si el proveedor falla por red, la rama de error persiste ese objeto con `__tracking_poll_error`; `core/model/SubmissionRecovery.kt:10` no restaura la pausa porque excluye el estado FAILED. `ui/generations/GenerationsScreen.kt:111` condiciona «Recuperar seguimiento» a la marca eliminada, por lo que el intento fallido pierde la etiqueta y la entrada de recuperación. La consulta de coste conserva el estado original y no equivale a recuperar el seguimiento. El ID remoto permanece intacto.
+
+Se comunicó al hilo activo conservar la marca hasta una respuesta válida o restaurarla en la rama de error. Evidencia: recorrido estático del código pendiente; no se ejecutaron pruebas en dispositivo, compilaciones ni operaciones externas desde esta revisión. No se modificaron las fuentes de la tarea activa.
+
+## Referencias técnicas
 
 - [AWS DocumentSource](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_DocumentSource.html): el SDK recibe bytes originales del documento.
 - [AWS DocumentBlock](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_DocumentBlock.html): formatos y nombre del bloque.
