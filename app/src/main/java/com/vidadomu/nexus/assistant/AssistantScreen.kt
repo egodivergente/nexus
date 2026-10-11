@@ -2,6 +2,8 @@
 
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.components.*
+import androidx.compose.animation.animateContentSize
 import com.vidadomu.nexus.ui.components.NexusTopAppBar
 import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.noticeMessage
@@ -107,7 +109,21 @@ fun AssistantScreen(
     if(showSettings) AssistantSettingsDialog(ui,vm,onDismiss={showSettings=false})
     if(showProject) ProjectSheet(ui,vm) {showProject=false}
 
-    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={
+    val latestFailure=ui.items.filterIsInstance<ChatItem.Notice>().lastOrNull {it.error}
+    var shownFailure by rememberSaveable {mutableStateOf(latestFailure?.id)}
+    LaunchedEffect(latestFailure?.id) {
+        val failure=latestFailure ?: return@LaunchedEffect
+        if(failure.id!=shownFailure) {
+            shownFailure=failure.id
+            val result=snackbar.showSnackbar(noticeMessage(failure.text),actionLabel=if(vm.canRetryTurn()) "Reintentar" else null,withDismissAction=true)
+            if(result==SnackbarResult.ActionPerformed) vm.retryTurn()
+        }
+    }
+    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
+        Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
+            containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
+            actionColor=MaterialTheme.colorScheme.primary)
+    }},topBar={
         NexusTopAppBar(title={Column(Modifier.clickable {showProject=true}.semantics {contentDescription="Abrir proyecto"}) {
             Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Text(listOfNotNull(ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
@@ -123,7 +139,7 @@ fun AssistantScreen(
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item)
                         is ChatItem.Notice -> NoticeRow(item)
-                        is ChatItem.ModeSwitch -> OutlinedCard(Modifier.fillMaxWidth()) {
+                        is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
                                 if (!item.resolved) TextButton(onClick = { vm.resolveModeSwitch(item.id) }, enabled = !ui.thinking) { Text("Activar Agente") }
@@ -182,12 +198,12 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
             }
             Text("Cambiar proyecto",style=MaterialTheme.typography.titleMedium)
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                item {FilterChip(active==null,{vm.selectProject(null)},label={Text("Sin proyecto")},shape=NexusTokens.filter)}
-                items(ui.projects,key={it.id}) {p->FilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name)},shape=NexusTokens.filter)}
+                item {StudioFilterChip(active==null,{vm.selectProject(null)},label={Text("Sin proyecto")},shape=NexusTokens.filter)}
+                items(ui.projects,key={it.id}) {p->StudioFilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name)},shape=NexusTokens.filter)}
             }
             TextButton(onClick={creating=!creating},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}
             if(creating) {
-                OutlinedTextField(name,{name=it.take(80)},singleLine=true,label={Text("Nombre")},shape=NexusTokens.field,modifier=Modifier.fillMaxWidth())
+                StudioTextField(name,{name=it.take(80)},singleLine=true,label={Text("Nombre")},shape=NexusTokens.field,modifier=Modifier.fillMaxWidth())
                 TextButton(onClick={vm.createProject(name);name="";creating=false},enabled=name.isNotBlank()) {Text("Crear")}
             }
             if(active!=null) holder.SaveableStateProvider(active.id) {ProjectMemoryEditor(active,vm,onClose)}
@@ -216,12 +232,12 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
     val assetCount = remember(p.id) { vm.projectAssetCount(p.id) }
             Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Text("El asistente la lee en cada mensaje para que los prompts sean coherentes. También la rellena él cuando le cuentas cosas del proyecto. $assetCount archivos etiquetados con este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                OutlinedTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas (una por línea)") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos (uno por línea)") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                StudioTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                StudioTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
+                StudioTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                StudioTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
+                StudioTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas (una por línea)") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
+                StudioTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos (uno por línea)") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
                 if (characters.isNotEmpty()) {
                     Text("Personajes", fontWeight = FontWeight.SemiBold)
                     characters.forEach { c -> Text("• ${c.name}" + (c.description?.let { ": $it" } ?: ""), style = MaterialTheme.typography.bodySmall) }
@@ -258,25 +274,39 @@ private fun UserBubble(item:ChatItem.User) {
 private fun AssistantBubble(item:ChatItem.Assistant) {
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         if(item.text.isNotBlank()) ChatMarkdownView(item.text)
-        if(item.toolCalls.isNotEmpty()) Text(item.toolCalls.distinct().joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+        if(item.toolCalls.isNotEmpty()) {
+            var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
+            Column(Modifier.animateContentSize()) {
+                StudioToolChip("⚙ ${item.toolCalls.size} llamadas a herramientas",selected=expanded) {expanded=!expanded}
+                if(expanded) Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.field) {
+                    Text(item.toolCalls.joinToString("\n"),Modifier.padding(12.dp),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun NoticeRow(item: ChatItem.Notice) {
-    if(item.error) InlineNotice(noticeMessage(item.text),technicalDetails=item.text) else Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+    if(item.error) {
+        var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
+        Column(Modifier.animateContentSize()) {
+            TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle del error" else "Ver detalle del error",color=TextSecondary)}
+            if(expanded) Text(item.text,style=MaterialTheme.typography.bodySmall,color=TextSecondary)
+        }
+    } else Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
 }
 
 @Composable
 private fun ProposalCard(item: ChatItem.Proposal, onApply: () -> Unit, onReject: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
             Text("Propuesta de organización", fontWeight = FontWeight.SemiBold)
             Text(item.description, style = MaterialTheme.typography.bodyMedium)
             when (item.state) {
                 ProposalState.PENDING -> Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     FilledTonalButton(onClick = onApply) { Text("Aplicar") }
-                    OutlinedButton(onClick = onReject) { Text("Descartar") }
+                    FilledTonalButton(onClick = onReject) { Text("Descartar") }
                 }
                 ProposalState.APPLYING -> LinearProgressIndicator(Modifier.fillMaxWidth())
                 ProposalState.APPLIED -> Text("Aplicada (es lógica: no se mueve ni renombra ningún archivo del disco).", color = TextMuted, style = MaterialTheme.typography.bodySmall)
@@ -349,7 +379,7 @@ internal fun PlanCardView(
     SideEffect {onDirtyChanged(dirty)}
     editParam?.let { (k, v) -> ParamEditDialog(k, v, onSave = { nv -> editParam = null; onEdit(PlanEdit(params = mapOf(k to nv))) }, onDismiss = { editParam = null }) }
 
-    OutlinedCard(Modifier.fillMaxWidth(),shape=NexusTokens.card,border=BorderStroke(1.dp,BorderSubtle)) {
+    Card(Modifier.fillMaxWidth(),shape=NexusTokens.card,border=null) {
         Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Column(Modifier.weight(1f)) {
@@ -364,7 +394,7 @@ internal fun PlanCardView(
                 }
             }
             if(p.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            OutlinedTextField(prompt,{prompt=it},enabled=editable && !p.busy,modifier=Modifier.fillMaxWidth(),minLines=3,maxLines=8,
+            StudioTextField(prompt,{prompt=it},enabled=editable && !p.busy,modifier=Modifier.fillMaxWidth(),minLines=3,maxLines=8,
                 textStyle=MaterialTheme.typography.bodyLarge,shape=NexusTokens.field,label={Text("Prompt")})
             if(changedUnderEdit && dirty) InlineNotice("El asistente cambió el prompt mientras editabas.",technicalDetails="Deshacer carga su versión; Aplicar guarda la tuya.",isError=false)
             if(dirty && editable) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -378,7 +408,7 @@ internal fun PlanCardView(
             p.error?.let {InlineNotice(noticeMessage(it,"No se pudo completar el encargo."),technicalDetails=it)}
             if(p.state==PlanState.UNCERTAIN) {
                 InlineNotice("Envío sin confirmar. Revisa Historial antes de generar otra vez.",technicalDetails="Este plan queda bloqueado para evitar un doble pago.",isError=false)
-                if(p.jobId!=null) OutlinedButton(onClick=onOpenOutput) {Text("Ver en Nexus",color=TextSecondary)}
+                if(p.jobId!=null) FilledTonalButton(onClick=onOpenOutput) {Text("Ver en Nexus",color=TextSecondary)}
             } else if(p.state==PlanState.SUBMITTED) {
                 if(p.jobStatus=="PENDING" || p.jobStatus=="PROCESSING") {
                     if(p.jobProgress!=null) LinearProgressIndicator(progress={p.jobProgress.coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())
@@ -445,7 +475,7 @@ private fun roleLabel(r: String) = when (r) { "first_frame" -> "Primer fotograma
 private fun ParamEditDialog(key: String, value: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var v by remember(key, value) { mutableStateOf(value) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(key) },
-        text = { Column { OutlinedTextField(v, { v = it }, shape=NexusTokens.field, singleLine = false, maxLines = 6); Text("Se valida contra el schema del modelo. Vacío o «–» = quitar.", style = MaterialTheme.typography.labelSmall, color = TextMuted) } },
+        text = { Column { StudioTextField(v, { v = it }, shape=NexusTokens.field, singleLine = false, maxLines = 6); Text("Se valida contra el schema del modelo. Vacío o «–» = quitar.", style = MaterialTheme.typography.labelSmall, color = TextMuted) } },
         confirmButton = { TextButton(onClick = { onSave(v.trim()) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
 }
@@ -487,50 +517,57 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
                 AgentStatus(ui,{})
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    FilterChip(backend != AssistantSettings.BACKEND_PROXY, { backend = AssistantSettings.BACKEND_DIRECT }, label = { Text("Bedrock directo") })
-                    FilterChip(backend == AssistantSettings.BACKEND_PROXY, { backend = AssistantSettings.BACKEND_PROXY }, label = { Text("Proxy") })
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock",AssistantSettings.BACKEND_PROXY to "Proxy").forEachIndexed { index, (value,label) ->
+                        SegmentedButton(selected=backend==value,onClick={backend=value},
+                            shape=SegmentedButtonDefaults.itemShape(index,2),border=BorderStroke(0.dp,androidx.compose.ui.graphics.Color.Transparent)) {Text(label)}
+                    }
                 }
                 if (backend != AssistantSettings.BACKEND_PROXY) {
                     Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    OutlinedTextField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
-                    OutlinedTextField(secret, { secret = it; clearSecret = false }, shape=NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
-                        singleLine = true, visualTransformation = PasswordVisualTransformation())
+                    StudioCredentialField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
+                    StudioCredentialField(secret, { secret = it; clearSecret = false }, shape=NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
+                        singleLine = true)
                     if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
                     }
-                    OutlinedTextField(region, { region = it }, shape=NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true)
+                    StudioTextField(region, { region = it }, shape=NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true)
                 } else {
                     Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    OutlinedTextField(endpoint, { endpoint = it }, shape=NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true)
-                    OutlinedTextField(token, { token = it; clearToken = false }, shape=NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
-                        singleLine = true, visualTransformation = PasswordVisualTransformation())
+                    StudioTextField(endpoint, { endpoint = it }, shape=NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true)
+                    StudioCredentialField(token, { token = it; clearToken = false }, shape=NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
+                        singleLine = true)
                     if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                OutlinedTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, label = { Text("Model ID / inference profile") }, singleLine = true)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    AssistantSettings.KNOWN_MODELS.forEach { (id, name) -> FilterChip(modelId == id, { modelId = id }, label = { Text(name) }) }
+                StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, label = { Text("Model ID / inference profile") }, singleLine = true)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    AssistantSettings.KNOWN_MODELS.forEachIndexed { index, (id,name) ->
+                        SegmentedButton(modelId==id,{modelId=id},shape=SegmentedButtonDefaults.itemShape(index,AssistantSettings.KNOWN_MODELS.size),
+                            border=BorderStroke(0.dp,androidx.compose.ui.graphics.Color.Transparent)) {
+                            Text(name.substringBefore(" "),maxLines=1,style=MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                    OutlinedTextField(temperature, { temperature = it }, shape=NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    StudioTextField(temperature, { temperature = it }, shape=NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    OutlinedTextField(maxTokens, { maxTokens = it.filter(Char::isDigit) }, shape=NexusTokens.field, label = { Text("Máx. tokens") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    StudioTextField(maxTokens, { maxTokens = it.filter(Char::isDigit) }, shape=NexusTokens.field, label = { Text("Máx. tokens") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(sendImages, { sendImages = it }); Spacer(Modifier.width(NexusTokens.space8)); Text("Enviar miniatura de las imágenes adjuntas al LLM", style = MaterialTheme.typography.bodySmall)
                 }
-                OutlinedTextField(excluded, { excluded = it.take(200) }, shape=NexusTokens.field, label = { Text("No recomendar estas familias") }, singleLine = true,
+                StudioTextField(excluded, { excluded = it.take(200) }, shape=NexusTokens.field, label = { Text("No recomendar estas familias") }, singleLine = true,
                     supportingText = { Text("Separadas por comas, p. ej. «veo, runway». Si pides uno por su nombre, se respeta.") })
                 HorizontalDivider()
                 Text("Skills: ${ui.skillsCount}" + if (ui.skillErrors.isNotEmpty()) " · ${ui.skillErrors.size} con errores" else "", style = MaterialTheme.typography.bodyMedium)
                 if(ui.skillErrors.isNotEmpty()) InlineNotice("Algunas skills no se pudieron cargar.",technicalDetails=ui.skillErrors.joinToString("\n"))
                 Text("Se cargan de la app y, sin recompilar, de Documents/ALEXIA/Nexus/Skills (las de igual id sustituyen a las de la app).", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    OutlinedButton(onClick = vm::reloadSkills) { Text("Recargar skills") }
-                    OutlinedButton(onClick = { vm.reindexHistory() }) { Text("Indexar historial") }
+                    FilledTonalButton(onClick = vm::reloadSkills) { Text("Recargar skills") }
+                    FilledTonalButton(onClick = { vm.reindexHistory() }) { Text("Indexar historial") }
                 }
                 error?.let {InlineNotice(noticeMessage(it,"Revisa los ajustes antes de guardar."),technicalDetails=it)}
             TextButton(onClick = {

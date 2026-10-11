@@ -74,7 +74,7 @@ internal fun insertModel(value: TextFieldValue, completion: ModelCompletion, mod
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
-    Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8)) {
+    Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8)) {
         Column(Modifier.fillMaxWidth().padding(NexusTokens.space8)) {
             completion?.let { suggestions ->
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
@@ -89,11 +89,11 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         trailingIcon = { Icon(Icons.Default.Close, "Quitar referencia") })
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Bottom) {
                 IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar") }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 TextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Cuéntame qué quieres crear…") },
-                    textStyle=MaterialTheme.typography.bodyLarge,shape=NexusTokens.field,colors=TextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surfaceVariant,unfocusedContainerColor=MaterialTheme.colorScheme.surfaceVariant,focusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent,unfocusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent),
+                    textStyle=MaterialTheme.typography.bodyLarge,shape=NexusTokens.field,colors=TextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surface,unfocusedContainerColor=MaterialTheme.colorScheme.surface,focusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent,unfocusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent),
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }))
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta") }

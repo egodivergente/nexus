@@ -131,10 +131,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ---- conversación -------------------------------------------------------------------------
 
-    fun send(text: String) {
+    private var failedTurn: Pair<String,List<Attachment>>? = null
+    fun canRetryTurn() = failedTurn != null
+    fun retryTurn() {
+        val request=failedTurn ?: return
+        if(_ui.value.thinking) return
+        send(request.first,request.second)
+    }
+    fun send(text: String, retryAttachments: List<Attachment>? = null) {
         val clean = text.trim()
-        val atts = _ui.value.pendingAttachments
+        val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking) return
+        failedTurn = null
         val latestSettings = runtime.settings.load()
         if (latestSettings != _ui.value.settings) {
             // Native settings tools affect the next request without dropping conversation, plans or proposals.
@@ -142,7 +150,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _ui.update { it.copy(settings = latestSettings) }
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = emptyList(), thinking = true, scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -158,8 +166,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 notice("Cancelado.")
                 throw e
             } catch (e: LlmException) {
+                failedTurn = clean to atts
                 notice(Redactor.redact(e.message ?: "El asistente no respondió."), error = true)
             } catch (e: Exception) {
+                failedTurn = clean to atts
                 notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
             } finally {
                 _ui.update { state ->
@@ -206,6 +216,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     internal fun openConversation(id: String) = switchConversation(id)
 
     private fun switchConversation(id: String?) {
+        failedTurn = null
         val current = _ui.value
         if(current.thinking || current.plans.values.any { it.busy }) return
         _ui.update { it.copy(thinking = true) }
@@ -258,6 +269,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun removeAttachment(id: String) = _ui.update { it.copy(pendingAttachments = it.pendingAttachments.filterNot { a -> a.id == id }) }
 
     fun selectProject(id: String?) {
+        failedTurn = null
         conversation.session.activeProjectId = id
         _ui.update { it.copy(activeProjectId = id, projectAssets = runtime.assets.snapshot().assets.filter { asset -> asset.projectId == id && id != null && !asset.libraryDeleted }) }
         runtime.settings.setActiveProject(id)

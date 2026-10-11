@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.ui.models
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
+import com.vidadomu.nexus.ui.components.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
@@ -135,24 +136,25 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             }
                 if(family == null) item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                        item {FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly;family=null},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.StarBorder,null)})}
+                        item {StudioFilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly;family=null},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.StarBorder,null)})}
                         items(listOf(Modality.VIDEO to "Vídeo", Modality.IMAGE to "Imagen") + if(showSecondary || modality in listOf(Modality.AUDIO,Modality.CHAT)) listOf(Modality.AUDIO to "Audio",Modality.CHAT to "Texto") else emptyList()) { (value,label) ->
-                            FilterChip(modality == value, { modality=value; family=null; groupKey=null; use=null; query=""; prefs.edit().putString("browser_modality",value.name).apply() }, label={Text(label)})
+                            StudioFilterChip(modality == value, { modality=value; family=null; groupKey=null; use=null; query=""; prefs.edit().putString("browser_modality",value.name).apply() }, label={Text(label)})
                         }
-                        item {FilterChip(showSecondary,{showSecondary=!showSecondary},label={Text("Más")})}
+                        item {StudioFilterChip(showSecondary,{showSecondary=!showSecondary},label={Text("Más")})}
                     }
                 }
                 item(span={GridItemSpan(maxLineSpan)}) {
-                    if(searchVisible || query.isNotBlank()) OutlinedTextField(query, { query=it }, Modifier.fillMaxWidth(), singleLine=true,
+                    StudioTextField(query, { query=it }, Modifier.fillMaxWidth(), singleLine=true,
                         placeholder={Text("Buscar modelo o función")}, leadingIcon={Icon(Icons.Default.Search,null)},
-                        trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}}, shape=NexusTokens.field)
+                        trailingIcon={Row {
+                            if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}
+                            IconButton(onClick={filters=!filters}) {Icon(Icons.Default.Tune,"Filtros y orden",
+                                tint=if(filters || providerFilter!=null || use!=null) MaterialTheme.colorScheme.primary else TextSecondary)}
+                        }}, shape=NexusTokens.filter)
                 }
-                item(span={GridItemSpan(maxLineSpan)}) {
-                    LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        item {IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar modelos")}}
-                        if(modality == Modality.IMAGE) item { FilterChip(imageReferences, { imageReferences = !imageReferences; use = null; groupKey = null }, label = { Text(if(imageReferences) "Con referencias" else "Todos los usos") }) }
-                        item {FilterChip(filters,{filters=!filters},label={Text("Filtros")},leadingIcon={Icon(Icons.Default.Tune,null,Modifier.size(16.dp))})}
-                    }
+                if(modality == Modality.IMAGE) item(span={GridItemSpan(maxLineSpan)}) {
+                    StudioFilterChip(imageReferences, {imageReferences=!imageReferences;use=null;groupKey=null},
+                        label={Text(if(imageReferences) "Con referencias" else "Todos los usos")})
                 }
                 if(use != null || favoritesOnly || providerFilter!=null) item(span={GridItemSpan(maxLineSpan)}) {
                     TextButton(onClick={use=null;favoritesOnly=false;providerFilter=null}) {Text("Quitar filtros activos")}
@@ -215,12 +217,12 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 IconButton(onClick={filters=false}) {Icon(Icons.Default.Close,"Cerrar filtros")}
             }
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        item {FilterChip(catalogSort==CatalogSort.RELEASE,{
+                        item {StudioFilterChip(catalogSort==CatalogSort.RELEASE,{
                             catalogSort=if(catalogSort==CatalogSort.RELEASE) CatalogSort.PERSONAL else CatalogSort.RELEASE
                             personalizing=false
                             prefs.edit().putString("sort",catalogSort.name).apply()
                         },label={Text("Más nuevos")},leadingIcon={Icon(Icons.Default.NewReleases,null,Modifier.size(16.dp))})}
-                        if(catalogSort==CatalogSort.RELEASE) item {FilterChip(onlyDated,{
+                        if(catalogSort==CatalogSort.RELEASE) item {StudioFilterChip(onlyDated,{
                             onlyDated=!onlyDated;prefs.edit().putBoolean("release_only_dated",onlyDated).apply()
                         },label={Text("Solo con fecha")})}
             }
@@ -230,19 +232,19 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                         Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            CatalogSort.entries.forEach {entry -> FilterChip(catalogSort==entry,{
+                            CatalogSort.entries.forEach {entry -> StudioFilterChip(catalogSort==entry,{
                                 catalogSort=entry;prefs.edit().putString("sort",entry.name).apply()
                             },label={Text(entry.label)},shape=NexusTokens.filter)}
                         }
                         Text("Proveedor",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            FilterChip(providerFilter==null,{providerFilter=null},label={Text("Todos")},shape=NexusTokens.filter)
-                            models.map {it.providerId}.distinct().forEach {id -> FilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
+                            StudioFilterChip(providerFilter==null,{providerFilter=null},label={Text("Todos")},shape=NexusTokens.filter)
+                            models.map {it.providerId}.distinct().forEach {id -> StudioFilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
                         }
-                        FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Mis favoritos")})
+                        StudioFilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Mis favoritos")})
                         LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            item { FilterChip(use==null,{use=null},label={Text("Todos los usos")}) }
-                            items(CreationUse.entries.filter {it.modality==modality}) { value -> FilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
+                            item { StudioFilterChip(use==null,{use=null},label={Text("Todos los usos")}) }
+                            items(CreationUse.entries.filter {it.modality==modality}) { value -> StudioFilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
                         }
                         TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
                     }
@@ -291,9 +293,12 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
         Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                BrandLogo(family=family,size=NexusTokens.space32,containerSize=NexusTokens.space32)
+                BrandLogo(family=family,size=28.dp,containerSize=40.dp,shape=NexusTokens.field)
                 Column(Modifier.weight(1f)) {
-                    Text(title,style=MaterialTheme.typography.titleMedium,color=TextPrimary)
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        Text(title,style=MaterialTheme.typography.titleMedium,
+                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
                     Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         maxLines=if(compact) 1 else 4,overflow=TextOverflow.Ellipsis)
                     releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
@@ -301,10 +306,12 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 if(!grid) Text(displayPrice ?: "Ver coste",
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=TextSecondary)}
-                else Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)
+                else if(!grid) Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)
             }
-            if(grid) Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",
-                style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
+            if(grid) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter) {
+                Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",Modifier.padding(horizontal=10.dp,vertical=5.dp),
+                    style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
+            }
             highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
             onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
         }

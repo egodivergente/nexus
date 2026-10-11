@@ -1,6 +1,11 @@
 package com.vidadomu.nexus.ui.library
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
+import com.vidadomu.nexus.ui.components.StudioTextField
+import com.vidadomu.nexus.ui.components.StudioFilterChip
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.interaction.*
+import androidx.compose.ui.graphics.graphicsLayer
 import android.content.Intent
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
@@ -69,7 +74,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         } catch (_:Exception) {}}) {Icon(Icons.Default.FolderSpecial,"Abrir Alexia",tint=TextSecondary)}
     })}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            OutlinedButton(onClick={projectLibrary.launch(arrayOf("image/*"))},modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin)) {
+            FilledTonalButton(onClick={projectLibrary.launch(arrayOf("image/*"))},modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin)) {
                 Icon(Icons.Default.PhotoLibrary,null)
                 Spacer(Modifier.width(NexusTokens.space8))
                 Text("Imágenes del proyecto · Gestionar")
@@ -78,13 +83,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.weight(1f))
                 IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca")}
             }
-            if(searchVisible || query.isNotBlank()) OutlinedTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),singleLine=true,
+            if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
             LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                item {FilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
+                item {StudioFilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
-                    FilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
+                    StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
                 }
             }
             if(completed.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
@@ -111,17 +116,20 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 @Composable
 private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,onOpen:()->Unit) {
     val context=LocalContext.current
+    val interaction=remember {MutableInteractionSource()}
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if(pressed) .96f else 1f,tween(120),label="Media press")
     val duration=mediaDuration(output.durationSeconds)
     val type=when(output.type) {Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.IMAGE->"Imagen";else->"Texto"}
-    Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainer)
-        .clickable(role=Role.Button,onClickLabel="Ver resultado",onClick=onOpen)
+    Box(Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer {scaleX=scale;scaleY=scale}.background(MaterialTheme.colorScheme.surfaceContainer)
+        .clickable(interactionSource=interaction,indication=null,role=Role.Button,onClickLabel="Ver resultado",onClick=onOpen)
         .semantics(mergeDescendants=true) {contentDescription="$type · ${job.prompt.ifBlank {"Creación"}}${duration?.let {" · $it"}.orEmpty()}"},
         contentAlignment=Alignment.Center) {
         val local=OutputFiles.trustedLocalUri(output,conflicts)
         if(output.type in listOf(Modality.IMAGE,Modality.VIDEO)) {
             var failed by remember(output.id,local,output.url) {mutableStateOf(false)}
             if(!failed) AsyncImage(model=remember(output.id,local,output.url) {ImageRequest.Builder(context)
-                .data(local ?: output.url).apply {if(output.type==Modality.VIDEO) decoderFactory {result,options,_->VideoFrameDecoder(result.source,options)}}.build()},
+                .data(local ?: output.url).crossfade(180).apply {if(output.type==Modality.VIDEO) decoderFactory {result,options,_->VideoFrameDecoder(result.source,options)}}.build()},
                 imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
             if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)

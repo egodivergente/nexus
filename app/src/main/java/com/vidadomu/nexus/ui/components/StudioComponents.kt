@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,9 +62,14 @@ fun StudioTextField(
     trailingIcon: (@Composable () -> Unit)? = null, supportingText: (@Composable () -> Unit)? = null,
     textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     shape: Shape = NexusTokens.prompt,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    minLines: Int = 1, maxLines: Int = Int.MAX_VALUE,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     TextField(value, onValueChange, modifier, enabled = enabled, readOnly = readOnly,
-        singleLine = singleLine, label = label, placeholder = placeholder,
+        singleLine = singleLine, label = label, placeholder = placeholder, leadingIcon = leadingIcon,
+        minLines = minLines, maxLines = maxLines, keyboardOptions = keyboardOptions, visualTransformation = visualTransformation,
         trailingIcon = trailingIcon, supportingText = supportingText, textStyle = textStyle,
         shape = shape, colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -108,4 +117,32 @@ fun StudioRemoveMediaButton(onClick: () -> Unit, modifier: Modifier = Modifier,
             Icon(Icons.Default.Close, null, Modifier.size(12.dp), tint = Color.White)
         }
     }
+}
+
+@Composable
+fun StudioCredentialField(value: String, onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier, label: (@Composable () -> Unit)? = null,
+    placeholder: (@Composable () -> Unit)? = null, singleLine: Boolean = true,
+    shape: Shape = NexusTokens.field) {
+    var visible by remember { mutableStateOf(false) }
+    StudioTextField(value, onValueChange, modifier.fillMaxWidth(), label=label,
+        placeholder=placeholder, singleLine=singleLine, shape=shape,
+        visualTransformation=if(visible) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password, autoCorrectEnabled=false),
+        trailingIcon={IconButton(onClick={visible=!visible}) {
+            Icon(if(visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                if(visible) "Ocultar credencial" else "Mostrar credencial")
+        }})
+}
+
+@Composable
+fun StudioFilterChip(selected: Boolean, onClick: () -> Unit, label: @Composable () -> Unit,
+    modifier: Modifier = Modifier, leadingIcon: (@Composable () -> Unit)? = null,
+    shape: Shape = NexusTokens.filter) {
+    val haptic=LocalHapticFeedback.current
+    FilterChip(selected=selected, onClick={haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);onClick()},
+        label=label, modifier=modifier, leadingIcon=leadingIcon, shape=shape, border=null,
+        colors=FilterChipDefaults.filterChipColors(containerColor=MaterialTheme.colorScheme.surface,
+            selectedContainerColor=MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor=MaterialTheme.colorScheme.primary))
 }

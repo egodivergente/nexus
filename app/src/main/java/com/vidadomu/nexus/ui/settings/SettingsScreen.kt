@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.components.StudioCredentialField
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -127,8 +128,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 Text(if(maskedApiKey=="Not configured") "Sin configurar · Clave API (Keystore)" else "Clave API guardada (Keystore)",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 Text(maskedApiKey.takeUnless {it=="Not configured"} ?: "Sin configurar",style=MaterialTheme.typography.bodyMedium)
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    OutlinedButton(onClick={apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text("Modificar clave Atlas")}
-                    OutlinedButton(enabled=!isTestingConnection,onClick={
+                    FilledTonalButton(onClick={apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {Text("Modificar clave Atlas")}
+                    FilledTonalButton(enabled=!isTestingConnection,onClick={
                         isTestingConnection=true;connectionStatusMessage=null
                         scope.launch {
                             val key=settingsRepo.getAtlasApiKey()
@@ -137,7 +138,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                             if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud."}
                             else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión."}
                         }
-                    },colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text(if(isTestingConnection) "Probando…" else "Probar conexión Atlas")}
+                    },colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {Text(if(isTestingConnection) "Probando…" else "Probar conexión Atlas")}
                 }
                 connectionStatusMessage?.let {status->InlineNotice(if(isConnectionSuccess) "Conexión correcta." else noticeMessage(status,"No se pudo conectar con Atlas."),technicalDetails=if(isConnectionSuccess) null else status,isError=!isConnectionSuccess)}
             }}
@@ -187,7 +188,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             TextButton(onClick={currencyDetails=!currencyDetails}) {Text("Detalles de conversión",color=TextSecondary)}
             if(currencyDetails) Text("Ejemplo: ${currencyManager.formatUsdDetails(.015)} → ${currencyManager.formatCost(.015)}",style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
             currencyState.error?.let {InlineNotice(noticeMessage(it,"No se pudo actualizar la tasa. Se conserva la guardada."),technicalDetails=it)}
-            OutlinedButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
+            FilledTonalButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
             TextButton(onClick={currencyManager.setPreference(CurrencyPreference.EUR_SMART)}) {Text("Restaurar predeterminado",color=TextSecondary)}
             TextButton(onClick={currencyOpen=false}) {Text("Cerrar moneda",color=TextSecondary)}
         }
@@ -222,20 +223,13 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                         text = "Tu clave API se almacena cifrada con AES256-GCM respaldada por el Keystore de Android.",
                         style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
                     )
-                    OutlinedTextField(
+                    StudioCredentialField(
                         value = apiKeyInput,
                         onValueChange = { apiKeyInput = it },
                         label = { Text("Clave API") },
                         placeholder = { Text("apikey-...") },
-                        visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryNeon,
-                            unfocusedBorderColor = BorderSubtle,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
+                        modifier = Modifier.fillMaxWidth()
                     , shape=NexusTokens.field)
                 }
             },
@@ -274,11 +268,10 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     Text("La clave se guarda cifrada en el Keystore de Android.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(
+                    StudioCredentialField(
                         value = providerKeyInput,
                         onValueChange = { providerKeyInput = it },
                         label = { Text("Clave API") },
-                        visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     , shape=NexusTokens.field)
@@ -333,7 +326,7 @@ private fun ProviderCredentialCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = SurfaceDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+        border = null,
         shape = NexusTokens.card
     ) {
         Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
@@ -352,8 +345,7 @@ private fun ProviderCredentialCard(
                 TextButton(onClick = onEdit) { Text("Modificar") }
             }
             if(accountStatus != null || loadingBalance) {
-                Surface(color = PrimaryNeon.copy(alpha = 0.08f), shape = NexusTokens.field,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.28f))) {
+                Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = NexusTokens.field) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                         verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = PrimaryNeon,
@@ -362,14 +354,14 @@ private fun ProviderCredentialCard(
                         Column(Modifier.weight(1f)) {
                             Text("Saldo", color = TextMuted, style = MaterialTheme.typography.labelSmall)
                             Text(accountStatus?.balanceLabel?.let {presentBalance(it,(LocalContext.current.applicationContext as NexusApplication).currencyManager)} ?: "Consultando…", color = TextPrimary,
-                                fontWeight = FontWeight.Bold)
+                                fontWeight = FontWeight.Medium,style=MaterialTheme.typography.headlineSmall.tabularMoney())
                         }
                         if(loadingBalance) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     }
                 }
             }
             balanceError?.let {InlineNotice(noticeMessage(it,"No se pudo consultar el saldo."),technicalDetails=it)}
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = {
                     testing = true
                     resultText = null

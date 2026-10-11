@@ -12,3 +12,13 @@ Primera entrega del rediseño, sobre 1.8.5 (versionCode 29), conservando los flu
 - Se mantienen los temas guardados y el acceso a encargos a varios modelos.
 
 Alcance pendiente: rediseño específico de catálogo, agente, conexiones y biblioteca. Esta entrega no acredita rendimiento a 120 Hz. Por petición del usuario no se ejecutan auditorías, pruebas funcionales ni benchmarks; se compila el APK para su instalación conservando datos.
+
+
+## Segunda entrega: 1.8.7 (versionCode 31)
+
+- Catálogo activo (CatalogTreeScreen): búsqueda y filtros en una píldora; filtros tonales con háptica; logos de 40 dp; títulos de una línea, tamaño adaptado al ancho y elipsis; precio en chip para la cuadrícula. También se limita el título de las variantes.
+- Agente: llamadas de herramientas plegadas por mensaje; avisos de error nuevos en Snackbar con detalle persistente plegable; reintento del turno fallido con sus referencias originales. Los adjuntos del borrador actual se conservan y cambiar de conversación/proyecto invalida el reintento anterior.
+- Conexiones: campos AWS, Atlas y tokens ocultos inicialmente, con alternancia de visibilidad; selectores segmentados para backend y familia LLM; saldos destacados sin segunda caja interior.
+- Biblioteca: filtros y búsqueda tonales, miniaturas cuadradas con crop, transición de carga de 180 ms y respuesta de presión; conserva navegación, proyectos y referencias.
+
+El APK se compila directamente en ASUS con un trabajador. No se ejecutan pruebas funcionales, auditorías visuales ni benchmarks por petición del usuario. Las transiciones añadidas no constituyen una medición de 120 Hz. Se conserva el catálogo y los contratos de proveedores.
