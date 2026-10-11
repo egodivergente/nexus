@@ -34,7 +34,7 @@ data class AgentConfig(
     /** Ids de skills activas; vacío = todas las disponibles. */
     val activeSkills: List<String> = emptyList(),
     /** Tope de rondas herramienta→modelo por mensaje del usuario (corta bucles). */
-    val maxToolRounds: Int = 14,
+    val maxToolRounds: Int = 7,
     /** Enviar al LLM una miniatura de las imágenes adjuntas para que vea el keyframe. */
     val sendImagesToLlm: Boolean = true,
     /** Sustituye el prompt de sistema base (las reglas de gasto se añaden siempre). */

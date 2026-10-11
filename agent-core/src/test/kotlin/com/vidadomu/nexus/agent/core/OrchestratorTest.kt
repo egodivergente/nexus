@@ -153,6 +153,20 @@ class OrchestratorTest {
         assertTrue(SystemPrompt.build(AgentMode.AGENT, null, "", null, "x").joinToString().contains("pulse GENERAR"))
     }
 
+    @Test fun `documento se lee una vez y se reutiliza su resumen`() = runTest {
+        val h=Harness()
+        val llm=ScriptedLlmProvider(listOf(
+            { r -> assertTrue(r.tools.isEmpty()); assertTrue(r.messages.any { m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document} }); text("Mateo viaja a Madrid en 1920.") },
+            { r -> assertFalse(r.messages.any {m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document}}); assertTrue(r.messages.any {"1920" in it.text()}); text("Resumen final") },
+            { r -> assertFalse(r.messages.any {m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document}}); text("Continuacion") }
+        ))
+        val o=AgentOrchestrator(llm,config,NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {com.vidadomu.nexus.agent.core.llm.ContentBlock.Document("pdf","Script",byteArrayOf(1,2))})
+        val conv=o.newConversation()
+        assertEquals("Resumen final",o.send(conv,"Resume",listOf(Attachment("doc","file:///doc.pdf","application/pdf","doc.pdf"))).text)
+        assertEquals("Continuacion",o.send(conv,"Sigue").text)
+    }
+
     @Test fun `adjunto se describe al LLM con su id`() = runTest {
         val h = Harness()
         val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.messages.last().text().contains("attachment_id=att_1")); text("visto") }))

@@ -67,7 +67,7 @@ data class AssistantSettings(
     fun toConfig() = AgentConfig(
         provider = when { offline -> "offline"; direct -> "bedrock-direct"; else -> "bedrock-proxy" },
         modelId = modelId.ifBlank { "offline" }, region = region,
-        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 40, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
+        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 7, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
     )
 
     companion object {
@@ -165,6 +165,14 @@ class AssistantSettingsStore(private val app: NexusApplication) {
     fun excludedFamilies(): Set<String> =
         AssistantSettings.parseFamilies(prefs.getString("excluded_families", AssistantSettings.DEFAULT_EXCLUDED).orEmpty())
 
+    fun llmLimits(): com.vidadomu.nexus.agent.core.llm.LlmLimits = com.vidadomu.nexus.agent.core.llm.LlmLimits(
+        perTurnUsd = prefs.getString("llm_turn_usd", "1.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 1.0,
+        dailyUsd = prefs.getString("llm_daily_usd", "5.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 5.0)
+    fun saveLlmLimits(turn: Double, daily: Double) {
+        require(turn.isFinite() && daily.isFinite() && turn in 0.01..100.0 && daily in turn..1000.0)
+        check(prefs.edit().putString("llm_turn_usd", turn.toString()).putString("llm_daily_usd", daily.toString()).commit())
+    }
+
     fun token(): String = secure.getProviderApiKey(TOKEN_ID)
 
     fun awsCredentials() = AwsCredentials(secure.getProviderApiKey(AWS_ACCESS_ID), secure.getProviderApiKey(AWS_SECRET_ID))
@@ -181,6 +189,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
 /** Todo el asistente montado sobre los repositorios de Nexus. Se reconstruye al recargar skills o ajustes. */
 class AssistantRuntime(private val app: NexusApplication) {
     val settings = AssistantSettingsStore(app)
+    val llmBudget = com.vidadomu.nexus.agent.core.llm.LlmBudgetLedger(File(app.filesDir, "assistant/llm-budget.json"))
     val registry = NexusModelRegistry(app)
     val assets = AssetIndex(File(app.filesDir, "assistant/index.json"))
     val guard = SpendGuard()
@@ -222,7 +231,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     fun llm(s: AssistantSettings): LlmProvider =
         when {
             s.offline -> OfflinePlannerProvider()
-            s.direct -> BedrockDirectProvider(s.region.trim(), { settings.awsCredentials() })
+            s.direct -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
+                BedrockDirectProvider(s.region.trim(), { settings.awsCredentials() }), llmBudget, { settings.llmLimits() })
             else -> BedrockProxyProvider(s.endpoint, { settings.token() })
         }
 

@@ -526,6 +526,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
                 AgentStatus(ui,{})
+                AgentBudgetSettings()
                 AgentInternetSettings()
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock",AssistantSettings.BACKEND_PROXY to "Proxy").forEachIndexed { index, (value,label) ->

@@ -44,6 +44,7 @@ data class LlmRequest(
     val tools: List<ToolSpec>,
     val maxTokens: Int,
     val temperature: Double? = null,
+    val turnId: String? = null,
 )
 
 enum class StopReason { END_TURN, TOOL_USE, MAX_TOKENS, STOP_SEQUENCE, GUARDRAIL, CONTENT_FILTERED, OTHER }
@@ -55,6 +56,7 @@ data class LlmResponse(val message: LlmMessage, val stopReason: StopReason, val 
 interface LlmProvider {
     val id: String
     suspend fun complete(request: LlmRequest): LlmResponse
+    suspend fun countInputTokens(request: LlmRequest): Int? = null
 }
 
 /** Error de proveedor con mensaje apto para el usuario (sin secretos ni cuerpos de petición). */

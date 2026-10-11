@@ -48,7 +48,7 @@ class NexusNativeOperations(
 
     private suspend fun active(input: JsonObject): JsonObject {
         app.database.loading.firstReady()
-        val jobs = app.generationRepository.allJobs.value.filter { it.status in ACTIVE &&
+        val jobs = app.generationRepository.allJobs.value.filter { (it.status in ACTIVE || it.parameters["__tracking_paused"]=="true" || it.parameters["__submission_uncertain"]=="true") &&
             (input.text("provider_id") == null || it.providerId == input.text("provider_id")) }
             .sortedBy { it.startedAt }.take(input.integer("limit", 20, 1..50))
         return buildJsonObject { put("jobs", JsonArray(jobs.map(::jobInfo))); put("checked_at", System.currentTimeMillis()) }

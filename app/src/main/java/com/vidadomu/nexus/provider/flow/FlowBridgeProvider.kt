@@ -78,12 +78,12 @@ class FlowBridgeProvider(
     override suspend fun pollJobStatus(job: GenerationJob): Result<GenerationJob> = withContext(Dispatchers.IO) {
         if (job.providerJobId?.startsWith("queue_") == true && queue != null) return@withContext queueLock.withLock {
             val previous = job.parameters["__flow_queue_previous"].orEmpty()
-            if (previous.isNotBlank() && queue.getString("state_$previous", "") !in setOf("completed", "failed")) {
+            if (previous.isNotBlank() && queue.getString("state_$previous", "") !in setOf("completed", "failed", "released")) {
                 val previousJob = (appContext as? com.vidadomu.nexus.NexusApplication)?.generationRepository?.getJob(previous)
                 val hasRemote = queue.contains("remote_${previous}_0")
-                if(!FlowQueueDependency.canProceed(previousJob,hasRemote))
+                if(!FlowQueueDependency.canProceed(previousJob,hasRemote,waitingSince=job.startedAt))
                     return@withLock Result.success(job.copy(status = GenerationStatus.QUEUED, error = "Esperando al encargo anterior de Flow; su seguimiento sigue activo."))
-                queue.edit().putString("state_$previous", "completed").commit()
+                queue.edit().putString("state_$previous", "released").commit()
             }
             val block = job.parameters["__flow_block"]?.toIntOrNull() ?: 0
             val requestId = "${job.id}_$block"
@@ -102,6 +102,7 @@ class FlowBridgeProvider(
             remote.map { submitted ->
                 queue.edit().putString("remote_$requestId", submitted.id).putString("state_${job.id}", if(submitted.state == "failed") "failed" else "active").commit()
                 job.copy(providerJobId = submitted.id, status = statusFor(submitted.state),
+                    parameters = job.parameters + ("__tracking_started_at" to System.currentTimeMillis().toString()),
                     completedAt = if(submitted.state == "failed") System.currentTimeMillis() else null,
                     error = if(submitted.state == "failed") flowFailureMessage(submitted.error) else pendingMessage(submitted))
             }
@@ -116,7 +117,10 @@ class FlowBridgeProvider(
         if(remote.state == "failed") queue?.edit()?.putString("state_${job.id}", "failed")?.apply()
         try {
             when (remote.state) {
-                "completed" -> copyCompletedResult(job, remote).map { copied ->
+                "completed" -> {
+                    // Retrieval failures must not hold the generation queue hostage.
+                    queue?.edit()?.putString("state_${job.id}", "released")?.commit()
+                    copyCompletedResult(job, remote).map { copied ->
                     val goal = job.parameters["count"]?.toIntOrNull() ?: 1
                     if(copied.status == GenerationStatus.COMPLETED && copied.outputs.size < goal) {
                         val block = job.parameters["__flow_block"]?.toIntOrNull() ?: 0
@@ -128,6 +132,7 @@ class FlowBridgeProvider(
                         if(copied.status == GenerationStatus.COMPLETED) queue?.edit()?.putString("state_${job.id}", "completed")?.apply()
                         copied
                     }
+                }
                 }
                 "failed" -> Result.success(
                     job.copy(

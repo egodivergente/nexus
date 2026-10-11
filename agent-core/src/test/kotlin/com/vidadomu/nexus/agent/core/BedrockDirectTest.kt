@@ -66,6 +66,18 @@ class BedrockDirectTest {
         assertEquals(5, r.usage.inputTokens)
     }
 
+    @Test fun `cuenta tokens con cuerpo Converse y firma directa`() = runTest {
+        var url="";var body=""
+        val p=BedrockDirectProvider("us-east-1",{creds},client(200,"""{"inputTokens":123}""") {
+            url=it.url.toString();body=Buffer().also {b -> it.body!!.writeTo(b)}.readUtf8()
+        },now={at})
+        assertEquals(123,p.countInputTokens(req))
+        assertTrue(url.endsWith("/count-tokens"))
+        val converse=Json.parseToJsonElement(body).jsonObject["input"]!!.jsonObject["converse"]!!.jsonObject
+        assertTrue("messages" in converse)
+        assertFalse("inferenceConfig" in converse)
+    }
+
     @Test fun `modelo no habilitado se explica`() = runTest {
         val p = BedrockDirectProvider("us-east-1", { creds }, client(403,
             """{"message":"anthropic.claude-sonnet-5-5 is not available for this account."}""", "AccessDeniedException:http://internal"), now = { at })

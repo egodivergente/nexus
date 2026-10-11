@@ -115,7 +115,7 @@ class GenerationRepository(
         database.loading.first { !it }
         if(database.loadError.value == null) {
             database.jobsFlow.value.forEach { job ->
-                val recovered = job.recoverInterruptedComparison()
+                val recovered = job.recoverInterruptedComparison().recoverInterruptedSubmission()
                 if(recovered != job) database.insertOrUpdateJob(recovered)
                 else if(context != null && !com.vidadomu.nexus.BuildConfig.OFFLINE_QA && !job.providerJobId.isNullOrBlank() &&
                     job.status in setOf(GenerationStatus.QUEUED, GenerationStatus.GENERATING, GenerationStatus.PROCESSING, GenerationStatus.RENDERING)) {
@@ -160,12 +160,17 @@ class GenerationRepository(
         }
 
     private suspend fun pollJobLocked(jobId: String, refreshFailed: Boolean): Result<GenerationJob> {
-        val currentJob = database.getJobById(jobId)
+        var currentJob = database.getJobById(jobId)
             ?: return Result.failure(ProviderError("Job $jobId not found in local database"))
 
         if (currentJob.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.CANCELLED) ||
             (currentJob.status == GenerationStatus.FAILED && !refreshFailed)) {
             return Result.success(currentJob)
+        }
+
+        val persistedJob = currentJob
+        if (refreshFailed && currentJob.parameters["__tracking_paused"] == "true") {
+            currentJob = currentJob.copy(parameters = (currentJob.parameters - "__tracking_paused") + ("__tracking_started_at" to System.currentTimeMillis().toString()))
         }
 
         val provider = providerRegistry.getProviderById(currentJob.providerId)
@@ -174,9 +179,10 @@ class GenerationRepository(
         val pollResult = provider.pollJobStatus(currentJob)
         if (pollResult.isSuccess) {
             val remote = pollResult.getOrThrow()
-            val updated = if(currentJob.parameters["__tracking_poll_error"] == "true") remote.copy(
+            val normalized = if(currentJob.parameters["__tracking_poll_error"] == "true") remote.copy(
                 error = remote.error.takeUnless { it == currentJob.error },
                 parameters = remote.parameters - "__tracking_poll_error") else remote
+            val updated = if(refreshFailed) normalized else normalized.pauseExpiredTracking()
             database.insertOrUpdateJob(updated)
             if (updated.status == GenerationStatus.COMPLETED && context != null) {
                 try {
@@ -189,8 +195,8 @@ class GenerationRepository(
         }
         val problem = pollResult.exceptionOrNull()
         val detail = (problem as? ProviderError)?.humanReadableMessage ?: "No se pudo consultar el estado. Se reintentará sin volver a enviar la generación."
-        database.insertOrUpdateJob(currentJob.copy(error = detail,
-            parameters = currentJob.parameters + ("__tracking_poll_error" to "true")))
+        database.insertOrUpdateJob(persistedJob.copy(error = detail,
+            parameters = persistedJob.parameters + ("__tracking_poll_error" to "true")).pauseExpiredTracking())
         return pollResult
     }
 

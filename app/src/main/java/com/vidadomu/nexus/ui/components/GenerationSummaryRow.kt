@@ -26,7 +26,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 internal fun generationStatusLabel(job:GenerationJob):String =
-    if(job.parameters["__submission_uncertain"]=="true") "Por confirmar"
+    if(job.parameters["__tracking_paused"]=="true") "Seguimiento pausado"
+    else if(job.parameters["__submission_uncertain"]=="true") "Por confirmar"
     else if(job.parameters["__tracking_poll_error"]=="true") "Consulta interrumpida"
     else when(job.status) {
         GenerationStatus.COMPLETED->"Completado"

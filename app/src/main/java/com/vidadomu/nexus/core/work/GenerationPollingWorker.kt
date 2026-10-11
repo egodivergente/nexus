@@ -49,7 +49,7 @@ class GenerationPollingWorker(
                     return Result.success()
                 } else if (job.status == GenerationStatus.FAILED) {
                     showCompletionNotification(
-                        title = "Nexus: Generation Failed",
+                        title = if(job.parameters["__tracking_paused"]=="true") "Nexus: seguimiento pausado" else "Nexus: Generation Failed",
                         message = job.error ?: "Unable to complete generation.",
                         jobId = jobId
                     )

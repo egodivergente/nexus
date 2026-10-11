@@ -108,6 +108,12 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         } else GenerationSummaryRow(job,currencyManager,
                             onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
                             menu={ close ->
+                                if(job.parameters["__tracking_paused"]=="true") DropdownMenuItem(text={Text("Recuperar seguimiento")},onClick={close();scope.launch {
+                                    val recovered=app.generationRepository.pollJob(job.id,refreshFailed=true)
+                                    if(recovered.getOrNull()?.status in setOf(GenerationStatus.QUEUED,GenerationStatus.GENERATING,GenerationStatus.PROCESSING,GenerationStatus.RENDERING))
+                                        com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context,job.id)
+                                    android.widget.Toast.makeText(context,if(recovered.isSuccess) "Estado consultado sin volver a generar" else "No se pudo consultar; se conserva el trabajo",android.widget.Toast.LENGTH_LONG).show()
+                                }})
                                 DropdownMenuItem(text={Text("Preparar de nuevo")},onClick={close();onPrepareAgain(job)})
                                 if(job.providerJobId!=null && job.providerId!="mock_provider") DropdownMenuItem(text={Text(if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) "Consultar coste" else "Actualizar estado")},onClick={close();
                                     scope.launch {
@@ -133,7 +139,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
 
     // Technical details dialog
     selectedTechnicalJob?.let { job ->
-        val statusSpanish = if(job.parameters["__submission_uncertain"]=="true") "POR CONFIRMAR" else when (job.status) {
+        val statusSpanish = if(job.parameters["__tracking_paused"]=="true") "SEGUIMIENTO PAUSADO" else if(job.parameters["__submission_uncertain"]=="true") "POR CONFIRMAR" else when (job.status) {
             GenerationStatus.COMPLETED -> "COMPLETADO"
             GenerationStatus.FAILED -> "FALLIDO"
             GenerationStatus.QUEUED -> "EN COLA"

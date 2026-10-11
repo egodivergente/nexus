@@ -101,7 +101,7 @@ class AgentOrchestrator(
         text: String,
         newAttachments: List<Attachment> = emptyList(),
         onEvent: (UiEvent) -> Unit = {},
-    ): TurnResult = conv.mutex.withLock {
+    ): TurnResult = conv.mutex.withLock { kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(AssetIndex.newId("turn"))) {
         val session = conv.session
         session.flowSubmittedResults = 0
         val start = conv.messages.size
@@ -125,6 +125,8 @@ class AgentOrchestrator(
 
         val events = mutableListOf<UiEvent>()
         val calls = mutableListOf<String>()
+        val turnId = kotlin.coroutines.coroutineContext[com.vidadomu.nexus.agent.core.llm.LlmTurnContext]!!.turnId
+        var llmCalls = 0
         var input = 0; var output = 0; var rounds = 0
         var stop = "END_TURN"
         val turnTexts = mutableListOf<String>()
@@ -137,8 +139,16 @@ class AgentOrchestrator(
         )
 
         while (true) {
+            if (llmCalls >= config.maxToolRounds + 1) {
+                stop = "MAX_ROUNDS"
+                turnTexts += "He alcanzado el limite de llamadas de este mensaje. El trabajo queda conservado."
+                break
+            }
+            val readingDocuments = conv.messages.any { m -> m.content.any { it is ContentBlock.Document } }
+            val requestSystem = if (readingDocuments) system + "Lee los documentos y extrae un resumen de trabajo preciso, con hechos, citas de seccion y detalles necesarios para la peticion del usuario. Indica lo que no has podido leer. Esta fase solo lee: no afirma haber ejecutado acciones. El original no se reenviara en los siguientes pasos; conserva aqui la informacion necesaria." else system
             val response = try {
-                llm.complete(LlmRequest(config.modelId, system, conv.messages.toList(), specs, config.maxTokens, config.temperature))
+                llmCalls++
+                llm.complete(LlmRequest(config.modelId, requestSystem, conv.messages.toList(), if(readingDocuments) emptyList() else specs, config.maxTokens, config.temperature, turnId))
             } catch (e: LlmException) {
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
                 if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)
@@ -148,6 +158,16 @@ class AgentOrchestrator(
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
             conv.messages += msg
             msg.text().takeIf { it.isNotBlank() }?.let { turnTexts += it }
+            if (readingDocuments) {
+                conv.messages.indices.forEach { i ->
+                    conv.messages[i] = conv.messages[i].copy(content = conv.messages[i].content.map {
+                        if(it is ContentBlock.Document) ContentBlock.Text("[Documento ${it.name}: lectura resumida en el siguiente mensaje; el original sigue en referencias.]") else it
+                    })
+                }
+                if(response.stopReason != StopReason.END_TURN) { stop=response.stopReason.name; break }
+                conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text("Con esa lectura, atiende ahora mi peticion original: $text")))
+                continue
+            }
             val uses = msg.toolUses()
             if (uses.isEmpty()) { stop = response.stopReason.name; break }
 
@@ -168,10 +188,10 @@ class AgentOrchestrator(
             }
             conv.messages += LlmMessage(Role.USER, results)
             rounds++
-            if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; }
+            if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
         }
         TurnResult(turnTexts.lastOrNull().orEmpty(), events, Usage(input, output), rounds, calls, stop)
-    }
+    } }
 
     private suspend fun runTool(use: ContentBlock.ToolUse, session: AgentSession): Triple<JsonElement, Boolean, List<UiEvent>> {
         val tool = byName[use.name]
