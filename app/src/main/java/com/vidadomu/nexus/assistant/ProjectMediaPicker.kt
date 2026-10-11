@@ -23,6 +23,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -30,6 +32,7 @@ import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.agent.core.assets.Asset
 import com.vidadomu.nexus.agent.core.assets.Project
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -131,7 +134,7 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ProjectMediaPickerSheet(
     assets: List<Asset>, projectId: String?, projectName: String?, mimeTypes: List<String>, maximum: Int,
@@ -163,6 +166,7 @@ internal fun ProjectMediaPickerSheet(
     }
     val filtered = remember(all, query) { all.filter { it.displayName.contains(query.trim(), ignoreCase = true) } }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(horizontal = NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
             Text(if (managing) "Biblioteca del proyecto" else "Importar fotografías y archivos", style = MaterialTheme.typography.titleMedium)
             if (managementOnly) Box {
@@ -174,7 +178,7 @@ internal fun ProjectMediaPickerSheet(
                         projectMenu = false; onProjectChange(project)
                     }) }
                 }
-            } else Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            } else FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 StudioFilterChip(recent,{recent=true;selected=emptyList()},label={Text("Recientes")})
                 if(projectId!=null) StudioFilterChip(!recent,{recent=false;selected=emptyList()},label={Text(projectName ?: "Proyecto")})
             }
@@ -209,7 +213,7 @@ internal fun ProjectMediaPickerSheet(
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 items(filtered, key = { it.id }) { asset ->
                     val checked = asset.id in selected
-                    Column(Modifier.clip(NexusTokens.field).toggleable(value = checked, role = Role.Checkbox,
+                    Column(Modifier.clip(NexusTokens.field).semantics {contentDescription=asset.displayName}.toggleable(value = checked, role = Role.Checkbox,
                         enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum),
                         onValueChange = { select -> selected = if (!select) selected - asset.id else if (!managing && maximum == 1) listOf(asset.id) else selected + asset.id })) {
                         if(asset.mimeType?.startsWith("image/")==true) AsyncImage(asset.uri, null, Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Crop)

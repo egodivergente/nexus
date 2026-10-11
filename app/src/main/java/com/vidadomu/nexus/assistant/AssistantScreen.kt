@@ -35,6 +35,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -133,9 +135,12 @@ fun AssistantScreen(
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={
-        NexusTopAppBar(title={Column(Modifier.clickable {showProject=true}.semantics {contentDescription="Abrir proyecto"}) {
+        NexusTopAppBar(title={Column(Modifier.heightIn(min=NexusTokens.minimumTouch).clickable {showProject=true}.semantics {
+            contentDescription="Abrir proyecto"
+            stateDescription=listOfNotNull(activeProject?.name ?: "Agente",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
+        },verticalArrangement=Arrangement.Center) {
             Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text(listOfNotNull(ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+            if(LocalDensity.current.fontScale<1.3f) Text(listOfNotNull(ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
         }},actions={IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {

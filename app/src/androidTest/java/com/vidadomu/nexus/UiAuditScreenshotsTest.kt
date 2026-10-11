@@ -81,7 +81,7 @@ class UiAuditScreenshotsTest {
         val originalTheme = preferences.theme()
         val args = InstrumentationRegistry.getArguments()
         val phase = args.getString("audit_phase") ?: "before"
-        val themes = if(phase=="after") listOf(NexusAppearance.AURORA,NexusAppearance.OLED,NexusAppearance.LIGHT,NexusAppearance.QUARTZ)
+        val themes = if(phase=="after") NexusAppearance.entries
             else listOf(NexusAppearance.LIGHT)
         val scales = when(phase) { "before" -> listOf(1f,1.3f); "after" -> listOf(1f,1.3f,1.5f); else -> listOf(1.3f) }
         val scenes=args.getString("audit_scenes")?.split(",")
@@ -127,6 +127,9 @@ class UiAuditScreenshotsTest {
                     // Give the emulator compositor time to present the settled screen.
                     android.os.SystemClock.sleep(1000)
                     instrumentation.waitForIdleSync()
+                    compose.waitUntil(10_000) {
+                        instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString()==app.packageName
+                    }
                     // Capture the full display, including a dialog/sheet in a separate window.
                     val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
                     File(folder,"${theme.name}-${fontScale}-$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }

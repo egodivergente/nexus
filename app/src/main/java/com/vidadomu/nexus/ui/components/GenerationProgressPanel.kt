@@ -155,11 +155,8 @@ fun GenerationProgressPanel(
             )
 
             job.error?.takeIf { it.isNotBlank() }?.let { message ->
-                Text(
-                    text = message,
-                    color = AccentCoral,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                InlineNotice(noticeMessage(message,"No se pudo actualizar este trabajo. Consulta su estado antes de repetir."),
+                    technicalDetails=message)
             }
         }
     }

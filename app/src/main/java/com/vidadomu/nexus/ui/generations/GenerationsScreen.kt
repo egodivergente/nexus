@@ -59,7 +59,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
     }
 
     Scaffold(containerColor=ScreenBackground,topBar={
-        TopAppBar(title={Text("Historial",style=MaterialTheme.typography.titleLarge)},actions={
+        TopAppBar(title={Text("Historial",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
             IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Historial")}
         },colors=TopAppBarDefaults.topAppBarColors(containerColor=BackgroundDark))
     }) { padding ->

@@ -103,7 +103,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         prefs.edit().putStringSet("model_favorites", favorites).apply()
     }
     Scaffold(containerColor = BackgroundDark, topBar = {
-        TopAppBar(title = { Text("Modelos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold) },
+        TopAppBar(title = { Text("Modelos",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),fontWeight=FontWeight.SemiBold) },
             navigationIcon = { if(family != null || groupKey != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
             actions = {
                 Box {

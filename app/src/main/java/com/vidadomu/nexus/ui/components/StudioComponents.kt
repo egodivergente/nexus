@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,8 +96,9 @@ fun StudioToolChip(label: String, description: String = label, enabled: Boolean 
             contentColor = if(enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             shape = NexusTokens.filter, modifier = Modifier
                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                .semantics { contentDescription = description }) {
-            Text(label, Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                .heightIn(min=NexusTokens.minimumTouch)
+                .semantics { contentDescription = description; if(description!=label) stateDescription=label }) {
+            Text(label, Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                 style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.vidadomu.nexus.core.model.*
 import java.io.File
+import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
+import com.vidadomu.nexus.ui.theme.NexusTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,8 +25,9 @@ internal fun LibraryActions(job:GenerationJob,output:GenerationOutput,localUri:S
     onDismiss:()->Unit,onOpen:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onError:(String)->Unit) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
-    ModalBottomSheet(onDismissRequest=onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=24.dp)) {
+    ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space24)) {
             Text("Opciones del archivo",style=MaterialTheme.typography.titleMedium)
             ListItem(headlineContent={Text("Abrir")},leadingContent={Icon(Icons.Default.OpenInFull,null)},
                 modifier=Modifier.actionClick {onDismiss();onOpen()})

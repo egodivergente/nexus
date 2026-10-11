@@ -243,7 +243,7 @@ fun FlowCreateScreen(
         snackbarHost = { SnackbarHost(snackbarHost) {data->InlineNotice(noticeMessage(data.visuals.message,"No se pudo completar la acción en Flow."),technicalDetails=data.visuals.message,actionLabel="Cerrar",onAction={data.dismiss()})} },
         topBar = {
             TopAppBar(
-                title = { Text("Flow", style=MaterialTheme.typography.titleLarge) },
+                title = { Text("Flow", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")

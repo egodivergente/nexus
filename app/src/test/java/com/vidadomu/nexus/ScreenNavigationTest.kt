@@ -11,7 +11,7 @@ class ScreenNavigationTest {
         assertEquals("flow", Screen.Flow.route)
         assertFalse(Screen.Flow in Screen.bottomNavItems)
         assertEquals(
-            listOf("assistant", "create", "models", "generations", "library"),
+            listOf("assistant", "create", "models", "library"),
             Screen.bottomNavItems.map { it.route }
         )
     }
