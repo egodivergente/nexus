@@ -37,8 +37,14 @@ fun interface AttachmentDocumentLoader {
     suspend fun load(attachment: Attachment): ContentBlock.Document?
 }
 
+/** Sampled visual frames and their timestamps; never audio or the original video. */
+fun interface AttachmentVideoLoader {
+    suspend fun load(attachment: Attachment): List<ContentBlock>
+}
+
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
 class AgentConversation(val session: AgentSession) {
+    internal var reasoningModelId: String? = null
     internal val messages = mutableListOf<LlmMessage>()
     internal val mutex = Mutex()
     fun history(): List<LlmMessage> = messages.toList()
@@ -79,6 +85,7 @@ class AgentOrchestrator(
     private val images: AttachmentImageLoader? = null,
     private val today: () -> String = { LocalDate.now().toString() },
     private val documents: AttachmentDocumentLoader? = null,
+    private val videos: AttachmentVideoLoader? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -102,6 +109,10 @@ class AgentOrchestrator(
         newAttachments: List<Attachment> = emptyList(),
         onEvent: (UiEvent) -> Unit = {},
     ): TurnResult = conv.mutex.withLock { kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(AssetIndex.newId("turn"))) {
+        if (conv.reasoningModelId != null && conv.reasoningModelId != config.modelId)
+            throw LlmException(LlmException.Kind.BAD_REQUEST, "Has cambiado el modelo. Abre una nueva conversación para usarlo; este chat se conserva.")
+        if (conv.reasoningModelId != null && conv.messages.size > MAX_MESSAGES)
+            throw LlmException(LlmException.Kind.BAD_REQUEST, "Este chat ha alcanzado su límite de contexto. Abre una nueva conversación; el proyecto y sus archivos se conservan.")
         val session = conv.session
         session.flowSubmittedResults = 0
         val start = conv.messages.size
@@ -115,8 +126,28 @@ class AgentOrchestrator(
                 runCatching { loader.load(a) }.getOrNull()?.let { blocks += it }
             }
         }
+        val videoAttachments = newAttachments.filter { it.mimeType.startsWith("video/") }
+        if (videoAttachments.isNotEmpty()) {
+            val videoLoader = videos
+            if (config.sendImagesToLlm && videoLoader != null) {
+                require(videoAttachments.size <= MAX_VIDEOS_PER_TURN) {
+                    "Puedes analizar hasta 2 vídeos por mensaje. Envía los demás en otro turno; los originales se conservan."
+                }
+                for (attachment in videoAttachments) {
+                    val frames = videoLoader.load(attachment)
+                    require(frames.count { it is ContentBlock.Image } == VIDEO_FRAMES_PER_ATTACHMENT &&
+                        frames.all { it is ContentBlock.Image || it is ContentBlock.Text }) {
+                        "No se pudieron obtener los 6 fotogramas del vídeo. No se ha analizado su contenido."
+                    }
+                    blocks += ContentBlock.Text("Vídeo ${attachment.name ?: attachment.id}: análisis visual muestreado de 6 fotogramas. SIN audio; no es una lectura completa del vídeo y puede omitir acciones entre muestras.")
+                    blocks += frames
+                }
+            } else {
+                blocks += ContentBlock.Text("Los vídeos adjuntos NO se han leído: el análisis visual está desactivado o no disponible. No se han enviado fotogramas ni audio; no afirmes haber visto su contenido.")
+            }
+        }
         documents?.let { loader ->
-            val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") }
+            val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") && !it.mimeType.startsWith("audio/") }
             require(docs.size <= 5) { "Bedrock admite hasta 5 documentos por mensaje. Envía los demás en el siguiente." }
             for (attachment in docs) {
                 onEvent(UiEvent.Info("Preparando documento ${docs.indexOf(attachment)+1}/${docs.size}: ${attachment.name ?: "archivo"}"))
@@ -166,8 +197,11 @@ class AgentOrchestrator(
             input += response.usage.inputTokens; output += response.usage.outputTokens
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
             conv.messages += msg
+            if (msg.content.any { it is ContentBlock.Reasoning }) conv.reasoningModelId = config.modelId
             msg.text().takeIf { it.isNotBlank() }?.let { turnTexts += it }
             if (readingDocuments) {
+                // Do not replace a document that belongs to signed reasoning context.
+                if (conv.reasoningModelId != null) { stop = response.stopReason.name; break }
                 conv.messages.indices.forEach { i ->
                     conv.messages[i] = conv.messages[i].copy(content = conv.messages[i].content.map {
                         if(it is ContentBlock.Document) ContentBlock.Text("[Documento ${it.name}: lectura resumida en el siguiente mensaje; el original sigue en referencias.]") else it
@@ -267,6 +301,12 @@ class AgentOrchestrator(
 
     private fun trimHistory(conv: AgentConversation) {
         val m = conv.messages
+        // Signed reasoning is tied to the exact conversation. Do not rewrite preceding
+        // images, documents or tool results. A new chat handles the bounded context limit.
+        if (m.any { message -> message.content.any { it is ContentBlock.Reasoning } }) {
+            conv.reasoningModelId = config.modelId
+            return
+        }
         // Imágenes solo en los dos últimos mensajes de usuario: ahorra tokens sin perder el contexto textual.
         val userIdx = m.indices.filter { m[it].role == Role.USER }
         userIdx.dropLast(2).forEach { i ->
@@ -298,6 +338,8 @@ class AgentOrchestrator(
     companion object {
         const val MAX_MESSAGES = 60
         const val MAX_IMAGES_PER_TURN = 4
+        const val MAX_VIDEOS_PER_TURN = 2
+        const val VIDEO_FRAMES_PER_ATTACHMENT = 6
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

@@ -53,7 +53,7 @@ fun GenerationProgressPanel(job: GenerationJob, modifier: Modifier = Modifier, c
             } else if(active) LinearProgressIndicator(modifier=Modifier.fillMaxWidth())
             if(active) Text("${elapsed/60} min ${elapsed%60} s transcurridos · ${timeLabel}",style=MaterialTheme.typography.labelSmall)
             Text(job.modelId,style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            job.error?.takeIf {it.isNotBlank()}?.let {Text(it,style=MaterialTheme.typography.bodySmall)}
+            job.error?.takeIf {it.isNotBlank()}?.let { message -> InlineNotice(noticeMessage(message,"No se pudo actualizar este trabajo. Consulta su estado antes de repetir."),technicalDetails=message) }
         }
     }
 }

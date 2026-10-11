@@ -5,6 +5,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -25,12 +27,24 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.tabularMoney
+
+/** Keep the Studio strip compact normally; enlarged text exposes all actions in wrapping rows. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun StudioToolRow(content: @Composable () -> Unit) {
+    if(LocalDensity.current.fontScale>=1.3f) {
+        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {content()}
+    } else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {content()}
+}
 
 @Composable
 internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
@@ -93,7 +107,7 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if(working) CircularProgressIndicator(Modifier.size(16.dp), color = scheme.onPrimary, strokeWidth = 2.dp)
                     Text(if(working) busyLabel else "Generar · $cost", style = MaterialTheme.typography.titleSmall.tabularMoney(),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        modifier=Modifier.weight(1f,fill=false),maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

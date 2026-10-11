@@ -99,13 +99,13 @@ class Usage:
                 pass
         return {"usd": 0.0, "input_tokens": 0, "output_tokens": 0, "requests": 0, "unpriced_requests": 0}
 
-    def reserve(self, usd: float, tokens: int, budget_usd: float, budget_tokens: int) -> None:
+    def reserve(self, usd: float, tokens: int, budget_usd: float, budget_tokens: int | None) -> None:
         """Aparta el peor caso de esta llamada ANTES de llamar a Bedrock (evita la carrera entre hilos)."""
         with self.lock:
             d = self.today()
             if d["usd"] + self.reserved_usd + usd > budget_usd:
                 raise ProxyError(402, "budget_exceeded", "Presupuesto diario del asistente agotado.")
-            if d["input_tokens"] + d["output_tokens"] + self.reserved_tokens + tokens > budget_tokens:
+            if budget_tokens is not None and d["input_tokens"] + d["output_tokens"] + self.reserved_tokens + tokens > budget_tokens:
                 raise ProxyError(402, "budget_exceeded", "Tope diario de tokens del asistente agotado.")
             self.reserved_usd += usd
             self.reserved_tokens += tokens
@@ -196,7 +196,7 @@ class NexusProxy:
         d = self.usage.today()
         if d["usd"] >= float(self.cfg["daily_budget_usd"]):
             raise ProxyError(402, "budget_exceeded", "Presupuesto diario del asistente agotado.")
-        if d["input_tokens"] + d["output_tokens"] >= int(self.cfg["daily_token_budget"]):
+        if self.cfg["daily_token_budget"] is not None and d["input_tokens"] + d["output_tokens"] >= int(self.cfg["daily_token_budget"]):
             raise ProxyError(402, "budget_exceeded", "Tope diario de tokens del asistente agotado.")
 
     def cost(self, model_id: str, inp: int, out: int) -> float | None:
@@ -279,6 +279,20 @@ class NexusProxy:
                 if not raw or len(raw) > int(self.cfg["max_document_bytes"]):
                     raise ProxyError(413, "too_large", "Documento vacio o superior a 4,5 MB.")
                 content.append({"document": {"format": doc["format"], "name": name, "source": {"bytes": raw}}})
+            elif isinstance(block, dict) and "reasoningContent" in block:
+                reasoning = block["reasoningContent"]
+                if m["role"] != "assistant" or not isinstance(reasoning, dict):
+                    raise ProxyError(400, "bad_request", "Contexto de razonamiento no válido.")
+                if set(reasoning) == {"redactedContent"}:
+                    try:
+                        decoded = base64.b64decode(reasoning["redactedContent"], validate=True)
+                    except (ValueError, TypeError):
+                        raise ProxyError(400, "bad_request", "Contexto de razonamiento mal codificado.")
+                    content.append({"reasoningContent": {"redactedContent": decoded}})
+                elif set(reasoning) == {"reasoningText"} and isinstance(reasoning["reasoningText"], dict) and all(isinstance(reasoning["reasoningText"].get(key), str) for key in ("text", "signature")):
+                    content.append(block)
+                else:
+                    raise ProxyError(400, "bad_request", "Contexto de razonamiento incompleto.")
             else:
                 content.append(block)
         if documents and not any(isinstance(b, dict) and isinstance(b.get("text"), str) and b["text"].strip() for b in content):
@@ -313,11 +327,12 @@ class NexusProxy:
                 # Keep the existing conservative reservation if counting is unsupported or unavailable.
                 # The explicit error below explains why a valid document may still exceed that reservation.
                 LOG.warning("Document token count unavailable; using conservative reservation")
-                remaining = int(self.cfg["daily_token_budget"]) - self.usage.today()["input_tokens"] - self.usage.today()["output_tokens"]
+                remaining = float("inf") if self.cfg["daily_token_budget"] is None else int(self.cfg["daily_token_budget"]) - self.usage.today()["input_tokens"] - self.usage.today()["output_tokens"]
                 if worst_in + worst_out > remaining:
                     raise ProxyError(422, "document_token_count_unavailable", "No se pudo contar el documento con Bedrock. Revisa el permiso bedrock:CountTokens, la compatibilidad del modelo y la version de boto3; la reserva provisional supera el presupuesto. El archivo se conserva.")
         worst_usd = self.cost(req["modelId"], worst_in, worst_out) or 0.0
-        self.usage.reserve(worst_usd, worst_in + worst_out, float(self.cfg["daily_budget_usd"]), int(self.cfg["daily_token_budget"]))
+        token_budget = self.cfg["daily_token_budget"]
+        self.usage.reserve(worst_usd, worst_in + worst_out, float(self.cfg["daily_budget_usd"]), None if token_budget is None else int(token_budget))
         started = time.monotonic()
         try:
             resp = self.bedrock.converse(**req)
@@ -333,7 +348,13 @@ class NexusProxy:
         LOG.info("converse model=%s dev=%s in=%d out=%d usd=%s day_usd=%.4f stop=%s tools=%s ms=%d",
                  req["modelId"], who, inp, out, "?" if usd is None else f"{usd:.4f}", day["usd"],
                  resp.get("stopReason"), ",".join(tools) or "-", int((time.monotonic() - started) * 1000))
-        return {"output": resp.get("output"), "stopReason": resp.get("stopReason"), "usage": usage}
+        result = {"output": resp.get("output"), "stopReason": resp.get("stopReason"), "usage": usage}
+        # boto3 returns this blob as bytes; JSON/Android use the original base64 representation.
+        for block in (result.get("output") or {}).get("message", {}).get("content", []):
+            reasoning = block.get("reasoningContent", {})
+            if isinstance(reasoning.get("redactedContent"), bytes):
+                reasoning["redactedContent"] = base64.b64encode(reasoning["redactedContent"]).decode("ascii")
+        return result
 
     @staticmethod
     def _map_aws_error(e: Exception) -> ProxyError:

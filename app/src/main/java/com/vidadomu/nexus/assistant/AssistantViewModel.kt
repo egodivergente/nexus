@@ -326,7 +326,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 for (uri in uris) runCatching {
                     val att = AgentMediaStore.persist(app, uri, null)
                     runtime.assets.addAsset(com.vidadomu.nexus.agent.core.assets.Asset(att.id, att.uri,
-                        if (att.mimeType.startsWith("image/")) com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE else com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO,
+                        com.vidadomu.nexus.agent.core.agent.GenerationLifecycle.typeOfMime(att.mimeType),
                         role = com.vidadomu.nexus.agent.core.assets.AssetRole.REFERENCE, displayName = att.name ?: "Referencia",
                         mimeType = att.mimeType, width = att.width, height = att.height, projectId = projectId, createdAt = System.currentTimeMillis()))
                 }.onFailure { notice("No se pudo importar: ${it.message}", true) }

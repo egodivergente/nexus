@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.*
 import androidx.compose.ui.graphics.graphicsLayer
 import android.content.Intent
 import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.assistant.LocalMediaEditsSheet
 import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,6 +65,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val snackbar=remember {SnackbarHostState()}
     val haptic=LocalHapticFeedback.current
     val runtime=remember(app) {AssistantRuntime.get(app)}
+    var showLocalEdits by rememberSaveable {mutableStateOf(false)}
+    if(showLocalEdits) LocalMediaEditsSheet {showLocalEdits=false}
     val index by runtime.assets.changes.collectAsState()
     val projectLibrary=rememberProjectMediaPicker(managementOnly=true) {}
     LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
@@ -102,7 +105,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 }}
             },onError={message -> scope.launch {snackbar.showSnackbar(message)}})
     }
-    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={Text("Biblioteca",style=MaterialTheme.typography.titleLarge)},actions={
+    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
+        IconButton(onClick={showLocalEdits=true}) {Icon(Icons.Default.Movie,"Ediciones locales",tint=TextSecondary)}
         IconButton(onClick={try {
             val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
                 component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")
@@ -184,12 +188,12 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
                 imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
             if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
-        IconButton(onClick=onActions,modifier=Modifier.align(Alignment.TopEnd).size(48.dp)) {
-            Surface(color=androidx.compose.ui.graphics.Color.Black.copy(alpha=.55f),shape=NexusTokens.filter) {
+        IconButton(onClick=onActions,modifier=Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
+            Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.55f),shape=NexusTokens.filter) {
                 Icon(Icons.Default.MoreVert,"Opciones del archivo",Modifier.size(22.dp),tint=MediaForeground)
             }
         }
-        if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(6.dp).size(18.dp),tint=androidx.compose.ui.graphics.Color.Yellow)
+        if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
         if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.78f),contentColor=MediaForeground,
             shape=NexusTokens.thumbnail,modifier=Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space4)) {
             Row(Modifier.padding(NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {

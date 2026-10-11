@@ -8,18 +8,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.ui.components.StudioTextField
+import com.vidadomu.nexus.ui.components.InlineNotice
+import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.tabularMoney
 
 @Composable
 internal fun AgentBudgetSettings() {
-    val runtime=AssistantRuntime.get(LocalContext.current.applicationContext as NexusApplication)
+    val app=LocalContext.current.applicationContext as NexusApplication
+    val runtime=AssistantRuntime.get(app)
+    val currencyState by app.currencyManager.state.collectAsState()
     val limits=remember {runtime.settings.llmLimits()}
     var expanded by remember {mutableStateOf(false)}
-    var turn by remember {mutableStateOf(limits.perTurnUsd.toString())}
-    var daily by remember {mutableStateOf(limits.dailyUsd.toString())}
+    var turn by remember {mutableStateOf(limits.perTurnUsd.toString().replace('.',','))}
+    var daily by remember {mutableStateOf(limits.dailyUsd.toString().replace('.',','))}
     var message by remember {mutableStateOf("")}
     val spent=remember {runCatching {runtime.llmBudget.spentToday()}.getOrNull()}
-    TextButton(onClick={expanded=!expanded}) {Text("Consumo del agente · " + (spent?.let {"%.2f USD hoy".format(java.util.Locale.US,it)} ?: "registro no disponible"))}
-    if(expanded) Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    val spendingLabel=remember(spent,currencyState) {spent?.let {app.currencyManager.formatCost(it)} ?: "registro no disponible"}
+    TextButton(onClick={expanded=!expanded}) {Text("Consumo del agente · $spendingLabel hoy",style=MaterialTheme.typography.bodyMedium.tabularMoney())}
+    if(expanded) Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        spent?.let {Text(app.currencyManager.formatUsdDetails(it),style=MaterialTheme.typography.labelMedium.tabularMoney())}
         Text("AWS directo: presupuesto local estimado con margen del 20%. Incluye reservas de envios sin respuesta; no es la factura global de AWS.",style=MaterialTheme.typography.bodySmall)
         StudioTextField(turn,{turn=it},label={Text("Maximo por mensaje · USD")},singleLine=true,modifier=Modifier.fillMaxWidth())
         StudioTextField(daily,{daily=it},label={Text("Maximo diario · USD (UTC)")},singleLine=true,modifier=Modifier.fillMaxWidth())
@@ -29,6 +36,6 @@ internal fun AgentBudgetSettings() {
                 .onSuccess {message="Limites guardados. Se aplican a la siguiente llamada."}
                 .onFailure {message="Indica importes positivos; el limite diario debe cubrir el de un mensaje."}
         }) {Text("Guardar limites")}
-        if(message.isNotEmpty()) Text(message,style=MaterialTheme.typography.bodySmall)
+        if(message.isNotEmpty()) InlineNotice(message,isError=!message.startsWith("Limites guardados"))
     }
 }

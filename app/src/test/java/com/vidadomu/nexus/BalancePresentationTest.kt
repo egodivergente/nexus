@@ -16,4 +16,12 @@ class BalancePresentationTest {
         assertEquals("No disponible",presentBalance("No disponible",currency))
         assertEquals("Consultando…",presentBalance("Consultando…",currency))
     }
+    @Test fun groupedCreditBalancesAreReadableAcrossProviderLocales() {
+        assertEquals("1.622 créditos",presentBalance("1.622,28 cr",currency))
+        assertEquals("1.622 créditos",presentBalance("1,622.28 credits",currency))
+    }
+    @Test fun technicalFailuresStayOutOfBalanceLabels() {
+        assertEquals("Saldo no disponible",presentBalance("Unable to resolve host provider.example",currency))
+        assertEquals("Saldo no disponible",presentBalance("1.2.3 USD",currency))
+    }
 }

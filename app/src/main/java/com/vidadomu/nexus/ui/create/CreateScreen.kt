@@ -271,7 +271,7 @@ fun CreateScreen(
         },
         containerColor=ScreenBackground,
         topBar={
-            if(!compactTyping) TopAppBar(title={Text("Lienzo", style=MaterialTheme.typography.titleLarge)},
+            if(!compactTyping) TopAppBar(title={Text("Lienzo", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
                 actions={
                     Box {
                         IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
@@ -352,17 +352,17 @@ fun CreateScreen(
                 }
             }
             item {
-                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    item { StudioToolChip("Inspirar") {showInspiration=true} }
-                    item { StudioToolChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true} }
-                    if(state.selectedModality == Modality.IMAGE) item {
+                StudioToolRow {
+                    StudioToolChip("Inspirar") {showInspiration=true}
+                    StudioToolChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true}
+                    if(state.selectedModality == Modality.IMAGE) {
                         StudioToolChip(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Varios modelos",
                             enabled=!state.isSubmitting && !state.isPreparingMedia) {
                             viewModel.comparison.open(state);showComparison=true
                         }
                     }
-                    item { StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true} }
-                    item { StudioToolChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true} }
+                    StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
+                    StudioToolChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true}
                 }
             }
             if(state.isLoadingSchema) item {

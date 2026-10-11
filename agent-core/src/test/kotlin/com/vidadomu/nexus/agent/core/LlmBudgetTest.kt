@@ -8,6 +8,22 @@ import kotlinx.coroutines.awaitAll
 import kotlin.test.*
 
 class LlmBudgetTest {
+    @Test fun newModelsHaveRatesAndStillRespectExistingSpendingLimits() = runTest {
+        var calls=0
+        val backend=object:LlmProvider {
+            override val id="fake"
+            override suspend fun countInputTokens(request:LlmRequest)=100
+            override suspend fun complete(request:LlmRequest):LlmResponse {calls++;return LlmResponse(LlmMessage(Role.ASSISTANT,listOf(ContentBlock.Text("ok"))),StopReason.END_TURN,Usage(100,10))}
+        }
+        for((model,cost) in listOf("us.anthropic.claude-sonnet-5-5" to .00036,"us.anthropic.claude-opus-5-5" to .00072)) {
+            val ledger=LlmBudgetLedger(file())
+            val provider=BudgetedLlmProvider(backend,ledger) {LlmLimits(perTurnCalls=1)}
+            provider.complete(req.copy(modelId=model))
+            assertEquals(cost,ledger.spentToday(),.000000001)
+            assertFailsWith<LlmException> {provider.complete(req.copy(modelId=model))}
+        }
+        assertEquals(2,calls)
+    }
     private fun file() = Files.createTempDirectory("nexus-budget").resolve("usage.json").toFile()
     private val req = LlmRequest("us.anthropic.claude-sonnet-4-6",emptyList(),listOf(LlmMessage(Role.USER,listOf(ContentBlock.Text("hola")))),emptyList(),10,turnId="turn")
     @Test fun reservationsSurviveRestartAndMidnightDoesNotResetTurn() {

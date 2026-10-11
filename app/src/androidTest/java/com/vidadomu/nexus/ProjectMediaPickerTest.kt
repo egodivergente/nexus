@@ -77,7 +77,7 @@ class ProjectMediaPickerTest {
         compose.onNodeWithContentDescription("Imagen 1").performClick()
         compose.onNodeWithText("ZIP de seleccionadas · 1").performClick()
         compose.runOnIdle { assertEquals(listOf(photos[0]), exported) }
-        compose.onNodeWithText("Buscar guardadas").performTextInput("Imagen 1")
+        compose.onNodeWithText("Buscar archivos").performTextInput("Imagen 1")
         compose.onNodeWithText("ZIP de todas las imágenes · 3").performClick()
         compose.runOnIdle { assertEquals(3, exported.size) }
         compose.onNodeWithText("Borrar · 1").performClick()

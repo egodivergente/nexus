@@ -63,6 +63,8 @@ class BudgetedLlmProvider(private val delegate: LlmProvider, private val ledger:
     override val id = delegate.id
     // Standard geo/in-region prices with a 20% margin over global list price; no cache discount assumed.
     private fun rates(model: String): Pair<Double, Double> = when {
+        "claude-sonnet-5-5" in model -> 2.4 to 12.0
+        "claude-opus-5-5" in model -> 4.8 to 24.0
         "claude-sonnet-4-6" in model -> 3.6 to 18.0
         "claude-opus-4-6" in model -> 6.0 to 30.0
         "claude-haiku-4-5" in model -> 1.2 to 6.0

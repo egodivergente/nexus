@@ -1,4 +1,4 @@
-# Agent 1.9.0: biblioteca y documentos
+# Agent 1.9.3: biblioteca y documentos
 
 - La Biblioteca muestra los encargos activos desde su registro local, incluyendo envíos de estado incierto y seguimientos pausados.
 - El progreso porcentual procede del proveedor. Los hitos fijos de Flow no se presentan como porcentaje medido. La estimación de tiempo usa la mediana de hasta 20 encargos recientes del mismo proveedor/modelo y exige al menos tres muestras; puede superarse.
@@ -9,4 +9,8 @@
 
 ## Comprobaciones
 
-ASUSVIDAL: 114 pruebas de agent-core superadas, sin errores ni omisiones. Incluyen lectura única de documentos, texto extraído y cancelación de HTTP. No se han realizado llamadas de generación ni de LLM de pago. La lectura completa de un PDF por el servicio real no queda certificada por estas pruebas.
+ASUSVIDAL: 128 pruebas de agent-core superadas en la versión integrada (114 en la base inicial), sin errores ni omisiones. Incluyen lectura única de documentos, texto extraído y cancelación de HTTP. No se han realizado llamadas de generación ni de LLM de pago. La lectura completa de un PDF por el servicio real no queda certificada por estas pruebas.
+
+## Integración con la versión instalada
+
+La primera APK 1.9.0 (34) compiló correctamente, pero Android rechazó su instalación porque el S25 ya tenía 1.9.2 (36). Se integró la rama `codex/aki-attachments-20261011` (fbae847) conservando Sol/AKI, adjuntos visuales, edición local, Whisper, reparación de CountTokens y mejoras de presentación. La actualización conjunta usa 1.9.3 (37). No se forzó ninguna instalación de versión inferior.

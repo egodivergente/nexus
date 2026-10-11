@@ -8,8 +8,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.currency.CurrencyManager
@@ -26,13 +31,18 @@ private val LocalChrome = staticCompositionLocalOf<ChromeActions?> { null }
 /** Formats an existing provider reading; does not query, sum or alter account balances. */
 internal fun presentBalance(raw: String, currency: CurrencyManager): String {
     val match=Regex("^\\s*([+-]?[0-9.,]+)\\s*(USD|US\\$|\\$|cr|credits|créditos)\\s*$", RegexOption.IGNORE_CASE).matchEntire(raw)
-        ?: return raw
-    val value=match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return raw
+        ?: return if(raw in setOf("No disponible","Consultando…")) raw else "Saldo no disponible"
+    val number=match.groupValues[1]
+    val normalized=if(',' in number && '.' in number) {
+        if(number.lastIndexOf(',')>number.lastIndexOf('.')) number.replace(".","").replace(',','.')
+        else number.replace(",","")
+    } else number.replace(',','.')
+    val value=normalized.toDoubleOrNull()?.takeIf {it.isFinite()} ?: return "Saldo no disponible"
     return if(match.groupValues[2].lowercase() in setOf("cr","credits","créditos")) currency.formatCredits(value)
         else currency.formatBalance(value)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NexusChrome(onSettings: () -> Unit, onNavigateToOutput: (String) -> Unit,
     settingsVisible: Boolean = true, content: @Composable () -> Unit) {
@@ -57,8 +67,8 @@ fun NexusChrome(onSettings: () -> Unit, onNavigateToOutput: (String) -> Unit,
         sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().fillMaxHeight(.92f)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),
-                horizontalArrangement=Arrangement.SpaceBetween) {
+            FlowRow(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),
+                horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 Text("Saldo y gasto",style=MaterialTheme.typography.titleLarge)
                 TextButton(onClick=vm::refresh,enabled=!busy) { Text(if(busy) "Actualizando…" else "Actualizar") }
             }
@@ -73,9 +83,12 @@ fun NexusChrome(onSettings: () -> Unit, onNavigateToOutput: (String) -> Unit,
                 }
                 balances.forEach { item ->
                     Column {
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                            Text(item.name,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+                        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                            Text(item.name,style=MaterialTheme.typography.bodyMedium)
                             Text(presentBalance(item.value,app.currencyManager),style=MaterialTheme.typography.bodyMedium.tabularMoney())
+                        }
+                        if(presentBalance(item.value,app.currencyManager)=="Saldo no disponible") {
+                            InlineNotice("No se pudo interpretar el saldo.",technicalDetails=item.value,isError=false)
                         }
                         item.time?.let { time ->
                             Text((if(item.stale) "Último dato · " else "Consultado · ")+DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(time)),
@@ -105,7 +118,8 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     val chrome=LocalChrome.current
     StudioChrome(modifier.fillMaxWidth()) {
     TopAppBar(title=title,modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
-        windowInsets=windowInsets,scrollBehavior=scrollBehavior,expandedHeight=NexusTokens.topBarHeight,
+        windowInsets=windowInsets,scrollBehavior=scrollBehavior,
+        expandedHeight=if(LocalDensity.current.fontScale>=1.3f) NexusTokens.minimumTouch+NexusTokens.space8 else NexusTokens.topBarHeight,
         actions={
             actions()
             chrome?.let {
@@ -121,11 +135,22 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
 @Composable
 fun NexusBalanceChip() {
     LocalChrome.current?.let { chrome ->
-        Surface(onClick=chrome.openBalance,shape=NexusTokens.field,color=MaterialTheme.colorScheme.surfaceVariant,
-            modifier=Modifier.heightIn(min=NexusTokens.minimumTouch).semantics { contentDescription="Saldo y gasto" }) {
-            Box(contentAlignment=androidx.compose.ui.Alignment.Center,modifier=Modifier.padding(horizontal=NexusTokens.space12)) {
-                Text(chrome.balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurface)
-            }
-        }
+        StudioBalanceChip(chrome.balance,chrome.openBalance)
     }
 }
+
+@Composable
+internal fun StudioBalanceChip(balance:String,onClick:()->Unit) {
+        Surface(onClick=onClick,shape=NexusTokens.field,color=MaterialTheme.colorScheme.surfaceVariant,
+            modifier=Modifier.widthIn(max=144.dp).heightIn(min=NexusTokens.minimumTouch).semantics { contentDescription="Saldo y gasto"; stateDescription=balance }) {
+            Box(contentAlignment=androidx.compose.ui.Alignment.Center,modifier=Modifier.padding(horizontal=NexusTokens.space12)) {
+                Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurface,
+                    maxLines=2,overflow=TextOverflow.Ellipsis)
+            }
+        }
+}
+
+/** Compact headings in chrome; the user's font scale still applies in full. */
+@Composable
+fun nexusScreenTitleStyle():TextStyle = if(LocalDensity.current.fontScale>=1.3f)
+    MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge

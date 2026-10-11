@@ -24,14 +24,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class OrchestratorTest {
+    @Test fun signedContextSurvivesTurnsAndModelChangeRequiresNewChat() = runTest {
+        val h=Harness()
+        val signed=com.vidadomu.nexus.agent.core.llm.ContentBlock.Reasoning(Json.parseToJsonElement("""{"reasoningText":{"text":"private","signature":"test-signature"}}""").jsonObject)
+        val llm=ScriptedLlmProvider(listOf(
+            { com.vidadomu.nexus.agent.core.llm.LlmResponse(com.vidadomu.nexus.agent.core.llm.LlmMessage(com.vidadomu.nexus.agent.core.llm.Role.ASSISTANT,listOf(signed)),com.vidadomu.nexus.agent.core.llm.StopReason.END_TURN,com.vidadomu.nexus.agent.core.llm.Usage(1,1)) },
+            { r -> assertTrue(r.messages.any {m->m.content.any {it===signed}});text("Conservado") },
+        ))
+        val first=orchestrator(h,llm)
+        val conv=first.newConversation()
+        first.send(conv,"Uno")
+        first.send(conv,"Dos")
+        val changed=AgentOrchestrator(llm,config.copy(modelId="us.anthropic.claude-sonnet-5-5"),NexusToolkit.all(h.deps),h.skills,h.assets)
+        val before=conv.history()
+        assertFailsWith<com.vidadomu.nexus.agent.core.llm.LlmException> {changed.send(conv,"Tres")}
+        assertEquals(before,conv.history())
+    }
     private val config = AgentConfig(provider = "scripted", modelId = "test-model", region = "eu-west-1", endpoint = "http://proxy", maxToolRounds = 4)
     private val kf = Attachment("att_1", "content://media/kf.png", "image/png", "kf.png", 1920, 1080)
 
     private fun orchestrator(h: Harness, llm: ScriptedLlmProvider, cfg: AgentConfig = config) =
         AgentOrchestrator(llm, cfg, NexusToolkit.all(h.deps), h.skills, h.assets, today = { "2026-10-02" })
+
+    @Test fun `audio remains local and does not consume document slots`() = runTest {
+        val h=Harness();var loaded=0
+        val llm=ScriptedLlmProvider(listOf({ request ->
+            assertTrue(request.messages.last().content.all {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Text})
+            text("Usaré los archivos locales.")
+        }))
+        val o=AgentOrchestrator(llm,config,NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {loaded++;null})
+        val audio=(1..6).map {Attachment("a$it","file:///private/audio$it.wav","audio/wav","audio$it.wav")}
+        val conv=o.newConversation(mode=AgentMode.AGENT)
+        o.send(conv,"Transcribe localmente",audio)
+        assertEquals(0,loaded)
+        assertEquals(6,conv.session.attachments.size)
+    }
 
     @Test fun `ninguna herramienta confirma ni paga`() {
         val names = NexusToolkit.all(Harness().deps).map { it.name }

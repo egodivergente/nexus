@@ -44,6 +44,30 @@ def body(**over):
 
 
 class ProxyTest(unittest.TestCase):
+    def test_signed_and_redacted_reasoning_preserve_provider_context(self):
+        signed = {"reasoningText": {"text": "private", "signature": "signed-test"}}
+        blocks = [{"reasoningContent": signed}, {"reasoningContent": {"redactedContent": "AQID"}}, {"text": "ready"}]
+        messages = [{"role": "assistant", "content": blocks}, {"role": "user", "content": [{"text": "continue"}]}]
+        self.proxy.converse("Bearer " + TOKEN, body(messages=messages))
+        sent = self.fake.calls[0]["messages"][0]["content"]
+        self.assertEqual(sent[0]["reasoningContent"], signed)
+        self.assertEqual(sent[1]["reasoningContent"]["redactedContent"], b"\x01\x02\x03")
+        real_converse = self.fake.converse
+        def with_redacted(**req):
+            result = real_converse(**req)
+            result["output"]["message"]["content"].insert(0, {"reasoningContent": {"redactedContent": b"\x01\x02\x03"}})
+            return result
+        self.fake.converse = with_redacted
+        response = self.proxy.converse("Bearer " + TOKEN, body())
+        self.assertEqual(response["output"]["message"]["content"][0]["reasoningContent"]["redactedContent"], "AQID")
+        json.dumps(response)
+
+    def test_invalid_reasoning_is_rejected_without_inference(self):
+        for role, reasoning in [("user", {"redactedContent": "AQID"}), ("assistant", {"redactedContent": "!"}), ("assistant", {"reasoningText": {"text": "unsigned"}})]:
+            with self.assertRaises(np.ProxyError):
+                self.proxy.converse("Bearer " + TOKEN, body(messages=[{"role": role, "content": [{"reasoningContent": reasoning}]}]))
+        self.assertEqual(self.fake.calls, [])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.fake = FakeBedrock()

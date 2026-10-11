@@ -89,7 +89,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
     val trustedLocal=chosenOutput?.let {OutputFiles.trustedLocalUri(it,conflicts)}
     val title=when(job?.modality) {Modality.IMAGE->"Imagen";Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.CHAT->"Texto";else->"Resultado"}
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(
-        title={Text(title,style=MaterialTheme.typography.titleLarge)},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
+        title={Text(title,style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
     }) {padding ->
         if(job==null) {Box(Modifier.fillMaxSize().padding(padding),contentAlignment=Alignment.Center) {Text("Generación no encontrada",color=TextSecondary)};return@Scaffold}
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {

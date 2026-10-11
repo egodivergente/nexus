@@ -100,7 +100,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
     var accountDetails by remember {mutableStateOf(false)}
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=MaterialTheme.typography.titleLarge)})}) {padding ->
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())})}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             item {Text("Personalización",style=MaterialTheme.typography.titleMedium)}
             item {SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true},{defaultSetting="Apariencia"})}

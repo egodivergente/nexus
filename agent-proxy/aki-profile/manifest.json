@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "3.0",
+  "metadata": {"name": "nexus-bridge", "displayName": "Nexus bridge", "version": "1.0.0", "visible": false},
+  "llm": {"provider": "bedrock", "modelId": "GPT-5.6 Sol", "effort": "low"},
+  "tools": {"permissions": {"deny": ["Bash(*)", "Read(*)", "Glob(*)", "Write(*)", "Edit(*)", "Task(*)", "Agent(*)"], "allow": [], "requireApproval": []}},
+  "prompts": {"systemPromptFile": "system.txt", "additionalFiles": []},
+  "enableMemory": false,
+  "marketplaceSkills": [],
+  "teammates": {}
+}
