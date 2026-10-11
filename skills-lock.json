@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "crun-agent-skills": {
+      "source": "CrunTeam/crun-agent-skills",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "dc90bfa0cb841562679c773ab554c4db36c901f4539b772540a02ea6d69bebc4"
+    }
+  }
+}
