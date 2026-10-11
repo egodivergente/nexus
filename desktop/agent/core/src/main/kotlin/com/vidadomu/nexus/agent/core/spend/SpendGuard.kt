@@ -48,6 +48,7 @@ data class GenerationPlan(
     /** Avisos para la tarjeta (duración ajustada, coste orientativo…). */
     val warnings: List<String> = emptyList(),
     val createdAt: Long,
+    val originalPrompt: String? = null,
 ) {
     /** Huella de lo que se va a pagar. Cualquier cambio exige una confirmación nueva. */
     fun fingerprint(): String {

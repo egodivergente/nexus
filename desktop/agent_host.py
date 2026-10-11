@@ -24,6 +24,8 @@ class AgentHost:
         self.pending = {}
         self.lines = queue.Queue()
         self.owner = None
+        self.native = None
+        self.tunnel = None
         atexit.register(self.close)
 
     def close(self):
@@ -33,6 +35,8 @@ class AgentHost:
                 self.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.process.kill()
+        if self.tunnel and self.tunnel.poll() is None:
+            self.tunnel.terminate()
 
     def settings(self):
         path = self.data / 'settings.json'
@@ -46,7 +50,7 @@ class AgentHost:
     def save_settings(self, args):
         settings = self.settings()
         fields = {'backend', 'region', 'modelId', 'mode', 'maxTokens', 'sendImages',
-                  'excludedFamilies', 'endpoint', 'temperature', 'projectId'}
+                  'excludedFamilies', 'endpoint', 'temperature', 'projectId', 'perTurnUsd', 'dailyUsd', 'perTurnCalls'}
         settings.update({k: v for k, v in args.items() if k in fields})
         import re
         from urllib.parse import urlsplit
@@ -63,6 +67,15 @@ class AgentHost:
             raise ValueError('Modo no valido.')
         settings['endpoint'] = endpoint
         settings['maxTokens'] = max(256, min(32000, int(settings['maxTokens'])))
+        for field in ('perTurnUsd', 'dailyUsd'):
+            if field in settings:
+                import math
+                value = float(settings[field])
+                if not math.isfinite(value) or value <= 0:
+                    raise ValueError('El límite de consumo debe ser mayor que cero.')
+                settings[field] = value
+        if 'perTurnCalls' in settings:
+            settings['perTurnCalls'] = max(1, min(64, int(settings['perTurnCalls'])))
         secret = self.read_secret(self.data / 'credentials.dpapi')
         for key in ('accessKey', 'secretKey', 'sessionToken', 'token'):
             if key in args:
@@ -84,6 +97,8 @@ class AgentHost:
         if self.process and self.process.poll() is None:
             return
         java = shutil.which('java')
+        if not java:
+            java = next(iter(Path('C:/Program Files/Microsoft').glob('jdk-17*/bin/java.exe')), None)
         if not java or not list((self.root / 'runtime').glob('*.jar')):
             raise RuntimeError('Falta Java 17 o el motor del asistente.')
         self.lines = queue.Queue()
@@ -126,7 +141,7 @@ class AgentHost:
     def exchange(self, op, args):
         self.process.stdin.write(json.dumps({'op': op, 'args': args}) + '\n')
         self.process.stdin.flush()
-        deadline = time.monotonic() + 170
+        deadline = time.monotonic() + (600 if op in {'send', 'rewritePrompt'} else 170)
         while True:
             try:
                 line = self.lines.get(timeout=max(0.1, deadline - time.monotonic()))
@@ -141,20 +156,50 @@ class AgentHost:
                     raise RuntimeError(response.get('error', 'Error del asistente'))
                 return response.get('value')
             name = response['callback']
+            if name in {'native', 'document', 'video', 'thumbnail'} and self.native is not None:
+                try:
+                    if name == 'native':
+                        try:
+                            value = self.native.run(response['args'])
+                        except Exception as error:
+                            value = {'isError': True, 'error': str(error)[:3500]}
+                    else:
+                        value = self.native.attachment(name, response['args'])
+                    reply = {'ok': True, 'value': value}
+                except Exception as error:
+                    reply = {'ok': False, 'error': str(error)[:1500]}
+                self.process.stdin.write(json.dumps(reply) + '\n')
+                self.process.stdin.flush()
+                continue
             if name not in {'models', 'schema', 'quote', 'submit', 'status', 'cancel', 'history', 'thumbnail'}:
                 raise RuntimeError('Operacion del motor no admitida.')
             if name == 'submit' and op != 'confirm':
-                raise RuntimeError('El asistente no puede confirmar generaciones.')
-            identifier = uuid.uuid4().hex
-            item = {'op': name, 'args': response['args'], 'event': threading.Event()}
-            with self.pending_lock:
-                self.pending[identifier] = item
-            answered = item['event'].wait(timeout=max(0.1, deadline - time.monotonic()))
-            with self.pending_lock:
-                self.pending.pop(identifier, None)
-            reply = item.get('reply') if answered else {'ok': False, 'error': 'La ventana no ha respondido.'}
+                submission = response.get('args') or {}
+                direct_flow = op == 'send' and (submission.get('ref') or {}).get('providerId') == 'google_flow'
+                if not direct_flow:
+                    raise RuntimeError('Este proveedor requiere revisar y confirmar la generación.')
+                count = float((submission.get('params') or {}).get('count', 1))
+                if not count.is_integer() or not 1 <= count <= 20:
+                    raise ValueError('Puedes pedir hasta 20 resultados de Flow por encargo.')
+            reply = self.browser_reply(name, response['args'], deadline)
             self.process.stdin.write(json.dumps(reply) + '\n')
             self.process.stdin.flush()
+
+    def browser_reply(self, name, args, deadline=None):
+        identifier = uuid.uuid4().hex
+        item = {'op': name, 'args': args, 'event': threading.Event()}
+        with self.pending_lock:
+            self.pending[identifier] = item
+        answered = item['event'].wait(timeout=max(.1, (deadline or time.monotonic()+120)-time.monotonic()))
+        with self.pending_lock:
+            self.pending.pop(identifier, None)
+        return item.get('reply') if answered else {'ok': False, 'error': 'La ventana no ha respondido.'}
+
+    def browser_callback(self, name, args):
+        result = self.browser_reply(name, args)
+        if not result.get('ok'):
+            raise ValueError(result.get('error', 'La operación falló.'))
+        return result.get('value')
 
     def command(self, args):
         if not self.lock.acquire(blocking=False):
@@ -163,18 +208,36 @@ class AgentHost:
             self.owner = args.get('owner')
             if not isinstance(self.owner, str) or not self.owner:
                 raise ValueError('Falta la sesion de la ventana.')
+            if args.get('op') in {'send', 'rewritePrompt'}:
+                from sol_bridge import ensure
+                ensure(self)
             self.start()
             op = args.get('op', 'snapshot')
             body = dict(args.get('args') or {})
             allowed = {'snapshot', 'send', 'new', 'mode', 'project', 'createProject', 'memory',
-                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory'}
+                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference', 'rewritePrompt', 'importAssets', 'deleteLibrary', 'restoreHistory', 'projectNote'}
             if op not in allowed:
                 raise ValueError('Operacion no admitida.')
+            if op == 'importReferences':
+                import re
+                files = body.get('files')
+                if not isinstance(files, list) or not files:
+                    raise ValueError('Selecciona los archivos que quieres importar.')
+                for file in files:
+                    uri = str(file.get('uri', ''))
+                    if not re.fullmatch(r'/media/[a-f0-9]{32}\.(png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a|pdf|txt|md|csv|html|srt|ogg|flac)', uri):
+                        raise ValueError('Referencia local no válida.')
+                    from native_operations import resolve_media
+                    path = resolve_media(self.data.parent, uri)
+                    if not path.is_file():
+                        raise ValueError('El archivo importado ya no está disponible.')
             if op == 'settings':
                 body = {'settings': self.save_settings(body),
                         'secrets': self.read_secret(self.data / 'credentials.dpapi')}
             elif op in {'mode', 'project'}:
                 self.save_settings({'mode': body['mode']} if op == 'mode' else {'projectId': body.get('id', '')})
+            if op == 'send':
+                body['runtimeSettings'] = self.settings()
             result = self.exchange(op, body)
             if op == 'createProject':
                 self.save_settings({'projectId': result.get('projectId', '')})

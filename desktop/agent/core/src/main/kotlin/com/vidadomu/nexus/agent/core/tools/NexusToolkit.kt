@@ -8,5 +8,5 @@ object NexusToolkit {
         PrepareGenerationTool(d), UpdatePlanTool(d), SubmitGenerationTool(d), GetGenerationStatusTool(d), CancelGenerationTool(d),
         ListProjectsTool(d), CreateProjectTool(d), OpenProjectTool(d), UpdateProjectMemoryTool(d), SearchAssetsTool(d), InspectAssetTool(d), ListShotsTool(d),
         GenerationHistoryTool(d), AssociateAssetTool(d), MoveAssetTool(d), RenameAssetTool(d),
-    )
+    ) + (d.nativeOperations?.let(NativeOperationTools::all) ?: emptyList())
 }

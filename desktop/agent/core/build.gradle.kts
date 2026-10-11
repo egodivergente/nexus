@@ -23,7 +23,8 @@ dependencies {
     // YAML 1.2 en Java puro (compatible con Android) para las cabeceras de las skills.
     implementation("org.snakeyaml:snakeyaml-engine:2.7")
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit5"))
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }

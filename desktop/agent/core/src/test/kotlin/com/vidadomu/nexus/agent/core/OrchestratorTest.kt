@@ -24,14 +24,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class OrchestratorTest {
+    @Test fun signedContextSurvivesTurnsAndModelChangeRequiresNewChat() = runTest {
+        val h=Harness()
+        val signed=com.vidadomu.nexus.agent.core.llm.ContentBlock.Reasoning(Json.parseToJsonElement("""{"reasoningText":{"text":"private","signature":"test-signature"}}""").jsonObject)
+        val llm=ScriptedLlmProvider(listOf(
+            { com.vidadomu.nexus.agent.core.llm.LlmResponse(com.vidadomu.nexus.agent.core.llm.LlmMessage(com.vidadomu.nexus.agent.core.llm.Role.ASSISTANT,listOf(signed)),com.vidadomu.nexus.agent.core.llm.StopReason.END_TURN,com.vidadomu.nexus.agent.core.llm.Usage(1,1)) },
+            { r -> assertTrue(r.messages.any {m->m.content.any {it===signed}});text("Conservado") },
+        ))
+        val first=orchestrator(h,llm)
+        val conv=first.newConversation()
+        first.send(conv,"Uno")
+        first.send(conv,"Dos")
+        val changed=AgentOrchestrator(llm,config.copy(modelId="us.anthropic.claude-sonnet-5-5"),NexusToolkit.all(h.deps),h.skills,h.assets)
+        val before=conv.history()
+        assertFailsWith<com.vidadomu.nexus.agent.core.llm.LlmException> {changed.send(conv,"Tres")}
+        assertEquals(before,conv.history())
+    }
     private val config = AgentConfig(provider = "scripted", modelId = "test-model", region = "eu-west-1", endpoint = "http://proxy", maxToolRounds = 4)
     private val kf = Attachment("att_1", "content://media/kf.png", "image/png", "kf.png", 1920, 1080)
 
     private fun orchestrator(h: Harness, llm: ScriptedLlmProvider, cfg: AgentConfig = config) =
         AgentOrchestrator(llm, cfg, NexusToolkit.all(h.deps), h.skills, h.assets, today = { "2026-10-02" })
+
+    @Test fun `audio remains local and does not consume document slots`() = runTest {
+        val h=Harness();var loaded=0
+        val llm=ScriptedLlmProvider(listOf({ request ->
+            assertTrue(request.messages.last().content.all {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Text})
+            text("Usaré los archivos locales.")
+        }))
+        val o=AgentOrchestrator(llm,config,NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {loaded++;null})
+        val audio=(1..6).map {Attachment("a$it","file:///private/audio$it.wav","audio/wav","audio$it.wav")}
+        val conv=o.newConversation(mode=AgentMode.AGENT)
+        o.send(conv,"Transcribe localmente",audio)
+        assertEquals(0,loaded)
+        assertEquals(6,conv.session.attachments.size)
+    }
 
     @Test fun `ninguna herramienta confirma ni paga`() {
         val names = NexusToolkit.all(Harness().deps).map { it.name }
@@ -148,9 +181,23 @@ class OrchestratorTest {
 
     @Test fun `reglas de gasto siempre en el sistema`() = runTest {
         val h = Harness()
-        val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.system.any { it.contains("REGLAS DE GASTO") }); assertEquals("solo esto", r.system.first()); text("ok") }))
+        val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.system.any { it.contains(SystemPrompt.SPEND_RULES) }); assertEquals("solo esto", r.system.first()); text("ok") }))
         orchestrator(h, llm, config.copy(systemPromptOverride = "solo esto")).let { it.send(it.newConversation(), "hola") }
         assertTrue(SystemPrompt.build(AgentMode.AGENT, null, "", null, "x").joinToString().contains("pulse GENERAR"))
+    }
+
+    @Test fun `documento se lee una vez y se reutiliza su resumen`() = runTest {
+        val h=Harness()
+        val llm=ScriptedLlmProvider(listOf(
+            { r -> assertTrue(r.tools.isEmpty()); assertTrue(r.messages.any { m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document} }); text("Mateo viaja a Madrid en 1920.") },
+            { r -> assertFalse(r.messages.any {m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document}}); assertTrue(r.messages.any {"1920" in it.text()}); text("Resumen final") },
+            { r -> assertFalse(r.messages.any {m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document}}); text("Continuacion") }
+        ))
+        val o=AgentOrchestrator(llm,config,NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {com.vidadomu.nexus.agent.core.llm.ContentBlock.Document("pdf","Script",byteArrayOf(1,2))})
+        val conv=o.newConversation()
+        assertEquals("Resumen final",o.send(conv,"Resume",listOf(Attachment("doc","file:///doc.pdf","application/pdf","doc.pdf"))).text)
+        assertEquals("Continuacion",o.send(conv,"Sigue").text)
     }
 
     @Test fun `adjunto se describe al LLM con su id`() = runTest {

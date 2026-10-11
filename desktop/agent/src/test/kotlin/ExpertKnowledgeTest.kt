@@ -60,6 +60,18 @@ class ExpertKnowledgeTest {
     @Test fun missingModelIsNotInvented() {
         assertTrue(run(Registry(emptyList()),"""{"query":"fictional 999"}""")["items"]!!.jsonArray.isEmpty())
     }
+    @Test fun flowUpscaleBriefUsesConnectedProviderAndCapability() {
+        val flow=ModelRef("google_flow","google-flow/image_upscale")
+        val r=Registry(listOf(
+            ModelSummary(flow,"Escalar imagen Flow",modalities=setOf("IMAGE"),capabilities=setOf("UPSCALE")),
+            ModelSummary(ModelRef("google_flow","google-flow/nano2"),"Nano Banana 2",modalities=setOf("IMAGE"),capabilities=setOf("TEXT_TO_IMAGE"))))
+        val result=run(r,"""{"provider_id":"google_flow","modality":"IMAGE","capability":"UPSCALE","focus":"schema"}""")
+        val item=result["items"]!!.jsonArray.single().jsonObject
+        assertEquals(flow.modelId,item["model_id"]!!.jsonPrimitive.content)
+        assertEquals("available",item["schema_status"]!!.jsonPrimitive.content)
+        assertEquals(1,r.queries)
+        assertTrue(ExpertPolicy.PROMPT.contains("no confirma saldo ni deduccion efectiva"))
+    }
     @Test fun brokenSchemaIsExplicitAndSanitized() {
         val r=Registry(listOf(ModelSummary(ref,"Flux",modalities=setOf("IMAGE"))),true)
         val result=run(r,"{}").toString()

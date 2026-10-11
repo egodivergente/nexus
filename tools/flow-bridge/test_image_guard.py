@@ -24,6 +24,13 @@ class GuardTests(unittest.TestCase):
     def test_other_models_do_not_inherit_mapping(self):
         self.assertIsNotNone(model_problem(body(["BELUGA"]), "GEM_PIX_2"))
 
+    def test_pro_accepts_its_measured_code_without_using_nano2(self):
+        self.assertIsNone(model_problem(body(['GEM_PIX_2']), 'GEM_PIX_2'))
+        self.assertIsNotNone(model_problem(body(['HARBOR_SEAL']), 'GEM_PIX_2'))
+
+    def test_lite_remains_prohibited_even_when_its_wire_identity_matches(self):
+        self.assertIsNotNone(model_problem(body(['HARBOR_SEAL']), 'HARBOR_SEAL'))
+
     def test_ampersand_in_prompt_does_not_break_json(self):
         self.assertIsNone(model_problem(body(["BELUGA"], "a & b"), "NARWHAL"))
 

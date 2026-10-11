@@ -17,5 +17,7 @@ assert.equal(E.validate(make({prompt:{type:'string',maxLength:0}}),'',{},[]),nul
 const runway=E.normalize({...base,providerId:'runway',providerModelId:'gen4.5',contractEndpoint:'text_to_video'});
 assert.equal(runway.textLimits.prompt.maximum,1000);
 assert.match(E.validate(runway,'\u{1f600}'.repeat(501),{},[]),/maximo 1000/);
-assert.deepEqual(E.normalize({...base,providerId:'runway',providerModelId:'gen4.5',contractEndpoint:'image_to_video'}).textLimits,{});
-console.log('PASS: 14 text-limit assertions, including Unicode, UTF-16, provider scope and payload guard');
+assert.equal(E.normalize({...base,providerId:'runway',providerModelId:'gen4.5',contractEndpoint:'image_to_video'}).textLimits.prompt.maximum,1000);
+assert.equal(E.normalize({...base,providerId:'runway',providerModelId:'gen4_image',contractEndpoint:'text_to_image'}).textLimits.prompt.maximum,1000);
+assert.deepEqual(E.normalize({...base,providerId:'runway',providerModelId:'hailuo3',contractEndpoint:'image_to_video'}).textLimits,{});
+console.log('PASS: schema and SDK text-limit assertions, including Unicode, UTF-16, provider scope and payload guard');

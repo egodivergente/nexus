@@ -1,0 +1,113 @@
+/* Android Studio presentation adapted for a keyboard, pointer and desktop window. */
+body.nexus-agent-studio{--ui-font-scale:1;--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--r1:8px;--r2:12px;--r3:16px;--r4:24px;--focus-ring:var(--accent);font-family:'Segoe UI Variable','Segoe UI',system-ui,sans-serif;font-size:calc(16px * var(--ui-font-scale));background:var(--bg);color:var(--text)}
+body.nexus-agent-studio *{box-sizing:border-box}
+body.nexus-agent-studio h1{font-size:calc(24px * var(--ui-font-scale))!important;letter-spacing:-.02em;line-height:1.3;font-weight:600}
+body.nexus-agent-studio h2,body.nexus-agent-studio h3{font-size:calc(17px * var(--ui-font-scale))!important;line-height:1.4;font-weight:600;text-transform:none;letter-spacing:normal;overflow-wrap:anywhere}
+body.nexus-agent-studio p,body.nexus-agent-studio button,body.nexus-agent-studio select,body.nexus-agent-studio input,body.nexus-agent-studio .agent-text{font-size:calc(14px * var(--ui-font-scale));line-height:1.55}
+body.nexus-agent-studio textarea,body.nexus-agent-studio .agent-message .agent-text{font-size:calc(16px * var(--ui-font-scale));line-height:1.6}
+body.nexus-agent-studio .hint,body.nexus-agent-studio small,body.nexus-agent-studio label,body.nexus-agent-studio .status,body.nexus-agent-studio .provider,body.nexus-agent-studio .card-meta,body.nexus-agent-studio summary{font-size:calc(12px * var(--ui-font-scale))!important;line-height:1.5;color:var(--muted);text-transform:none;letter-spacing:normal}
+body.nexus-agent-studio button,body.nexus-agent-studio .select-trigger{min-height:48px;min-width:48px;border:0;border-radius:var(--r2);background:var(--surface);color:var(--text);padding:var(--s2) var(--s4);transition:background 120ms ease}
+body.nexus-agent-studio button:hover:not(:disabled){background:color-mix(in srgb,var(--surface) 80%,var(--text) 8%)}
+body.nexus-agent-studio button.primary{background:var(--accent)!important;color:var(--bg)!important;border:0!important;border-radius:28px}
+body.nexus-agent-studio button:disabled{opacity:.55}
+body.nexus-agent-studio .gallery-select,body.nexus-agent-studio .gallery-overlay button{min-width:48px!important;min-height:48px!important;width:48px;height:48px}
+body.nexus-agent-studio :focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px}
+body.nexus-agent-studio input,body.nexus-agent-studio textarea,body.nexus-agent-studio select{background:var(--panel)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:var(--r3);min-height:48px;padding:var(--s3);min-width:0}
+body.nexus-agent-studio input[type=checkbox],body.nexus-agent-studio input[type=radio]{min-height:20px;min-width:20px;width:20px;height:20px;accent-color:var(--accent)}
+body.nexus-agent-studio .sidebar{width:216px;background:var(--bg);border:0;padding:var(--s5) var(--s4)}
+body.nexus-agent-studio.creative-dock-expanded .sidebar{width:216px!important;padding:var(--s5) var(--s4)!important}
+body.nexus-agent-studio:not(.creative-dock-expanded) .sidebar{width:80px!important;padding:var(--s5) var(--s2)!important}
+body.nexus-agent-studio:not(.creative-dock-expanded) #navigation .creative-nav-label{display:none!important}
+body.nexus-agent-studio.creative-dock-expanded .brand{min-height:48px;margin:0 0 var(--s5);justify-content:flex-start}
+body.nexus-agent-studio .brand .nexus-brand-mark{display:block!important;width:36px;height:36px}
+body.nexus-agent-studio .brand .nexus-brand-logo{display:none!important}
+body.nexus-agent-studio #navigation button{font-size:calc(14px * var(--ui-font-scale))!important;min-height:48px!important}
+body.nexus-agent-studio .agent-toolbar button{font-size:calc(14px * var(--ui-font-scale))!important;min-height:48px!important}
+body.nexus-agent-studio .agent-session-info,body.nexus-agent-studio .agent-session-info button,body.nexus-agent-studio .creative-status{font-size:calc(12px * var(--ui-font-scale))!important}
+body.nexus-agent-studio #header-actions [data-agent=settings]{display:none}
+body.nexus-agent-studio .model .top{padding-right:48px;min-height:48px}
+body.nexus-agent-studio .model .top h3{white-space:normal;overflow:visible;text-overflow:clip}
+body.nexus-agent-studio .catalog{grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))!important;gap:var(--s4)}
+body.nexus-agent-studio .model .card-actions{display:grid;grid-template-columns:minmax(0,1fr) 48px 48px;gap:var(--s2)}
+body.nexus-agent-studio .model .card-actions .choose{min-width:0;overflow-wrap:anywhere}
+body.nexus-agent-studio .sidebar .brand{margin-bottom:var(--s6);color:var(--text)}
+body.nexus-agent-studio .sidebar nav button{display:flex;align-items:center;gap:var(--s3);border-radius:28px;background:transparent;color:var(--muted);margin-bottom:var(--s2);text-align:left;width:100%}
+body.nexus-agent-studio .sidebar nav button.active{background:color-mix(in srgb,var(--accent) 15%,var(--panel));color:var(--accent)}
+body.nexus-agent-studio main{min-width:0;background:var(--bg)}
+body.nexus-agent-studio main>header{min-height:56px;padding:var(--s2) var(--s5);display:flex;align-items:center;justify-content:space-between;gap:var(--s4);border:0;background:var(--bg)}
+body.nexus-agent-studio main>header h1{margin:0}
+body.nexus-agent-studio #eyebrow,body.nexus-agent-studio .nx-welcome,body.nexus-agent-studio .nx-selected-label,body.nexus-agent-studio .section-label{display:none}
+body.nexus-agent-studio #header-actions{display:flex;gap:var(--s2);flex-wrap:wrap;justify-content:flex-end}
+body.nexus-agent-studio #content{padding:var(--s4) var(--s5) var(--s5);min-height:0;scrollbar-gutter:stable}
+body.nexus-agent-studio #account-balances{display:none!important}
+body.nexus-agent-studio #parity-balance-chip{font-variant-numeric:tabular-nums;border-radius:28px;background:var(--panel);font-size:calc(14px * var(--ui-font-scale));white-space:nowrap}
+body.nexus-agent-studio .model,body.nexus-agent-studio .sheet,body.nexus-agent-studio .result,body.nexus-agent-studio .agent-plan,body.nexus-agent-studio .agent-flow-result{background:var(--panel);border:0!important;border-radius:var(--r3);box-shadow:none!important;min-width:0}
+body.nexus-agent-studio .model{padding:var(--s4);height:auto;min-height:0}
+body.nexus-agent-studio .model .top .logo,body.nexus-agent-studio .model .initial{width:32px;height:32px;object-fit:contain}
+body.nexus-agent-studio .model .description{min-height:0;color:var(--muted);font-size:calc(14px * var(--ui-font-scale));display:block;-webkit-line-clamp:unset;line-clamp:unset}
+body.nexus-agent-studio .price,body.nexus-agent-studio .quote strong,body.nexus-agent-studio .parity-cost{font-variant-numeric:tabular-nums;color:var(--text)}
+body.nexus-agent-studio .toolbar,body.nexus-agent-studio .fields,body.nexus-agent-studio .agent-toolbar{gap:var(--s3)}
+body.nexus-agent-studio .tabs button,body.nexus-agent-studio .gallery-chips button{border-radius:28px;background:transparent;color:var(--muted)}
+body.nexus-agent-studio .tabs button.active,body.nexus-agent-studio .gallery-chips button[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 15%,var(--panel))!important;color:var(--accent)}
+body.nexus-agent-studio .agent-toolbar{padding:var(--s2) 0;flex-wrap:wrap;border:0;background:transparent}
+body.nexus-agent-studio .agent-message:not(.user){background:transparent;border:0;border-radius:0;box-shadow:none;color:var(--text);padding:var(--s3) 0}
+body.nexus-agent-studio .agent-message.user{background:var(--surface);border:0;box-shadow:none;border-radius:var(--r3);max-width:min(80%,680px);margin-left:auto;padding:var(--s3) var(--s4)}
+body.nexus-agent-studio .agent-author{font-size:calc(12px * var(--ui-font-scale));color:var(--muted)}
+body.nexus-agent-studio #agent-compose{background:var(--panel);border:0!important;border-radius:28px;padding:var(--s2);box-shadow:none!important}
+body.nexus-agent-studio #agent-input{background:transparent!important;border:0!important;resize:none;min-height:48px;padding:var(--s3);max-height:240px}
+body.nexus-agent-studio .agent-project{flex-wrap:wrap;gap:var(--s2)}
+body.nexus-agent-studio .agent-project #agent-project{max-width:320px}
+body.nexus-agent-studio .agent-mode-description{display:none}
+body.nexus-agent-studio .inline-notice,body.nexus-agent-studio .agent-error{background:var(--error-container)!important;color:var(--danger)!important;border-radius:var(--r3);padding:var(--s4);font-size:calc(14px * var(--ui-font-scale));display:flex;gap:var(--s3);align-items:center;flex-wrap:wrap}
+body.nexus-agent-studio .inline-notice details{width:100%;margin:0}
+body.nexus-agent-studio .inline-notice summary{color:var(--danger)}
+body.nexus-agent-studio pre{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);user-select:text;font-size:calc(12px * var(--ui-font-scale))}
+body.nexus-agent-studio dialog:not(.gallery-lightbox){background:var(--panel);border:0;border-radius:var(--r4);padding:var(--s5);width:min(760px,calc(100vw - 48px));max-height:calc(100dvh - 48px);box-shadow:0 24px 80px #0006}
+body.nexus-agent-studio dialog.parity-sheet{width:min(880px,calc(100vw - 48px));height:calc(100dvh - 48px);margin:var(--s5) var(--s5) var(--s5) auto;overflow:auto}
+body.nexus-agent-studio dialog.parity-sheet .close{position:sticky;top:0;z-index:1}
+body.nexus-agent-studio .parity-section{padding:var(--s4) 0;border-bottom:1px solid var(--line)}
+body.nexus-agent-studio .parity-section>header{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+body.nexus-agent-studio .parity-section .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4)}
+body.nexus-agent-studio .parity-section label{display:grid;gap:var(--s2)}
+body.nexus-agent-studio .parity-section textarea,body.nexus-agent-studio .parity-section input,body.nexus-agent-studio .parity-section select{width:100%}
+body.nexus-agent-studio .parity-result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--s2)}
+body.nexus-agent-studio .parity-asset{background:var(--panel);border-radius:var(--r1);overflow:hidden;position:relative}
+body.nexus-agent-studio .parity-asset img,body.nexus-agent-studio .parity-asset video{width:100%;height:160px;object-fit:cover}
+body.nexus-agent-studio .parity-asset audio{width:100%}
+body.nexus-agent-studio .parity-asset button{position:absolute;bottom:var(--s2);right:var(--s2)}
+body.nexus-agent-studio .parity-asset>p{padding:var(--s4);margin:0}
+body.nexus-agent-studio .gallery-lightbox{background:var(--bg)!important;color:var(--text);grid-template-columns:minmax(0,1fr) 360px}
+body.nexus-agent-studio .gallery-viewer-details{background:var(--panel);border:0;padding:var(--s5)}
+body.nexus-agent-studio .gallery-viewer-details dl{font-size:calc(12px * var(--ui-font-scale))}
+body.nexus-agent-studio .gallery-stage{padding:0}
+body.nexus-agent-studio .gallery-viewer-actions{gap:var(--s2)}
+body.nexus-agent-studio .gallery-grid{gap:2px!important}
+body.nexus-agent-studio .gallery-piece{border-radius:var(--r1)!important}
+body.nexus-agent-studio .gallery-overlay{background:linear-gradient(transparent,#000c);color:#fff}
+body.nexus-agent-studio .gallery-piece .gallery-media{aspect-ratio:1;min-height:0}
+body.nexus-agent-studio .history-list{display:grid;gap:var(--s2)}
+body.nexus-agent-studio .history-row{display:grid;grid-template-columns:56px minmax(0,1fr) auto 48px;gap:var(--s3);align-items:center;background:var(--panel);padding:var(--s2) var(--s3);border-radius:var(--r3);min-height:72px}
+body.nexus-agent-studio .history-row img{width:56px;height:56px;object-fit:cover;border-radius:var(--r1)}
+body.nexus-agent-studio .history-row .history-open{background:transparent;padding:0;text-align:left;min-width:0}
+body.nexus-agent-studio .history-row strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.nexus-agent-studio .history-row small{display:block;overflow-wrap:anywhere}
+body.nexus-agent-studio .parity-balance-row{display:flex;justify-content:space-between;gap:var(--s4);padding:var(--s4) 0;border-bottom:1px solid var(--line)}
+body.nexus-agent-studio .parity-balance-row strong{font-size:calc(17px * var(--ui-font-scale));font-variant-numeric:tabular-nums}
+body.nexus-agent-studio .parity-balance-row small{display:block}
+body.nexus-agent-studio .parity-billing{display:grid;gap:var(--s2)}
+body.nexus-agent-studio .parity-billing article{display:flex;justify-content:space-between;gap:var(--s3);padding:var(--s3) 0;border-bottom:1px solid var(--line)}
+body.nexus-agent-studio .parity-file-picker{display:grid;gap:var(--s2);max-height:240px;overflow:auto}
+body.nexus-agent-studio .parity-file-picker label{display:flex;align-items:center;gap:var(--s3)}
+body.nexus-agent-studio .agent-empty{max-width:540px;margin:auto;padding:var(--s6);background:transparent;border:0}
+body.nexus-agent-studio .agent-empty .nx-idea:nth-child(n+4){display:none}
+body.nexus-agent-studio .nx-start-hint,body.nexus-agent-studio .nx-create-welcome{display:none}
+body.nexus-agent-studio .canvas .selected{background:transparent;border:0;padding:var(--s2) 0}
+body.nexus-agent-studio .canvas .sendbar{border:0;background:var(--bg);padding:var(--s3) 0}
+body.nexus-agent-studio .canvas .sendbar .primary{min-height:48px;margin-top:var(--s2)}
+body.nexus-agent-studio .canvas .preview{background:var(--panel);border-radius:var(--r3)}
+body.nexus-agent-studio .canvas .sheet{padding:var(--s4)}
+body.nexus-agent-studio .agent-plan details{padding:var(--s2) 0}
+body.nexus-agent-studio #toast{background:var(--surface);color:var(--text);font-size:calc(14px * var(--ui-font-scale));max-width:calc(100vw - 48px);z-index:10000}
+@media(max-width:1050px){body.nexus-agent-studio .sidebar{width:176px;padding:var(--s4) var(--s2)}body.nexus-agent-studio #content,body.nexus-agent-studio main>header{padding-left:var(--s4);padding-right:var(--s4)}}
+@media(max-width:760px){body.nexus-agent-studio .sidebar{width:80px}body.nexus-agent-studio .sidebar nav button{font-size:0;justify-content:center;padding:var(--s3)}body.nexus-agent-studio .sidebar nav svg{width:24px;height:24px}body.nexus-agent-studio .brand span,body.nexus-agent-studio #gallery-collections{display:none}body.nexus-agent-studio .gallery-lightbox{grid-template-columns:1fr;overflow:auto}body.nexus-agent-studio .gallery-stage{min-height:45dvh}body.nexus-agent-studio .parity-section .fields{grid-template-columns:1fr}body.nexus-agent-studio .history-row{grid-template-columns:48px minmax(0,1fr) 48px}body.nexus-agent-studio .history-row .parity-cost{grid-column:2}}
+@media(prefers-reduced-motion:reduce){body.nexus-agent-studio *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

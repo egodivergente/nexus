@@ -25,6 +25,22 @@ internal fun GenerationPlan.cardJson(state: PlanState?): JsonObject = buildJsonO
     if (warnings.isNotEmpty()) put("warnings", strings(warnings))
 }
 
+private suspend fun submitAccountFlow(d: ToolDeps, plan: GenerationPlan, session: AgentSession): ToolOutcome {
+    val count = (plan.params["count"] ?: plan.effectiveParams["count"] ?: "1").toIntOrNull()
+        ?: throw ToolInputException("Cantidad no válida.")
+    if (count !in 1..20 || session.flowSubmittedResults + count > 20)
+        throw ToolInputException("Puedes pedir hasta 20 resultados de Flow en este encargo.")
+    if (d.guard.state(plan.id) in listOf(PlanState.SUBMITTED, PlanState.UNCERTAIN, PlanState.DISCARDED))
+        throw ToolInputException("Este trabajo ya se envió o se descartó; consulta su estado.")
+    val job = try { d.lifecycle.confirmAndSubmit(plan.id, plan.fingerprint()) }
+        catch(error: com.vidadomu.nexus.agent.core.spend.SubmissionUncertain) {
+            session.flowSubmittedResults += count
+            throw error
+        }
+    session.flowSubmittedResults += count
+    return ok(buildJsonObject { put("plan_id", plan.id); put("job_id", job.jobId); put("submitted", true); put("state", "SUBMITTED") }, listOf(UiEvent.GenerationSubmitted(plan, job.jobId)))
+}
+
 private fun SchemaBuilder.mediaArray() = objectArray("media", "Archivos de entrada: adjuntos de la conversación o assets del índice.") {
     string("role", "Papel del archivo.", required = true, enum = PlanBuilder.ROLES)
     string("attachment_id", "Id de un adjunto de esta conversación.")
@@ -43,13 +59,15 @@ internal fun resolveMedia(input: JsonObject, session: AgentSession, assets: Asse
 
 class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
     "prepare_generation", ToolCategory.PLAN,
-    "Prepara UNA generación (modelo + prompt + parámetros + medios) validada contra el schema real y con coste estimado. NO envía nada ni gasta: muestra al usuario la tarjeta con botón GENERAR.",
+    "Valida modelo, prompt, parámetros y medios. Para Google Flow con acceso directo y una petición de generar, execute=true envía sin tarjeta ni confirmación; count permite hasta 20 resultados. Para proveedores de pago prepara la tarjeta de revisión.",
     schema {
         string("model_id", "Id exacto del registro.", required = true)
         string("provider_id", "Proveedor del modelo.")
-        string("prompt", "Prompt final, escrito para este modelo según su skill.", required = true)
+        string("prompt", "Prompt final según el schema: obligatorio solo cuando promptRequired=true; omitir para operaciones sin prompt.")
         string("negative_prompt", "Solo si el schema tiene negative_prompt.")
         freeObject("params", "Parámetros del schema (sin prompt ni medios).")
+        boolean("execute", "Google Flow: true cuando el usuario ha pedido generar; envía directamente con su cuenta.")
+        boolean("new_copy", "Solo true si el usuario pide otra generación idéntica; normalmente se reutiliza el encargo pendiente.")
         mediaArray()
         string("task", "Tarea (image_to_video…).")
         string("rationale", "Por qué este modelo y esta configuración, en 1–3 frases para el usuario.")
@@ -71,7 +89,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         val built = d.plans.build(
             id = AssetIndex.newId("plan"),
             model = model,
-            prompt = input.req("prompt"),
+            prompt = input.str("prompt") ?: "",
             negativePrompt = input.str("negative_prompt"),
             params = input.paramMap("params"),
             media = resolveMedia(input, session, d.assets),
@@ -87,14 +105,23 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         return when (built) {
             is PlanBuild.Invalid -> fail("El plan no es válido; corrige y vuelve a prepararlo.") { put("issues", built.issues.toJson()) }
             is PlanBuild.Ready -> {
-                val plan = built.plan.let { p ->
+                val candidate = built.plan.let { p ->
                     if (projectName != null && project == null) p.copy(warnings = p.warnings + "El proyecto «$projectName» no existe todavía: créalo para que la generación quede asociada.") else p
                 }
-                d.guard.register(plan)
+                val existing = if(input["new_copy"]?.toString() == "true") null else d.guard.plans().firstOrNull { p ->
+                    d.guard.state(p.id) in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) &&
+                        p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
+                        p.sceneCode == candidate.sceneCode && p.shotCode == candidate.shotCode &&
+                        p.characters == candidate.characters && p.parentGenerationId == candidate.parentGenerationId && p.task == candidate.task
+                }
+                val plan = existing ?: candidate.also { d.guard.register(it) }
+                if (d.directFlow && plan.ref.providerId == "google_flow" && input["execute"]?.toString() == "true")
+                    return submitAccountFlow(d, plan, session)
                 ok(
                     buildJsonObject {
-                        put("plan", plan.cardJson(PlanState.PREPARED))
-                        put("next", "Tarjeta mostrada. Si el usuario quiere generar, llama a submit_generation con este plan_id; el envío real solo ocurre cuando el usuario pulsa GENERAR.")
+                        put("plan", plan.cardJson(d.guard.state(plan.id)))
+                        put("reused", existing != null)
+                        put("next", if (d.directFlow && plan.ref.providerId == "google_flow") "Si el usuario pidió generar, llama a submit_generation: Flow se envía directamente sin confirmación." else "Tarjeta mostrada. Si el usuario quiere generar, llama a submit_generation con este plan_id; el envío real solo ocurre cuando el usuario pulsa GENERAR.")
                     },
                     listOf(UiEvent.PlanReady(plan, executable = true)),
                 )
@@ -105,12 +132,13 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
 
 class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
     "update_plan", ToolCategory.PLAN,
-    "Modifica prompt, prompt negativo o parámetros de un plan ya preparado y lo revalida. Cualquier confirmación previa queda anulada.",
+    "Modifica prompt, parámetros o archivos de un encargo pendiente sin duplicarlo. Para añadir/cambiar referencias envía media con todos los archivos que debe conservar. Revalida y anula cualquier confirmación previa.",
     schema {
         string("plan_id", "Plan a modificar.", required = true)
         string("prompt", "Nuevo prompt.")
         string("negative_prompt", "Nuevo prompt negativo.")
         freeObject("params", "Parámetros a cambiar; null o «–» para quitar uno.")
+        mediaArray()
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
@@ -122,7 +150,8 @@ class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
             PlanState.UNCERTAIN -> throw ToolInputException("Ese plan pudo enviarse; pide al usuario que lo compruebe en Historial.")
             else -> Unit
         }
-        return when (val r = d.plans.rebuild(plan, PlanEdit(input.str("prompt"), input.str("negative_prompt"), input.paramMap("params")))) {
+        return when (val r = d.plans.rebuild(plan, PlanEdit(input.str("prompt"), input.str("negative_prompt"), input.paramMap("params"),
+            media = if(input.containsKey("media")) resolveMedia(input, session, d.assets) else null))) {
             is PlanBuild.Invalid -> fail("El cambio no es válido; el plan sigue como estaba.") { put("issues", r.issues.toJson()) }
             is PlanBuild.Ready -> {
                 d.guard.replace(r.plan)
@@ -134,12 +163,13 @@ class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
 
 class SubmitGenerationTool(private val d: ToolDeps) : BaseTool(
     "submit_generation", ToolCategory.PLAN,
-    "Pide al usuario confirmación para ejecutar un plan preparado. NO ejecuta: deja el plan esperando a que el usuario pulse GENERAR en la tarjeta. Cada generación necesita su propia confirmación; no lo llames para varias a la vez.",
+    "Google Flow con acceso directo: envía el plan solicitado sin tarjeta ni confirmación adicional. Otros proveedores: pide revisión y confirmación de coste antes del envío.",
     schema { string("plan_id", "Plan preparado con prepare_generation.", required = true) },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val id = input.req("plan_id")
         val plan = d.guard.plan(id) ?: throw ToolInputException("Plan desconocido «$id».")
+        if (d.directFlow && plan.ref.providerId == "google_flow") return submitAccountFlow(d, plan, session)
         val state = d.guard.requestConfirmation(id)
         if (state == PlanState.SUBMITTED) return fail("Ese plan ya se envió. Para otra generación prepara un plan nuevo.")
         if (state == PlanState.DISCARDED) return fail("El usuario descartó ese plan.")

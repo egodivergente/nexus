@@ -17,7 +17,7 @@ def redact(value):
                 return redact(json.loads(value))
             except ValueError:
                 pass
-        if re.fullmatch(r"(?:veo_[a-z0-9_]+|YhhmEf|eb1hJf|MZZa6b|nprQif)", value):
+        if re.fullmatch(r"(?:veo_[a-z0-9_]+|omni_[a-z0-9_]+|YhhmEf|eb1hJf|MZZa6b|nprQif)", value):
             return value
         return f"[string:{len(value)}]"
     return value
@@ -46,13 +46,18 @@ async def run(args):
             composer._close_pane = close_with_cost
             await composer.ensure_editor(page, args.project)
             request = GenerateVideoRequest(prompt="An amber glass cube slowly rotates on an ivory pedestal.",
-                model=VideoModel.VEO_3_1_FAST, mode=Mode.T2V, aspect=Aspect.LANDSCAPE, count=1)
+                model=VideoModel.from_cli(args.model), mode=Mode.T2V, aspect=Aspect.LANDSCAPE, count=1)
             await composer.apply_video_settings(page, request)
             async def intercept(route, raw):
                 if _rpcid(raw.url) in SUBMIT_RPCS:
                     try:
                         body = parse_qs(raw.post_data or "").get("f.req", [""])[0]
-                        evidence.update(submit=redact(json.loads(body)), aborted_before_google=True)
+                        wire=json.loads(body)
+                        payload=json.loads(wire[0][0][1])
+                        model_slot=payload[0][0][1]
+                        if not isinstance(model_slot,str) or not re.fullmatch(r'[a-zA-Z0-9_]{1,50}',model_slot):
+                            raise ValueError('Unexpected model field')
+                        evidence.update(submit=redact(wire),model_slot=model_slot,aborted_before_google=True)
                     finally:
                         await route.abort()
                 else:
@@ -75,4 +80,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--model", choices=['veo_fast','veo_quality','veo_lite','omni_flash'], default='veo_fast')
     asyncio.run(run(parser.parse_args()))

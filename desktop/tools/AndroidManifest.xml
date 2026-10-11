@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.vidadomu.nexus.transfer">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
   <application android:label="Nexus desktop transfer" android:allowBackup="false"/>
-  <instrumentation android:name="com.vidadomu.nexus.transfer.Transfer" android:targetPackage="com.vidadomu.nexus" android:functionalTest="true"/>
+  <instrumentation android:name="com.vidadomu.nexus.transfer.Transfer" android:targetPackage="com.vidadomu.nexus.agent" android:functionalTest="true"/>
 </manifest>

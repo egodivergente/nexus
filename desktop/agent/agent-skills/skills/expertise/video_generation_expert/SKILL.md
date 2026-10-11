@@ -2,8 +2,8 @@
 id: video_generation_expert
 kind: expertise
 title: Experto en generación de vídeo
-version: 1
-updated: 2026-10-02
+version: 2
+updated: 2026-10-08
 applies_to: [VIDEO]
 triggers: [generar vídeo, animar imagen, clip, escena de vídeo musical]
 ---
@@ -38,4 +38,4 @@ Petición: "anima esta foto de Julián para que mire a cámara y sonría". Es `i
 Si la petición del usuario cae claramente en el ámbito de otra skill de esta lista (p. ej. elección de modelo, coste, continuidad entre planos, movimiento de cámara), delega explícitamente en ella con `load_skill` en vez de improvisar ese criterio aquí.
 
 
-Recuerda que toda generación de vídeo se confirma individualmente con el usuario (ver `cost_optimizer`), nunca en bucle.
+Prepara el conjunto solicitado de vídeos sin confirmaciones individuales. En proveedores de pago, una pulsación de GENERAR autoriza los encargos concretos del bloque. Google Flow con acceso directo se ejecuta al pedirlo, sin tarjetas ni otra confirmación; consulta las capacidades reales del puente.

@@ -33,11 +33,28 @@ fun interface AttachmentImageLoader {
     suspend fun load(attachment: Attachment): ContentBlock.Image?
 }
 
+fun interface AttachmentDocumentLoader {
+    suspend fun load(attachment: Attachment): ContentBlock.Document?
+}
+
+/** Sampled visual frames and their timestamps; never audio or the original video. */
+fun interface AttachmentVideoLoader {
+    suspend fun load(attachment: Attachment): List<ContentBlock>
+}
+
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
 class AgentConversation(val session: AgentSession) {
+    internal var reasoningModelId: String? = null
     internal val messages = mutableListOf<LlmMessage>()
     internal val mutex = Mutex()
     fun history(): List<LlmMessage> = messages.toList()
+    /** Restore completed text turns; never replay old tool calls or submissions. */
+    fun restoreTextHistory(turns: List<Pair<String, String>>) {
+        check(messages.isEmpty())
+        turns.takeLast(80).forEach { (role, text) ->
+            messages += LlmMessage(if (role == "user") Role.USER else Role.ASSISTANT, listOf(ContentBlock.Text(text)))
+        }
+    }
 }
 
 data class TurnResult(
@@ -67,6 +84,8 @@ class AgentOrchestrator(
     private val logger: AgentLogger = AgentLogger { _, _ -> },
     private val images: AttachmentImageLoader? = null,
     private val today: () -> String = { LocalDate.now().toString() },
+    private val documents: AttachmentDocumentLoader? = null,
+    private val videos: AttachmentVideoLoader? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -89,8 +108,13 @@ class AgentOrchestrator(
         text: String,
         newAttachments: List<Attachment> = emptyList(),
         onEvent: (UiEvent) -> Unit = {},
-    ): TurnResult = conv.mutex.withLock {
+    ): TurnResult = conv.mutex.withLock { kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(AssetIndex.newId("turn"))) {
+        if (conv.reasoningModelId != null && conv.reasoningModelId != config.modelId)
+            throw LlmException(LlmException.Kind.BAD_REQUEST, "Has cambiado el modelo. Abre una nueva conversación para usarlo; este chat se conserva.")
+        if (conv.reasoningModelId != null && conv.messages.size > MAX_MESSAGES)
+            throw LlmException(LlmException.Kind.BAD_REQUEST, "Este chat ha alcanzado su límite de contexto. Abre una nueva conversación; el proyecto y sus archivos se conservan.")
         val session = conv.session
+        session.flowSubmittedResults = 0
         val start = conv.messages.size
         newAttachments.forEach { a -> if (session.attachment(a.id) == null) session.attachments += a }
 
@@ -102,11 +126,38 @@ class AgentOrchestrator(
                 runCatching { loader.load(a) }.getOrNull()?.let { blocks += it }
             }
         }
+        val videoAttachments = newAttachments.filter { it.mimeType.startsWith("video/") }
+        if (videoAttachments.isNotEmpty()) {
+            val videoLoader = videos
+            if (config.sendImagesToLlm && videoLoader != null) {
+                require(videoAttachments.size <= MAX_VIDEOS_PER_TURN) {
+                    "Puedes analizar hasta 2 vídeos por mensaje. Envía los demás en otro turno; los originales se conservan."
+                }
+                for (attachment in videoAttachments) {
+                    val frames = videoLoader.load(attachment)
+                    require(frames.count { it is ContentBlock.Image } == VIDEO_FRAMES_PER_ATTACHMENT &&
+                        frames.all { it is ContentBlock.Image || it is ContentBlock.Text }) {
+                        "No se pudieron obtener los 6 fotogramas del vídeo. No se ha analizado su contenido."
+                    }
+                    blocks += ContentBlock.Text("Vídeo ${attachment.name ?: attachment.id}: análisis visual muestreado de 6 fotogramas. SIN audio; no es una lectura completa del vídeo y puede omitir acciones entre muestras.")
+                    blocks += frames
+                }
+            } else {
+                blocks += ContentBlock.Text("Los vídeos adjuntos NO se han leído: el análisis visual está desactivado o no disponible. No se han enviado fotogramas ni audio; no afirmes haber visto su contenido.")
+            }
+        }
+        documents?.let { loader ->
+            val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") && !it.mimeType.startsWith("audio/") }
+            require(docs.size <= 5) { "Bedrock admite hasta 5 documentos por mensaje. Envía los demás en el siguiente." }
+            for (attachment in docs) loader.load(attachment)?.let { blocks += it }
+        }
         appendUser(conv, blocks)
         trimHistory(conv)
 
         val events = mutableListOf<UiEvent>()
         val calls = mutableListOf<String>()
+        val turnId = kotlin.coroutines.coroutineContext[com.vidadomu.nexus.agent.core.llm.LlmTurnContext]!!.turnId
+        var llmCalls = 0
         var input = 0; var output = 0; var rounds = 0
         var stop = "END_TURN"
         val turnTexts = mutableListOf<String>()
@@ -119,8 +170,16 @@ class AgentOrchestrator(
         )
 
         while (true) {
+            if (llmCalls >= config.maxToolRounds + 1) {
+                stop = "MAX_ROUNDS"
+                turnTexts += "He alcanzado el limite de llamadas de este mensaje. El trabajo queda conservado."
+                break
+            }
+            val readingDocuments = conv.messages.any { m -> m.content.any { it is ContentBlock.Document } }
+            val requestSystem = if (readingDocuments) system + "Lee los documentos y extrae un resumen de trabajo preciso, con hechos, citas de seccion y detalles necesarios para la peticion del usuario. Indica lo que no has podido leer. Esta fase solo lee: no afirma haber ejecutado acciones. El original no se reenviara en los siguientes pasos; conserva aqui la informacion necesaria." else system
             val response = try {
-                llm.complete(LlmRequest(config.modelId, system, conv.messages.toList(), specs, config.maxTokens, config.temperature))
+                llmCalls++
+                llm.complete(LlmRequest(config.modelId, requestSystem, conv.messages.toList(), if(readingDocuments) emptyList() else specs, config.maxTokens, config.temperature, turnId))
             } catch (e: LlmException) {
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
                 if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)
@@ -129,7 +188,20 @@ class AgentOrchestrator(
             input += response.usage.inputTokens; output += response.usage.outputTokens
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
             conv.messages += msg
+            if (msg.content.any { it is ContentBlock.Reasoning }) conv.reasoningModelId = config.modelId
             msg.text().takeIf { it.isNotBlank() }?.let { turnTexts += it }
+            if (readingDocuments) {
+                // Do not replace a document that belongs to signed reasoning context.
+                if (conv.reasoningModelId != null) { stop = response.stopReason.name; break }
+                conv.messages.indices.forEach { i ->
+                    conv.messages[i] = conv.messages[i].copy(content = conv.messages[i].content.map {
+                        if(it is ContentBlock.Document) ContentBlock.Text("[Documento ${it.name}: lectura resumida en el siguiente mensaje; el original sigue en referencias.]") else it
+                    })
+                }
+                if(response.stopReason != StopReason.END_TURN) { stop=response.stopReason.name; break }
+                conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text("Con esa lectura, atiende ahora mi peticion original: $text")))
+                continue
+            }
             val uses = msg.toolUses()
             if (uses.isEmpty()) { stop = response.stopReason.name; break }
 
@@ -150,10 +222,10 @@ class AgentOrchestrator(
             }
             conv.messages += LlmMessage(Role.USER, results)
             rounds++
-            if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; }
+            if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
         }
         TurnResult(turnTexts.lastOrNull().orEmpty(), events, Usage(input, output), rounds, calls, stop)
-    }
+    } }
 
     private suspend fun runTool(use: ContentBlock.ToolUse, session: AgentSession): Triple<JsonElement, Boolean, List<UiEvent>> {
         val tool = byName[use.name]
@@ -208,18 +280,42 @@ class AgentOrchestrator(
     /** Si el último mensaje es del usuario (p. ej. tras cortar por rondas), se fusiona para alternar roles. */
     private fun appendUser(conv: AgentConversation, blocks: List<ContentBlock>) {
         val last = conv.messages.lastOrNull()
-        if (last != null && last.role == Role.USER) conv.messages[conv.messages.lastIndex] = last.copy(content = last.content + blocks)
+        if (last != null && last.role == Role.USER) {
+            val existingDocuments=last.content.filterIsInstance<ContentBlock.Document>().map {it.name}.toSet()
+            val merged=last.content + blocks.filterNot {it is ContentBlock.Document && it.name in existingDocuments}
+            require(merged.count {it is ContentBlock.Document}<=5) {"Este mensaje ya contiene 5 documentos. Completa el turno antes de añadir más."}
+            conv.messages[conv.messages.lastIndex] = last.copy(content = merged)
+        }
         else conv.messages += LlmMessage(Role.USER, blocks)
     }
 
     private fun trimHistory(conv: AgentConversation) {
         val m = conv.messages
+        // Signed reasoning is tied to the exact conversation. Do not rewrite preceding
+        // images, documents or tool results. A new chat handles the bounded context limit.
+        if (m.any { message -> message.content.any { it is ContentBlock.Reasoning } }) {
+            conv.reasoningModelId = config.modelId
+            return
+        }
         // Imágenes solo en los dos últimos mensajes de usuario: ahorra tokens sin perder el contexto textual.
         val userIdx = m.indices.filter { m[it].role == Role.USER }
         userIdx.dropLast(2).forEach { i ->
             if (m[i].content.any { it is ContentBlock.Image }) {
                 m[i] = m[i].copy(content = m[i].content.map { if (it is ContentBlock.Image) ContentBlock.Text("[imagen enviada antes]") else it })
             }
+        }
+        // Keep at most five distinct recent documents across the conversation.
+        // Text markers preserve provenance without pretending the old binary is still available.
+        val retainedDocuments = mutableSetOf<String>()
+        for (i in m.indices.reversed()) {
+            val content = m[i].content.toMutableList()
+            for (j in content.indices.reversed()) {
+                val doc = content[j] as? ContentBlock.Document ?: continue
+                if (doc.name in retainedDocuments || retainedDocuments.size >= 5) {
+                    content[j] = ContentBlock.Text("[Documento anterior ${doc.name}: contenido retirado del contexto; vuelve a adjuntarlo desde las referencias si necesitas consultarlo.]")
+                } else retainedDocuments.add(doc.name)
+            }
+            m[i] = m[i].copy(content = content)
         }
         while (m.size > MAX_MESSAGES || (m.isNotEmpty() && !isPlainUser(m.first()))) {
             m.removeAt(0)
@@ -232,6 +328,8 @@ class AgentOrchestrator(
     companion object {
         const val MAX_MESSAGES = 60
         const val MAX_IMAGES_PER_TURN = 4
+        const val MAX_VIDEOS_PER_TURN = 2
+        const val VIDEO_FRAMES_PER_ATTACHMENT = 6
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

@@ -3,6 +3,8 @@ package com.vidadomu.nexus.agent.core.assets
 import java.io.File
 import java.text.Normalizer
 import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -84,6 +86,8 @@ data class Asset(
     val tags: List<String> = emptyList(),
     val generationId: String? = null,
     val parentAssetId: String? = null,
+    /** Removed from library; history and existing references retain the file and asset identity. */
+    val libraryDeleted: Boolean = false,
     val version: Int = 1,
     val createdAt: Long,
 )
@@ -150,21 +154,35 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     private val mutex = Mutex()
     private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
 
+    private val mutableChanges = MutableStateFlow(data)
+    val changes = mutableChanges.asStateFlow()
+
     fun snapshot(): IndexData = data
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
+        persist(next)
         data = next
-        persist()
+        mutableChanges.value = next
         result
     }
 
-    private fun persist() {
+    private fun persist(snapshot: IndexData) {
         val f = file ?: return
         f.parentFile?.mkdirs()
         val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(JSON.encodeToString(IndexData.serializer(), data))
-        if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+        try {
+            java.io.FileOutputStream(tmp).use { output ->
+                output.write(JSON.encodeToString(IndexData.serializer(), snapshot).toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            try {
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally { tmp.delete() }
     }
 
     // ---------- proyectos y estructura ----------
@@ -301,9 +319,25 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         d.copy(assets = d.assets + a) to a
     }
 
+    /** One atomic, project-scoped library removal. Never invalidates historical file references. */
+    suspend fun deleteFromLibrary(projectId: String, ids: Set<String>): Int = edit { d ->
+        val targets = d.assets.filter { it.id in ids && it.projectId == projectId && !it.libraryDeleted }.map { it.id }.toSet()
+        d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = true) else it }) to targets.size
+    }
+
     suspend fun updateAsset(id: String, change: (Asset) -> Asset): Asset = edit { d ->
         val cur = d.assets.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Asset desconocido: $id")
         val next = change(cur).copy(id = cur.id, uri = cur.uri, createdAt = cur.createdAt)
+        d.copy(assets = d.assets.map { if (it.id == id) next else it }) to next
+    }
+
+    /** Native file operations use this only after preserving the previous URI on disk. */
+    suspend fun relocateAsset(id: String, expectedUri: String, uri: String, displayName: String): Asset = edit { d ->
+        val current = d.assets.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Asset desconocido: $id")
+        require(current.uri == expectedUri) { "El archivo cambió durante la operación." }
+        require(uri.isNotBlank() && displayName.isNotBlank())
+        require(d.assets.none { it.id != id && it.uri == uri }) { "La nueva ruta ya está indexada." }
+        val next = current.copy(uri = uri, displayName = displayName)
         d.copy(assets = d.assets.map { if (it.id == id) next else it }) to next
     }
 
@@ -315,6 +349,7 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         val gens = data.generations.associateBy { it.id }
         val words = q.text?.let { norm(it).split(' ').filter { w -> w.length > 1 } }.orEmpty()
         return data.assets.asSequence()
+            .filter { !it.libraryDeleted }
             .filter { project == null || it.projectId == project.id }
             .filter { q.type == null || it.type == q.type }
             .filter { q.role == null || it.role == q.role }
@@ -324,7 +359,8 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
             .filter { q.modelId == null || gens[it.generationId]?.modelId?.contains(q.modelId, true) == true }
             .filter { a ->
                 if (words.isEmpty()) true else {
-                    val hay = norm(listOfNotNull(a.displayName, gens[a.generationId]?.prompt, a.tags.joinToString(" "),
+                    val hay = norm(listOfNotNull(a.displayName, gens[a.generationId]?.prompt,
+                        gens[a.generationId]?.providerId, gens[a.generationId]?.modelId, a.tags.joinToString(" "),
                         a.characterIds.mapNotNull { id -> data.characters.firstOrNull { it.id == id }?.name }.joinToString(" "),
                         data.scenes.firstOrNull { it.id == a.sceneId }?.title).joinToString(" "))
                     words.all { hay.contains(it) }

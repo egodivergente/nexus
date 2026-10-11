@@ -57,6 +57,28 @@ class BedrockDirectProvider(
         }
     }
 
+    override suspend fun countInputTokens(request: LlmRequest): Int? = withContext(Dispatchers.IO) {
+        val fields = ConverseCodec.encodeRequest(request).filterKeys { it in setOf("messages", "system", "toolConfig") }
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("input", kotlinx.serialization.json.buildJsonObject { put("converse", JsonObject(fields)) })
+        }.toString()
+        val host = "bedrock-runtime.$region.amazonaws.com"
+        // CountTokens accepts a foundation model, whereas Converse uses the inference profile.
+        // Passing us.anthropic.* here yields ValidationException and inflates the budget fallback.
+        val countModel = request.modelId.replace(
+            Regex("^(us|eu|apac|au|jp|global)\\.(anthropic\\..+)$"), "$2")
+        val path = "/model/${SigV4.encode(countModel)}/count-tokens"
+        val signed = SigV4.sign("POST", host, path, body, region, "bedrock", credentials(), now())
+        val http = Request.Builder().url("https://$host$path").apply { signed.forEach { (k,v) -> header(k,v) } }
+            .post(body.toRequestBody("application/json".toMediaType())).build()
+        try {
+            client.newCall(http).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                Json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject["inputTokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()?.takeIf { it >= 0 }
+            }
+        } catch (error: IOException) { null }
+    }
+
     private fun mapError(code: Int, body: String, type: String?): LlmException {
         val detail = runCatching { Json.parseToJsonElement(body).jsonObject["message"]?.jsonPrimitive?.contentOrNull }
             .getOrNull()?.take(240)

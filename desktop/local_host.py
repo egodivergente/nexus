@@ -13,7 +13,9 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import socketserver
 import subprocess
+import tempfile
 import threading
 import tkinter as tk
 from tkinter import filedialog
@@ -37,10 +39,12 @@ SCHEMA_LOCK = threading.Lock()
 ALLOWED_PROVIDERS = {'atlas_cloud': 'https://api.atlascloud.ai',
                      'runway': 'https://api.dev.runwayml.com',
                      'crun': 'https://api.crun.ai'}
-MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif':'image/gif',
         '.webp': 'image/webp', '.mp4': 'video/mp4', '.mov': 'video/quicktime',
         '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
-        '.m4a': 'audio/mp4'}
+        '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
+        '.pdf': 'application/pdf', '.txt': 'text/plain', '.md': 'text/markdown',
+        '.csv': 'text/csv', '.html': 'text/html', '.srt': 'text/plain', '.zip': 'application/zip'}
 
 
 class Blob(ctypes.Structure):
@@ -99,6 +103,8 @@ def agent_host():
         if _agent is None:
             from agent_host import AgentHost
             _agent = AgentHost(ROOT, DATA, windows_keys, write_secret)
+            from native_operations import NativeOperations
+            _agent.native = NativeOperations(DATA, _agent, read_state, write_state, provider_request, windows_keys)
     return _agent
 
 
@@ -107,9 +113,55 @@ def read_state():
     return json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else None
 
 
+def merge_jobs(incoming, previous):
+    """Keep jobs from other windows and prevent stale terminal-state regression."""
+    previous_by_id = {job.get('id'): job for job in previous if isinstance(job, dict) and job.get('id')}
+    merged = []
+    seen = set()
+    terminal = {'COMPLETED', 'FAILED', 'CANCELLED'}
+    for job in incoming:
+        if not isinstance(job, dict) or not job.get('id'):
+            raise ValueError('Trabajo sin identificador.')
+        identifier = job['id']
+        if identifier in seen:
+            continue
+        seen.add(identifier)
+        old = previous_by_id.get(identifier)
+        current = dict(job)
+        if old:
+            current = {**old, **current}
+            # Completion can recover an uncertain failure, but an old active
+            # snapshot must never erase an already confirmed terminal result.
+            newer_recovery = job.get('flowRecoveryRevision', 0) > old.get('flowRecoveryRevision', 0)
+            stale_recovery = job.get('flowRecoveryRevision', 0) < old.get('flowRecoveryRevision', 0)
+            preserve = stale_recovery or (not newer_recovery and (old.get('status') == 'COMPLETED' and job.get('status') != 'COMPLETED'
+                        or old.get('status') in terminal and job.get('status') not in terminal))
+            if preserve:
+                for key in ('status', 'outputs', 'error', 'uncertain', 'remoteId', 'flowRecoveryRevision'):
+                    if key in old:
+                        current[key] = old[key]
+                    else:
+                        current.pop(key, None)
+            elif old.get('outputs'):
+                outputs = list(old['outputs'])
+                outputs.extend(output for output in job.get('outputs', []) if output not in outputs)
+                current['outputs'] = outputs
+            if current.get('status') == 'COMPLETED':
+                current.pop('error', None)
+                current['uncertain'] = False
+        merged.append(current)
+    merged.extend(dict(job) for job in previous if isinstance(job, dict)
+                  and job.get('id') and job['id'] not in seen)
+    return merged
+
+
 def write_state(value):
+    if not isinstance(value, dict) or not isinstance(value.get('jobs'), list):
+        raise ValueError('Estado de biblioteca no válido.')
     with STATE_LOCK:
         path = DATA / 'state.json'
+        previous = json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else {}
+        value = {**value, 'jobs': merge_jobs(value['jobs'], previous.get('jobs', []))}
         temporary = DATA / 'state.json.tmp'
         temporary.write_text(json.dumps(value, ensure_ascii=False), encoding='utf-8')
         if path.exists():
@@ -200,12 +252,8 @@ def select_files():
 
 
 def media_path(identifier):
-    if not re.fullmatch(r'[a-f0-9]{32}\.(png|jpe?g|webp|mp4|mov|webm|mp3|wav|m4a)', identifier):
-        raise ValueError('Archivo local no válido.')
-    path = MEDIA / identifier
-    if not path.is_file():
-        raise ValueError('El archivo local ya no está disponible.')
-    return path
+    from native_operations import resolve_media
+    return resolve_media(DATA, identifier, MEDIA)
 
 
 def https_stream(url, method, headers, prefix, file_path, suffix=b''):
@@ -282,16 +330,124 @@ def save_remote(url):
     if not destination:
         return False
     request = urllib.request.Request(url, headers={'User-Agent': 'Nexus/1.0.0 (Windows; Desktop)'})
+    # Download beside the destination so replacement is atomic on its volume.
+    # Only this temporary file belongs to the operation; never remove the user's file.
+    temporary = None
     try:
-        with OPENER.open(request, timeout=120) as response, open(destination, 'wb') as target:
-            shutil.copyfileobj(response, target, 1024 * 1024)
-    except Exception:
-        Path(destination).unlink(missing_ok=True)
-        raise
+        with OPENER.open(request, timeout=120) as response:
+            descriptor, temporary = tempfile.mkstemp(prefix='.nexus-download-', dir=Path(destination).parent)
+            with os.fdopen(descriptor, 'wb') as target:
+                shutil.copyfileobj(response, target, 1024 * 1024)
+                expected = response.headers.get('Content-Length')
+                if expected is not None and target.tell() != int(expected):
+                    raise ValueError('La descarga está incompleta.')
+                target.flush()
+                os.fsync(target.fileno())
+        os.replace(temporary, destination)
+    finally:
+        if temporary is not None:
+            Path(temporary).unlink(missing_ok=True)
     return True
 
 
 def dispatch(keys, operation, args):
+    if operation == 'readCredential':
+        if args.get('provider') in ALLOWED_PROVIDERS:
+            return {'value': keys.get(args['provider'], '')}
+        if args.get('field') not in {'accessKey', 'secretKey', 'sessionToken', 'token'}:
+            raise ValueError('Campo desconocido.')
+        return {'value': windows_keys(DATA / 'assistant/credentials.dpapi').get(args['field'], '')}
+    if operation == 'saveProviderCredential':
+        provider=args.get('provider')
+        if provider not in ALLOWED_PROVIDERS:
+            raise ValueError('Proveedor desconocido.')
+        value=str(args.get('value','')).strip()
+        if not value:
+            raise ValueError('Introduce la clave del proveedor.')
+        keys[provider]=value
+        write_secret(KEY_FILE,keys)
+        return {'configured':list(keys)}
+    if operation in {'archiveChat', 'listChats', 'loadChat'}:
+        directory = DATA / 'assistant/conversations'
+        directory.mkdir(parents=True, exist_ok=True)
+        def converted(value):
+            if value.get('desktop'):
+                return value
+            items = []
+            for item in value.get('items', []):
+                role = str(item.get('type', item.get('kind', ''))).split('.')[-1].lower()
+                if role in {'user', 'assistant'}:
+                    attachments = [{'id': a.get('id'), 'url': a.get('uri'), 'mime': a.get('mimeType'), 'name': a.get('name')} for a in item.get('attachments', [])]
+                    items.append({'role': role, 'text': item.get('text', ''), 'attachments': attachments})
+                elif role == 'plancard':
+                    entry=value.get('plans',{}).get(item.get('planId'))
+                    if entry and entry.get('plan'):
+                        plan=entry['plan']
+                        items.append({'role':'assistant','text':plan.get('modelName','Encargo')+' · '+entry.get('state','Archivado')+'\n'+plan.get('prompt',''),
+                            'archivedPlan':plan,'archiveState':entry.get('state'),'archiveJobId':entry.get('jobId')})
+                elif role == 'notice':
+                    items.append({'role':'assistant','text':item.get('text','Aviso archivado')})
+            return {'desktop': True, 'items': items, 'draft': '', 'anchors': {}, 'resultPlans': []}
+        if operation == 'archiveChat':
+            items = args.get('items', [])
+            if not items:
+                return {'saved': False}
+            identifier = str(args.get('id', '')) or uuid.uuid4().hex
+            if not re.fullmatch('[A-Za-z0-9_-]{1,100}', identifier):
+                raise ValueError('Identificador de conversación no válido.')
+            from native_operations import atomic_json
+            atomic_json(directory / (identifier+'.json'), {**args, 'desktop': True})
+            return {'saved': True, 'id': identifier}
+        if operation == 'loadChat':
+            identifier = str(args.get('id', ''))
+            if not re.fullmatch('[A-Za-z0-9_-]{1,100}', identifier):
+                raise ValueError('Conversación no válida.')
+            return converted(json.loads((directory / (identifier+'.json')).read_text('utf-8')))
+        result = []
+        for file in sorted(directory.glob('*.json'), key=lambda path: path.stat().st_mtime, reverse=True):
+            chat = converted(json.loads(file.read_text('utf-8')))
+            title = next((item['text'][:100] for item in chat['items'] if item['role']=='user'), 'Conversación')
+            result.append({'id': file.stem, 'title': title, 'messages': len(chat['items'])})
+        return result
+    if operation == 'exchangeRate':
+        if OFFLINE_QA:
+            raise ValueError('Laboratorio: consulta de cambio bloqueada.')
+        url = 'https://api.frankfurter.dev/v1/latest?from=USD&symbols=EUR'
+        with urllib.request.urlopen(url, timeout=20) as response:
+            value = json.load(response)
+        rate = value.get('rates', {}).get('EUR')
+        if not isinstance(rate, (int, float)) or not math.isfinite(rate) or rate <= 0:
+            raise ValueError('El servicio de divisas no devolvió un cambio válido.')
+        return {'rate': rate, 'date': value['date'], 'source': 'Frankfurter / BCE'}
+    if operation == 'exportProject':
+        import zipfile
+        index = json.loads((DATA / 'assistant/index.json').read_text('utf-8'))
+        project = next((p for p in index.get('projects', []) if p['id'] == args.get('projectId')), None)
+        if not project:
+            raise ValueError('Proyecto desconocido.')
+        native = agent_host().native
+        assets = [a for a in index.get('assets', []) if a.get('projectId') == project['id'] and not a.get('libraryDeleted') and ('assetIds' not in args or a['id'] in args['assetIds'])]
+        identifier = uuid.uuid4().hex + '.zip'
+        with zipfile.ZipFile(MEDIA / identifier, 'w', zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('project.json', json.dumps({'project': project, 'assets': assets,
+                'characters': [c for c in index.get('characters', []) if c.get('projectId') == project['id']]}, ensure_ascii=False))
+            for asset in assets:
+                _, source = native.asset(asset['id'], assets)
+                archive.write(source, 'media/'+asset['id']+source.suffix)
+        return {'url': '/media/'+identifier, 'name': project['name']+'.zip', 'assets': len(assets)}
+    if operation == 'nativeOperation':
+        if OFFLINE_QA and args.get('operation') in {'web_search', 'read_web_page', 'connect_mcp_server', 'call_mcp_tool', 'atlas_get_balance', 'diagnose_flow', 'repair_flow', 'recover_generation'}:
+            raise ValueError('Laboratorio: operación de red bloqueada.')
+        return agent_host().native.run(args)
+    if operation == 'mediaJobs':
+        native = agent_host().native
+        return sorted([json.loads(path.read_text('utf-8')) for path in native.directory.glob('*.json')], key=lambda item: item['createdAt'], reverse=True)[:100]
+    if operation == 'openAlexia':
+        adb=Path(os.environ['LOCALAPPDATA'])/'Android/Sdk/platform-tools/adb.exe'
+        result=subprocess.run([str(adb),'-s','100.119.88.105:5555','shell','am','start','-n','com.axel.library/.MainActivity'],capture_output=True,text=True,timeout=15,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        if result.returncode or 'Error' in result.stdout:
+            raise ValueError('No se pudo abrir Alexia en el S25. Comprueba su conexión por Tailscale.')
+        return {'opened':True,'device':'S25'}
     if operation == 'agent':
         if args.get('op') == 'reload':
             with SCHEMA_LOCK:
@@ -300,10 +456,40 @@ def dispatch(keys, operation, args):
     if operation == 'agentEvents':
         return agent_host().events(args.get('owner'))
     if operation == 'agentReply':
-        return agent_host().reply(args)
+        from flow_agent import reply
+        return reply(agent_host(), args, read_state())
     if operation == 'init':
-        return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys), 'state': read_state(),
-                'version': '1.7.0-agent-desktop', 'platform': 'HP EliteBook · Windows x64'}
+        import flow_provider
+        flow_models = flow_provider.catalog()
+        if flow_models and not OFFLINE_QA:
+            flow_provider.automation_initialize(DATA)
+        return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
+                'version': '1.9.2-agent-desktop', 'androidSource': 'fbae847eee709ae462b7e5eb83fa8b47ccad3ad8',
+                'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
+    if operation in ('flowConnection', 'flowConnect'):
+        if OFFLINE_QA:
+            return {'status': 'unavailable', 'checked_at': 0}
+        import flow_connection
+        return flow_connection.snapshot(refresh=args.get('refresh') is True, interactive=operation=='flowConnect')
+    if operation in ('flowQuote', 'flowSubmit', 'flowStatus', 'flowAssetOptions', 'flowRecover', 'flowAutomation', 'flowPolicy', 'flowCancel'):
+        if OFFLINE_QA:
+            raise ValueError('Laboratorio: Flow bloqueado.')
+        import flow_provider
+        if operation == 'flowAutomation':
+            return flow_provider.automation_overview(DATA)
+        if operation == 'flowPolicy':
+            return flow_provider.automation_configure(DATA, args)
+        if operation == 'flowCancel':
+            return flow_provider.automation_cancel(DATA, args.get('request_id', ''))
+        if operation == 'flowRecover':
+            return flow_provider.recover(DATA, args.get('request_id', ''))
+        if operation == 'flowAssetOptions':
+            return flow_provider.asset_options(args.get('source_request_id', ''))
+        if operation == 'flowQuote':
+            return flow_provider.quote(args, DATA)
+        if operation == 'flowSubmit':
+            return flow_provider.submit(DATA, args)
+        return flow_provider.status(DATA, args.get('request_id', ''))
     if operation == 'save':
         write_state(args); return True
     if operation == 'pick':
@@ -351,9 +537,16 @@ def dispatch(keys, operation, args):
     if operation == 'generate':
         if OFFLINE_QA:
             raise ValueError('Laboratorio: generaciones bloqueadas.')
+        body = args.get('body') or {}
+        if not isinstance(body, dict):
+            raise ValueError('Solicitud de generación no válida.')
+        for field in ('model', 'model_id', 'modelId'):
+            if re.search(r'nano[_ -]?banana.*lite|nano[_ -]?lite', str(body.get(field, '')), re.I):
+                raise ValueError('Nano Banana Lite está desactivado. Elige otro modelo.')
         cost = args.get('cost')
-        if not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0:
-            raise ValueError('Primero confirma un coste válido.')
+        unavailable = cost is None and args.get('estimate_status') == 'unavailable'
+        if not unavailable and (isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0):
+            raise ValueError('Estimación no válida.')
         return provider_request(keys, args['provider'], args['path'], 'POST', args['body'], paid=True)
     if operation == 'upload':
         if OFFLINE_QA:
@@ -413,7 +606,7 @@ class Handler(BaseHTTPRequestHandler):
             if first >= size or last < first:
                 self.send_error(416); return
         self.send_response(206 if wanted else 200)
-        self.send_header('Content-Type', MIME[path.suffix])
+        self.send_header('Content-Type', 'text/plain; charset=utf-8' if path.suffix == '.html' else MIME[path.suffix])
         self.send_header('Content-Length', str(max(0, last - first + 1)))
         self.send_header('Accept-Ranges', 'bytes')
         self.send_header('Cache-Control', 'private, no-store')
@@ -446,12 +639,19 @@ class Handler(BaseHTTPRequestHandler):
         if (not self.checked() or self.path != '/rpc' or self.headers.get('Origin') != origin
                 or not secrets.compare_digest(self.headers.get('X-Nexus-Session', ''), self.server.token)):
             self.send_error(403); return
-        length = int(self.headers.get('Content-Length', '0'))
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            self.send_error(400); return
         if length < 2 or length > 20 * 1024 * 1024:
             self.send_error(413); return
         message = {}
         try:
-            message = json.loads(self.rfile.read(length))
+            payload = json.loads(self.rfile.read(length))
+            if (not isinstance(payload, dict) or not isinstance(payload.get('op'), str)
+                    or not isinstance(payload.get('args', {}), dict)):
+                self.send_error(400); return
+            message = payload
             value = dispatch(self.server.keys, message.get('op'), message.get('args') or {})
             answer = {'id': message.get('id'), 'ok': True, 'value': value}
         except Exception as error:
@@ -476,6 +676,7 @@ def main():
     global DATA, MEDIA, KEY_FILE, SESSION_FILE, OFFLINE_QA
     parser = argparse.ArgumentParser()
     parser.add_argument('--headless', action='store_true', help='Start without opening Edge; for local smoke tests.')
+    parser.add_argument('--port', type=int, default=0, help='Optional existing loopback port for a host update.')
     parser.add_argument('--offline-qa', action='store_true')
     parser.add_argument('--data-dir')
     options = parser.parse_args()
@@ -521,9 +722,17 @@ def main():
         kernel.CloseHandle(mutex)
 
 
+class LoopbackHTTPServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # The address is explicitly loopback; startup does not need reverse DNS.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = 'localhost'
+        self.server_port = self.server_address[1]
+
+
 def run_server(options):
     keys = {} if OFFLINE_QA else windows_keys(KEY_FILE)
-    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    server = LoopbackHTTPServer(('127.0.0.1', options.port), Handler)
     server.token = secrets.token_urlsafe(32)
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
@@ -550,7 +759,8 @@ def open_window(url):
         profile = DATA / 'EdgeProfile'
         profile.mkdir(parents=True, exist_ok=True)
         subprocess.Popen([edge, '--app=' + url, '--user-data-dir=' + str(profile),
-                          '--no-first-run', '--no-default-browser-check', '--window-size=1280,840'],
+                          '--no-first-run', '--no-default-browser-check', '--force-dark-mode',
+                          '--window-size=1280,840'],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         os.startfile(url)

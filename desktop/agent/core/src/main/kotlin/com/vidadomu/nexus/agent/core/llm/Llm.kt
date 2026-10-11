@@ -12,6 +12,13 @@ enum class Role { USER, ASSISTANT }
 
 sealed interface ContentBlock {
     data class Text(val text: String) : ContentBlock
+    /** Opaque, signed provider context. Never display or log its contents. */
+    class Reasoning(val content: JsonObject) : ContentBlock {
+        override fun toString() = "Reasoning([private provider context])"
+    }
+    class Document(val format: String, val name: String, val bytes: ByteArray) : ContentBlock {
+        override fun toString() = "Document($format, ${bytes.size} bytes)"
+    }
 
     data class ToolUse(val id: String, val name: String, val input: JsonObject) : ContentBlock
 
@@ -41,6 +48,7 @@ data class LlmRequest(
     val tools: List<ToolSpec>,
     val maxTokens: Int,
     val temperature: Double? = null,
+    val turnId: String? = null,
 )
 
 enum class StopReason { END_TURN, TOOL_USE, MAX_TOKENS, STOP_SEQUENCE, GUARDRAIL, CONTENT_FILTERED, OTHER }
@@ -52,6 +60,7 @@ data class LlmResponse(val message: LlmMessage, val stopReason: StopReason, val 
 interface LlmProvider {
     val id: String
     suspend fun complete(request: LlmRequest): LlmResponse
+    suspend fun countInputTokens(request: LlmRequest): Int? = null
 }
 
 /** Error de proveedor con mensaje apto para el usuario (sin secretos ni cuerpos de petición). */

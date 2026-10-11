@@ -25,6 +25,8 @@ class OfflinePlannerProvider : LlmProvider {
         val userIdx = msgs.indexOfLast { m -> m.role == Role.USER && m.content.any { it is ContentBlock.Text } && m.content.none { it is ContentBlock.ToolResult } }
         if (userIdx < 0) return say("Escribe qué quieres crear.")
         val userText = msgs[userIdx].text()
+        if (com.vidadomu.nexus.agent.core.agent.ExternalServices.mentionsFlow(userText.substringBefore("\n\n[Adjuntos:")))
+            return say(com.vidadomu.nexus.agent.core.agent.ExternalServices.OFFLINE_FLOW_REPLY)
         val last = msgs.last()
         val tools = request.tools.map { it.name }.toSet()
         if (last.role == Role.USER && last.content.any { it is ContentBlock.ToolResult }) {

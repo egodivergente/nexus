@@ -50,7 +50,7 @@ private val TRAITS = listOf(
 
 private fun SchemaBuilder.modelRef() {
     string("model_id", "Id exacto del modelo tal como lo devuelve el registro.", required = true)
-    string("provider_id", "atlas_cloud, crun o runway. Obligatorio si el id existe en varios proveedores.")
+    string("provider_id", "Proveedor exacto del registro actual. Obligatorio si el id existe en varios proveedores.")
 }
 
 class ListModelsTool(private val d: ToolDeps) : BaseTool(
@@ -59,7 +59,7 @@ class ListModelsTool(private val d: ToolDeps) : BaseTool(
     schema {
         string("modality", "Modalidad.", enum = MODALITIES)
         string("capability", "Capacidad del registro, p. ej. IMAGE_TO_VIDEO, TEXT_TO_IMAGE, IMAGE_EDITING, REFERENCE_TO_VIDEO.")
-        string("provider_id", "atlas_cloud, crun o runway.")
+        string("provider_id", "Proveedor exacto del registro actual, incluido cualquier proveedor conectado localmente.")
         integer("offset", "Desde qué posición (0 por defecto).")
         integer("limit", "Cuántos (máx. 50, 20 por defecto).")
     },
@@ -106,6 +106,13 @@ class SearchModelsTool(private val d: ToolDeps) : BaseTool(
             .take(limit).toList()
         return ok {
             put("count", hits.size)
+            if (com.vidadomu.nexus.agent.core.agent.ExternalServices.mentionsFlow(input.req("query"))) put("external_service", buildJsonObject {
+                put("name", "Google Flow")
+                put("generation_available_in_nexus", true)
+                put("requires_explicit_confirmation", false)
+                put("authentication_status", "check_in_app")
+                put("details", com.vidadomu.nexus.agent.core.agent.ExternalServices.FLOW_INFO)
+            })
             put("items", JsonArray(hits.map { it.first.compact(d.skills.forModel(it.first.ref.modelId)) }))
             if (hits.isEmpty()) put("note", "Ningún modelo del registro coincide. No propongas modelos que no estén aquí.")
         }

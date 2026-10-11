@@ -1,0 +1,7 @@
+.ux-job-info{display:grid;gap:6px;font-size:12px;color:var(--muted);margin:12px 0 18px;line-height:1.5}
+.ux-notice{border-left:3px solid var(--danger);background:color-mix(in srgb,var(--danger) 8%,var(--panel));padding:12px;line-height:1.6;font-size:12px;color:var(--text)}
+.ux-attention{color:var(--danger)!important}.ux-recovery-help{font-size:12px;line-height:1.5}
+.studio-detail-actions{display:flex;flex-wrap:wrap;gap:8px}.studio-details .output-controls{margin:12px 0}.studio-details p,.studio-details dd{overflow-wrap:anywhere}
+.studio-picker-toolbar{display:flex;flex-wrap:wrap;gap:10px}.studio-picker-toolbar input{flex:1 1 220px;min-width:0}.studio-picker-toolbar select{min-width:0;max-width:100%;flex:1 1 150px}.ux-picker-count{margin:12px 0}.studio-model-row{min-height:64px}
+.pc-toolbar [data-ux=clear-filters]{white-space:nowrap}.empty p{max-width:440px;margin:10px auto 20px;line-height:1.6;color:var(--muted)}
+@media(max-width:700px){.studio-details{width:min(100%,400px);max-width:100%;padding:20px}.studio-detail-actions button{flex:1 1 140px}.studio-picker-toolbar input,.studio-picker-toolbar select{flex-basis:100%}.studio-model-row .studio-price{font-size:11px;max-width:90px}.studio-model-row strong{overflow-wrap:anywhere}}

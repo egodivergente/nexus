@@ -30,7 +30,8 @@ object ConverseCodec {
         put("messages", buildJsonArray { request.messages.forEach { add(encodeMessage(it)) } })
         put("inferenceConfig", buildJsonObject {
             put("maxTokens", request.maxTokens)
-            request.temperature?.let { put("temperature", it) }
+            // Claude 5.5 rejects custom sampling parameters; use its model defaults.
+            if (!request.modelId.contains("-5-5")) request.temperature?.let { put("temperature", it) }
         })
         if (request.tools.isNotEmpty()) {
             put("toolConfig", buildJsonObject {
@@ -56,6 +57,7 @@ object ConverseCodec {
 
     private fun encodeBlock(block: ContentBlock): JsonObject = when (block) {
         is ContentBlock.Text -> buildJsonObject { put("text", block.text) }
+        is ContentBlock.Reasoning -> buildJsonObject { put("reasoningContent", block.content) }
         is ContentBlock.ToolUse -> buildJsonObject {
             put("toolUse", buildJsonObject {
                 put("toolUseId", block.id)
@@ -70,6 +72,13 @@ object ConverseCodec {
                 val doc = block.content as? JsonObject ?: buildJsonObject { put("result", block.content) }
                 put("content", buildJsonArray { add(buildJsonObject { put("json", doc) }) })
                 if (block.isError) put("status", "error")
+            })
+        }
+        is ContentBlock.Document -> buildJsonObject {
+            put("document", buildJsonObject {
+                put("format", block.format)
+                put("name", block.name)
+                put("source", buildJsonObject { put("bytes", Base64.getEncoder().encodeToString(block.bytes)) })
             })
         }
         is ContentBlock.Image -> buildJsonObject {
@@ -117,7 +126,8 @@ object ConverseCodec {
                         isError = t["status"]?.jsonPrimitive?.contentOrNull == "error",
                     )
                 }
-                // Bloques de razonamiento u otros desconocidos: se ignoran sin romper el turno.
+                "reasoningContent" in o -> ContentBlock.Reasoning(o["reasoningContent"]!!.jsonObject)
+                // Otros bloques desconocidos no se presentan como texto.
                 else -> null
             }
         }

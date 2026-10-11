@@ -2,6 +2,8 @@
 
 Puente local basado en [gflow-cli 0.82.1](https://github.com/ffroliva/gflow-cli), con MCP por stdio y un perfil independiente de Chromium. Usa la sesión personal de Flow iniciada por el usuario. Grok Bots no es necesario para esta ruta.
 
+Desde el 2026-10-06 admite `nano-pro` (preferido) y `nano2` para imagen; `veo_fast`, `veo_quality`, `veo_lite` y `omni_flash` para vídeo. Los modelos se leyeron en la cuenta real y sus contratos se inspeccionaron abortando las solicitudes antes de Google. Esto no prueba una generación completa de cada modelo. Nano Banana Lite sigue desactivado. Consulta [los modelos y la verificación](../../docs/FLOW-MODELOS-DISPONIBLES.md).
+
 ## Estado comprobado el 2026-10-06
 
 - **PASS:** Google reconoce la sesión guardada del perfil `nexus`.
@@ -10,9 +12,9 @@ Puente local basado en [gflow-cli 0.82.1](https://github.com/ffroliva/gflow-cli)
 - **PASS:** una nueva conexión MCP devuelve el mismo archivo. Repetir el identificador conserva un único trabajo nativo.
 - **PASS:** seis pruebas del control de modelo y cinco de persistencia/idempotencia. Estas pruebas usan datos locales y mocks; la generación real se comprobó por separado.
 - **PASS:** petición de inspección interceptada y abortada antes de Google; el selector mostraba Nano Banana 2 y el campo de modelo enviaba `BELUGA`. El control corregido acepta ese campo.
-- **PASS:** nueva generación completa con la capa final de idempotencia y control de modelo: petición MCP, trabajo nativo completado y JPEG de 1024 × 1024 descargado y verificado, sin recuperación adicional. Se enviaron dos generaciones reales en total, una antes de la corrección y otra para validar la versión final.
-- **NO PROBADO:** vídeo, imágenes de referencia, otros modelos y saldo/deducción exacta de créditos.
-- **PENDIENTE:** incorporación a NEXUS Agent. El alcance implementado es Codex en este PC.
+- **PASS:** generación completa con idempotencia y control de modelo: petición MCP, trabajo nativo completado y JPEG de 1024 × 1024 descargado y verificado. La primera fase envió dos imágenes; la continuación añadió un vídeo y otra imagen, cuatro generaciones nativas en total.
+- **PASS:** vídeo, mejoras 2K/4K de imagen, vídeo 1080p, GIF y recorrido completo del Agente de NEXUS en este PC, detallados abajo.
+- **NO PROBADO:** imágenes de referencia, otros modelos, Android, ejecución de vídeo 4K y saldo/deducción exacta de créditos.
 
 La respuesta de Google observada no atribuye un modelo al archivo generado. Se conserva `requested_model` separado y `model_confirmed=false`, conforme al [hallazgo upstream](https://github.com/ffroliva/gflow-cli/issues/789). El proyecto es un wrapper no oficial; los cambios del proveedor pueden requerir mantenimiento.
 
@@ -24,13 +26,13 @@ La respuesta de Google observada no atribuye un modelo al archivo generado. Se c
 
 `flow_list_jobs()` enumera los trabajos persistidos por este puente. `gflow_auth_status(profile="nexus")` consulta autenticación. `gflow_get_credits` sigue disponible para consulta, sin suponer que el endpoint funciona en una cuenta migrada.
 
-La configuración de Codex habilita estas cinco herramientas. Las herramientas nativas de generación quedan fuera de la lista habilitada para que las llamadas habituales pasen por el registro de identificadores. El proceso usa el [MCP original](https://github.com/ffroliva/gflow-cli/blob/develop/docs/MCP.md); no abre un servidor HTTP en la red.
+La configuración de Codex habilita nueve herramientas, incluidas `flow_generate_video`, `flow_get_quote`, `flow_get_asset_options` y `flow_process_asset`. Las herramientas nativas de generación quedan fuera de la lista habilitada para que las llamadas habituales pasen por el registro de identificadores. El proceso usa el [MCP original](https://github.com/ffroliva/gflow-cli/blob/develop/docs/MCP.md); no abre un servidor HTTP en la red.
 
 ## Rutas y operación
 
 El runtime está en `$HOME/.codex/integrations/google-flow`: `venv`, `browsers`, `state/profile_nexus`, `jobs` y `results`. El perfil, la base de datos, los logs y los resultados son privados y no se versionan.
 
-La instalación registra `google-flow` en `$HOME/.codex/config.toml`, conserva las demás tablas y limita la concurrencia a uno. El navegador de generación se posiciona fuera de pantalla; la autenticación manual usa su ventana de acceso normal. La modificación local de compatibilidad se limita a seleccionar Chromium para ese perfil y a comprobar el modelo de imagen antes del envío. La validación de sesión contra Google sigue activa.
+La instalación registra `google-flow` en `$HOME/.codex/config.toml`, conserva las demás tablas y limita la concurrencia a uno. El navegador de generación se posiciona fuera de pantalla; la autenticación manual usa su ventana de acceso normal. La compatibilidad selecciona Chromium para ese perfil, comprueba los modelos antes del envío y reconoce la forma de vídeo observada. Nano Banana Lite está explícitamente prohibido. La validación de sesión contra Google sigue activa.
 
 Si el catálogo de herramientas del turno se creó antes de registrar el servidor, el agente puede usar el cliente MCP incluido:
 
@@ -52,7 +54,7 @@ La segunda llamada genera contenido y utiliza la cuota de la cuenta. El agente d
 
 La primera llamada real encontró un cambio de modelo (`NARWHAL` frente a `BELUGA`) después del envío. La recuperación lee el checkpoint nativo para localizar el proyecto y decodifica su listado `Zzl0ze`; exige una única imagen con el prompt exacto. Descarga únicamente desde dominios Google admitidos, comprueba cada redirección y solicita la versión original del handle `/asb/`, exigiendo las dimensiones que registra Google. No publica URLs firmadas ni cookies.
 
-Si falta el checkpoint o hay varias coincidencias, devuelve `needs_reconciliation`. Si un proceso se interrumpe antes de guardar su task id, el identificador permanece reservado y no permite otro envío. La recuperación automática se limita a imágenes; no presentar el puente como una API oficial ni como vídeo validado.
+Si falta el checkpoint o hay varias coincidencias, devuelve `needs_reconciliation`. Si un proceso se interrumpe antes de guardar su task id, el identificador permanece reservado y no permite otro envío. La recuperación de vídeo exige un registro con el prompt exacto del proyecto existente. La forma medida del registro lleva `null` donde upstream esperaba `CAE`. Cuando el listado entrega una miniatura, se abre el editor del activo y se descarga exclusivamente 720p de tamaño original. La recuperación no solicita mejoras; los escalados pasan por la operación explícita descrita abajo. No presentar el puente como una API oficial.
 
 ## Reproducción
 
@@ -68,4 +70,51 @@ Al repetir la autenticación con `auth login --browser internal --profile nexus`
 
 ## GitHub
 
-Al realizar esta tarea, el checkout no tenía commits ni remoto y el conector GitHub no mostraba repositorios accesibles. Se ha solicitado al usuario la URL del destino. Un commit local no equivale a publicación verificada.
+Destino identificado y acceso Git verificado: https://github.com/vidaltb94-collab/nexus. La integración se publica en `codex/google-flow-account`, partiendo de la rama de recuperación existente y conservando su historial. El perfil, las credenciales, las bases de datos y los resultados se excluyen.
+
+## Vídeo, precios y NEXUS comprobados el 2026-10-06
+
+`flow_generate_video(request_id, prompt, aspect="16:9", model="veo_fast")` genera una sola salida con Veo Fast y duración automática. No ofrece Lite. El MP4 real recuperado mide 1280 × 720, dura 8 segundos y tiene 930214 bytes. El primer envío sufrió un error del lector upstream; se recuperó el mismo clip sin volver a generar. Se comprobó el contenedor y su SHA-256.
+
+`flow_get_quote(model, aspect)` lee los ajustes de la cuenta sin generar: Nano Banana 2 mostró 0 puntos y Veo Fast 10 puntos. No se comprobó el saldo ni el descuento efectivo. Las cotizaciones de NEXUS se conservan como máximo cinco minutos y se renuevan para otro formato. No se convierten a USD. Si falla la lectura de imagen, el envío queda bloqueado; para Veo Fast existe una estimación conservadora publicada de hasta 20 créditos, claramente identificada.
+
+NEXUS comenzó con dos modelos del proveedor `google_flow` y ofrece ahora cinco entradas, incluidas las operaciones de mejora/exportación. La primera prueba real pasó por `agentCallback submit`, el host local, el MCP y la biblioteca: generó una imagen Nano Banana 2 de 1024 × 1024. Las llamadas comunes de modelos, esquema y cotización se comprobaron también con el motor Java. La conversación real con el LLM se validó después, como se detalla al final. Android sigue sin probarse.
+
+El host instalado sigue en su puerto loopback y conserva los 85 trabajos anteriores. Se añadieron los dos resultados verificados: 87 trabajos después de la integración. Los procesos de generación se ejecutan ocultos y con prioridad baja; una reserva persistente evita repetir un envío. Los resultados se copian al almacén de NEXUS después de comprobar SHA-256 y se sirven mediante sus rutas locales existentes.
+
+Pruebas reproducibles: `desktop/tools/test-flow-provider.py`, `desktop/tools/test-flow-integration.py` y las pruebas `test_*.py` del puente. `desktop/tools/verify-flow-live.py` es una prueba real autorizada que crea una imagen solo cuando el coste leído es 0; preserva su identificador y no debe utilizarse como prueba offline. No se compiló ni empaquetó APK o EXE.
+
+## Escalado y exportación de activos existentes
+
+`flow_get_asset_options(source_request_id)` abre únicamente el activo identificado por un trabajo completado de este puente. Lee su menú nativo, excluye opciones deshabilitadas y devuelve el precio indicado antes de cualquier clic de mejora. Se comprobaron en esta cuenta: imágenes original/2K/4K; vídeos original/1080p/4K/GIF 270p. El vídeo 4K muestra 50 puntos; las otras opciones no muestran cargo. Eso no verifica el saldo ni el descuento efectivo.
+
+```json
+{"request_id":"imagen-2k-001","source_request_id":"imagen-ejemplo-001","resolution":"2k","expected_credits":0}
+```
+
+Enviar esos argumentos a `flow_process_asset`. Una reserva SQLite se guarda antes de la acción, el precio se comprueba otra vez antes del clic y un identificador repetido nunca vuelve a escalar. Un archivo ya descargado puede reconciliarse desde disco; una acción incierta permanece bloqueada para evitar duplicar consumo. Los prompts y RPC de generación de imagen/vídeo están bloqueados en este navegador de postprocesado, sin fallback a Lite. Solo se admite un archivo original propio con SHA-256 válido y sus UUID de proyecto y activo. Se conserva el original; los resultados nuevos verifican formato, dimensiones y SHA-256.
+
+La biblioteca de NEXUS ofrece «Mejorar / exportar» en los detalles de resultados Flow. Su catálogo y el gateway común del Agente ofrecen `image_upscale`, `video_upscale` y `video_gif`, con `source_request_id` (jobId del historial) y `resolution`. El coste se expresa en créditos Flow. El envío comparte el almacén de trabajos y la descarga local; no requiere otra cuenta o API de pago.
+
+Validación real: imágenes 2K de 2048 × 2048 y 4K de 4096 × 4096; vídeo 1080p de 1920 × 1080 y 8 segundos; GIF animado de 480 × 270 y 128 fotogramas. Se comprobó la lectura repetida de los mismos identificadores sin reenviar. La imagen 4K pasó por `agentCallback submit`, el host, el MCP y la biblioteca de NEXUS mediante `desktop/tools/verify-flow-upscales.py`; esta prueba solo permite la opción cotizada en 0. El menú de mejora de vídeo se verificó en la interfaz y no registró errores JavaScript. El contador de generaciones nativas siguió en cuatro: no se enviaron prompts nuevos en esta ampliación. Vídeo 4K: opción y coste comprobados, ejecución de pago NO PROBADA. Android sigue NO PROBADO.
+
+Las pruebas offline del puente cubren reservas, cambios de parámetros, fuente desconocida, recuperación desde archivo, precio ilegible/opciones deshabilitadas, integridad y resolución. `verify-flow-upscales.py` debe ejecutarse con un host de prueba aislado; nunca constituye una prueba offline ni envía vídeo 4K.
+
+Verificación del host instalado: cinco entradas Flow en el catálogo y 91 trabajos en la biblioteca, conservando los 87 anteriores. Los cuatro resultados se descargaron por la ruta local; el MP4 1080p se reprodujo realmente en Edge y el GIF se sirvió como `image/gif`. La lista permitida mantiene identificadores SHA-256 y rechaza rutas con traversal. Pasaron 25 pruebas del puente y seis del proveedor/ruta de medios. El host conserva su puerto loopback y funciona oculto con prioridad baja.
+
+## Conversación real y entrega mediante NEXUS Agent
+
+Se comprobó con el LLM conectado, en modo Agente y una copia local aislada con una imagen Flow existente. Petición natural, sin facilitar ids ni nombres de herramientas: «Escala a 2K mi imagen más reciente de Google Flow usando mi propia cuenta Flow. Conserva el original. Prepara el trabajo con su coste en créditos Flow y déjalo listo para revisar, sin enviarlo todavía».
+
+El LLM encontró el origen, consultó el esquema de `google-flow/image_upscale` y preparó el plan en dos rondas. La tarjeta mostró 0 créditos Flow, con confianza `NEXUS_QUOTE` y sin importe USD. Preparar el plan no envió medios. El ensayo autorizado completó después la confirmación nativa de ese mismo plan: host → MCP → cuenta Flow → biblioteca de NEXUS. Resultado JPEG de 2048 × 2048, 2083648 bytes, SHA-256 `68138bf4470c49744789267e087f7b1b6ff363c25535d815862e34e4e326f8cd`. Se comprobó que el original conservaba su SHA-256 y que el contador de generaciones nativas seguía en cuatro. No hubo errores JavaScript ni se ejecutó vídeo 4K.
+
+El índice expone `provider_id`, `model_id` y `nexus_job_id`; ese último identifica la fuente del puente. La búsqueda incluye el proveedor/modelo de origen. La preparación admite ausencia de prompt cuando el esquema lo permite; los modelos que lo exigen siguen rechazándolo. Las cotizaciones Flow mantienen su unidad: un importe confirmado en créditos no se convierte a USD, y un límite superior o un importe desconocido no se marca como confirmado. El puente no obtiene saldo ni deducción efectiva.
+
+Pruebas: `desktop/tools/test-flow-agent-quotes.js` es offline. `verify-flow-agent-conversation.py` consume el LLM real y requiere un workspace de prueba aislado, con el activo de validación original y las credenciales locales cifradas del usuario; no debe apuntar al workspace de uso diario. `verify-flow-agent-result.py` completa exclusivamente el plan de esa conversación cuando la cotización renovada de imagen 2K es 0; reutiliza su trabajo si existe y nunca recrea un plan perdido. Sus resultados privados se guardan fuera de Git.
+
+El motor Kotlin se compila mediante la receta `tools/ecosystem-build/recipes/nexus-flow-agent.json` y el selector del ecosistema: fuentes aisladas con manifiesto SHA-256, un worker y pruebas con heap limitado. Se recuperan y verifican los JAR e informes antes de sustituir el runtime local, comprobando que el Agente esté libre y conservando los ajustes y credenciales. No se genera APK o EXE para esta integración.
+
+
+## Actualización de automatización del 2026-10-08
+
+El estado y límites actuales están en [la entrega de automatización](../../docs/FLOW-AUTOMATIZACION-20261008.md). NEXUS utiliza cola compartida, recuperación sin reenvío y Control Flow para presupuesto y tiempos. El catálogo actual incluye 17 entradas de generación, modalidades y postprocesado: los recuentos de dos/cinco modelos de las secciones históricas no describen el catálogo actual. Veo Lite está admitido; Nano Banana Lite continúa prohibido. Quality queda limitado a 8 s. El saldo no está verificado. Las conexiones MCP nuevas usan el diagnóstico del editor; las ya abiertas requieren reconectar. No se han ejecutado nuevas generaciones en esta actualización.

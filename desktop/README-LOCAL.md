@@ -1,3 +1,7 @@
+# Estado actual · 11 de octubre de 2026
+
+Esta edición es **Nexus Studio 1.9.2-agent-desktop**, adaptada de la APK 1.9.2 del S25 y del escritorio en uso. Consulta [la entrega y sus comprobaciones](../docs/DESKTOP-AGENT-PARITY-20261011.md). Sol, edición local, Whisper, proyectos, adjuntos y seis temas están disponibles. Los apartados siguientes conservan la documentación de entregas anteriores y sus cifras históricas.
+
 # Nexus Studio privado para este EliteBook
 
 Nexus ya está instalado como acceso directo en el escritorio: **Nexus Studio**. Se abre en una ventana independiente de Microsoft Edge y funciona mediante un servicio local de Python, ambos firmados e instalados en este equipo. El servicio escucha exclusivamente en `127.0.0.1` y usa un puerto variable. No se han cambiado las protecciones de Windows.

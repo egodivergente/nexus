@@ -1,5 +1,6 @@
 from pathlib import Path
-import os,subprocess,zipfile
+import os,subprocess,zipfile,argparse
+parser=argparse.ArgumentParser();parser.add_argument('--keystore',type=Path,default=Path.home()/'.android/debug.keystore');args=parser.parse_args()
 root=Path(__file__).resolve().parent
 sdk=Path(os.environ['LOCALAPPDATA'])/'Android/Sdk'
 jdk=Path('C:/Program Files/Microsoft/jdk-17.0.20.8-hotspot/bin')
@@ -15,5 +16,5 @@ run(jdk/'java.exe','-Xmx128m','-cp',bt/'lib/d8.jar','com.android.tools.r8.D8','-
 apk=build/'transfer.apk'
 run(bt/'aapt2.exe','link','--manifest',root/'AndroidManifest.xml','-I',android,'-o',apk)
 with zipfile.ZipFile(apk,'a',zipfile.ZIP_DEFLATED) as z:z.write(dex/'classes.dex','classes.dex')
-run(jdk/'java.exe','-Xmx128m','-jar',bt/'lib/apksigner.jar','sign','--ks',Path.home()/'.android/debug.keystore','--ks-key-alias','androiddebugkey','--ks-pass','pass:android',apk)
+run(jdk/'java.exe','-Xmx128m','-jar',bt/'lib/apksigner.jar','sign','--ks',args.keystore,'--ks-key-alias','androiddebugkey','--ks-pass','pass:android',apk)
 print('Herramienta temporal de transferencia compilada; sin permisos de red.')

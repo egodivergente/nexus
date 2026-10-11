@@ -70,6 +70,9 @@ internal class SchemaBuilder {
     fun stringArray(name: String, description: String, required: Boolean = false) =
         prop(name, required) { put("type", "array"); put("description", description); put("items", buildJsonObject { put("type", "string") }) }
 
+    fun integerArray(name: String, description: String, required: Boolean = false) =
+        prop(name, required) { put("type", "array"); put("description", description); put("items", buildJsonObject { put("type", "integer") }) }
+
     fun freeObject(name: String, description: String, required: Boolean = false) =
         prop(name, required) { put("type", "object"); put("description", description); put("additionalProperties", true) }
 

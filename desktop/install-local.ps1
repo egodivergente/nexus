@@ -1,4 +1,4 @@
-param([switch]$NoLaunch)
+param([switch]$NoLaunch, [string]$AdditionalShortcut, [int]$Port = 0)
 $ErrorActionPreference = 'Stop'
 $python = (Get-Command python.exe -ErrorAction Stop).Source
 $pythonw = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
@@ -11,13 +11,22 @@ $shortcut = Join-Path $desktop 'Nexus Studio.lnk'
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = $pythonw
-$link.Arguments = '"' + $script + '"'
+$link.Arguments = '"' + $script + '"' + $(if ($Port) { ' --port ' + $Port } else { '' })
 $link.WorkingDirectory = $PSScriptRoot
 $link.IconLocation = $icon
 $link.Description = 'Nexus Studio local, privado y con datos protegidos en Windows'
 $link.Save()
+if ($AdditionalShortcut) {
+    $extra = $shell.CreateShortcut($AdditionalShortcut)
+    $extra.TargetPath = $link.TargetPath
+    $extra.Arguments = $link.Arguments
+    $extra.WorkingDirectory = $link.WorkingDirectory
+    $extra.IconLocation = $link.IconLocation
+    $extra.Description = 'Nexus Studio · Agente, proyectos, edición local y Whisper'
+    $extra.Save()
+}
 Write-Output ('Acceso directo creado: ' + $shortcut)
 if (-not $NoLaunch) {
-    Start-Process -FilePath $pythonw -ArgumentList ('"' + $script + '"') -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+    Start-Process -FilePath $pythonw -ArgumentList $link.Arguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
     Write-Output 'Nexus Studio iniciado.'
 }

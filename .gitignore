@@ -41,3 +41,10 @@ local.properties
 node_modules/
 __pycache__/
 outputs/
+desktop/agent/runtime/
+desktop/dist/
+desktop/vendor/
+desktop/tools/transfer-build/
+tools/flow-bridge/upstream/
+tools/flow-bridge/evidence-private/
+/entregas/Nexus-Studio-Agent-1.9.2-Windows.zip
