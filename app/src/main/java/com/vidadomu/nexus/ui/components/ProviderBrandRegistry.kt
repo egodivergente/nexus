@@ -21,6 +21,7 @@ sealed class BrandAsset {
 }
 
 object ProviderBrandRegistry {
+    internal val artworkBackground=Color(0xFF141B29)
 
     fun resolve(
         organization: String? = null,

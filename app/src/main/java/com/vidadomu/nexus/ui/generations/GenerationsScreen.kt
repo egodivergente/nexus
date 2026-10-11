@@ -59,7 +59,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
     }
 
     Scaffold(containerColor=ScreenBackground,topBar={
-        TopAppBar(title={Text("Historial",style=MaterialTheme.typography.titleLarge)},actions={
+        TopAppBar(title={Text("Historial",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
             IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Historial")}
         },colors=TopAppBarDefaults.topAppBarColors(containerColor=BackgroundDark))
     }) { padding ->
@@ -104,12 +104,12 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                 supportingContent={Text("${group.count {it.status==GenerationStatus.COMPLETED}} completadas · ${group.size} enviadas",style=MaterialTheme.typography.labelMedium)},
                                 trailingContent={IconButton(onClick={expanded=!expanded}) {Icon(if(expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,"Desplegar lote")}},
                                 colors=ListItemDefaults.colors(containerColor=ScreenBackground))
-                            if(expanded) TextButton(onClick={comparisonId=id},modifier=Modifier.padding(horizontal=NexusTokens.screenMargin)) {Text("Ver comparativa",color=TextSecondary)}
+                            if(expanded) TextButton(onClick={comparisonId=id},modifier=Modifier.padding(horizontal=NexusTokens.screenMargin), shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Ver comparativa",color=TextSecondary)}
                         } else GenerationSummaryRow(job,currencyManager,
                             onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
                             menu={ close ->
                                 DropdownMenuItem(text={Text("Preparar de nuevo")},onClick={close();onPrepareAgain(job)})
-                                if(job.providerJobId!=null && job.providerId!="mock_provider") DropdownMenuItem(text={Text(if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) "Consultar coste" else "Actualizar estado")},onClick={close();
+                                if(job.providerJobId!=null && job.providerId!="mock_provider") DropdownMenuItem(text={Text(if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED)) "Consultar coste" else "Actualizar estado")},onClick={close();
                                     scope.launch {
                                         val result=if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED)) app.generationRepository.refreshConfirmedCost(job.id) else app.generationRepository.pollJob(job.id)
                                         android.widget.Toast.makeText(context,
@@ -133,15 +133,15 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
 
     // Technical details dialog
     selectedTechnicalJob?.let { job ->
-        val statusSpanish = if(job.parameters["__submission_uncertain"]=="true") "POR CONFIRMAR" else when (job.status) {
-            GenerationStatus.COMPLETED -> "COMPLETADO"
-            GenerationStatus.FAILED -> "FALLIDO"
-            GenerationStatus.QUEUED -> "EN COLA"
-            GenerationStatus.GENERATING -> "GENERANDO"
-            GenerationStatus.PROCESSING -> "PROCESANDO"
-            GenerationStatus.RENDERING -> "RENDERIZANDO"
-            GenerationStatus.UPLOADING -> "SUBIENDO"
-            GenerationStatus.CANCELLED -> "CANCELADO"
+        val statusSpanish = if(job.parameters["__submission_uncertain"]=="true") "Por confirmar" else when (job.status) {
+            GenerationStatus.COMPLETED -> "Completado"
+            GenerationStatus.FAILED -> "Fallido"
+            GenerationStatus.QUEUED -> "En cola"
+            GenerationStatus.GENERATING -> "Generando"
+            GenerationStatus.PROCESSING -> "Procesando"
+            GenerationStatus.RENDERING -> "Renderizando"
+            GenerationStatus.UPLOADING -> "Subiendo"
+            GenerationStatus.CANCELLED -> "Cancelado"
         }
         AlertDialog(
             onDismissRequest = { selectedTechnicalJob = null },
@@ -151,29 +151,29 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
             },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    Text("ID Tarea: ${job.id}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    Text("ID Proveedor: ${job.providerJobId ?: "N/D"}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    Text("Proveedor: ${providerName(job.providerId)}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    Text("Modelo: ${job.modelId}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    Text("Modalidad: ${job.modality.name}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    Text("Estado: $statusSpanish", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("ID Tarea: ${job.id}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("ID Proveedor: ${job.providerJobId ?: "N/D"}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("Proveedor: ${providerName(job.providerId)}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("Modelo: ${job.modelId}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("Modalidad: ${job.modality.name}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("Estado: $statusSpanish", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                     job.estimatedCostUsd?.let {Text("Estimación previa: ${currencyManager.formatCost(it)}",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
                     job.parameters["__actual_credits"]?.toDoubleOrNull()?.let {Text(currencyManager.formatCredits(it),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)}
                     val cost = job.actualCostUsd
                     if (cost != null) {
-                        Text("Coste: ${currencyManager.formatCost(cost)} (${currencyManager.formatUsdDetails(cost)})", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Text("Coste: ${currencyManager.formatCost(cost)} (${currencyManager.formatUsdDetails(cost)})", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                     }
                     if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) GenerationProgressPanel(job,compact=true)
                     job.error?.let {
-                        Text("Error: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        Text("Error: $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                     }
                     job.technicalDetails?.let {
-                        Text("Traza Técnica:\n$it", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        Text("Traza Técnica:\n$it", style = MaterialTheme.typography.bodyMedium, color = TextMuted)
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { selectedTechnicalJob = null }) {
+                TextButton(onClick = { selectedTechnicalJob = null }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                     Text("Cerrar", color = TextSecondary)
                 }
             }

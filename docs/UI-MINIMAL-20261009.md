@@ -25,6 +25,20 @@ El mapa de funciones y su verificación está en [INVENTARIO-UI.md](INVENTARIO-U
 | 8 | Ajustes y Flow | ASUS: 105 núcleo + 259 app, cero fallos; emulador: dos pruebas y capturas 1.3 | Completada |
 | 9 | QA visual, accesibilidad y regresión | Pendiente | Pendiente |
 
+## Continuación del 11 de octubre: base superada
+
+El S25 se comprobó mediante ADB el 11 de octubre: `com.vidadomu.nexus.agent`, versión `1.8.7-agent-preview`, versionCode 31, instalada a las 04:59. La fuente publicada corresponde a `codex/studio-foundations-canvas`, commit `3f305f8b94b827e3fc20f8039cbad8089f758e6a`, en el worktree `nexus-android-parity/NEXUS`. Esa rama contiene mejoras posteriores de biblioteca, navegación por deslizamiento y diseño Studio, y otra tarea sigue trabajando en ella. Este rediseño sobre vc28 no se debe instalar encima ni considerarse QA de la versión actual.
+
+El usuario pidió esperar al cierre del hilo `01a118e5-7a95-7b21-a22d-1724e15d35b8`, revisar sus novedades y adaptar las mejoras útiles a la fuente nueva. La integración se hará en otra rama, conservando los cambios y preferencias recientes. Esta rama guarda el trabajo anterior; la fase 9 completa permanece pendiente.
+
+Para conservar el trabajo concurrente se creó el worktree aislado `C:\Users\User\.codex\worktrees\nexus-ui-final\NEXUS`, desde `d502af8`. Se recuperaron 440 archivos de la copia privada de compilación, verificando su manifiesto SHA-256. La compilación de continuación usa la copia exclusiva `/home/vidal/.cache/nexus-ui-final-20261011-qa/source`, pues la copia temporal anterior ya contenía archivos de otra tarea. No se borraron ni sobrescribieron sus fuentes.
+
+Evidencia parcial de fase 9: los APK de la copia `phase9-release` se compilaron en ASUS y sus tests JVM terminaron sin fallos. El emulador ejecutó 34 regresiones de interfaz y tres pruebas de MainActivity a escalas 1.0, 1.3 y 1.5. Estas pruebas pertenecen a la base anterior. Se detectaron dos problemas de espacio con letra grande y se preparó una fila adaptable de acciones del Lienzo y un selector de modos con objetivos de 48 dp. Su validación visual definitiva está pendiente.
+
+Las capturas preliminares con una ventana ANR de SystemUI fueron rechazadas al revisarlas y no se publican. El capturador ahora verifica el paquete de la ventana visible. La prueba inicial con TalkBack activo falló por buscar la etiqueta y la acción de la pestaña en el mismo nodo, cuando Compose las expone en hijo y padre; se corrigió el selector. No se da por superada esta prueba, ni se acredita voz o gestos manuales de TalkBack. No hubo generación de pago ni instalación en el S25. El emulador de QA se cerró restaurando los paquetes opcionales, la escala de fuente y los ajustes de accesibilidad.
+
+La repetición final `phase9-final-verified` se interrumpió deliberadamente al comprobar que su base estaba superada. Se detuvo únicamente el daemon de esta copia exclusiva, verificando su directorio de trabajo, para dejar recursos a la compilación de la versión actual. No se presenta esta repetición como una compilación completada. Los nuevos ajustes guardados en este cierre requieren validación al adaptarlos a la rama actual. Se programó una continuación de este mismo hilo para comprobar el cierre de la tarea concurrente antes de comenzar esa adaptación.
+
 Las capturas antes del S25 se realizan con la APK original vc28, a escalas 1.0 y 1.3. Se restaura la escala original al terminar cada captura. Las imágenes privadas están fuera de Git en `outputs/ui-minimal-20261009/before` del workspace original.
 
 La compilación se realiza en una copia exclusiva `/home/vidal/.cache/nexus-ui-minimal-20261009/source` del ASUS, con Java 17, SDK 35, un worker, sin paralelismo, compilador Kotlin dentro del proceso y prioridad baja. La primera copia omitió los assets de skills y fallaron ocho tests del núcleo; se corrigió la copia, conservando intactas las fuentes del agente. La repetición completa terminó en BUILD SUCCESSFUL (19m 21s), con 105 tests del núcleo y 245 de la app, cero fallos y cero errores. Se recuperaron los dos APK y se verificaron los hashes de las 419 fuentes copiadas.

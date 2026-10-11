@@ -50,6 +50,8 @@ fun BillingLedgerScreen(
     modifier: Modifier = Modifier,
     showBalance: Boolean = true
 ) {
+    val currencyState by currencyManager.state.collectAsState()
+    currencyState.preference
     var selectedFilter by remember { mutableStateOf<Modality?>(null) }
 
     // Financial calculations
@@ -79,7 +81,7 @@ fun BillingLedgerScreen(
                     Text("Saldo Atlas",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                     Text(accountBalance?.let {currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",style=MaterialTheme.typography.titleMedium.tabularMoney())
                 }
-                TextButton(onClick={balanceDetails=!balanceDetails}) {Text("Detalles",color=TextSecondary)}
+                TextButton(onClick={balanceDetails=!balanceDetails}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Detalles",color=TextSecondary)}
                 IconButton(onClick=onRefreshBalance) {Icon(Icons.Default.Refresh,"Actualizar saldo")}
             }
             if(balanceDetails) accountBalance?.let {Text(currencyManager.formatUsdDetails(it.availableUsd),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)}
@@ -129,5 +131,5 @@ fun BilledOutputReceiptCard(job:GenerationJob,currencyManager:CurrencyManager,on
         job.actualCostUsd?.let {Text(currencyManager.formatUsdDetails(it),style=MaterialTheme.typography.bodyMedium.tabularMoney())}
         job.parameters["__actual_credits"]?.toDoubleOrNull()?.let {Text(currencyManager.formatCredits(it),style=MaterialTheme.typography.bodyMedium.tabularMoney())}
         Text("ID: ${job.id}",style=MaterialTheme.typography.labelMedium)
-    }},confirmButton={TextButton(onClick={details=false}) {Text("Cerrar")}})
+    }},confirmButton={TextButton(onClick={details=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar")}})
 }

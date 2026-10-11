@@ -1,5 +1,9 @@
 package com.vidadomu.nexus.ui.components
 
+import com.vidadomu.nexus.ui.theme.TextSecondary
+
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -93,12 +97,12 @@ fun GenerationProgressPanel(
     Surface(
         modifier = modifier,
         color = SurfaceDark,
-        shape = RoundedCornerShape(if (compact) 10.dp else 16.dp),
+        shape = NexusTokens.card,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(
-            modifier = Modifier.padding(if (compact) 10.dp else 18.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 12.dp)
+            modifier = Modifier.padding(if (compact) NexusTokens.space8 else NexusTokens.space16),
+            verticalArrangement = Arrangement.spacedBy(if (compact) NexusTokens.space8 else NexusTokens.space12)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -108,22 +112,22 @@ fun GenerationProgressPanel(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = liveStage,
-                        color = PrimaryNeon,
-                        style = MaterialTheme.typography.labelLarge,
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     if (!compact) {
                         Text(
                             text = "Seguimiento de la tarea",
                             color = TextMuted,
-                            style = MaterialTheme.typography.labelSmall
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
                 }
                 Text(
                     text = "$percentage%",
                     color = TextPrimary,
-                    fontSize = MaterialTheme.typography.titleLarge.fontSize,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black
                 )
             }
@@ -132,14 +136,14 @@ fun GenerationProgressPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (compact) 5.dp else 9.dp)
-                    .clip(RoundedCornerShape(99.dp))
+                    .clip(NexusTokens.card)
                     .background(BorderSubtle)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(animatedProgress)
                         .height(if (compact) 5.dp else 9.dp)
-                        .clip(RoundedCornerShape(99.dp))
+                        .clip(NexusTokens.card)
                         .background(
                             Brush.horizontalGradient(
                                 listOf(PrimaryNeon, SecondaryVioletLight, AccentEmerald)
@@ -151,14 +155,14 @@ fun GenerationProgressPanel(
             Text(
                 text = "Tiempo transcurrido: ${elapsedSeconds}s  •  Restante estimado: ~${remainingSeconds}s",
                 color = TextMuted,
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelMedium
             )
 
             job.error?.takeIf { it.isNotBlank() }?.let { message ->
                 Text(
                     text = message,
                     color = AccentCoral,
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }

@@ -75,7 +75,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
     val trustedLocal=chosenOutput?.let {OutputFiles.trustedLocalUri(it,conflicts)}
     val title=when(job?.modality) {Modality.IMAGE->"Imagen";Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.CHAT->"Texto";else->"Resultado"}
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(
-        title={Text(title,style=MaterialTheme.typography.titleLarge)},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
+        title={Text(title,style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
     }) {padding ->
         if(job==null) {Box(Modifier.fillMaxSize().padding(padding),contentAlignment=Alignment.Center) {Text("Generación no encontrada",color=TextSecondary)};return@Scaffold}
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -112,11 +112,11 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
                 if(export.busy) Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalAlignment=Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(NexusTokens.space24),strokeWidth=2.dp)
                     Text("${export.bytes/1024} KB",Modifier.weight(1f).padding(horizontal=NexusTokens.space12))
-                    TextButton(onClick=exporter::cancel) {Text("Cancelar",color=TextSecondary)}
+                    TextButton(onClick=exporter::cancel, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cancelar",color=TextSecondary)}
                 }
             }
             Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                TextButton(onClick={details=!details},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {
+                TextButton(onClick={details=!details},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary), shape=NexusTokens.field) {
                     Text(if(details) "Ocultar detalles" else "Detalles");Icon(if(details) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
                 }
                 if(details) {
@@ -190,11 +190,11 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null) {
                 onError={if(useLocal){useLocal=false}else{loading=false;failed=true}})
         }
         if(loading && !failed) CircularProgressIndicator(Modifier.testTag("output_loading"))
-        if(failed) Column(Modifier.padding(NexusTokens.space24),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        if(failed) Column(Modifier.padding(NexusTokens.space24),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Icon(Icons.Default.BrokenImage,null,modifier=Modifier.size(40.dp),tint=TextSecondary)
             Text("No se puede cargar la imagen",style=MaterialTheme.typography.titleMedium)
             Text("El enlace puede haber caducado o no estar disponible. La tarea sigue guardada en tu historial.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-            OutlinedButton(onClick={failed=false;loading=true;retry++}) {Text("Volver a intentar")}
+            OutlinedButton(onClick={failed=false;loading=true;retry++}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Volver a intentar")}
         }
     }
 }
@@ -311,8 +311,8 @@ private fun NativeAudioPlayer(audioUrl: String) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(com.vidadomu.nexus.ui.library.mediaDuration(currentPosition/1000f).orEmpty(), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-            Text(com.vidadomu.nexus.ui.library.mediaDuration(duration/1000f).orEmpty(), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            Text(com.vidadomu.nexus.ui.library.mediaDuration(currentPosition/1000f).orEmpty(), style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text(com.vidadomu.nexus.ui.library.mediaDuration(duration/1000f).orEmpty(), style = MaterialTheme.typography.labelMedium, color = TextSecondary)
         }
 
         Spacer(modifier = Modifier.height(NexusTokens.space12))
@@ -354,7 +354,7 @@ private fun TextOutputViewer(text: String) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
-            OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(text)) }) {
+            OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(text)) }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(NexusTokens.space8))
                 Text("Copiar")

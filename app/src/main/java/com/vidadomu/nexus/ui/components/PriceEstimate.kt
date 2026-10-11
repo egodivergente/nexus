@@ -41,10 +41,6 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
             else "≈ " + app.currencyManager.formatUsd(it.usd) + (it.clipSeconds?.let { seconds ->
                 " / " + java.math.BigDecimal.valueOf(seconds).stripTrailingZeros().toPlainString() + " s"
             } ?: "")
-        val rate = it.unitUsd?.let { value ->
-            "Tarifa Atlas: " + java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString() + " USD" +
-                (if(it.unit == null || it.unit == "s") "/s" else "/" + it.unit)
-        }
         val details = if(it.baseTariff) {
             val date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(java.util.Date(it.checkedAt))
             "Base publicada · $date · varía según opciones"
@@ -68,7 +64,7 @@ private fun rememberCrunEstimate(model:NexusModel,parameters:Map<String,String>?
         val provider=app.providerRegistry.getProviderById("crun") as? com.vidadomu.nexus.provider.crun.CrunProvider
         result=try {
             val credits=provider?.estimateCredits(model,parameters ?: model.parameters.associate { it.key to it.defaultValue },prompt)?.getOrThrow()
-            if(credits!=null && credits.isFinite() && credits>=0) EstimateUi("≈ ${java.math.BigDecimal.valueOf(credits).stripTrailingZeros().toPlainString()} créditos",
+            if(credits!=null && credits.isFinite() && credits>=0) EstimateUi(app.currencyManager.formatCredits(credits),
                 "Crun · cotización del proveedor. El valor monetario depende de los créditos comprados.",hasPrice=true)
             else EstimateUi("Precio por confirmar","Crun no ha devuelto una tarifa válida para estas opciones.",retry={attempt++})
         } catch(e:CancellationException) {throw e} catch(e:Exception) {

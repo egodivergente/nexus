@@ -98,7 +98,6 @@ fun BrandLogo(
             }
         }
         is BrandAsset.Monogram -> {
-            val textSizeSp = MaterialTheme.typography.labelMedium.fontSize
             Box(
                 modifier = modifier
                     .size(actualContainerSize)
@@ -110,7 +109,7 @@ fun BrandLogo(
                 Text(
                     text = asset.initials,
                     color = asset.textColor,
-                    fontSize = textSizeSp,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp
                 )

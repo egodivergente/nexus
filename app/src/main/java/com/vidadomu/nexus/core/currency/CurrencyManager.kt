@@ -141,7 +141,11 @@ class CurrencyManager(
     fun formatBalance(usdAmount: Double): String = displayAmount(usdAmount,false)
     fun formatCost(usdAmount: Double): String = displayAmount(usdAmount,true)
     fun formatUnitPrice(usdAmount: Double): String = displayAmount(usdAmount,true)
-    fun formatCredits(credits: Double): String = if(credits.isFinite()) "${number(credits, 0)} créditos" else "—"
+    fun formatCredits(credits: Double): String = when {
+        !credits.isFinite() -> "—"
+        credits>0 && credits<.5 -> "<1 crédito"
+        else -> number(credits,0).let {"$it ${if(it=="1") "crédito" else "créditos"}"}
+    }
     /** Original USD precision is reserved for expanded details. */
     fun formatUsdDetails(usdAmount: Double): String = if(usdAmount.isFinite()) "${number(usdAmount, 4)} USD" else "—"
 

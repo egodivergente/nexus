@@ -110,14 +110,14 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
     val pending = prepared.filter { it.includeInBatch }
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currencyState by app.currencyManager.state.collectAsState()
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
+    Surface(color=MaterialTheme.colorScheme.surfaceVariant,contentColor=MaterialTheme.colorScheme.onSurface) {
         Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if(pending.isEmpty()) "Selecciona los encargos" else "${pending.size} de ${prepared.size} seleccionados", style = MaterialTheme.typography.labelLarge)
+                Text(if(pending.isEmpty()) "Selecciona los encargos" else "${pending.size} de ${prepared.size} seleccionados", style = MaterialTheme.typography.labelMedium)
                 if(blockedByDraft) Text("Aplica o deshaz los cambios antes de generar el lote.",style=MaterialTheme.typography.labelMedium)
                 val estimated = pending.mapNotNull { it.plan.estimate?.amountUsd }
-                Text(if(pending.isEmpty()) "Marca «Incluir en lote» en las tarjetas" else if(estimated.size == pending.size) remember(estimated,currencyState) {app.currencyManager.formatCost(estimated.sum())} else "Incluye coste sin estimación",
-                    style = MaterialTheme.typography.labelSmall)
+                Text(if(pending.isEmpty()) "Marca «Incluir en lote»" else if(estimated.size == pending.size) remember(estimated,currencyState) {app.currencyManager.formatCost(estimated.sum())} else "Incluye coste sin estimación",
+                    style = MaterialTheme.typography.labelMedium)
             }
             val enabled=pending.isNotEmpty() && !ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
             if(pending.size>=2) Button(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar ${minOf(pending.size,20)}")}
@@ -130,20 +130,26 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
 @Composable
 internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
+    details()
+    PlanFooter(p,outputs,onOpenOutput,onAttach,onDiscard,onToggleBatch,assistantBusy)
+}
+
+@Composable
+internal fun PlanFooter(p:PlanUi,outputs:List<String>,onOpenOutput:()->Unit,onAttach:(List<android.net.Uri>)->Unit,
+    onDiscard:()->Unit,onToggleBatch:()->Unit,assistantBusy:Boolean) {
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(),onAttach)
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(p.includeInBatch, { onToggleBatch() }, enabled = !p.busy && !assistantBusy)
-                Text("Incluir en lote", Modifier.clickable(enabled = !p.busy && !assistantBusy, onClick = onToggleBatch), style = MaterialTheme.typography.bodySmall)
+                Text("Incluir en lote", Modifier.clickable(enabled = !p.busy && !assistantBusy, onClick = onToggleBatch), style = MaterialTheme.typography.bodyMedium)
             }
             FlowRow(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                TextButton(onClick = { picker.launch(arrayOf("image/*")) }, enabled = !p.busy && !assistantBusy) {
+                TextButton(onClick = { picker.launch(arrayOf("image/*")) }, enabled = !p.busy && !assistantBusy, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                     Icon(Icons.Default.AttachFile, null, Modifier.size(16.dp))
                     Text(if(p.plan.media.isEmpty()) "Adjuntar referencias" else "Cambiar referencias · ${p.plan.media.size}")
                 }
-                TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy) { Text("Descartar") }
+                TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Descartar") }
             }
         }
         if(p.busy || p.jobStatus in listOf("PENDING", "PROCESSING")) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -151,7 +157,7 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
             items(outputs) { uri ->
                 if(p.plan.modality == "IMAGE") AsyncImage(uri, "Resultado generado", Modifier.width(240.dp).aspectRatio(16f/9f)
                     .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
-                else OutlinedButton(onClick = onOpenOutput) { Icon(Icons.Default.PlayArrow, null); Text("Abrir vídeo") }
+                else OutlinedButton(onClick = onOpenOutput, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Icon(Icons.Default.PlayArrow, null); Text("Abrir vídeo") }
             }
         }
 
@@ -161,16 +167,19 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
 @Composable
 internal fun AgentModeSelector(mode:AgentMode,onMode:(AgentMode)->Unit) {
     var help by remember {mutableStateOf(false)}
-    LazyRow(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        items(AgentMode.entries) {value->FilterChip(value==mode,{onMode(value)},label={Text(when(value) {AgentMode.ASSISTANT->"Asistente";AgentMode.COPILOT->"Copiloto";AgentMode.AGENT->"Agente"})},shape=NexusTokens.filter)}
-        item {IconButton(onClick={help=true}) {Icon(Icons.Default.HelpOutline,"Ayuda de los modos")}}
+    Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),
+        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4),verticalAlignment=Alignment.CenterVertically) {
+        AgentMode.entries.forEach {value->FilterChip(value==mode,{onMode(value)},
+            modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch),
+            label={Text(when(value) {AgentMode.ASSISTANT->"Asistente";AgentMode.COPILOT->"Copiloto";AgentMode.AGENT->"Agente"},style=MaterialTheme.typography.labelMedium)},shape=NexusTokens.filter)}
+        IconButton(onClick={help=true}) {Icon(Icons.Default.HelpOutline,"Ayuda de los modos")}
     }
     if(help) ModalBottomSheet(onDismissRequest={help=false},shape=NexusTokens.sheet) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().padding(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Text("Modos del asistente",style=MaterialTheme.typography.titleMedium)
             Text("Asistente conversa sobre tu idea. Copiloto y Agente preparan propuestas según las herramientas disponibles. Revisa el plan y pulsa Generar para enviarlo.",style=MaterialTheme.typography.bodyMedium)
-            TextButton(onClick={help=false}) {Text("Cerrar",color=TextSecondary)}
+            TextButton(onClick={help=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar",color=TextSecondary)}
         }
     }
 }
@@ -184,23 +193,23 @@ internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel, exp
     var name by remember { mutableStateOf("") }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.importProjectFiles(it) }
     FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        TextButton(onClick = { import.launch(arrayOf("image/*", "video/*")) }, enabled = !ui.attaching) { Icon(Icons.Default.AddPhotoAlternate, null); Text("Importar archivos") }
-        TextButton(onClick = { open = !open }) { Text("Referencias · ${ui.projectAssets.size}") }
+        TextButton(onClick = { import.launch(arrayOf("image/*", "video/*")) }, enabled = !ui.attaching, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Icon(Icons.Default.AddPhotoAlternate, null); Text("Importar archivos") }
+        TextButton(onClick = { open = !open }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Referencias · ${ui.projectAssets.size}") }
     }
     if(open) LazyRow(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         items(ui.projectAssets, key = { it.id }) { asset ->
             Column(Modifier.width(120.dp)) {
                 AsyncImage(asset.uri, "Usar referencia ${asset.displayName}", Modifier.size(112.dp,64.dp).clip(NexusTokens.thumbnail)
                     .clickable { vm.reuseAsset(asset.id) }, contentScale = ContentScale.Crop)
-                Text(asset.displayName, maxLines = 1, style = MaterialTheme.typography.labelSmall)
-                TextButton(onClick = { renaming = asset; name = asset.displayName }) { Text("Renombrar") }
+                Text(asset.displayName, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = { renaming = asset; name = asset.displayName }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Renombrar") }
             }
         }
     }
     renaming?.let { asset -> AlertDialog(onDismissRequest = { renaming = null }, title = { Text("Nombre de referencia") },
         text = { OutlinedTextField(name, { name = it }, shape=NexusTokens.field, singleLine = true) },
-        confirmButton = { TextButton(onClick = { vm.renameReference(asset.id,name); renaming = null }) { Text("Guardar") } },
-        dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancelar") } }) }
+        confirmButton = { TextButton(onClick = { vm.renameReference(asset.id,name); renaming = null }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Guardar") } },
+        dismissButton = { TextButton(onClick = { renaming = null }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Cancelar") } }) }
 }
 
 @Composable

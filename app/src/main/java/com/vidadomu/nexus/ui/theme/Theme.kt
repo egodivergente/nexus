@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.text.font.*
@@ -38,7 +39,7 @@ internal fun palette(theme: NexusAppearance): ColorScheme {
     val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)
     val base = if (light) lightColorScheme() else darkColorScheme()
     return base.copy(primary=accent, onPrimary=if(light) Color.White else bg,
-        primaryContainer=variant, onPrimaryContainer=accent, secondary=accent,
+        primaryContainer=accent.copy(alpha=.12f).compositeOver(variant), onPrimaryContainer=accent, secondary=accent,
         onSecondary=if(light) Color.White else bg, secondaryContainer=variant, onSecondaryContainer=ink,
         tertiary=accent, onTertiary=if(light) Color.White else bg,
         tertiaryContainer=variant, onTertiaryContainer=ink,

@@ -16,4 +16,7 @@ class BalancePresentationTest {
         assertEquals("No disponible",presentBalance("No disponible",currency))
         assertEquals("Consultando…",presentBalance("Consultando…",currency))
     }
+    @Test fun transportTextIsNotPresentedAsBalance() {
+        assertEquals("Saldo no disponible",presentBalance("Unable to resolve host example.invalid",currency))
+    }
 }

@@ -48,16 +48,16 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
         Text("Google Flow", style = MaterialTheme.typography.titleLarge)
         Text("Proyecto activo del ASUS", style = MaterialTheme.typography.bodyMedium)
         Text("La creación usa los ajustes y el coste que muestre Google Flow.",
-            style = MaterialTheme.typography.bodySmall)
+            style = MaterialTheme.typography.bodyMedium)
         FilledTonalButton(onClick = {
             if (isLinked) onCreateInFlow() else pair = true
-        }) {
+        }, shape=NexusTokens.field) {
             Icon(Icons.Default.AutoAwesome, contentDescription = null)
             Spacer(Modifier.width(NexusTokens.space8))
             Text(if (isLinked) "Crear en Flow" else "Vincular Flow")
         }
         if (isLinked) {
-            OutlinedButton(onClick = ::openRecovery) {
+            OutlinedButton(onClick = ::openRecovery, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                 Icon(Icons.Default.OpenInNew, contentDescription = null)
                 Spacer(Modifier.width(NexusTokens.space8))
                 Text("Abrir Flow")
@@ -84,8 +84,8 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
                     token = ""; pair = false
                     error = "No se pudo guardar la clave de forma segura."
                 }
-            }) { Text("Vincular") }
+            }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Vincular") }
         },
-        dismissButton = { TextButton(onClick = { pair = false; token = "" }) { Text("Cancelar") } }
+        dismissButton = { TextButton(onClick = { pair = false; token = "" }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Cancelar") } }
     )
 }

@@ -160,8 +160,8 @@ private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
     Surface(color = st.codeBg, shape = NexusTokens.card, border = BorderStroke(1.dp, st.accent.copy(alpha = 0.22f)), modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space12, end = NexusTokens.space4, top = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
-                TextButton(onClick = { clipboard.setText(AnnotatedString(b.code)); copied = true }, contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = 0.dp)) {
+                Text(label, style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent, modifier = Modifier.weight(1f))
+                TextButton(onClick = { clipboard.setText(AnnotatedString(b.code)); copied = true }, contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = 0.dp), shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                     Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, null, Modifier.size(15.dp), tint = st.accent)
                     Spacer(Modifier.width(NexusTokens.space4))
                     Text(if (copied) "Copiado" else "Copiar", style = MaterialTheme.typography.labelMedium, color = st.accent)

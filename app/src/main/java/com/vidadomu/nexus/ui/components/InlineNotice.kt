@@ -40,11 +40,11 @@ fun InlineNotice(message: String, modifier: Modifier = Modifier, technicalDetail
             }
             if(onAction != null || !technicalDetails.isNullOrBlank()) {
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    if(onAction != null && actionLabel != null) TextButton(onClick=onAction) {
-                        Text(actionLabel, color=if(isError) colors.error else colors.onSurface)
+                    if(onAction != null && actionLabel != null) TextButton(onClick=onAction, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
+                        Text(actionLabel, color=if(isError) colors.onErrorContainer else colors.onSurface)
                     }
-                    if(!technicalDetails.isNullOrBlank()) TextButton(onClick={ expanded=!expanded }) {
-                        Text(if(expanded) "Ocultar detalles" else "Detalles", color=colors.onSurfaceVariant)
+                    if(!technicalDetails.isNullOrBlank()) TextButton(onClick={ expanded=!expanded }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
+                        Text(if(expanded) "Ocultar detalles" else "Detalles", color=if(isError) colors.onErrorContainer else colors.onSurfaceVariant)
                     }
                 }
             }

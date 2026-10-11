@@ -243,7 +243,7 @@ fun FlowCreateScreen(
         snackbarHost = { SnackbarHost(snackbarHost) {data->InlineNotice(noticeMessage(data.visuals.message,"No se pudo completar la acción en Flow."),technicalDetails=data.visuals.message,actionLabel="Cerrar",onAction={data.dismiss()})} },
         topBar = {
             TopAppBar(
-                title = { Text("Flow", style=MaterialTheme.typography.titleLarge) },
+                title = { Text("Flow", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -263,7 +263,7 @@ fun FlowCreateScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
+                        .padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space12)
                         .heightIn(min=NexusTokens.minimumTouch),
                     shape = NexusTokens.field
                 ) {
@@ -290,7 +290,7 @@ fun FlowCreateScreen(
                 .padding(innerPadding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(PaddingValues(horizontal = NexusTokens.space16, vertical = NexusTokens.space16)),
+                .padding(PaddingValues(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space16)),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
             FlowConnectionCard(connection = connection, onRefresh = {
@@ -364,12 +364,12 @@ fun FlowCreateScreen(
                 }
                 Text(
                     "El puente puede recuperar imagen o vídeo. Elige el tipo que coincida con los ajustes actuales del proyecto Flow.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = TextMuted
                 )
             }
 
-            TextButton(onClick={costDetails=!costDetails},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Text(if(costDetails) "Ocultar detalles" else "Ajustes y coste · Detalles")}
+            TextButton(onClick={costDetails=!costDetails},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary), shape=NexusTokens.field) {Text(if(costDetails) "Ocultar detalles" else "Ajustes y coste · Detalles")}
             if(costDetails) Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = SurfaceDark,
@@ -380,17 +380,17 @@ fun FlowCreateScreen(
                     modifier = Modifier.padding(NexusTokens.space16),
                     verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
-                    Text("Ajustes y coste", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                    Text("Ajustes y coste", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                     Text(
                         "NEXUS enviará solo este prompt. Flow usa el modelo, los ajustes y los créditos de su proyecto activo. " +
                             "Aquí no hay una estimación de coste verificable.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = TextMuted
                     )
                     HorizontalDivider(color = BorderSubtle)
                     Text(
                         "Las referencias multimedia se añaden directamente en Flow por ahora.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = TextMuted
                     )
                 }

@@ -121,4 +121,9 @@ class CurrencyManagerTest {
     @Test fun testOfflineFallbackRate() {
         assertEquals(.8666,CurrencyManager(FakeSecureStorage(rate=0.0)).state.value.rate,.00001)
     }
+    @Test fun fractionalCreditsNeverLookLikeFreeGeneration() {
+        assertEquals("<1 crédito",currencyManager.formatCredits(.01))
+        assertEquals("1 crédito",currencyManager.formatCredits(1.0))
+        assertEquals("0 créditos",currencyManager.formatCredits(0.0))
+    }
 }

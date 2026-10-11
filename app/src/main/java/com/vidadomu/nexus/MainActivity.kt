@@ -1,6 +1,7 @@
 package com.vidadomu.nexus
 
 import android.content.Intent
+import com.vidadomu.nexus.ui.components.nexusChromeScroll
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -69,8 +70,8 @@ class MainActivity : ComponentActivity() {
                         confirmButton={androidx.compose.material3.TextButton(onClick={
                             createViewModel.prepareAgentDraft(draft);agentDraft=null
                             navController.navigate(Screen.Create.route) {launchSingleTop=true}
-                        }) {androidx.compose.material3.Text("Revisar en el lienzo")}},
-                        dismissButton={androidx.compose.material3.TextButton(onClick={agentDraft=null}) {androidx.compose.material3.Text("Cancelar")}})
+                        }, shape=com.vidadomu.nexus.ui.theme.NexusTokens.field) {androidx.compose.material3.Text("Revisar en el lienzo")}},
+                        dismissButton={androidx.compose.material3.TextButton(onClick={agentDraft=null}, shape=com.vidadomu.nexus.ui.theme.NexusTokens.field) {androidx.compose.material3.Text("Cancelar")}})
                 }
 
                 LaunchedEffect(Unit) {
@@ -115,11 +116,12 @@ class MainActivity : ComponentActivity() {
                 com.vidadomu.nexus.ui.components.NexusChrome(
                     onSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
                     onNavigateToOutput = { id -> navController.navigate("output/$id") },
+                    routeKey=activeEntry?.destination?.route,
                     settingsVisible = activeEntry?.destination?.route != Screen.Settings.route
                 ) {
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    modifier = Modifier.fillMaxSize().imePadding(),
+                    modifier = Modifier.fillMaxSize().imePadding().nexusChromeScroll(),
                     containerColor = ScreenBackground,
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)

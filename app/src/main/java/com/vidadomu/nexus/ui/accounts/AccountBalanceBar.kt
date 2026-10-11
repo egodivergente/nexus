@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.accounts
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.app.Application
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -67,28 +69,9 @@ class AccountBalanceViewModel(application: Application) : AndroidViewModel(appli
 }
 
 @Composable
-fun AccountBalanceBar(onSettings: () -> Unit = {}, vm: AccountBalanceViewModel = viewModel()) {
-    val balances by vm.balances.collectAsState()
-    val busy by vm.busy.collectAsState()
-    Surface(color = MaterialTheme.colorScheme.surface) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                if (balances.isEmpty()) Text("Saldos: sin proveedores configurados", style = MaterialTheme.typography.labelSmall)
-                balances.forEach { item ->
-                    Column {
-                        Text(item.name + " · " + item.value, style = MaterialTheme.typography.labelMedium)
-                        item.time?.let {
-                            Text((if (item.stale) "Último dato " else "Consulta ") + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)),
-                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-            IconButton(onClick = vm::refresh, enabled = !busy) {
-                if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Default.Refresh, contentDescription = "Actualizar saldos")
-            }
-            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Ajustes") }
-        }
+fun AccountBalanceBar(onSettings:()->Unit={},vm:AccountBalanceViewModel=viewModel()) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+        com.vidadomu.nexus.ui.components.NexusBalanceChip()
+        IconButton(onClick=onSettings) {Icon(Icons.Default.Settings,"Ajustes de Nexus")}
     }
 }

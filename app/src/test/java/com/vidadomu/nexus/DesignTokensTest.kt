@@ -17,6 +17,7 @@ class DesignTokensTest {
             val c=palette(theme)
             listOf(c.onSurface to c.surface, c.onSurfaceVariant to c.surface,
                 c.onSurfaceVariant to c.surfaceVariant,c.onPrimary to c.primary,
+                c.onPrimaryContainer to c.primaryContainer,c.onSecondaryContainer to c.secondaryContainer,
                 c.error to c.surface,c.onErrorContainer to c.errorContainer).forEach { (text,bg) ->
                 assertTrue("$theme text contrast is ${contrast(text,bg)}",contrast(text,bg)>=4.5f)
             }

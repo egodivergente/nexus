@@ -102,12 +102,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         prefs.edit().putStringSet("model_favorites", favorites).apply()
     }
     Scaffold(containerColor = BackgroundDark, topBar = {
-        TopAppBar(title = { Text("Modelos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold) },
+        TopAppBar(title = { Text("Modelos",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),fontWeight=FontWeight.SemiBold) },
+            showSettings=family==null && groupKey==null,
             navigationIcon = { if(family != null || groupKey != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
             actions = {
                 Box {
                     IconButton(onClick={moreMenu=true}) {Icon(Icons.Default.MoreVert,"Opciones del catálogo")}
                     DropdownMenu(expanded=moreMenu,onDismissRequest={moreMenu=false}) {
+                        if(family!=null || groupKey!=null) com.vidadomu.nexus.ui.components.NexusSettingsMenuItem {moreMenu=false}
                         if(personalizing) DropdownMenuItem(text={Text("Terminar personalización")},onClick={personalizing=false;moreMenu=false})
                         DropdownMenuItem(text={Text("Personalizar y ordenar")},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
                         DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},onClick={manageHidden=true;moreMenu=false})
@@ -125,13 +127,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 modifier=Modifier.fillMaxSize().padding(padding))
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
                 Text(if(family != null) family.orEmpty()
-                    else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+                    else "Tus favoritos", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
-                Text("Arrastra el asa para ordenar o mantén pulsada una tarjeta. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+                Text("Arrastra el asa para ordenar o mantén pulsada una tarjeta. Tu orden se guarda.",color=TextSecondary,style = MaterialTheme.typography.bodyMedium)
             }
                 if(family == null) item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
@@ -142,7 +144,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         item {FilterChip(showSecondary,{showSecondary=!showSecondary},label={Text("Más")})}
                     }
                 }
-                item(span={GridItemSpan(maxLineSpan)}) {
+                if(searchVisible || query.isNotBlank()) item(span={GridItemSpan(maxLineSpan)}) {
                     if(searchVisible || query.isNotBlank()) OutlinedTextField(query, { query=it }, Modifier.fillMaxWidth(), singleLine=true,
                         placeholder={Text("Buscar modelo o función")}, leadingIcon={Icon(Icons.Default.Search,null)},
                         trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}}, shape=NexusTokens.field)
@@ -155,10 +157,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     }
                 }
                 if(use != null || favoritesOnly || providerFilter!=null) item(span={GridItemSpan(maxLineSpan)}) {
-                    TextButton(onClick={use=null;favoritesOnly=false;providerFilter=null}) {Text("Quitar filtros activos")}
+                    TextButton(onClick={use=null;favoritesOnly=false;providerFilter=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Quitar filtros activos")}
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
-                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
+                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,style = MaterialTheme.typography.labelMedium)}
                 if(modality in listOf(Modality.VIDEO,Modality.IMAGE)) item(span={GridItemSpan(maxLineSpan)}) {
                     Text(if(modality==Modality.VIDEO) "Precios desde · por 5 s" else "Precios desde · por imagen",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
@@ -178,7 +180,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         }
                     }
                     if(modality == Modality.IMAGE && sections.size > prioritySections.size && !personalizing) item(span={GridItemSpan(maxLineSpan)}) {
-                        TextButton(onClick={allImageFamilies=!allImageFamilies}, modifier=Modifier.fillMaxWidth()) {Text(if(allImageFamilies) "Ver solo mis familias" else "Otras familias")}
+                        TextButton(onClick={allImageFamilies=!allImageFamilies}, modifier=Modifier.fillMaxWidth(), shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text(if(allImageFamilies) "Ver solo mis familias" else "Otras familias")}
                     }
                 } else {
                     items(groups,key={it.key}) { group ->
@@ -196,9 +198,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 }
                 if(visible.isEmpty() || !rootLevel && groups.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
                     Text(if(loading && models.isEmpty()) "Preparando tu catálogo…" else if(favoritesOnly) "No hay favoritos en esta sección." else "No hay resultados con estos filtros.",color=TextSecondary)
-                    TextButton(onClick={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()}) {Text("Limpiar filtros")}
+                    TextButton(onClick={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Limpiar filtros")}
                 }
-            item(span={GridItemSpan(maxLineSpan)}) {Text("Precios base orientativos. El total se calcula al configurar.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
+            item(span={GridItemSpan(maxLineSpan)}) {Text("Precios base orientativos. El total se calcula al configurar.",color=TextSecondary,style = MaterialTheme.typography.labelMedium)}
             item(span={GridItemSpan(maxLineSpan)}) {Spacer(Modifier.height(NexusTokens.space24))}
         }
         }
@@ -225,7 +227,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         },label={Text("Solo con fecha")})}
             }
             if(catalogSort==CatalogSort.RELEASE) {
-                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
+                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",style = MaterialTheme.typography.labelMedium,color=TextSecondary)
             }
                     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                         Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
@@ -244,28 +246,28 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                             item { FilterChip(use==null,{use=null},label={Text("Todos los usos")}) }
                             items(CreationUse.entries.filter {it.modality==modality}) { value -> FilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
                         }
-                        TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
+                        TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Actualizar catálogo y tarifas")}
                     }
         }
     }
     contextTarget?.let { (key,label,model) ->
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(label)},text={Column {
-            TextButton(onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;contextTarget=null}) {Text("Mover y ordenar")}
+            TextButton(onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;contextTarget=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Mover y ordenar")}
             TextButton(onClick={
                 val itemKey=if(model==null) label else groups.firstOrNull {groupVisibilityKey(it.routes.first())==key}?.key
                 if(itemKey!=null) saveOrder(listOf(itemKey)+(savedOrder+displayedKeys).distinct().filterNot {it==itemKey})
                 contextTarget=null
-            }) {Text("Poner al principio")}
-            if(model!=null) TextButton(onClick={toggleFavorite(model);contextTarget=null}) {Text(if(modelBookmark(model) in favorites) "Quitar favorito" else "Marcar favorito")}
-            TextButton(onClick={pendingHide=key to label;contextTarget=null}) {Text("Quitar de mi catálogo")}
-            TextButton(onClick={saveOrder(emptyList());contextTarget=null}) {Text("Restaurar orden predeterminado")}
-        }},confirmButton={TextButton(onClick={contextTarget=null}) {Text("Cerrar")}})
+            }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Poner al principio")}
+            if(model!=null) TextButton(onClick={toggleFavorite(model);contextTarget=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text(if(modelBookmark(model) in favorites) "Quitar favorito" else "Marcar favorito")}
+            TextButton(onClick={pendingHide=key to label;contextTarget=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Quitar de mi catálogo")}
+            TextButton(onClick={saveOrder(emptyList());contextTarget=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Restaurar orden predeterminado")}
+        }},confirmButton={TextButton(onClick={contextTarget=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar")}})
     }
     pendingHide?.let { (key,label) ->
         AlertDialog(onDismissRequest={pendingHide=null},title={Text("Quitar $label")},
             text={Text("Dejará de aparecer en tu catálogo y al elegir modelos para crear. Tu historial y archivos se conservan. Puedes recuperarlo en Modelos ocultos.")},
-            confirmButton={TextButton(onClick={app.modelCatalogRepository.setCatalogHidden(key,label,true);pendingHide=null;groupKey=null}) {Text("Quitar")}},
-            dismissButton={TextButton(onClick={pendingHide=null}) {Text("Cancelar")}})
+            confirmButton={TextButton(onClick={app.modelCatalogRepository.setCatalogHidden(key,label,true);pendingHide=null;groupKey=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Quitar")}},
+            dismissButton={TextButton(onClick={pendingHide=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cancelar")}})
     }
     if(manageHidden) AlertDialog(onDismissRequest={manageHidden=false},title={Text("Modelos ocultos")},
         text={LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -273,11 +275,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             items(hiddenEntries.toList(),key={it.first}) { (key,label) ->
                 Column {
                     Text(label,fontWeight=FontWeight.SemiBold)
-                    Text(when {key.startsWith("family:")->"Familia completa";key.startsWith("group:")->"Modelo y todas sus variantes";else->"Variante concreta"},fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
-                    TextButton(onClick={app.modelCatalogRepository.setCatalogHidden(key,label,false)}) {Text("Recuperar")}
+                    Text(when {key.startsWith("family:")->"Familia completa";key.startsWith("group:")->"Modelo y todas sus variantes";else->"Variante concreta"},style = MaterialTheme.typography.labelMedium,color=TextSecondary)
+                    TextButton(onClick={app.modelCatalogRepository.setCatalogHidden(key,label,false)}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Recuperar")}
                 }
             }
-        }},confirmButton={TextButton(onClick={manageHidden=false}) {Text("Cerrar")}})
+        }},confirmButton={TextButton(onClick={manageHidden=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar")}})
 
 }
 
@@ -306,7 +308,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
             if(grid) Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",
                 style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
             highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
-            onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
+            onHide?.let {action -> TextButton(onClick=action, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
         }
     }
 }

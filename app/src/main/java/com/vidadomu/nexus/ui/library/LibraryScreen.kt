@@ -53,7 +53,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         .decoderDispatcher(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(2))
         .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.08).build()}.build()}
     DisposableEffect(imageLoader) {onDispose {imageLoader.shutdown()}}
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Biblioteca",style=MaterialTheme.typography.titleLarge)},actions={
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
         IconButton(onClick={try {
             val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
                 component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")
@@ -63,7 +63,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     })}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalAlignment=Alignment.CenterVertically) {
-                Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.weight(1f))
+                Text("${completed.sumOf {it.outputs.size}} ${if(completed.sumOf {it.outputs.size}==1) "archivo" else "archivos"} · ${completed.size} ${if(completed.size==1) "creación" else "creaciones"}",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.weight(1f))
                 IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca")}
             }
             if(searchVisible || query.isNotBlank()) OutlinedTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),singleLine=true,

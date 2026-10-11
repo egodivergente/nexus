@@ -48,6 +48,6 @@ internal object AlexiaBrandAssets {
             "longcat" in text -> R.drawable.alexia_longcat
             else -> return null
         }
-        return BrandAsset.Resource(id, isBitmap = true, backgroundColor = Color(0xFF141B29))
+        return BrandAsset.Resource(id, isBitmap = true, backgroundColor = ProviderBrandRegistry.artworkBackground)
     }
 }

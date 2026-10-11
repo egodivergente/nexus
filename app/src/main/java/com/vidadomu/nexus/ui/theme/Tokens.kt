@@ -17,7 +17,8 @@ object NexusTokens {
     val space16 = 16.dp
     val space24 = 24.dp
     val space32 = 32.dp
-    val screenMargin = space16
+    val screenMargin: androidx.compose.ui.unit.Dp
+        @androidx.compose.runtime.Composable get() = if(androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp>=600) tabletMargin else space16
     val tabletMargin = 20.dp
     val galleryGap = 2.dp
     val minimumTouch = 48.dp
@@ -32,13 +33,13 @@ object NexusTokens {
 }
 
 fun nexusTypography(heading: FontFamily, body: FontFamily): Typography {
-    val title = TextStyle(fontFamily=heading, fontWeight=FontWeight.Medium,
+    val title = TextStyle(fontFeatureSettings="tnum",fontFamily=heading, fontWeight=FontWeight.Medium,
         fontSize=24.sp, lineHeight=32.sp)
-    val section = TextStyle(fontFamily=heading, fontWeight=FontWeight.Medium,
+    val section = TextStyle(fontFeatureSettings="tnum",fontFamily=heading, fontWeight=FontWeight.Medium,
         fontSize=17.sp, lineHeight=24.sp)
-    val main = TextStyle(fontFamily=body, fontSize=16.sp, lineHeight=24.sp)
-    val secondary = TextStyle(fontFamily=body, fontSize=14.sp, lineHeight=20.sp)
-    val metadata = TextStyle(fontFamily=body, fontWeight=FontWeight.Medium,
+    val main = TextStyle(fontFeatureSettings="tnum",fontFamily=body, fontSize=16.sp, lineHeight=24.sp)
+    val secondary = TextStyle(fontFeatureSettings="tnum",fontFamily=body, fontSize=14.sp, lineHeight=20.sp)
+    val metadata = TextStyle(fontFeatureSettings="tnum",fontFamily=body, fontWeight=FontWeight.Medium,
         fontSize=12.sp, lineHeight=18.sp)
     return Typography(displayLarge=title, displayMedium=title, displaySmall=title,
         headlineLarge=title, headlineMedium=title, headlineSmall=title,

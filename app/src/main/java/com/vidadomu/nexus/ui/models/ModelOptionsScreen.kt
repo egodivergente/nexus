@@ -59,30 +59,30 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
 
     Scaffold(modifier=modifier,containerColor=colors.background,contentWindowInsets=WindowInsets(0,0,0,0),bottomBar={
         Surface(color=colors.background) {
-            Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin).padding(top=NexusTokens.space12,bottom=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 HorizontalDivider(color=colors.outlineVariant.copy(alpha=.5f))
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                     Column(Modifier.weight(1f)) {
                         Text(if(estimate.hasPrice) estimate.amount else if(estimate.retry==null) "Consultando precio…" else "Tarifa no disponible",style=MaterialTheme.typography.titleMedium,
                             fontWeight=FontWeight.SemiBold,color=if(estimate.hasPrice) colors.onSurface else colors.onSurfaceVariant)
-                        Text(if(estimate.hasPrice) "Confirma el total con tus ajustes en el lienzo" else if(estimate.retry==null) "Consultando la tarifa del proveedor" else "Revisa el motivo en Detalles del modelo",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                        Text(if(estimate.hasPrice) "Confirma el total con tus ajustes en el lienzo" else if(estimate.retry==null) "Consultando la tarifa del proveedor" else "Revisa el motivo en Detalles del modelo",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                     }
                     if(!estimate.hasPrice) estimate.retry?.let {retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Volver a consultar el precio")}}
                 }
                 Button(onClick={onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
-                    Text("Usar ${group.title}",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+                    Text("Usar ${group.title}",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
                 }
             }
         }
     }) {padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-            .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space24)) {
+            .padding(horizontal=NexusTokens.screenMargin).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space24)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=NexusTokens.space32,containerSize=NexusTokens.space32)
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                     Text(group.title,style=MaterialTheme.typography.titleMedium,color=colors.onSurface)
-                    release?.let {Text(it.label,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)}
+                    release?.let {Text(it.label,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)}
                 }
                 IconToggleButton(checked=modelBookmark(selected) in favorites,onCheckedChange={toggleFavorite(selected)}) {
                     Icon(if(modelBookmark(selected) in favorites) Icons.Default.Star else Icons.Default.StarBorder,
@@ -95,7 +95,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                         val checked=task==workflow
                         Surface(shape=NexusTokens.field,color=if(checked) colors.primary.copy(alpha=.12f) else colors.surface,
                             modifier=Modifier.selectable(selected=checked,role=Role.Tab,onClick={taskKey=task.name;choices.edit().putString("task:${group.key}",task.name).apply()})) {
-                            Text(task.label,Modifier.heightIn(min=48.dp).padding(horizontal=NexusTokens.space16,vertical=NexusTokens.space12),style=MaterialTheme.typography.labelLarge,
+                            Text(task.label,Modifier.heightIn(min=48.dp).padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),style=MaterialTheme.typography.bodyMedium,
                                 fontWeight=if(checked) FontWeight.SemiBold else FontWeight.Normal,color=if(checked) colors.primary else colors.onSurfaceVariant)
                         }
                     }
@@ -106,11 +106,11 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 }
                 focusAdvice?.let { advice ->
                     Text("Bueno para: ${advice.good}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurface)
-                    Text("Evítalo si: ${advice.avoid}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    Text("Evítalo si: ${advice.avoid}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                 }
             }
             Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                Text("Variante y proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                Text("Variante y proveedor",style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)
                 Surface(color=colors.surface,shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
                     .clickable(enabled=routes.size>1,role=Role.Button,onClickLabel="Cambiar variante y proveedor") {variantsOpen=true}) {
                     Row(Modifier.padding(NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -129,23 +129,24 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 }
                 if(details) {
                     Text(guide.purpose,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
-                    if(estimate.details.isNotBlank()) Text(estimate.details,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    Text(guide.note,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    Text(selected.id,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}) {Text("Fuente del lanzamiento",color=colors.onSurfaceVariant)}}
-                    guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}) {Text("Ficha y tarifas del proveedor",color=colors.onSurfaceVariant)}}
+                    if(estimate.details.isNotBlank()) Text(estimate.details,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                    Text(guide.note,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                    Text(selected.id,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                    release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Fuente del lanzamiento",color=colors.onSurfaceVariant)}}
+                    guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Ficha y tarifas del proveedor",color=colors.onSurfaceVariant)}}
                 }
-                onHide?.let {action -> TextButton(onClick={action(selected)}) {Text("Quitar esta variante",color=colors.onSurfaceVariant)}}
+                onHide?.let {action -> TextButton(onClick={action(selected)}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Quitar esta variante",color=colors.onSurfaceVariant)}}
             }
         }
     }
-    if(variantsOpen) ModalBottomSheet(onDismissRequest={variantsOpen=false},containerColor=colors.surface,
+    if(variantsOpen) ModalBottomSheet(onDismissRequest={variantsOpen=false},containerColor=colors.surface,shape=NexusTokens.sheet,
         sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-            Text("Elige una variante",style=MaterialTheme.typography.headlineSmall)
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+            Text("Elige una variante",style=MaterialTheme.typography.titleLarge)
             Text("${group.title} · ${workflow.label.lowercase()}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
         }
-        LazyColumn(Modifier.fillMaxWidth().weight(1f,false),contentPadding=PaddingValues(horizontal=NexusTokens.space16,vertical=NexusTokens.space16)) {
+        LazyColumn(Modifier.fillMaxWidth().weight(1f,false),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space16)) {
             items(routes.sortedWith(compareBy<NexusModel> {providerName(it.providerId)}.thenByDescending {it.variantRank}.thenBy {it.id}),key=::modelBookmark) {route ->
                 val checked=modelBookmark(route)==modelBookmark(selected)
                 Column {
@@ -156,7 +157,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                             Text(optionVariantLabel(route,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Medium)
                             Text(providerName(route.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                             AtlasPublishedPrice.cached(route)?.let {price ->
-                                Text("Desde ${app.currencyManager.formatUnitPrice(price.usd)} / ${price.unit}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                                Text("Desde ${app.currencyManager.formatUnitPrice(price.usd)} / ${price.unit}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                             }
                         }
                         RadioButton(selected=checked,onClick=null)

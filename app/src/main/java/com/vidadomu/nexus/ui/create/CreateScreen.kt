@@ -58,6 +58,7 @@ import com.vidadomu.nexus.core.model.ModelInputMode
 import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -82,8 +83,8 @@ private fun NativeParameterControl(param: com.vidadomu.nexus.core.model.ModelPar
         Text("Valor actual: ${ParameterPresentation.describe(param,value)}")
         Text("Predeterminado del modelo: ${ParameterPresentation.describe(param,param.defaultValue)}")
         if(param.minValue!=null || param.maxValue!=null) Text("Rango: ${param.minValue ?: "—"} – ${param.maxValue ?: "—"}")
-    }},confirmButton={TextButton(onClick={onChange(param.defaultValue);showDefaults=false}) {Text("Restaurar predeterminado")}},
-        dismissButton={TextButton(onClick={showDefaults=false}) {Text("Cerrar")}})
+    }},confirmButton={TextButton(onClick={onChange(param.defaultValue);showDefaults=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Restaurar predeterminado")}},
+        dismissButton={TextButton(onClick={showDefaults=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar")}})
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,7 +105,7 @@ private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParam
                     val optionLabel = ParameterPresentation.label(param,option)
                     DropdownMenuItem(text = { Column {
                         Text(optionLabel.primary)
-                        optionLabel.secondary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        optionLabel.secondary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     } }, onClick = { onChange(option); expanded = false })
                 }
             }
@@ -115,7 +116,7 @@ private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParam
                 Text(if(value=="true") "Activado" else "Desactivado", color = TextPrimary, modifier = Modifier.weight(1f))
                 Switch(value == "true", { onChange(it.toString()) })
             }
-            if (!param.isRequired) TextButton(onClick = { onChange("") }) {
+            if (!param.isRequired) TextButton(onClick = { onChange("") }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                 Text(if(value.isBlank()) "Automático (sin enviar)" else "Usar valor del proveedor")
             }
         }
@@ -258,7 +259,7 @@ fun CreateScreen(
                     verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.CenterVertically,
                         horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                        TextButton(onClick={showPriceDetails=true}, modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)) {
+                        TextButton(onClick={showPriceDetails=true}, modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch), shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                             Column(Modifier.fillMaxWidth()) {
                                 Text(estimate.amount, style=MaterialTheme.typography.bodyMedium.tabularMoney(), color=TextPrimary)
                                 Text("Coste estimado · Detalles", style=MaterialTheme.typography.labelMedium, color=TextSecondary)
@@ -272,7 +273,7 @@ fun CreateScreen(
         },
         containerColor=ScreenBackground,
         topBar={
-            if(!compactTyping) TopAppBar(title={Text("Lienzo", style=MaterialTheme.typography.titleLarge)},
+            if(!compactTyping) TopAppBar(title={Text("Lienzo", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
                 actions={
                     Box {
                         IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
@@ -305,7 +306,7 @@ fun CreateScreen(
                         Text(
                             text = if(state.selectedModality == Modality.CHAT) "Escribe tu consulta..." else "Describe lo que quieres cambiar o crear...",
                             color = TextMuted,
-                            fontSize = MaterialTheme.typography.bodyLarge.fontSize
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     },
                     minLines = 3,
@@ -340,7 +341,7 @@ fun CreateScreen(
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
-                                color = PrimaryNeon
+                                color = TextSecondary
                             )
                             Text(
                                 text = if (state.isPreparingMedia) {
@@ -348,7 +349,7 @@ fun CreateScreen(
                                 } else {
                                     "Subiendo multimedia a ${state.selectedModel?.let { app.providerRegistry.getProviderById(it.providerId)?.displayName } ?: "proveedor"}..."
                                 },
-                                style = MaterialTheme.typography.bodySmall.copy(color = PrimaryNeon)
+                                style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
                             )
                         }
                     }
@@ -376,16 +377,23 @@ fun CreateScreen(
                 }
             }
             item {
-                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    item { CanvasChip("Inspirar") {showInspiration=true} }
-                    item { CanvasChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true} }
-                    if(state.selectedModality == Modality.IMAGE) item {
+                val actions: @Composable () -> Unit = {
+                    CanvasChip("Inspirar") {showInspiration=true}
+                    CanvasChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true}
+                    if(state.selectedModality == Modality.IMAGE) {
                         CanvasChip(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Comparar",
                             enabled=!state.isSubmitting && !state.isPreparingMedia) {
                             viewModel.comparison.open(state);showComparison=true
                         }
                     }
-                    item { CanvasChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true} }
+                    CanvasChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true}
+                }
+                if(androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f) {
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+                        verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {actions()}
+                } else {
+                    Row(Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {actions()}
                 }
             }
             if(state.isLoadingSchema) item {
@@ -446,6 +454,7 @@ fun CreateScreen(
 
     }
     if(showParameters) CanvasSheet("Parámetros",{showParameters=false}) {
+        CreativePresetsRow(state.prompt) {viewModel.updatePrompt(it)}
         if(state.isLoadingSchema) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.schemaMessage?.let { raw ->
             InlineNotice(if(state.schemaReady) "Revisa la compatibilidad de estas opciones." else noticeMessage(raw,"Las opciones aún no están disponibles."),
@@ -469,7 +478,7 @@ fun CreateScreen(
     if(showPriceDetails) CanvasSheet("Coste estimado",{showPriceDetails=false}) {
         Text(estimate.amount,style=MaterialTheme.typography.titleMedium.tabularMoney())
         Text(estimate.details.ifBlank {"El coste depende de la configuración elegida."},style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-        estimate.retry?.let { retry -> TextButton(onClick=retry) {Text("Reintentar precio",color=TextSecondary)} }
+        estimate.retry?.let { retry -> TextButton(onClick=retry, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Reintentar precio",color=TextSecondary)} }
     }
 
     // Modal Bottom Sheet para Seleccionar Modelo
@@ -548,7 +557,7 @@ private fun RequestInspectorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max=560.dp).verticalScroll(rememberScrollState())
-                .padding(horizontal = NexusTokens.space16)
+                .padding(horizontal = NexusTokens.screenMargin)
                 .padding(bottom = NexusTokens.space32),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)
         ) {
@@ -561,10 +570,10 @@ private fun RequestInspectorSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
-                    Icon(Icons.Default.Terminal, contentDescription = null, tint = PrimaryNeon, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Terminal, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
                     Text(
                         text = "Diagnóstico local",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(NexusTokens.minimumTouch)) {
@@ -581,27 +590,27 @@ private fun RequestInspectorSheet(
             ) {
                 Column(modifier = Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Endpoint", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                        Text(endpoint, style = MaterialTheme.typography.bodySmall, color = PrimaryNeon, fontFamily = FontFamily.Monospace)
+                        Text("Endpoint", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+                        Text(endpoint, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, fontFamily = FontFamily.Monospace)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Header Auth", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Text("Header Auth", style = MaterialTheme.typography.labelMedium, color = TextMuted)
                         Text(
                             if (model?.providerId == "crun") "x-api-key: ••••••••••••" else "Bearer ••••••••••••",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AccentEmerald,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Modo de entrada", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                        Text(model?.inputMode?.name ?: "TEXT_ONLY", style = MaterialTheme.typography.bodySmall, color = AccentAmber, fontFamily = FontFamily.Monospace)
+                        Text("Modo de entrada", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+                        Text(model?.inputMode?.name ?: "TEXT_ONLY", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, fontFamily = FontFamily.Monospace)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Media adjunta", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Text("Media adjunta", style = MaterialTheme.typography.labelMedium, color = TextMuted)
                         Text(
                             if (state.attachedMedia.isNotEmpty()) "${state.attachedMedia.size} adjunto(s) (${model?.inputMode?.name})" else "0 adjuntos (Texto puro)",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = if (state.attachedMedia.isNotEmpty()) AccentEmerald else TextSecondary
                         )
                     }
@@ -611,7 +620,7 @@ private fun RequestInspectorSheet(
             // Payload Preview
             Text(
                 text = "Payload sin prompt ni rutas privadas",
-                style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = MaterialTheme.typography.labelMedium.fontSize, letterSpacing = 1.sp)
+                style = MaterialTheme.typography.labelMedium.copy(color = TextMuted, fontSize = MaterialTheme.typography.labelMedium.fontSize, letterSpacing = 1.sp)
             )
             Surface(
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -621,7 +630,7 @@ private fun RequestInspectorSheet(
             ) {
                 Text(
                     text = simulatedPayload,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontFamily = FontFamily.Monospace, fontSize = MaterialTheme.typography.labelMedium.fontSize),
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontFamily = FontFamily.Monospace, fontSize = MaterialTheme.typography.labelMedium.fontSize),
                     modifier = Modifier.padding(NexusTokens.space12)
                 )
             }
@@ -798,12 +807,12 @@ private fun AdaptiveModelMediaInput(
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
                                 contentDescription = null,
-                                tint = PrimaryNeon.copy(alpha = 0.8f),
+                                tint = TextSecondary.copy(alpha = 0.8f),
                                 modifier = Modifier.size(15.dp)
                             )
                             Text(
                                 text = "Este modelo crea desde texto",
-                                style = MaterialTheme.typography.bodySmall.copy(
+                                style = MaterialTheme.typography.bodyMedium.copy(
                                     color = TextMuted,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize
                                 )
@@ -811,8 +820,8 @@ private fun AdaptiveModelMediaInput(
                         }
                         Text(
                             text = "Usar una imagen",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = PrimaryNeon,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = TextSecondary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
@@ -853,7 +862,7 @@ private fun AdaptiveModelMediaInput(
                 ) {
                     Text(
                         text = "Imágenes del clip",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextMuted,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
@@ -862,8 +871,8 @@ private fun AdaptiveModelMediaInput(
                     )
                     Text(
                         text = "Final opcional",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = PrimaryNeon,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -912,7 +921,7 @@ private fun AdaptiveModelMediaInput(
                 ) {
                     Text(
                         text = "Imágenes de referencia",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextMuted,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
@@ -930,7 +939,7 @@ private fun AdaptiveModelMediaInput(
                         Text(
                             text = if(maxAllowed==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size} / $maxAllowed imágenes",
                             modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = if (refImages.isNotEmpty()) AccentEmerald else TextSecondary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -990,7 +999,7 @@ private fun AdaptiveModelMediaInput(
                 ) {
                     Text(
                         text = "Archivos de referencia",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextMuted,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
@@ -999,8 +1008,8 @@ private fun AdaptiveModelMediaInput(
                     )
                     Text(
                         text = if(model.maxImages==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size}/${model.maxImages} imágenes",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = PrimaryNeon,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -1086,8 +1095,8 @@ private fun SingleMediaSlotCard(
                     ) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = AccentEmerald,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = TextSecondary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 letterSpacing = 0.8.sp
@@ -1096,7 +1105,7 @@ private fun SingleMediaSlotCard(
                     }
                     Text(
                         text = media.fileName ?: "Archivo adjunto cargado",
-                        style = MaterialTheme.typography.bodySmall.copy(
+                        style = MaterialTheme.typography.bodyMedium.copy(
                             color = TextPrimary,
                             fontWeight = FontWeight.Medium
                         ),
@@ -1106,7 +1115,7 @@ private fun SingleMediaSlotCard(
                     MediaFactsLabel(media)
                     Text(
                         text = "Toca para reemplazar",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextMuted,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
@@ -1143,7 +1152,7 @@ private fun SingleMediaSlotCard(
                     ) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = if (isRequired) TextSecondary else TextSecondary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
@@ -1158,7 +1167,7 @@ private fun SingleMediaSlotCard(
                                 Text(
                                     text = badge,
                                     modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                                    style = MaterialTheme.typography.labelSmall.copy(
+                                    style = MaterialTheme.typography.labelMedium.copy(
                                         color = TextSecondary,
                                         fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                         fontWeight = FontWeight.Bold
@@ -1169,8 +1178,8 @@ private fun SingleMediaSlotCard(
                     }
                     Text(
                         text = if(isRequired) placeholder + "\nNecesaria para este modelo" else placeholder,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = if (isRequired) TextSecondary.copy(alpha = 0.85f) else TextMuted
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = if (isRequired) TextSecondary else TextMuted
                         )
                     )
                 }
@@ -1239,15 +1248,15 @@ private fun DualFrameSlotCard(
                         .background(MediaScrim.copy(alpha = 0.35f))
                 )
                 Surface(
-                    shape = RoundedCornerShape(bottomEnd = 6.dp),
+                    shape = NexusTokens.thumbnail,
                     color = SurfaceDark.copy(alpha = 0.85f),
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Text(
                         text = label,
                         modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = AccentEmerald,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
                             fontWeight = FontWeight.Bold,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
@@ -1291,7 +1300,7 @@ private fun DualFrameSlotCard(
                 Spacer(modifier = Modifier.height(NexusTokens.space4))
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1299,8 +1308,8 @@ private fun DualFrameSlotCard(
                 )
                 Text(
                     text = subLabel,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (isRequired) TextSecondary.copy(alpha = 0.7f) else TextMuted,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = if (isRequired) TextSecondary else TextMuted,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
                 )
@@ -1381,7 +1390,7 @@ private fun AddReferenceButton(
             Spacer(modifier = Modifier.height(NexusTokens.space4))
             Text(
                 text = "Añadir",
-                style = MaterialTheme.typography.labelSmall.copy(
+                style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = TextSecondary,
                     fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1401,7 +1410,7 @@ private fun CompactChipSelector(
     Column {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelSmall.copy(
+            style = MaterialTheme.typography.labelMedium.copy(
                 color = TextMuted,
                 fontSize = MaterialTheme.typography.labelMedium.fontSize
             ),
@@ -1424,7 +1433,7 @@ private fun CompactChipSelector(
                 ) {
                     Text(
                         text = option,
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) PrimaryNeon else TextSecondary,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1445,7 +1454,7 @@ private fun VisualAspectRatioSelector(
     Column {
         Text(
             text = "RELACIÓN DE ASPECTO",
-            style = MaterialTheme.typography.labelSmall.copy(
+            style = MaterialTheme.typography.labelMedium.copy(
                 color = TextMuted,
                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
                 fontWeight = FontWeight.Bold,
@@ -1495,7 +1504,7 @@ private fun VisualAspectRatioSelector(
                         )
                         Text(
                             text = option,
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) PrimaryNeon else TextSecondary,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1529,7 +1538,7 @@ private fun CreativePresetsRow(
     Column {
         Text(
             text = "Estilos creativos",
-            style = MaterialTheme.typography.labelSmall.copy(
+            style = MaterialTheme.typography.labelMedium.copy(
                 color = TextMuted,
                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
                 fontWeight = FontWeight.Bold,
@@ -1547,7 +1556,7 @@ private fun CreativePresetsRow(
                         1.dp,
                         if (isApplied) SecondaryVioletLight else BorderSubtle
                     ),
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.heightIn(min=NexusTokens.minimumTouch).clickable {
                         val nextPrompt = if (isApplied) {
                             currentPrompt.replace(preset.promptSuffix, "").replace(" , ", " ").trim(' ', ',')
                         } else {
@@ -1569,7 +1578,7 @@ private fun CreativePresetsRow(
                         Icon(Icons.Default.AutoAwesome, null, Modifier.size(NexusTokens.space24), tint=if(isApplied) PrimaryNeon else TextSecondary)
                         Text(
                             text = preset.label,
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (isApplied) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isApplied) SecondaryVioletLight else TextSecondary,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1618,12 +1627,13 @@ private fun ModelPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        shape = NexusTokens.sheet
     ) {
+        NexusSheetSystemBars()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NexusTokens.space16)
+                .padding(horizontal = NexusTokens.screenMargin)
                 .padding(bottom = NexusTokens.space24)
         ) {
             Row(
@@ -1634,7 +1644,7 @@ private fun ModelPickerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Seleccionar Modelo",
+                    text = "Seleccionar modelo",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -1642,8 +1652,8 @@ private fun ModelPickerSheet(
                 )
                 Text(
                     text = "${filteredModels.size} disponibles",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = PrimaryNeon,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = TextSecondary,
                         fontWeight = FontWeight.SemiBold
                     )
                 )
@@ -1674,7 +1684,7 @@ private fun ModelPickerSheet(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Buscar modelo...", color = TextMuted, fontSize = MaterialTheme.typography.bodyMedium.fontSize) },
+                        placeholder = { Text("Buscar modelo...", color = TextMuted, style = MaterialTheme.typography.bodyMedium) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -1684,7 +1694,7 @@ private fun ModelPickerSheet(
                             unfocusedTextColor = TextPrimary,
                             cursorColor = PrimaryNeon
                         )
-                    )
+                    , shape=NexusTokens.field)
                     if (searchQuery.isNotEmpty()) {
                         IconButton(
                             onClick = { searchQuery = "" },
@@ -1716,7 +1726,7 @@ private fun ModelPickerSheet(
                         ) {
                             Text(
                                 text = "Todos",
-                                style = MaterialTheme.typography.labelSmall.copy(
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     color = if (isAll) PrimaryNeon else TextSecondary,
                                     fontWeight = if (isAll) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -1735,7 +1745,7 @@ private fun ModelPickerSheet(
                         ) {
                             Text(
                                 text = org,
-                                style = MaterialTheme.typography.labelSmall.copy(
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     color = if (isSelected) PrimaryNeon else TextSecondary,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -1798,8 +1808,8 @@ private fun ModelPickerSheet(
                                             Text(
                                                 text = badge,
                                                 modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    color = PrimaryNeon,
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    color = TextSecondary,
                                                     fontSize = MaterialTheme.typography.labelMedium.fontSize
                                                 )
                                             )
@@ -1808,8 +1818,8 @@ private fun ModelPickerSheet(
                                 }
                                 Text(
                                     text = "${model.organization} • $formattedPrice",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = AccentEmerald,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        color = TextSecondary,
                                         fontSize = MaterialTheme.typography.labelMedium.fontSize
                                     )
                                 )
@@ -1818,7 +1828,7 @@ private fun ModelPickerSheet(
                                 Icon(
                                     Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = PrimaryNeon,
+                                    tint = TextSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1837,14 +1847,14 @@ private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPic
             val selected=media.filter { it.fieldKey==field.key }
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    Text(field.label+(if(field.required) " · obligatorio" else " · opcional"),style=MaterialTheme.typography.titleSmall)
+                    Text(field.label+(if(field.required) " · obligatorio" else " · opcional"),style=MaterialTheme.typography.titleMedium)
                     selected.forEachIndexed { index,item ->
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                             Text("Archivo ${index+1} preparado",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
                             IconButton(onClick={onRemove(item.id)}) {Icon(Icons.Default.Close,"Quitar ${field.label} ${index+1}")}
                         }
                     }
-                    if(selected.size<field.maximum || field.maximum==1) OutlinedButton(onClick={onPick(field)},modifier=Modifier.heightIn(min=48.dp)) {
+                    if(selected.size<field.maximum || field.maximum==1) OutlinedButton(onClick={onPick(field)},modifier=Modifier.heightIn(min=48.dp), shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                         Text(if(selected.isNotEmpty() && field.maximum==1) "Cambiar archivo" else "Añadir archivo")
                     }
                     if(field.maximum>1) Text("${selected.size} de ${field.maximum} archivos",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
@@ -1861,7 +1871,7 @@ private fun MediaFactsLabel(media:AttachedMedia) {
     LaunchedEffect(media.uriString) {facts=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         runCatching {LocalMediaInspector.inspect(context,Uri.parse(media.uriString),media.mimeType).summary}.getOrNull()
     }}
-    facts?.let {Text(it,color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
+    facts?.let {Text(it,color=TextSecondary,style = MaterialTheme.typography.labelMedium)}
 }
 
 @Composable
@@ -1876,7 +1886,8 @@ private fun GenerateActionButton(enabled:Boolean,onClick:()->Unit,modifier:Modif
 private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable ColumnScope.()->Unit) {
     ModalBottomSheet(onDismissRequest=onDismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
         shape=NexusTokens.sheet,containerColor=MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.88f).verticalScroll(rememberScrollState())
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().heightIn(max=androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * .88f).verticalScroll(rememberScrollState())
             .padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             Row(verticalAlignment=Alignment.CenterVertically) {

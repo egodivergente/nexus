@@ -58,7 +58,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             confirmButton={TextButton(onClick={
                 if(isAppearance) appearance.setTheme(NexusAppearance.AURORA) else currencyManager.setPreference(CurrencyPreference.EUR_SMART)
                 defaultSetting=null
-            }) {Text("Restaurar predeterminado")}},dismissButton={TextButton(onClick={defaultSetting=null}) {Text("Cerrar")}})
+            }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Restaurar predeterminado")}},dismissButton={TextButton(onClick={defaultSetting=null}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar")}})
     }
 
     val currencyState by currencyManager.state.collectAsState()
@@ -99,7 +99,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
     var accountDetails by remember {mutableStateOf(false)}
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=MaterialTheme.typography.titleLarge)})}) {padding ->
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())})}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             item {Text("Personalización",style=MaterialTheme.typography.titleMedium)}
             item {SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true},{defaultSetting="Apariencia"})}
@@ -111,7 +111,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                     Text(accountBalance?.let {currencyManager.formatBalance(it.availableUsd)} ?: "Saldo sin consultar",style=MaterialTheme.typography.titleMedium.tabularMoney(),modifier=Modifier.weight(1f))
                     IconButton(onClick={refreshBalance()},enabled=!isRefreshingBalance) {Icon(Icons.Default.Refresh,"Actualizar saldo Atlas")}
                 }
-                TextButton(onClick={accountDetails=!accountDetails},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Text(if(accountDetails) "Ocultar cuenta" else "Detalles de cuenta")}
+                TextButton(onClick={accountDetails=!accountDetails},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary), shape=NexusTokens.field) {Text(if(accountDetails) "Ocultar cuenta" else "Detalles de cuenta")}
                 if(accountDetails) accountBalance?.let {balance ->
                     Text(currencyManager.formatUsdDetails(balance.availableUsd),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
                     AccountAmount("Efectivo",currencyManager.formatBalance(balance.cashUsd))
@@ -127,7 +127,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 Text(if(maskedApiKey=="Not configured") "Sin configurar · Clave API (Keystore)" else "Clave API guardada (Keystore)",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 Text(maskedApiKey.takeUnless {it=="Not configured"} ?: "Sin configurar",style=MaterialTheme.typography.bodyMedium)
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    OutlinedButton(onClick={apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text("Modificar clave Atlas")}
+                    OutlinedButton(onClick={apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary), shape=NexusTokens.field) {Text("Modificar clave Atlas")}
                     OutlinedButton(enabled=!isTestingConnection,onClick={
                         isTestingConnection=true;connectionStatusMessage=null
                         scope.launch {
@@ -137,7 +137,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                             if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud."}
                             else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión."}
                         }
-                    },colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text(if(isTestingConnection) "Probando…" else "Probar conexión Atlas")}
+                    },colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary), shape=NexusTokens.field) {Text(if(isTestingConnection) "Probando…" else "Probar conexión Atlas")}
                 }
                 connectionStatusMessage?.let {status->InlineNotice(if(isConnectionSuccess) "Conexión correcta." else noticeMessage(status,"No se pudo conectar con Atlas."),technicalDetails=if(isConnectionSuccess) null else status,isError=!isConnectionSuccess)}
             }}
@@ -168,8 +168,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 RadioButton(selectedTheme==option,null)
                 Column(Modifier.weight(1f)) {Text(option.label,style=MaterialTheme.typography.bodyLarge);Text(option.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
             }}
-            TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            TextButton(onClick={appearanceOpen=false}) {Text("Cerrar apariencia",color=TextSecondary)}
+            TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Restaurar predeterminado",color=TextSecondary)}
+            TextButton(onClick={appearanceOpen=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar apariencia",color=TextSecondary)}
         }
     }
     if(currencyOpen) ModalBottomSheet(onDismissRequest={currencyOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
@@ -184,12 +184,12 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             Text(currencyState.rateSummaryText,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Fuente: BCE / Frankfurter",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
             Text("Última sincronización: ${currencyState.formattedLastUpdated}",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
-            TextButton(onClick={currencyDetails=!currencyDetails}) {Text("Detalles de conversión",color=TextSecondary)}
+            TextButton(onClick={currencyDetails=!currencyDetails}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Detalles de conversión",color=TextSecondary)}
             if(currencyDetails) Text("Ejemplo: ${currencyManager.formatUsdDetails(.015)} → ${currencyManager.formatCost(.015)}",style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
             currencyState.error?.let {InlineNotice(noticeMessage(it,"No se pudo actualizar la tasa. Se conserva la guardada."),technicalDetails=it)}
-            OutlinedButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary)) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
-            TextButton(onClick={currencyManager.setPreference(CurrencyPreference.EUR_SMART)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            TextButton(onClick={currencyOpen=false}) {Text("Cerrar moneda",color=TextSecondary)}
+            OutlinedButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.outlinedButtonColors(contentColor=TextSecondary), shape=NexusTokens.field) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
+            TextButton(onClick={currencyManager.setPreference(CurrencyPreference.EUR_SMART)}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Restaurar predeterminado",color=TextSecondary)}
+            TextButton(onClick={currencyOpen=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar moneda",color=TextSecondary)}
         }
     }
     if(showDiagnostics) ModalBottomSheet(onDismissRequest={showDiagnostics=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
@@ -202,7 +202,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             Text(if(app.secureStorage.credentialStorageAvailable) "Almacenamiento cifrado disponible" else "Almacenamiento cifrado no disponible",style=MaterialTheme.typography.bodyMedium)
             Text("Media3 ExoPlayer 1.4.1 · WorkManager 2.9",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Divisas: BCE / Frankfurter",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-            TextButton(onClick={showDiagnostics=false}) {Text("Cerrar diagnóstico",color=TextSecondary)}
+            TextButton(onClick={showDiagnostics=false}, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {Text("Cerrar diagnóstico",color=TextSecondary)}
         }
     }
 
@@ -220,7 +220,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     Text(
                         text = "Tu clave API se almacena cifrada con AES256-GCM respaldada por el Keystore de Android.",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
+                        style = MaterialTheme.typography.bodyMedium.copy(color = TextMuted)
                     )
                     OutlinedTextField(
                         value = apiKeyInput,
@@ -251,12 +251,12 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                         showEditKeyDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = MaterialTheme.colorScheme.onPrimary)
-                ) {
+                , shape=NexusTokens.field) {
                     Text("Guardar clave", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEditKeyDialog = false }) {
+                TextButton(onClick = { showEditKeyDialog = false }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                     Text("Cancelar", color = TextSecondary)
                 }
             },
@@ -273,7 +273,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             title = { Text("Configurar clave de ${provider?.displayName ?: providerId}", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    Text("La clave se guarda cifrada en el Keystore de Android.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                    Text("La clave se guarda cifrada en el Keystore de Android.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(
                         value = providerKeyInput,
                         onValueChange = { providerKeyInput = it },
@@ -293,9 +293,9 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                     app.secureStorage.saveProviderApiKey(providerId, providerKeyInput.trim())
                     providerKeyRevision++
                     providerKeyDialogId = null
-                }) { Text("Guardar clave", fontWeight = FontWeight.Bold) }
+                }, shape=NexusTokens.field) { Text("Guardar clave", fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { providerKeyDialogId = null }) { Text("Cancelar") } },
+            dismissButton = { TextButton(onClick = { providerKeyDialogId = null }, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Cancelar") } },
             containerColor = SurfaceDark,
             shape = NexusTokens.card
         )
@@ -338,29 +338,29 @@ private fun ProviderCredentialCard(
     ) {
         Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.CloudQueue, contentDescription = null, tint = PrimaryNeon)
+                Icon(Icons.Default.CloudQueue, contentDescription = null, tint = TextSecondary)
                 Spacer(Modifier.width(NexusTokens.space8))
                 Column(Modifier.weight(1f)) {
                     Text(provider.displayName, color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text(provider.description, color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                    Text(provider.description, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             Divider(color = BorderSubtle)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(maskedKey.takeUnless {it=="Not configured"} ?: "Sin configurar", modifier = Modifier.weight(1f), color = if (maskedKey == "Not configured") AccentCoral else TextPrimary,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                TextButton(onClick = onEdit) { Text("Modificar") }
+                TextButton(onClick = onEdit, shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Modificar") }
             }
             if(accountStatus != null || loadingBalance) {
                 Surface(color = PrimaryNeon.copy(alpha = 0.08f), shape = NexusTokens.field,
                     border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.28f))) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
                         verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = PrimaryNeon,
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = TextSecondary,
                             modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(NexusTokens.space8))
                         Column(Modifier.weight(1f)) {
-                            Text("Saldo", color = TextMuted, style = MaterialTheme.typography.labelSmall)
+                            Text("Saldo", color = TextMuted, style = MaterialTheme.typography.labelMedium)
                             Text(accountStatus?.balanceLabel?.let {presentBalance(it,(LocalContext.current.applicationContext as NexusApplication).currencyManager)} ?: "Consultando…", color = TextPrimary,
                                 fontWeight = FontWeight.Bold)
                         }
@@ -382,7 +382,7 @@ private fun ProviderCredentialCard(
                     }
                 },
                 enabled = !testing && apiKey().isNotBlank()
-            ) {
+            , shape=NexusTokens.field, colors=androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)) {
                 if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(NexusTokens.space4))

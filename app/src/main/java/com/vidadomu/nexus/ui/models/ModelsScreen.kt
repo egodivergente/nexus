@@ -215,7 +215,7 @@ fun LegacyModelsScreen(
                         )
                         Text(
                             text = "${models.size} modelos de ${availableProviders.size} proveedores líderes",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = TextMuted,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
@@ -251,7 +251,7 @@ fun LegacyModelsScreen(
             // SECCIÓN 2: BUSCADOR
             // ==========================================
             item {
-                Box(modifier = Modifier.padding(horizontal = NexusTokens.space16)) {
+                Box(modifier = Modifier.padding(horizontal = NexusTokens.screenMargin)) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -260,7 +260,7 @@ fun LegacyModelsScreen(
                             Text(
                                 text = "Buscar por nombre, tarea o proveedor...",
                                 color = TextMuted,
-                                fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         },
                         leadingIcon = {
@@ -303,12 +303,12 @@ fun LegacyModelsScreen(
             // ==========================================
             item {
                 Column(
-                    modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                    modifier = Modifier.padding(horizontal = NexusTokens.screenMargin),
                     verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
                     Text(
                         text = "ORDENAR POR",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextMuted,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize,
                             fontWeight = FontWeight.Bold,
@@ -342,7 +342,7 @@ fun LegacyModelsScreen(
                                 ) {
                                     Text(
                                         text = sort.displayName,
-                                        style = MaterialTheme.typography.labelSmall.copy(
+                                        style = MaterialTheme.typography.labelMedium.copy(
                                             color = if (isSelected) PrimaryNeon else TextSecondary,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -364,12 +364,12 @@ fun LegacyModelsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     // Filtro por Tipo
                     Column(
-                        modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                        modifier = Modifier.padding(horizontal = NexusTokens.screenMargin),
                         verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
                         Text(
                             text = "TIPO DE MODELO",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = TextMuted,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 fontWeight = FontWeight.Bold,
@@ -398,7 +398,7 @@ fun LegacyModelsScreen(
                                     Text(
                                         text = filter.displayName,
                                         modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4),
-                                        style = MaterialTheme.typography.labelSmall.copy(
+                                        style = MaterialTheme.typography.labelMedium.copy(
                                             color = if (isSelected) PrimaryNeon else TextSecondary,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -436,7 +436,7 @@ fun LegacyModelsScreen(
                                         )
                                         Text(
                                             text = "Ofertas",
-                                            style = MaterialTheme.typography.labelSmall.copy(
+                                            style = MaterialTheme.typography.labelMedium.copy(
                                                 color = if (filterDiscountOnly) AccentCoral else TextSecondary,
                                                 fontWeight = if (filterDiscountOnly) FontWeight.Bold else FontWeight.Medium,
                                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -450,12 +450,12 @@ fun LegacyModelsScreen(
 
                     // Filtro por Proveedor
                     Column(
-                        modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                        modifier = Modifier.padding(horizontal = NexusTokens.screenMargin),
                         verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                     ) {
                         Text(
                             text = "PROVEEDORES DESTACADOS",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = TextMuted,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                 fontWeight = FontWeight.Bold,
@@ -491,7 +491,7 @@ fun LegacyModelsScreen(
                                             Icon(
                                                 imageVector = Icons.Default.AutoAwesome,
                                                 contentDescription = null,
-                                                tint = PrimaryNeon,
+                                                tint = TextSecondary,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         } else {
@@ -504,7 +504,7 @@ fun LegacyModelsScreen(
                                         }
                                         Text(
                                             text = provider,
-                                            style = MaterialTheme.typography.labelSmall.copy(
+                                            style = MaterialTheme.typography.labelMedium.copy(
                                                 color = if (isSelected) TextPrimary else TextSecondary,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -524,7 +524,7 @@ fun LegacyModelsScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = NexusTokens.space16)
+                            .padding(horizontal = NexusTokens.screenMargin)
                             .clip(NexusTokens.field)
                             .clickable { isFullListView = false },
                         color = SurfaceVariantDark,
@@ -537,21 +537,21 @@ fun LegacyModelsScreen(
                         ) {
                             Text(
                                 text = "← Volver al escaparate visual",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = PrimaryNeon,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = TextSecondary,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
                             Text(
                                 text = "Mostrando ${filteredModels.size} modelos",
-                                style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
+                                style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
                             )
                         }
                     }
                 }
 
                 items(filteredModels, key = { it.id }) { model ->
-                    Box(modifier = Modifier.padding(horizontal = NexusTokens.space16)) {
+                    Box(modifier = Modifier.padding(horizontal = NexusTokens.screenMargin)) {
                         FullCatalogModelRow(
                             model = model,
                             currencyManager = currencyManager,
@@ -569,7 +569,7 @@ fun LegacyModelsScreen(
                 // ==========================================
                 item {
                     Column(
-                        modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                        modifier = Modifier.padding(horizontal = NexusTokens.screenMargin),
                         verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                     ) {
                         Row(
@@ -579,7 +579,7 @@ fun LegacyModelsScreen(
                         ) {
                             Text(
                                 text = "NOVEDADES RECIENTES",
-                                style = MaterialTheme.typography.labelSmall.copy(
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     color = TextMuted,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.Bold,
@@ -588,8 +588,8 @@ fun LegacyModelsScreen(
                             )
                             Text(
                                 text = "Últimos 30 días",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = AccentEmerald,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = TextSecondary,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -629,7 +629,7 @@ fun LegacyModelsScreen(
                                     )
                                     Text(
                                         text = "Sin novedades esta semana · Todos los modelos se encuentran en sus versiones oficiales estables.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
+                                        style = MaterialTheme.typography.bodyMedium.copy(
                                             color = TextSecondary,
                                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                                         )
@@ -646,12 +646,12 @@ fun LegacyModelsScreen(
                 if (imageAndVideoModels.isNotEmpty()) {
                     item {
                         Column(
-                            modifier = Modifier.padding(horizontal = NexusTokens.space16),
+                            modifier = Modifier.padding(horizontal = NexusTokens.screenMargin),
                             verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                         ) {
                             Text(
                                 text = "IMAGEN Y VÍDEO",
-                                style = MaterialTheme.typography.labelSmall.copy(
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     color = TextMuted,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.Bold,
@@ -660,7 +660,7 @@ fun LegacyModelsScreen(
                             )
                             Text(
                                 text = "Generación y edición con los motores insignia líderes de la industria",
-                                style = MaterialTheme.typography.bodySmall.copy(
+                                style = MaterialTheme.typography.bodyMedium.copy(
                                     color = TextSecondary,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize
                                 )
@@ -673,7 +673,7 @@ fun LegacyModelsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = NexusTokens.space16),
+                                .padding(horizontal = NexusTokens.screenMargin),
                             horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
@@ -704,12 +704,12 @@ fun LegacyModelsScreen(
                 if (secondaryModels.isNotEmpty()) {
                     item {
                         Column(
-                            modifier = Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space4),
+                            modifier = Modifier.padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space4),
                             verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
                         ) {
                             Text(
                                 text = "CHAT, AUDIO Y OTROS SERVICIOS",
-                                style = MaterialTheme.typography.labelSmall.copy(
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     color = TextMuted,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize,
                                     fontWeight = FontWeight.Bold,
@@ -718,7 +718,7 @@ fun LegacyModelsScreen(
                             )
                             Text(
                                 text = "Modelos complementarios de lenguaje conversacional y síntesis musical",
-                                style = MaterialTheme.typography.bodySmall.copy(
+                                style = MaterialTheme.typography.bodyMedium.copy(
                                     color = TextMuted,
                                     fontSize = MaterialTheme.typography.labelMedium.fontSize
                                 )
@@ -727,7 +727,7 @@ fun LegacyModelsScreen(
                     }
 
                     items(secondaryModels) { model ->
-                        Box(modifier = Modifier.padding(horizontal = NexusTokens.space16)) {
+                        Box(modifier = Modifier.padding(horizontal = NexusTokens.screenMargin)) {
                             SecondaryCompactModelRow(
                                 model = model,
                                 currencyManager = currencyManager,
@@ -744,7 +744,7 @@ fun LegacyModelsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
+                            .padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space12)
                     ) {
                         Surface(
                             modifier = Modifier
@@ -758,21 +758,21 @@ fun LegacyModelsScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryNeon.copy(alpha = 0.4f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12),
+                                modifier = Modifier.padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space12),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ViewList,
                                     contentDescription = null,
-                                    tint = PrimaryNeon,
+                                    tint = TextSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(NexusTokens.space8))
                                 Text(
                                     text = "Ver los ${filteredModels.size} modelos del catálogo completo",
                                     style = MaterialTheme.typography.labelMedium.copy(
-                                        color = PrimaryNeon,
+                                        color = TextSecondary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = MaterialTheme.typography.bodyMedium.fontSize
                                     )
@@ -841,7 +841,7 @@ private fun NewReleaseHeroCard(
                     )
                     Text(
                         text = model.organization,
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextSecondary,
                             fontWeight = FontWeight.Medium,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -859,8 +859,8 @@ private fun NewReleaseHeroCard(
                     Text(
                         text = daysAgo,
                         modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = AccentEmerald,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
                             fontWeight = FontWeight.Bold,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
@@ -882,11 +882,9 @@ private fun NewReleaseHeroCard(
                 )
                 Text(
                     text = model.shortDescription.ifBlank { "Modelo generativo insignia de alta fidelidad." },
-                    style = MaterialTheme.typography.bodySmall.copy(
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextMuted,
-                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                        lineHeight = 14.sp
-                    ),
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -900,8 +898,8 @@ private fun NewReleaseHeroCard(
             ) {
                 Text(
                     text = formattedPrice,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = AccentEmerald,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = TextSecondary,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
@@ -915,8 +913,8 @@ private fun NewReleaseHeroCard(
                     Text(
                         text = "Probar ↗",
                         modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = PrimaryNeon,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
                             fontWeight = FontWeight.Bold,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
@@ -982,7 +980,7 @@ private fun EscaparateMediaCard(
                     )
                     Text(
                         text = model.organization,
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = TextSecondary,
                             fontWeight = FontWeight.Medium,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1000,7 +998,7 @@ private fun EscaparateMediaCard(
                     Text(
                         text = speedTag,
                         modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             color = tagColor,
                             fontWeight = FontWeight.Bold,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1023,11 +1021,9 @@ private fun EscaparateMediaCard(
                 )
                 Text(
                     text = model.shortDescription.ifBlank { "Generación visual de alta resolución y consistencia." },
-                    style = MaterialTheme.typography.bodySmall.copy(
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextMuted,
-                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                        lineHeight = 14.sp
-                    ),
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1041,8 +1037,8 @@ private fun EscaparateMediaCard(
             ) {
                 Text(
                     text = formattedPrice,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = AccentEmerald,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = TextSecondary,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
                     ),
@@ -1054,7 +1050,7 @@ private fun EscaparateMediaCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = null,
-                    tint = PrimaryNeon,
+                    tint = TextSecondary,
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -1104,7 +1100,7 @@ private fun SecondaryCompactModelRow(
                 )
                 Text(
                     text = model.displayName,
-                    style = MaterialTheme.typography.bodySmall.copy(
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1114,7 +1110,7 @@ private fun SecondaryCompactModelRow(
                 )
                 Text(
                     text = "• ${model.organization}",
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    style = MaterialTheme.typography.labelMedium.copy(
                         color = TextMuted,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
                     ),
@@ -1130,7 +1126,7 @@ private fun SecondaryCompactModelRow(
             ) {
                 Text(
                     text = formattedPrice,
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    style = MaterialTheme.typography.labelMedium.copy(
                         color = TextMuted,
                         fontSize = MaterialTheme.typography.labelMedium.fontSize
                     )
@@ -1206,7 +1202,7 @@ private fun FullCatalogModelRow(
                         )
                         Text(
                             text = "${model.organization} • ${model.modalities.joinToString { it.name }}",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = TextMuted,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
                             )
@@ -1220,8 +1216,8 @@ private fun FullCatalogModelRow(
                 ) {
                     Text(
                         text = formattedPrice,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = AccentEmerald,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
@@ -1244,7 +1240,7 @@ private fun FullCatalogModelRow(
 
                     Text(
                         text = model.description.ifBlank { model.shortDescription },
-                        style = MaterialTheme.typography.bodySmall.copy(
+                        style = MaterialTheme.typography.bodyMedium.copy(
                             color = TextSecondary,
                             fontSize = MaterialTheme.typography.labelMedium.fontSize
                         )
@@ -1266,7 +1262,7 @@ private fun FullCatalogModelRow(
                     ) {
                         Text(
                             text = "ID: ${model.id}",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 fontFamily = FontFamily.Monospace,
                                 color = TextSecondary,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -1297,7 +1293,7 @@ private fun FullCatalogModelRow(
                                 text = "Usar en Lienzo ↗",
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = MaterialTheme.typography.labelMedium.fontSize
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
