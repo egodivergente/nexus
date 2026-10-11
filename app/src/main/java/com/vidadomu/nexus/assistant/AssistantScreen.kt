@@ -15,6 +15,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -80,11 +81,19 @@ fun AssistantScreen(
 
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
+    val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && ui.plans[it.planId]?.state==PlanState.DISCARDED}
+    val latestVisible by rememberUpdatedState(visibleItems)
     val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
-        if(latestUi.items.isEmpty()) return
+        if(latestVisible.isEmpty()) return
         automaticScroll = true
-        try { listState.scrollToItem(latestUi.items.size - 1 + if(latestUi.thinking) 1 else 0) }
+        try {
+            listState.scrollToItem(latestVisible.size - 1 + if(latestUi.thinking) 1 else 0)
+            val layout=listState.layoutInfo
+            layout.visibleItemsInfo.lastOrNull()?.let { last ->
+                listState.scrollBy((last.offset+last.size-layout.viewportEndOffset).coerceAtLeast(0).toFloat())
+            }
+        }
         finally { automaticScroll = false }
     }
     LaunchedEffect(listState) {
@@ -134,7 +143,7 @@ fun AssistantScreen(
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
                 if (ui.items.isEmpty()) item { EmptyHint() }
-                items(ui.items.filterNot { it is ChatItem.PlanCard && ui.plans[it.planId]?.state == PlanState.DISCARDED }, key = { it.id }) { item ->
+                items(visibleItems, key = { it.id }) { item ->
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item)
@@ -168,8 +177,8 @@ fun AssistantScreen(
             }
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
-            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*"), maxSelection = 6) },
-                onSend = { vm.send(input.text); draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("") }, onStop = vm::stop, onRemove = vm::removeAttachment)
+            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*") + AgentDocuments.types, maxSelection = 20) },
+                onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment)
         }
     }
 }
@@ -486,7 +495,7 @@ private fun ParamEditDialog(key: String, value: String, onSave: (String) -> Unit
 private fun AttachmentThumb(a: Attachment, onRemove: (() -> Unit)? = null) {
     Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail)) {
         if (a.mimeType.startsWith("image/")) AsyncImage(model = a.uri, contentDescription = a.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        else Surface(color = SurfaceVariantDark, modifier = Modifier.fillMaxSize()) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Movie, a.name) } }
+        else Surface(color = SurfaceVariantDark, modifier = Modifier.fillMaxSize()) { Box(contentAlignment = Alignment.Center) { Icon(if(a.mimeType.startsWith("video/")) Icons.Default.Movie else Icons.Default.Description, a.name) } }
         if (onRemove != null) IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
             Icon(Icons.Default.Close, "Quitar", tint = MediaForeground)
         }
@@ -517,6 +526,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
                 AgentStatus(ui,{})
+                AgentInternetSettings()
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock",AssistantSettings.BACKEND_PROXY to "Proxy").forEachIndexed { index, (value,label) ->
                         SegmentedButton(selected=backend==value,onClick={backend=value},

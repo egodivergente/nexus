@@ -33,6 +33,10 @@ fun interface AttachmentImageLoader {
     suspend fun load(attachment: Attachment): ContentBlock.Image?
 }
 
+fun interface AttachmentDocumentLoader {
+    suspend fun load(attachment: Attachment): ContentBlock.Document?
+}
+
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
 class AgentConversation(val session: AgentSession) {
     internal val messages = mutableListOf<LlmMessage>()
@@ -74,6 +78,7 @@ class AgentOrchestrator(
     private val logger: AgentLogger = AgentLogger { _, _ -> },
     private val images: AttachmentImageLoader? = null,
     private val today: () -> String = { LocalDate.now().toString() },
+    private val documents: AttachmentDocumentLoader? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -109,6 +114,11 @@ class AgentOrchestrator(
             newAttachments.filter { it.mimeType.startsWith("image/") }.take(MAX_IMAGES_PER_TURN).forEach { a ->
                 runCatching { loader.load(a) }.getOrNull()?.let { blocks += it }
             }
+        }
+        documents?.let { loader ->
+            val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") }
+            require(docs.size <= 5) { "Bedrock admite hasta 5 documentos por mensaje. Envía los demás en el siguiente." }
+            for (attachment in docs) loader.load(attachment)?.let { blocks += it }
         }
         appendUser(conv, blocks)
         trimHistory(conv)
@@ -216,7 +226,12 @@ class AgentOrchestrator(
     /** Si el último mensaje es del usuario (p. ej. tras cortar por rondas), se fusiona para alternar roles. */
     private fun appendUser(conv: AgentConversation, blocks: List<ContentBlock>) {
         val last = conv.messages.lastOrNull()
-        if (last != null && last.role == Role.USER) conv.messages[conv.messages.lastIndex] = last.copy(content = last.content + blocks)
+        if (last != null && last.role == Role.USER) {
+            val existingDocuments=last.content.filterIsInstance<ContentBlock.Document>().map {it.name}.toSet()
+            val merged=last.content + blocks.filterNot {it is ContentBlock.Document && it.name in existingDocuments}
+            require(merged.count {it is ContentBlock.Document}<=5) {"Este mensaje ya contiene 5 documentos. Completa el turno antes de añadir más."}
+            conv.messages[conv.messages.lastIndex] = last.copy(content = merged)
+        }
         else conv.messages += LlmMessage(Role.USER, blocks)
     }
 
@@ -228,6 +243,19 @@ class AgentOrchestrator(
             if (m[i].content.any { it is ContentBlock.Image }) {
                 m[i] = m[i].copy(content = m[i].content.map { if (it is ContentBlock.Image) ContentBlock.Text("[imagen enviada antes]") else it })
             }
+        }
+        // Keep at most five distinct recent documents across the conversation.
+        // Text markers preserve provenance without pretending the old binary is still available.
+        val retainedDocuments = mutableSetOf<String>()
+        for (i in m.indices.reversed()) {
+            val content = m[i].content.toMutableList()
+            for (j in content.indices.reversed()) {
+                val doc = content[j] as? ContentBlock.Document ?: continue
+                if (doc.name in retainedDocuments || retainedDocuments.size >= 5) {
+                    content[j] = ContentBlock.Text("[Documento anterior ${doc.name}: contenido retirado del contexto; vuelve a adjuntarlo desde las referencias si necesitas consultarlo.]")
+                } else retainedDocuments.add(doc.name)
+            }
+            m[i] = m[i].copy(content = content)
         }
         while (m.size > MAX_MESSAGES || (m.isNotEmpty() && !isPlainUser(m.first()))) {
             m.removeAt(0)

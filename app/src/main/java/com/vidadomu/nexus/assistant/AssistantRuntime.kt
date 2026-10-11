@@ -228,6 +228,7 @@ class AssistantRuntime(private val app: NexusApplication) {
 
     fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(
         llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
+        documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { AgentDocuments.load(it) },
         images = if (s.sendImages && !s.offline) AttachmentImageLoader { AgentMediaStore.thumbnail(it) } else null,
     )
 

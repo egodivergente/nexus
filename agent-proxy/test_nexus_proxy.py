@@ -15,6 +15,9 @@ class FakeBedrock:
     def __init__(self, error=None, usage=(40, 200)):
         self.calls, self.error, self.usage = [], error, usage
 
+    def count_tokens(self, **req):
+        return {"inputTokens": self.usage[0]}
+
     def converse(self, **req):
         self.calls.append(req)
         if self.error:
@@ -81,6 +84,48 @@ class ProxyTest(unittest.TestCase):
         msgs = [{"role": "user", "content": [{"text": "mira"}, {"image": {"format": "jpeg", "source": {"bytes": img}}}]}]
         self.proxy.converse("Bearer " + TOKEN, body(messages=msgs))
         self.assertEqual(self.fake.calls[0]["messages"][0]["content"][1]["image"]["source"]["bytes"], b"\xff\xd8jpegdata")
+
+    def test_document_bytes_decoded(self):
+        raw = b"%PDF-example"
+        doc = {"document": {"format": "pdf", "name": "Document 1", "source": {"bytes": base64.b64encode(raw).decode()}}}
+        self.proxy.converse("Bearer " + TOKEN, body(messages=[{"role": "user", "content": [{"text": "resume"}, doc]}]))
+        self.assertEqual(self.fake.calls[0]["messages"][0]["content"][1]["document"]["source"]["bytes"], raw)
+
+    def test_documents_reject_invalid_inputs(self):
+        doc = {"document": {"format": "pdf", "name": "Document 1", "source": {"bytes": "YQ=="}}}
+        bad = [
+            {"role": "assistant", "content": [{"text": "x"}, doc]},
+            {"role": "user", "content": [doc]},
+            {"role": "user", "content": [{"text": "x"}] + [doc] * 6},
+            {"role": "user", "content": [{"text": "x"}, {"document": {"format": "pdf", "name": "Doc", "source": {"bytes": "!!!"}}}]},
+        ]
+        for message in bad:
+            with self.subTest(message=message), self.assertRaises(np.ProxyError):
+                self.proxy.build_request(json.loads(body(messages=[message])))
+        self.assertEqual(self.fake.calls, [])
+
+    def test_two_full_size_documents_fit_transport(self):
+        doc = {"document": {"format": "pdf", "name": "Document 1", "source": {"bytes": base64.b64encode(b"x" * 4_500_000).decode()}}}
+        payload = body(messages=[{"role": "user", "content": [{"text": "compare"}, doc, doc]}])
+        self.assertLess(len(payload), self.proxy.cfg["max_request_bytes"])
+        result = self.proxy.build_request(json.loads(payload))
+        self.assertEqual(len(result["messages"][0]["content"][1]["document"]["source"]["bytes"]), 4_500_000)
+
+    def test_large_document_uses_counted_tokens_under_default_budget(self):
+        doc = {"document": {"format": "pdf", "name": "Document", "source": {"bytes": base64.b64encode(b"x" * 4_500_000).decode()}}}
+        self.proxy.converse("Bearer " + TOKEN, body(messages=[{"role": "user", "content": [{"text": "read"}, doc]}]))
+        self.assertEqual(len(self.fake.calls), 1)
+        self.assertEqual(self.proxy.usage.reserved_tokens, 0)
+
+    def test_unavailable_token_count_preserves_budget(self):
+        def unavailable(**req):
+            raise RuntimeError("not supported")
+        self.fake.count_tokens = unavailable
+        doc = {"document": {"format": "pdf", "name": "Document", "source": {"bytes": base64.b64encode(b"x" * 4_500_000).decode()}}}
+        with self.assertRaises(np.ProxyError) as error:
+            self.proxy.converse("Bearer " + TOKEN, body(messages=[{"role": "user", "content": [{"text": "read"}, doc]}]))
+        self.assertEqual(error.exception.code, "document_token_count_unavailable")
+        self.assertEqual(self.fake.calls, [])
 
     def test_budget_blocks_before_calling_bedrock(self):
         # 1000 in * 3 $/M + 200 out * 15 $/M = 0.006 $ por llamada; presupuesto 0.01 -> la 3.ª se bloquea.

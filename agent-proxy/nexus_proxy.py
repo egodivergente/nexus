@@ -48,7 +48,8 @@ DEFAULTS: dict[str, Any] = {
     "default_model": None,
     "device_token_sha256": [],
     "max_tokens_cap": 8192,
-    "max_request_bytes": 8 * 1024 * 1024,
+    "max_request_bytes": 40 * 1024 * 1024,
+    "max_document_bytes": 4_500_000,
     "max_images_per_request": 20,
     "max_image_bytes": 3_750_000,
     "max_tools": 64,
@@ -244,6 +245,7 @@ class NexusProxy:
         if not isinstance(m, dict) or m.get("role") not in ("user", "assistant") or not isinstance(m.get("content"), list):
             raise ProxyError(400, "bad_request", "Mensaje con formato no válido.")
         content = []
+        documents = 0
         for block in m["content"]:
             if isinstance(block, dict) and "image" in block:
                 img = block["image"]
@@ -260,8 +262,27 @@ class NexusProxy:
                 if len(raw) > int(self.cfg["max_image_bytes"]):
                     raise ProxyError(413, "too_large", "Imagen demasiado grande.")
                 content.append({"image": {"format": fmt, "source": {"bytes": raw}}})
+            elif isinstance(block, dict) and "document" in block:
+                documents += 1
+                doc = block["document"]
+                if m["role"] != "user" or not isinstance(doc, dict) or documents > 5:
+                    raise ProxyError(400, "bad_request", "Solo se admiten hasta cinco documentos por mensaje de usuario.")
+                if doc.get("format") not in ("pdf", "csv", "doc", "docx", "xls", "xlsx", "html", "txt", "md"):
+                    raise ProxyError(400, "bad_request", "Formato de documento no admitido.")
+                name = doc.get("name")
+                if not isinstance(name, str) or not name.strip() or len(name) > 200:
+                    raise ProxyError(400, "bad_request", "Nombre de documento no valido.")
+                try:
+                    raw = base64.b64decode(doc["source"]["bytes"], validate=True)
+                except Exception:
+                    raise ProxyError(400, "bad_request", "Documento mal codificado.")
+                if not raw or len(raw) > int(self.cfg["max_document_bytes"]):
+                    raise ProxyError(413, "too_large", "Documento vacio o superior a 4,5 MB.")
+                content.append({"document": {"format": doc["format"], "name": name, "source": {"bytes": raw}}})
             else:
                 content.append(block)
+        if documents and not any(isinstance(b, dict) and isinstance(b.get("text"), str) and b["text"].strip() for b in content):
+            raise ProxyError(400, "bad_request", "Los documentos necesitan una instruccion de texto.")
         return {"role": m["role"], "content": content}
 
     def converse(self, auth_header: str | None, raw: bytes) -> dict[str, Any]:
@@ -277,8 +298,24 @@ class NexusProxy:
             raise ProxyError(400, "bad_request", "JSON no válido.")
         req = self.build_request(body)
         self.check_budget()
-        # Peor caso: ~4 bytes por token de entrada + maxTokens de salida.
+        # Binary document size is not a token count. Ask the model tokenizer when documents are present.
         worst_in, worst_out = len(raw) // 3, req["inferenceConfig"]["maxTokens"]
+        has_documents = any("document" in block for message in req["messages"] for block in message["content"] if isinstance(block, dict))
+        if has_documents:
+            try:
+                counted = self.bedrock.count_tokens(modelId=req["modelId"], input={"converse": {
+                    key: req[key] for key in ("messages", "system", "toolConfig") if key in req
+                }})["inputTokens"]
+                if not isinstance(counted, int) or isinstance(counted, bool) or counted < 0:
+                    raise ValueError("Invalid token count")
+                worst_in = counted
+            except Exception:
+                # Keep the existing conservative reservation if counting is unsupported or unavailable.
+                # The explicit error below explains why a valid document may still exceed that reservation.
+                LOG.warning("Document token count unavailable; using conservative reservation")
+                remaining = int(self.cfg["daily_token_budget"]) - self.usage.today()["input_tokens"] - self.usage.today()["output_tokens"]
+                if worst_in + worst_out > remaining:
+                    raise ProxyError(422, "document_token_count_unavailable", "No se pudo contar el documento con Bedrock. Revisa el permiso bedrock:CountTokens, la compatibilidad del modelo y la version de boto3; la reserva provisional supera el presupuesto. El archivo se conserva.")
         worst_usd = self.cost(req["modelId"], worst_in, worst_out) or 0.0
         self.usage.reserve(worst_usd, worst_in + worst_out, float(self.cfg["daily_budget_usd"]), int(self.cfg["daily_token_budget"]))
         started = time.monotonic()

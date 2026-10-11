@@ -15,8 +15,8 @@ android {
         applicationId = "com.vidadomu.nexus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "1.8.7-agent"
+        versionCode = 32
+        versionName = "1.8.8-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")

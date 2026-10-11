@@ -11,7 +11,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.Alignment
+import com.vidadomu.nexus.ui.components.StudioTextField
+import com.vidadomu.nexus.ui.components.StudioFilterChip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,6 +54,8 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
     val app = context.applicationContext as NexusApplication
     val runtime = remember(app) { AssistantRuntime.get(app) }
     val scope = rememberCoroutineScope()
+    val recentPrefs=remember {context.getSharedPreferences("recent_media_v1",Context.MODE_PRIVATE)}
+    fun recordRecent(uris: List<Uri>) {recentPrefs.edit().apply {uris.forEach {putLong(it.toString(),System.currentTimeMillis())}}.apply()}
     val deliver by rememberUpdatedState(onResult)
     var request by rememberSaveable { mutableStateOf<MediaPickerRequest?>(null) }
     var visible by rememberSaveable { mutableStateOf(false) }
@@ -73,18 +78,18 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
                 try {
                     val selected = mutableListOf<Uri>()
                     var failed = 0
+                    var failureReason: String? = null
                     for (uri in uris.distinct().take(current.maximum)) {
                         try {
                             val mime = context.contentResolver.getType(uri).orEmpty()
-                            selected += if (current.projectId != null && (mime.startsWith("image/") || mime.startsWith("video/"))) {
-                                Uri.parse(AgentMediaStore.persist(app, uri, mime, current.projectId).uri)
-                            } else uri
+                            selected += Uri.parse(AgentMediaStore.persist(app, uri, mime, current.projectId).uri)
                         } catch (cancelled: CancellationException) { throw cancelled }
-                        catch (_: Exception) { failed++ }
+                        catch (error: Exception) { failed++;failureReason=error.message }
                     }
-                    if (failed > 0) Toast.makeText(context, "No se pudieron importar $failed archivos. Puedes volver a intentarlo.", Toast.LENGTH_LONG).show()
+                    if (failed > 0) Toast.makeText(context, "No se pudieron importar $failed archivos. ${failureReason ?: "Puedes volver a intentarlo."}", Toast.LENGTH_LONG).show()
                     if (uris.distinct().size > current.maximum) Toast.makeText(context, "Se pueden seleccionar hasta ${current.maximum} archivos.", Toast.LENGTH_LONG).show()
                     if (selected.isNotEmpty()) {
+                        recordRecent(selected)
                         visible = false
                         if (runtime.settings.activeProjectId() == current.projectId) deliver(selected)
                         else Toast.makeText(context, "Archivos guardados en el proyecto de origen. Ábrelo para seleccionarlos.", Toast.LENGTH_LONG).show()
@@ -111,6 +116,7 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
                 export.launch("$name-imagenes.zip")
             } },
             onUse = { chosen ->
+                recordRecent(chosen.map {Uri.parse(it.uri)})
                 visible = false
                 if (runtime.settings.activeProjectId() == current.projectId) deliver(chosen.map { Uri.parse(it.uri) })
             },
@@ -134,12 +140,19 @@ internal fun ProjectMediaPickerSheet(
     onDelete: (List<Asset>) -> Unit = {}, onExport: (List<Asset>) -> Unit = {},
     projects: List<Project> = emptyList(), onProjectChange: (Project) -> Unit = {},
 ) {
+    val context=LocalContext.current
+    val recentPrefs=remember {context.getSharedPreferences("recent_media_v1",Context.MODE_PRIVATE)}
+    var recent by remember(projectId) {mutableStateOf(true)}
     var query by remember(projectId) { mutableStateOf("") }
     var selected by remember(projectId) { mutableStateOf(emptyList<String>()) }
     var managing by remember(projectId, managementOnly) { mutableStateOf(managementOnly) }
     var confirmDelete by remember(projectId) { mutableStateOf<List<Asset>?>(null) }
     var projectMenu by remember { mutableStateOf(false) }
-    val all = remember(assets, projectId, mimeTypes, managing) { projectMediaChoices(assets, projectId, if (managing) listOf("image/*") else mimeTypes, includeGenerated = managing) }
+    val all = remember(assets, projectId, mimeTypes, managing, recent) {
+        projectMediaChoices(assets, projectId, if(managing) listOf("image/*") else mimeTypes,
+            includeGenerated=managing, allProjects=recent && !managing)
+            .let { if(recent && !managing) it.sortedByDescending {asset -> recentPrefs.getLong(asset.uri,asset.createdAt)} else it }
+    }
     val chosen = all.filter { it.id in selected }
     LaunchedEffect(all) { selected = selected.filter { id -> all.any { it.id == id } } }
     confirmDelete?.let { toDelete ->
@@ -161,7 +174,10 @@ internal fun ProjectMediaPickerSheet(
                         projectMenu = false; onProjectChange(project)
                     }) }
                 }
-            } else Text(projectName?.let { "Guardadas en $it" } ?: "Selecciona un proyecto para conservar aquí tus fotografías.", style = MaterialTheme.typography.bodyMedium)
+            } else Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                StudioFilterChip(recent,{recent=true;selected=emptyList()},label={Text("Recientes")})
+                if(projectId!=null) StudioFilterChip(!recent,{recent=false;selected=emptyList()},label={Text(projectName ?: "Proyecto")})
+            }
             if (!managementOnly) TextButton(onClick = { managing = !managing; selected = emptyList() }, enabled = !busy) {
                 Text(if (managing) "Volver a importar" else "Gestionar biblioteca")
             }
@@ -185,9 +201,9 @@ internal fun ProjectMediaPickerSheet(
                     TextButton(onClick = { confirmDelete = chosen }, enabled = chosen.isNotEmpty() && !busy) { Text("Borrar · ${chosen.size}") }
                 }
             }
-            OutlinedTextField(query, { query = it }, label = { Text("Buscar guardadas") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            StudioTextField(query, { query = it }, placeholder = { Text("Buscar archivos") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             if (filtered.isEmpty()) {
-                Text(if (projectId == null && managing) "Elige un proyecto para gestionar sus imágenes." else if (projectId == null) "Importa un archivo desde el dispositivo." else if (all.isEmpty()) "Este proyecto todavía no tiene imágenes guardadas." else "No hay fotografías con ese nombre.", style = MaterialTheme.typography.bodyMedium)
+                Text(if (projectId == null && managing) "Elige un proyecto para gestionar sus imágenes." else if (projectId == null) "Todavía no tienes recientes. Importa un archivo una vez para reutilizarlo aquí." else if (all.isEmpty()) "Este proyecto todavía no tiene imágenes guardadas." else "No hay fotografías con ese nombre.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
             } else LazyVerticalGrid(columns = GridCells.Adaptive(104.dp), modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
@@ -196,7 +212,10 @@ internal fun ProjectMediaPickerSheet(
                     Column(Modifier.clip(NexusTokens.field).toggleable(value = checked, role = Role.Checkbox,
                         enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum),
                         onValueChange = { select -> selected = if (!select) selected - asset.id else if (!managing && maximum == 1) listOf(asset.id) else selected + asset.id })) {
-                        AsyncImage(asset.uri, asset.displayName, Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Crop)
+                        if(asset.mimeType?.startsWith("image/")==true) AsyncImage(asset.uri, null, Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Crop)
+                        else Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,modifier=Modifier.fillMaxWidth().aspectRatio(1f)) {
+                            Box(contentAlignment=Alignment.Center) {Icon(if(asset.mimeType?.startsWith("video/")==true) Icons.Default.Movie else Icons.Default.Description,null,Modifier.size(32.dp))}
+                        }
                         Row {
                             Checkbox(checked, null)
                             Text(asset.displayName, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(top = NexusTokens.space8))

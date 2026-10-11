@@ -11,7 +11,7 @@ token de dispositivo que se puede revocar quitando su hash de la configuración.
 
 1. `pip install boto3` (Python 3.10+).
 2. Credenciales de AWS por la vía estándar de boto3 (perfil `aws_profile`, variables de entorno o rol).
-   Permiso mínimo: `bedrock:InvokeModel` sobre el modelo / inference profile elegido.
+   Permisos: `bedrock:InvokeModel` y, para contar documentos antes del envio, `bedrock:CountTokens` sobre el modelo elegido. Usar una version actual de boto3 con `count_tokens`.
 3. `python nexus_proxy.py --new-token` → copia el **hash** a `device_token_sha256` y guarda el **token** para el móvil.
 4. `copy config.example.json config.local.json` y rellena `region`, `allowed_models`
    (el model ID o inference profile de Claude que vayas a usar), `prices_per_mtok` y `daily_budget_usd`.
@@ -37,7 +37,7 @@ token de dispositivo que se puede revocar quitando su hash de la configuración.
 | Tamaño de petición | `max_request_bytes` | 413 |
 
 El gasto del día se guarda en `usage/AAAA-MM-DD.json`. Antes de cada llamada se **reserva el peor caso**
-(entrada estimada por tamaño + `maxTokens` de salida) bajo un cerrojo, así que varias peticiones a la vez
+(entrada contada con CountTokens para documentos, estimada por tamaño en el resto, + `maxTokens` de salida) bajo un cerrojo, así que varias peticiones a la vez
 no pueden pasarse del presupuesto. Todo modelo permitido necesita precio en `prices_per_mtok`
 (o `allow_unpriced_models: true`, y entonces solo lo frena el tope de tokens).
 
@@ -54,3 +54,5 @@ y solo tras pulsar GENERAR en la tarjeta de cada plan.
 ## Pruebas
 
 `python -m unittest test_nexus_proxy -v` (cliente Bedrock falso; no hace llamadas a AWS).
+
+Documentos: hasta cinco por mensaje, 4,5 MB cada uno. El cuerpo JSON admite 40 MiB por defecto; los limites explicitos de una configuracion previa se conservan. Si CountTokens no esta disponible se mantiene la reserva conservadora anterior; cuando esta supera los tokens disponibles se devuelve `document_token_count_unavailable` con un diagnostico, sin enviar inferencia.

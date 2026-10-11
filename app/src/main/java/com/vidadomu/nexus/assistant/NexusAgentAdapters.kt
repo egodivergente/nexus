@@ -291,14 +291,18 @@ object AgentMediaStore {
             return@withContext Attachment(existing.id, existing.uri, existing.mimeType ?: mime ?: "image/*",
                 existing.displayName, existing.width, existing.height, assetId = existing.id)
         }
-        val resolved = mime?.takeIf { it.isNotBlank() && it != "application/octet-stream" } ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
-        require(resolved.startsWith("image/") || resolved.startsWith("video/")) { "Adjunta una imagen o un vídeo." }
+        var resolved = mime?.takeIf { it.isNotBlank() && it != "application/octet-stream" } ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
         val name = runCatching {
             context.contentResolver.query(uri, arrayOf("_display_name"), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
         }.getOrNull() ?: uri.lastPathSegment ?: "adjunto"
+        val documentFormat=AgentDocuments.format(resolved,name)
+        if(documentFormat!=null && resolved !in AgentDocuments.types) resolved=AgentDocuments.mimeType(documentFormat)
+        require(resolved.startsWith("image/") || resolved.startsWith("video/") || resolved.startsWith("audio/") || documentFormat!=null) { "Formato no compatible. Usa PDF, Word, TXT o Markdown." }
+        val byteLimit=if(documentFormat!=null) AgentDocuments.MAX_BYTES else MAX_BYTES
         val ext = when {
+            documentFormat!=null -> documentFormat
             "png" in resolved -> "png"; "webp" in resolved -> "webp"; "jpeg" in resolved || "jpg" in resolved -> "jpg"
-            "quicktime" in resolved -> "mov"; resolved.startsWith("video/") -> "mp4"; else -> "bin"
+            "quicktime" in resolved -> "mov"; resolved.startsWith("video/") -> "mp4"; resolved.startsWith("audio/") -> android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(resolved) ?: "audio"; else -> "bin"
         }
         val dir = File(context.filesDir, "agent_media").apply { mkdirs() }
         val target = File(dir, "agent_${UUID.randomUUID()}.$ext")
@@ -308,7 +312,7 @@ object AgentMediaStore {
                     val buf = ByteArray(65536); var total = 0L
                     while (true) {
                         val n = input.read(buf); if (n < 0) break
-                        total += n; require(total <= MAX_BYTES) { "El archivo supera 512 MB." }
+                        total += n; require(total <= byteLimit) { if(documentFormat!=null) "Bedrock admite documentos de hasta 4,5 MB; divide el archivo en capítulos." else "El archivo supera 512 MB." }
                         out.write(buf, 0, n)
                     }
                 }
@@ -320,10 +324,14 @@ object AgentMediaStore {
             BitmapFactory.decodeFile(target.path, o); w = o.outWidth.takeIf { it > 0 }; h = o.outHeight.takeIf { it > 0 }
         }
         val attachment = Attachment("att_" + UUID.randomUUID().toString().take(8), Uri.fromFile(target).toString(), resolved, name, w, h)
-        if (projectId == null) return@withContext attachment
         val saved = runtime.assets.addAsset(com.vidadomu.nexus.agent.core.assets.Asset(
             id = attachment.id, uri = attachment.uri,
-            type = if (resolved.startsWith("image/")) com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE else com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO,
+            type = when {
+                resolved.startsWith("image/") -> com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE
+                resolved.startsWith("video/") -> com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO
+                resolved.startsWith("audio/") -> com.vidadomu.nexus.agent.core.assets.AssetType.AUDIO
+                else -> com.vidadomu.nexus.agent.core.assets.AssetType.OTHER
+            },
             role = com.vidadomu.nexus.agent.core.assets.AssetRole.REFERENCE,
             displayName = name, mimeType = resolved, width = w, height = h,
             projectId = projectId, createdAt = System.currentTimeMillis(),

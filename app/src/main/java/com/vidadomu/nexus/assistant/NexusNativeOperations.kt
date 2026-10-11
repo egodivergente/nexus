@@ -24,6 +24,7 @@ class NexusNativeOperations(
     private val app: NexusApplication,
     private val runtime: AssistantRuntime,
 ) : NativeOperations {
+    private val internet = AgentInternet(app)
     private val media = AgentFileOperations(app, runtime.assets)
     private val http = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build()
@@ -31,6 +32,7 @@ class NexusNativeOperations(
     override suspend fun run(operation: String, input: JsonObject, session: AgentSession): JsonObject =
         withContext(Dispatchers.IO) {
             when (operation) {
+                "web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools", "call_mcp_tool", "disconnect_mcp_server" -> internet.run(operation,input)
                 "get_active_generations" -> active(input)
                 "recover_generation" -> recover(input.requiredText("job_id"))
                 "diagnose_flow" -> flow(false)

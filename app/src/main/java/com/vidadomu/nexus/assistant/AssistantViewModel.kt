@@ -138,10 +138,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if(_ui.value.thinking) return
         send(request.first,request.second)
     }
-    fun send(text: String, retryAttachments: List<Attachment>? = null) {
+    fun send(text: String, retryAttachments: List<Attachment>? = null): Boolean {
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
-        if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking) return
+        if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking) return false
+        if(atts.count {AgentDocuments.format(it.mimeType,it.name)!=null}>5) {
+            _ui.update {it.copy(message=msg("Bedrock admite 5 documentos por mensaje. Quita alguno y envíalo en el siguiente; tu borrador se conserva."))}
+            return false
+        }
         failedTurn = null
         val latestSettings = runtime.settings.load()
         if (latestSettings != _ui.value.settings) {
@@ -184,6 +188,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }?.let { selectProject(it) }
             }
         }
+        return true
     }
 
     fun stop() { turnJob?.cancel() }

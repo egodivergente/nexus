@@ -12,6 +12,9 @@ enum class Role { USER, ASSISTANT }
 
 sealed interface ContentBlock {
     data class Text(val text: String) : ContentBlock
+    class Document(val format: String, val name: String, val bytes: ByteArray) : ContentBlock {
+        override fun toString() = "Document($format, ${bytes.size} bytes)"
+    }
 
     data class ToolUse(val id: String, val name: String, val input: JsonObject) : ContentBlock
 

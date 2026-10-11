@@ -72,6 +72,13 @@ object ConverseCodec {
                 if (block.isError) put("status", "error")
             })
         }
+        is ContentBlock.Document -> buildJsonObject {
+            put("document", buildJsonObject {
+                put("format", block.format)
+                put("name", block.name)
+                put("source", buildJsonObject { put("bytes", Base64.getEncoder().encodeToString(block.bytes)) })
+            })
+        }
         is ContentBlock.Image -> buildJsonObject {
             put("image", buildJsonObject {
                 put("format", block.format)
