@@ -13,7 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import kotlin.math.abs
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,7 +42,7 @@ import com.vidadomu.nexus.ui.theme.BackgroundDark
 import com.vidadomu.nexus.ui.theme.ScreenBackground
 import com.vidadomu.nexus.ui.theme.NexusTheme
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     private var initialSharedUri by mutableStateOf<Uri?>(null)
@@ -59,6 +66,16 @@ class MainActivity : ComponentActivity() {
             NexusTheme {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
+                var controlsOpen by remember { mutableStateOf(false) }
+                val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
+                if(controlsOpen) ModalBottomSheet(onDismissRequest = { controlsOpen = false }) {
+                    Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                        Text("Estudio", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
+                        com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings = { controlsOpen = false; navController.navigate(Screen.Settings.route) { launchSingleTop = true } })
+                        TextButton(onClick = { controlsOpen = false; navController.navigate(Screen.Generations.route) { launchSingleTop = true } }) { Text("Trabajos en curso y actividad") }
+                        TextButton(onClick = { controlsOpen = false; navController.navigate(Screen.Settings.route) { launchSingleTop = true } }) { Text("Ajustes y temas") }
+                    }
+                }
                 val createViewModel: CreateViewModel = viewModel()
                 // Ligado a la actividad (como el Lienzo): la conversación y el plan pendiente sobreviven a «Atrás» y al cambio de pestaña.
                 val assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel = viewModel()
@@ -115,17 +132,36 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
-                    topBar = { if(activeEntry?.destination?.route != Screen.Assistant.route) com.vidadomu.nexus.ui.accounts.AccountBalanceBar(onSettings = {
-                        navController.navigate(Screen.Settings.route) { launchSingleTop = true }
-                    }) },
                     bottomBar = {
-                        if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)
+                        if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController, onControls = { controlsOpen = true })
                     }
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Models.route,
+                        startDestination = Screen.Assistant.route,
                         modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
+                            .pointerInput(activeEntry?.destination?.route, swipeThreshold) {
+                                val index = Screen.bottomNavItems.indexOfFirst { it.route == activeEntry?.destination?.route }
+                                if(index >= 0) {
+                                    var distance = 0f
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { distance = 0f },
+                                        onHorizontalDrag = { _, delta -> distance += delta },
+                                        onDragCancel = { distance = 0f },
+                                        onDragEnd = {
+                                            if(abs(distance) >= swipeThreshold) {
+                                                val target = Screen.bottomNavItems.getOrNull(index + if(distance < 0) 1 else -1)
+                                                target?.let { screen -> navController.navigate(screen.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = screen.route != Screen.Models.route
+                                                } }
+                                            }
+                                            distance = 0f
+                                        }
+                                    )
+                                }
+                            }
                     ) {
                         composable(Screen.Assistant.route) {
                             com.vidadomu.nexus.assistant.AssistantScreen(

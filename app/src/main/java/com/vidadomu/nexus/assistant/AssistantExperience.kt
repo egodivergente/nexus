@@ -137,14 +137,6 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
 }
 
 @Composable
-internal fun AgentModeSelector(mode: AgentMode, onMode: (AgentMode) -> Unit) {
-    LazyRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        items(AgentMode.entries) { value -> FilterChip(selected = value == mode, onClick = { onMode(value) },
-            label = { Text(when(value) { AgentMode.ASSISTANT -> "Asistente"; AgentMode.COPILOT -> "Copiloto"; AgentMode.AGENT -> "Agente" }) }) }
-    }
-}
-
-@Composable
 internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel) {
     if(ui.activeProjectId == null) return
     var open by remember { mutableStateOf(false) }

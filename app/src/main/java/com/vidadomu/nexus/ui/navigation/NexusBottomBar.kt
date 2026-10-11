@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,7 +29,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.vidadomu.nexus.ui.theme.*
 
 @Composable
-fun NexusBottomBar(navController: NavController) {
+fun NexusBottomBar(navController: NavController, onControls: () -> Unit = {}) {
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
 
@@ -53,7 +54,7 @@ fun NexusBottomBar(navController: NavController) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(48.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Screen.bottomNavItems.forEach { screen ->
@@ -91,7 +92,7 @@ fun NexusBottomBar(navController: NavController) {
                             tint = itemColor,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.height(3.dp))
+                        Spacer(modifier = Modifier.height(1.dp))
                         Text(
                             text = screen.title,
                             fontSize = 10.sp,
@@ -109,6 +110,9 @@ fun NexusBottomBar(navController: NavController) {
                                 .background(if (selected) PrimaryNeon else Color.Transparent)
                         )
                     }
+                }
+                androidx.compose.material3.IconButton(onClick = onControls) {
+                    Icon(androidx.compose.material.icons.Icons.Default.Tune, "Cuentas, actividad y ajustes", tint = TextMuted)
                 }
             }
         }

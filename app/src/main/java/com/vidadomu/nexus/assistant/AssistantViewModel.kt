@@ -74,7 +74,7 @@ data class AssistantUiState(
     val catalog: List<com.vidadomu.nexus.agent.core.registry.ModelSummary> = emptyList(),
     val projectAssets: List<com.vidadomu.nexus.agent.core.assets.Asset> = emptyList(),
     val settings: AssistantSettings = AssistantSettings(),
-    val mode: AgentMode = AgentMode.COPILOT,
+    val mode: AgentMode = AgentMode.AGENT,
     val projects: List<Project> = emptyList(),
     val activeProjectId: String? = null,
     val pendingAttachments: List<Attachment> = emptyList(),
@@ -211,9 +211,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setMode(mode: AgentMode) {
-        runtime.settings.setMode(mode)
-        conversation.session.mode = mode
-        _ui.update { it.copy(mode = mode) }
+        runtime.settings.setMode(AgentMode.AGENT)
+        conversation.session.mode = AgentMode.AGENT
+        _ui.update { it.copy(mode = AgentMode.AGENT) }
     }
 
     // ---- adjuntos y proyectos -----------------------------------------------------------------
@@ -315,7 +315,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun restoreSavedChat(saved: SavedAssistantChat) {
         val plans = saved.plans.mapValues { (_, p) ->
-            if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, error = "La app se cerró durante el envío. Comprueba Historial antes de repetir.")
+            if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, error = "La app se cerró durante el envío. Comprueba Biblioteca antes de repetir.")
             else if (p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) {
                 runtime.guard.register(p.plan); p.copy(state = PlanState.PREPARED, busy = false)
             } else p.copy(busy = false)
@@ -407,7 +407,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 val sent = runtime.guard.plan(planId) ?: p.plan
                 setPlan(planId) { it.copy(plan = sent, busy = false, submitting = false, state = PlanState.SUBMITTED, jobId = r.jobId, jobStatus = "PENDING") }
-                notice("Enviado a ${sent.modelName}. Lo verás en Historial; aquí se actualiza el estado." + (r.note?.takeIf { "lineage" in it }?.let { " $it" } ?: ""))
+                notice("Enviado a ${sent.modelName}. Lo verás en Biblioteca; aquí se actualiza el estado." + (r.note?.takeIf { "lineage" in it }?.let { " $it" } ?: ""))
                 onJobs(app.generationRepository.allJobs.value)
             } catch (e: SubmissionUncertain) {
                 setPlan(planId) { it.copy(busy = false, submitting = false, state = PlanState.UNCERTAIN, jobId = e.jobId, error = e.message) }

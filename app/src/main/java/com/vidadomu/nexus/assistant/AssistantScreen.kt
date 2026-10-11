@@ -48,6 +48,7 @@ import com.vidadomu.nexus.ui.theme.*
 import java.util.Locale
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssistantScreen(
     onOpenInCanvas: (CreateUiState) -> Unit,
@@ -96,12 +97,20 @@ fun AssistantScreen(
     LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
 
     if (showSettings) AssistantSettingsDialog(ui, vm, onDismiss = { showSettings = false })
+    if (showContext) ModalBottomSheet(onDismissRequest = { showContext = false }) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            ProjectRow(ui, vm)
+            ProjectReferences(ui, vm)
+            AgentStatus(ui, onOpenSettings)
+            TextButton(onClick = { showContext = false; onOpenSettings() }) { Text("Temas y cuentas") }
+        }
+    }
 
     Scaffold(containerColor = ScreenBackground, snackbarHost = { SnackbarHost(snackbar) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).imePadding()) {
+        Column(Modifier.fillMaxSize().padding(pad)) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("¿Qué quieres crear?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary, modifier = Modifier.weight(1f))
-                if(compact) IconButton(onClick = { showContext = !showContext }) { Icon(Icons.Default.Tune, "Proyecto y modo") }
+                Text(ui.projects.firstOrNull { it.id == ui.activeProjectId }?.name ?: "Agente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = TextPrimary, modifier = Modifier.weight(1f))
+                IconButton(onClick = { showContext = true }) { Icon(Icons.Default.FolderOpen, "Proyecto, referencias y estado") }
                 Box {
                     IconButton(onClick = { showHistory = true }, enabled = !ui.thinking) { Icon(Icons.Default.History, "Conversaciones") }
                     DropdownMenu(expanded = showHistory, onDismissRequest = { showHistory = false }) {
@@ -113,18 +122,7 @@ fun AssistantScreen(
                 IconButton(onClick = vm::newConversation, enabled = !ui.thinking) { Icon(Icons.Default.AddComment, "Nueva conversación") }
                 IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, "Ajustes del asistente") }
             }
-            if (!compact || showContext) {
-                AgentModeSelector(ui.mode, vm::setMode)
-                ProjectRow(ui, vm)
-                ProjectReferences(ui, vm)
-            }
-            if (ui.settings.offline && (!compact || showContext)) {
-                Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                    Text("Sin LLM configurado: planificador local (elige modelo y prepara el plan, sin razonamiento). Configura Bedrock en ⚙.",
-                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(10.dp), color = MaterialTheme.colorScheme.onTertiaryContainer)
-                }
-            }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (ui.items.isEmpty()) item { EmptyHint() }
                 items(ui.items, key = { it.id }) { item ->
                     when (item) {
@@ -149,7 +147,6 @@ fun AssistantScreen(
             }
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui, vm::generatePending)
-            AgentStatus(ui, onOpenSettings)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
                 onSend = { vm.send(input.text); draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("") }, onStop = vm::stop, onRemove = vm::removeAttachment)
         }
@@ -408,7 +405,7 @@ private fun PlanCardView(
             p.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ErrorRed) }
 
             if (p.state == PlanState.UNCERTAIN) {
-                Text("No se pudo confirmar si el proveedor aceptó el envío. Revisa Historial antes de generar otra vez; este plan queda bloqueado para no pagar dos veces.",
+                Text("No se pudo confirmar si el proveedor aceptó el envío. Revisa Biblioteca antes de generar otra vez; este plan queda bloqueado para no pagar dos veces.",
                     style = MaterialTheme.typography.bodySmall, color = AccentAmber)
                 if (p.jobId != null) OutlinedButton(onClick = onOpenOutput) { Text("Ver en Nexus") }
             } else if (p.state == PlanState.SUBMITTED) {

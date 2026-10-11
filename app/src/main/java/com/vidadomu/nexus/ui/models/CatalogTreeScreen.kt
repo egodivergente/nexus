@@ -48,6 +48,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
     var compactCards by remember {mutableStateOf(prefs.getBoolean("compact_cards",true))}
     var gridCards by remember {mutableStateOf(prefs.getBoolean("grid_cards",false))}
     var moreMenu by remember {mutableStateOf(false)}
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(models) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {models.forEach {modelSearchText(it)}}
     }
@@ -99,9 +100,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         prefs.edit().putStringSet("model_favorites", favorites).apply()
     }
     Scaffold(containerColor = BackgroundDark, topBar = {
-        TopAppBar(title = { Text(activeGroup?.title ?: family ?: "Modelos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold) },
+        TopAppBar(windowInsets = WindowInsets(0,0,0,0), expandedHeight = 48.dp, title = { Text(activeGroup?.title ?: family ?: "Modelos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold) },
             navigationIcon = { if(family != null || groupKey != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
             actions = {
+                IconButton(onClick = { searchOpen = !searchOpen }) { Icon(Icons.Default.Search, "Buscar modelos") }
                 if(personalizing) IconButton(onClick={personalizing=false}) {Icon(Icons.Default.Check,"Terminar personalización")}
                 else if(groupKey==null) IconButton(onClick={favoritesOnly=!favoritesOnly;family=null}) {
                     Icon(if(favoritesOnly) Icons.Default.Star else Icons.Default.StarBorder,"Mis favoritos",tint=if(favoritesOnly) PrimaryNeon else TextSecondary)
@@ -125,7 +127,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 modifier=Modifier.fillMaxSize().padding(padding))
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
                 Text(if(family != null) "Elige el modelo. Las variantes están dentro."
                     else "Tus favoritos", color = TextSecondary, fontSize = 13.sp)
@@ -141,15 +143,12 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         item {FilterChip(showSecondary,{showSecondary=!showSecondary},label={Text("Más")})}
                     }
                 }
-                item(span={GridItemSpan(maxLineSpan)}) {
+                if(searchOpen || query.isNotBlank()) item(span={GridItemSpan(maxLineSpan)}) {
                     OutlinedTextField(query, { query=it }, Modifier.fillMaxWidth(), singleLine=true,
                         placeholder={Text("Buscar modelo o función")}, leadingIcon={Icon(Icons.Default.Search,null)},
                         trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}}, shape=RoundedCornerShape(16.dp))
                 }
-                if(family==null && query.isBlank()) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text("Todas las familias siguen aquí. Busca una tarea o abre una familia; las fichas explican cuándo usar cada modelo.",fontSize=12.sp,color=TextSecondary)
-                }
-                item(span={GridItemSpan(maxLineSpan)}) {
+                if(filters) item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         if(modality == Modality.IMAGE) item { FilterChip(imageReferences, { imageReferences = !imageReferences; use = null; groupKey = null }, label = { Text(if(imageReferences) "Con referencias" else "Todos los usos") }) }
                         item {FilterChip(catalogSort==CatalogSort.RELEASE,{
@@ -199,7 +198,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { _ ->
                         val brief=section.models.firstNotNullOfOrNull(CatalogFocus::forModel)
-                        NavigationCard(section.family,section.family,brief?.let {"${children.size} modelos · Ejemplo: ${it.good}"} ?: "${children.size} modelos",section.models,modality,
+                        NavigationCard(section.family,section.family,"${children.size} modelos",section.models,modality,
                             onClick={family=section.family;filters=false}, compact=compactCards,grid=useGrid,
                             onLongClick={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
@@ -288,13 +287,13 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 else Icon(Icons.Default.ChevronRight,"Abrir $title",tint=PrimaryNeon)
             }
             if(grid) {
-                Text(title,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=TextPrimary)
+                Text(title,fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=TextPrimary)
                 releaseLabel?.let {Text(it,fontSize=11.sp,color=TextSecondary)}
-                    Text(subtitle,fontSize=12.sp,color=TextSecondary,maxLines=if(compact) 3 else 5,overflow=TextOverflow.Ellipsis)
+                    Text(subtitle,fontSize=12.sp,color=TextSecondary,maxLines=if(compact) 1 else 3,overflow=TextOverflow.Ellipsis)
             }
             highlight?.takeIf {!grid || !compact}?.let { Text(it,fontSize=12.sp,color=TextSecondary,maxLines=2,overflow=TextOverflow.Ellipsis) }
             currency.preference
-            if(!compact || grid) {
+            if(!compact) {
                 Text(price?.let { "Desde ≈ ${app.currencyManager.formatUsd(it)}" } ?: "Coste en opciones",color=PrimaryNeon,fontSize=14.sp,fontWeight=FontWeight.Medium)
                 if(price!=null) Text(if(modality==Modality.VIDEO) "por 5 s" else "por imagen",color=TextSecondary,fontSize=11.sp)
             }

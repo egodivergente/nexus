@@ -140,7 +140,7 @@ fun CreateScreen(
     val currencyManager = app.currencyManager
     val haptic = LocalHapticFeedback.current
     val configuration = LocalConfiguration.current
-    val horizontalActions = configuration.screenWidthDp >= 600
+    val horizontalActions = true
     val compactTyping = configuration.screenHeightDp < 500 && WindowInsets.isImeVisible
     val generateAction = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.submitGeneration(onNavigateToOutput) }
     val canvasScroll = rememberLazyListState()
@@ -258,7 +258,7 @@ fun CreateScreen(
                 color = BackgroundDark,
                 shadowElevation = 8.dp
             ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     readiness.message?.let { Text(it, color = TextSecondary, fontSize = 12.sp) }
                     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -273,65 +273,14 @@ fun CreateScreen(
         },
         containerColor = ScreenBackground,
         topBar = {
-            if(!compactTyping) TopAppBar(
-                windowInsets = WindowInsets(0, 0, 0, 0),
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) "Lienzo · Lab" else "Lienzo",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.sp,
-                                color = TextPrimary
-                            )
-                        )
-
-                    }
-                },
-                actions = {
-                    IconButton(onClick={showPersonalPresets=true},enabled=state.schemaReady && !state.isSubmitting) {Icon(Icons.Default.Tune,"Mis ajustes",tint=TextSecondary)}
-                    if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality != Modality.CHAT) IconButton(onClick = { showRequestInspector = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Terminal,
-                            contentDescription = "Inspector de Solicitud (DEBUG)",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    val balanceStr = accountBalance?.availableUsd?.let {currencyManager.formatBalance(it)}
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = SurfaceDark,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier.padding(end = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(AccentEmerald)
-                            )
-                            Text(
-                                text = creationProviderLabel(state.selectedModel?.providerId, balanceStr),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
+            Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onBrowseModels, modifier = Modifier.weight(1f)) {
+                    Text(state.selectedModel?.displayName ?: "Elegir modelo", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Icon(Icons.Default.ExpandMore, null, Modifier.size(18.dp))
+                }
+                IconButton(onClick = { viewModel.comparison.open(state); showComparison = true }, enabled = !state.isSubmitting && !state.isPreparingMedia && state.selectedModality == Modality.IMAGE) { Icon(Icons.Default.Layers, "Encargar a varios modelos") }
+                IconButton(onClick = { showPersonalPresets = true }, enabled = state.schemaReady && !state.isSubmitting) { Icon(Icons.Default.Tune, "Mis ajustes") }
+            }
         }
     ) { innerPadding ->
         LazyColumn(
@@ -341,30 +290,9 @@ fun CreateScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 2. Tarjeta Compacta del Modelo Seleccionado (72-80dp)
-            item {
-                CompactModelSelectionCard(
-                    selectedModel = state.selectedModel,
-                    currencyManager = currencyManager,
-                    onClick = onBrowseModels
-                )
-            }
-
-            if(state.selectedModality == Modality.IMAGE) item {
-                TextButton(onClick = {
-                    viewModel.comparison.open(state)
-                    showComparison = true
-                }, enabled = !state.isSubmitting && !state.isPreparingMedia,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Icon(Icons.Default.Compare, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote en curso" else "Encargar a varios modelos")
-                }
-            }
-
             // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
             if (state.isPreparingMedia || state.isUploading) {
                 item {
@@ -465,19 +393,6 @@ fun CreateScreen(
                         unfocusedTextColor = TextPrimary,
                         cursorColor = PrimaryNeon
                     )
-                )
-            }
-
-            // 6. Carrusel de Presets Creativos (1 toque con haptic feedback)
-            item {
-                var showPresets by remember { mutableStateOf(false) }
-                TextButton(onClick = { showPresets = !showPresets }) { Text("Inspiración creativa") }
-                if(showPresets) CreativePresetsRow(
-                    currentPrompt = state.prompt,
-                    onApplyPreset = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        viewModel.updatePrompt(it)
-                    }
                 )
             }
 
