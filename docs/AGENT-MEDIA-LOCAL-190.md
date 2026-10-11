@@ -1,6 +1,6 @@
 # NEXUS Agent 1.9.0: edición y Whisper en el teléfono
 
-Estado: compilación final, pruebas físicas e instalación de 1.9.0 verificadas. El modelo Whisper está preparado en la app principal. El uso real de Claude 5.5 sigue pendiente de una prueba de conversación y del estado de acuerdo devuelto por AWS.
+Estado: compilación final, pruebas físicas e instalación de 1.9.0 verificadas. El modelo Whisper está preparado en la app principal. Los acuerdos Claude 5.5 están activados en la cuenta del CSV proporcionado posteriormente; su consulta desde las credenciales existentes de Nexus sigue sin confirmar ese acceso. La conversación real con 5.5 está pendiente; véase [el resultado de activación](AGENT-CLAUDE-55-20261011.md#activación-de-acuerdos-autorizada-posteriormente).
 
 ## Procedencia y alcance
 
