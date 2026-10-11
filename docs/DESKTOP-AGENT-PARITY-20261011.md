@@ -39,7 +39,7 @@ Sol reutiliza el puente autenticado del móvil mediante SSH sobre Tailscale: Win
 - Compilación JVM en ASUS, prioridad baja, un worker, sin paralelismo: **PASS**.
 - **141 pruebas JVM, 8 de edición/MCP, 9 de integridad del host y 7 de Flow: PASS**.
 - **108 comprobaciones de interfaz: PASS**, con escalas 1.0, 1.3 y 1.5.
-- Recorte desde UI → cola → archivo → índice/biblioteca; exportación ZIP; visor SRT; conversación archivada: **PASS**.
+- Recorte desde UI → cola → archivo → índice/biblioteca; exportación ZIP; visor SRT; conversación archivada; comparación A/B y reutilización de planes de sesiones anteriores: **PASS**.
 - Sol real con herramienta y adjuntos imagen/PDF/vídeo: **PASS**.
 - Whisper real local, TXT/SRT: **PASS**.
 - Perfil y accesos de la instalación real: **PASS**.

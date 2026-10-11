@@ -48,6 +48,11 @@ try:
         page.locator('[data-gallery-select]').first.click();page.locator('[data-gallery-select]').nth(1).click();page.locator('[data-gallery=compare]').click()
         assert page.locator('.pc-comparison-item').count()==2;report['result_comparison']=True
         page.locator('#dialog .close').click()
+        page.evaluate("()=>{const m=models.find(m=>m.modalities.includes('VIDEO'));state.agentConversation={...state.agentConversation,resultPlans:[{state:'PREPARED',plan:{id:'archived-qa-plan',ref:{providerId:m.providerId,modelId:m.id},modelName:m.displayName,modality:'VIDEO',prompt:'Archivado QA',params:{},effectiveParams:{},media:[],warnings:[],createdAt:1}}]};navigate('assistant');}")
+        assert page.locator('[data-agent-generate="archived-qa-plan"]').is_disabled()
+        page.locator('[data-agent-canvas="archived-qa-plan"]').click()
+        page.wait_for_function("()=>view==='canvas'&&!configuring")
+        assert page.evaluate("state.draft.prompt==='Archivado QA'");report['archived_plan_reuse']=True
         for theme in ['aurora','oled','quartz','ocean','forest','light']:
             page.evaluate("theme=>{state.interfaceTheme=theme;NexusThemes.apply();navigate('assistant');}",theme);page.wait_for_timeout(150);page.screenshot(path=str(out/(theme+'.png')))
         if args.sol:
