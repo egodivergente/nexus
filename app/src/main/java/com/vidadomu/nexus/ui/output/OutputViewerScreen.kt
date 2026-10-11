@@ -11,7 +11,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.media3.common.PlaybackException
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -58,7 +58,22 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
-    val job=remember(jobs,jobId) {jobs.find {it.id==jobId}}
+    var selection by remember(jobId,initialOutputIndex) {mutableStateOf(jobId to initialOutputIndex.coerceAtLeast(0))}
+    val job=remember(jobs,selection.first) {jobs.find {it.id==selection.first}}
+    val selectedOutput=selection.second
+    val libraryPrefs=remember {context.getSharedPreferences("library_actions_v1",0)}
+    val assetIndex by com.vidadomu.nexus.assistant.AssistantRuntime.get(app).assets.changes.collectAsState()
+    val removed=remember(assetIndex) {assetIndex.assets.filter {it.libraryDeleted}.map {it.uri}.toSet()}
+    val gallery=remember(jobs,removed) {
+        val hidden=libraryPrefs.getStringSet("hidden",emptySet()).orEmpty()
+        jobs.filter {it.status==GenerationStatus.COMPLETED}.sortedByDescending {it.startedAt}.flatMap {j ->
+            j.outputs.mapIndexedNotNull {i,o -> if(o.type==Modality.IMAGE && o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden) j.id to i else null}
+        }
+    }
+    val galleryIndex=gallery.indexOf(selection)
+    val previous=gallery.getOrNull(galleryIndex-1).takeIf {galleryIndex>0}
+    val next=gallery.getOrNull(galleryIndex+1).takeIf {galleryIndex>=0}
+    val movePhoto:(Int)->Unit={direction -> (if(direction<0) previous else next)?.let {selection=it}}
     val currencyManager=app.currencyManager
     val currencyState by currencyManager.state.collectAsState()
     val exporter:OutputExportViewModel=androidx.lifecycle.viewmodel.compose.viewModel()
@@ -68,7 +83,6 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
         result->exporter.save(if(result.resultCode==android.app.Activity.RESULT_OK) result.data?.data else null)
     }
     LaunchedEffect(export.message) {export.message?.let {snackbar.showSnackbar(it);exporter.dismissMessage()}}
-    var selectedOutput by remember(job?.id,initialOutputIndex) {mutableIntStateOf(initialOutputIndex.coerceAtLeast(0))}
     var details by remember(jobId) {mutableStateOf(false)}
     val chosenOutput=job?.outputs?.getOrNull(selectedOutput) ?: job?.outputs?.firstOrNull()
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
@@ -81,18 +95,23 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             val output=chosenOutput
             if(job.outputs.size>1) androidx.compose.foundation.lazy.LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                items(job.outputs.size) {index->FilterChip(selectedOutput==index,{selectedOutput=index},label={Text("Resultado ${index+1}")},shape=NexusTokens.filter)}
+                items(job.outputs.size) {index->FilterChip(selectedOutput==index,{selection=job.id to index},label={Text("Resultado ${index+1}")},shape=NexusTokens.filter)}
             }
             val ratio=output?.let {o->if(o.width!=null && o.height!=null && o.width>0 && o.height>0) o.width.toFloat()/o.height else null}
             Box(Modifier.fillMaxWidth().aspectRatio((ratio ?: if(job.modality==Modality.VIDEO) 16f/9f else 1f).coerceIn(.55f,2f)).background(SurfaceDark),contentAlignment=Alignment.Center) {
                 if(output!=null) key(output.id) {when(job.modality) {
-                    Modality.IMAGE->ZoomableImageViewer(output.url,trustedLocal)
+                    Modality.IMAGE->ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto)
                     Modality.VIDEO->NativeVideoPlayer(trustedLocal ?: output.url)
                     Modality.AUDIO->NativeAudioPlayer(trustedLocal ?: output.url)
                     Modality.CHAT->TextOutputViewer(output.url)
                 }} else if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) {
                     GenerationProgressPanel(job,Modifier.fillMaxWidth().padding(NexusTokens.screenMargin))
                 } else com.vidadomu.nexus.ui.components.InlineNotice("No hay un resultado disponible.",Modifier.padding(NexusTokens.screenMargin),job.error)
+            }
+            if(output?.type==Modality.IMAGE && galleryIndex>=0) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
+                IconButton(enabled=previous!=null,onClick={movePhoto(-1)}) {Icon(Icons.Default.ChevronLeft,"Imagen anterior")}
+                Text("${galleryIndex+1} / ${gallery.size}",style=MaterialTheme.typography.labelLarge)
+                IconButton(enabled=next!=null,onClick={movePhoto(1)}) {Icon(Icons.Default.ChevronRight,"Imagen siguiente")}
             }
             if(output!=null) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -156,7 +175,8 @@ private fun ViewerDetail(label:String,value:String) {
 }
 
 @Composable
-internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null) {
+internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onNavigate: ((Int)->Unit)? = null) {
+    val navigate by rememberUpdatedState(onNavigate)
     var scale by remember(imageUrl, localUri) { mutableStateOf(1f) }
     var offsetX by remember(imageUrl, localUri) { mutableStateOf(0f) }
     var offsetY by remember(imageUrl, localUri) { mutableStateOf(0f) }
@@ -165,15 +185,25 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null) {
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(imageUrl, localUri) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
-                        offsetX += pan.x
-                        offsetY += pan.y
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed=false)
+                    var horizontal=0f;var vertical=0f;var transformed=false
+                    do {
+                        val event=awaitPointerEvent()
+                        val zoom=event.calculateZoom()
+                        val pan=event.calculatePan()
+                        if(event.changes.count {it.pressed}>1 || scale>1f) {
+                            transformed=true
+                            scale=(scale*zoom).coerceIn(1f,5f)
+                            if(scale>1f) {offsetX+=pan.x;offsetY+=pan.y} else {offsetX=0f;offsetY=0f}
+                            event.changes.forEach {it.consume()}
+                        } else {
+                            horizontal+=pan.x;vertical+=pan.y
+                            if(kotlin.math.abs(horizontal)>viewConfiguration.touchSlop && kotlin.math.abs(horizontal)>kotlin.math.abs(vertical)) event.changes.forEach {it.consume()}
+                        }
+                    } while(event.changes.any {it.pressed})
+                    if(!transformed && kotlin.math.abs(horizontal)>80.dp.toPx() && kotlin.math.abs(horizontal)>kotlin.math.abs(vertical)*1.5f)
+                        navigate?.invoke(if(horizontal>0) -1 else 1)
                 }
             },
         contentAlignment = Alignment.Center

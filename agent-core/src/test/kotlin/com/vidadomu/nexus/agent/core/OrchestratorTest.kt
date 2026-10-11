@@ -167,6 +167,20 @@ class OrchestratorTest {
         assertEquals("Continuacion",o.send(conv,"Sigue").text)
     }
 
+    @Test fun `PDF extraido se envia como texto y no se reenvia en siguientes rondas`() = runTest {
+        val h=Harness()
+        val llm=ScriptedLlmProvider(listOf(
+            { r -> assertTrue(r.tools.isEmpty()); assertFalse(r.messages.any { m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document} }); assertTrue(r.messages.any {"Texto extraido del PDF" in it.text()}); text("Mateo viaja a Madrid en 1920.") },
+            { r -> assertFalse(r.messages.any {m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document}}); assertTrue(r.messages.any {"1920" in it.text()}); text("Resumen final") },
+            { r -> assertFalse(r.messages.any {m -> m.content.any {it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document}}); text("Continuacion") }
+        ))
+        val o=AgentOrchestrator(llm,config,NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {com.vidadomu.nexus.agent.core.llm.ContentBlock.Document("txt","Script","Texto extraido del PDF".toByteArray())})
+        val conv=o.newConversation()
+        assertEquals("Resumen final",o.send(conv,"Resume",listOf(Attachment("doc","file:///doc.pdf","application/pdf","doc.pdf"))).text)
+        assertEquals("Continuacion",o.send(conv,"Sigue").text)
+    }
+
     @Test fun `adjunto se describe al LLM con su id`() = runTest {
         val h = Harness()
         val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.messages.last().text().contains("attachment_id=att_1")); text("visto") }))

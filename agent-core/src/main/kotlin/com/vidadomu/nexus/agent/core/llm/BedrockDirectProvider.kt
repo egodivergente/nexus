@@ -45,7 +45,7 @@ class BedrockDirectProvider(
             .post(body.toRequestBody("application/json".toMediaType()))
             .build()
         try {
-            client.newCall(http).execute().use { resp ->
+            client.newCall(http).awaitBody().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw mapError(resp.code, text, resp.header("x-amzn-ErrorType"))
                 val json = runCatching { Json.parseToJsonElement(text).jsonObject }
@@ -53,7 +53,7 @@ class BedrockDirectProvider(
                 ConverseCodec.decodeResponse(json)
             }
         } catch (e: IOException) {
-            throw LlmException(LlmException.Kind.NETWORK, "No se pudo contactar con Bedrock (${e.javaClass.simpleName}).")
+            throw LlmException(LlmException.Kind.NETWORK, if(e is java.io.InterruptedIOException) "Bedrock ha tardado demasiado en responder. Los archivos se conservan; puedes reintentar." else "No se pudo contactar con Bedrock (${e.javaClass.simpleName}).")
         }
     }
 
@@ -68,7 +68,7 @@ class BedrockDirectProvider(
         val http = Request.Builder().url("https://$host$path").apply { signed.forEach { (k,v) -> header(k,v) } }
             .post(body.toRequestBody("application/json".toMediaType())).build()
         try {
-            client.newCall(http).execute().use { response ->
+            client.newBuilder().callTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build().newCall(http).awaitBody().use { response ->
                 if (!response.isSuccessful) return@withContext null
                 Json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject["inputTokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()?.takeIf { it >= 0 }
             }

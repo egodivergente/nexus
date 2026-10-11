@@ -73,6 +73,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden) {jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
         .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}}
+    val pending=remember(jobs,filter,query,showHidden,favoriteOnly) {if(showHidden || favoriteOnly) emptyList() else jobs.filter {
+        it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.CANCELLED) &&
+        (it.status!=GenerationStatus.FAILED || it.parameters["__tracking_paused"]=="true" || it.parameters["__submission_uncertain"]=="true") &&
+        (filter==null || it.modality==filter) && matchesCreationSearch(it,query)
+    }.sortedByDescending {it.startedAt}}
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
     val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
@@ -126,11 +131,20 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
                 }
             }
-            if(completed.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
+            if(completed.isEmpty() && pending.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
                 Text(if(query.isNotBlank()) "No hay resultados." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
             } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
+                if(pending.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
+                    Text("En curso · ${pending.size}",Modifier.padding(NexusTokens.screenMargin),style=MaterialTheme.typography.titleSmall)
+                }
+                items(pending,key={"pending:${it.id}"},span={GridItemSpan(maxLineSpan)}) {job ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin).clickable {onNavigateToOutput(job.id)}) {
+                        Text(job.prompt.ifBlank {"Preparando creación"},maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall)
+                        com.vidadomu.nexus.ui.components.GenerationProgressPanel(job,Modifier.fillMaxWidth(),compact=true)
+                    }
+                }
                 groups.forEach {(day,entries) ->
                     item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
