@@ -43,25 +43,21 @@ internal fun completeModels(value: TextFieldValue, models: List<ModelSummary>): 
     if (!value.selection.collapsed) return null
     val end = value.selection.end
     val prefix = value.text.substring(0, end)
-    val match = Regex("[\\p{L}\\p{N}][\\p{L}\\p{N}. -]{1,35}$").find(prefix) ?: return null
-    val wordMatches = Regex("\\S+").findAll(match.value).toList()
-    val words = wordMatches.map { it.value }
-    for (length in minOf(words.size, 5) downTo 1) {
-        val query = words.takeLast(length).joinToString(" ").lowercase()
-        if(query.length < 2) continue
-        val terms = query.split(' ')
-        val found = models.filter { model ->
-            val haystack = "${model.name} ${model.family.orEmpty()} ${model.ref.modelId}".lowercase()
-            terms.all { it in haystack } && model.name.lowercase() != query
-        }.sortedWith(compareByDescending<ModelSummary> { it.modalities.any { modality -> modality in setOf("IMAGE", "VIDEO") } }
-            .thenByDescending { it.name.lowercase().startsWith(terms.first()) }
-            .thenByDescending { it.isFlagship }.thenBy { it.name })
-        // Show a representative of each family before filling the remaining variant slots.
-        val representatives = found.distinctBy { it.family?.lowercase()?.takeIf(String::isNotBlank) ?: it.name.substringBefore(' ').lowercase() }
-        val suggestions = (representatives + found).distinctBy { it.ref }.take(6)
-        if(suggestions.isNotEmpty()) return ModelCompletion(match.range.first + wordMatches[words.size - length].range.first, end, suggestions)
-    }
-    return null
+    val trigger=prefix.lastIndexOf('@')
+    if(trigger<0 || (trigger>0 && !prefix[trigger-1].isWhitespace())) return null
+    val fragment=prefix.substring(trigger+1)
+    if(fragment.length>60 || fragment.any { !it.isLetterOrDigit() && it !in " _.-:/" }) return null
+    val query=fragment.trim().lowercase()
+    val terms=query.split(' ').filter {it.isNotBlank()}
+    val found=models.filter {model ->
+        val haystack="${model.name} ${model.family.orEmpty()} ${model.ref.modelId}".lowercase()
+        terms.all {it in haystack}
+    }.sortedWith(compareByDescending<ModelSummary> {it.modalities.any {modality -> modality in setOf("IMAGE","VIDEO")}}
+        .thenByDescending {query.isNotEmpty() && it.name.lowercase().startsWith(query)}
+        .thenByDescending {it.isFlagship}.thenBy {it.name})
+    val representatives=found.distinctBy {it.family?.lowercase()?.takeIf(String::isNotBlank) ?: it.name.substringBefore(' ').lowercase()}
+    val suggestions=(representatives+found).distinctBy {it.ref}.take(6)
+    return suggestions.takeIf {it.isNotEmpty()}?.let {ModelCompletion(trigger,end,it)}
 }
 
 internal fun insertModel(value: TextFieldValue, completion: ModelCompletion, model: ModelSummary): TextFieldValue {
