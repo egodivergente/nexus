@@ -25,6 +25,23 @@ Las 13 pruebas existentes de `agent-proxy/test_nexus_proxy.py` terminaron en **O
 
 Esta auditoría no modifica lógica del agente, proveedores, cobro, persistencia ni la interfaz de la tarea activa. Las correcciones y su validación corresponden al hilo en curso. La adaptación del rediseño seguirá desde su fuente publicada cuando termine.
 
+## Reverificación del seguimiento: 11 de octubre, 03:51 UTC
+
+El hilo continúa activo. La rama publicada ha avanzado a `fd5f71b9432bfbaa7f2a8a1585ae1f6d8bf8db53` (habilidades Crun); la entrega 1.8.8 sigue pendiente. Esta comprobación lee sus cambios en curso y no modifica sus fuentes ni inicia compilaciones.
+
+| Hallazgo anterior | Comprobación nueva | Límite de la conclusión |
+|---|---|---|
+| Decodificación de documentos | **PASS local**: el proxy devuelve los bytes originales de un documento de prueba. | Cliente Bedrock falso; no prueba del proxy desplegado ni de AWS. |
+| Tamaño del cuerpo | **PASS local**: dos y cinco documentos de 4.500.000 bytes generan cuerpos de 12.000.297 y 30.000.537 bytes y alcanzan el upstream falso con el nuevo límite de 41.943.040 bytes. | Presupuesto amplio sólo en el fixture; la reserva predeterminada presenta la restricción descrita debajo. |
+| Audio importado | El filtro admite `audio/` y el registro usa `AssetType.AUDIO`. | Corrección presente en código; importación real pendiente. |
+| Contexto binario | La poda conserva hasta cinco documentos distintos y sustituye los anteriores por marcadores de procedencia. | Código revisado; memoria y comportamiento conversacional no medidos. |
+| MCP y revisión de coste | Se descubre el nombre en el catálogo, se exigen argumentos obligatorios y `readOnlyHint=true`, y se bloquean nombres con verbos de modificación o generación. | Política cambiada; no se ha validado funcionalmente ni se considera una garantía basada sólo en anotaciones de un servidor externo. |
+| MCP `isError` | Se convierte `isError=true` en `ToolInputException`. | Propagación corregida en código; prueba con servidor MCP falso y S25 pendiente. |
+
+Nuevo límite reproducido: con `daily_token_budget=2.000.000` predeterminado, un único documento permitido de 4,5 MB produce un cuerpo de 6.000.217 bytes. La reserva `len(raw)//3 + maxTokens` estima 2.000.172 tokens y rechaza la petición con HTTP 402, con cero llamadas al upstream. La aceptación del transporte no garantiza la aceptación presupuestaria. Se comunicaron los datos al hilo para informar esta restricción en la experiencia de adjuntos o ajustar la estimación conservando los controles de presupuesto; no se cambió la política desde esta auditoría.
+
+La copia probada del proxy tiene SHA-256 `1c6af66fb3169046459edc0357014a67df5180f06e1e9644ecf22871be6522b0`. Las **16 pruebas** de la suite copiada terminaron en **OK**, en 0,689 s. Evidencia privada adicional: `outputs/ui-minimal-20261009/current-code-audit/recheck-20261011-0351/results.json`. Sin llamadas externas, operaciones de pago ni instalación.
+
 ## Fuentes técnicas
 
 - [AWS DocumentSource](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_DocumentSource.html): el SDK recibe bytes originales del documento.
