@@ -71,68 +71,6 @@ import com.vidadomu.nexus.ui.components.StudioRemoveMediaButton
 import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.theme.*
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun NativeParameterControl(param: com.vidadomu.nexus.core.model.ModelParameter, value: String, onChange: (String) -> Unit) {
-    var showDefaults by remember(param.key) { mutableStateOf(false) }
-    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-        Row(Modifier.fillMaxWidth().combinedClickable(onClick={showDefaults=true},onLongClick={showDefaults=true}).padding(vertical=NexusTokens.space8),
-            verticalAlignment=Alignment.CenterVertically) {
-            Text(ParameterPresentation.title(param) + if(param.isRequired) " *" else "",Modifier.weight(1f),color=TextPrimary)
-            IconButton(onClick={onChange(param.defaultValue)}) { Icon(Icons.Default.Restore,"Restaurar ${ParameterPresentation.title(param)}",tint=TextSecondary) }
-            IconButton(onClick={showDefaults=true}) { Icon(Icons.Default.MoreVert,"Ajustes de ${param.displayName}",tint=TextSecondary) }
-        }
-        NativeParameterValue(param,value,onChange)
-    }
-    if(showDefaults) AlertDialog(onDismissRequest={showDefaults=false},title={Text(ParameterPresentation.title(param))},text={Column {
-        Text("Valor actual: ${ParameterPresentation.describe(param,value)}")
-        Text("Predeterminado del modelo: ${ParameterPresentation.describe(param,param.defaultValue)}")
-        if(param.minValue!=null || param.maxValue!=null) Text("Rango: ${param.minValue ?: "—"} – ${param.maxValue ?: "—"}")
-    }},confirmButton={TextButton(onClick={onChange(param.defaultValue);showDefaults=false}) {Text("Restaurar predeterminado")}},
-        dismissButton={TextButton(onClick={showDefaults=false}) {Text("Cerrar")}})
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun NativeParameterValue(param: com.vidadomu.nexus.core.model.ModelParameter, value: String, onChange: (String) -> Unit) {
-    val choices = ParameterPresentation.options(param)
-    if(choices.isNotEmpty()) {
-        var expanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-            val label = ParameterPresentation.label(param,value)
-            StudioTextField(value = if(value.isBlank()) "Seleccionar" else label.primary, onValueChange = {}, readOnly = true,
-                supportingText = if(label.secondary == null) null else { { Text(label.secondary.orEmpty()) } },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth(), shape = NexusTokens.field)
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                if(!param.isRequired) DropdownMenuItem(text = { Text("Usar valor del proveedor") }, onClick = { onChange(""); expanded = false })
-                choices.forEach { option ->
-                    val optionLabel = ParameterPresentation.label(param,option)
-                    DropdownMenuItem(text = { Column {
-                        Text(optionLabel.primary)
-                        optionLabel.secondary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    } }, onClick = { onChange(option); expanded = false })
-                }
-            }
-        }
-    } else if(param.type == ParameterType.BOOLEAN) {
-        Column {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(if(value=="true") "Activado" else "Desactivado", color = TextPrimary, modifier = Modifier.weight(1f))
-                Switch(value == "true", { onChange(it.toString()) })
-            }
-            if (!param.isRequired) TextButton(onClick = { onChange("") }) {
-                Text(if(value.isBlank()) "Automático (sin enviar)" else "Usar valor del proveedor")
-            }
-        }
-    } else {
-        StudioTextField(value, onChange, modifier = Modifier.fillMaxWidth(),
-            supportingText = { if(param.minValue != null || param.maxValue != null) Text("Rango: " + (param.minValue ?: "—") + " – " + (param.maxValue ?: "—")) },
-            shape = NexusTokens.field)
-    }
-}
-
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CreateScreen(

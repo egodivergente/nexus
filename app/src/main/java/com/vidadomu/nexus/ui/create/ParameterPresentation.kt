@@ -27,10 +27,27 @@ internal object ParameterPresentation {
             } == true }
     }
     fun title(parameter: ModelParameter): String = if(parameter.key in formatKeys && options(parameter).any { dimensions(it) != null })
-        "Formato" else parameter.displayName
+        "Formato" else when (parameter.key.lowercase()) {
+            "return_last_frame" -> "Guardar último fotograma"
+            "generate_audio", "enable_audio", "sound", "audio" -> "Generar sonido"
+            "keep_original_sound" -> "Conservar sonido original"
+            "duration", "duration_seconds", "seconds" -> "Duración"
+            "resolution" -> "Resolución"
+            "seed" -> "Semilla"
+            "output_format" -> "Tipo de archivo"
+            "num_images", "number_of_images" -> "Número de imágenes"
+            else -> parameter.displayName
+        }
+
+    fun proportion(parameter: ModelParameter, value: String): Float? =
+        if (parameter.key in formatKeys) dimensions(value)?.let { (w,h) -> w.toFloat() / h } else null
 
     fun label(parameter: ModelParameter, value: String): Label {
         if(value.isBlank()) return Label("Automático")
+        if(parameter.type == com.vidadomu.nexus.core.model.ParameterType.BOOLEAN)
+            return Label(when(value) { "true" -> "Sí"; "false" -> "No"; else -> value })
+        if(parameter.key.lowercase() in setOf("duration", "duration_seconds", "seconds") && value.toDoubleOrNull() != null)
+            return Label("$value s")
         if(parameter.key !in formatKeys) return Label(value)
         if(value.equals("auto", true)) return Label("Automático")
         if(value.lowercase() in setOf("match_input_image", "same_as_input", "original")) return Label("Como la referencia")
