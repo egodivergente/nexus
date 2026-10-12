@@ -10,7 +10,7 @@ with sync_playwright() as p:
     page.wait_for_function('()=>Boolean(window.NexusAgentParity)&&Boolean(initial)',timeout=45000)
     page.wait_for_function('()=>!Agent.busy',timeout=30000)
     result=page.evaluate("async()=>{await agentCall('snapshot');const whisper=await NexusAgentParity.native('get_whisper_status');return {version:initial.version,androidSource:initial.androidSource,providers:initial.configured,model:Agent.settings.modelId,endpoint:Agent.settings.endpoint,tools:Agent.snapshot.tools.length,offline:Agent.snapshot.offline,projects:Agent.snapshot.index.projects.length,assets:Agent.snapshot.index.assets.length,jobs:state.jobs.length,whisperReady:whisper.ready};}")
-    assert result['version']=='1.9.2-agent-desktop' and result['tools']==51 and result['whisperReady'],result
+    assert result['version']=='1.9.3-agent-desktop' and result['tools']==51 and result['whisperReady'],result
     assert result['model']=='openai.gpt-5.6-sol' and result['endpoint']=='http://127.0.0.1:18787',result
     page.evaluate("navigate('assistant')");page.screenshot(path=str(out/'installed-assistant-private.png'))
     page.evaluate("navigate('library')");page.wait_for_timeout(500);page.screenshot(path=str(out/'installed-library-private.png'))

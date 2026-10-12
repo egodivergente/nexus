@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib, json, zipfile
 root=Path(__file__).resolve().parents[2]
-desktop=root/'desktop';output=root/'entregas/Nexus-Studio-Agent-1.9.2-Windows.zip';output.parent.mkdir(exist_ok=True)
+desktop=root/'desktop';output=root/'entregas/Nexus-Studio-Agent-1.9.3-Windows.zip';output.parent.mkdir(exist_ok=True)
 files=[]
 for path in desktop.rglob('*'):
     if not path.is_file():continue

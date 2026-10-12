@@ -9,7 +9,7 @@ jobCard=function(job){
 };
 function pcJobs(){
  const query=PC.search.trim().toLocaleLowerCase();
- return state.jobs.filter(j=>(view!=='library'||j.outputs?.length)&&(!PC.provider||j.providerId===PC.provider)&&(!PC.kind||j.modality===PC.kind)&&(!PC.status||j.status===PC.status)&&(!query||[j.prompt,j.name,j.modelId].join(' ').toLocaleLowerCase().includes(query)));
+ return state.jobs.filter(j=>(view!=='library'||j.outputs?.length||!['COMPLETED','FAILED','CANCELLED'].includes(j.status)||j.uncertain||j.parameters?.__tracking_paused==='true')&&(!PC.provider||j.providerId===PC.provider)&&(!PC.kind||j.modality===PC.kind)&&(!PC.status||j.status===PC.status)&&(!query||[j.prompt,j.name,j.modelId].join(' ').toLocaleLowerCase().includes(query)));
 }
 function pcOptions(values,current){return values.map(([id,label])=>'<option value="'+id+'" '+(id===current?'selected':'')+'>'+label+'</option>').join('');}
 function renderPC(){

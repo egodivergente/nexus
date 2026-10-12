@@ -464,7 +464,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '1.9.2-agent-desktop', 'androidSource': 'fbae847eee709ae462b7e5eb83fa8b47ccad3ad8',
+                'version': '1.9.3-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
                 'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:

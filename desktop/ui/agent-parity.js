@@ -187,6 +187,6 @@
    if(form.id==='parity-rename'||form.id==='parity-convert'){const result=await native(form.id==='parity-rename'?'rename_asset_file':'convert_image_asset',form.id==='parity-rename'?{asset_id:data.id,file_name:data.name}:{asset_id:data.id,format:data.format,max_dimension:Number(data.max_dimension)},assets());if(result._assets)await agentCall('importAssets',{assets:result._assets});toast('Archivo guardado.');await assetView(result.asset?.id||data.id);}
   }catch(reason){error(reason);}finally{if(submit?.isConnected)submit.disabled=false;}
  });
- window.NexusAgentParity={version:'1.9.2',native,editor,project,mediaJobs,history,currency};
+ window.NexusAgentParity={version:'1.9.3',native,editor,project,mediaJobs,history,currency};
  render();syncMediaJobs();const notifications=document.createElement('script');notifications.src='desktop-notifications.js';document.head.append(notifications);
 })();

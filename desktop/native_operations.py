@@ -365,11 +365,13 @@ class NativeOperations:
             format_name = formats.get(path.suffix[1:])
             if not format_name or path.stat().st_size > 4_500_000:
                 raise ValueError('El documento debe ser PDF, TXT, Markdown, CSV o HTML y tener menos de 4,5 MB.')
+            payload = path.read_bytes()
             if format_name == 'pdf':
-                from pypdf import PdfReader
-                if len(PdfReader(path).pages) > 20:
-                    raise ValueError('El PDF supera 20 páginas; divide el documento.')
-            return {'format': format_name, 'name': re.sub(r'[^\w -]', ' ', args.get('name', 'Documento'))[:100], 'bytes': base64.b64encode(path.read_bytes()).decode()}
+                from document_reader import extract_pdf
+                text = extract_pdf(path)
+                if text is not None:
+                    format_name, payload = 'txt', text.encode('utf-8')
+            return {'format': format_name, 'name': re.sub(r'[^\w -]', ' ', args.get('name', 'Documento'))[:100], 'bytes': base64.b64encode(payload).decode()}
         if operation == 'video':
             info = self.inspect(path)
             frames = []

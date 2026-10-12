@@ -39,7 +39,7 @@ class BedrockProxyProvider(
             .post(body)
             .build()
         try {
-            client.newCall(http).execute().use { resp ->
+            client.newCall(http).awaitBody().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw mapError(resp.code, text)
                 val json = runCatching { Json.parseToJsonElement(text).jsonObject }
@@ -76,9 +76,9 @@ class BedrockProxyProvider(
     companion object {
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(180, TimeUnit.SECONDS)
+            .readTimeout(110, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
-            .callTimeout(240, TimeUnit.SECONDS)
+            .callTimeout(120, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false)
             .build()
     }

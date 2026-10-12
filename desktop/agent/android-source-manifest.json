@@ -2,7 +2,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt",
-    "sha256": "11c114d437d8c1101d1b9807e10fe7c7831012ccad2e0eea611382f711077ad1"
+    "sha256": "d58e2ed1a787ed736d946d523c05a65a6f1c1c29760a52f20a3b49eeb7c19934"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ExternalServices.kt",
@@ -42,12 +42,12 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt",
-    "sha256": "74a6bfd3249fcfe7b664fd272340d39252dda499c125aee4659f1c79f8a2e2b0"
+    "sha256": "6d425c5d4521120ecf7ad86dd71b17a5121764e207b013b493f956160a96d914"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockProxyProvider.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockProxyProvider.kt",
-    "sha256": "f21c99659dbf4a0a989886ff99a2ef56bf72d7e0df463e28014ab96a9b9293ab"
+    "sha256": "b17d1bd831a718a63f0911a219881a11b964777ad0f95f1cac73155c91636a08"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ConverseCodec.kt",
@@ -127,7 +127,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
-    "sha256": "d6a98a08ff565822ad3ba16ca170d92c8a5999ddb21929efd1294707fa86aa41"
+    "sha256": "c9b12cf343704bb5d12d3f3e5f32e9434853648e3ecfbf4741ed1f47bebcc682"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NexusToolkit.kt",
@@ -242,7 +242,7 @@
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrchestratorTest.kt",
     "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrchestratorTest.kt",
-    "sha256": "f76079ae669bf8f54b5b127fa94da8da578247753a293fa23bd1ac3650e41fe6"
+    "sha256": "ea066e2fb19c87e4d790e720c9ae41354dc60785ad52c5b36107aaea154385c5"
   },
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PlanReferenceRecoveryTest.kt",
@@ -593,5 +593,15 @@
     "source": "agent-skills/skills/models/wan/SKILL.md",
     "target": "agent/agent-skills/skills/models/wan/SKILL.md",
     "sha256": "48ae25004e2f5f8a605db1602ae8273cb00db244cb09a1cabeece6fd0a9da227"
+  },
+  {
+    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttp.kt",
+    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttp.kt",
+    "sha256": "b137ce0f92992c351d2d61da04e75ab3661faea1c3a4ff4f76e0f709d74beae2"
+  },
+  {
+    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttpTest.kt",
+    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttpTest.kt",
+    "sha256": "0324449c5b6e9f286757f0415c94f58bfe9d12c7676851b442ea64ed3d2a2459"
   }
 ]

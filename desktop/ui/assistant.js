@@ -161,6 +161,7 @@ function agentMedia(plan,m){
  });
 }
 async function agentCallback(op,args){
+ if(op==='progress'){const node=document.querySelector('.agent-thinking');if(node)node.textContent=String(args);return true;}
  switch(op){
   case'models':return models.filter(m=>!state.hidden.includes(m.id)).map(agentSummary);
   case'schema':return agentSchema(await agentModel(args));

@@ -38,3 +38,5 @@ body.gallery-studio #account-balances.gallery-balances{gap:8px;padding:8px 0 14p
 @media(prefers-reduced-motion:reduce){.gallery-overlay{transition:none}}
 /* Legacy activity cards also omit the result-comparison controls. */
 body.gallery-studio [data-pc-compare],body.gallery-studio [data-pc="open-compare"],body.gallery-studio [data-pc="clear"]{display:none!important}
+
+.gallery-progress{display:flex;flex-direction:column;gap:10px;align-items:stretch;justify-content:center;padding:24px;width:100%;height:100%;box-sizing:border-box;background:var(--surface,#131922);font-size:14px}.gallery-progress small{opacity:.8}.gallery-progress progress{width:100%;accent-color:var(--accent,#4ebae8)}
