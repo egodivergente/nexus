@@ -5,9 +5,10 @@ import com.vidadomu.nexus.agent.core.llm.ContentBlock
 import com.vidadomu.nexus.agent.core.tools.Attachment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 
-/** Native Converse documents. Original files stay private and are never converted or truncated. */
+/** Read text locally where possible; preserve every original document. */
 internal object AgentDocuments {
     const val MAX_BYTES = 4_500_000L
     val types = arrayOf("application/pdf", "application/msword",
@@ -36,7 +37,29 @@ internal object AgentDocuments {
         require(uri.scheme=="file") {"Vuelve a adjuntar el documento para recuperar su copia local."}
         val file=File(uri.path.orEmpty())
         require(file.isFile && file.length() in 1..MAX_BYTES) {"Bedrock admite documentos de hasta 4,5 MB. Divide el archivo en capítulos y vuelve a adjuntarlo."}
+        if(format=="pdf" && android.os.Build.VERSION.SDK_INT>=35) {
+            val extracted=extractPdf(file)
+            if(extracted!=null) return@withContext ContentBlock.Document("txt","Document " + attachment.id.filter {it.isLetterOrDigit()}.take(40),extracted.toByteArray(Charsets.UTF_8))
+        }
         // Neutral ASCII name: original filename is already present in attachment metadata.
         ContentBlock.Document(format,"Document " + attachment.id.filter {it.isLetterOrDigit()}.take(40),file.readBytes())
+    }
+    @android.annotation.TargetApi(35)
+    private suspend fun extractPdf(file:File):String? {
+        val text=StringBuilder("Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n")
+        android.os.ParcelFileDescriptor.open(file,android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            android.graphics.pdf.PdfRenderer(descriptor).use { pdf ->
+                // Pages without extractable text require the original visual document.
+                for(i in 0 until pdf.pageCount) {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    pdf.openPage(i).use {page ->
+                        val content=page.textContents.joinToString("\n") {it.text}
+                        if(content.isBlank()) return null
+                        text.append("\n[Pagina ${i+1}]\n").append(content)
+                    }
+                }
+            }
+        }
+        return text.toString().takeIf {it.isNotBlank()}
     }
 }

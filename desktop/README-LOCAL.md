@@ -1,6 +1,6 @@
-# Estado actual · 11 de octubre de 2026
+# Estado actual · 13 de octubre de 2026
 
-Esta edición es **Nexus Studio 1.9.2-agent-desktop**, adaptada de la APK 1.9.2 del S25 y del escritorio en uso. Consulta [la entrega y sus comprobaciones](../docs/DESKTOP-AGENT-PARITY-20261011.md). Sol, edición local, Whisper, proyectos, adjuntos y seis temas están disponibles. Los apartados siguientes conservan la documentación de entregas anteriores y sus cifras históricas.
+Esta edición es **Nexus Studio 1.9.3-agent-desktop**. Consulta [biblioteca, PDF y visor](../docs/DESKTOP-LIBRARY-PDF-193.md) y la [fuente consolidada](../docs/RELEASE-193-CONSOLIDADA-20261013.md). Sol, edición local, Whisper, proyectos, adjuntos y seis temas están disponibles. Los apartados siguientes conservan la documentación de entregas anteriores y sus cifras históricas.
 
 # Nexus Studio privado para este EliteBook
 

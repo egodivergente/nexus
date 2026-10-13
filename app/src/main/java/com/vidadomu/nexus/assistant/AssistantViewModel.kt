@@ -161,11 +161,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val started = android.os.SystemClock.elapsedRealtime()
         turnJob = viewModelScope.launch {
             try {
-                val r = orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
+                val r = kotlinx.coroutines.withTimeout(if(atts.any {AgentDocuments.format(it.mimeType,it.name)!=null}) 240_000L else 600_000L) {
+                    orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
+                }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop)) }
                 }
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false)
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                failedTurn = clean to atts
+                notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true)
             } catch (e: CancellationException) {
                 notice("Cancelado.")
                 throw e

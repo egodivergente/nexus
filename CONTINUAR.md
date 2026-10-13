@@ -1,13 +1,23 @@
-# Continuar nexus
+# Continuar NEXUS
 
-Estado: **ULTIMA_FUENTE_RECUPERADA_PENDIENTE_DISPOSITIVOS**.
+Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
+Estado actual: Android 1.9.3-agent / vc37 y Windows 1.9.3-agent-desktop.
 
-La fuente Android v18 conserva todos los archivos de v17 y añade el asistente; desktop procede de la edición actual del PC. S25 pendiente.
+El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
+Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
+`docs/RELEASE-193-CONSOLIDADA-20261013.md` y `MIGRATION-STATUS.json`.
 
-Fuente: Android 1.7.0-agent / vc18 de Drive y desktop actualizado del PC
+Antes de trabajar, leer `AGENTS.md`, hacer fetch, comprobar versiones instaladas
+y crear una rama propia desde `main`. No asumir que el directorio antiguo
+`Documents/ChatGPT/NEXUS` contiene esta versión: conserva cambios de otras tareas.
+La ruta de esta consolidación es
+`C:/Users/User/.codex/worktrees/nexus-unified-release-193/NEXUS`.
 
-Esta copia conserva el código recuperado y un manifiesto SHA-256. No se ha recompilado durante la migración. Los datos de las apps, claves y artefactos generados se conservan en sus ubicaciones originales; no están incluidos aquí.
+Al terminar, revisar el diff, ejecutar verificaciones proporcionadas, crear commit,
+publicar sin force y verificar el SHA remoto. Conservar trabajos ajenos. No instalar
+ni ejecutar operaciones de pago por compilar o publicar una entrega.
 
-Pixel: se recuperaron las fuentes NEXUS de Termux mediante SSH verificado. S25: identidad y versiones instaladas comprobadas, fuentes compartidas recuperadas; falta leer su Termux privado activo. Los dispositivos offline siguen pendientes. El estado de esta copia figura en MIGRATION-STATUS.json; no se garantiza última fuente de ámbitos inaccesibles.
-
-Antes de continuar: recuperar cambios del repositorio, comprobar la rama y leer AGENTS.md. Al terminar: commit y push de la rama, documentar pruebas y trabajo pendiente. Para Android, verificar el certificado de la app instalada antes de preparar una actualización.
+La APK visual entregada aún no está instalada en el S25. El S25 lleva 1.9.3 previa
+a ese ajuste; el EliteBook lleva Windows 1.9.3. Las pruebas físicas de las nuevas
+opciones visuales siguen pendientes. El código del puente AKI y su lanzador están
+versionados; su sesión y configuración activa viven en Termux, fuera de Git.

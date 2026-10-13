@@ -10,6 +10,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
 
 /** Maps transport failures to a useful message, leaving diagnostics available on demand. */
@@ -41,21 +43,23 @@ fun InlineNotice(message: String, modifier: Modifier = Modifier, technicalDetail
     var expanded by remember(technicalDetails) { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     Surface(modifier=modifier.fillMaxWidth().semantics {liveRegion=LiveRegionMode.Polite}, shape=NexusTokens.field,
-        color=if(isError) colors.errorContainer else colors.surfaceContainer,
-        contentColor=if(isError) colors.onErrorContainer else colors.onSurfaceVariant) {
+        color=colors.surfaceContainerHigh,
+        border=BorderStroke(1.dp, colors.outlineVariant),
+        contentColor=colors.onSurface) {
         Column(Modifier.padding(NexusTokens.space12)) {
             Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                Icon(Icons.Outlined.Info, contentDescription=null, modifier=Modifier.size(NexusTokens.space24))
+                Icon(Icons.Outlined.Info, contentDescription=if(isError) "Aviso" else null,
+                    tint=colors.onSurfaceVariant, modifier=Modifier.size(20.dp))
                 Text(message, style=MaterialTheme.typography.bodyMedium, modifier=Modifier.weight(1f))
             }
             if(onAction != null || !technicalDetails.isNullOrBlank()) {
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     if(onAction != null && actionLabel != null) TextButton(onClick=onAction) {
-                        Text(actionLabel, color=if(isError) colors.onErrorContainer else colors.onSurface)
+                        Text(actionLabel, color=colors.primary)
                     }
                     if(!technicalDetails.isNullOrBlank()) TextButton(onClick={ expanded=!expanded },
                         modifier=Modifier.semantics {stateDescription=if(expanded) "Detalles expandidos" else "Detalles contraídos"}) {
-                        Text(if(expanded) "Ocultar detalles" else "Detalles", color=if(isError) colors.onErrorContainer else colors.onSurfaceVariant)
+                        Text(if(expanded) "Ocultar detalles" else "Detalles", color=colors.onSurfaceVariant)
                     }
                 }
             }
