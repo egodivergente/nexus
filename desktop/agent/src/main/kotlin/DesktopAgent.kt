@@ -111,7 +111,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             BedrockProxyProvider(settings.text("endpoint"), { secrets.text("token") })
         } else OfflinePlannerProvider()
         offline = llm is OfflinePlannerProvider
-        val effective = if (llm is BedrockDirectProvider || llm is BedrockProxyProvider) BudgetedLlmProvider(llm, budget) {
+        val effective = if (llm is BedrockDirectProvider) BudgetedLlmProvider(llm, budget) {
             LlmLimits(perTurnUsd = settings["perTurnUsd"]?.jsonPrimitive?.doubleOrNull ?: 1.0,
                 dailyUsd = settings["dailyUsd"]?.jsonPrimitive?.doubleOrNull ?: 5.0,
                 perTurnCalls = settings["perTurnCalls"]?.jsonPrimitive?.intOrNull ?: 8)

@@ -59,5 +59,16 @@ class BridgeTest(unittest.TestCase):
             usage = Usage(Path(directory))
             with self.assertRaises(ProxyError): usage.reserve(0, 500001, 5, 500000)
 
+    def test_cli_zero_exit_with_credential_error_on_stderr(self):
+        def run(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command, 0, "", "[cli] Error: failed to load AWS credentials: an error occurred while loading credentials\n"
+            )
+        client = AkiClient("aki", "/tmp", runner=run)
+        with self.assertRaises(ProxyError) as ctx:
+            client.converse(**self.request())
+        self.assertEqual(ctx.exception.code, "aki_auth_expired")
+        self.assertIn("auth.json", ctx.exception.message)
+
 
 if __name__ == "__main__": unittest.main()

@@ -13,7 +13,8 @@ for path in desktop.rglob('*'):
     files.append(path)
 for path in (root/'tools/flow-bridge').rglob('*'):
     if path.is_file() and path.suffix in {'.py','.json','.md'} and not any(p in {'__pycache__','upstream','evidence-private'} for p in path.relative_to(root/'tools/flow-bridge').parts):files.append(path)
-for relative in ['README.md', 'docs/RELEASE-193-CONSOLIDADA-20261013.md',
+for relative in ['README.md', 'CHANGELOG.md', 'docs/MEJORAS-AUDITORIA-20261014.md',
+                 'docs/RELEASE-193-CONSOLIDADA-20261013.md',
                  'docs/DESKTOP-LIBRARY-PDF-193.md', 'docs/DESKTOP-AGENT-PARITY-20261011.md',
                  'docs/NEXUS-AKI-WIDGET-20261012.md', 'docs/COMPILAR-PIXEL.md']:
     path = root / relative

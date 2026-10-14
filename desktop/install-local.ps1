@@ -25,6 +25,16 @@ if ($AdditionalShortcut) {
     $extra.Description = 'Nexus Studio · Agente, proyectos, edición local y Whisper'
     $extra.Save()
 }
+$taskbarShortcut = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Nexus Studio.lnk'
+if (Test-Path -LiteralPath $taskbarShortcut -PathType Leaf) {
+    $pinned = $shell.CreateShortcut($taskbarShortcut)
+    $pinned.TargetPath = $link.TargetPath
+    $pinned.Arguments = $link.Arguments
+    $pinned.WorkingDirectory = $link.WorkingDirectory
+    $pinned.IconLocation = $link.IconLocation
+    $pinned.Description = 'Nexus Studio · Agente, proyectos, edición local y Whisper'
+    $pinned.Save()
+}
 Write-Output ('Acceso directo creado: ' + $shortcut)
 if (-not $NoLaunch) {
     Start-Process -FilePath $pythonw -ArgumentList $link.Arguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden

@@ -29,17 +29,17 @@ Conjunto de mejoras de seguridad de cobro, idempotencia, concurrencia, recuperac
   - `AgentOrchestrator.kt` añade bloques sintéticos `ContentBlock.ToolResult(..., isError = true)` para cualquier `ToolUse` pendiente cuando se cancela un turno (`CancellationException`), evitando que el siguiente mensaje falle la validación de Bedrock Converse (`toolResult blocks at messages.N.content`).
   - Se captura `TimeoutCancellationException` por herramienta sin abortar todo el turno como cancelación del usuario.
 - **Presupuesto de contexto y límites de salida (`B-M10`)**:
-  - `AssistantRuntime.kt` (Android) y `DesktopAgent.kt` (Windows) envuelven `BedrockProxyProvider` en `BudgetedLlmProvider` para aplicar el recorte automático de contexto (`LlmBudget`).
-  - `AgentOrchestrator.kt` limita cada `ToolResult` serializado a `32_000` caracteres e impide ejecutar bloques `ToolUse` truncados cuando `stopReason == StopReason.MAX_TOKENS`.
+  - `AgentOrchestrator.kt` limita cada `ToolResult` serializado a `32_000` caracteres e impide ejecutar bloques `ToolUse` truncados cuando `stopReason == StopReason.MAX_TOKENS`, manteniendo `BudgetedLlmProvider` acotado a `BedrockDirectProvider` para que los modelos del puente (`openai.gpt-5.6-sol`) deleguen el presupuesto en el proxy.
 - **Unificación de `NativeOperations.kt` y sincronización de skills (`B-A9`, `B-M1`, `B-M2`)**:
   - `agent-core` incorpora `"sol"` en el `enum` de `agent_model` de `configure_assistant` y propaga `isError == "true"` de operaciones nativas como fallos reales (`fail(...)`) al orquestador.
   - Se sincronizaron `agent-core` y `agent-skills` (incluyendo `mateo_madrid_no_duerme/SKILL.md`) hacia `desktop/agent/` mediante `desktop/tools/sync-agent-core.py` y se recompilaron los JAR de `desktop/agent/runtime/`.
 
 ### Puentes Sol / AKI y red (`agent-proxy`, Android y Windows)
-- **Alineación de timeouts y salud real del túnel (`B-A7`)**:
+- **Alineación de timeouts, salud real del túnel y fallback Wi-Fi LAN (`B-A7`)**:
   - `BedrockProxyProvider.kt` amplía `readTimeout` a `170s` y `callTimeout` a `180s` (superando los `150s` de `aki_proxy.py`).
-  - `agent-proxy/aki_proxy.py` espera hasta `8.0s` en `AkiClient.lock.acquire(timeout=8.0)` antes de devolver `429 Busy`.
-  - `desktop/sol_bridge.py` verifica `/health` por HTTP antes de dar por bueno un puerto abierto y mata cualquier proceso `ssh.exe` que exceda su timeout.
+  - `agent-proxy/aki_proxy.py` espera hasta `8.0s` en `AkiClient.lock.acquire(timeout=8.0)` antes de devolver `429 Busy`, y distingue salidas vacías por expiración de sesión OAuth (`[cli] Error: failed to load AWS credentials` con código de salida `0` -> `aki_auth_expired`) frente a errores de lectura de adjuntos (`aki_tools`).
+  - `desktop/sol_bridge.py` verifica `/health` por HTTP antes de dar por bueno un puerto abierto, limpia procesos `ssh.exe` colgados tras timeout y añade fallback automático a la IP Wi-Fi local del S25 (`192.168.1.134:8022`) cuando Tailscale (`100.119.88.105:8022`) está desconectado.
+  - `desktop/install-local.ps1` actualiza también el acceso directo anclado en la barra de tareas (`User Pinned\TaskBar\Nexus Studio.lnk`) para evitar que lance un worktree antiguo.
 - **Autenticación previa a lectura de cuerpo y protección SSRF (`B-B2`, `B-B3`, `B-B5`)**:
   - `agent-proxy/nexus_proxy.py` valida el encabezado `Authorization` antes de leer `Content-Length` bytes del socket.
   - `desktop/native_internet.py` y `AgentInternet.kt` bloquean direcciones loopback, privadas, link-local y reservadas en `fetch_web_page` / `AgentInternet.page` para prevenir SSRF hacia `127.0.0.1`.

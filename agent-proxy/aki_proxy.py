@@ -71,7 +71,12 @@ class AkiClient:
                 host_calls += 1
                 if event.get("name") != "Bash" or event.get("status") != "done" or event.get("output"):
                     raise ProxyError(502, "aki_media", "No se pudo verificar la lectura visual del adjunto.")
-        if not usage or usage.get("total_tools", 0) != host_calls or (host_calls and not allowed_views) or viewed != allowed_views:
+        if not usage:
+            stderr_text = result.stderr or ""
+            if "failed to load AWS credentials" in stderr_text or "session may have expired" in stderr_text:
+                raise ProxyError(502, "aki_auth_expired", "La sesión OAuth de AKI en el S25 (auth.json) ha caducado. Sincroniza auth.json desde un equipo con postura AEA o selecciona un modelo de Bedrock directo.")
+            raise ProxyError(502, "aki_failed", "AKI rechazó la petición. Comprueba su sesión y el modelo; no se utilizó AWS directo.")
+        if usage.get("total_tools", 0) != host_calls or (host_calls and not allowed_views) or viewed != allowed_views:
             raise ProxyError(502, "aki_tools", "AKI no completó la lectura autorizada de todos los adjuntos.")
         try:
             answer = json.loads("".join(chunks))
