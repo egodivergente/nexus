@@ -12,6 +12,8 @@ body.nx-desktop :is(input,textarea)::placeholder{color:var(--nx-soft)}
 body.nx-desktop :is(input,textarea):focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 9%,transparent)}
 body.nx-desktop .sidebar,body.nx-desktop:has(.agent-view) .sidebar{width:194px;background:var(--nx-sidebar);border-right:1px solid #ffffff08;padding:24px 12px 14px}
 body.nx-desktop .brand{position:relative;margin:0 12px 38px;gap:10px;flex-wrap:wrap}
+body.nx-desktop .brand .nexus-brand-mark{display:block;width:36px;height:36px;object-fit:contain;flex:none}
+body.nx-desktop .brand .nexus-brand-logo{display:none}
 body.nx-desktop .brand>svg{width:28px;height:28px;color:var(--accent)}
 body.nx-desktop .brand>span{font-size:20px;font-weight:700;letter-spacing:-.6px;color:var(--text)}
 body.nx-desktop .brand>span small{display:none}
@@ -158,8 +160,8 @@ body.nx-desktop .nx-compose-hint span{margin:0 4px}
 body.nx-desktop .agent-view .agent-message{border:0;background:transparent;padding:8px 0 18px;margin:0 0 12px}
 body.nx-desktop .agent-view .agent-message.user{margin-left:55px;padding:16px 18px;background:var(--panel);border:1px solid #ffffff07;border-radius:15px;margin-bottom:24px}
 body.nx-desktop .agent-view .agent-author{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:10px;margin-bottom:10px;font-weight:600}
-body.nx-desktop .nx-avatar{width:24px;height:24px;display:grid;place-items:center;border:1px solid #ffffff08;border-radius:8px;color:var(--accent);background:var(--panel)}
-body.nx-desktop .nx-avatar svg{width:16px;height:16px}.nx-desktop .user .nx-avatar{color:var(--muted);background:var(--surface-2)}
+body.nx-desktop .nx-avatar{width:24px;height:24px;display:grid;place-items:center;border:1px solid #ffffff08;border-radius:8px;color:var(--accent);background:var(--panel);overflow:hidden;flex-shrink:0}
+body.nx-desktop .nx-avatar svg,body.nx-desktop .nx-avatar img,body.nx-desktop .nexus-mark{width:16px;height:16px;max-width:100%;max-height:100%;object-fit:contain}.nx-desktop .user .nx-avatar{color:var(--muted);background:var(--surface-2)}
 body.nx-desktop .agent-view .agent-text{font-size:14px;line-height:1.75;color:var(--text)}
 body.nx-desktop .agent-message>.hint{font-size:9px;color:var(--nx-soft);margin-top:12px}
 body.nx-desktop .agent-plan{padding:20px;background:var(--panel);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));border-radius:14px;margin:16px 0}

@@ -13,7 +13,8 @@ renderAssistant=function(){
  document.querySelectorAll('.agent-message.user').forEach((node,index)=>{
   const item=Agent.items.filter(i=>i.role==='user')[index];
   let button=node.querySelector('[data-remember]');
-  if(item?.text&&!button){node.insertAdjacentHTML('beforeend',`<button class="small" data-remember="${index}">Guardar preferencia</button>`);button=node.querySelector('[data-remember]');}
+  if(!Agent.snapshot?.projectId||!item?.text||item.text.trim().length<12){button?.remove();return;}
+  if(!button){node.insertAdjacentHTML('beforeend',`<button class="small" data-remember="${index}">Guardar preferencia</button>`);button=node.querySelector('[data-remember]');}
   if(button)button.disabled=Agent.busy;
  });
 };

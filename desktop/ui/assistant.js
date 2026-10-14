@@ -2,7 +2,7 @@
 const Agent = {owner:(()=>{try{let id=sessionStorage.getItem('nexus_agent_owner');if(!id){id=crypto.randomUUID();sessionStorage.setItem('nexus_agent_owner',id);}return id;}catch{return crypto.randomUUID();}})(),snapshot:null,settings:{},items:[],attachments:[],busy:false,generating:false,callbacks:new Set(),draft:'',error:'',cardAnchors:new Map(),expandedBatches:new Set()};
 // Keep the editor and unchanged messages alive across job/status updates.
 const agentMarkup=new WeakMap();
-function agentNodeKey(node){return node.dataset.agentMessage||node.dataset.agentCard||node.id||node.className;}
+function agentNodeKey(node){return node.dataset.agentMessage||node.dataset.agentCard||node.id||node.classList?.[0]||node.className;}
 function agentPatchChildren(parent,incoming){
  const existing=new Map([...parent.children].map(node=>[agentNodeKey(node),node]));
  let cursor=parent.firstElementChild;
@@ -310,7 +310,7 @@ function renderAssistant(){
  if(!Agent.restored){Agent.restored=true;const saved=state.agentConversation;Agent.draft=saved?.draft||Agent.draft;if(saved?.items?.length){Agent.items=saved.items;for(const [key,index] of Object.entries(saved.anchors||{}))if(Agent.items[index])Agent.cardAnchors.set(key,Agent.items[index]);}}
  const content=$('#content'),oldMessages=$('.agent-messages'),oldCompose=$('#agent-compose');
  AgentViewport.capture(oldMessages);
- const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),disabled=Agent.busy||Agent.generating?'disabled':'';
+ const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),busyUi=Agent.busy&&!Agent.initPromise,disabled=busyUi||Agent.generating?'disabled':'';
  const ready=agentPendingEntries(),readyCount=ready.reduce((sum,e)=>sum+planOutputCount(e.plan),0),readyModels=[...new Set(ready.map(e=>e.plan.modelName))];
  for(const entry of s?.plans||[]){
   const id=entry.plan.id,key='plan:'+id;
@@ -323,16 +323,16 @@ function renderAssistant(){
  const messageMarkup=Agent.items.length?Agent.items.map(i=>`<article data-agent-message="${i.id||=crypto.randomUUID()}" class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}${i.failed?'<small class="hint">Envío no confirmado. Tu mensaje se conserva.</small>':''}</article>`).join(''):(!generationMarkup&&!proposalMarkup?'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>':'');
  $('#content').classList.add('agent-view');
  const template=document.createElement('template');
- template.innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select>${aiButton('project-new','Nuevo proyecto','plus',Agent.busy)}${aiButton('memory','Memoria del proyecto','book',Agent.busy||!project)}<button type="button" data-project-references ${disabled}>Archivos de referencia</button></div></div>
+ template.innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select>${aiButton('project-new','Nuevo proyecto','plus',busyUi)}${aiButton('memory','Memoria del proyecto','book',busyUi||!project)}<button type="button" data-project-references ${disabled}>Archivos de referencia</button></div></div>
  <div class="agent-session-info"><span>${s?(s.offline?'Sin modelo conectado':escape(agentModelLabel())):'Conectando con el asistente'}</span><button class="small" data-agent="skills" ${disabled}>Skills · ${s?.skills.length||0}</button><span>${s?.tools?.length||0} herramientas</span></div>
  ${Agent.error?`<div class="agent-error inline-notice" role="alert"><span>No se pudo completar el mensaje. Tu texto y los adjuntos se conservan.</span><button type="button" data-agent="reconnect" ${disabled}>Comprobar conexión</button><details><summary>Detalles</summary><pre>${escape(Agent.error)}</pre></details></div>`:''}
  <div class="agent-messages" role="log" aria-label="Conversación" aria-live="polite" aria-relevant="additions text" tabindex="0">${messageMarkup}
  ${generationMarkup}
  ${proposalMarkup}
- ${Agent.busy?'<div class="agent-thinking"><span class="loading"></span> Preparando…</div>':''}</div>
+ ${busyUi?'<div class="agent-thinking"><span class="loading"></span> Preparando…</div>':''}</div>
  <div class="agent-scroll-tools"><button type="button" data-agent-latest hidden aria-label="Ir al último mensaje">↓ Últimos mensajes</button></div>
  ${ready.length?`<div class="agent-ready-actions"><span>${escape(readyModels.length===1?readyModels[0]:readyModels.length+' modelos')} · ${readyCount} resultado${readyCount===1?'':'s'} preparado${readyCount===1?'':'s'}</span><button type="button" class="primary" data-agent="generate-ready" ${disabled}>${Agent.generating?'Enviando…':'Generar'+(readyCount>1?' '+readyCount:'')}</button></div>`:''}
- <form id="agent-compose"><div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…">${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${aiButton('attach','Adjuntar imagen o vídeo','clip',Agent.busy)}${aiButton('send','Enviar mensaje','send',Agent.busy)}</div></form>`;
+ <form id="agent-compose"><div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…">${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${aiButton('attach','Adjuntar imagen o vídeo','clip',busyUi)}${aiButton('send','Enviar mensaje','send',busyUi)}</div></form>`;
  const messages=template.content.querySelector('.agent-messages');
  const messageNodes=[...messages.querySelectorAll('.agent-message')];
  // Anchor each card to the message present when it first appeared. Updates to
@@ -377,18 +377,27 @@ render=function(){
  if(view==='assistant'){
   renderShell();
   $('#title').textContent='Asistente';$('#eyebrow').textContent='NEXUS · AGENTE';
-  $('#header-actions').innerHTML=aiButton('new','Nueva conversación','plus',Agent.busy)+aiButton('settings','Ajustes del asistente','settings',Agent.busy);
+  const busyUi=Agent.busy&&!Agent.initPromise;
+  $('#header-actions').innerHTML=aiButton('new','Nueva conversación','plus',busyUi)+aiButton('settings','Ajustes del asistente','settings',busyUi);
   $('#content').classList.remove('canvas-view');renderAssistant();
  }else originalRender();
  $('#navigation').insertAdjacentHTML('afterbegin',`<button data-nav="assistant" class="${view==='assistant'?'active':''}">${aiIcon('chat')}Asistente</button>`);
  if(view==='assistant')$('#navigation').querySelectorAll('[data-nav]:not([data-nav="assistant"])').forEach(b=>b.classList.remove('active'));
 };
+async function ensureAssistantReady(){
+ if(Agent.snapshot)return Agent.snapshot;
+ if(Agent.initPromise)return Agent.initPromise;
+ Agent.initPromise=(async()=>{try{await agentCall('snapshot');await agentCall('importHistory');return Agent.snapshot;}finally{Agent.initPromise=null;}})();
+ return Agent.initPromise;
+}
 async function sendAgent(requestText){
- const text=Agent.draft.trim();if(!text||Agent.busy||Agent.generating)return;
+ const text=Agent.draft.trim();if(!text||Agent.generating)return;
+ if(Agent.initPromise){try{await Agent.initPromise;}catch{}}
+ if(Agent.busy)return;
  window.NexusModelSuggestions?.close();
  Agent.error='';
  if(!Agent.snapshot||Agent.snapshot.offline){
-  try{await agentCall('snapshot');}catch(error){Agent.error=error.message;if(view==='assistant')renderAssistant();return;}
+  try{await ensureAssistantReady();}catch(error){Agent.error=error.message;if(view==='assistant')renderAssistant();return;}
   if(Agent.snapshot.offline){toast('El asistente necesita una conexion LLM. Configurala en sus ajustes.');agentSettings();return;}
  }
  const attachments=Agent.attachments.slice(),sent={role:'user',text,attachments};Agent.items.push(sent);Agent.draft='';Agent.attachments=[];AgentViewport.latest();
@@ -428,7 +437,7 @@ document.addEventListener('click',async e=>{
  if(b.hasAttribute('data-agent-latest')){AgentViewport.latest();return;}
  if(Agent.generating&&(b.dataset.agent||Object.keys(b.dataset).some(key=>key.startsWith('agent'))))return;
  try{
-  if(b.dataset.nav==='assistant'&&!Agent.busy){const first=!Agent.snapshot;await agentCall('snapshot');if(first)await agentCall('importHistory');}
+  if(b.dataset.nav==='assistant'&&!Agent.busy)await ensureAssistantReady();
   if(b.dataset.agentMode)await agentCall('mode',{mode:b.dataset.agentMode});
   if(b.dataset.agentRemove){Agent.attachments=Agent.attachments.filter(f=>f.id!==b.dataset.agentRemove);renderAssistant();}
    if(b.dataset.agentPromptToggle){if(Agent.expandedBatches.has(b.dataset.agentPromptToggle))Agent.expandedBatches.delete(b.dataset.agentPromptToggle);else Agent.expandedBatches.add(b.dataset.agentPromptToggle);renderAssistant();return;}
@@ -451,7 +460,7 @@ document.addEventListener('click',async e=>{
    case'send':e.preventDefault();await sendAgent();break;
    case'generate-ready':await generateAgentEntries(agentPendingEntries());break;
    case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
-   case'new':if(Agent.items.length)await rpc('archiveChat',{...state.agentConversation,items:Agent.items,draft:Agent.draft});await agentCall('new');Agent.items=[];Agent.draft='';Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();state.agentConversation=null;persist();AgentViewport.latest();renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
+   case'new':if(Agent.initPromise){try{await Agent.initPromise;}catch{}}if(Agent.items.length)await rpc('archiveChat',{...state.agentConversation,items:Agent.items,draft:Agent.draft});await agentCall('new');Agent.items=[];Agent.draft='';Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();state.agentConversation=null;persist();AgentViewport.latest();renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
    case'settings':agentSettings();break;
    case'project-new':modal('<h2>Nuevo proyecto</h2><form id="agent-project-form"><label>Nombre<input name="name" maxlength="80" required></label><button class="primary">Crear proyecto</button></form>');break;
    case'memory':{const p=Agent.snapshot.index.projects.find(p=>p.id===Agent.snapshot.projectId),m=p.memory;

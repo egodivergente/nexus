@@ -129,28 +129,28 @@ document.addEventListener('DOMContentLoaded',boot,{once:true});
 // Load after the desktop helpers have registered their render functions.
 document.addEventListener('DOMContentLoaded',()=>{
  if(typeof Studio==='undefined'||typeof renderPC==='undefined')return;
- const style=document.createElement('link');style.rel='stylesheet';style.href='studio-gallery.css';document.head.append(style);
+ if(!document.querySelector('link[href="studio-gallery.css"]')){const style=document.createElement('link');style.rel='stylesheet';style.href='studio-gallery.css';document.head.append(style);}
  const script=document.createElement('script');script.src='studio-gallery.js';document.head.append(script);
  const batch=document.createElement('script');batch.src='studio-batch.js';document.head.append(batch);
  const telemetry=document.createElement('script');telemetry.src='studio-telemetry.js';document.head.append(telemetry);
  const flowControl=document.createElement('script');flowControl.src='studio-flow-control.js';document.head.append(flowControl);
- const creativeStyle=document.createElement('link');creativeStyle.rel='stylesheet';creativeStyle.href='creative-engine.css';document.head.append(creativeStyle);
+ if(!document.querySelector('link[href="creative-engine.css"]')){const creativeStyle=document.createElement('link');creativeStyle.rel='stylesheet';creativeStyle.href='creative-engine.css';document.head.append(creativeStyle);}
  const creative=document.createElement('script');creative.src='creative-engine.js';document.head.append(creative);
 },{once:true});
 
 document.addEventListener('DOMContentLoaded',()=>{const script=document.createElement('script');script.src='project-references.js';document.body.append(script);},{once:true});
 document.addEventListener('DOMContentLoaded',()=>{
- const style=document.createElement('link');style.rel='stylesheet';style.href='studio-ux.css';document.head.append(style);
+ if(!document.querySelector('link[href="studio-ux.css"]')){const style=document.createElement('link');style.rel='stylesheet';style.href='studio-ux.css';document.head.append(style);}
  const script=document.createElement('script');script.src='studio-ux.js';document.body.append(script);
 },{once:true});
 document.addEventListener('DOMContentLoaded',()=>{
  for(const file of ['interface-themes','chat-model-suggestions']){
-  const style=document.createElement('link');style.rel='stylesheet';style.href=file+'.css';document.head.append(style);
+  if(!document.querySelector(`link[href="${file}.css"]`)){const style=document.createElement('link');style.rel='stylesheet';style.href=file+'.css';document.head.append(style);}
   const script=document.createElement('script');script.src=file+'.js';document.body.append(script);
  }
 },{once:true});
-// Android Studio parity loads after all existing desktop extensions, including nested ones.
-window.addEventListener('load',()=>{
- const style=document.createElement('link');style.rel='stylesheet';style.href='agent-parity.css';document.head.append(style);
+// Android Studio parity loads on DOMContentLoaded so slow external gallery URLs never block navigation or styles.
+document.addEventListener('DOMContentLoaded',()=>{
+ if(!document.querySelector('link[href="agent-parity.css"]')){const style=document.createElement('link');style.rel='stylesheet';style.href='agent-parity.css';document.head.append(style);}
  const script=document.createElement('script');script.src='agent-parity.js';document.body.append(script);
 },{once:true});

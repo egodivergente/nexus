@@ -3,7 +3,7 @@
 const DesktopDesign={version:'2026-10-06',ready:false};
 const desktopThemeBefore=applyTheme;
 applyTheme=function(){desktopThemeBefore();document.body.classList.add('nx-desktop');};
-const desktopSpark='<img class="nexus-mark" src="branding/nexus-mark.png" alt="" aria-hidden="true">';
+const desktopSpark='<img class="nexus-mark" src="branding/nexus-mark.png" alt="" width="20" height="20" aria-hidden="true">';
 const desktopIdeas=[
  {id:'image',title:'Una imagen',subtitle:'De una idea a algo visual',icon:'library',text:'Quiero crear una imagen. Ayúdame a preparar un buen prompt y elegir el modelo.'},
  {id:'video',title:'Un vídeo',subtitle:'Una escena con movimiento',icon:'canvas',text:'Quiero crear un vídeo. Ayúdame a definir la escena y preparar sus opciones.'},

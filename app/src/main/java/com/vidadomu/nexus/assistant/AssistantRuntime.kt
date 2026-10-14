@@ -95,14 +95,15 @@ class AssistantSettingsStore(private val app: NexusApplication) {
 
     init { seedFromBuild() }
 
-    /** Primera ejecución: si la build trae claves de Bedrock (fichero local fuera del repo) y no hay guardadas, se copian. */
+    /** Primera ejecución o migración de build con claves de Bedrock (fichero local fuera del repo). */
     private fun seedFromBuild() = runCatching {
-        if (BuildConfig.BEDROCK_ACCESS_KEY.isNotBlank() && !secure.hasProviderApiKey(AWS_SECRET_ID)) {
+        if (BuildConfig.BEDROCK_ACCESS_KEY.isNotBlank() && (!secure.hasProviderApiKey(AWS_SECRET_ID) || !secure.hasProviderApiKey(AWS_ACCESS_ID) || !prefs.getBoolean("bedrock_direct_seeded_v2", false))) {
             secure.saveProviderApiKey(AWS_ACCESS_ID, BuildConfig.BEDROCK_ACCESS_KEY)
             secure.saveProviderApiKey(AWS_SECRET_ID, BuildConfig.BEDROCK_SECRET_KEY)
             prefs.edit().putString("backend", AssistantSettings.BACKEND_DIRECT)
                 .putString("region", BuildConfig.BEDROCK_REGION.ifBlank { AssistantSettings.DEFAULT_REGION })
-                .putString("model_id", BuildConfig.BEDROCK_MODEL.ifBlank { AssistantSettings.DEFAULT_MODEL }).apply()
+                .putString("model_id", BuildConfig.BEDROCK_MODEL.ifBlank { AssistantSettings.DEFAULT_MODEL })
+                .putBoolean("bedrock_direct_seeded_v2", true).apply()
         }
     }
 
