@@ -2,9 +2,28 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
-## [1.9.4-audit] - 2026-10-14
+## [1.9.4-agent] - 2026-10-14
 
-Conjunto de mejoras de seguridad de cobro, idempotencia, concurrencia, recuperación ante fallos, puentes (Flow y Sol/AKI), paridad entre núcleos del asistente y pulido de interfaz tras la auditoría integral sobre `v1.9.3-agent`.
+Release `v1.9.4-agent` (Android `1.9.4-agent` / `versionCode 38` y Windows `1.9.4-agent-desktop`) con las mejoras de seguridad de cobro, idempotencia, concurrencia, puentes (Flow y Sol/AKI), paridad entre núcleos del asistente y las correcciones de la revisión del commit `b5401b8`, conservando intactos los artefactos de la Release `v1.9.3-agent`.
+
+### Correcciones de revisión (`b5401b8`)
+1. **Windows — `job_id` obligatorio en `generate` y asignación exacta de `remoteId`**:
+   - `desktop/ui/app.js` incluye `job_id: job.id` en cada petición `rpc('generate', ...)`.
+   - `desktop/local_host.py` exige `job_id` no vacío y asigna `remoteId` **únicamente** al trabajo cuyo `id == job_id` bajo `STATE_LOCK` (`threading.RLock()`), eliminando la selección implícita del primer trabajo `SENDING` del proveedor.
+   - Añadida prueba de concurrencia en `desktop/tools/test-host-integrity.py` con dos envíos simultáneos cuyas respuestas llegan en orden inverso.
+2. **PDFs mixtos — preservación de páginas escaneadas o gráficas**:
+   - `desktop/document_reader.py` y `AgentDocuments.kt` conservan la vía del documento PDF original (`format = "pdf"`) cuando cualquier página carece de texto extraíble o contiene imágenes incrustadas, evitando descartar páginas escaneadas o gráficas al convertir a texto.
+   - Añadida prueba en `desktop/tools/test-library-pdf-193.py` con un PDF mixto de 3 páginas (`texto + página gráfica + texto`).
+3. **Google Flow — verificación SHA-256 de la copia local y recuperación automática**:
+   - `desktop/flow_provider.py` verifica el hash SHA-256 de la copia local en `media/` antes de reutilizarla y, si está alterada o corrupta (incluso manteniendo el mismo tamaño en bytes), la restaura atómicamente desde el archivo original válido en `RUNTIME / 'results'`.
+   - Añadida prueba en `desktop/tools/test-flow-automation.py` con una copia local alterada del mismo tamaño exacto en bytes.
+4. **Android — separación entre «Detener seguimiento» y «Cancelar generación»**:
+   - `GenerationRepository` y `GenerationCancellationPolicy` (`Repositories.kt`) separan `stopTrackingJob` (acción estrictamente local que detiene el `WorkManager` y pausa el seguimiento con `__tracking_paused = "true"` sin llamar al proveedor) de `cancelRemoteGeneration` (acción explícita que verifica `supportsRemoteCancellation` en el proveedor y explica claramente si el proveedor admite cancelación remota: Runway sí admite `DELETE /v1/tasks/{id}`; Atlas Cloud, cRun y Google Flow no admiten cancelación remota una vez enviada la tarea).
+   - `GenerationsScreen.kt` ofrece ambas acciones por separado en el menú de tareas en curso y muestra un diálogo explícito de confirmación para «Cancelar generación».
+   - Añadida suite unitaria `GenerationCancellationTest.kt`.
+5. **Windows — arranque desde la instalación actual y verificación de accesos directos**:
+   - `desktop/local_host.py` registra `root` y `version` (`1.9.4-agent-desktop`) en `local-session.json` y, al detectar el mutex activo (`GetLastError() == 183`), verifica `is_same_installation_root`: si el proceso previo pertenecía a otra ruta (como `Documents\ChatGPT\NEXUS` o una versión anterior), detiene el host antiguo y toma el relevo desde la instalación actual conservando `%LOCALAPPDATA%\NexusDesktop`.
+   - `desktop/install-local.ps1` y `desktop/tools/deploy-desktop-parity.py` actualizan y verifican los accesos directos de Escritorio, `Documents\Biblioteca\Aplicaciones\Nexus Studio.lnk` y barra de tareas (`User Pinned\TaskBar\Nexus Studio.lnk`).
 
 ### Seguridad de cobro e idempotencia (`agent-core`, Android y Windows)
 - **Protección de planes con envío incierto (`B-C1`, `B-A6`)**:
@@ -46,9 +65,6 @@ Conjunto de mejoras de seguridad de cobro, idempotencia, concurrencia, recuperac
   - `desktop/native_internet.py` restringe la limpieza de tokens MCP en fallo `401/403` al servidor afectado en lugar de vaciar todos los servidores configurados.
 
 ### Estabilidad, base de datos, multimedia e interfaz
-- **Cancelación y borrado de tareas (`B-A11`, `B-M9`, `B-B4`)**:
-  - En Android (`Repositories.kt`, `GenerationsScreen.kt`, `NexusAgentAdapters.kt`, `GenerationPollingWorker.kt`), se añadió `cancelJob(jobId)` conectado al agente y a la UI (`"Cancelar seguimiento"` en tareas activas y `"Eliminar del historial"` en tareas terminales), deteniendo el worker de inmediato si la tarea se cancela o elimina.
-  - En Windows (`desktop/local_host.py`), `merge_jobs` y `write_state` respetan `deletedJobIds` y protegen `read_state()` con `STATE_LOCK` para que un sondeo en segundo plano no resucite tareas borradas.
 - **Protección de índice Alexia y base de datos Room (`B-A10`, `B-M8`)**:
   - `AlexiaBridge.kt` evita sobrescribir un `axel-index.json` no vacío con un índice vacío si falla la lectura o el parseo JSON, y se eliminó la doble llamada a `AlexiaBridge.classifyJob` en `GenerationPollingWorker.kt`.
   - `NexusDatabase.kt` añade `onDowngrade` no destructivo y conversión tolerante a valores desconocidos en `Converters`.
@@ -59,8 +75,6 @@ Conjunto de mejoras de seguridad de cobro, idempotencia, concurrencia, recuperac
   - `AssistantViewModel.kt` restablece `includeInBatch = false` al restaurar planes persistidos.
   - `desktop/ui/assistant.js` persiste `Agent.owner` en `sessionStorage` para no mezclar historiales al recargar.
   - `desktop/native_operations.py` limpia siempre el archivo temporal `.wav` de Whisper en un bloque `finally:` y resuelve alias de caché (`asset-file?...`) al renombrar archivos en la biblioteca.
-  - `desktop/document_reader.py` conserva el texto extraído en PDFs multipágina aunque alguna página intermedia esté en blanco.
-  - `desktop/flow_provider.py` evita recalcular el SHA-256 dos veces sobre el mismo archivo descargado cuando `verify_media_file` ya lo calculó.
   - Mejoras visuales en `NativeParameterControl.kt` (`verticalArrangement = Arrangement.spacedBy(6.dp)` en `FlowRow`), `InlineNotice.kt` (iconos diferenciados para error vs información) y `desktop/ui/studio-ux.css` (espaciado y truncado limpio en barra de estado inferior).
   - Añadido `.gitattributes` en la raíz con `eol=lf` para `gradlew` y `*.sh`.
 

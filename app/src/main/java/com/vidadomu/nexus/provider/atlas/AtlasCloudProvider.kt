@@ -382,8 +382,7 @@ class AtlasCloudProvider(
     }
 
     override suspend fun cancelJob(jobId: String): Result<Boolean> = withContext(Dispatchers.IO) {
-        // Atlas prediction cancel if supported or marked locally
-        Result.success(true)
+        Result.failure(ProviderError("Atlas Cloud no admite cancelación remota de generaciones ya enviadas. Usa «Detener seguimiento» para pausar las consultas locales."))
     }
 
     override suspend fun uploadMedia(

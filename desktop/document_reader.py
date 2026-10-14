@@ -16,17 +16,34 @@ def extract_pdf(path):
         raise ValueError('No se pudo leer el PDF. Comprueba que abre correctamente y no requiere contraseña.')
     return json.loads(result.stdout.decode('utf-8'))
 
+def _has_embedded_image(page):
+    try:
+        resources = page.get('/Resources') or {}
+        if hasattr(resources, 'get_object'):
+            resources = resources.get_object()
+        xobjects = resources.get('/XObject') or {}
+        if hasattr(xobjects, 'get_object'):
+            xobjects = xobjects.get_object()
+        for obj in xobjects.values():
+            resolved = obj.get_object() if hasattr(obj, 'get_object') else obj
+            if isinstance(resolved, dict) and str(resolved.get('/Subtype') or '') == '/Image':
+                return True
+    except Exception:
+        return True
+    return False
+
 if __name__ == '__main__':
     from pypdf import PdfReader
     reader = PdfReader(sys.argv[1])
     total_pages = len(reader.pages)
     pages = []
-    non_empty = 0
+    complete = total_pages > 0
     for index, page in enumerate(reader.pages):
         text = (page.extract_text() or '').strip()
-        if text:
-            non_empty += 1
-            pages.append((index + 1, text))
-    usable = non_empty > 0 and (non_empty == total_pages or (total_pages > 2 and non_empty * 2 >= total_pages))
-    result = ('Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n' + '\n'.join(f'[Página {num}]\n{text}' for num, text in pages)) if usable else None
+        if not text or _has_embedded_image(page):
+            complete = False
+            break
+        pages.append((index + 1, text))
+    result = ('Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n' + '\n'.join(f'[Página {num}]\n{text}' for num, text in pages)) if complete else None
     sys.stdout.buffer.write(json.dumps(result,ensure_ascii=False).encode('utf-8'))
+

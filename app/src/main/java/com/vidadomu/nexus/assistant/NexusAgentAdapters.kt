@@ -259,7 +259,8 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
         const val PLAN_KEY = "__assistant_plan"
     }
 
-    override suspend fun cancel(jobId: String): Boolean = app.generationRepository.cancelJob(jobId)
+    override suspend fun cancel(jobId: String): Boolean =
+        app.generationRepository.cancelRemoteGeneration(jobId).getOrThrow().status == GenerationStatus.CANCELLED
 }
 
 class NexusHistorySource(private val app: NexusApplication) : GenerationHistorySource {

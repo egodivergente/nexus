@@ -32,7 +32,7 @@ DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
 KEY_FILE = DATA / 'credentials.dpapi'
 SESSION_FILE = DATA / 'local-session.json'
-STATE_LOCK = threading.Lock()
+STATE_LOCK = threading.RLock()
 OFFLINE_QA = False
 SCHEMA_CACHE = {}
 SCHEMA_LOCK = threading.Lock()
@@ -469,7 +469,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '1.9.3-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
+                'version': '1.9.4-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
                 'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -552,22 +552,25 @@ def dispatch(keys, operation, args):
         unavailable = cost is None and args.get('estimate_status') == 'unavailable'
         if not unavailable and (isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0):
             raise ValueError('Estimación no válida.')
+        target_id = args.get('job_id')
+        if not isinstance(target_id, str) or not target_id.strip():
+            raise ValueError('Falta job_id en la solicitud de generación.')
         result = provider_request(keys, args['provider'], args['path'], 'POST', args['body'], paid=True)
         if isinstance(result, dict):
             payload = result.get('data') if isinstance(result.get('data'), dict) else result
             remote_id = payload.get('id') or payload.get('task_id')
             if remote_id:
                 try:
-                    current_state = read_state()
-                    if isinstance(current_state, dict) and isinstance(current_state.get('jobs'), list):
-                        target_id = args.get('job_id')
-                        for item in current_state['jobs']:
-                            if isinstance(item, dict) and ((target_id and item.get('id') == target_id) or (not target_id and item.get('status') == 'SENDING' and item.get('providerId') == args['provider'] and not item.get('remoteId'))):
-                                item['remoteId'] = str(remote_id)
-                                if item.get('status') == 'SENDING':
-                                    item['status'] = 'PROCESSING'
-                                write_state(current_state)
-                                break
+                    with STATE_LOCK:
+                        current_state = read_state()
+                        if isinstance(current_state, dict) and isinstance(current_state.get('jobs'), list):
+                            for item in current_state['jobs']:
+                                if isinstance(item, dict) and item.get('id') == target_id:
+                                    item['remoteId'] = str(remote_id)
+                                    if item.get('status') == 'SENDING':
+                                        item['status'] = 'PROCESSING'
+                                    write_state(current_state)
+                                    break
                 except Exception:
                     pass
         return result
@@ -695,6 +698,35 @@ def edge_path():
     return shutil.which('msedge')
 
 
+def is_same_installation_root(previous, current_root=ROOT):
+    try:
+        recorded = previous.get('root')
+        if not recorded:
+            return False
+        return Path(str(recorded)).resolve() == Path(current_root).resolve()
+    except Exception:
+        return False
+
+
+def _stop_foreign_host(previous):
+    try:
+        prev_pid = int(previous.get('pid') or 0)
+    except (TypeError, ValueError):
+        return
+    if prev_pid <= 0 or prev_pid == os.getpid():
+        return
+    cmd = (
+        f'$p = Get-CimInstance Win32_Process -Filter "ProcessId = {prev_pid}" -ErrorAction SilentlyContinue; '
+        f'if ($p -and ($p.CommandLine -like "*local_host.py*")) {{ Stop-Process -Id {prev_pid} -Force -ErrorAction SilentlyContinue }}'
+    )
+    subprocess.run(
+        ['powershell', '-NoProfile', '-Command', cmd],
+        capture_output=True,
+        timeout=10,
+        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+    )
+
+
 def main():
     global DATA, MEDIA, KEY_FILE, SESSION_FILE, OFFLINE_QA
     parser = argparse.ArgumentParser()
@@ -726,18 +758,41 @@ def main():
         raise RuntimeError('No se pudo reservar la instancia local de Nexus.')
     if kernel.GetLastError() == 183:
         kernel.CloseHandle(mutex)
+        mutex = None
         if not options.headless:
-            for _ in range(20):
-                try:
-                    previous = json.loads(SESSION_FILE.read_text(encoding='utf-8'))
-                    previous_url = f"http://127.0.0.1:{int(previous['port'])}/"
-                    with urllib.request.urlopen(previous_url + 'health', timeout=0.5) as answer:
-                        if answer.read() == b'{"app":"Nexus Studio"}':
-                            open_window(previous_url)
-                            return
-                except (OSError, ValueError, KeyError, urllib.error.URLError):
+            previous = {}
+            try:
+                previous = json.loads(SESSION_FILE.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                previous = {}
+            if is_same_installation_root(previous, ROOT):
+                for _ in range(20):
+                    try:
+                        previous = json.loads(SESSION_FILE.read_text(encoding='utf-8'))
+                        previous_url = f"http://127.0.0.1:{int(previous['port'])}/"
+                        with urllib.request.urlopen(previous_url + 'health', timeout=0.5) as answer:
+                            if answer.read() == b'{"app":"Nexus Studio"}':
+                                open_window(previous_url)
+                                return
+                    except (OSError, ValueError, KeyError, urllib.error.URLError):
+                        time.sleep(0.15)
+            else:
+                if not options.port and previous.get('port'):
+                    try:
+                        options.port = int(previous['port'])
+                    except (TypeError, ValueError):
+                        pass
+                _stop_foreign_host(previous)
+                for _ in range(30):
                     time.sleep(0.15)
-        raise RuntimeError('Nexus ya se está iniciando. Vuelve a abrir el acceso directo.')
+                    candidate = kernel.CreateMutexW(None, True, mutex_name)
+                    if candidate and kernel.GetLastError() != 183:
+                        mutex = candidate
+                        break
+                    if candidate:
+                        kernel.CloseHandle(candidate)
+        if not mutex:
+            raise RuntimeError('Nexus ya se está iniciando. Vuelve a abrir el acceso directo.')
     try:
         run_server(options)
     finally:
@@ -755,11 +810,17 @@ class LoopbackHTTPServer(ThreadingHTTPServer):
 
 def run_server(options):
     keys = {} if OFFLINE_QA else windows_keys(KEY_FILE)
-    server = LoopbackHTTPServer(('127.0.0.1', options.port), Handler)
+    try:
+        server = LoopbackHTTPServer(('127.0.0.1', options.port), Handler)
+    except OSError:
+        server = LoopbackHTTPServer(('127.0.0.1', 0), Handler)
     server.token = secrets.token_urlsafe(32)
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
-    SESSION_FILE.write_text(json.dumps({'pid': os.getpid(), 'port': server.server_port}), encoding='utf-8')
+    SESSION_FILE.write_text(
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.4-agent-desktop'}),
+        encoding='utf-8',
+    )
     if options.headless:
         print(json.dumps({'url': url, 'configured': list(keys), 'paidCalls': 0}), flush=True)
     else:
