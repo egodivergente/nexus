@@ -17,7 +17,7 @@ class AuthInterceptor(private val secureStorage: SecureStorage) : Interceptor {
         val key = secureStorage.getAtlasApiKey()
         val requestBuilder = original.newBuilder()
         // Never leak the Atlas credential to another provider or to a presigned upload host.
-        if (original.url.host.equals("api.atlascloud.ai", ignoreCase = true) && key.isNotBlank()) {
+        if (original.url.host.equals("api.atlascloud.ai", ignoreCase = true) && key.isNotBlank() && original.header("Authorization").isNullOrBlank()) {
             requestBuilder.header("Authorization", "Bearer $key")
         }
         val bodyContentType = original.body?.contentType()

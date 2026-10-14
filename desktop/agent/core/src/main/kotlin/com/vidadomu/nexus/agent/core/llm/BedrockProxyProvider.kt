@@ -76,9 +76,9 @@ class BedrockProxyProvider(
     companion object {
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(110, TimeUnit.SECONDS)
+            .readTimeout(170, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
-            .callTimeout(120, TimeUnit.SECONDS)
+            .callTimeout(180, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false)
             .build()
     }

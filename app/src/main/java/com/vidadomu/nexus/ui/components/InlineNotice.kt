@@ -3,6 +3,7 @@ package com.vidadomu.nexus.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -48,8 +49,9 @@ fun InlineNotice(message: String, modifier: Modifier = Modifier, technicalDetail
         contentColor=colors.onSurface) {
         Column(Modifier.padding(NexusTokens.space12)) {
             Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                Icon(Icons.Outlined.Info, contentDescription=if(isError) "Aviso" else null,
-                    tint=colors.onSurfaceVariant, modifier=Modifier.size(20.dp))
+                Icon(if(isError) Icons.Outlined.WarningAmber else Icons.Outlined.Info,
+                    contentDescription=if(isError) "Aviso" else "Información",
+                    tint=if(isError) colors.error else colors.onSurfaceVariant, modifier=Modifier.size(20.dp))
                 Text(message, style=MaterialTheme.typography.bodyMedium, modifier=Modifier.weight(1f))
             }
             if(onAction != null || !technicalDetails.isNullOrBlank()) {

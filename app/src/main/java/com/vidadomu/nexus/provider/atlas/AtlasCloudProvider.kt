@@ -199,8 +199,7 @@ class AtlasCloudProvider(
                     ))
                 }
                 val dataObj = (jsonElement["data"] as? JsonObject) ?: jsonElement
-                val predictionId = (dataObj["id"] as? JsonPrimitive)?.contentOrNull
-                    ?: UUID.randomUUID().toString()
+                val rawPredictionId = (dataObj["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
                 val statusStr = (dataObj["status"] as? JsonPrimitive)?.contentOrNull?.lowercase() ?: "processing"
                 val serverProgress = listOf("progress", "percentage", "percent")
@@ -226,6 +225,9 @@ class AtlasCloudProvider(
                 }
 
                 val isCompleted = statusStr == "completed" || statusStr == "succeeded" || initialOutputs.isNotEmpty()
+                val predictionId = rawPredictionId ?: if (isCompleted) request.id else {
+                    return@withContext Result.failure(ProviderError("El proveedor no devolvió un identificador de seguimiento válido."))
+                }
                 val initialStatus = when {
                     isCompleted -> GenerationStatus.COMPLETED
                     statusStr in setOf("failed", "error") -> GenerationStatus.FAILED

@@ -33,7 +33,7 @@ class AkiClient:
                     "AWS_CONTAINER_CREDENTIALS_FULL_URI"):
             env.pop(key, None)
         env.update(AWS_SHARED_CREDENTIALS_FILE="/dev/null", AWS_CONFIG_FILE="/dev/null", AWS_EC2_METADATA_DISABLED="true")
-        if not self.lock.acquire(blocking=False):
+        if not self.lock.acquire(timeout=8.0):
             raise ProxyError(429, "busy", "AKI está atendiendo otra petición de Nexus.")
         try:
             try:

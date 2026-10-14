@@ -76,6 +76,9 @@ class FlowBridgeProvider(
     }
 
     override suspend fun pollJobStatus(job: GenerationJob): Result<GenerationJob> = withContext(Dispatchers.IO) {
+        if (job.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
+            return@withContext Result.success(job)
+        }
         if (job.providerJobId?.startsWith("queue_") == true && queue != null) return@withContext queueLock.withLock {
             val previous = job.parameters["__flow_queue_previous"].orEmpty()
             if (previous.isNotBlank() && queue.getString("state_$previous", "") !in setOf("completed", "failed", "released")) {
@@ -96,7 +99,7 @@ class FlowBridgeProvider(
                 "flow_references_not_empty", "flow_reference_controls_unavailable",
                 "flow_reference_multiple_unavailable", "flow_reference_upload_failed", "flow_references_unconfirmed")) {
                 queue.edit().putString("state_${job.id}", "failed").commit()
-                return@withLock Result.success(job.copy(status = GenerationStatus.FAILED,
+                return@withLock Result.success(job.copy(providerJobId = null, status = GenerationStatus.FAILED,
                     completedAt = System.currentTimeMillis(), error = submissionError?.humanReadableMessage))
             }
             remote.map { submitted ->

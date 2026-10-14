@@ -224,11 +224,29 @@ class AgentOrchestrator(
                 turnTexts += "He parado tras ${config.maxToolRounds} pasos para no entrar en bucle. Dime cómo seguir."
                 break
             }
-            val results = uses.map { use ->
-                calls += use.name
-                val (result, isError, evs) = runTool(use, session)
-                evs.forEach { events += it; onEvent(it) }
-                ContentBlock.ToolResult(use.id, result, isError)
+            val results = mutableListOf<ContentBlock.ToolResult>()
+            try {
+                for (use in uses) {
+                    calls += use.name
+                    val (result, isError, evs) = if (response.stopReason == StopReason.MAX_TOKENS) {
+                        Triple(buildJsonObject { put("error", "Llamada a herramienta truncada por límite de tokens (MAX_TOKENS).") }, true, emptyList())
+                    } else {
+                        runTool(use, session)
+                    }
+                    evs.forEach { events += it; onEvent(it) }
+                    results += ContentBlock.ToolResult(use.id, capToolResult(result), isError)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                val answeredIds = results.map { it.toolUseId }.toSet()
+                uses.filter { it.id !in answeredIds }.forEach { pendingUse ->
+                    results += ContentBlock.ToolResult(
+                        pendingUse.id,
+                        buildJsonObject { put("error", "Ejecución de herramienta cancelada por el usuario.") },
+                        isError = true,
+                    )
+                }
+                conv.messages += LlmMessage(Role.USER, results)
+                throw e
             }
             conv.messages += LlmMessage(Role.USER, results)
             rounds++
@@ -236,6 +254,16 @@ class AgentOrchestrator(
         }
         TurnResult(turnTexts.lastOrNull().orEmpty(), events, Usage(input, output), rounds, calls, stop)
     } }
+
+    private fun capToolResult(element: JsonElement): JsonElement {
+        val raw = element.toString()
+        if (raw.length <= MAX_TOOL_RESULT_CHARS) return element
+        return buildJsonObject {
+            put("truncated", true)
+            put("original_chars", raw.length)
+            put("preview", raw.take(MAX_TOOL_RESULT_CHARS))
+        }
+    }
 
     private suspend fun runTool(use: ContentBlock.ToolUse, session: AgentSession): Triple<JsonElement, Boolean, List<UiEvent>> {
         val tool = byName[use.name]
@@ -260,6 +288,9 @@ class AgentOrchestrator(
         }
         val outcome = try {
             tool.run(use.input, session)
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            logger.log("W", "tool ${use.name} agotó el tiempo límite")
+            return Triple(buildJsonObject { put("error", "Tiempo agotado ejecutando ${use.name}.") }, true, emptyList())
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             logger.log("E", "tool ${use.name} falló: ${e.javaClass.simpleName}: ${Redactor.redact(e.message ?: "")}")
@@ -340,6 +371,7 @@ class AgentOrchestrator(
         const val MAX_IMAGES_PER_TURN = 4
         const val MAX_VIDEOS_PER_TURN = 2
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
+        const val MAX_TOOL_RESULT_CHARS = 32_000
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

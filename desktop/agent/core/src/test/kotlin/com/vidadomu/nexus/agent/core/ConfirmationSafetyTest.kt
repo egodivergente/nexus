@@ -39,12 +39,16 @@ class ConfirmationSafetyTest {
         assertEquals("15", backend.submitted.single().params["duration"])
     }
 
-    @Test fun `envio incierto bloquea el plan para no pagar dos veces`() = runTest {
+    @Test fun `envio incierto bloquea el plan para no pagar dos veces incluso si se pide confirmacion otra vez`() = runTest {
         val fp = guard.register(plan()).fingerprint()
         backend.failNext = SubmissionUncertain("timeout leyendo la respuesta", "job_x")
         assertFailsWith<SubmissionUncertain> { lifecycle().confirmAndSubmit("p1", fp) }
         assertEquals(PlanState.UNCERTAIN, guard.state("p1"))
+        // Regression B-C1: requestConfirmation must NOT overwrite UNCERTAIN with AWAITING_CONFIRMATION
+        assertEquals(PlanState.UNCERTAIN, guard.requestConfirmation("p1"))
+        assertEquals(PlanState.UNCERTAIN, guard.state("p1"))
         assertFailsWith<SpendViolation> { lifecycle().confirmAndSubmit("p1", fp) }
+        assertFailsWith<SpendViolation> { guard.confirmByUser("p1", fp) }
         assertFailsWith<SpendViolation> { guard.replace(plan(prompt = "otro")) }
         guard.discard("p1")
         assertEquals(PlanState.UNCERTAIN, guard.state("p1"))

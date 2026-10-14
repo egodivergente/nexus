@@ -30,7 +30,7 @@ private suspend fun submitAccountFlow(d: ToolDeps, plan: GenerationPlan, session
         ?: throw ToolInputException("Cantidad no válida.")
     if (count !in 1..20 || session.flowSubmittedResults + count > 20)
         throw ToolInputException("Puedes pedir hasta 20 resultados de Flow en este encargo.")
-    if (d.guard.state(plan.id) in listOf(PlanState.SUBMITTED, PlanState.UNCERTAIN, PlanState.DISCARDED))
+    if (d.guard.state(plan.id) in listOf(PlanState.SUBMITTED, PlanState.UNCERTAIN, PlanState.DISCARDED, PlanState.CONFIRMED))
         throw ToolInputException("Este trabajo ya se envió o se descartó; consulta su estado.")
     val job = try { d.lifecycle.confirmAndSubmit(plan.id, plan.fingerprint()) }
         catch(error: com.vidadomu.nexus.agent.core.spend.SubmissionUncertain) {
@@ -108,7 +108,17 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
                 val candidate = built.plan.let { p ->
                     if (projectName != null && project == null) p.copy(warnings = p.warnings + "El proyecto «$projectName» no existe todavía: créalo para que la generación quede asociada.") else p
                 }
-                val existing = if(input["new_copy"]?.toString() == "true") null else d.guard.plans().firstOrNull { p ->
+                val newCopy = input["new_copy"]?.toString() == "true"
+                val hasUncertainDuplicate = !newCopy && d.guard.plans().any { p ->
+                    d.guard.state(p.id) == PlanState.UNCERTAIN &&
+                        p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
+                        p.sceneCode == candidate.sceneCode && p.shotCode == candidate.shotCode &&
+                        p.characters == candidate.characters && p.parentGenerationId == candidate.parentGenerationId && p.task == candidate.task
+                }
+                if (d.directFlow && candidate.ref.providerId == "google_flow" && input["execute"]?.toString() == "true" && hasUncertainDuplicate) {
+                    return fail("Un envío idéntico de Flow quedó en estado incierto; comprueba Historial antes de reenviar con execute=true.")
+                }
+                val existing = if (newCopy) null else d.guard.plans().firstOrNull { p ->
                     d.guard.state(p.id) in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) &&
                         p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
                         p.sceneCode == candidate.sceneCode && p.shotCode == candidate.shotCode &&

@@ -396,6 +396,7 @@ def make_handler(proxy: NexusProxy):
                 self._send(404, {"error": {"code": "not_found", "message": "Ruta desconocida."}})
                 return
             try:
+                proxy.authenticate(self.headers.get("Authorization"))
                 length = int(self.headers.get("Content-Length") or 0)
                 if length > int(proxy.cfg["max_request_bytes"]):
                     raise ProxyError(413, "too_large", "Petición demasiado grande.")

@@ -36,11 +36,6 @@ class GenerationPollingWorker(
             if (pollResult.isSuccess) {
                 val job = pollResult.getOrThrow()
                 if (job.status == GenerationStatus.COMPLETED) {
-                    try {
-                        com.vidadomu.nexus.core.alexia.AlexiaBridge.classifyJob(applicationContext, job, repository)
-                    } catch (e: Exception) {
-                        Log.e("GenerationPollingWorker", "Error clasificando en Alexia: ${e.message}", e)
-                    }
                     showCompletionNotification(
                         title = "Nexus: ${job.modality.name.lowercase().replaceFirstChar { it.uppercase() }} Ready",
                         message = "Generation finished: \"${job.prompt.take(40)}...\"",
@@ -57,6 +52,8 @@ class GenerationPollingWorker(
                 } else if (job.status == GenerationStatus.CANCELLED) {
                     return Result.success()
                 }
+            } else if (repository.getJob(jobId) == null) {
+                return Result.failure()
             }
 
             // Adaptive backoff: 3s early, 6s later to protect battery

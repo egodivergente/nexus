@@ -136,20 +136,27 @@ class GenerationRepository(
             prompt=request.prompt,negativePrompt=request.negativePrompt,parameters=request.parameters + localMetadata,
             inputMediaUri=request.mediaInputs.firstOrNull()?.uriString,status=GenerationStatus.QUEUED)
         database.insertOrUpdateJob(pending)
-        val result=try {provider.submitGeneration(request)} catch(e:kotlinx.coroutines.CancellationException) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                database.insertOrUpdateJob(pending.copy(status=GenerationStatus.FAILED,error="Envío interrumpido. Comprueba el proveedor antes de repetir.",parameters=pending.parameters+("__submission_uncertain" to "true")))
-            };throw e
-        } catch(e:Exception) {Result.failure(e)}
-        if (result.isSuccess) database.insertOrUpdateJob(result.getOrThrow().let { it.copy(parameters = it.parameters + localMetadata) })
-        else {
-            val error=result.exceptionOrNull()
-            val definite=(error as? ProviderError)?.httpStatusCode?.let {it in setOf(400, 401, 402, 403, 404, 422)} == true
-            database.insertOrUpdateJob(pending.copy(status=GenerationStatus.FAILED,
-                error=if(definite) (error as? ProviderError)?.humanReadableMessage else "No se pudo confirmar el envío. Comprueba el proveedor antes de repetir; podría haberse iniciado.",
-                parameters=pending.parameters+("__submission_uncertain" to (!definite).toString())))
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
+            val result=try {provider.submitGeneration(request)} catch(e:Exception) {Result.failure(e)}
+            if (result.isSuccess) {
+                val submitted = result.getOrThrow().let { it.copy(parameters = it.parameters + localMetadata) }
+                database.insertOrUpdateJob(submitted)
+                if (context != null && submitted.status != GenerationStatus.COMPLETED) {
+                    com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context, submitted.id)
+                }
+            } else {
+                val error=result.exceptionOrNull()
+                val definite = error is IllegalArgumentException ||
+                    error is java.net.UnknownHostException ||
+                    error is java.net.ConnectException ||
+                    (error as? ProviderError)?.errorCode in setOf("NO_NETWORK") ||
+                    (error as? ProviderError)?.httpStatusCode?.let {it in setOf(400, 401, 402, 403, 404, 422, 429)} == true
+                database.insertOrUpdateJob(pending.copy(status=GenerationStatus.FAILED,
+                    error=if(definite) (error as? ProviderError)?.humanReadableMessage ?: error?.message else "No se pudo confirmar el envío. Comprueba el proveedor antes de repetir; podría haberse iniciado.",
+                    parameters=pending.parameters+("__submission_uncertain" to (!definite).toString())))
+            }
+            result
         }
-        return result
     }
 
     private val pollLocks = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
@@ -200,20 +207,49 @@ class GenerationRepository(
         return pollResult
     }
 
-    suspend fun refreshConfirmedCost(jobId:String):Result<GenerationJob> {
-        val current=database.getJobById(jobId) ?: return Result.failure(ProviderError("Resultado no encontrado"))
-        val provider=providerRegistry.getProviderById(current.providerId)
-            ?: return Result.failure(ProviderError("Proveedor no disponible"))
-        return provider.pollJobStatus(current).map { remote ->
-            val updated=current.copy(actualCostUsd=remote.actualCostUsd ?: current.actualCostUsd,
-                outputs=if(remote.outputs.isEmpty()) current.outputs else remote.outputs.mapIndexed { index,output ->
-                    output.copy(localUri=current.outputs.getOrNull(index)?.localUri)
-                },
-                parameters=current.parameters + remote.parameters.filterKeys { it.startsWith("__actual_") })
-            database.insertOrUpdateJob(updated)
-            updated
+    suspend fun refreshConfirmedCost(jobId:String):Result<GenerationJob> =
+        pollLocks.getOrPut(jobId) { kotlinx.coroutines.sync.Mutex() }.withLock {
+            val current=database.getJobById(jobId) ?: return@withLock Result.failure(ProviderError("Resultado no encontrado"))
+            if (current.providerId == "google_flow" || current.providerJobId?.startsWith("queue_") == true) {
+                return@withLock Result.failure(ProviderError("Flow utiliza créditos de suscripción y no expone consulta de importe final por tarea."))
+            }
+            if (current.status != GenerationStatus.COMPLETED) {
+                return@withLock Result.failure(ProviderError("Solo se puede consultar el coste confirmado de generaciones completadas."))
+            }
+            val provider=providerRegistry.getProviderById(current.providerId)
+                ?: return@withLock Result.failure(ProviderError("Proveedor no disponible"))
+            provider.pollJobStatus(current).map { remote ->
+                val updated=current.copy(actualCostUsd=remote.actualCostUsd ?: current.actualCostUsd,
+                    outputs=if(remote.outputs.isEmpty()) current.outputs else remote.outputs.mapIndexed { index,output ->
+                        output.copy(localUri=current.outputs.getOrNull(index)?.localUri)
+                    },
+                    parameters=current.parameters + remote.parameters.filterKeys { it.startsWith("__actual_") })
+                database.insertOrUpdateJob(updated)
+                updated
+            }
         }
-    }
+
+    suspend fun cancelJob(jobId: String): Boolean =
+        pollLocks.getOrPut(jobId) { kotlinx.coroutines.sync.Mutex() }.withLock {
+            val current = database.getJobById(jobId) ?: return@withLock false
+            if (current.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
+                return@withLock false
+            }
+            context?.let { ctx ->
+                runCatching { androidx.work.WorkManager.getInstance(ctx).cancelUniqueWork("poll_$jobId") }
+            }
+            val remoteJobId = current.providerJobId
+            if (!remoteJobId.isNullOrBlank() && !remoteJobId.startsWith("queue_")) {
+                runCatching { providerRegistry.getProviderById(current.providerId)?.cancelJob(remoteJobId) }
+            }
+            val cancelled = current.copy(
+                status = GenerationStatus.CANCELLED,
+                completedAt = System.currentTimeMillis(),
+                error = "Seguimiento cancelado por el usuario."
+            )
+            database.insertOrUpdateJob(cancelled)
+            true
+        }
 
     suspend fun getJob(jobId: String): GenerationJob? {
         return database.getJobById(jobId)
@@ -224,6 +260,9 @@ class GenerationRepository(
     }
 
     suspend fun deleteJob(jobId: String) {
+        context?.let { ctx ->
+            runCatching { androidx.work.WorkManager.getInstance(ctx).cancelUniqueWork("poll_$jobId") }
+        }
         database.deleteJob(jobId)
     }
 }
@@ -242,7 +281,7 @@ class SettingsRepository(
     fun setMockMode(enabled: Boolean) = providerRegistry.setMockMode(enabled)
 
     suspend fun testConnection(apiKey: String): Result<Boolean> {
-        val provider = providerRegistry.getActiveProvider()
+        val provider = providerRegistry.getProviderById("atlas_cloud") ?: providerRegistry.getActiveProvider()
         return provider.testConnection(apiKey)
     }
 }

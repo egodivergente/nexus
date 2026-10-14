@@ -115,17 +115,32 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                     android.widget.Toast.makeText(context,if(recovered.isSuccess) "Estado consultado sin volver a generar" else "No se pudo consultar; se conserva el trabajo",android.widget.Toast.LENGTH_LONG).show()
                                 }})
                                 DropdownMenuItem(text={Text("Preparar de nuevo")},onClick={close();onPrepareAgain(job)})
-                                if(job.providerJobId!=null && job.providerId!="mock_provider") DropdownMenuItem(text={Text(if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) "Consultar coste" else "Actualizar estado")},onClick={close();
+                                val isTerminal = job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)
+                                val canCheckCost = job.status==GenerationStatus.COMPLETED && job.providerId !in setOf("mock_provider","google_flow") && job.providerJobId!=null && !job.providerJobId.startsWith("queue_")
+                                val canPollStatus = !isTerminal && job.providerId!="mock_provider" && job.providerJobId!=null
+                                if(canCheckCost || canPollStatus) DropdownMenuItem(text={Text(if(canCheckCost) "Consultar coste" else "Actualizar estado")},onClick={close();
                                     scope.launch {
-                                        val result=if(job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED)) app.generationRepository.refreshConfirmedCost(job.id) else app.generationRepository.pollJob(job.id)
+                                        val result=if(canCheckCost) app.generationRepository.refreshConfirmedCost(job.id) else app.generationRepository.pollJob(job.id)
                                         android.widget.Toast.makeText(context,
                                             if(result.isFailure) "No se pudo consultar el proveedor. Se conserva el trabajo sin volver a enviarlo."
-                                            else if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED)) "Estado actualizado: " + generationStatusLabel(result.getOrThrow())
+                                            else if(canPollStatus) "Estado actualizado: " + generationStatusLabel(result.getOrThrow())
                                             else if(result.getOrNull()?.actualCostUsd==null && result.getOrNull()?.parameters?.get("__actual_credits")==null) "El proveedor no ha informado un importe final."
                                             else "Coste actualizado",android.widget.Toast.LENGTH_LONG).show()
                                     }
                                 })
+                                if(!isTerminal) DropdownMenuItem(text={Text("Cancelar seguimiento")},onClick={close();
+                                    scope.launch {
+                                        val cancelled = app.generationRepository.cancelJob(job.id)
+                                        android.widget.Toast.makeText(context, if(cancelled) "Seguimiento cancelado" else "No se pudo cancelar el seguimiento", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                })
                                 DropdownMenuItem(text={Text("Diagnóstico")},onClick={close();selectedTechnicalJob=job})
+                                if(isTerminal) DropdownMenuItem(text={Text("Eliminar del historial")},onClick={close();
+                                    scope.launch {
+                                        app.generationRepository.deleteJob(job.id)
+                                        android.widget.Toast.makeText(context, "Trabajo eliminado del historial", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                })
                                 job.parameters[com.vidadomu.nexus.ui.create.ComparisonPlan.ID]?.let {id ->
                                     DropdownMenuItem(text={Text("Ver comparativa")},onClick={close();comparisonId=id})
                                 }

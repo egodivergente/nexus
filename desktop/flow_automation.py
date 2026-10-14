@@ -174,12 +174,18 @@ def submit(provider, data, args):
         return provider.status(data, identifier)
     if any(k in params for k in provider.INPUTS): provider.media_parameters(data,params)
     before = time.monotonic()
-    credits = None if account_direct else provider.quote(params,data)['amount']
+    raw_cost = args.get('cost')
+    has_numeric_cost = type(raw_cost) in {int, float} and math.isfinite(raw_cost) and raw_cost >= 0
+    credits = (raw_cost if has_numeric_cost else None) if account_direct else provider.quote(params,data)['amount']
     if credits is not None and (type(credits) not in {int,float} or not math.isfinite(credits) or credits<0):
         raise ValueError('Precio Flow no válido.')
-    if not account_direct and (args.get('cost') != credits or type(args.get('cost')) is bool):
+    if not account_direct and (raw_cost != credits or type(raw_cost) is bool):
         raise ValueError('Actualiza la estimación Flow antes del envío.')
-    if 'source_request_id' in params and params['model']!='video_edit': params['expected_credits']=credits
+    if 'source_request_id' in params and params['model']!='video_edit':
+        if credits is None:
+            quoted = provider.quote(params, data).get('amount')
+            credits = quoted if type(quoted) in {int, float} and math.isfinite(quoted) and quoted >= 0 else 0
+        params['expected_credits'] = int(credits)
     with provider.LOCK, database(provider, data) as db:
         db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT params FROM jobs WHERE id=?',(identifier,)).fetchone()

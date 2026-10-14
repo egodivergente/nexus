@@ -1,5 +1,5 @@
 'use strict';
-const Agent = {owner:crypto.randomUUID(),snapshot:null,settings:{},items:[],attachments:[],busy:false,generating:false,callbacks:new Set(),draft:'',error:'',cardAnchors:new Map(),expandedBatches:new Set()};
+const Agent = {owner:(()=>{try{let id=sessionStorage.getItem('nexus_agent_owner');if(!id){id=crypto.randomUUID();sessionStorage.setItem('nexus_agent_owner',id);}return id;}catch{return crypto.randomUUID();}})(),snapshot:null,settings:{},items:[],attachments:[],busy:false,generating:false,callbacks:new Set(),draft:'',error:'',cardAnchors:new Map(),expandedBatches:new Set()};
 // Keep the editor and unchanged messages alive across job/status updates.
 const agentMarkup=new WeakMap();
 function agentNodeKey(node){return node.dataset.agentMessage||node.dataset.agentCard||node.id||node.className;}

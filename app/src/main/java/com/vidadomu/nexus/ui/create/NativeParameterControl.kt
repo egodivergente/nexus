@@ -48,14 +48,14 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
             }
             when {
                 param.type == ParameterType.BOOLEAN -> {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (!param.isRequired) ParameterChip(param, "", value, onChange, "Automático")
                         ParameterChip(param, "true", value, onChange, "Sí")
                         ParameterChip(param, "false", value, onChange, "No")
                     }
                 }
                 choices.isNotEmpty() && choices.size <= 6 -> {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (!param.isRequired) ParameterChip(param, "", value, onChange)
                         choices.forEach { ParameterChip(param, it, value, onChange) }
                     }

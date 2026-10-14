@@ -130,6 +130,31 @@ class IntegrityTests(unittest.TestCase):
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=2)
 
+    def test_deleted_job_ids_prevent_stale_window_resurrection(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)):
+            host.write_state({'jobs': [{'id': 'keep', 'status': 'COMPLETED'}, {'id': 'remove', 'status': 'FAILED'}]})
+            stale = host.read_state()
+            host.write_state({'jobs': [{'id': 'keep', 'status': 'COMPLETED'}], 'deletedJobIds': ['remove']})
+            host.write_state(stale)
+            saved = host.read_state()
+            self.assertEqual([j['id'] for j in saved['jobs']], ['keep'])
+            self.assertIn('remove', saved.get('deletedJobIds', []))
+
+    def test_generate_persists_remote_id_before_http_response_returns(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)), patch.object(host, 'OFFLINE_QA', False):
+            host.write_state({'jobs': [{'id': 'job-1', 'providerId': 'atlas_cloud', 'status': 'SENDING'}]})
+            with patch.object(host, 'provider_request', return_value={'data': {'id': 'pred-999'}}):
+                res = host.dispatch({'atlas_cloud': 'key'}, 'generate', {
+                    'provider': 'atlas_cloud',
+                    'path': '/api/v1/model/generateImage',
+                    'body': {'model': 'flux', 'prompt': 'test'},
+                    'cost': 0.05,
+                })
+            self.assertEqual(res['data']['id'], 'pred-999')
+            persisted = host.read_state()['jobs'][0]
+            self.assertEqual(persisted['remoteId'], 'pred-999')
+            self.assertEqual(persisted['status'], 'PROCESSING')
+
 
 if __name__ == '__main__':
     unittest.main()

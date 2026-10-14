@@ -141,7 +141,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun send(text: String, retryAttachments: List<Attachment>? = null): Boolean {
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
-        if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking) return false
+        if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
         if(atts.count {AgentDocuments.format(it.mimeType,it.name)!=null}>5) {
             _ui.update {it.copy(message=msg("Bedrock admite 5 documentos por mensaje. Quita alguno y envíalo en el siguiente; tu borrador se conserva."))}
             return false
@@ -361,10 +361,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun restoreSavedChat(saved: SavedAssistantChat) {
         val plans = saved.plans.mapValues { (_, p) ->
-            if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, error = "La app se cerró durante el envío. Comprueba Historial antes de repetir.")
+            if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, includeInBatch = false, error = "La app se cerró durante el envío. Comprueba Historial antes de repetir.")
             else if (p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) {
-                runtime.guard.register(p.plan); p.copy(state = PlanState.PREPARED, busy = false)
-            } else p.copy(busy = false)
+                runtime.guard.register(p.plan); p.copy(state = PlanState.PREPARED, busy = false, includeInBatch = false)
+            } else p.copy(busy = false, includeInBatch = false)
         }
         _ui.update { it.copy(items = saved.items, plans = plans, pendingAttachments = saved.attachments) }
         // Recheck only the old reference-validation failures; never submit restored plans.

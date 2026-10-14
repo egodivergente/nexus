@@ -109,6 +109,10 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         }
     }
 
+    override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // Preserve existing rows on downgrade instead of throwing SQLiteException at startup.
+    }
+
     private fun reloadJobsSync() {
         val jobs = queryAllJobsSync()
         _jobsFlow.value = jobs
@@ -211,12 +215,14 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         val providerJobId = cursor.getString(cursor.getColumnIndexOrThrow("provider_job_id"))
         val providerId = cursor.getString(cursor.getColumnIndexOrThrow("provider_id"))
         val modelId = cursor.getString(cursor.getColumnIndexOrThrow("model_id"))
-        val modality = Modality.valueOf(cursor.getString(cursor.getColumnIndexOrThrow("modality")))
+        val modalityStr = cursor.getString(cursor.getColumnIndexOrThrow("modality")).orEmpty()
+        val modality = runCatching { Modality.valueOf(modalityStr) }.getOrDefault(Modality.IMAGE)
         val prompt = cursor.getString(cursor.getColumnIndexOrThrow("prompt"))
         val negativePrompt = cursor.getString(cursor.getColumnIndexOrThrow("negative_prompt")) ?: ""
         val paramsJson = cursor.getString(cursor.getColumnIndexOrThrow("parameters_json")) ?: "{}"
         val inputMediaUri = cursor.getString(cursor.getColumnIndexOrThrow("input_media_uri"))
-        val status = GenerationStatus.valueOf(cursor.getString(cursor.getColumnIndexOrThrow("status")))
+        val statusStr = cursor.getString(cursor.getColumnIndexOrThrow("status")).orEmpty()
+        val status = runCatching { GenerationStatus.valueOf(statusStr) }.getOrDefault(GenerationStatus.FAILED)
         val progress = if (cursor.isNull(cursor.getColumnIndexOrThrow("progress"))) null else cursor.getFloat(cursor.getColumnIndexOrThrow("progress"))
         val startedAt = cursor.getLong(cursor.getColumnIndexOrThrow("started_at"))
         val completedAt = if (cursor.isNull(cursor.getColumnIndexOrThrow("completed_at"))) null else cursor.getLong(cursor.getColumnIndexOrThrow("completed_at"))
@@ -265,11 +271,12 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         val outCursor = db.rawQuery(sql, args)
         outCursor.use { oc ->
             while (oc.moveToNext()) {
+                val typeStr = oc.getString(oc.getColumnIndexOrThrow("type")).orEmpty()
                 outputs.add(
                     GenerationOutput(
                         id = oc.getString(oc.getColumnIndexOrThrow("id")),
                         jobId = oc.getString(oc.getColumnIndexOrThrow("job_id")),
-                        type = Modality.valueOf(oc.getString(oc.getColumnIndexOrThrow("type"))),
+                        type = runCatching { Modality.valueOf(typeStr) }.getOrDefault(Modality.IMAGE),
                         url = oc.getString(oc.getColumnIndexOrThrow("url")),
                         localUri = oc.getString(oc.getColumnIndexOrThrow("local_uri")),
                         mimeType = oc.getString(oc.getColumnIndexOrThrow("mime_type")) ?: "",

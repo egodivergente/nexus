@@ -1,7 +1,9 @@
 """Bounded web reading and Android-compatible Streamable HTTP MCP adapters."""
 from html.parser import HTMLParser
+import ipaddress
 import json
 import re
+import socket
 import urllib.parse
 import urllib.request
 import uuid
@@ -14,6 +16,31 @@ def url(value):
     if parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError('Introduce una URL HTTP o HTTPS sin credenciales incrustadas.')
     return str(value)
+
+
+def public_url(value):
+    checked = url(value)
+    host = (urllib.parse.urlsplit(checked).hostname or '').lower().strip('[]')
+    if host == 'localhost' or host.endswith('.localhost') or host.endswith('.local'):
+        raise ValueError('Por seguridad, read_web_page solo accede a páginas públicas de Internet.')
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified or ip.is_reserved:
+            raise ValueError('Por seguridad, read_web_page no accede a direcciones locales o privadas.')
+    except ValueError as err:
+        if 'Por seguridad' in str(err):
+            raise
+        try:
+            for info in socket.getaddrinfo(host, None):
+                addr = ipaddress.ip_address(info[4][0].split('%')[0])
+                if addr.is_loopback or addr.is_private or addr.is_link_local or addr.is_unspecified:
+                    raise ValueError('Por seguridad, read_web_page no accede a direcciones locales o privadas.')
+        except ValueError as inner:
+            if 'Por seguridad' in str(inner):
+                raise
+        except OSError:
+            pass
+    return checked
 
 
 def bounded(response, maximum=2_000_000):
@@ -148,13 +175,13 @@ def run(native, operation, args):
             root = ET.fromstring(bounded(response))
         return {'query': args['query'], 'results': [{'title': node.findtext('title'), 'url': node.findtext('link'), 'snippet': node.findtext('description')} for node in root.findall('.//item')[:10]]}
     if operation == 'read_web_page':
-        endpoint = url(args['url'])
+        endpoint = public_url(args['url'])
         with urllib.request.urlopen(urllib.request.Request(endpoint, headers={'User-Agent': 'NexusStudio/1.9.2'}), timeout=30) as response:
+            final_url = public_url(response.url)
             mime = response.headers.get('Content-Type', '')
             if not any(kind in mime for kind in ['text/', 'application/xhtml+xml', 'application/json']):
                 raise ValueError('La URL no devuelve una página o documento de texto.')
             text = bounded(response).decode(response.headers.get_content_charset() or 'utf-8', errors='replace')
-            final_url = response.url
         parser = PageText()
         parser.feed(text)
         content = re.sub('[ \t]+', ' ', ''.join(parser.parts)).strip()
@@ -170,7 +197,9 @@ def run(native, operation, args):
     credentials = native.host.read_secret(secrets_path)
     if operation == 'connect_mcp_server':
         endpoint = url(args['url'])
-        token = str(args.get('token', credentials.get(identifier, '')))
+        previous_url = (servers.get(identifier) or {}).get('url', '')
+        same_host = bool(previous_url) and urllib.parse.urlsplit(previous_url).netloc.lower() == urllib.parse.urlsplit(endpoint).netloc.lower()
+        token = str(args['token']) if 'token' in args and args['token'] is not None else (credentials.get(identifier, '') if same_host else '')
         client = MCP(endpoint, token)
         catalog = client.tools()
         old = native.mcp.get(identifier)
@@ -181,6 +210,9 @@ def run(native, operation, args):
         atomic_json(path, servers)
         if args.get('token'):
             credentials[identifier] = token
+            native.host.write_secret(secrets_path, credentials)
+        elif not same_host and identifier in credentials:
+            credentials.pop(identifier, None)
             native.host.write_secret(secrets_path, credentials)
         return {'server_id': identifier, 'connected': True, **catalog}
     if operation == 'disconnect_mcp_server':

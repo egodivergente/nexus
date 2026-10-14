@@ -285,9 +285,12 @@ class NativeOperations:
             if not info['has_audio']:
                 raise ValueError('Este medio no tiene audio para transcribir.')
             wav = self.directory / (uuid.uuid4().hex+'.wav')
-            self.encode(['-ss', start/1000, '-i', source, '-t', (end-start)/1000, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wav])
             prefix = self.media / uuid.uuid4().hex
-            self.process([status['executable'], '-m', status['model'], '-f', str(wav), '-t', '2', '-l', 'auto', '-otxt', '-osrt', '-of', str(prefix)], 3600)
+            try:
+                self.encode(['-ss', start/1000, '-i', source, '-t', (end-start)/1000, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wav])
+                self.process([status['executable'], '-m', status['model'], '-f', str(wav), '-t', '2', '-l', 'auto', '-otxt', '-osrt', '-of', str(prefix)], 3600)
+            finally:
+                wav.unlink(missing_ok=True)
             result = [self.output(prefix.with_suffix(ext), parent['displayName']+' · transcripción'+ext, parent, 'OTHER') for ext in ['.txt', '.srt']]
             # Whisper starts subtitles at the extracted interval's zero; preserve the source offset in metadata.
             for asset in result:
@@ -447,10 +450,14 @@ class NativeOperations:
             if target.exists() and target != path:
                 raise ValueError('Ya existe un archivo con ese nombre.')
             aliases_path = self.data / 'media-aliases.json'
+            cache_path = self.data / 'remote-media-cache.json'
             with self.lock:
                 aliases = json.loads(aliases_path.read_text('utf-8')) if aliases_path.exists() else {}
-                old_identifier = asset['uri'].split('/')[-1]
-                path.rename(target)
+                cache = json.loads(cache_path.read_text('utf-8')) if cache_path.exists() else {}
+                local_uri = cache.get(asset['id'], asset['uri']) if str(asset.get('uri', '')).startswith('https://') else asset['uri']
+                old_identifier = local_uri.split('/')[-1]
+                if path != target:
+                    path.rename(target)
                 aliases[old_identifier] = name
                 for key, value in list(aliases.items()):
                     if value == path.name:
@@ -458,10 +465,11 @@ class NativeOperations:
                 try:
                     atomic_json(aliases_path, aliases)
                 except Exception:
-                    target.rename(path)
+                    if target.exists() and target != path:
+                        target.rename(path)
                     raise
-            result = {**asset, 'displayName': name}
-            return {'renamed': True, 'uri': asset['uri'], 'file_name': name, '_assets': [result]}
+            result = {**asset, 'displayName': name, 'uri': local_uri}
+            return {'renamed': True, 'uri': local_uri, 'file_name': name, '_assets': [result]}
         if operation == 'convert_image_asset':
             from PIL import Image, ImageOps
             parent, path = self.asset(args['asset_id'], assets)

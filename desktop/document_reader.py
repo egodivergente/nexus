@@ -19,12 +19,14 @@ def extract_pdf(path):
 if __name__ == '__main__':
     from pypdf import PdfReader
     reader = PdfReader(sys.argv[1])
+    total_pages = len(reader.pages)
     pages = []
-    for page in reader.pages:
-        text = page.extract_text() or ''
-        if not text.strip():
-            pages = []
-            break
-        pages.append(text)
-    result = ('Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n' + '\n'.join(f'[Página {i+1}]\n{text}' for i,text in enumerate(pages))) if pages else None
+    non_empty = 0
+    for index, page in enumerate(reader.pages):
+        text = (page.extract_text() or '').strip()
+        if text:
+            non_empty += 1
+            pages.append((index + 1, text))
+    usable = non_empty > 0 and (non_empty == total_pages or (total_pages > 2 and non_empty * 2 >= total_pages))
+    result = ('Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n' + '\n'.join(f'[Página {num}]\n{text}' for num, text in pages)) if usable else None
     sys.stdout.buffer.write(json.dumps(result,ensure_ascii=False).encode('utf-8'))

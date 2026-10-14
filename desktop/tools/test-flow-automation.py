@@ -26,6 +26,11 @@ class QueueTests(unittest.TestCase):
             self.quote.assert_not_called()
         with self.assertRaisesRegex(ValueError,'20'):
             flow.submit(self.data,self.args('over',account_direct=True,count=21,cost=None))
+        with patch.object(flow,'call',side_effect=self.proof) as call:
+            flow.submit(self.data,{'request_id':'upscale1','model':'image_upscale','source_request_id':'orig1','resolution':'2k','account_direct':True,'cost':0})
+            self.settled()
+            self.assertEqual(call.call_args.args[0],'flow_process_asset')
+            self.assertIs(type(call.call_args.args[1]['expected_credits']),int)
     def test_direct_uncertain_does_not_freeze_other_requested_jobs(self):
         flow.automation_configure(self.data,{'paused':True})
         flow.submit(self.data,self.args(account_direct=True,cost=None))

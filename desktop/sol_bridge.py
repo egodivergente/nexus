@@ -6,19 +6,33 @@ the S25 online in Tailscale; the separate Bedrock option stays available.
 import socket
 import subprocess
 import time
+import urllib.request
 from pathlib import Path
 
 PORT = 18787
+
+
+def _healthy():
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{PORT}/health', timeout=0.6) as response:
+            return response.status == 200
+    except Exception:
+        return False
 
 
 def ensure(host):
     settings = host.settings()
     if settings.get('backend') != 'proxy' or settings.get('endpoint') != f'http://127.0.0.1:{PORT}':
         return
-    with socket.socket() as probe:
-        probe.settimeout(.3)
-        if probe.connect_ex(('127.0.0.1', PORT)) == 0:
-            return
+    if _healthy():
+        return
+    existing = getattr(host, 'tunnel', None)
+    if existing is not None and existing.poll() is None:
+        try:
+            existing.terminate()
+            existing.wait(timeout=1)
+        except Exception:
+            pass
     ssh = Path('C:/Windows/System32/OpenSSH/ssh.exe')
     host.tunnel = subprocess.Popen([str(ssh), '-N', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
         '-o', 'ConnectTimeout=7', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30',
@@ -31,7 +45,11 @@ def ensure(host):
             raise ValueError('No se pudo conectar con Sol en el S25. Comprueba Tailscale y el puente del móvil.')
         with socket.socket() as probe:
             probe.settimeout(.2)
-            if probe.connect_ex(('127.0.0.1', PORT)) == 0:
+            if probe.connect_ex(('127.0.0.1', PORT)) == 0 and _healthy():
                 return
         time.sleep(.1)
+    try:
+        host.tunnel.terminate()
+    except Exception:
+        pass
     raise ValueError('El S25 no respondió. El mensaje se conserva; no se ha enviado a otro modelo.')

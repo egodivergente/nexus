@@ -28,6 +28,17 @@ internal class AgentInternet(private val app:NexusApplication) {
     private fun text(input:JsonObject,key:String)=input[key]?.jsonPrimitive?.contentOrNull.orEmpty()
     private fun url(raw:String):okhttp3.HttpUrl = raw.toHttpUrlOrNull()?.takeIf {it.username.isEmpty() && it.password.isEmpty()}
         ?: throw ToolInputException("Indica una URL HTTP o HTTPS válida, sin credenciales incrustadas.")
+    private fun requirePublicHost(target:okhttp3.HttpUrl):okhttp3.HttpUrl {
+        val host=target.host.lowercase().trim('[',']')
+        if(host=="localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
+            throw ToolInputException("Por seguridad, read_web_page solo accede a páginas públicas de Internet.")
+        }
+        val addr=runCatching {java.net.InetAddress.getByName(host)}.getOrNull()
+        if(addr!=null && (addr.isLoopbackAddress || addr.isLinkLocalAddress || addr.isSiteLocalAddress || addr.isAnyLocalAddress || addr.hostAddress?.startsWith("100.64.")==true || addr.hostAddress?.startsWith("169.254.")==true)) {
+            throw ToolInputException("Por seguridad, read_web_page no accede a direcciones locales o privadas.")
+        }
+        return target
+    }
     private fun bounded(response:okhttp3.Response):String {
         val body=response.body ?: throw ToolInputException("La respuesta está vacía.")
         val source=body.source();source.request(2_000_001)
@@ -86,10 +97,10 @@ internal class AgentInternet(private val app:NexusApplication) {
             if(results.isEmpty()) put("message","El buscador no devolvió resultados legibles. No inventes resultados: prueba otra consulta o una URL.")}
     }
     private fun page(raw:String):JsonObject {
-        var current=url(raw)
+        var current=requirePublicHost(url(raw))
         repeat(6) {
             http.newCall(Request.Builder().url(current).header("User-Agent","Mozilla/5.0 (compatible; NexusStudio/1.8)").build()).execute().use {response ->
-                if(response.isRedirect) {current=current.resolve(response.header("Location").orEmpty()) ?: throw ToolInputException("Redirección no válida.");return@repeat}
+                if(response.isRedirect) {current=requirePublicHost(current.resolve(response.header("Location").orEmpty()) ?: throw ToolInputException("Redirección no válida."));return@repeat}
                 if(!response.isSuccessful) throw ToolInputException("La página respondió HTTP ${response.code}. Puede requerir acceso o no estar disponible.")
                 val type=response.header("Content-Type").orEmpty()
                 if(type.isNotBlank() && !type.startsWith("text/") && "json" !in type && "xml" !in type) throw ToolInputException("Este enlace es un archivo. Adjunta PDF o Word al chat para leer documentos.")

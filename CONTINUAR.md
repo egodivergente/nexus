@@ -6,6 +6,9 @@ Estado actual: Android 1.9.3-agent / vc37 y Windows 1.9.3-agent-desktop.
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
 `docs/RELEASE-193-CONSOLIDADA-20261013.md` y `MIGRATION-STATUS.json`.
+El 14 de octubre de 2026 se aplicaron las mejoras de la auditoría integral
+(seguridad de cobro, idempotencia, concurrencia, puentes Flow/Sol y paridad del
+núcleo del agente). Véase `CHANGELOG.md` y `docs/MEJORAS-AUDITORIA-20261014.md`.
 
 Antes de trabajar, leer `AGENTS.md`, hacer fetch, comprobar versiones instaladas
 y crear una rama propia desde `main`. No asumir que el directorio antiguo

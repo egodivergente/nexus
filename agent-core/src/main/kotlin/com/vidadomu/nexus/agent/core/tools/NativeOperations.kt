@@ -41,7 +41,7 @@ object NativeOperationTools {
         NativeTool(operations, "update_nexus_settings", ToolCategory.ORGANIZE,
             "Cambia ajustes reales; el modelo se aplica en el siguiente mensaje. No cambia claves ni conexiones.",
             schema {
-                string("agent_model", "Modelo del agente. La disponibilidad depende de la cuenta Bedrock.", enum = listOf("sonnet-5.5", "opus-5.5", "sonnet-4.6", "opus-4.6", "haiku-4.5"))
+                string("agent_model", "Modelo del agente. La disponibilidad depende de la conexión.", enum = listOf("sol", "sonnet-5.5", "opus-5.5", "sonnet-4.6", "opus-4.6", "haiku-4.5"))
                 integer("max_tokens", "De 256 a 32000.")
                 boolean("send_images", "Permitir enviar adjuntos visuales al agente.")
                 string("excluded_families", "Familias que no se recomiendan, separadas por comas.")
@@ -105,7 +105,8 @@ private class NativeTool(
 ) : BaseTool(name, category, description, inputSchema) {
     override fun describe(input: JsonObject) = description + if (input.isEmpty()) "" else " · $input"
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome = try {
-        ok(operations.run(name, input, session))
+        val result = operations.run(name, input, session)
+        if (result["isError"]?.toString() == "true") fail(result.toString()) else ok(result)
     } catch (error: CancellationException) {
         throw error
     } catch (error: ToolInputException) {

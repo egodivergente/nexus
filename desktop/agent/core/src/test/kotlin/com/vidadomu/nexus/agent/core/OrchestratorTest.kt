@@ -223,4 +223,30 @@ class OrchestratorTest {
         assertEquals("content://media/kf.png", conv.session.attachment("att_1")?.uri)
         assertNull(conv.session.attachment("att_2"))
     }
+
+    @Test fun `cancelar herramienta en curso cierra toolResult y permite continuar el chat`() = runTest {
+        val h = Harness()
+        val cancellingTool = object : AgentTool {
+            override val name = "slow_cancel_tool"
+            override val description = "Cancela"
+            override val category = ToolCategory.READ
+            override val inputSchema = JsonObject(emptyMap())
+            override suspend fun run(input: JsonObject, session: AgentSession): ToolOutcome {
+                throw kotlinx.coroutines.CancellationException("Detenido por el usuario")
+            }
+        }
+        val llm = ScriptedLlmProvider(listOf(
+            { tools(use("u_cancel", "slow_cancel_tool")) },
+            { r ->
+                r.messages.zipWithNext().forEach { (a, b) -> assertTrue(a.role != b.role, "roles consecutivos iguales tras cancelar") }
+                assertTrue(r.result("u_cancel").isError)
+                text("Recuperado tras cancelar")
+            },
+        ))
+        val o = AgentOrchestrator(llm, config, NexusToolkit.all(h.deps) + cancellingTool, h.skills, h.assets)
+        val conv = o.newConversation()
+        assertFailsWith<kotlinx.coroutines.CancellationException> { o.send(conv, "ejecuta lento") }
+        val next = o.send(conv, "sigue ahora")
+        assertEquals("Recuperado tras cancelar", next.text)
+    }
 }

@@ -208,9 +208,15 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
                 providerId = "google_flow", modelId = plan.ref.modelId, modality = Modality.valueOf(plan.modality), prompt = plan.prompt,
                 parameters = plan.params + mapOf(com.vidadomu.nexus.provider.flow.FlowBridgeProvider.EXPECTED_OUTPUT_KEY to plan.modality.lowercase()),
                 mediaInputs = media)
-            val job = app.generationRepository.submitGeneration(request, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt))).getOrThrow()
-            if (job.status == GenerationStatus.FAILED) error(job.error ?: "Flow no aceptó el envío.")
+            val job = app.generationRepository.submitGeneration(request, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt))).getOrElse { err ->
+                val stored = withContext(NonCancellable) { runCatching { app.generationRepository.getJob(jobId) }.getOrNull() }
+                if (stored != null && (stored.parameters["__submission_uncertain"] == "true" || stored.status != GenerationStatus.FAILED)) {
+                    throw SubmissionUncertain("Envío Flow pendiente de comprobar.", stored.id)
+                }
+                throw err
+            }
             if (job.parameters["__submission_uncertain"] == "true") throw SubmissionUncertain("Envío Flow pendiente de comprobar.", job.id)
+            if (job.status == GenerationStatus.FAILED) error(job.error ?: "Flow no aceptó el envío.")
             if (job.status != GenerationStatus.COMPLETED) com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(app, job.id)
             return SubmitResult(job.id)
         }
@@ -253,8 +259,7 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
         const val PLAN_KEY = "__assistant_plan"
     }
 
-    /** Nexus no expone cancelación de trabajos remotos: se dice claramente en lugar de fingirla. */
-    override suspend fun cancel(jobId: String): Boolean = false
+    override suspend fun cancel(jobId: String): Boolean = app.generationRepository.cancelJob(jobId)
 }
 
 class NexusHistorySource(private val app: NexusApplication) : GenerationHistorySource {

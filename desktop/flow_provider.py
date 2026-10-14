@@ -399,17 +399,24 @@ def status(data, request_id):
         source = Path(artifact['path']).resolve()
         if not source.is_relative_to((RUNTIME / 'results').resolve()) or source.suffix.lower() not in {'.png','.jpg','.jpeg','.webp','.mp4','.gif'}:
             raise ValueError('Resultado Flow fuera del almacén permitido.')
-        digest = hashlib.sha256(source.read_bytes()).hexdigest()
-        if digest != artifact.get('sha256'):
-            raise ValueError('La integridad del resultado Flow no coincide.')
-        destination = Path(data) / 'media' / (digest[:32] + source.suffix.lower())
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if not destination.exists():
-            temporary = destination.with_suffix(destination.suffix + '.tmp-' + threading.current_thread().name)
-            shutil.copyfile(source, temporary)
-            temporary.replace(destination)
-        if hashlib.sha256(destination.read_bytes()).hexdigest() != digest:
-            raise ValueError('La copia local de Flow no coincide.')
+        expected_sha = str(artifact.get('sha256') or '')
+        fast_dest = (Path(data) / 'media' / (expected_sha[:32] + source.suffix.lower())) if re.fullmatch(r'[a-f0-9]{64}', expected_sha) else None
+        if fast_dest and fast_dest.is_file() and source.is_file() and fast_dest.stat().st_size == source.stat().st_size > 0:
+            digest = expected_sha
+            destination = fast_dest
+        else:
+            source_bytes = source.read_bytes()
+            digest = hashlib.sha256(source_bytes).hexdigest()
+            if digest != expected_sha:
+                raise ValueError('La integridad del resultado Flow no coincide.')
+            destination = Path(data) / 'media' / (digest[:32] + source.suffix.lower())
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if not destination.exists():
+                temporary = destination.with_suffix(destination.suffix + '.tmp-' + threading.current_thread().name)
+                shutil.copyfile(source, temporary)
+                temporary.replace(destination)
+            if hashlib.sha256(destination.read_bytes()).hexdigest() != digest:
+                raise ValueError('La copia local de Flow no coincide.')
         response['outputs'].append('/media/' + destination.name)
         response.update(sha256=digest,
             dimensions=artifact.get('dimensions'), duration_seconds=artifact.get('duration_seconds'),

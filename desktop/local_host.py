@@ -109,13 +109,15 @@ def agent_host():
 
 
 def read_state():
-    path = DATA / 'state.json'
-    return json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else None
+    with STATE_LOCK:
+        path = DATA / 'state.json'
+        return json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else None
 
 
-def merge_jobs(incoming, previous):
+def merge_jobs(incoming, previous, deleted_ids=()):
     """Keep jobs from other windows and prevent stale terminal-state regression."""
-    previous_by_id = {job.get('id'): job for job in previous if isinstance(job, dict) and job.get('id')}
+    deleted = set(deleted_ids or ())
+    previous_by_id = {job.get('id'): job for job in previous if isinstance(job, dict) and job.get('id') and job.get('id') not in deleted}
     merged = []
     seen = set()
     terminal = {'COMPLETED', 'FAILED', 'CANCELLED'}
@@ -123,7 +125,7 @@ def merge_jobs(incoming, previous):
         if not isinstance(job, dict) or not job.get('id'):
             raise ValueError('Trabajo sin identificador.')
         identifier = job['id']
-        if identifier in seen:
+        if identifier in seen or identifier in deleted:
             continue
         seen.add(identifier)
         old = previous_by_id.get(identifier)
@@ -151,7 +153,7 @@ def merge_jobs(incoming, previous):
                 current['uncertain'] = False
         merged.append(current)
     merged.extend(dict(job) for job in previous if isinstance(job, dict)
-                  and job.get('id') and job['id'] not in seen)
+                  and job.get('id') and job['id'] not in seen and job['id'] not in deleted)
     return merged
 
 
@@ -161,7 +163,10 @@ def write_state(value):
     with STATE_LOCK:
         path = DATA / 'state.json'
         previous = json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else {}
-        value = {**value, 'jobs': merge_jobs(value['jobs'], previous.get('jobs', []))}
+        deleted_ids = list(dict.fromkeys([*(previous.get('deletedJobIds') or []), *(value.get('deletedJobIds') or [])]))[-500:]
+        value = {**value, 'jobs': merge_jobs(value['jobs'], previous.get('jobs', []), deleted_ids)}
+        if deleted_ids:
+            value['deletedJobIds'] = deleted_ids
         temporary = DATA / 'state.json.tmp'
         temporary.write_text(json.dumps(value, ensure_ascii=False), encoding='utf-8')
         if path.exists():
@@ -547,7 +552,25 @@ def dispatch(keys, operation, args):
         unavailable = cost is None and args.get('estimate_status') == 'unavailable'
         if not unavailable and (isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0):
             raise ValueError('Estimación no válida.')
-        return provider_request(keys, args['provider'], args['path'], 'POST', args['body'], paid=True)
+        result = provider_request(keys, args['provider'], args['path'], 'POST', args['body'], paid=True)
+        if isinstance(result, dict):
+            payload = result.get('data') if isinstance(result.get('data'), dict) else result
+            remote_id = payload.get('id') or payload.get('task_id')
+            if remote_id:
+                try:
+                    current_state = read_state()
+                    if isinstance(current_state, dict) and isinstance(current_state.get('jobs'), list):
+                        target_id = args.get('job_id')
+                        for item in current_state['jobs']:
+                            if isinstance(item, dict) and ((target_id and item.get('id') == target_id) or (not target_id and item.get('status') == 'SENDING' and item.get('providerId') == args['provider'] and not item.get('remoteId'))):
+                                item['remoteId'] = str(remote_id)
+                                if item.get('status') == 'SENDING':
+                                    item['status'] = 'PROCESSING'
+                                write_state(current_state)
+                                break
+                except Exception:
+                    pass
+        return result
     if operation == 'upload':
         if OFFLINE_QA:
             raise ValueError('Laboratorio: subidas bloqueadas.')

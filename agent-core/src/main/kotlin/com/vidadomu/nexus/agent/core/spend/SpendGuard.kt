@@ -97,6 +97,7 @@ class SpendGuard(
     private val tickets = ConcurrentHashMap<String, ExecutionTicket>()
     private val used = ConcurrentHashMap.newKeySet<String>()
 
+    @Synchronized
     fun register(plan: GenerationPlan): GenerationPlan {
         plans[plan.id] = plan
         states[plan.id] = PlanState.PREPARED
@@ -108,15 +109,17 @@ class SpendGuard(
     fun plans(): List<GenerationPlan> = plans.values.sortedByDescending { it.createdAt }
 
     /** El agente pide ejecutar: queda a la espera del usuario. No ejecuta nada. */
+    @Synchronized
     fun requestConfirmation(planId: String): PlanState {
         plans[planId] ?: throw IllegalArgumentException("Plan desconocido: $planId")
         val s = states[planId]
-        if (s == PlanState.SUBMITTED || s == PlanState.DISCARDED) return s
+        if (s == PlanState.SUBMITTED || s == PlanState.DISCARDED || s == PlanState.UNCERTAIN || s == PlanState.CONFIRMED) return s
         states[planId] = PlanState.AWAITING_CONFIRMATION
         return PlanState.AWAITING_CONFIRMATION
     }
 
     /** Sustituye un plan (edición del usuario en la tarjeta o update_plan). Invalida tickets previos. */
+    @Synchronized
     fun replace(plan: GenerationPlan) {
         require(plans.containsKey(plan.id)) { "Plan desconocido: ${plan.id}" }
         val s = states[plan.id]
@@ -134,11 +137,14 @@ class SpendGuard(
      * El envío falló SIN llegar al proveedor: el plan vuelve a PREPARED y hace falta pulsar
      * GENERAR otra vez (nunca se reintenta solo).
      */
+    @Synchronized
     fun markSubmitFailed(planId: String) { if (plans.containsKey(planId)) states[planId] = PlanState.PREPARED }
 
     /** El envío pudo llegar al proveedor: se bloquea el plan para no pagar dos veces. */
+    @Synchronized
     fun markUncertain(planId: String) { if (plans.containsKey(planId)) states[planId] = PlanState.UNCERTAIN }
 
+    @Synchronized
     fun discard(planId: String) {
         if (states[planId] == PlanState.SUBMITTED || states[planId] == PlanState.UNCERTAIN) return
         states[planId] = PlanState.DISCARDED; tickets.values.removeIf { it.planId == planId }
@@ -149,10 +155,12 @@ class SpendGuard(
      * [expectedFingerprint] = huella del plan que el usuario TENÍA DELANTE en el diálogo: si el plan
      * cambió mientras confirmaba (p. ej. update_plan del LLM), no se emite ticket.
      */
+    @Synchronized
     fun confirmByUser(planId: String, expectedFingerprint: String? = null): ExecutionTicket {
         val plan = plans[planId] ?: throw IllegalArgumentException("Plan desconocido: $planId")
         val s = states[planId]
         if (s == PlanState.SUBMITTED) throw SpendViolation("Este plan ya se envió; prepara uno nuevo para volver a generar.")
+        if (s == PlanState.CONFIRMED) throw SpendViolation("Este plan ya está confirmado y en proceso de envío.")
         if (s == PlanState.DISCARDED) throw SpendViolation("Plan descartado.")
         if (s == PlanState.UNCERTAIN) throw SpendViolation("Este plan pudo enviarse ya. Compruébalo en Historial antes de generar otra vez.")
         val fp = plan.fingerprint()
@@ -167,6 +175,7 @@ class SpendGuard(
     }
 
     /** Lo llama el ejecutor justo antes de enviar. Valida todo y, al final, consume el ticket. */
+    @Synchronized
     fun consume(ticket: ExecutionTicket, plan: GenerationPlan) {
         val known = tickets[ticket.id] ?: throw SpendViolation("Ticket no emitido por esta sesión o ya invalidado.")
         if (known !== ticket) throw SpendViolation("Ticket falsificado.")
@@ -175,6 +184,10 @@ class SpendGuard(
         if (ticket.planId != plan.id || ticket.fingerprint != plan.fingerprint()) {
             tickets.remove(ticket.id); states[plan.id] = PlanState.PREPARED
             throw SpendViolation("El plan cambió después de confirmar; revisa y confirma de nuevo.")
+        }
+        if (states[plan.id] != PlanState.CONFIRMED) {
+            tickets.remove(ticket.id)
+            throw SpendViolation("El plan no está en estado confirmado para envío.")
         }
         if (!used.add(ticket.id)) throw SpendViolation("Ticket ya usado: cada generación necesita su propia confirmación.")
         tickets.remove(ticket.id)

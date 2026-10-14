@@ -235,7 +235,8 @@ class AssistantRuntime(private val app: NexusApplication) {
             s.offline -> OfflinePlannerProvider()
             s.direct -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
                 BedrockDirectProvider(s.region.trim(), { settings.awsCredentials() }), llmBudget, { settings.llmLimits() })
-            else -> BedrockProxyProvider(s.endpoint, { settings.token() })
+            else -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
+                BedrockProxyProvider(s.endpoint, { settings.token() }), llmBudget, { settings.llmLimits() })
         }
 
     fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(

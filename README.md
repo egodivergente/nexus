@@ -62,7 +62,10 @@ Whisper necesita su runtime y modelo locales; no se incluyen pesos en el ZIP.
 
 ## Estado y pruebas
 
-[Consolidación y procedencia de esta entrega](docs/RELEASE-193-CONSOLIDADA-20261013.md).
+- [Changelog del proyecto](CHANGELOG.md).
+- [Mejoras implementadas tras la auditoría del 14 de octubre de 2026](docs/MEJORAS-AUDITORIA-20261014.md).
+- [Consolidación y procedencia de la Release 1.9.3](docs/RELEASE-193-CONSOLIDADA-20261013.md).
+
 Se conservaron todos los commits de ambas ramas, sin reescribir su historial.
 Los antiguos `SOURCE-MANIFEST.json` y `REPOSITORY-MANIFEST.json` corresponden a la
 recuperación inicial de 2026; no describen esta Release.

@@ -264,11 +264,22 @@ object AlexiaBridge {
         val backupFile = File(root, BACKUP_FILE_NAME)
 
         try {
-            val json = if (indexFile.exists()) {
+            val json = if (indexFile.exists() && indexFile.length() > 0L) {
                 try {
                     JSONObject(indexFile.readText(Charsets.UTF_8))
                 } catch (e: Exception) {
-                    createEmptyIndexJson()
+                    Log.w(TAG, "Error leyendo axel-index.json, intentando respaldo: ${e.message}")
+                    if (backupFile.exists() && backupFile.length() > 0L) {
+                        try {
+                            JSONObject(backupFile.readText(Charsets.UTF_8))
+                        } catch (backupErr: Exception) {
+                            Log.e(TAG, "No se pudo leer ni axel-index.json ni su respaldo; se aborta escritura para proteger el índice.", backupErr)
+                            return@withLock false
+                        }
+                    } else {
+                        Log.e(TAG, "axel-index.json ilegible y sin respaldo válido; se aborta escritura para proteger el índice.", e)
+                        return@withLock false
+                    }
                 }
             } else {
                 createEmptyIndexJson()
