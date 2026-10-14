@@ -162,7 +162,8 @@ class FlowBridgeProvider(
     }
 
     /** Flow does not expose a reliable cancellation action through this private bridge. */
-    override suspend fun cancelJob(jobId: String): Result<Boolean> = Result.success(false)
+    override suspend fun cancelJob(jobId: String): Result<Boolean> =
+        Result.failure(ProviderError("Google Flow no admite cancelación remota de generaciones ya enviadas. Usa «Detener seguimiento» para pausar las consultas locales."))
 
     override suspend fun uploadFile(file: File, fileName: String, mimeType: String,
         onProgress: (Long, Long) -> Unit): Result<String> = bridge.uploadReference(file, mimeType)

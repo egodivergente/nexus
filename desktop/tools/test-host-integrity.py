@@ -144,7 +144,15 @@ class IntegrityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)), patch.object(host, 'OFFLINE_QA', False):
             host.write_state({'jobs': [{'id': 'job-1', 'providerId': 'atlas_cloud', 'status': 'SENDING'}]})
             with patch.object(host, 'provider_request', return_value={'data': {'id': 'pred-999'}}):
+                with self.assertRaises(ValueError):
+                    host.dispatch({'atlas_cloud': 'key'}, 'generate', {
+                        'provider': 'atlas_cloud',
+                        'path': '/api/v1/model/generateImage',
+                        'body': {'model': 'flux', 'prompt': 'test'},
+                        'cost': 0.05,
+                    })
                 res = host.dispatch({'atlas_cloud': 'key'}, 'generate', {
+                    'job_id': 'job-1',
                     'provider': 'atlas_cloud',
                     'path': '/api/v1/model/generateImage',
                     'body': {'model': 'flux', 'prompt': 'test'},
@@ -155,6 +163,63 @@ class IntegrityTests(unittest.TestCase):
             self.assertEqual(persisted['remoteId'], 'pred-999')
             self.assertEqual(persisted['status'], 'PROCESSING')
 
+    def test_concurrent_generate_responses_in_reverse_order_assign_exact_job_ids(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)), patch.object(host, 'OFFLINE_QA', False):
+            host.write_state({'jobs': [
+                {'id': 'job-1', 'providerId': 'atlas_cloud', 'status': 'SENDING'},
+                {'id': 'job-2', 'providerId': 'atlas_cloud', 'status': 'SENDING'},
+            ]})
+            both_entered = threading.Barrier(2, timeout=5)
+            second_persisted = threading.Event()
+            results = {}
+            errors = []
+
+            def fake_provider_request(keys, provider, path, method, body, paid=False):
+                both_entered.wait()
+                if body['prompt'] == 'first':
+                    self.assertTrue(second_persisted.wait(timeout=5))
+                    return {'data': {'id': 'remote-first'}}
+                return {'data': {'id': 'remote-second'}}
+
+            def worker(job_id, prompt):
+                try:
+                    results[job_id] = host.dispatch({'atlas_cloud': 'key'}, 'generate', {
+                        'job_id': job_id,
+                        'provider': 'atlas_cloud',
+                        'path': '/api/v1/model/generateImage',
+                        'body': {'model': 'flux', 'prompt': prompt},
+                        'cost': 0.05,
+                    })
+                    if job_id == 'job-2':
+                        second_persisted.set()
+                except Exception as exc:
+                    errors.append(exc)
+                    second_persisted.set()
+
+            t1 = threading.Thread(target=worker, args=('job-1', 'first'))
+            t2 = threading.Thread(target=worker, args=('job-2', 'second'))
+            with patch.object(host, 'provider_request', side_effect=fake_provider_request):
+                t1.start()
+                t2.start()
+                t1.join(timeout=5)
+                t2.join(timeout=5)
+            self.assertEqual(errors, [])
+            jobs_by_id = {j['id']: j for j in host.read_state()['jobs']}
+            self.assertEqual(jobs_by_id['job-1'].get('remoteId'), 'remote-first')
+            self.assertEqual(jobs_by_id['job-2'].get('remoteId'), 'remote-second')
+            self.assertEqual(jobs_by_id['job-1'].get('status'), 'PROCESSING')
+            self.assertEqual(jobs_by_id['job-2'].get('status'), 'PROCESSING')
+
+    def test_installation_root_check_rejects_documents_chatgpt_nexus_and_reports_194(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)), patch.object(host, 'OFFLINE_QA', True):
+            self.assertFalse(host.is_same_installation_root({}, host.ROOT))
+            self.assertFalse(host.is_same_installation_root({'root': r'C:\Users\User\Documents\ChatGPT\NEXUS\desktop'}, host.ROOT))
+            self.assertTrue(host.is_same_installation_root({'root': str(host.ROOT)}, host.ROOT))
+            info = host.dispatch({}, 'init', {})
+            self.assertEqual(info.get('version'), '1.9.4-agent-desktop')
+
 
 if __name__ == '__main__':
     unittest.main()
+
+

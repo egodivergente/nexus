@@ -37,6 +37,8 @@ if (Test-Path -LiteralPath $taskbarShortcut -PathType Leaf) {
 }
 Write-Output ('Acceso directo creado: ' + $shortcut)
 if (-not $NoLaunch) {
-    Start-Process -FilePath $pythonw -ArgumentList $link.Arguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+    $cmdLine = '"' + $pythonw + '" ' + $link.Arguments
+    $null = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine; CurrentDirectory = $PSScriptRoot }
     Write-Output 'Nexus Studio iniciado.'
 }
+

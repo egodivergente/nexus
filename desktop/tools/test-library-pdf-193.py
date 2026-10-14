@@ -20,6 +20,15 @@ with tempfile.TemporaryDirectory(prefix='nexus193-') as tmp:
  blank=native.new_path('.pdf');writer=PdfWriter();writer.add_blank_page(200,200)
  with blank.open('wb') as f:writer.write(f)
  assert native.attachment('document',{'uri':'/media/'+blank.name,'name':'Scanned'})['format']=='pdf'
+ mixed=native.new_path('.pdf');mixed_canvas=Canvas(str(mixed))
+ mixed_canvas.drawString(50,700,'Introduccion textual pagina 1');mixed_canvas.showPage()
+ mixed_canvas.setFillColorRGB(0.2,0.4,0.7);mixed_canvas.rect(40,400,220,180,fill=1,stroke=1);mixed_canvas.showPage()
+ mixed_canvas.drawString(50,700,'Conclusion textual pagina 3');mixed_canvas.showPage()
+ mixed_canvas.save();mixed_sha=hashlib.sha256(mixed.read_bytes()).hexdigest()
+ mixed_result=native.attachment('document',{'uri':'/media/'+mixed.name,'name':'Mixto'})
+ assert mixed_result['format']=='pdf', mixed_result
+ assert hashlib.sha256(base64.b64decode(mixed_result['bytes'])).hexdigest()==mixed_sha
+ assert hashlib.sha256(mixed.read_bytes()).hexdigest()==mixed_sha
  native.executor.shutdown()
  (data/'state.json').write_text(json.dumps({'jobs':[],'draft':{'prompt':'','values':{},'media':[]}}))
  process=subprocess.Popen([sys.executable,str(root/'desktop/local_host.py'),'--headless','--offline-qa','--data-dir',str(data)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))

@@ -9,7 +9,7 @@ import local_host as host
 class OrderCosts(unittest.TestCase):
     def test_unknown_quote_is_informational_for_all_paid_providers(self):
         for provider in ('atlas_cloud','runway','crun'):
-            args={'provider':provider,'path':'/test','body':{'model':'test'},'cost':None,'estimate_status':'unavailable'}
+            args={'job_id':'job-1','provider':provider,'path':'/test','body':{'model':'test'},'cost':None,'estimate_status':'unavailable'}
             with patch.object(host,'OFFLINE_QA',False), patch.object(host,'provider_request',return_value={'id':'fake'}) as request:
                 self.assertEqual(host.dispatch({},'generate',args),{'id':'fake'})
                 self.assertTrue(request.call_args.kwargs['paid'])

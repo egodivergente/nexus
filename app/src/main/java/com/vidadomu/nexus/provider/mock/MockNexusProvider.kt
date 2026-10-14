@@ -17,6 +17,7 @@ class MockNexusProvider(
 ) : NexusProvider {
 
     override val id: String = PROVIDER_ID
+    override val supportsRemoteCancellation: Boolean = true
     override val displayName: String = "Proveedor Simulado (Mock)"
     override val description: String = "Proveedor de pruebas sin conexión para control de calidad, verificación de UI y coste cero."
 

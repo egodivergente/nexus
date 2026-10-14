@@ -35,6 +35,7 @@ interface NexusProvider {
     val description: String
 
     val catalogNotice:String? get() = null
+    val supportsRemoteCancellation: Boolean get() = false
 
     suspend fun getModels(): List<NexusModel>
     suspend fun testConnection(apiKey: String): Result<Boolean>

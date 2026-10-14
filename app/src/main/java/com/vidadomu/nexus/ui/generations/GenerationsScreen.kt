@@ -40,6 +40,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
     val scope=rememberCoroutineScope()
     var statusFilter by rememberSaveable {mutableStateOf("ALL")}
     var selectedTechnicalJob by remember {mutableStateOf<GenerationJob?>(null)}
+    var pendingCancelJob by remember {mutableStateOf<GenerationJob?>(null)}
     val filteredJobs = remember(jobs, statusFilter,searchQuery) {
         when (statusFilter) {
             "ACTIVE" -> jobs.filter {
@@ -128,12 +129,17 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                             else "Coste actualizado",android.widget.Toast.LENGTH_LONG).show()
                                     }
                                 })
-                                if(!isTerminal) DropdownMenuItem(text={Text("Cancelar seguimiento")},onClick={close();
-                                    scope.launch {
-                                        val cancelled = app.generationRepository.cancelJob(job.id)
-                                        android.widget.Toast.makeText(context, if(cancelled) "Seguimiento cancelado" else "No se pudo cancelar el seguimiento", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                })
+                                if(!isTerminal) {
+                                    DropdownMenuItem(text={Text("Detener seguimiento")},onClick={close();
+                                        scope.launch {
+                                            val stopped = app.generationRepository.stopTrackingJob(job.id)
+                                            android.widget.Toast.makeText(context, if(stopped) "Seguimiento local detenido. No se ha cancelado en el proveedor." else "No se pudo detener el seguimiento", android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    })
+                                    DropdownMenuItem(text={Text("Cancelar generación")},onClick={close();
+                                        pendingCancelJob = job
+                                    })
+                                }
                                 DropdownMenuItem(text={Text("Diagnóstico")},onClick={close();selectedTechnicalJob=job})
                                 if(isTerminal) DropdownMenuItem(text={Text("Eliminar del historial")},onClick={close();
                                     scope.launch {
@@ -150,6 +156,68 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                 }
             }
         }
+    }
+
+    pendingCancelJob?.let { job ->
+        val canRemoteCancel = app.generationRepository.supportsRemoteCancellation(job.providerId) &&
+            !job.providerJobId.isNullOrBlank() &&
+            !job.providerJobId.startsWith("queue_")
+        val supportMessage = app.generationRepository.remoteCancellationSupportMessage(job)
+        AlertDialog(
+            onDismissRequest = { pendingCancelJob = null },
+            containerColor = SurfaceDark,
+            title = {
+                Text("Cancelar generación", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                    Text(supportMessage, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text(
+                        "«Detener seguimiento» solo pausa las consultas en este dispositivo sin cancelar la tarea en el servidor.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                }
+            },
+            confirmButton = {
+                if (canRemoteCancel) {
+                    TextButton(onClick = {
+                        val targetId = job.id
+                        pendingCancelJob = null
+                        scope.launch {
+                            val result = app.generationRepository.cancelRemoteGeneration(targetId)
+                            val message = result.fold(
+                                onSuccess = { "Generación cancelada en ${providerName(it.providerId)}." },
+                                onFailure = { (it as? ProviderError)?.humanReadableMessage ?: it.message ?: "No se pudo cancelar en el proveedor." }
+                            )
+                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }) {
+                        Text("Cancelar en proveedor", color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    TextButton(onClick = {
+                        val targetId = job.id
+                        pendingCancelJob = null
+                        scope.launch {
+                            val stopped = app.generationRepository.stopTrackingJob(targetId)
+                            android.widget.Toast.makeText(
+                                context,
+                                if (stopped) "Seguimiento local detenido. No se ha cancelado en el proveedor." else "No se pudo detener el seguimiento",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }) {
+                        Text("Detener seguimiento local", color = TextPrimary)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingCancelJob = null }) {
+                    Text("Cerrar", color = TextSecondary)
+                }
+            }
+        )
     }
 
     // Technical details dialog

@@ -165,7 +165,8 @@ class CrunProvider(
         }
     }
 
-    override suspend fun cancelJob(jobId: String): Result<Boolean> = Result.success(false)
+    override suspend fun cancelJob(jobId: String): Result<Boolean> =
+        Result.failure(ProviderError("cRun no admite cancelación remota de generaciones ya enviadas. Usa «Detener seguimiento» para pausar las consultas locales."))
 
     override suspend fun uploadMedia(fileBytes: ByteArray, fileName: String, mimeType: String): Result<String> = withContext(Dispatchers.IO) {
         val key = secureStorage.getProviderApiKey(PROVIDER_ID)

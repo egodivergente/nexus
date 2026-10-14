@@ -54,7 +54,7 @@ internal object AgentDocuments {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     pdf.openPage(i).use {page ->
                         val content=page.textContents.joinToString("\n") {it.text}
-                        if(content.isBlank()) return null
+                        if(content.isBlank() || page.imageContents.isNotEmpty()) return null
                         text.append("\n[Pagina ${i+1}]\n").append(content)
                     }
                 }

@@ -6,26 +6,26 @@
   "canonicalBranch": "main",
   "components": {
     "android": {
-      "versionName": "1.9.3-agent-preview",
-      "versionCode": 37,
-      "source": "7d45857b6cfe8f85735f3a306651ba94ec6a3890"
+      "versionName": "1.9.4-agent-preview",
+      "versionCode": 38,
+      "sha256": "e9d4f10c4e1fa528a54f73462694b4a8100e5dd762c6e02c0bc2a4cd0e220986"
     },
     "desktop": {
-      "versionName": "1.9.3-agent-desktop",
-      "source": "fde6de635521f3ed0e9cdefde8fce70c51acf7bf"
+      "versionName": "1.9.4-agent-desktop",
+      "sha256": "eb0a680180c3fedaf5d861ea96f930094334ef8432bd836c81d47f89d82083b7"
     },
     "termuxWidget": {
       "source": "1d8c0ec7648d67628c263816a62f970fa53bdaaa"
     }
   },
   "validation": {
-    "androidFilesMatchBuiltArtifactSource": 512,
+    "androidFilesMatchBuiltArtifactSource": 513,
     "androidUnitTestsRun": "PASS",
     "agentCoreUnitTestsRun": 129,
     "desktopAgentRuntimeBuiltAndTested": "PASS",
-    "desktopHostIntegrityTestsRun": 11,
+    "desktopHostIntegrityTestsRun": 13,
     "desktopDispatchIntegrityTestsRun": 14,
-    "desktopFlowQueueTestsRun": 16,
+    "desktopFlowQueueTestsRun": 20,
     "desktopLibraryPdfRegressionRun": "PASS",
     "agentProxyUnitTestsRun": 33,
     "androidNewVisualOptionsInstalledOnS25": false,

@@ -31,11 +31,11 @@ context.parseResponse(immediate,{outputs:['result']});assert.equal(immediate.sta
  const sending=context.dispatch(plan);
  plan.values.ratio='16:9';plan.media[0].remoteUrl='https://example.invalid/changed';plan.cost.amount=99;plan.prompt='changed';
  release();const job=await sending;
- assert.equal(posted.body.ratio,'1:1');assert.equal(posted.body.prompt,'confirmed');assert.equal(posted.cost,1);
+ assert.equal(posted.job_id,job.id);assert.equal(posted.body.ratio,'1:1');assert.equal(posted.body.prompt,'confirmed');assert.equal(posted.cost,1);
  assert.equal(posted.body.media[0].remoteUrl,'https://example.invalid/original');
  assert.equal(job.parameters.ratio,'1:1');assert.equal(job.estimated.amount,1);
  const unknown={model:plan.model,prompt:'fitted prompt',originalPrompt:'unabridged original',values:{},media:[],cost:{amount:null,currency:'unknown',status:'unavailable',time:Date.now()}};
  const noPrice=await context.dispatch(unknown);
- assert.equal(posted.cost,null);assert.equal(posted.estimate_status,'unavailable');assert.equal(noPrice.originalPrompt,'unabridged original');
+ assert.equal(posted.job_id,noPrice.id);assert.equal(posted.cost,null);assert.equal(posted.estimate_status,'unavailable');assert.equal(noPrice.originalPrompt,'unabridged original');
  console.log('PASS: 14 provider-state cases and immutable confirmed dispatch across an awaited save. Zero network.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

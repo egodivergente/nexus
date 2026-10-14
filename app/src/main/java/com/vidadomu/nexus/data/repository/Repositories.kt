@@ -229,27 +229,39 @@ class GenerationRepository(
             }
         }
 
-    suspend fun cancelJob(jobId: String): Boolean =
+    fun supportsRemoteCancellation(providerId: String): Boolean =
+        providerRegistry.getProviderById(providerId)?.supportsRemoteCancellation == true
+
+    fun remoteCancellationSupportMessage(job: GenerationJob): String =
+        GenerationCancellationPolicy.supportMessage(job, providerRegistry.getProviderById(job.providerId))
+
+    suspend fun stopTrackingJob(jobId: String): Boolean =
         pollLocks.getOrPut(jobId) { kotlinx.coroutines.sync.Mutex() }.withLock {
             val current = database.getJobById(jobId) ?: return@withLock false
-            if (current.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
-                return@withLock false
-            }
+            val paused = GenerationCancellationPolicy.stopLocalTracking(current) ?: return@withLock false
             context?.let { ctx ->
                 runCatching { androidx.work.WorkManager.getInstance(ctx).cancelUniqueWork("poll_$jobId") }
             }
-            val remoteJobId = current.providerJobId
-            if (!remoteJobId.isNullOrBlank() && !remoteJobId.startsWith("queue_")) {
-                runCatching { providerRegistry.getProviderById(current.providerId)?.cancelJob(remoteJobId) }
-            }
-            val cancelled = current.copy(
-                status = GenerationStatus.CANCELLED,
-                completedAt = System.currentTimeMillis(),
-                error = "Seguimiento cancelado por el usuario."
-            )
-            database.insertOrUpdateJob(cancelled)
+            database.insertOrUpdateJob(paused)
             true
         }
+
+    suspend fun cancelRemoteGeneration(jobId: String): Result<GenerationJob> =
+        pollLocks.getOrPut(jobId) { kotlinx.coroutines.sync.Mutex() }.withLock {
+            val current = database.getJobById(jobId)
+                ?: return@withLock Result.failure(ProviderError("Trabajo no encontrado en la base de datos local."))
+            val provider = providerRegistry.getProviderById(current.providerId)
+            val result = GenerationCancellationPolicy.cancelRemote(current, provider)
+            if (result.isSuccess) {
+                context?.let { ctx ->
+                    runCatching { androidx.work.WorkManager.getInstance(ctx).cancelUniqueWork("poll_$jobId") }
+                }
+                database.insertOrUpdateJob(result.getOrThrow())
+            }
+            result
+        }
+
+    suspend fun cancelJob(jobId: String): Boolean = stopTrackingJob(jobId)
 
     suspend fun getJob(jobId: String): GenerationJob? {
         return database.getJobById(jobId)
@@ -285,3 +297,60 @@ class SettingsRepository(
         return provider.testConnection(apiKey)
     }
 }
+
+object GenerationCancellationPolicy {
+    fun supportMessage(job: GenerationJob, provider: com.vidadomu.nexus.provider.api.NexusProvider?): String {
+        val label = com.vidadomu.nexus.ui.models.providerName(job.providerId)
+        val remoteId = job.providerJobId
+        return when {
+            provider?.supportsRemoteCancellation != true ->
+                "$label no admite cancelación remota de generaciones ya enviadas. Puedes usar «Detener seguimiento» para pausar las consultas locales sin cancelar en el proveedor."
+            remoteId.isNullOrBlank() || remoteId.startsWith("queue_") ->
+                "Este trabajo aún no tiene un identificador remoto cancelable en $label. Usa «Detener seguimiento» para pausar las consultas locales."
+            else ->
+                "$label admite cancelación remota. Si confirmas «Cancelar generación», se solicitará al proveedor cancelar la tarea remota ($remoteId)."
+        }
+    }
+
+    fun stopLocalTracking(current: GenerationJob): GenerationJob? {
+        if (current.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
+            return null
+        }
+        return current.copy(
+            status = GenerationStatus.FAILED,
+            parameters = current.parameters + ("__tracking_paused" to "true"),
+            error = "Seguimiento local detenido por el usuario. No se ha cancelado en el proveedor."
+        )
+    }
+
+    suspend fun cancelRemote(
+        current: GenerationJob,
+        provider: com.vidadomu.nexus.provider.api.NexusProvider?
+    ): Result<GenerationJob> {
+        if (current.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
+            return Result.failure(ProviderError("El trabajo ya no está en curso."))
+        }
+        if (provider == null) {
+            return Result.failure(ProviderError("Proveedor no disponible."))
+        }
+        val remoteJobId = current.providerJobId
+        if (!provider.supportsRemoteCancellation || remoteJobId.isNullOrBlank() || remoteJobId.startsWith("queue_")) {
+            return Result.failure(ProviderError(supportMessage(current, provider)))
+        }
+        val remoteCancel = provider.cancelJob(remoteJobId)
+        if (remoteCancel.isFailure || remoteCancel.getOrDefault(false) != true) {
+            val err = (remoteCancel.exceptionOrNull() as? ProviderError)
+                ?: ProviderError(remoteCancel.exceptionOrNull()?.message ?: "El proveedor rechazó la cancelación remota.")
+            return Result.failure(err)
+        }
+        return Result.success(
+            current.copy(
+                status = GenerationStatus.CANCELLED,
+                completedAt = System.currentTimeMillis(),
+                parameters = current.parameters - "__tracking_paused",
+                error = "Generación cancelada en ${provider.displayName} por solicitud explícita del usuario."
+            )
+        )
+    }
+}
+

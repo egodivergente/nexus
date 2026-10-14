@@ -291,8 +291,11 @@ class RunwayProvider(
         }
     }
 
+    override val supportsRemoteCancellation: Boolean = true
+
     override suspend fun cancelJob(jobId: String): Result<Boolean> = withContext(Dispatchers.IO) {
         val key = secureStorage.getProviderApiKey(PROVIDER_ID)
+        if (key.isBlank()) return@withContext Result.failure(ProviderError("Configura la clave API de Runway en Ajustes."))
         execute(Request.Builder().url("$BASE_URL/v1/tasks/$jobId").headers(key).delete().build()) { true }
     }
 

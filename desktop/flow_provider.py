@@ -401,7 +401,13 @@ def status(data, request_id):
             raise ValueError('Resultado Flow fuera del almacén permitido.')
         expected_sha = str(artifact.get('sha256') or '')
         fast_dest = (Path(data) / 'media' / (expected_sha[:32] + source.suffix.lower())) if re.fullmatch(r'[a-f0-9]{64}', expected_sha) else None
-        if fast_dest and fast_dest.is_file() and source.is_file() and fast_dest.stat().st_size == source.stat().st_size > 0:
+        if (
+            fast_dest
+            and fast_dest.is_file()
+            and source.is_file()
+            and fast_dest.stat().st_size == source.stat().st_size > 0
+            and hashlib.sha256(fast_dest.read_bytes()).hexdigest() == expected_sha
+        ):
             digest = expected_sha
             destination = fast_dest
         else:
@@ -411,7 +417,7 @@ def status(data, request_id):
                 raise ValueError('La integridad del resultado Flow no coincide.')
             destination = Path(data) / 'media' / (digest[:32] + source.suffix.lower())
             destination.parent.mkdir(parents=True, exist_ok=True)
-            if not destination.exists():
+            if not destination.is_file() or hashlib.sha256(destination.read_bytes()).hexdigest() != digest:
                 temporary = destination.with_suffix(destination.suffix + '.tmp-' + threading.current_thread().name)
                 shutil.copyfile(source, temporary)
                 temporary.replace(destination)

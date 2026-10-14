@@ -162,6 +162,22 @@ class QueueTests(unittest.TestCase):
             flow.recover(self.data,'damaged');self.settled()
             self.assertEqual(call.call_args.args[0],'flow_get_result');self.assertEqual(call.call_args.args[1],{'request_id':'damaged'})
         self.assertEqual(flow.status(self.data,'damaged')['status'],'completed')
+    def test_corrupted_local_copy_of_same_size_is_recovered_from_valid_original(self):
+        with patch.object(flow,'call',side_effect=self.proof):
+            flow.submit(self.data,self.args('same_size_corrupt'));self.settled()
+        first=flow.status(self.data,'same_size_corrupt')
+        self.assertEqual(first['status'],'completed')
+        local_copy=self.data/'media'/Path(first['outputs'][0]).name
+        original_bytes=local_copy.read_bytes()
+        expected_sha=hashlib.sha256(original_bytes).hexdigest()
+        corrupted_bytes=(b'\x00' if original_bytes[:1]!=b'\x00' else b'\xff')+original_bytes[1:]
+        self.assertEqual(len(corrupted_bytes),len(original_bytes))
+        self.assertNotEqual(hashlib.sha256(corrupted_bytes).hexdigest(),expected_sha)
+        local_copy.write_bytes(corrupted_bytes)
+        second=flow.status(self.data,'same_size_corrupt')
+        self.assertEqual(second['status'],'completed')
+        self.assertEqual(local_copy.read_bytes(),original_bytes)
+        self.assertEqual(hashlib.sha256(local_copy.read_bytes()).hexdigest(),expected_sha)
     def test_quality_and_count_constraints_reach_catalog_and_contract(self):
         with patch.object(flow,'available',return_value=True):models=flow.catalog()
         for m in models:
