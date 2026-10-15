@@ -117,3 +117,22 @@ No hay validación de cobertura total ni de funcionamiento con cualquier APK.
   React Native and arbitrary stateful interfaces are not claimed as automatic source renders.
 - Earlier NEXUS Agent/Canvas fixtures still have the previously documented validation
   limits; successful Weather rendering does not validate those fixtures.
+
+## NEXUS source render validated — 2026-10-15
+
+- PASS: all 12 scenarios in `render_profiles/nexus.json` compiled and rendered from the
+  current local NEXUS sources (`versionName=1.6.3-results`, versionCode 17).
+- JUnit: tests=12, failures=0, errors=0, skipped=0, execution 32.714 seconds.
+  Gradle: BUILD SUCCESSFUL in 5m 17s, 26 actionable tasks, 22 executed, 4 from cache.
+- Visual review: Canvas empty/loading/error, Aurora/Light; empty Library, Models and
+  Progress in both themes. Loading and error indicators appear in the relevant Canvas
+  screenshots. Model logos can remain async placeholders as previously documented.
+- ASUS connection failed; compilation used the PC with limited workers/priority.
+  No phone, emulator, actual account data or paid generations were used.
+- Evidence: ignored session `sessions/nexus-source-confirmed-20261015-01/`:
+  `render.json`, `source-provenance.json`, `render.log`, both `source-overview-*.jpg`,
+  and `source/app/build/test-results/testDebugUnitTest/TEST-explorer.render.ExplorerSourceRenderTest.xml`.
+- Original source/profile snapshots and hashes were retained. The report adds the
+  post-capture review separately; the distributed profile now records completed validation.
+- This supersedes the pending status for the local NEXUS Canvas fixture only. The
+  separate `nexus-agent.json` profile and the S25's newer Agent APK are not covered.

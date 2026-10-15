@@ -9,7 +9,7 @@
   "render_notes": [
     "Screens are rendered in isolation; app-wide navigation chrome is not part of these entry points.",
     "Model data is synthetic. Asynchronous brand images can remain as placeholders in static rendering; do not infer a production defect from those placeholders.",
-    "New Agent/Canvas fixtures have not yet passed Kotlin compilation or visual validation; Python discovery tests do not validate rendering."
+    "All 12 scenarios rendered successfully from local NEXUS 1.6.3 sources on 2026-10-15. This does not validate the separate Agent profile or installed APK."
   ],
   "inputs": [
     "build.gradle.kts",
@@ -31,7 +31,8 @@
       "scope": "screen",
       "data": "Six synthetic video models; no account or provider connection",
       "symbol": "ModelsScreen",
-      "source": "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt"
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt",
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "modelsLight",
@@ -39,7 +40,8 @@
       "scope": "screen",
       "data": "Six synthetic video models; no account or provider connection",
       "symbol": "ModelsScreen",
-      "source": "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt"
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt",
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "libraryAurora",
@@ -47,7 +49,8 @@
       "scope": "screen",
       "data": "Empty generation repository",
       "symbol": "LibraryScreen",
-      "source": "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt",
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "libraryLight",
@@ -55,7 +58,8 @@
       "scope": "screen",
       "data": "Empty generation repository",
       "symbol": "LibraryScreen",
-      "source": "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt",
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "progressAurora",
@@ -63,7 +67,8 @@
       "scope": "component",
       "data": "Synthetic queued generation",
       "symbol": "GenerationProgressPanel",
-      "source": "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt"
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt",
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "progressLight",
@@ -71,7 +76,8 @@
       "scope": "component",
       "data": "Synthetic queued generation",
       "symbol": "GenerationProgressPanel",
-      "source": "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt"
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt",
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "canvasEmptyAurora",
@@ -80,7 +86,7 @@
       "data": "Synthetic state; mocked view model, balance and storage",
       "symbol": "CreateScreen",
       "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
-      "validation": "pending_native_render"
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "canvasLoadingAurora",
@@ -89,7 +95,7 @@
       "data": "Synthetic state; mocked view model, balance and storage",
       "symbol": "CreateScreen",
       "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
-      "validation": "pending_native_render"
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "canvasErrorAurora",
@@ -98,7 +104,7 @@
       "data": "Synthetic state; mocked view model, balance and storage",
       "symbol": "CreateScreen",
       "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
-      "validation": "pending_native_render"
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "canvasEmptyLight",
@@ -107,7 +113,7 @@
       "data": "Synthetic state; mocked view model, balance and storage",
       "symbol": "CreateScreen",
       "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
-      "validation": "pending_native_render"
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "canvasLoadingLight",
@@ -116,7 +122,7 @@
       "data": "Synthetic state; mocked view model, balance and storage",
       "symbol": "CreateScreen",
       "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
-      "validation": "pending_native_render"
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     },
     {
       "test": "canvasErrorLight",
@@ -125,7 +131,7 @@
       "data": "Synthetic state; mocked view model, balance and storage",
       "symbol": "CreateScreen",
       "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
-      "validation": "pending_native_render"
+      "validation": "rendered_local_nexus_1.6.3_2026-10-15"
     }
   ]
 }
