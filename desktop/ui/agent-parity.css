@@ -1449,3 +1449,66 @@ body.nexus-agent-studio .nx-more-list button:hover:not(:disabled) {
 body.nexus-agent-studio .gallery-overlay small {
   color: #dfe5ec !important;
 }
+
+/* Estados de carga: esqueleto al abrir y fondo animado mientras llegan las miniaturas */
+@keyframes nx-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* miniaturas: fondo de reposo fijo (sin animación, para no repintar cientos de tarjetas) */
+body.nexus-agent-studio .gallery-media,
+body.nexus-agent-studio .creative-piece,
+body.nexus-agent-studio .history-row > img,
+body.nexus-agent-studio .history-row > video.history-thumb {
+  background-color: color-mix(in srgb, var(--panel) 85%, var(--text) 5%);
+}
+
+/* esqueleto de arranque: solo existe hasta el primer render */
+.nx-skel {
+  background-image: linear-gradient(100deg, transparent 30%, #ffffff12 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: nx-shimmer 1.4s linear infinite;
+}
+
+.nx-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.nx-boot-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 16px;
+}
+
+.nx-skel {
+  border-radius: 10px;
+  background-color: #ffffff0d;
+}
+
+.nx-skel-bar {
+  height: 34px;
+  width: min(100%, 560px);
+}
+
+.nx-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.nx-skel-tile {
+  aspect-ratio: 4 / 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-skel {
+    animation: none;
+  }
+}
