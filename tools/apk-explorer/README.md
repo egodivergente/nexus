@@ -1,5 +1,10 @@
 # APK Explorer
 
+**APK Android preliminar:** [app nativa con Shizuku](android/README.md), con
+selector de apps, motor local de pantalla virtual y exportación de capturas.
+Consulta allí las funciones incluidas y las pruebas pendientes; el cliente
+Python y el renderizado de fuentes siguen disponibles por separado.
+
 **Pantalla virtual:** explora una APK en el móvil mientras usas otra app en su
 pantalla física. Actívala en la ventana o añade `--virtual` al comando del agente.
 Requisitos, verificación y límites en [VIRTUAL_DISPLAY.md](VIRTUAL_DISPLAY.md).
