@@ -206,6 +206,7 @@
    if(form.id==='parity-rename'||form.id==='parity-convert'){const result=await native(form.id==='parity-rename'?'rename_asset_file':'convert_image_asset',form.id==='parity-rename'?{asset_id:data.id,file_name:data.name}:{asset_id:data.id,format:data.format,max_dimension:Number(data.max_dimension)},assets());if(result._assets)await agentCall('importAssets',{assets:result._assets});toast('Archivo guardado.');await assetView(result.asset?.id||data.id);}
   }catch(reason){error(reason);}finally{if(submit?.isConnected)submit.disabled=false;}
  });
+  document.addEventListener('click',async e=>{const copy=e.target.closest('[data-agent-copy]');if(!copy)return;const text=copy.closest('.agent-message')?.querySelector('.agent-text')?.innerText||'';try{await navigator.clipboard.writeText(text);copy.textContent='Copiado';setTimeout(()=>{copy.textContent='Copiar';},1600);}catch(reason){toast('No se pudo copiar: '+reason.message);}});
   document.addEventListener('click',e=>{document.querySelectorAll('.nx-more-menu[open]').forEach(menu=>{if(!menu.contains(e.target)||e.target.closest('.nx-more-list button'))menu.open=false;});});
   document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const menu=document.querySelector('.nx-more-menu[open]');if(menu){menu.open=false;menu.querySelector('summary')?.focus();}});
  window.NexusAgentParity={version:'1.9.5',native,editor,project,mediaJobs,history,currency};
