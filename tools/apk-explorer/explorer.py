@@ -27,7 +27,8 @@ HOME = Path(__file__).resolve().parent
 ASUS_HOST = "vidal@100.112.57.2"
 DEFAULT_SETTINGS = {"host": "", "serial": "", "package": "com.vidadomu.nexus.agent",
                     "apk": "", "repo": "egodivergente/nexus", "tag": "", "ref": "",
-                    "max_states": 60, "minutes": 15, "source": False, "device_model": ""}
+                    "max_states": 60, "minutes": 15, "source": False, "device_model": "",
+                    "project": str(HOME.parents[1])}
 
 
 def settings_path():
@@ -641,12 +642,12 @@ def gui():
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
     root = tk.Tk()
-    root.title("APK Explorer · Privado y local")
+    root.title("APK Explorer · APK y código")
     root.geometry("850x800")
     frame = ttk.Frame(root, padding=20)
     frame.pack(fill="both", expand=True)
     ttk.Label(frame, text="APK Explorer", font=("Segoe UI", 24, "bold")).pack(anchor="w")
-    ttk.Label(frame, text="Explora tus apps y reúne sus interfaces en una galería local.").pack(anchor="w")
+    ttk.Label(frame, text="Explora tu app o genera vistas desde su código.").pack(anchor="w")
     saved = load_settings()
     fields = {}
     connection = tk.StringVar()
@@ -680,6 +681,7 @@ def gui():
     messages = queue.Queue()
     stop = threading.Event()
     busy = False
+    rendering = False
     assets = []
     last = [None]
     options = ttk.Frame(frame)
@@ -695,6 +697,8 @@ def gui():
     ttk.Label(frame, text="No sube APK ni capturas. Omite acciones sensibles reconocibles; usa datos de prueba.").pack(anchor="w")
     buttons = ttk.Frame(frame)
     buttons.pack(fill="x", pady=10)
+    source_buttons = ttk.Frame(frame)
+    source_buttons.pack(fill="x", pady=(0, 8))
     log = tk.Text(frame, height=10, wrap="word", font=("Consolas", 10))
     log.pack(fill="both", expand=True)
 
@@ -718,7 +722,8 @@ def gui():
     def persist(*_):
         try:
             updated = values() | {"max_states": limit.get(), "minutes": minutes.get(),
-                                  "source": source.get(), "device_model": saved["device_model"]}
+                                  "source": source.get(), "device_model": saved["device_model"],
+                                  "project": saved["project"]}
             save_settings(updated)
         except (OSError, tk.TclError) as exc:
             log.insert("end", "No se pudieron guardar las preferencias: " + str(exc) + "\n")
@@ -820,20 +825,48 @@ def gui():
                 messages.put(("log", "Informe: " + str(last[0])))
         background(work)
 
+    def render_code():
+        nonlocal rendering
+        if busy:
+            return
+        project = filedialog.askdirectory(title="Proyecto Android que quieres renderizar",
+                                           initialdir=saved["project"])
+        if not project:
+            return
+        saved["project"] = project
+        persist()
+        rendering = True
+        stop_button.configure(state="disabled")
+        def work():
+            from source_render import render_source
+            output = session_path()
+            messages.put(("log", "Renderizado desde las fuentes; prioriza ASUS y no usa el móvil."))
+            result = render_source(project, output, log=lambda message: messages.put(("log", message)))
+            last[0] = output / "index.html"
+            messages.put(("open", last[0]))
+            if result["error"]:
+                messages.put(("log", result["error"]))
+        background(work)
+
     ttk.Button(buttons, text="Dispositivos", command=devices).pack(side="left", padx=3)
     ttk.Button(buttons, text="Apps instaladas", command=apps).pack(side="left", padx=3)
     ttk.Button(buttons, text="Elegir APK", command=pick_apk).pack(side="left", padx=3)
     ttk.Button(buttons, text="APK de GitHub", command=releases).pack(side="left", padx=3)
     ttk.Button(buttons, text="Explorar", command=start).pack(side="left", padx=3)
-    ttk.Button(buttons, text="Detener", command=stop.set).pack(side="left", padx=3)
+    stop_button = ttk.Button(buttons, text="Detener", command=stop.set)
+    stop_button.pack(side="left", padx=3)
     ttk.Button(buttons, text="Galería", command=lambda: webbrowser.open(last[0].as_uri()) if last[0] else None).pack(side="left", padx=3)
+    ttk.Button(source_buttons, text="Renderizar código", command=render_code).pack(side="left", padx=3)
+    ttk.Label(source_buttons, text="Proyecto → funciones reales → imágenes · ASUS preferente").pack(side="left", padx=8)
 
     def poll():
-        nonlocal busy, assets, device_options
+        nonlocal busy, assets, device_options, rendering
         while not messages.empty():
             kind, value = messages.get_nowait()
             if kind == "done":
                 busy = False
+                rendering = False
+                stop_button.configure(state="normal")
             elif kind == "devices":
                 host, device_options, errors = value
                 fields["host"].set(host)
@@ -881,6 +914,9 @@ def gui():
     def close():
         persist()
         if busy:
+            if rendering:
+                log.insert("end", "El renderizado sigue en ejecución; podrás cerrar cuando termine.\n")
+                return
             stop.set()
             log.insert("end", "Deteniendo… espera a que se guarde el informe antes de cerrar.\n")
         else:
@@ -919,6 +955,11 @@ def main(argv=None):
     parser.add_argument("--inspect", nargs="?", const="", help="Inspección visual para agentes: APK o package; detecta conexión")
     parser.add_argument("--json", action="store_true", help="Devuelve el manifiesto JSON por stdout, progreso por stderr")
     parser.add_argument("--bundle", type=Path, help="Prepara capturas de una sesión existente para un agente, sin usar ADB")
+    parser.add_argument("--render", type=Path, help="Renderiza funciones Compose desde un proyecto, sin móvil")
+    parser.add_argument("--render-config", type=Path, help="Perfil JSON de fuentes, fixture Kotlin y estados")
+    parser.add_argument("--render-local", action="store_true", help="Compila/renderiza aquí en vez de ASUS")
+    parser.add_argument("--render-host", default="auto", help="auto (ASUS si tiene memoria, después PC) o usuario@host")
+    parser.add_argument("--render-list", action="store_true", help="Lista estados del perfil, sin compilar")
     parser.add_argument("--max-states", type=int)
     parser.add_argument("--max-actions", type=int)
     parser.add_argument("--minutes", type=float)
@@ -931,8 +972,25 @@ def main(argv=None):
         gui()
         return
     quick = args.inspect is not None
-    if args.json and not (quick or args.bundle):
-        parser.error("--json requiere --inspect o --bundle.")
+    if sum([quick, bool(args.bundle), bool(args.render)]) > 1:
+        parser.error("Elige un modo: --inspect, --bundle o --render.")
+    if args.json and not (quick or args.bundle or args.render):
+        parser.error("--json requiere --inspect, --bundle o --render.")
+    if args.render:
+        from source_render import render_source, profile_for
+        if args.render_list:
+            profile, _, _ = profile_for(args.render.resolve(), args.render_config)
+            result = {"mode": "source_render", "states": profile["states"], "device_used": False}
+        else:
+            result = render_source(args.render, args.output or session_path(), args.render_config,
+                                   host="" if args.render_local else args.render_host,
+                                   log=lambda message: print(message, file=sys.stderr if args.json else sys.stdout))
+        print(json.dumps(result, ensure_ascii=True) if args.json else result.get("gallery", json.dumps(result, ensure_ascii=False)))
+        if result.get("status") == "error":
+            raise SystemExit(1)
+        if result.get("status") == "partial":
+            raise SystemExit(3)
+        return result
     if args.bundle:
         result = agent_bundle(args.bundle)
         print(json.dumps(result, ensure_ascii=True) if args.json else result["manifest"])

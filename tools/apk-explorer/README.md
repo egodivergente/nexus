@@ -4,6 +4,11 @@ Explorador local para APK Android privadas: recorre elementos accesibles, captur
 pantallas distintas y genera una galería HTML, árboles XML y un mapa de navegación JSON.
 No requiere API de IA, suscripción ni dependencias Python externas.
 
+También incorpora [renderizado desde el código](SOURCE_RENDER.md): compila y renderiza
+funciones Compose con datos de prueba, sin abrir la app en un teléfono. Requiere un
+perfil de estados; NEXUS tiene un perfil inicial incluido. El motor Gradle descarga
+sus dependencias durante la primera ejecución.
+
 ## Abrir
 
 En Windows, doble clic en `Explorador.cmd`. Requiere Python 3.10+ con Tkinter y

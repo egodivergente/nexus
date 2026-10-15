@@ -1,5 +1,37 @@
 # Verificación · 2026-10-15
 
+## Renderizado desde las fuentes
+
+- 36 pruebas Python pasan, incluyendo copia aislada, preservación de fuentes originales,
+  exclusión de claves, validación de rutas, imágenes inválidas, selección del host y
+  CLI de listado sin ADB. La ventana se construyó y se comprobó el botón Renderizar código.
+- Compilación y render real en Windows, Java 17, Gradle 8.9, AGP 8.7.3,
+  Kotlin 2.0.21 y Paparazzi 1.3.5: `BUILD SUCCESSFUL in 5m 14s` en la ejecución
+  de recuperación, con recursos y código de la app ya compilados. El primer arranque
+  completo necesitó más tiempo de compilación/preparación; no se afirma que un render
+  desde cero tarde 49 segundos.
+- JUnit del motor: 6 tests, 0 fallos, 0 errores, 0 omitidos, 49.632 segundos dentro
+  de esa ejecución Gradle. Se recuperaron 6 PNG y se abrió la lámina: Biblioteca vacía,
+  Modelos con datos sintéticos y el panel de progreso, cada uno en Aurora y Claro.
+  Son llamadas a `LibraryScreen`, `ModelsScreen`, `GenerationProgressPanel` y `NexusTheme`
+  del código local. El manifiesto declara alcance y datos. Los logos asíncronos pueden
+  quedar en placeholder; no se presenta eso como fallo de la app en producción.
+- El ASUS compiló las fuentes pero se quedó bajo presión de memoria al preparar las
+  pruebas. Se detuvieron exclusivamente los procesos iniciados por esta tarea. Se
+  continuó en Windows con prioridad BelowNormal y ActiveProcessorCount=2 comprobados.
+  El heap del compilador se ajustó a 1024 MiB y el metaspace a 640 MiB tras un intento
+  demasiado limitado. El motor nuevo prioriza ASUS solo con margen de memoria y sin
+  otra compilación; la ejecución local usa esos límites y la caché de compilación.
+- Artefactos locales: `sessions/source-render-nexus-20261015-03/`, con `render.json`,
+  `source-provenance.json`, registro, galería, lámina y originales. La procedencia
+  registra los hashes de las fuentes locales exactas, incluidas las no versionadas;
+  no se afirma equivalencia con la APK Agent instalada. El reintento reutilizó esa
+  misma copia y actualizó únicamente los límites de JVM, conservando su procedencia.
+- No se usó móvil ni emulador en este modo. Cobertura actual: los seis estados
+  registrados; Agente, Lienzo y demás estados necesitan sus propios fixtures.
+
+## Exploración de APK instalada
+
 - Python 3.12 en Windows: 27 pruebas unitarias pasan. Cubren navegación ramificada,
   recuperación de rutas, límites, persistencia ante error, controles sensibles,
   diálogos externos, keyguard, escape HTML, SSH, descargas GitHub con digest,

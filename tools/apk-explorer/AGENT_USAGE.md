@@ -1,5 +1,11 @@
 # Inspección visual de APK para agentes
 
+Si tienes las fuentes y quieres evaluar cómo se renderiza el código, usa
+`python tools/apk-explorer/explorer.py --render RUTA_PROYECTO --json`.
+Consulta [renderizado desde fuentes](SOURCE_RENDER.md) para el contrato, estados
+registrados, datos de prueba y requisitos. Ese modo no usa el móvil. Los comandos
+siguientes inspeccionan una app ejecutándose en Android.
+
 Desde la raíz del proyecto:
 
 ```powershell
