@@ -626,7 +626,7 @@ private fun CompactModelSelectionCard(
             Column(Modifier.weight(1f)) {
                 Text(selectedModel?.displayName ?: "Seleccionar modelo",style=MaterialTheme.typography.titleMedium,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
                 Text(selectedModel?.let {com.vidadomu.nexus.ui.models.modelUse(it).label} ?: "Elige qué quieres crear",
-                    style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                    style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
             }
             Icon(Icons.Default.ExpandMore,null,tint=TextSecondary)
         }

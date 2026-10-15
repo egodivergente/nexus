@@ -12,11 +12,11 @@ object NexusTokens {
     val space16 = 16.dp
     val space24 = 24.dp
     val space32 = 32.dp
-    val screenMargin = space8
+    val screenMargin = space16
     val tabletMargin = 20.dp
     val galleryGap = 2.dp
     val minimumTouch = 48.dp
-    val topBarHeight = 48.dp
+    val topBarHeight = 56.dp
     val thumbnail = RoundedCornerShape(8.dp)
     val field = RoundedCornerShape(16.dp)
     val card = RoundedCornerShape(16.dp)

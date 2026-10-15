@@ -105,7 +105,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 }}
             },onError={message -> scope.launch {snackbar.showSnackbar(message)}})
     }
-    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
+    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={
+        Column(verticalArrangement=Arrangement.Center) {
+            Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+    },actions={
+        IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca",tint=TextSecondary)}
         IconButton(onClick={showLocalEdits=true}) {Icon(Icons.Default.Movie,"Ediciones locales",tint=TextSecondary)}
         IconButton(onClick={try {
             val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
@@ -115,24 +121,20 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         } catch (_:Exception) {}}) {Icon(Icons.Default.FolderSpecial,"Abrir Alexia",tint=TextSecondary)}
     })}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            FilledTonalButton(onClick={projectLibrary.launch(arrayOf("image/*"))},modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin)) {
-                Icon(Icons.Default.PhotoLibrary,null)
-                Spacer(Modifier.width(NexusTokens.space8))
-                Text("Imágenes del proyecto · Gestionar")
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),verticalAlignment=Alignment.CenterVertically) {
-                Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.weight(1f))
-                IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca")}
-            }
-            if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),singleLine=true,
+            if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
-            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                if(hidden.isNotEmpty() || showHidden) item {StudioFilterChip(showHidden,{showHidden=!showHidden},label={Text("Ocultos")})}
-                item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Text("Favoritos")})}
+            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
                 item {StudioFilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
+                }
+                item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Text("Favoritos")})}
+                if(hidden.isNotEmpty() || showHidden) item {StudioFilterChip(showHidden,{showHidden=!showHidden},label={Text("Ocultos")})}
+                item {
+                    StudioFilterChip(false,{projectLibrary.launch(arrayOf("image/*"))},
+                        label={Text("Imágenes del proyecto · Gestionar",maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
+                        leadingIcon={Icon(Icons.Default.PhotoLibrary,null,Modifier.size(16.dp))},shape=NexusTokens.filter)
                 }
             }
             if(completed.isEmpty() && pending.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
