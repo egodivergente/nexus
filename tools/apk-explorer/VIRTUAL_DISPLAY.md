@@ -46,6 +46,17 @@ durante el recorrido. El display 11 se eliminó al terminar. Evidencia privada l
 Los informes incluyen `isolation`: display, política IME, estado observado de la
 pantalla principal y cierre confirmado cuando es posible. Suite: 60 pruebas PASS.
 
+Segunda app comprobada: ALEXIA (`com.axel.library`, versión
+`1.1.66-filtered-import`, código 68), en el mismo S25. Siete interfaces distintas y
+diez acciones: biblioteca de proyectos, diálogo de carpeta, contenido de proyecto,
+detalle de imagen, diálogo de persona, diálogo de movimiento y visor ampliado.
+Los tres diálogos se cancelaron; no se confirmó creación, edición ni movimiento.
+Estado final `finished_partial`, sin errores. Display 13 eliminado y mismo launcher
+en la pantalla principal antes y después, con foco recuperado al cerrar.
+Durante la sesión el foco principal fue temporalmente nulo: esta prueba demuestra
+separación visual y navegación, no escritura simultánea. Evidencia privada local:
+`sessions/alexia-virtual-20261015-01`.
+
 Referencias:
 - [scrcpy virtual display](https://github.com/Genymobile/scrcpy/blob/master/doc/virtual-display.md)
 - [Android UiAutomation](https://developer.android.com/reference/android/app/UiAutomation)
