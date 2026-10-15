@@ -17,6 +17,12 @@ Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin camb
 - **Saldo y gasto:** título y fecha en dos líneas, importe a la derecha.
 - **Asistente:** «Conversaciones» y «Nueva charla» a la vista; «+ Proyecto», «Proyecto», «Referencias» y «Ediciones» en un menú «Más» (cierra con Esc o al elegir).
 - **Historial vacío:** estado diseñado, con «Crear» si no hay generaciones y «Quitar filtros» si la búsqueda no coincide.
+- **Asistente:** botón «Copiar» en cada respuesta y ancho de lectura de 72 caracteres; notas de uso a 11 px.
+- **Ajustes:** «Avisarme cuando termine una creación» es ahora un interruptor (activar y desactivar).
+- **Carga:** esqueleto de rejilla mientras abre el estudio; fondo de reposo en las miniaturas.
+- **Tema Claro:** título de bienvenida y subtítulos sobre miniaturas con contraste suficiente.
+- **Corrección:** Enter sobre una tarjeta de Biblioteca abría el visor y lo cerraba al instante.
+- **Tests:** `test-desktop-design`, `test-studio-gallery` y `test-chat-workflow` actualizados a la galería y los temas actuales.
 
 ## [1.9.5-agent] - 2026-10-15
 
