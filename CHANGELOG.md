@@ -24,6 +24,18 @@ Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin camb
 - **Corrección:** Enter sobre una tarjeta de Biblioteca abría el visor y lo cerraba al instante.
 - **Tests:** `test-desktop-design`, `test-studio-gallery` y `test-chat-workflow` actualizados a la galería y los temas actuales.
 
+## [Unreleased] - rama `ux/fase3-pantallas` (Windows): pantallas, estados y movimiento
+
+- **Modelos:** monograma de color para proveedores sin logotipo (Youchuan, HiDream, Grok, Krea…) en lugar de una «N» genérica; Ideogram, Black Forest Labs, Pika, Suno, ElevenLabs, Luma, DeepSeek… con su logotipo.
+- **Paneles:** un único cierre ✕ arriba a la derecha (nombre accesible «Cerrar», tecla Esc).
+- **Saldo y gasto:** resumen arriba con gasto de hoy, del mes y número de generaciones del mes.
+- **Biblioteca:** «Edición local» a la vista; Encargos locales, Whisper y Alexia en un menú «Herramientas».
+- **Movimiento:** paneles que entran deslizando, menús y cambio de vista con un fundido corto; mismos tiempos y curva en todo; desactivado con «reducir movimiento».
+- **Deshacer:** al quitar creaciones de la galería, el aviso ofrece «Deshacer».
+- **Lienzo:** el aviso de error ocupa su propia fila, con color de error y acciones alineadas.
+- **Selector de modelos:** «Desde X» en lugar de «Base X»; «Catálogo completo» con tilde.
+- **Historial:** los grupos suman también estimaciones en cualquier moneda mostrada en US$ (igual que la lista).
+
 ## [Unreleased] - rama `ux/fase2-sistema` (Windows): sistema de diseño
 
 - **`tokens.css`:** fuente única de escalas (espaciado 4–48, radios 6/8/12/16/píldora, texto 11–28, pesos 400/500/600, alturas de control, elevación, movimiento) y colores semánticos (éxito, aviso, error, información) ajustados por tema.
