@@ -1818,3 +1818,9 @@ body.nexus-agent-studio .settings-layout > .sheet h2:focus {
     display: none !important;
   }
 }
+
+/* Biblioteca: botones sobre la miniatura con objetivo de 32 px */
+body.nexus-agent-studio .gallery-overlay button {
+  min-width: 32px !important;
+  width: auto;
+}

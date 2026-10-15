@@ -10,7 +10,7 @@ Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin camb
 - **Contraste:** el color del texto sobre el acento se calcula por tema (WCAG 4.5:1).
 - **Objetivos clicables y texto:** ningún botón por debajo de 24 px (WCAG 2.5.8); pestañas 30 px, barra de estado 26 px; texto mínimo 11 px.
 - **Marca:** insignia de versión corta en la barra lateral sin recorte; la versión de bienvenida, vista previa y guía se mantiene (decisión de 1.9.5).
-- **Historial:** agrupa 3 o más generaciones idénticas seguidas (×N, desplegable), «Hoy/Ayer», «Local» / «Sin coste» con explicación en lugar de «—».
+- **Historial:** agrupa 3 o más generaciones idénticas seguidas (×N, desplegable), «Hoy/Ayer», «Local» / «No informado» con explicación en lugar de «—».
 - **Modelos:** selectores de filtro sin recorte; «Desde X · sin confirmar» con tooltip.
 - **Ajustes:** tarjetas en columnas sin huecos; temas con vista previa y nombre visibles.
 - **Biblioteca / Lienzo:** buscador con un solo borde; miniaturas de «Producción reciente» con su tamaño real, alineadas con el compositor.
@@ -23,6 +23,14 @@ Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin camb
 - **Tema Claro:** título de bienvenida y subtítulos sobre miniaturas con contraste suficiente.
 - **Corrección:** Enter sobre una tarjeta de Biblioteca abría el visor y lo cerraba al instante.
 - **Tests:** `test-desktop-design`, `test-studio-gallery` y `test-chat-workflow` actualizados a la galería y los temas actuales.
+
+## [Unreleased] - rama `ux/fase5-final` (Windows): revisión con datos reales
+
+- **Ajustes:** índice de secciones fijo arriba (Proveedores, Temas, Datos locales, Agente y herramientas, Lectura y moneda) que lleva a cada tarjeta.
+- **Barra lateral estrecha:** el logotipo cede espacio para que la insignia de versión no se corte.
+- **Historial con datos reales (300 generaciones):** «No informado» en lugar de «Sin coste» cuando el proveedor no da el importe (98 filas), para no sugerir que fue gratis.
+- **Biblioteca:** los botones sobre la miniatura pasan de 24 a 32 px de ancho.
+- Revisión en la app instalada con datos reales: sin textos recortados, sin desbordamiento horizontal y sin errores de JavaScript en las seis pantallas.
 
 ## [Unreleased] - rama `ux/fase3-pantallas` (Windows): pantallas, estados y movimiento
 
