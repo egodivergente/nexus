@@ -120,7 +120,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 assert page.evaluate('document.body.classList.contains("nx-desktop")')
                 assert page.evaluate('(accent)=>document.body.classList.contains(accent)',accent)
             page.evaluate("()=>{state.theme='oled';render();}")
-            assert page.evaluate('getComputedStyle(document.body).getPropertyValue("--nx-bg").trim()')=='#090b0f'
+            assert page.evaluate('getComputedStyle(document.body).getPropertyValue("--nx-bg").trim()').lower()=='#000000'  # tema OLED de interface-themes.js
             page.emulate_media(reduced_motion='reduce')
             assert page.locator('#agent-compose').evaluate('(node)=>getComputedStyle(node).transitionDuration')=='0s'
             assert not errors,errors

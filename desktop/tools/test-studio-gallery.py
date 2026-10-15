@@ -242,7 +242,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert not blocked, blocked
             report={'status':'PASS','errors':errors,'blockedOperations':blocked,'paidCalls':0,
                 'viewerAndOutputs':True,'favoritesPersisted':True,'collectionsPersisted':True,
-                'contextSelection':True,'resultComparatorRemoved':True,'commands':True,'draftPreserved':True,
+                'contextSelection':True,'comparatorAvailable':True,'commands':True,'draftPreserved':True,
                 'savedView':True,'reversibleHide':True,'videoPreviewAndControls':video_checked,'prepareVideo':True,
                 'multiModelConfirmationAndParallelDispatch':True,'videoModelSelection':True,
                 'telemetryPanelLatencyErrorsPauseClearExport':True,
