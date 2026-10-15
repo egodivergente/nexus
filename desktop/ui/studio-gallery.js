@@ -191,7 +191,7 @@
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();e.stopImmediatePropagation();commands();return;}
   if(e.target.matches('input,textarea,select')||e.target.isContentEditable)return;
   if(G.viewer){if(['ArrowRight','j'].includes(e.key)){e.preventDefault();nextViewer(1);}if(['ArrowLeft','k'].includes(e.key)){e.preventDefault();nextViewer(-1);}if(e.key===' '){e.preventDefault();document.querySelector('[data-gallery="play"]')?.click();}if(e.key.toLowerCase()==='f')document.querySelector('.gallery-lightbox [data-gallery-favorite]')?.click();}
-  else if(e.key==='Enter'&&e.target.matches('.gallery-media'))showViewer(e.target.closest('[data-job]').dataset.job);
+  else if(e.key==='Enter'&&e.target.matches('.gallery-media')){e.preventDefault();showViewer(e.target.closest('[data-job]').dataset.job);}
   if(e.key==='ArrowDown'&&$('#gallery-command-search')){e.preventDefault();$('#gallery-command-list button')?.focus();}
  },true);
  // Additional commands remain reversible and local.
