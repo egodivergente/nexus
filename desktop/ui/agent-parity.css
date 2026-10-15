@@ -1623,3 +1623,85 @@ body.nexus-agent-studio .history-header-bar [data-parity-status="FAILED"]::befor
 body.nexus-agent-studio .gallery-balances .is-warning::before { background: var(--warning); }
 body.nexus-agent-studio .gallery-balances .is-warning strong { color: var(--warning) !important; }
 body.nexus-agent-studio .gallery-status.warning { color: var(--danger); }
+
+/* Modelos: monograma con color propio cuando el proveedor no tiene logotipo */
+body.nexus-agent-studio .nx-monogram {
+  display: grid;
+  place-items: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: .02em;
+  color: hsl(var(--mono-h) 70% 82%);
+  background: hsl(var(--mono-h) 45% 32% / .45);
+  border-radius: var(--radius-sm);
+}
+
+body[data-interface-theme="light"].nexus-agent-studio .nx-monogram {
+  color: hsl(var(--mono-h) 55% 28%);
+  background: hsl(var(--mono-h) 55% 85%);
+}
+
+/* Paneles: un solo patrón de cierre (✕ arriba a la derecha) */
+body.nexus-agent-studio dialog {
+  position: fixed;
+}
+
+body.nexus-agent-studio dialog > .close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  float: none;
+  width: var(--control-sm);
+  min-width: var(--control-sm);
+  height: var(--control-sm);
+  padding: 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  color: var(--muted);
+  z-index: 2;
+}
+
+body.nexus-agent-studio dialog > .close:hover {
+  color: var(--text);
+}
+
+body.nexus-agent-studio dialog > h2:first-of-type {
+  padding-right: var(--space-7);
+}
+
+/* Saldo y gasto: resumen de gasto arriba */
+body.nexus-agent-studio .parity-spend-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+body.nexus-agent-studio .parity-spend-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+body.nexus-agent-studio .parity-spend-summary small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+body.nexus-agent-studio .parity-spend-summary strong {
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+body.nexus-agent-studio dialog.parity-sheet > .close {
+  position: sticky;
+  top: 0;
+  right: auto;
+  display: grid;
+  place-items: center;
+  margin: 0 0 calc(var(--control-sm) * -1) auto;
+}
