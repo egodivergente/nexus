@@ -1776,3 +1776,45 @@ body.nexus-agent-studio .studio-recovery-actions {
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Ajustes: índice de secciones */
+body.nexus-agent-studio .nx-settings-nav {
+  position: sticky;
+  top: calc(var(--space-4) * -1);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  max-width: 1120px;
+  margin: calc(var(--space-4) * -1) 0 var(--space-4);
+  padding: calc(var(--space-4) + var(--space-2)) 0 var(--space-2);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+body.nexus-agent-studio .nx-settings-nav button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+body.nexus-agent-studio .nx-settings-nav button:hover,
+body.nexus-agent-studio .nx-settings-nav button[aria-current] {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+body.nexus-agent-studio .settings-layout > .sheet {
+  scroll-margin-top: 64px;
+}
+
+body.nexus-agent-studio .settings-layout > .sheet h2:focus {
+  outline: none;
+}
+
+/* Barra lateral estrecha: el logotipo cede espacio para que la versión no se corte */
+@media (max-width: 1100px) {
+  body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-logo {
+    display: none !important;
+  }
+}
