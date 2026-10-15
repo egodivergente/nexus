@@ -56,6 +56,53 @@ class FakeAndroid:
 
 
 class ExplorerTests(unittest.TestCase):
+    def test_preferences_defaults_and_roundtrip(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "settings.json"
+            self.assertEqual(e.load_settings(path)["repo"], "egodivergente/nexus")
+            e.save_settings({"host": e.ASUS_HOST, "serial": "phone:123", "repo": "owner/private",
+                             "token": "must-not-be-saved"}, path)
+            restored = e.load_settings(path)
+            self.assertEqual(restored["host"], e.ASUS_HOST)
+            self.assertEqual(restored["serial"], "phone:123")
+            self.assertNotIn("token", path.read_text())
+
+    def test_invalid_preferences_recover(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "settings.json"
+            path.write_text('{"minutes": 9000, "max_states": false, "host": null}')
+            result = e.load_settings(path)
+            self.assertEqual(result["minutes"], 15)
+            self.assertEqual(result["max_states"], 60)
+            self.assertEqual(result["host"], "")
+            path.write_text("broken json")
+            self.assertEqual(e.load_settings(path), e.DEFAULT_SETTINGS)
+
+    def test_phone_selection_survives_port_changes(self):
+        devices = e.parse_devices("List of devices attached\n"
+                                  "tv:5555 device model:BeyondTV\n"
+                                  "pixel:4321 device model:Pixel_8_Pro\n"
+                                  "samsung:5555 device model:SM_S938B\n"
+                                  "offline:123 offline model:SM_S938B\n")
+        self.assertEqual(len(devices), 3)
+        self.assertEqual(e.preferred_device(devices)["serial"], "samsung:5555")
+        self.assertEqual(e.preferred_device(devices, "old-pixel:987", "Pixel_8_Pro")["serial"], "pixel:4321")
+
+    def test_discovery_falls_back_to_asus(self):
+        with patch.object(e.Android, "devices", side_effect=["List of devices attached\n",
+                    "List of devices attached\nphone:123 device model:SM_S938B\n"]):
+            host, devices, errors = e.discover_devices("", fallback=True)
+            self.assertEqual(host, e.ASUS_HOST)
+            self.assertEqual(devices[0]["serial"], "phone:123")
+            self.assertEqual(errors, [])
+
+    def test_manual_connection_does_not_switch_hosts(self):
+        with patch.object(e.Android, "devices", return_value="List of devices attached\n") as fetch:
+            host, devices, _ = e.discover_devices(e.ASUS_HOST)
+            self.assertEqual(host, e.ASUS_HOST)
+            self.assertEqual(devices, [])
+            self.assertEqual(fetch.call_count, 1)
+
     def test_branch_replay_and_gallery(self):
         with tempfile.TemporaryDirectory() as d:
             device = FakeAndroid()

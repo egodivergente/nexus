@@ -10,9 +10,11 @@ En Windows, doble clic en `Explorador.cmd`. Requiere Python 3.10+ con Tkinter y
 Android Platform Tools (`adb`). En Linux puede necesitar el paquete `python3-tk`.
 
 1. Conecta un Android con depuración autorizada y la pantalla desbloqueada.
-2. Pulsa **Dispositivos** y copia el serial. Si ADB está en ASUS, indica primero
-   `vidal@100.112.57.2` en SSH; se usan las claves existentes y la clave de host conocida.
-3. Introduce el package de la app, por ejemplo `com.empresa.app`. Al elegir una APK
+2. Al abrir, detecta los móviles autorizados y selecciona uno. Puedes elegir **Este PC**
+   o **ASUS** sin escribir direcciones. Si no encuentra ninguno en la conexión recordada,
+   prueba la otra. El selector muestra el modelo y el serial vigente; **Dispositivos**
+   actualiza la lista. Se usan las claves SSH existentes y la clave de host conocida.
+3. Pulsa **Apps instaladas** para elegir la app o introduce su package. Al elegir una APK
    se intenta detectarlo automáticamente con `aapt2`/`aapt` del SDK Android instalado.
 4. Elige una APK para instalarla o deja el campo vacío para usar la app instalada.
 5. Ajusta los límites y pulsa **Explorar**. **Detener** conserva lo ya capturado.
@@ -20,6 +22,13 @@ Android Platform Tools (`adb`). En Linux puede necesitar el paquete `python3-tk`
 La instalación usa `adb install -r`: no desinstala ni borra datos. Si la firma no
 coincide, falla y muestra el error. Las sesiones se guardan en `sessions/`, excluido
 de Git. Los nombres de botones de la interfaz se muestran en español.
+
+Recuerda conexión, dispositivo preferido, app, APK, repositorio, referencia y límites.
+El repositorio inicial es `egodivergente/nexus`. Si cambia el puerto ADB, intenta
+seleccionar el mismo modelo; en la primera apertura prioriza el S25 y después el Pixel.
+Las preferencias se guardan en `%LOCALAPPDATA%/APK Explorer/settings.json` en Windows
+o `~/.config/APK Explorer/settings.json` en Linux, sin tokens ni claves. Abrir la
+ventana solo detecta dispositivos; no instala ni explora hasta pulsar **Explorar**.
 
 ## GitHub privado
 

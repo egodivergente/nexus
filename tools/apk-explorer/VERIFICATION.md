@@ -1,8 +1,12 @@
 # Verificación · 2026-10-15
 
-- Python 3.12 en Windows: 14 pruebas unitarias pasan. Cubren navegación ramificada,
+- Python 3.12 en Windows: 19 pruebas unitarias pasan. Cubren navegación ramificada,
   recuperación de rutas, límites, persistencia ante error, controles sensibles,
-  diálogos externos, keyguard, escape HTML, SSH y descargas GitHub con digest.
+  diálogos externos, keyguard, escape HTML, SSH, descargas GitHub con digest,
+  persistencia de preferencias, detección de móviles y selección con cambio de puerto.
+- Detección automática real desde Windows: S25 `192.168.1.134:5555` y Pixel por mDNS.
+  La GUI seleccionó el S25 y guardó las preferencias en una carpeta temporal de prueba.
+  Esta comprobación solo enumeró dispositivos; no lanzó apps ni exploró sus pantallas.
 - GUI Tkinter: ventana construida, bucle de eventos ejecutado y cierre comprobado.
   No se ha hecho una revisión visual completa de todos los controles de la ventana.
 - GitHub real: acceso al repositorio privado `egodivergente/nexus` con la sesión

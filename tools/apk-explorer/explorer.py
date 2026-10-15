@@ -23,6 +23,75 @@ import webbrowser
 import xml.etree.ElementTree as ET
 
 HOME = Path(__file__).resolve().parent
+ASUS_HOST = "vidal@100.112.57.2"
+DEFAULT_SETTINGS = {"host": "", "serial": "", "package": "com.vidadomu.nexus.agent",
+                    "apk": "", "repo": "egodivergente/nexus", "tag": "", "ref": "",
+                    "max_states": 60, "minutes": 15, "source": False, "device_model": ""}
+
+
+def settings_path():
+    base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".config")
+    return base / "APK Explorer" / "settings.json"
+
+
+def load_settings(path=None):
+    result = DEFAULT_SETTINGS.copy()
+    try:
+        stored = json.loads((path or settings_path()).read_text(encoding="utf-8"))
+        if isinstance(stored, dict):
+            for key, default in DEFAULT_SETTINGS.items():
+                if key in stored and type(stored[key]) is type(default):
+                    result[key] = stored[key]
+        if not 1 <= result["max_states"] <= 500:
+            result["max_states"] = 60
+        if not 1 <= result["minutes"] <= 120:
+            result["minutes"] = 15
+    except (OSError, ValueError):
+        pass
+    return result
+
+
+def save_settings(values, path=None):
+    path = path or settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Only preferences, never credentials or arbitrary extra fields.
+    clean = {key: values.get(key, default) for key, default in DEFAULT_SETTINGS.items()}
+    temporary = path.with_name("settings-" + uuid.uuid4().hex + ".tmp")
+    temporary.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def parse_devices(output):
+    devices = []
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[1] == "device":
+            model = next((p[6:] for p in parts[2:] if p.startswith("model:")), "Android")
+            name = {"SM_S938B": "Samsung S25 Ultra", "Pixel_8_Pro": "Pixel 8 Pro"}.get(model, model.replace("_", " "))
+            devices.append({"serial": parts[0], "model": model, "label": f"{name} · {parts[0]}"})
+    return devices
+
+
+def preferred_device(devices, serial="", model=""):
+    for key, value in (("serial", serial), ("model", model), ("model", "SM_S938B"), ("model", "Pixel_8_Pro")):
+        if value:
+            match = next((d for d in devices if d[key] == value), None)
+            if match:
+                return match
+    return devices[0] if devices else None
+
+
+def discover_devices(host, fallback=False):
+    errors = []
+    hosts = list(dict.fromkeys([host] + (["", ASUS_HOST] if fallback else [])))
+    for candidate in hosts:
+        try:
+            found = parse_devices(Android(host=candidate).devices())
+            if found:
+                return candidate, found, errors
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            errors.append(f"{candidate or 'Este PC'}: {exc}")
+    return host, [], errors
 
 
 def command(args, timeout=60, binary=False):
@@ -434,17 +503,36 @@ def gui():
     frame.pack(fill="both", expand=True)
     ttk.Label(frame, text="APK Explorer", font=("Segoe UI", 24, "bold")).pack(anchor="w")
     ttk.Label(frame, text="Explora tus apps y reúne sus interfaces en una galería local.").pack(anchor="w")
+    saved = load_settings()
     fields = {}
-    for label, key, default in [("SSH al equipo con ADB (vacío = este PC)", "host", ""),
-                                ("Serial ADB del dispositivo", "serial", ""),
+    connection = tk.StringVar()
+    device_choice = tk.StringVar()
+    device_options = []
+    for label, key, default in [("Conexión", "host", ""),
+                                ("Móvil (detección automática)", "serial", ""),
                                 ("Package de la app (com.empresa.app)", "package", ""),
                                 ("APK local (opcional; se instala conservando datos)", "apk", ""),
                                 ("Repositorio GitHub privado: propietario/repo (opcional)", "repo", ""),
                                 ("Tag de release (vacío = última publicada)", "tag", ""),
                                 ("Referencia del código (vacío = rama predeterminada)", "ref", "")]:
         ttk.Label(frame, text=label).pack(anchor="w", pady=(8, 0))
-        fields[key] = tk.StringVar(value=default)
-        ttk.Entry(frame, textvariable=fields[key]).pack(fill="x")
+        fields[key] = tk.StringVar(value=saved.get(key, default))
+        if key == "host":
+            connection_box = ttk.Combobox(frame, textvariable=connection, state="readonly")
+            profiles = {"Este PC": "", "ASUS": ASUS_HOST}
+            if saved["host"] not in profiles.values():
+                profiles[saved["host"]] = saved["host"]
+            connection_box["values"] = tuple(profiles)
+            connection.set(next(name for name, host in profiles.items() if host == saved["host"]))
+            connection_box.pack(fill="x")
+        elif key == "serial":
+            device_box = ttk.Combobox(frame, textvariable=device_choice, state="readonly")
+            device_box.pack(fill="x")
+        elif key == "package":
+            package_box = ttk.Combobox(frame, textvariable=fields[key])
+            package_box.pack(fill="x")
+        else:
+            ttk.Entry(frame, textvariable=fields[key]).pack(fill="x")
     messages = queue.Queue()
     stop = threading.Event()
     busy = False
@@ -453,12 +541,12 @@ def gui():
     options = ttk.Frame(frame)
     options.pack(fill="x", pady=10)
     ttk.Label(options, text="Máx. pantallas").pack(side="left")
-    limit = tk.IntVar(value=60)
+    limit = tk.IntVar(value=saved["max_states"])
     ttk.Spinbox(options, from_=1, to=500, width=6, textvariable=limit).pack(side="left", padx=8)
     ttk.Label(options, text="Minutos").pack(side="left")
-    minutes = tk.IntVar(value=15)
+    minutes = tk.IntVar(value=saved["minutes"])
     ttk.Spinbox(options, from_=1, to=120, width=6, textvariable=minutes).pack(side="left", padx=8)
-    source = tk.BooleanVar(value=False)
+    source = tk.BooleanVar(value=saved["source"])
     ttk.Checkbutton(frame, text="Leer candidatos de pantallas del código GitHub", variable=source).pack(anchor="w")
     ttk.Label(frame, text="No sube APK ni capturas. Omite acciones sensibles reconocibles; usa datos de prueba.").pack(anchor="w")
     buttons = ttk.Frame(frame)
@@ -483,9 +571,47 @@ def gui():
     def values():
         return {k: v.get().strip() for k, v in fields.items()}
 
-    def devices():
+    def persist(*_):
+        try:
+            updated = values() | {"max_states": limit.get(), "minutes": minutes.get(),
+                                  "source": source.get(), "device_model": saved["device_model"]}
+            save_settings(updated)
+        except (OSError, tk.TclError) as exc:
+            log.insert("end", "No se pudieron guardar las preferencias: " + str(exc) + "\n")
+
+    def devices(auto=False):
         v = values()
-        background(lambda: messages.put(("log", Android(host=v["host"]).devices())))
+        def work():
+            messages.put(("devices", discover_devices(v["host"], fallback=auto)))
+        background(work)
+
+    def choose_connection(_=None):
+        if busy:
+            connection.set(next(name for name, host in profiles.items() if host == fields["host"].get()))
+            return
+        fields["host"].set(profiles[connection.get()])
+        fields["serial"].set("")
+        device_choice.set("")
+        device_box["values"] = ()
+        persist()
+        devices()
+
+    def choose_device(_=None):
+        selected = next((d for d in device_options if d["label"] == device_choice.get()), None)
+        if selected:
+            fields["serial"].set(selected["serial"])
+            saved["device_model"] = selected["model"]
+            persist()
+
+    def apps():
+        v = values()
+        def work():
+            device = Android(v["serial"], v["host"])
+            device.validate()
+            packages = device.shell("pm", "list", "packages", "-3", "--user", "0")
+            messages.put(("packages", sorted(line.removeprefix("package:").strip()
+                          for line in packages.splitlines() if line.startswith("package:"))))
+        background(work)
 
     def releases():
         v = values()
@@ -528,6 +654,7 @@ def gui():
             return
         if busy:
             return
+        persist()
         stop.clear()
         def work():
             device = Android(v["serial"], v["host"])
@@ -550,6 +677,7 @@ def gui():
         background(work)
 
     ttk.Button(buttons, text="Dispositivos", command=devices).pack(side="left", padx=3)
+    ttk.Button(buttons, text="Apps instaladas", command=apps).pack(side="left", padx=3)
     ttk.Button(buttons, text="Elegir APK", command=pick_apk).pack(side="left", padx=3)
     ttk.Button(buttons, text="APK de GitHub", command=releases).pack(side="left", padx=3)
     ttk.Button(buttons, text="Explorar", command=start).pack(side="left", padx=3)
@@ -557,11 +685,30 @@ def gui():
     ttk.Button(buttons, text="Galería", command=lambda: webbrowser.open(last[0].as_uri()) if last[0] else None).pack(side="left", padx=3)
 
     def poll():
-        nonlocal busy, assets
+        nonlocal busy, assets, device_options
         while not messages.empty():
             kind, value = messages.get_nowait()
             if kind == "done":
                 busy = False
+            elif kind == "devices":
+                host, device_options, errors = value
+                fields["host"].set(host)
+                connection.set(next(name for name, address in profiles.items() if address == host))
+                device_box["values"] = tuple(d["label"] for d in device_options)
+                chosen = preferred_device(device_options, fields["serial"].get(), saved["device_model"])
+                if chosen:
+                    device_choice.set(chosen["label"])
+                    choose_device()
+                    log.insert("end", f"Conectado: {connection.get()} → {chosen['label']}\n")
+                else:
+                    fields["serial"].set("")
+                    device_choice.set("")
+                    log.insert("end", "No hay móviles ADB autorizados disponibles.\n" + "\n".join(errors) + "\n")
+            elif kind == "packages":
+                package_box["values"] = tuple(value)
+                if value:
+                    package_box.event_generate("<Down>")
+                log.insert("end", f"{len(value)} apps disponibles en el selector de app.\n")
             elif kind == "package":
                 fields["package"].set(value)
             elif kind == "apk":
@@ -588,13 +735,24 @@ def gui():
         root.after(150, poll)
 
     def close():
+        persist()
         if busy:
             stop.set()
             log.insert("end", "Deteniendo… espera a que se guarde el informe antes de cerrar.\n")
         else:
             root.destroy()
     root.protocol("WM_DELETE_WINDOW", close)
+    connection_box.bind("<<ComboboxSelected>>", choose_connection)
+    device_box.bind("<<ComboboxSelected>>", choose_device)
+    save_timer = [None]
+    def schedule_save(*_):
+        if save_timer[0]:
+            root.after_cancel(save_timer[0])
+        save_timer[0] = root.after(600, persist)
+    for variable in [*fields.values(), limit, minutes, source]:
+        variable.trace_add("write", schedule_save)
     poll()
+    root.after(200, lambda: devices(auto=True))
     root.mainloop()
 
 
