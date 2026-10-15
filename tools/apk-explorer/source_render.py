@@ -46,8 +46,7 @@ def inside(root, relative):
 def profile_for(project, config=None):
     path = Path(config).resolve() if config else project / "apk-explorer.render.json"
     if not path.exists() and not config:
-        agent = project / "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt"
-        path = HERE / ("render_profiles/nexus-agent.json" if agent.is_file() else "render_profiles/nexus.json")
+        raise FileNotFoundError('El proyecto no tiene un perfil explícito; usa --project para prepararlo automáticamente.')
     profile = json.loads(path.read_text(encoding="utf-8"))
     if profile.get("schema_version") != 1 or profile.get("engine") != "paparazzi":
         raise ValueError("Perfil de renderizado no compatible.")
@@ -65,8 +64,11 @@ def profile_for(project, config=None):
 
 def prepare(project, output, config=None):
     project, output = Path(project).resolve(strict=True), Path(output).resolve()
-    profile, profile_path, fixture = profile_for(project, config)
     output.mkdir(parents=True, exist_ok=False)
+    if config is None and not (project / 'apk-explorer.render.json').is_file():
+        from project_adapter import automatic_profile
+        config = automatic_profile(project, output / 'plan')
+    profile, profile_path, fixture = profile_for(project, config)
     (output / "render-profile.json").write_bytes(profile_path.read_bytes())
     work = output / "source"
     work.mkdir()
@@ -93,17 +95,38 @@ def prepare(project, output, config=None):
             files[relative.as_posix()] = hashlib.sha256(data).hexdigest()
     module = profile["module"].replace(":", "/").strip("/")
     build = inside(work, module + "/build.gradle.kts")
+    if not build.exists():
+        build = inside(work, module + '/build.gradle')
+    kotlin_dsl = build.name.endswith('.kts')
     text = build.read_text(encoding="utf-8")
     if not re.search(r"plugins\s*\{", text):
-        raise ValueError("Se necesita un módulo Android con plugins en build.gradle.kts.")
+        raise ValueError("Se necesita un módulo Android con bloque plugins en Gradle.")
     if "app.cash.paparazzi" in text:
         raise ValueError("El módulo ya configura Paparazzi; prepara un perfil compatible sin duplicarlo.")
-    text = re.sub(r"plugins\s*\{", 'plugins {\n    id("app.cash.paparazzi") version "' +
-                  profile["plugin_version"] + '"', text, count=1)
-    text += '''
+    plugin = ('id("app.cash.paparazzi") version "' + profile['plugin_version'] + '"') if kotlin_dsl else (
+        "id 'app.cash.paparazzi' version '" + profile['plugin_version'] + "'")
+    text = re.sub(r"plugins\s*\{", 'plugins {\n    ' + plugin, text, count=1)
+    if not kotlin_dsl:
+        text += '''
+android.sourceSets.test.java.setSrcDirs(['src/explorerRender'])
+dependencies {
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'junit:junit:4.13.2'
+}
+tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+    maxHeapSize = '512m'
+    maxParallelForks = 1
+    jvmArgs '-XX:ActiveProcessorCount=2', '-XX:MaxMetaspaceSize=512m'
+}
+'''
+    else:
+        text += '''
 // APK Explorer: added only in this isolated source snapshot.
 android.sourceSets.getByName("test").java.setSrcDirs(listOf("src/explorerRender"))
-dependencies { testImplementation("org.mockito:mockito-core:5.14.2") }
+dependencies {
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("junit:junit:4.13.2")
+}
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     maxHeapSize = "512m"
     maxParallelForks = 1
@@ -246,7 +269,7 @@ def render_source(project, output, config=None, host="auto", log=print):
     output = Path(output).resolve()
     profile, work, archive, provenance = prepare(project, output, config)
     from source_discovery import discover, write_report
-    write_report(discover(project, config), output)
+    write_report(discover(project, provenance['profile']), output)
     args = gradle_arguments(profile)
     provenance["gradle_arguments"] = args
     build_log = output / "render.log"

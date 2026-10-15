@@ -25,10 +25,10 @@ import xml.etree.ElementTree as ET
 
 HOME = Path(__file__).resolve().parent
 ASUS_HOST = "vidal@100.112.57.2"
-DEFAULT_SETTINGS = {"host": "", "serial": "", "package": "com.vidadomu.nexus.agent",
-                    "apk": "", "repo": "egodivergente/nexus", "tag": "", "ref": "",
+DEFAULT_SETTINGS = {"host": "", "serial": "", "package": "",
+                    "apk": "", "repo": "", "tag": "", "ref": "",
                     "max_states": 60, "minutes": 15, "source": False, "device_model": "",
-                    "project": str(HOME.parents[1])}
+                    "project": str(Path.home())}
 
 
 def settings_path():
@@ -640,7 +640,7 @@ def agent_bundle(folder):
 
 def gui():
     import tkinter as tk
-    from tkinter import ttk, filedialog, messagebox
+    from tkinter import ttk, filedialog, messagebox, simpledialog
     root = tk.Tk()
     root.title("APK Explorer · APK y código")
     root.geometry("850x800")
@@ -825,6 +825,22 @@ def gui():
                 messages.put(("log", "Informe: " + str(last[0])))
         background(work)
 
+    def prepare_project():
+        if busy:
+            return
+        value = simpledialog.askstring("Preparar proyecto", "Carpeta, APK o repositorio GitHub (propietario/repo):", initialvalue=saved["project"])
+        if not value:
+            return
+        def work():
+            from project_adapter import resolve_input, plan_project
+            output = session_path()
+            project, origin = resolve_input(value, output)
+            result = plan_project(project, output / "plan")
+            last[0] = output / "plan/project.html"
+            messages.put(("log", str(result["frameworks"]) + " · " + result["status"]))
+            messages.put(("open", last[0]))
+        background(work)
+
     def discover_code():
         if busy:
             return
@@ -872,6 +888,7 @@ def gui():
     stop_button = ttk.Button(buttons, text="Detener", command=stop.set)
     stop_button.pack(side="left", padx=3)
     ttk.Button(buttons, text="Galería", command=lambda: webbrowser.open(last[0].as_uri()) if last[0] else None).pack(side="left", padx=3)
+    ttk.Button(source_buttons, text="Proyecto / GitHub", command=prepare_project).pack(side="left", padx=3)
     ttk.Button(source_buttons, text="Descubrir pantallas", command=discover_code).pack(side="left", padx=3)
     ttk.Button(source_buttons, text="Renderizar código", command=render_code).pack(side="left", padx=3)
     ttk.Label(source_buttons, text="Proyecto → funciones reales → imágenes · ASUS preferente").pack(side="left", padx=8)
@@ -972,6 +989,8 @@ def main(argv=None):
     parser.add_argument("--inspect", nargs="?", const="", help="Inspección visual para agentes: APK o package; detecta conexión")
     parser.add_argument("--json", action="store_true", help="Devuelve el manifiesto JSON por stdout, progreso por stderr")
     parser.add_argument("--bundle", type=Path, help="Prepara capturas de una sesión existente para un agente, sin usar ADB")
+    parser.add_argument("--project", help="Prepara una APK, carpeta o repositorio GitHub sin depender de una app concreta")
+    parser.add_argument("--project-run", action="store_true", help="Ejecuta los perfiles preparados o explora la APK indicada")
     parser.add_argument("--discover", type=Path, help="Inventario de pantallas Compose, previews y rutas sin compilar")
     parser.add_argument("--render", type=Path, help="Renderiza funciones Compose desde un proyecto, sin móvil")
     parser.add_argument("--render-config", type=Path, help="Perfil JSON de fuentes, fixture Kotlin y estados")
@@ -990,10 +1009,41 @@ def main(argv=None):
         gui()
         return
     quick = args.inspect is not None
-    if sum([quick, bool(args.bundle), bool(args.render), bool(args.discover)]) > 1:
-        parser.error("Elige un modo: --inspect, --bundle, --discover o --render.")
-    if args.json and not (quick or args.bundle or args.render or args.discover):
-        parser.error("--json requiere --inspect, --bundle, --discover o --render.")
+    if sum([quick, bool(args.bundle), bool(args.render), bool(args.discover), bool(args.project)]) > 1:
+        parser.error("Elige un modo: --inspect, --bundle, --discover, --project o --render.")
+    if args.json and not (quick or args.bundle or args.render or args.discover or args.project):
+        parser.error("--json requiere --inspect, --bundle, --discover, --project o --render.")
+    if args.project_run and not args.project:
+        parser.error("--project-run requiere --project.")
+    if args.project:
+        from project_adapter import resolve_input, plan_project, write_plan_report
+        output = (args.output or session_path()).resolve()
+        project, origin = resolve_input(args.project, output, args.ref)
+        result = plan_project(project, output / "plan")
+        result["origin"] = origin
+        if args.project_run:
+            if result["status"] == "apk_runtime":
+                forwarded = []
+                for flag, value in [("--serial", args.serial), ("--ssh", args.ssh), ("--package", args.package), ("--max-states", args.max_states), ("--max-actions", args.max_actions), ("--minutes", args.minutes), ("--depth", args.depth), ("--delay", args.delay)]:
+                    if value is not None:
+                        forwarded += [flag, str(value)]
+                return main(["--inspect", str(project), "--output", str(output / "inspection")] + forwarded + (["--json"] if args.json else []))
+            from source_render import render_source
+            result["renders"] = [render_source(project, output / ("render-" + str(i)), item["profile"],
+                host="" if args.render_local else args.render_host,
+                log=lambda message: print(message, file=sys.stderr if args.json else sys.stdout))
+                for i, item in enumerate(result["profiles"], 1)]
+            if result["renders"]:
+                result["status"] = "rendered" if all(r["status"] == "rendered" for r in result["renders"]) else "partial"
+                for item, rendered in zip(result['profiles'], result['renders']):
+                    item['render_status'] = rendered['status']
+                    item['verified'] = rendered['status'] == 'rendered'
+        (output / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_plan_report(result, output / 'plan')
+        print(json.dumps(result, ensure_ascii=True) if args.json else str(output / "plan/project.html"))
+        if args.project_run and result["status"] != "rendered":
+            raise SystemExit(3)
+        return result
     if args.discover:
         from source_discovery import discover, write_report
         result = discover(args.discover, args.render_config)
@@ -1003,7 +1053,11 @@ def main(argv=None):
     if args.render:
         from source_render import render_source, profile_for
         if args.render_list:
-            profile, _, _ = profile_for(args.render.resolve(), args.render_config)
+            config = args.render_config
+            if config is None and not (args.render / "apk-explorer.render.json").exists():
+                from project_adapter import automatic_profile
+                config = automatic_profile(args.render, (args.output or session_path()) / "plan")
+            profile, _, _ = profile_for(args.render.resolve(), config)
             result = {"mode": "source_render", "states": profile["states"], "device_used": False}
         else:
             result = render_source(args.render, args.output or session_path(), args.render_config,

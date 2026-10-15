@@ -76,5 +76,17 @@ La ventana ofrece la misma operación con **Descubrir pantallas**.
 Usar `readiness` para preparar escenarios y `render.json` para conocer la captura real.
 No interpretar `registered` o `preview_candidate` como prueba de renderizado: la
 detección es estática, admite omisiones y no enumera automáticamente todos los estados.
-Los perfiles de NEXUS y NEXUS Agent se seleccionan por sus fuentes; los nuevos escenarios
-Agent/Lienzo aún requieren validación Kotlin/visual (ver SOURCE_RENDER.md).
+Los perfiles NEXUS son ejemplos opcionales seleccionados mediante --render-config.
+Para otras apps, --project prepara previews Compose y layouts XML automáticamente.
+
+## Entrada general para agentes
+
+```powershell
+python explorer.py --project propietario/repositorio --json
+python explorer.py --project "C:\proyectos\OtraApp" --project-run --json
+```
+
+El primer comando analiza sin compilar. El segundo ejecuta los perfiles elegibles.
+Para una APK, `--project-run` delega en `--inspect`. Un `needs_adapter` o un escenario
+pendiente no debe comunicarse como una captura completada. Consulta SOURCE_RENDER.md
+para los límites concretos. Los escenarios automáticos no dependen de paquetes NEXUS.

@@ -180,7 +180,7 @@ class ExplorerTests(unittest.TestCase):
     def test_preferences_defaults_and_roundtrip(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "settings.json"
-            self.assertEqual(e.load_settings(path)["repo"], "egodivergente/nexus")
+            self.assertEqual(e.load_settings(path)["repo"], "")
             e.save_settings({"host": e.ASUS_HOST, "serial": "phone:123", "repo": "owner/private",
                              "token": "must-not-be-saved"}, path)
             restored = e.load_settings(path)

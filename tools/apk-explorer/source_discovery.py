@@ -26,19 +26,21 @@ def close_at(code, start, opening='(', closing=')'):
     return start
 
 
-def discover(project, config=None):
+def discover(project, config=None, load_profile=True):
     from source_render import profile_for
     root = Path(project).resolve(strict=True)
     if not root.is_dir():
         raise ValueError('Selecciona una carpeta de proyecto.')
     registered, profile_error = {}, None
     try:
+        if not load_profile:
+            raise FileNotFoundError('Profile lookup disabled during automatic planning')
         profile, _, _ = profile_for(root, config)
         for state in profile['states']:
             if state.get('source') and state.get('symbol'):
                 registered.setdefault((state['source'], state['symbol']), []).append(state['test'])
     except (OSError, ValueError, KeyError) as exc:
-        profile_error = str(exc)
+        profile_error = str(exc) if load_profile else None
     items, routes, warnings = [], [], []
     files = 0
     for folder, dirs, names in os.walk(root, followlinks=False):
@@ -78,6 +80,9 @@ def discover(project, config=None):
                 previews = bool(re.search(r'@(?:[\w.]+\.)?Preview\b', prefix))
                 states = registered.get((relative, name), [])
                 items.append({'symbol': name, 'file': relative, 'line': text.count('\n', 0, match.start())+1,
+                    'package': (re.search(r'^\s*package\s+([\w.]+)', code, re.M).group(1) if re.search(r'^\s*package\s+([\w.]+)', code, re.M) else ''),
+                    'top_level': code[:match.start()].count('{') == code[:match.start()].count('}'),
+                    'visibility': 'private' if re.search(r'\bprivate\b', prefix) else 'accessible',
                     'kind': 'screen' if name.endswith('Screen') else 'component',
                     'parameters': params, 'preview': previews, 'dependencies': dependencies,
                     'registered_states': states,

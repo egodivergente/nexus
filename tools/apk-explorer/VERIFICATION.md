@@ -92,3 +92,28 @@ No hay validación de cobertura total ni de funcionamiento con cualquier APK.
   Windows free physical RAM fell to about 250 MiB; ASUS had about 1420 MiB available.
   No new screenshots were produced. Only the owned wrapper/daemon were stopped.
 - No physical device used, no original Android source files modified, no LLM calls.
+
+## Generic project adapter — 2026-10-15
+
+- PASS: 51 Python tests in the full explorer suite.
+
+- PASS: source profiles are no longer implicitly selected for NEXUS. New installations
+  have no fixed application package or repository; saved user preferences are retained.
+- PASS: independent Weather and Notes projects in Python integration tests, different
+  modules and package names, Compose previews, XML layouts, rejected private/member/
+  parameterized previews, Groovy snapshot injection and multi-module selection.
+- PASS: real automatic preparation, Kotlin compilation and Paparazzi render for an
+  independent synthetic Weather app (`sample.weather`, module `weather`). Two images:
+  Compose WeatherPreview and XML forecast. JUnit tests=2, failures=0, errors=0.
+  BUILD SUCCESSFUL in 4m 35s; 24 tasks (20 executed, 4 from cache).
+  Actual images visually inspected. No Android device used.
+- Evidence (ignored session): `sessions/generic-weather-result-20261015/result.json`,
+  `render-1/render.json`, `render-1/render.log`, `render-1/source-provenance.json`,
+  `render-1/source/weather/build/test-results/testDebugUnitTest/TEST-explorer.generated.GeneratedRenderTest.xml`.
+- PASS: real GitHub clone through existing gh authentication for octocat/Hello-World,
+  commit 7fd1a60b01f91b314f59955a4e4d4e80d8edf11d. Classified needs_adapter; no invented UI.
+  Private-repository access was not newly tested. Existing GitHub APK release support remains.
+- Groovy generation is tested in Python, not a separate native compilation. Flutter,
+  React Native and arbitrary stateful interfaces are not claimed as automatic source renders.
+- Earlier NEXUS Agent/Canvas fixtures still have the previously documented validation
+  limits; successful Weather rendering does not validate those fixtures.

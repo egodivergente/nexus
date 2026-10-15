@@ -1,115 +1,105 @@
-# Renderizar desde el código
+# Renderizado visual por proyecto
 
-Este modo compila las funciones Compose reales y las ejecuta con Paparazzi/Layoutlib
-en el host. No instala una APK, no arranca un emulador y no navega por el móvil.
-Está integrado en el botón **Renderizar código** y en la CLI para agentes.
+El explorador no depende de NEXUS. Acepta una APK, una carpeta local o un repositorio
+GitHub y prepara el método disponible. No presupone que todo proyecto pueda renderizar
+su interfaz desde fuentes: identifica los casos que necesitan un adaptador o datos.
+
+## Uso
 
 ```powershell
-python tools/apk-explorer/explorer.py --render "C:\ruta\proyecto" --json
-python tools/apk-explorer/explorer.py --render "C:\ruta\proyecto" --render-list --json
+python explorer.py --project "C:\apps\MiApp" --json
+python explorer.py --project propietario/repositorio --ref main --json
+python explorer.py --project "C:\apps\MiApp" --project-run --json
+python explorer.py --project "C:\apps\MiApp.apk" --project-run --json
 ```
 
-La ejecución prioriza ASUSVIDAL y devuelve los resultados al PC. En modo automático,
-si tiene menos de 2200 MiB disponibles, hay otra compilación o no está accesible, usa
-el PC con prioridad baja y dos hilos, e indica el motivo. Reutiliza
-las claves SSH existentes, exige la clave de host conocida y ejecuta Gradle con
-prioridad baja, un worker, sin paralelismo y sin daemon persistente. El SDK/JDK y
-la caché Gradle del ASUS son los configurados en las instrucciones de este proyecto.
-`--render-host usuario@host` cambia el destino, pero ese host necesita las mismas
-rutas de toolchain. `--render-local` usa el JDK/SDK del equipo que ejecuta el script.
+Sin `--project-run`, solo descarga/analiza y prepara escenarios. Con él, ejecuta
+secuencialmente los perfiles generados; para una APK delega en la exploración ADB
+existente, conservando el dispositivo y los límites indicados.
 
-La primera ejecución descarga el motor y sus dependencias. Las siguientes reutilizan
-la caché Gradle; cada sesión conserva una copia aislada de las fuentes. No se tocan
-los build scripts originales ni el workspace compartido del servidor. Los archivos
-del proyecto sí se compilan: usa fuentes y perfiles de confianza.
+La ventana ofrece **Proyecto / GitHub**, **Descubrir pantallas** y **Renderizar código**.
+El informe de preparación muestra los perfiles, el comando de ejecución y los casos
+pendientes. El acceso directo del escritorio sigue abriendo la misma herramienta.
+Las preferencias previas se conservan, pero una instalación nueva no fija app ni repo.
 
-## Perfil inicial de NEXUS
+`gh repo clone` utiliza la autenticación existente. Se descarga a una sesión nueva
+sin tocar un checkout del usuario. `repository.json` registra repositorio y commit.
+`--ref` admite una rama o tag; no se hacen pushes al proyecto que se está inspeccionando.
 
-El perfil incluido invoca directamente:
+## Preparación automática
 
-- `ModelsScreen`: seis modelos sintéticos de vídeo, temas Aurora y Claro.
-- `LibraryScreen`: repositorio vacío, temas Aurora y Claro.
-- `GenerationProgressPanel`: trabajo sintético en cola, temas Aurora y Claro.
+- Android Kotlin con Gradle Kotlin DSL o Groovy: genera un fixture Paparazzi por módulo.
+- Compose: detecta e invoca previews de nivel superior, accesibles, sin parámetros.
+  Los argumentos de la anotación Preview (dispositivo, fondo, modo oscuro, etc.) no se
+  expanden; se captura la función con sus valores internos en el dispositivo del motor.
+- También prepara funciones `*Screen` accesibles, de nivel superior, sin parámetros ni
+  dependencias detectadas. Es una selección conservadora, no una prueba de pureza.
+- XML: infla layouts básicos de `src/main/res/layout` con el namespace real del módulo.
+  No inventa datos, navegación ni contenido que solo aparece en ejecución.
+- Los paquetes, módulos y nombres de funciones provienen del código seleccionado.
+  Se copian las fuentes y scripts de los módulos locales para resolver dependencias.
+- Flutter, React Native y proyectos JavaScript se identifican, pero no tienen todavía
+  un adaptador automático de renderizado desde fuentes. Sus APK Android sí pueden
+  explorarse con el modo de dispositivo.
 
-Usa `NexusTheme`, sus recursos y fuentes reales. Las dependencias de datos se sustituyen
-por dobles de prueba; no se inicia `NexusApplication.onCreate` ni se usan cuentas,
-credenciales o datos del teléfono. El fixture no replica el diseño en HTML ni dibuja
-una imitación de las pantallas: llama a las funciones de producción.
+Los previews privados, miembros de clases, parámetros, ViewModels y pantallas sin
+preview se incluyen en la lista de pendientes. Data Binding, merge, fragments,
+variantes Gradle complejas y módulos Android sin Kotlin requieren un perfil específico.
+La detección de Kotlin es heurística, no un compilador; puede omitir declaraciones.
+Los layouts alternativos por qualifiers tampoco se enumeran automáticamente.
+Un perfil preparado no acredita que se pueda compilar: la ejecución real lo verifica.
 
-Son seis estados registrados, no toda la app. No están preparados todavía Agente,
-Lienzo ni todos los diálogos. Las imágenes corresponden a las fuentes seleccionadas,
-que pueden diferir de la APK instalada. El manifiesto identifica el alcance de cada
-imagen (`screen` o `component`) y sus datos de prueba.
+## Render directo y perfiles personalizados
 
-## Otras apps y nuevos estados
+```powershell
+python explorer.py --render "C:\apps\MiApp" --render-list --json
+python explorer.py --render "C:\apps\MiApp" --json
+python explorer.py --render "C:\apps\MiApp" --render-config perfil.json --json
+```
 
-Cada proyecto puede tener `apk-explorer.render.json` en su raíz, o usar
-`--render-config perfil.json`. Copia como punto de partida el perfil y el fixture
-de `render_profiles/`. El perfil declara módulo, variante, entradas de la copia
-de fuentes, clase JUnit y estados esperados. El fixture Kotlin llama a los componentes
-reales y proporciona los datos que necesitan. Una pantalla con servicios, ViewModel,
-base de datos o red necesita ese estado preparado; no se infiere automáticamente.
+`--render` utiliza `apk-explorer.render.json` si existe; de lo contrario genera un
+perfil. Si hay varios módulos elegibles, usa `--project-run` para ejecutarlos todos
+o selecciona uno con `--render-config`. El archivo declara entradas de fuentes,
+módulo, variante, versión del motor, fixture Kotlin y estados esperados.
+Una app con estado complejo puede aportar un fixture que llame a sus funciones reales
+con datos controlados. Los perfiles NEXUS de `render_profiles/` son ejemplos explícitos;
+no se seleccionan automáticamente y no son necesarios para otras apps.
 
-Se soportan proyectos Android con `build.gradle.kts` y Compose. La copia añade el
-plugin Paparazzi y un source set de pruebas separado; no ejecuta los tests ajenos
-al fixture. La combinación incluida fija Paparazzi 1.3.5 para Kotlin 2.0.21/Compose
-1.7 del NEXUS local. Otros toolchains pueden necesitar otro perfil y versión.
+El motor incluido es Paparazzi 1.3.5. La prueba de integración utiliza AGP 8.7.3,
+Kotlin 2.0.21 y Compose BOM 2024.10.00. Otras combinaciones pueden requerir ajustar
+la versión mediante un perfil; no se promete compatibilidad con todos los toolchains.
+Los proyectos con Paparazzi ya configurado se señalan para usar sus propias tareas,
+sin duplicar el plugin.
 
-## Resultado para el agente
+## Ejecución y evidencia
 
-`stdout` contiene un objeto JSON y `stderr` el progreso. `render.json` incluye las
-imágenes originales, láminas resumen, galería, estados pendientes y errores. La salida
-de proceso es 0 si se generaron todos los estados registrados, 3 si faltan estados
-y 1 si falló la compilación o el motor. Un fallo no se sustituye por una imagen ficticia.
+Compila una copia aislada, sin alterar los build scripts originales ni instalar la app.
+Prioriza ASUS si está disponible, sin otro Gradle y con al menos 2200 MiB de RAM libre;
+si no, usa el PC con prioridad baja, dos hilos y un worker. También comprueba el margen
+de memoria del PC antes de iniciar. Las rutas SSH/toolchain son la configuración del
+entorno actual; `--render-host usuario@host` y `--render-local` permiten elegir destino.
+Se verifican las claves SSH conocidas. No cierra trabajos ajenos para liberar memoria.
 
-`source-provenance.json` guarda SHA-256 de las entradas originales, del perfil y del
-fixture. El commit Git es contexto: los hashes identifican también archivos locales
-sin commit o sin seguimiento. Los cambios de build necesarios se aplican exclusivamente
-en la copia aislada. Las sesiones y sus fuentes se guardan en `sessions/`, excluido de Git.
+Los fuentes y scripts del proyecto se ejecutan durante la compilación. Una preview
+puede contener lógica propia: la preparación automática no sustituye servicios ni
+asegura que sus funciones no hagan red. El aislamiento de archivos no es un sandbox
+de ejecución. Usa proyectos de confianza.
 
-La GUI mantiene el renderizado en segundo plano. El botón **Detener** se desactiva
-durante esa compilación; el comando tiene un límite de ejecución de 30 minutos.
+Las sesiones se excluyen de Git. La copia omite cachés, outputs, `.env`, claves y
+`local.properties`; no copia toda la raíz. El wrapper y las dependencias del proyecto
+se usan desde la copia. La primera ejecución puede descargar dependencias Gradle.
 
-Referencias del motor: [Paparazzi](https://cashapp.github.io/paparazzi/) y
+- `project.json` / `project.html`: detección, perfiles, pendientes y enlaces a renders.
+- `discovery.json` / `discovery.html`: símbolos, líneas, dependencias y rutas literales.
+- `render.json` / `index.html`: imágenes reales, estados faltantes, errores y galería.
+- `source-provenance.json`: hashes de fuentes y fixture, commit de contexto y comandos.
+- `render.log`: resultado de la compilación y pruebas; un error nunca crea una captura ficticia.
+
+`prepared` significa escenario generado; `rendered` significa que se obtuvieron todas
+las imágenes registradas, no todas las interfaces posibles de la app. Las capturas
+no acreditan equivalencia con una APK instalada. El CLI entrega JSON por stdout y
+progreso por stderr. El render directo devuelve 0 al completar, 3 si es parcial y 1
+si falla el motor; `--project-run` devuelve 3 si no completa todos los perfiles.
+
+Referencias: [Paparazzi](https://cashapp.github.io/paparazzi/) y
 [versión 1.3.5](https://github.com/cashapp/paparazzi/releases/tag/1.3.5).
-# Descubrimiento y escenarios ampliados (2026-10-15)
-
-En la ventana, **Descubrir pantallas** analiza el proyecto sin compilar ni usar ADB.
-Genera `discovery.html` y `discovery.json` con funciones Compose, ubicación y línea,
-previews, registros de navegación con rutas literales y dependencias que pueden
-necesitar dobles de prueba. Excluye builds, sesiones, outputs y backups.
-
-```powershell
-python tools/apk-explorer/explorer.py --discover . --json
-python tools/apk-explorer/explorer.py --render . --render-list --json
-```
-
-El análisis es heurístico, no un parser completo de Kotlin ni un inventario exhaustivo.
-Las rutas dinámicas, extensiones, anotaciones propias y estados internos pueden faltar.
-`registered` identifica un escenario por archivo y función; **no significa que se haya
-renderizado**. `preview_candidate` necesita comprobar dependencias; `fixture_required`
-necesita preparar un escenario. Ninguna preview detectada se ejecuta automáticamente.
-El resultado de una ejecución real sigue estando en `render.json` y su registro de build.
-Cada render nuevo incorpora también el informe de descubrimiento y vincula sus imágenes
-a los símbolos de origen declarados en el perfil.
-
-Perfiles seleccionados automáticamente según las fuentes:
-
-- NEXUS local: seis escenarios anteriores y seis nuevos de Lienzo (vacío, carga,
-  error; Aurora y Claro).
-- NEXUS con `assistant/AssistantScreen.kt`: perfil `nexus-agent.json`, diez escenarios:
-  Agent vacío y conversación en Aurora/Claro, pensando y error en Aurora; Lienzo vacío
-  en Aurora/Claro, carga y error en Aurora. Incluye el módulo `agent-core`.
-
-Los escenarios nuevos usan las funciones de producción con ViewModels y servicios
-simulados. No instancian el runtime del agente, no llaman a un LLM ni generan contenido.
-No se mezclan fuentes de distintos checkouts. Se ha localizado una fuente compatible en
-`C:\Users\User\.codex\worktrees\nexus-android-parity\NEXUS` (1.9.3-agent);
-esto no acredita equivalencia con la APK 1.9.5 instalada.
-
-**Estado de validación:** el descubrimiento y la protección de memoria tienen pruebas
-Python. Los nuevos fixtures Kotlin están preparados pero pendientes de compilación y
-validación visual: se interrumpió el intento local al quedar aproximadamente 250 MiB
-libres; ASUS tenía aproximadamente 1420 MiB. Las seis capturas anteriores conservan su
-validación histórica. Ahora el render local rechaza iniciar Gradle con menos de 2200 MiB
-libres y devuelve un error en el manifiesto, sin cerrar trabajos ajenos.
