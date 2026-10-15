@@ -34,6 +34,6 @@
   }catch(error){toast(error.message);draw();}
  });
  document.addEventListener('input',e=>{if(e.target.id==='agent-input'){state.agentConversation ||= {};state.agentConversation.draft=e.target.value;persist();}});
- const style=document.createElement('style');style.textContent='.project-reference-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-top:20px}.project-reference{min-width:0}.project-reference img,.project-reference video{width:100%;height:160px;object-fit:contain;background:#0b0d10;border-radius:12px}.project-reference input,#reference-project{width:100%;margin:8px 0}.project-reference label{font-size:12px}';document.head.append(style);
+ const style=document.createElement('style');style.textContent='.project-reference-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-top:20px}.project-reference{min-width:0}.project-reference img,.project-reference video{width:100%;height:160px;object-fit:contain;background:#0b0d10;border-radius:var(--radius-md)}.project-reference input,#reference-project{width:100%;margin:8px 0}.project-reference label{font-size:var(--text-sm)}';document.head.append(style);
  window.NexusProjectReferences={open,importFiles,references};
 })();

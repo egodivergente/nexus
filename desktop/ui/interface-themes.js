@@ -10,7 +10,7 @@
  ];
  function selected(){const old={graphite:'aurora',amber:'quartz',carbon:'aurora'};return themes.find(t=>t.id===(old[state.interfaceTheme]||state.interfaceTheme))||themes.find(t=>t.id===(state.theme==='oled'?'oled':'aurora'));}
  function apply(){
-  const t=selected(),body=document.body;body.dataset.interfaceTheme=t.id;body.style.setProperty('--danger',t.id==='light'?'#9C3E42':'#E6A5AA');body.style.setProperty('--error-container',t.id==='light'?'#F7DEDF':'#35262B');
+  const t=selected(),body=document.body;body.dataset.interfaceTheme=t.id;body.style.setProperty('--danger',t.id==='light'?'#9C3E42':'#E6A5AA');body.style.setProperty('--error-container',t.id==='light'?'#F7DEDF':'#35262B');const light=t.id==='light',semantic=light?{success:'#2F7D4F',warning:'#8A5A00',danger:'#9C3E42',info:'#245C8F'}:{success:'#7FD4A0',warning:'#E8C27A',danger:'#E6A5AA',info:'#8FC7F0'};for(const [k,v] of Object.entries(semantic)){body.style.setProperty('--'+k,v);body.style.setProperty('--'+k+'-soft',v+(light?'1A':'1F'));}
   const lum=h=>{const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]};
   const ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
   const ink=ratio(t.accent,'#FFFFFF')>=4.5?'#FFFFFF':'#06141C';body.style.setProperty('--accent-ink',ink);
