@@ -1293,3 +1293,89 @@ body.nexus-agent-studio .history-row.history-sub {
 body.nexus-agent-studio .history-row .parity-cost[title] {
   cursor: help;
 }
+
+/* Ajustes: tarjetas en columnas sin huecos y temas con su nombre visible */
+body.nexus-agent-studio .settings-layout {
+  display: block;
+  column-width: 380px;
+  column-gap: 16px;
+}
+
+body.nexus-agent-studio .settings-layout > .sheet {
+  break-inside: avoid;
+  margin-bottom: 16px !important;
+}
+
+body.nexus-agent-studio .interface-themes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.nexus-agent-studio .interface-themes button {
+  height: auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px;
+  overflow: visible;
+  position: relative;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview {
+  height: 56px;
+  padding: 8px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview i {
+  height: 26px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview i:first-child {
+  height: 34px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview i:last-child {
+  height: 18px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-selected {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  margin: 0;
+}
+
+/* Biblioteca: el buscador tiene un solo borde (el de la etiqueta) y anillo de foco visible */
+body.nexus-agent-studio .gallery-search input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  outline: 0 !important;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+body.nexus-agent-studio .gallery-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Lienzo: las miniaturas de «Producción reciente» recuperan su tamaño (la regla global de botones las aplastaba a 32 px) */
+body.nexus-agent-studio .creative-piece {
+  width: 140px;
+  height: 90px;
+  min-height: 90px;
+  display: block;
+}
+
+body.nexus-agent-studio .creative-piece span {
+  font-size: 11px;
+}
+
+/* Lienzo: «Producción reciente» alineada con la tarjeta del compositor */
+body.nexus-agent-studio .creative-production {
+  width: min(100%, 680px);
+  margin-inline: auto;
+}
