@@ -66,3 +66,15 @@ Las láminas requieren Pillow (`python -m pip install Pillow`). Si falta, el age
 recibe los PNG originales y una nota de que no se pudo generar la lámina. El informe
 no contiene una crítica visual generada por IA: aporta la evidencia para que el agente
 la observe y razone. No hace llamadas a proveedores de IA ni cobra por capturas.
+# Descubrir interfaces desde las fuentes
+
+`python explorer.py --discover RUTA_PROYECTO --json` devuelve un inventario Compose
+con archivo/línea, dependencias, rutas literales y escenarios registrados. No necesita
+ADB, perfil compatible ni compilación. `--output CARPETA` guarda JSON y un informe HTML.
+La ventana ofrece la misma operación con **Descubrir pantallas**.
+
+Usar `readiness` para preparar escenarios y `render.json` para conocer la captura real.
+No interpretar `registered` o `preview_candidate` como prueba de renderizado: la
+detección es estática, admite omisiones y no enumera automáticamente todos los estados.
+Los perfiles de NEXUS y NEXUS Agent se seleccionan por sus fuentes; los nuevos escenarios
+Agent/Lienzo aún requieren validación Kotlin/visual (ver SOURCE_RENDER.md).

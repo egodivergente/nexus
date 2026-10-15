@@ -72,3 +72,44 @@ durante esa compilación; el comando tiene un límite de ejecución de 30 minuto
 
 Referencias del motor: [Paparazzi](https://cashapp.github.io/paparazzi/) y
 [versión 1.3.5](https://github.com/cashapp/paparazzi/releases/tag/1.3.5).
+# Descubrimiento y escenarios ampliados (2026-10-15)
+
+En la ventana, **Descubrir pantallas** analiza el proyecto sin compilar ni usar ADB.
+Genera `discovery.html` y `discovery.json` con funciones Compose, ubicación y línea,
+previews, registros de navegación con rutas literales y dependencias que pueden
+necesitar dobles de prueba. Excluye builds, sesiones, outputs y backups.
+
+```powershell
+python tools/apk-explorer/explorer.py --discover . --json
+python tools/apk-explorer/explorer.py --render . --render-list --json
+```
+
+El análisis es heurístico, no un parser completo de Kotlin ni un inventario exhaustivo.
+Las rutas dinámicas, extensiones, anotaciones propias y estados internos pueden faltar.
+`registered` identifica un escenario por archivo y función; **no significa que se haya
+renderizado**. `preview_candidate` necesita comprobar dependencias; `fixture_required`
+necesita preparar un escenario. Ninguna preview detectada se ejecuta automáticamente.
+El resultado de una ejecución real sigue estando en `render.json` y su registro de build.
+Cada render nuevo incorpora también el informe de descubrimiento y vincula sus imágenes
+a los símbolos de origen declarados en el perfil.
+
+Perfiles seleccionados automáticamente según las fuentes:
+
+- NEXUS local: seis escenarios anteriores y seis nuevos de Lienzo (vacío, carga,
+  error; Aurora y Claro).
+- NEXUS con `assistant/AssistantScreen.kt`: perfil `nexus-agent.json`, diez escenarios:
+  Agent vacío y conversación en Aurora/Claro, pensando y error en Aurora; Lienzo vacío
+  en Aurora/Claro, carga y error en Aurora. Incluye el módulo `agent-core`.
+
+Los escenarios nuevos usan las funciones de producción con ViewModels y servicios
+simulados. No instancian el runtime del agente, no llaman a un LLM ni generan contenido.
+No se mezclan fuentes de distintos checkouts. Se ha localizado una fuente compatible en
+`C:\Users\User\.codex\worktrees\nexus-android-parity\NEXUS` (1.9.3-agent);
+esto no acredita equivalencia con la APK 1.9.5 instalada.
+
+**Estado de validación:** el descubrimiento y la protección de memoria tienen pruebas
+Python. Los nuevos fixtures Kotlin están preparados pero pendientes de compilación y
+validación visual: se interrumpió el intento local al quedar aproximadamente 250 MiB
+libres; ASUS tenía aproximadamente 1420 MiB. Las seis capturas anteriores conservan su
+validación histórica. Ahora el render local rechaza iniciar Gradle con menos de 2200 MiB
+libres y devuelve un error en el manifiesto, sin cerrar trabajos ajenos.

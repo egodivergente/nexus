@@ -19,6 +19,20 @@ IGNORED_PARTS = {".git", ".gradle", "build", "node_modules", "__pycache__", ".id
 PRIVATE_SUFFIXES = {".jks", ".keystore", ".pem", ".key", ".p12", ".pfx", ".apk", ".aab"}
 
 
+def local_available_mb():
+    if os.name != "nt":
+        return None
+    import ctypes
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + [
+            (name, ctypes.c_ulonglong) for name in ("total", "available", "page_total", "page_available", "virtual_total", "virtual_available", "extended")]
+    status = MemoryStatus()
+    status.length = ctypes.sizeof(status)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+        raise RuntimeError("No se pudo consultar la memoria disponible para renderizar.")
+    return status.available // (1024 * 1024)
+
+
 def inside(root, relative):
     relative = Path(relative)
     if relative.is_absolute() or ".." in relative.parts:
@@ -32,7 +46,8 @@ def inside(root, relative):
 def profile_for(project, config=None):
     path = Path(config).resolve() if config else project / "apk-explorer.render.json"
     if not path.exists() and not config:
-        path = HERE / "render_profiles/nexus.json"
+        agent = project / "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt"
+        path = HERE / ("render_profiles/nexus-agent.json" if agent.is_file() else "render_profiles/nexus.json")
     profile = json.loads(path.read_text(encoding="utf-8"))
     if profile.get("schema_version") != 1 or profile.get("engine") != "paparazzi":
         raise ValueError("Perfil de renderizado no compatible.")
@@ -155,6 +170,7 @@ def collect(output, profile, provenance, host, error=None):
             continue
         states.append({"number": len(states) + 1, "title": case["title"], "scope": case["scope"],
                        "data": case["data"], "test": case["test"], "image": str(image.resolve()),
+                       "source": case.get("source"), "symbol": case.get("symbol"),
                        "sha256": hashlib.sha256(data).hexdigest()})
     missing = [s["test"] for s in profile["states"] if s["test"] not in {x["test"] for x in states}]
     result = {"schema_version": 1, "mode": "source_render", "engine": "paparazzi/" + profile["plugin_version"],
@@ -162,6 +178,7 @@ def collect(output, profile, provenance, host, error=None):
               "project": provenance["project"], "host": host or "local", "output": str(output),
               "gallery": str(output / "index.html"), "manifest": str(output / "render.json"),
               "provenance": str(output / "source-provenance.json"), "log": str(output / "render.log"),
+              "discovery": str(output / "discovery.json") if (output / "discovery.json").exists() else None,
               "states": states, "missing_states": missing, "error": error, "invalid_images": invalid_images,
               "coverage": "Only registered source states; no claim of whole-app coverage or installed APK equivalence.",
               "device_used": False, "overviews": [], "render_notes": profile.get("render_notes", [])}
@@ -193,7 +210,7 @@ def collect(output, profile, provenance, host, error=None):
 <style>body{{font:15px system-ui;background:#11151d;color:#e5eafa;padding:24px}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}}article{{background:#1e2533;padding:15px;border-radius:14px}}img{{width:100%;max-height:650px;object-fit:contain}}a{{color:#a6bfff}}pre{{white-space:pre-wrap}}</style>
 <h1>Renderizado desde el código</h1><p>{esc(result['status'])} · {len(states)} estados registrados · sin móvil ni emulador</p>
 <p>Funciones de interfaz reales, con datos controlados. No demuestra el estado de la APK instalada.</p>
-<p><a href="render.json">Manifiesto</a> · <a href="source-provenance.json">Fuentes y hashes</a> · <a href="render.log">Registro de compilación</a></p>
+<p><a href="render.json">Manifiesto</a> · <a href="source-provenance.json">Fuentes y hashes</a> · <a href="render.log">Registro de compilación</a> · <a href="discovery.html">Pantallas detectadas</a></p>
 <pre>{esc(error or '')}</pre><div class="grid">{cards}</div><p>Estados pendientes: {esc(', '.join(missing))}</p></html>''', encoding="utf-8")
     (output / "render.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     return result
@@ -228,13 +245,19 @@ def gradle_arguments(profile):
 def render_source(project, output, config=None, host="auto", log=print):
     output = Path(output).resolve()
     profile, work, archive, provenance = prepare(project, output, config)
+    from source_discovery import discover, write_report
+    write_report(discover(project, config), output)
     args = gradle_arguments(profile)
     provenance["gradle_arguments"] = args
     build_log = output / "render.log"
     error = None
-    host = select_host(host, log)
-    log("Fuentes aisladas; iniciando renderizado en " + (host or "este equipo") + "…")
     try:
+        host = select_host(host, log)
+        if not host:
+            available = local_available_mb()
+            if available is not None and available < 2200:
+                raise RuntimeError(f"PC sin memoria suficiente: {available} MiB disponibles; se necesitan 2200 MiB libres antes de compilar. No se ha iniciado Gradle.")
+        log("Fuentes aisladas; iniciando renderizado en " + (host or "este equipo") + "…")
         if host:
             if not re.fullmatch(r"[\w.-]+@[\w.:-]+", host):
                 raise ValueError("Destino SSH inválido.")

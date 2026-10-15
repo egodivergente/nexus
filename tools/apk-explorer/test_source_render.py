@@ -14,6 +14,15 @@ import explorer as e
 
 
 class SourceRenderTests(unittest.TestCase):
+    def test_low_memory_returns_error_without_starting_gradle(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root, config = self.fixture(folder)
+            with patch.object(r, 'local_available_mb', return_value=300), patch.object(r, 'select_host', return_value=''), patch.object(r, 'logged_run', side_effect=AssertionError('Must not build')):
+                result = r.render_source(root, Path(folder)/'output', config, log=lambda _: None)
+            self.assertEqual(result['status'], 'error')
+            self.assertIn('300 MiB', result['error'])
+            self.assertEqual(result['states'], [])
+
     def test_auto_host_requires_memory_and_no_existing_build(self):
         from subprocess import CompletedProcess
         with patch.object(r.subprocess, "run", return_value=CompletedProcess([], 0, b"3500000\n0\n", b"")):

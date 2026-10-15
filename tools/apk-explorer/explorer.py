@@ -825,6 +825,22 @@ def gui():
                 messages.put(("log", "Informe: " + str(last[0])))
         background(work)
 
+    def discover_code():
+        if busy:
+            return
+        project = filedialog.askdirectory(title="Proyecto que quieres analizar", initialdir=saved["project"])
+        if not project:
+            return
+        saved["project"] = project
+        persist()
+        def work():
+            from source_discovery import discover, write_report
+            result = discover(project)
+            last[0] = write_report(result, session_path())
+            messages.put(("log", str(result["summary"])))
+            messages.put(("open", last[0]))
+        background(work)
+
     def render_code():
         nonlocal rendering
         if busy:
@@ -856,6 +872,7 @@ def gui():
     stop_button = ttk.Button(buttons, text="Detener", command=stop.set)
     stop_button.pack(side="left", padx=3)
     ttk.Button(buttons, text="Galería", command=lambda: webbrowser.open(last[0].as_uri()) if last[0] else None).pack(side="left", padx=3)
+    ttk.Button(source_buttons, text="Descubrir pantallas", command=discover_code).pack(side="left", padx=3)
     ttk.Button(source_buttons, text="Renderizar código", command=render_code).pack(side="left", padx=3)
     ttk.Label(source_buttons, text="Proyecto → funciones reales → imágenes · ASUS preferente").pack(side="left", padx=8)
 
@@ -955,6 +972,7 @@ def main(argv=None):
     parser.add_argument("--inspect", nargs="?", const="", help="Inspección visual para agentes: APK o package; detecta conexión")
     parser.add_argument("--json", action="store_true", help="Devuelve el manifiesto JSON por stdout, progreso por stderr")
     parser.add_argument("--bundle", type=Path, help="Prepara capturas de una sesión existente para un agente, sin usar ADB")
+    parser.add_argument("--discover", type=Path, help="Inventario de pantallas Compose, previews y rutas sin compilar")
     parser.add_argument("--render", type=Path, help="Renderiza funciones Compose desde un proyecto, sin móvil")
     parser.add_argument("--render-config", type=Path, help="Perfil JSON de fuentes, fixture Kotlin y estados")
     parser.add_argument("--render-local", action="store_true", help="Compila/renderiza aquí en vez de ASUS")
@@ -972,10 +990,16 @@ def main(argv=None):
         gui()
         return
     quick = args.inspect is not None
-    if sum([quick, bool(args.bundle), bool(args.render)]) > 1:
-        parser.error("Elige un modo: --inspect, --bundle o --render.")
-    if args.json and not (quick or args.bundle or args.render):
-        parser.error("--json requiere --inspect, --bundle o --render.")
+    if sum([quick, bool(args.bundle), bool(args.render), bool(args.discover)]) > 1:
+        parser.error("Elige un modo: --inspect, --bundle, --discover o --render.")
+    if args.json and not (quick or args.bundle or args.render or args.discover):
+        parser.error("--json requiere --inspect, --bundle, --discover o --render.")
+    if args.discover:
+        from source_discovery import discover, write_report
+        result = discover(args.discover, args.render_config)
+        report = write_report(result, args.output or session_path())
+        print(json.dumps(result, ensure_ascii=True) if args.json else str(report))
+        return result
     if args.render:
         from source_render import render_source, profile_for
         if args.render_list:

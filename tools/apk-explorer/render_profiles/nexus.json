@@ -6,15 +6,126 @@
   "plugin_version": "1.3.5",
   "fixture": "NexusSourceRenderTest.kt",
   "test_class": "explorer.render.ExplorerSourceRenderTest",
-  "render_notes": ["Screens are rendered in isolation; app-wide navigation chrome is not part of these entry points.", "Model data is synthetic. Asynchronous brand images can remain as placeholders in static rendering; do not infer a production defect from those placeholders."],
-  "inputs": ["build.gradle.kts", "settings.gradle.kts", "gradlew", "gradlew.bat", "gradle/wrapper", "app/build.gradle.kts", "app/src/main"],
-  "requires": ["app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt", "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"],
+  "render_notes": [
+    "Screens are rendered in isolation; app-wide navigation chrome is not part of these entry points.",
+    "Model data is synthetic. Asynchronous brand images can remain as placeholders in static rendering; do not infer a production defect from those placeholders.",
+    "New Agent/Canvas fixtures have not yet passed Kotlin compilation or visual validation; Python discovery tests do not validate rendering."
+  ],
+  "inputs": [
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradlew",
+    "gradlew.bat",
+    "gradle/wrapper",
+    "app/build.gradle.kts",
+    "app/src/main"
+  ],
+  "requires": [
+    "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt",
+    "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"
+  ],
   "states": [
-    {"test": "modelsAurora", "title": "Modelos · Aurora", "scope": "screen", "data": "Six synthetic video models; no account or provider connection"},
-    {"test": "modelsLight", "title": "Modelos · Claro", "scope": "screen", "data": "Six synthetic video models; no account or provider connection"},
-    {"test": "libraryAurora", "title": "Biblioteca vacía · Aurora", "scope": "screen", "data": "Empty generation repository"},
-    {"test": "libraryLight", "title": "Biblioteca vacía · Claro", "scope": "screen", "data": "Empty generation repository"},
-    {"test": "progressAurora", "title": "Progreso · Aurora", "scope": "component", "data": "Synthetic queued generation"},
-    {"test": "progressLight", "title": "Progreso · Claro", "scope": "component", "data": "Synthetic queued generation"}
+    {
+      "test": "modelsAurora",
+      "title": "Modelos · Aurora",
+      "scope": "screen",
+      "data": "Six synthetic video models; no account or provider connection",
+      "symbol": "ModelsScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt"
+    },
+    {
+      "test": "modelsLight",
+      "title": "Modelos · Claro",
+      "scope": "screen",
+      "data": "Six synthetic video models; no account or provider connection",
+      "symbol": "ModelsScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt"
+    },
+    {
+      "test": "libraryAurora",
+      "title": "Biblioteca vacía · Aurora",
+      "scope": "screen",
+      "data": "Empty generation repository",
+      "symbol": "LibraryScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"
+    },
+    {
+      "test": "libraryLight",
+      "title": "Biblioteca vacía · Claro",
+      "scope": "screen",
+      "data": "Empty generation repository",
+      "symbol": "LibraryScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt"
+    },
+    {
+      "test": "progressAurora",
+      "title": "Progreso · Aurora",
+      "scope": "component",
+      "data": "Synthetic queued generation",
+      "symbol": "GenerationProgressPanel",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt"
+    },
+    {
+      "test": "progressLight",
+      "title": "Progreso · Claro",
+      "scope": "component",
+      "data": "Synthetic queued generation",
+      "symbol": "GenerationProgressPanel",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationProgressPanel.kt"
+    },
+    {
+      "test": "canvasEmptyAurora",
+      "title": "Lienzo · Empty · Aurora",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasLoadingAurora",
+      "title": "Lienzo · Loading · Aurora",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasErrorAurora",
+      "title": "Lienzo · Error · Aurora",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasEmptyLight",
+      "title": "Lienzo · Empty · Light",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasLoadingLight",
+      "title": "Lienzo · Loading · Light",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasErrorLight",
+      "title": "Lienzo · Error · Light",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    }
   ]
 }

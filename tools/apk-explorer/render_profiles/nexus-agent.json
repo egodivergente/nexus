@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "module": "app",
+  "variant": "OfflineQa",
+  "engine": "paparazzi",
+  "plugin_version": "1.3.5",
+  "fixture": "AgentSourceRenderTest.kt",
+  "test_class": "explorer.render.AgentSourceRenderTest",
+  "render_notes": [
+    "Screens are rendered in isolation; app-wide navigation chrome is not part of these entry points.",
+    "Model data is synthetic. Asynchronous brand images can remain as placeholders in static rendering; do not infer a production defect from those placeholders.",
+    "New Agent/Canvas fixtures have not yet passed Kotlin compilation or visual validation; Python discovery tests do not validate rendering."
+  ],
+  "inputs": [
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradlew",
+    "gradlew.bat",
+    "gradle/wrapper",
+    "app/build.gradle.kts",
+    "app/src/main",
+    "agent-core/build.gradle.kts",
+    "agent-core/src/main"
+  ],
+  "requires": [
+    "app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt",
+    "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt",
+    "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt"
+  ],
+  "states": [
+    {
+      "test": "agentEmptyAurora",
+      "title": "Agent · Empty · Aurora",
+      "scope": "screen",
+      "data": "Synthetic conversation and mocked view model; no LLM requests",
+      "symbol": "AssistantScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "agentEmptyLight",
+      "title": "Agent · Empty · Light",
+      "scope": "screen",
+      "data": "Synthetic conversation and mocked view model; no LLM requests",
+      "symbol": "AssistantScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "agentConversationAurora",
+      "title": "Agent · Conversation · Aurora",
+      "scope": "screen",
+      "data": "Synthetic conversation and mocked view model; no LLM requests",
+      "symbol": "AssistantScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "agentConversationLight",
+      "title": "Agent · Conversation · Light",
+      "scope": "screen",
+      "data": "Synthetic conversation and mocked view model; no LLM requests",
+      "symbol": "AssistantScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "agentThinkingAurora",
+      "title": "Agent · Thinking · Aurora",
+      "scope": "screen",
+      "data": "Synthetic conversation and mocked view model; no LLM requests",
+      "symbol": "AssistantScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "agentErrorAurora",
+      "title": "Agent · Error · Aurora",
+      "scope": "screen",
+      "data": "Synthetic conversation and mocked view model; no LLM requests",
+      "symbol": "AssistantScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasEmptyAurora",
+      "title": "Lienzo · Empty · Aurora",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasLoadingAurora",
+      "title": "Lienzo · Loading · Aurora",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasErrorAurora",
+      "title": "Lienzo · Error · Aurora",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    },
+    {
+      "test": "canvasEmptyLight",
+      "title": "Lienzo · Empty · Light",
+      "scope": "screen",
+      "data": "Synthetic state; mocked view model, balance and storage",
+      "symbol": "CreateScreen",
+      "source": "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt",
+      "validation": "pending_native_render"
+    }
+  ]
+}

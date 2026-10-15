@@ -20,6 +20,15 @@ import com.vidadomu.nexus.ui.components.GenerationProgressPanel
 import com.vidadomu.nexus.ui.library.LibraryScreen
 import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.theme.NexusTheme
+import com.vidadomu.nexus.ui.create.*
+import com.vidadomu.nexus.core.security.SecureStorage
+import com.vidadomu.nexus.provider.atlas.AtlasCloudProvider
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.core.app.ActivityOptionsCompat
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
@@ -49,6 +58,11 @@ class ExplorerSourceRenderTest {
         val catalog = mock(ModelCatalogRepository::class.java)
         val generations = mock(GenerationRepository::class.java)
         val currency = mock(CurrencyManager::class.java)
+        val storage = mock(SecureStorage::class.java)
+        val atlas = mock(AtlasCloudProvider::class.java)
+        runBlocking { `when`(atlas.fetchBalance()).thenReturn(Result.failure(IllegalStateException("Offline render"))) }
+        `when`(app.secureStorage).thenReturn(storage)
+        `when`(app.atlasProvider).thenReturn(atlas)
         val models = listOf("Kling", "Wan", "Seedance", "Hailuo", "Vidu", "PixVerse").map { family ->
             NexusModel(id = "render/${family.lowercase()}", displayName = "$family · ejemplo",
                 providerId = "render_fixture", organization = family, family = family,
@@ -74,7 +88,11 @@ class ExplorerSourceRenderTest {
     private fun render(theme: String, content: @Composable () -> Unit) {
         val fixtureContext = context(theme)
         paparazzi.snapshot {
-            CompositionLocalProvider(LocalContext provides fixtureContext) {
+            CompositionLocalProvider(LocalContext provides fixtureContext, LocalActivityResultRegistryOwner provides object : ActivityResultRegistryOwner {
+                override val activityResultRegistry = object : ActivityResultRegistry() {
+                    override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {}
+                }
+            }) {
                 NexusTheme { content() }
             }
         }
@@ -86,6 +104,28 @@ class ExplorerSourceRenderTest {
     @Test fun libraryLight() = render("LIGHT") { LibraryScreen(onNavigateToOutput = {}) }
     @Test fun progressAurora() = progress("AURORA")
     @Test fun progressLight() = progress("LIGHT")
+
+    @Test fun canvasEmptyAurora() = canvas("AURORA", "Empty")
+    @Test fun canvasLoadingAurora() = canvas("AURORA", "Loading")
+    @Test fun canvasErrorAurora() = canvas("AURORA", "Error")
+    @Test fun canvasEmptyLight() = canvas("LIGHT", "Empty")
+    @Test fun canvasLoadingLight() = canvas("LIGHT", "Loading")
+    @Test fun canvasErrorLight() = canvas("LIGHT", "Error")
+
+    private fun canvas(theme: String, mode: String) = render(theme) {
+        val vm = remember {
+            mock(CreateViewModel::class.java).also { model ->
+                val comparison = mock(ComparisonController::class.java)
+                `when`(comparison.state).thenReturn(MutableStateFlow(ComparisonState()))
+                `when`(model.comparison).thenReturn(comparison)
+                `when`(model.uiState).thenReturn(MutableStateFlow(CreateUiState(
+                    isLoadingSchema = mode == "Loading",
+                    errorMessage = if (mode == "Error") "Error de ejemplo: no se pudo cargar el modelo" else null
+                )))
+            }
+        }
+        CreateScreen(onNavigateToOutput = {}, onBrowseModels = {}, viewModel = vm)
+    }
 
     private fun progress(theme: String) = render(theme) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {

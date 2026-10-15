@@ -78,3 +78,17 @@
 
 Los artefactos de estas comprobaciones permanecen en `sessions/`, excluido de Git.
 No hay validación de cobertura total ni de funcionamiento con cualquier APK.
+
+## Source discovery extension — 2026-10-15
+
+- PASS: 40 Python tests, including source inventory, ignored outputs, comments/strings,
+  literal routes, file-qualified registration and low-memory rejection before Gradle.
+- PASS: local inventory: 10 screens, 53 composables, four registered functions.
+  Evidence: `sessions/discovery-20261015-02/discovery.json` (private, ignored).
+- PASS: inventory also executed against the separate nexus-android-parity checkout;
+  report: `sessions/discovery-agent-20261015-01/discovery.json`.
+- NOT VALIDATED: six new Canvas cases and the separate ten-case Agent/Canvas profile.
+  Local build session `sessions/source-render-expanded-20261015-01` was stopped when
+  Windows free physical RAM fell to about 250 MiB; ASUS had about 1420 MiB available.
+  No new screenshots were produced. Only the owned wrapper/daemon were stopped.
+- No physical device used, no original Android source files modified, no LLM calls.
