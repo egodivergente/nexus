@@ -2,6 +2,20 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [Unreleased] - rama `ux/premium-10` (Windows)
+
+Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin cambios de lógica ni de datos):
+
+- **Vídeo:** miniaturas con primer fotograma en Biblioteca, Lienzo e Historial.
+- **Contraste:** el color del texto sobre el acento se calcula por tema (WCAG 4.5:1).
+- **Objetivos clicables y texto:** ningún botón por debajo de 24 px (WCAG 2.5.8); pestañas 30 px, barra de estado 26 px; texto mínimo 11 px.
+- **Marca:** insignia de versión corta en la barra lateral sin recorte; la versión de bienvenida, vista previa y guía se mantiene (decisión de 1.9.5).
+- **Historial:** agrupa 3 o más generaciones idénticas seguidas (×N, desplegable), «Hoy/Ayer», «Local» / «Sin coste» con explicación en lugar de «—».
+- **Modelos:** selectores de filtro sin recorte; «Desde X · sin confirmar» con tooltip.
+- **Ajustes:** tarjetas en columnas sin huecos; temas con vista previa y nombre visibles.
+- **Biblioteca / Lienzo:** buscador con un solo borde; miniaturas de «Producción reciente» con su tamaño real, alineadas con el compositor.
+- **Saldo y gasto:** título y fecha en dos líneas, importe a la derecha.
+
 ## [1.9.5-agent] - 2026-10-15
 
 Release `v1.9.5-agent` (Android `1.9.5-agent-preview` / `versionCode 39` y Windows `1.9.5-agent-desktop`) que incorpora el logo oficial de NEXUS y el indicador de versión en el preview/onboarding de apertura, pantallas de bienvenida y cabeceras en móvil y EliteBook.
