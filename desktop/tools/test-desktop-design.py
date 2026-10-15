@@ -95,6 +95,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 assert page.locator('#content .result').count()==3  # la galería muestra también el encargo en curso
                 assert page.locator('#content .result[data-job=sample-c] .gallery-progress').count()==1
                 # La galería abre el visor (antes, un panel lateral de detalles).
+                page.wait_for_selector('#content .result[data-job=sample-a][data-gallery-wired]')
                 page.locator('#content .result[data-job=sample-a] .gallery-media').click()
                 capture('details',width,height)
                 panel=page.locator('.gallery-lightbox').bounding_box()
