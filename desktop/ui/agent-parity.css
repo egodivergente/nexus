@@ -1380,3 +1380,66 @@ body.nexus-agent-studio .creative-production {
   width: min(100%, 680px);
   margin-inline: auto;
 }
+
+/* Asistente: acciones secundarias agrupadas en «Más» */
+body.nexus-agent-studio .nx-more-menu {
+  position: relative;
+}
+
+body.nexus-agent-studio .nx-more-menu > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r2);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  color: var(--text);
+  font-size: calc(12.5px * var(--ui-font-scale));
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.nexus-agent-studio .nx-more-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.nexus-agent-studio .nx-more-menu > summary::after {
+  content: '▾';
+  font-size: 11px;
+  color: var(--muted);
+}
+
+body.nexus-agent-studio .nx-more-menu[open] > summary {
+  border-color: var(--accent);
+}
+
+body.nexus-agent-studio .nx-more-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  background: var(--surface);
+  box-shadow: 0 14px 36px #0006;
+}
+
+body.nexus-agent-studio .nx-more-list button {
+  width: 100%;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+}
+
+body.nexus-agent-studio .nx-more-list button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
