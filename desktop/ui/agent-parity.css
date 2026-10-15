@@ -1715,3 +1715,44 @@ body.nexus-agent-studio header .nx-more-list button {
 body.nexus-agent-studio header .nx-more-list button:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
 }
+
+/* Movimiento (fase 4): mismo tiempo y curva en todo; se desactiva con «reducir movimiento» */
+@keyframes nx-slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes nx-pop { from { transform: scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes nx-fade-up { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+body.nexus-agent-studio dialog.parity-sheet[open] {
+  animation: nx-slide-in var(--duration-standard) var(--ease-out);
+}
+
+body.nexus-agent-studio dialog#dialog[open]:not(.parity-sheet) {
+  animation: nx-pop var(--duration-standard) var(--ease-out);
+}
+
+body.nexus-agent-studio .nx-more-menu[open] > .nx-more-list {
+  animation: nx-fade-up var(--duration-fast) var(--ease-out);
+}
+
+body.nexus-agent-studio button,
+body.nexus-agent-studio .select-trigger,
+body.nexus-agent-studio summary {
+  transition: background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+/* Avisos con acción reversible («Deshacer») */
+body.nexus-agent-studio #toast.has-action {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+body.nexus-agent-studio #toast .nx-toast-action {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: transparent;
+  font-weight: var(--weight-semibold);
+}
