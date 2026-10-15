@@ -1705,3 +1705,13 @@ body.nexus-agent-studio dialog.parity-sheet > .close {
   place-items: center;
   margin: 0 0 calc(var(--control-sm) * -1) auto;
 }
+
+body.nexus-agent-studio header .nx-more-list button {
+  background: transparent !important;
+  border-color: transparent !important;
+  justify-content: flex-start;
+}
+
+body.nexus-agent-studio header .nx-more-list button:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+}
