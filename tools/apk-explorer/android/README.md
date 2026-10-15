@@ -1,4 +1,47 @@
-# APK Explorer para Android — 0.1.1 preview
+# APK Explorer para Android — 0.2.0 preview
+
+## Referencias de diseño y repetición
+
+1. Explora y pulsa **Recuperar y ver capturas**.
+2. Pulsa **Guardar como referencia de diseño**. Conserva una copia del ZIP antes
+   de actualizar la aplicación que estés auditando.
+3. Tras actualizarla, conecta Shizuku y pulsa **Repetir recorrido de referencia**.
+   Se utiliza la app de la referencia guardada, independientemente del selector.
+4. Recupera el resultado y exporta ambos ZIP: **Exportar referencia (antes)** y
+   **Exportar ZIP para un agente** (después).
+
+Cada ZIP incluye `route.json`, `AUDIT.md`, imágenes, XML y `agent.json` schema 2.
+La ruta usa etiqueta normalizada, resource-id y clase; no coordenadas físicas.
+Un selector ausente o ambiguo detiene la repetición con un error visible en el
+informe. Replay conserva una captura por paso, incluso si dos pasos se ven iguales:
+en exploración se siguen descartando duplicados. Son comprobaciones de recorrido.
+
+El agente compara ambos ZIP con `../visual_audit.py` (Pillow): obtiene galería
+antes/después/diferencias, métricas y pistas geométricas para revisar controles.
+No se asigna una nota estética automática. `comparison_complete` significa que se
+compararon los puntos de esa referencia, no cobertura completa de la aplicación.
+
+Se repiten acciones, no se restauran datos, scroll, autenticación ni contenido
+remoto. La espera tras cada acción es fija (1,4 s); cargas lentas y animaciones
+pueden generar diferencias. La revisión debe distinguirlas de cambios de diseño.
+No se borran datos ni se fuerza la parada de la app. Se conserva una referencia
+local; guardar otra la reemplaza. Los ZIP anteriores a 0.2.0 necesitan nueva captura.
+
+Verificación 2026-10-15: compilación en AXELPC y ocho tests JUnit correctos;
+66 tests Python correctos, incluidos seis del comparador (igualdad, diferencias,
+ruta divergente, entorno distinto/error, requisito de replay y geometría).
+En S25 SM-S938B, el motor final capturó cuatro pantallas de NEXUS Agent y repitió
+cuatro acciones con cinco puntos de comprobación (uno vuelve a Agente). Los cuatro
+pares de la referencia coincidieron píxel a píxel; `comparison_complete=true`.
+Un selector alterado a propósito produjo error en el paso 0, sin pulsar otro control.
+Las pantallas virtuales se liberaron. La primera tentativa de captura no obtuvo
+ventanas; el siguiente intento terminó. No se ha determinado la causa de ese fallo
+transitorio. Evidencia privada en `../sessions/design-replay/`.
+La APK 0.2.0 se instaló en S25 conservando datos. Estas pruebas ejecutaron el motor
+por ADB; los nuevos botones de referencia/exportación no se recorrieron mediante
+automatización de la interfaz Shizuku. La prueba confirma repetición sin cambios
+de diseño, no una mejora estética ni compatibilidad universal.
+
 
 ## Corrección de capturas repetidas — 2026-10-15
 

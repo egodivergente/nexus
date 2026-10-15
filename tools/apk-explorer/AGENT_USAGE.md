@@ -1,5 +1,33 @@
 # Inspección visual de APK para agentes
 
+## Auditoría antes/después con la APK nativa 0.2.0
+
+Usa una referencia exportada por la app Android. El agente puede repetirla sin
+operar su interfaz ni instalar nada (ADB autorizado y serial explícito):
+
+```powershell
+python tools/apk-explorer/replay_capture.py antes.zip --serial SERIAL --out despues.zip --adb RUTA_ADB
+python tools/apk-explorer/visual_audit.py antes.zip despues.zip --out auditoria-nueva
+```
+
+`replay_capture.py` usa por defecto la APK compilada en `android/app/build/outputs/`;
+`--apk` permite especificar otra. Ejecuta su motor en una pantalla virtual y retira
+los ficheros temporales. Devuelve JSON con estado y evidencia; salida 2 si el replay
+no terminó. No sustituye una app instalada, ni actúa sobre la pantalla física.
+
+`visual_audit.py` requiere Pillow y una carpeta de salida nueva. Empareja por prefijo
+de recorrido, no por posición ni parecido visual. Produce `comparison.json`,
+`index.html`, pares PNG y diferencias, y `AUDIT.md` con el contrato de revisión.
+Un paso ausente, ruta divergente, entorno distinto o replay incompleto queda marcado.
+Las métricas miden píxeles; no demuestran calidad estética. Las pistas de tamaño
+de controles son candidatas, pues el área táctil real puede estar ampliada.
+
+Para cada hallazgo cita paso, captura, elemento y su impacto; vincula archivos
+solo después de inspeccionar el código. Tras corregir el diseño, compila y repite
+la misma referencia. No des por restaurados datos o contenido remoto. Conserva
+estos ZIP como evidencia privada; no los publiques en GitHub.
+
+
 Para dejar disponible la pantalla física, usa una pantalla virtual:
 
 ```powershell

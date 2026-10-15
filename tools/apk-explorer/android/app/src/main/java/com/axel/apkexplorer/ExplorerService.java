@@ -16,6 +16,18 @@ public final class ExplorerService extends IExplorer.Stub {
         return "Explorando en pantalla virtual. Puedes usar otra app.";
     }
     public synchronized String status() { return engine==null ? "Sin sesión" : engine.status; }
+    public synchronized String replay(String plan) {
+        if(engine!=null && engine.running)return "Ya hay una exploración en curso.";
+        try {
+            if(plan.length()>100000)throw new IOException("Recorrido demasiado grande");
+            org.json.JSONObject data=new org.json.JSONObject(plan);
+            String pkg=data.getString("package");
+            if(!pkg.matches("[A-Za-z][\\w]*(\\.[A-Za-z][\\w]*)+"))throw new IOException("Paquete inválido");
+            engine=new Engine(context,pkg,20,plan);
+            new Thread(engine,"explorer-replay").start();
+            return "Repitiendo recorrido guardado…";
+        }catch(Exception e){return "No se puede repetir: "+e.getMessage();}
+    }
     public synchronized void stop() { if(engine!=null) engine.stop=true; }
     public synchronized ParcelFileDescriptor exportZip() {
         if(engine==null || engine.running) return null;

@@ -62,6 +62,24 @@ public final class MainActivity extends Activity {
         });
         button(root,"Detener",()->io.execute(()->{try{if(service!=null)service.stop();}catch(Exception e){message(e.toString());}}));
         button(root,"Recuperar y ver capturas",this::retrieve);
+        button(root,"Guardar como referencia de diseño",()->io.execute(()->{try{
+            if(!archive.exists())throw new IOException("Recupera las capturas primero.");
+            String plan=readRoute(archive);
+            org.json.JSONObject data=new org.json.JSONObject(plan);
+            java.nio.file.Files.copy(archive.toPath(),new File(getFilesDir(),"baseline.zip").toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            getPreferences(0).edit().putString("route",plan).apply();
+            message("Referencia guardada: "+data.getString("package")+". Actualiza esa app y pulsa Repetir.");
+        }catch(Exception e){message(e.getMessage());}}));
+        button(root,"Repetir recorrido de referencia",()->{
+            if(service==null){message("Primero conecta Shizuku.");return;}
+            String plan=getPreferences(0).getString("route","");
+            if(plan.isEmpty()){message("Guarda primero una referencia de diseño.");return;}
+            io.execute(()->{try{message(service.replay(plan));}catch(Exception e){message(e.toString());}});
+        });
+        button(root,"Exportar referencia (antes)",()->{
+            if(!new File(getFilesDir(),"baseline.zip").exists()){message("Guarda primero una referencia.");return;}
+            startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/zip").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"apk-explorer-antes.zip"),21);
+        });
         button(root,"Exportar ZIP para un agente",()->{if(!archive.exists()){message("Recupera las capturas primero.");return;}Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/zip").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"apk-explorer-"+System.currentTimeMillis()+".zip");startActivityForResult(i,20);});
         button(root,"Releases de GitHub",()->{EditText repo=new EditText(this);repo.setHint("propietario/repositorio");repo.setText(getPreferences(0).getString("repo",""));new AlertDialog.Builder(this).setTitle("Abrir releases en GitHub").setMessage("Usa tu sesión de GitHub en el navegador para descargar e instalar tu APK; después selecciónala aquí.").setView(repo).setPositiveButton("Abrir",(d,w)->{String r=repo.getText().toString().trim();if(!r.matches("[\\w.-]+/[\\w.-]+")){message("Indica propietario/repositorio");return;}getPreferences(0).edit().putString("repo",r).apply();startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/"+r+"/releases")));}).setNegativeButton("Cancelar",null).show();});
         button(root,"Actualizar lista de apps",this::refreshApps);
@@ -98,6 +116,19 @@ public final class MainActivity extends Activity {
             handler.post(()->{WebView web=new WebView(this);web.getSettings().setJavaScriptEnabled(false);web.getSettings().setAllowFileAccess(true);web.getSettings().setAllowFileAccessFromFileURLs(false);web.loadUrl(Uri.fromFile(new File(folder,"index.html")).toString());new AlertDialog.Builder(this).setView(web).setPositiveButton("Cerrar",(d,w)->web.destroy()).show();});
         }catch(Exception e){message(e.toString());}});
     }
-    protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==20&&result==RESULT_OK&&data!=null){Uri uri=data.getData();io.execute(()->{try(InputStream in=new FileInputStream(archive);OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("Destino no disponible");in.transferTo(out);message("ZIP exportado");}catch(Exception e){message(e.toString());}});}}
+    private String readRoute(File source)throws Exception {
+        try(ZipFile zip=new ZipFile(source)){
+            ZipEntry metadata=zip.getEntry("agent.json");
+            if(metadata==null)throw new IOException("Falta el informe de la captura.");
+            try(InputStream in=zip.getInputStream(metadata)){
+                org.json.JSONObject report=new org.json.JSONObject(new String(in.readNBytes(1000000),java.nio.charset.StandardCharsets.UTF_8));
+                if(report.getJSONArray("states").length()==0 || report.optString("status").equals("error"))throw new IOException("La captura falló; explora de nuevo antes de guardar una referencia.");
+            }
+            ZipEntry entry=zip.getEntry("route.json");
+            if(entry==null)throw new IOException("Esta captura es antigua. Haz una nueva exploración.");
+            try(InputStream in=zip.getInputStream(entry)){byte[] bytes=in.readNBytes(100001);if(bytes.length>100000)throw new IOException("Recorrido demasiado grande");return new String(bytes,java.nio.charset.StandardCharsets.UTF_8);}
+        }
+    }
+    protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if((request==20||request==21)&&result==RESULT_OK&&data!=null){Uri uri=data.getData();File source=request==21?new File(getFilesDir(),"baseline.zip"):archive;io.execute(()->{try(InputStream in=new FileInputStream(source);OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("Destino no disponible");in.transferTo(out);message("ZIP exportado");}catch(Exception e){message(e.toString());}});}}
     protected void onDestroy(){destroyed=true;handler.removeCallbacks(poll);Shizuku.removeRequestPermissionResultListener(permission);io.shutdown();super.onDestroy();}
 }

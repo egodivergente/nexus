@@ -6,4 +6,5 @@ interface IExplorer {
     String status() = 1;
     void stop() = 2;
     ParcelFileDescriptor exportZip() = 3;
+    String replay(String plan) = 4;
 }

@@ -35,6 +35,8 @@ public final class Engine implements Runnable {
     private final Map<String,byte[]> files=new LinkedHashMap<>();
     private final JSONArray states=new JSONArray(), edges=new JSONArray();
     private final JSONObject report=new JSONObject();
+    private final JSONArray route=new JSONArray();
+    private JSONObject replay;
     private UiAutomation ui;
     private VirtualDisplay display;
     private HandlerThread thread;
@@ -42,6 +44,27 @@ public final class Engine implements Runnable {
     private int displayId=-1;
     private long size;
     public Engine(Context ctx,String packageName,int max) {context=ctx;pkg=packageName;limit=max;}
+    public Engine(Context ctx,String packageName,int max,String plan)throws Exception {
+        this(ctx,packageName,max);
+        replay=new JSONObject(plan);
+        if(!pkg.equals(replay.getString("package")) || replay.getInt("schema")!=1 || replay.getJSONArray("steps").length()>40)
+            throw new IOException("Recorrido incompatible");
+        for(int i=0;i<replay.getJSONArray("steps").length();i++){
+            JSONObject step=replay.getJSONArray("steps").getJSONObject(i);
+            String kind=step.getString("kind");
+            if(!kind.equals("back") && !kind.equals("click"))throw new IOException("Acción desconocida");
+            if(kind.equals("click")){step.getString("label");step.getString("resource_id");step.getString("class");}
+        }
+    }
+    private JSONObject selector(AccessibilityNodeInfo n)throws Exception {
+        return new JSONObject().put("label",ActionPolicy.identity(label(n,0)))
+            .put("resource_id",n.getViewIdResourceName()==null?"":n.getViewIdResourceName())
+            .put("class",String.valueOf(n.getClassName())).put("kind","click");
+    }
+    private boolean matches(AccessibilityNodeInfo n,JSONObject s)throws Exception {
+        JSONObject actual=selector(n);
+        return actual.getString("label").equals(s.getString("label")) && actual.getString("resource_id").equals(s.getString("resource_id")) && actual.getString("class").equals(s.getString("class"));
+    }
 
     private static String shell(String... args) throws Exception {
         Process p=new ProcessBuilder(args).redirectErrorStream(true).start();
@@ -119,7 +142,16 @@ public final class Engine implements Runnable {
     public void run() {
         String result="finished_partial";
         try {
-            report.put("package",pkg).put("coverage_complete",false).put("mode","native_virtual_display");
+            report.put("package",pkg).put("coverage_complete",false).put("mode","native_virtual_display")
+                .put("schema",2).put("replay",replay!=null).put("started_at",System.currentTimeMillis())
+                .put("environment",new JSONObject().put("width",720).put("height",1600).put("density_dpi",320)
+                    .put("sdk",android.os.Build.VERSION.SDK_INT).put("model",android.os.Build.MODEL)
+                    .put("locale",Locale.getDefault().toLanguageTag())
+                    .put("night_mode",context.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                    .put("font_scale",shell("settings","get","system","font_scale").trim()))
+                .put("state_reset",false);
+            android.content.pm.PackageInfo packageInfo=context.getPackageManager().getPackageInfo(pkg,0);
+            report.put("app_version",packageInfo.versionName).put("app_version_code",packageInfo.getLongVersionCode());
             open();Thread.sleep(2500);
             List<int[]> frames=new ArrayList<>();
             List<String> frameKeys=new ArrayList<>();
@@ -128,7 +160,7 @@ public final class Engine implements Runnable {
             int duplicates=0;
             long deadline=System.currentTimeMillis()+180000;
             int count=0;
-            while(!stop && states.length()<limit && count<40 && System.currentTimeMillis()<deadline){
+            while(!stop && (replay!=null || states.length()<limit) && count<=40 && System.currentTimeMillis()<deadline){
                 ui.clearCache();
                 guard();
                 List<AccessibilityWindowInfo> windows=ui.getWindowsOnAllDisplays().get(displayId);
@@ -148,18 +180,33 @@ public final class Engine implements Runnable {
                 int match=-1;
                 for(int i=0;i<frames.size();i++)if(VisualFingerprint.same(frames.get(i),pixels)){match=i;break;}
                 String key;
-                if(match<0){
+                if(match<0 || replay!=null){
                     ByteArrayOutputStream png=new ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.PNG,100,png);
                     key=Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(png.toByteArray()));
                     frames.add(pixels);frameKeys.add(key);
                     String stem=String.format(Locale.ROOT,"screen-%04d",states.length()+1);
                     store(stem+".png",png.toByteArray());store(stem+".xml",raw.getBytes(StandardCharsets.UTF_8));
-                    states.put(new JSONObject().put("image",stem+".png").put("xml",stem+".xml").put("id",key));
+                    states.put(new JSONObject().put("image",stem+".png").put("xml",stem+".xml").put("id",key).put("route_step",count));
                     status="Explorando · "+states.length()+" capturas · "+count+" acciones";
                 }else{key=frameKeys.get(match);duplicates++;}
                 bitmap.recycle();
                 report.put("duplicate_frames_skipped",duplicates);
-                if(states.length()>=limit)break;
+                if(replay!=null){
+                    JSONArray steps=replay.getJSONArray("steps");
+                    if(count>=steps.length()){result="replay_complete";break;}
+                    JSONObject step=steps.getJSONObject(count);
+                    guard();
+                    if(step.getString("kind").equals("back"))shell("input","-d",String.valueOf(displayId),"keyevent","KEYCODE_BACK");
+                    else {
+                        AccessibilityNodeInfo chosen=null;int found=0;
+                        for(AccessibilityNodeInfo a:actions)if(matches(a,step)){chosen=a;found++;}
+                        if(found!=1)throw new IOException("Recorrido interrumpido en paso "+count+": selector encontrado "+found+" veces");
+                        if(!chosen.performAction(AccessibilityNodeInfo.ACTION_CLICK))throw new IOException("No se pudo pulsar el paso "+count);
+                    }
+                    route.put(step);edges.put(new JSONObject().put("from",key).put("action",step).put("performed",true));count++;
+                    Thread.sleep(1400);continue;
+                }
+                if(states.length()>=limit || count>=40)break;
                 AccessibilityNodeInfo next=null;String actionLabel="";
                 actions.sort(Comparator.comparingInt(a->{Rect b=new Rect();a.getBoundsInScreen(b);return ActionPolicy.priority(label(a,0),b.top>=1440 && b.bottom-b.top<=160 && b.right-b.left<=360);}));
                 // Semantic action budget is session-wide: layout shifts and accordion
@@ -168,6 +215,7 @@ public final class Engine implements Runnable {
                 if(next==null){
                     if(!backedOut.add(key) || count>=39)break;
                     guard();shell("input","-d",String.valueOf(displayId),"keyevent","KEYCODE_BACK");count++;
+                    route.put(new JSONObject().put("kind","back"));
                     edges.put(new JSONObject().put("from",key).put("action","Atrás (pantalla virtual)").put("performed",true));
                     Thread.sleep(1400);
                     List<AccessibilityWindowInfo> remaining=ui.getWindowsOnAllDisplays().get(displayId);
@@ -175,7 +223,9 @@ public final class Engine implements Runnable {
                     continue;
                 }
                 guard();
-                boolean ok=next.performAction(AccessibilityNodeInfo.ACTION_CLICK);count++;
+                JSONObject selected=selector(next);
+                boolean ok=next.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                if(ok){route.put(selected);count++;}else{result="action_failed";break;}
                 edges.put(new JSONObject().put("from",key).put("action",actionLabel).put("performed",ok));
                 Thread.sleep(1400);
             }
@@ -185,12 +235,18 @@ public final class Engine implements Runnable {
             try{if(ui!=null)UiAutomation.class.getMethod("disconnect").invoke(ui);}catch(Exception ignored){}
             try{if(display!=null)display.release();report.put("display_released",true);}catch(Exception e){result="error";try{report.put("cleanup_error",e.toString());}catch(Exception ignored){}}
             if(reader!=null)reader.close();if(thread!=null)thread.quitSafely();
-            try{report.put("status",result).put("states",states).put("edges",edges);files.put("agent.json",report.toString(2).getBytes(StandardCharsets.UTF_8));
+            try{report.put("status",result).put("states",states).put("edges",edges);
+                JSONObject plan=new JSONObject().put("schema",1).put("package",pkg).put("steps",route);
+                report.put("route",plan);
+                files.put("route.json",plan.toString(2).getBytes(StandardCharsets.UTF_8));
+                files.put("AUDIT.md",("# Evidencia para auditoria visual\n\nLee agent.json y las capturas junto al XML. Cada route_step identifica el punto del recorrido.\nComprueba jerarquia, espaciado, tipografia, contraste, consistencia y etiquetas accesibles.\nCita imagen y elemento en cada hallazgo, separa observaciones de propuestas y relaciona con codigo solo tras inspeccionarlo.\nLa cobertura es parcial. No se restauran datos, scroll, sesion ni contenido remoto. Replay repite acciones, no garantiza un estado identico.\nPara comparar usa visual_audit.py con los ZIP antes/despues. Un cambio de pixeles no demuestra una mejora de diseno.\n").getBytes(StandardCharsets.UTF_8));
+                files.put("agent.json",report.toString(2).getBytes(StandardCharsets.UTF_8));
                 StringBuilder html=new StringBuilder("<!doctype html><meta name='viewport' content='width=device-width'><title>APK Explorer</title><style>body{background:#10232d;color:#e5f4f5;font:16px sans-serif;padding:20px}img{max-width:100%;max-height:75vh;border-radius:16px}article{display:inline-block;margin:12px}a{color:#84e4c8}</style><h1>APK Explorer</h1><p>").append(ActionPolicy.html(pkg)).append(" · ").append(ActionPolicy.html(result)).append("</p>");
                 for(int i=0;i<states.length();i++){String image=states.getJSONObject(i).getString("image");html.append("<article><h2>").append(i+1).append("</h2><a href='").append(image).append("'><img src='").append(image).append("'></a></article>");}
                 files.put("index.html",html.toString().getBytes(StandardCharsets.UTF_8));
             }catch(Exception ignored){}
-            status=(result.equals("error")?"Error: "+report.optString("error",report.optString("cleanup_error")):"Terminado · "+states.length()+" capturas · cobertura parcial");
+            status=(result.equals("error")?"Error: "+report.optString("error",report.optString("cleanup_error")):
+                (result.equals("replay_complete")?"Recorrido repetido":replay!=null?"Recorrido incompleto":"Terminado")+" · "+states.length()+" capturas · cobertura parcial");
             running=false;
         }
     }
@@ -200,7 +256,7 @@ public final class Engine implements Runnable {
         Looper.prepareMainLooper();
         Object activityThread=Class.forName("android.app.ActivityThread").getMethod("systemMain").invoke(null);
         Context ctx=(Context)activityThread.getClass().getMethod("getSystemContext").invoke(activityThread);
-        Engine e=new Engine(ctx,args[0],Integer.parseInt(args[1]));
+        Engine e=args.length>3?new Engine(ctx,args[0],Integer.parseInt(args[1]),new String(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(args[3])),StandardCharsets.UTF_8)):new Engine(ctx,args[0],Integer.parseInt(args[1]));
         new Thread(()->{e.run();try{java.nio.file.Files.write(java.nio.file.Path.of(args[2]),e.zip());System.out.println(e.status);}catch(Exception ex){ex.printStackTrace();}System.exit(e.report.optString("status").equals("error")?1:0);}).start();
         Looper.loop();
     }
