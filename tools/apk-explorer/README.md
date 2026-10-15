@@ -61,6 +61,10 @@ recorre primero las pantallas cercanas al inicio y devuelve láminas de capturas
 rutas y acciones pendientes. No necesita que el agente maneje la ventana. Las láminas
 usan Pillow si está disponible; los originales y el informe se generan sin esa dependencia.
 Para revisar una sesión anterior sin recorrer otra vez la app, usar `--bundle CARPETA --json`.
+El modo rápido prioriza las pestañas inferiores y la navegación antes que los mensajes
+y el desplazamiento. Espera a que el árbol de interfaz se estabilice para evitar capturar
+el splash como si fuera la pantalla final. El JSON usa escapes Unicode compatibles con
+consolas Windows de codificación heredada.
 
 Los comandos tradicionales siguientes se ejecutan desde la carpeta de la herramienta:
 

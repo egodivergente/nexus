@@ -299,6 +299,22 @@ class Action:
             device.shell("input", "swipe", x, y + delta, x, y - delta, 350)
 
 
+def navigation_first(actions):
+    bottom = max((a.bounds[3] for a in actions), default=0)
+    def priority(action):
+        if action.kind == "scroll":
+            return 3
+        label = normalized(action.label)
+        if bottom and action.bounds[1] >= bottom * .88:
+            return 0
+        if re.search(
+                r"\b(inicio|home|modelos|models|biblioteca|library|biblio|galeria|gallery|"
+                r"lienzo|canvas|ajustes|settings|perfil|profile|proyecto|project)\b", label):
+            return 1
+        return 2
+    return sorted(actions, key=priority)
+
+
 def inspect(raw, package):
     root = ET.fromstring(raw)
     nodes = list(root.iter("node"))
@@ -364,8 +380,22 @@ class Explorer:
         return (not self.stop.is_set() and time.monotonic() < self.deadline and
                 len(self.states) < self.max_states and self.count < self.max_actions)
 
+    def stable_dump(self):
+        previous = None
+        raw = ""
+        for _ in range(4):
+            raw = self.device.dump()
+            key = inspect(raw, self.package)[0]
+            if key == previous:
+                return raw
+            previous = key
+            if self.stop.wait(min(self.delay, .3)):
+                return raw
+        self.notes.append("La interfaz seguía cambiando al capturar; revisar esta ruta.")
+        return raw
+
     def observe(self, route, raw=None):
-        raw = raw if raw is not None else self.device.dump()
+        raw = raw if raw is not None else self.stable_dump()
         key, title, actions, skipped, owned = inspect(raw, self.package)
         if key not in self.states:
             number = len(self.states) + 1
@@ -398,13 +428,16 @@ class Explorer:
         self.device.shell("am", "force-stop", "--user", "0", self.package)
         self.device.launch(self.package)
         self.stop.wait(self.delay)
-        if inspect(self.device.dump(), self.package)[0] != root_key:
+        current = inspect(self.stable_dump(), self.package)[0]
+        if current != root_key:
             self.notes.append("La pantalla inicial cambió; una ruta no pudo reproducirse.")
             return False
         for expected, action, target in path:
-            if inspect(self.device.dump(), self.package)[0] != expected or not self.perform(action):
+            if current != expected or not self.perform(action):
+                self.notes.append("No se pudo repetir un paso de la ruta: " + action.label)
                 return False
-            if inspect(self.device.dump(), self.package)[0] != target:
+            current = inspect(self.stable_dump(), self.package)[0]
+            if current != target:
                 self.notes.append("Ruta no reproducible: " + action.label)
                 return False
         return True
@@ -421,7 +454,7 @@ class Explorer:
             if not self.perform(action):
                 return
             next_route = route + [action.label]
-            raw = self.device.dump()
+            raw = self.stable_dump()
             target = inspect(raw, self.package)[0]
             known = target in self.states
             target, next_actions = self.observe(next_route, raw)
@@ -440,7 +473,7 @@ class Explorer:
             if len(path) >= self.depth:
                 self.notes.append(f"Profundidad máxima en {key}.")
                 continue
-            for action in candidates:
+            for action in navigation_first(candidates):
                 if not self.available():
                     return
                 if not first and not self.restore(root_key, path):
@@ -448,7 +481,7 @@ class Explorer:
                 first = False
                 if not self.perform(action):
                     return
-                raw = self.device.dump()
+                raw = self.stable_dump()
                 target = inspect(raw, self.package)[0]
                 known = target in self.states
                 next_route = route + [action.label]
@@ -469,6 +502,8 @@ class Explorer:
             if source:
                 self.report["source"] = source
             if not capture_only:
+                if self.strategy == "breadth":
+                    self.device.shell("am", "force-stop", "--user", "0", self.package)
                 self.device.launch(self.package)
                 self.stop.wait(self.delay)
             key, actions = self.observe([])
@@ -866,6 +901,9 @@ def gui():
 
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package")
     parser.add_argument("--serial")
@@ -897,7 +935,7 @@ def main(argv=None):
         parser.error("--json requiere --inspect o --bundle.")
     if args.bundle:
         result = agent_bundle(args.bundle)
-        print(json.dumps(result, ensure_ascii=False) if args.json else result["manifest"])
+        print(json.dumps(result, ensure_ascii=True) if args.json else result["manifest"])
         return result
     saved = load_settings() if quick else DEFAULT_SETTINGS.copy()
     args.max_states = args.max_states if args.max_states is not None else (12 if quick else 80)
@@ -962,12 +1000,12 @@ def main(argv=None):
         if quick and (output / "report.json").exists():
             manifest = agent_bundle(output)
             if args.json:
-                print(json.dumps(manifest, ensure_ascii=False))
+                print(json.dumps(manifest, ensure_ascii=True))
                 raise SystemExit(1)
         raise
     if quick:
         manifest = agent_bundle(output)
-        print(json.dumps(manifest, ensure_ascii=False) if args.json else "Manifiesto para agente: " + manifest["manifest"])
+        print(json.dumps(manifest, ensure_ascii=True) if args.json else "Manifiesto para agente: " + manifest["manifest"])
     else:
         print("Galería:", result)
     if explorer.report["status"] == "blocked":
@@ -980,7 +1018,7 @@ if __name__ == "__main__":
         main()
     except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
         if "--json" in sys.argv:
-            print(json.dumps({"schema_version": 1, "status": "error", "error": str(exc)}, ensure_ascii=False))
+            print(json.dumps({"schema_version": 1, "status": "error", "error": str(exc)}, ensure_ascii=True))
         else:
             print("ERROR:", exc, file=sys.stderr)
         raise SystemExit(1)

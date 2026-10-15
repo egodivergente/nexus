@@ -16,6 +16,8 @@ El modo `--inspect` detecta el package del APK con aapt, reutiliza las preferenc
 de conexión y descubre el serial vigente. No requiere GitHub CLI para una APK local
 o una app instalada. Usa exploración por anchura, 12 estados, 40 acciones y 3 minutos
 por defecto; los límites incluyen la recuperación de rutas y se pueden ajustar.
+Para empezar desde un estado reproducible, reinicia el proceso de la app al iniciar
+el modo rápido y al recuperar rutas; no borra sus datos. `--capture-only` evita ese reinicio.
 El tiempo de descarga, instalación o lectura del código queda fuera de esos 3 minutos.
 
 El APK indicado se instala con `-r`, conservando datos y comprobando la firma mediante

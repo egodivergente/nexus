@@ -9,7 +9,7 @@ import tempfile
 import struct
 import zlib
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location("explorer", Path(__file__).with_name("explorer.py"))
 e = importlib.util.module_from_spec(spec)
@@ -60,6 +60,36 @@ class FakeAndroid:
 
 
 class ExplorerTests(unittest.TestCase):
+    def test_quick_mode_prioritizes_navigation_over_chat_and_scroll(self):
+        actions = [e.Action("scroll", (0, 200, 100, 800), "Chat"),
+                   e.Action("tap", (0, 300, 100, 350), "Detalle del mensaje"),
+                   e.Action("tap", (0, 900, 100, 1000), "Lienzo"),
+                   e.Action("tap", (0, 900, 100, 1000), "Modelos")]
+        self.assertEqual([a.label for a in e.navigation_first(actions)],
+                         ["Lienzo", "Modelos", "Detalle del mensaje", "Chat"])
+
+    def test_capture_waits_for_splash_to_settle(self):
+        with tempfile.TemporaryDirectory() as d:
+            device = FakeAndroid()
+            device.dump = Mock(side_effect=[
+                screen("Splash"), screen("App lista"), screen("App lista")])
+            runner = e.Explorer(device, PKG, Path(d) / "run", delay=.001)
+            raw = runner.stable_dump()
+            self.assertEqual(e.inspect(raw, PKG)[1], "App lista")
+            self.assertEqual(device.dump.call_count, 3)
+
+    def test_agent_json_escapes_symbols_for_windows_consoles(self):
+        with tempfile.TemporaryDirectory() as d:
+            device = FakeAndroid()
+            device.dump = lambda: screen("⚙ Opciones")
+            device.screenshot = self.png
+            output = io.StringIO()
+            with patch.object(e, "Android", return_value=device), contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                e.main(["--inspect", PKG, "--serial", "test", "--json", "--capture-only", "--delay", ".001",
+                        "--output", str(Path(d) / "run")])
+            self.assertTrue(output.getvalue().isascii())
+            self.assertEqual(json.loads(output.getvalue())["screens"][0]["title"], "⚙ Opciones")
+
     @staticmethod
     def png():
         def chunk(kind, data):

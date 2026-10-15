@@ -1,11 +1,24 @@
 # Verificación · 2026-10-15
 
-- Python 3.12 en Windows: 24 pruebas unitarias pasan. Cubren navegación ramificada,
+- Python 3.12 en Windows: 27 pruebas unitarias pasan. Cubren navegación ramificada,
   recuperación de rutas, límites, persistencia ante error, controles sensibles,
   diálogos externos, keyguard, escape HTML, SSH, descargas GitHub con digest,
   persistencia de preferencias, detección de móviles, selección con cambio de puerto,
   CLI para agentes con JSON limpio, inferencia del package, recorrido por anchura,
-  listado de acciones pendientes y detección de capturas modificadas.
+  listado de acciones pendientes, detección de capturas modificadas, estabilización
+  después del splash, prioridades de navegación y JSON Unicode en consola Windows.
+- Prueba real sobre NEXUS Agent ya instalado en el S25 (`com.vidadomu.nexus.agent`,
+  interfaz `v1.9.5-agent-preview`, build 39), ADB local `192.168.1.134:5555`:
+  una pasada de 3 minutos obtuvo 9 estados, 9 acciones, 94 acciones pendientes y
+  14 controles omitidos, finalizó con `limit_reached` y devolvió JSON válido.
+  Se abrió su lámina y se verificaron capturas reales del chat, diálogos, proyecto,
+  ajustes y saldo. No se reinstaló la app. Los artefactos privados están excluidos de Git.
+  Esta prueba corrigió una salida Unicode incompatible con la consola y una captura
+  prematura del splash, además de priorizar pestañas y navegación frente al chat.
+  La pasada posterior, con las prioridades corregidas, obtuvo Agente, Lienzo, Modelos
+  y Biblioteca en 4 capturas y 3 pulsaciones, todas propias de la app, con SHA-256
+  verificado y sin avisos de imagen uniforme. Finalizó por el límite de 4 estados;
+  se revisó visualmente su lámina y el JSON de stdout era válido. Cobertura parcial.
 - Modo agente real en el Pixel: creó `agent.json` y una lámina JPG desde XML/PNG
   del dispositivo. Marcó `blocked`, captura uniforme y SHA-256 válido; se abrió la
   lámina y se comprobó que muestra la captura negra con aviso de revisión.
