@@ -799,7 +799,8 @@ body.nexus-agent-studio .history-list {
   gap: 6px;
 }
 
-body.nexus-agent-studio .history-list > h3 {
+body.nexus-agent-studio .history-list > h3,
+body.nexus-agent-studio .history-list > .history-day {
   font-size: calc(11.5px * var(--ui-font-scale)) !important;
   color: var(--muted);
   text-transform: uppercase;

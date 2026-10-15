@@ -88,7 +88,7 @@
   const visible=jobs.slice(0,200),items=[];
   for(let i=0;i<visible.length;){let j=i+1;while(j<visible.length&&sig(visible[j])===sig(visible[i]))j++;items.push(visible.slice(i,j));i=j;}
   let previous='';
-  const rows=items.map(run=>{const first=run[0],day=dayOf(first),heading=day!==previous?`<h3>${escape(dayLabel(first))}</h3>`:'';previous=day;
+  const rows=items.map(run=>{const first=run[0],day=dayOf(first),heading=day!==previous?`<h2 class="history-day">${escape(dayLabel(first))}</h2>`:'';previous=day;
    if(run.length<3)return heading+run.map(job=>row(job)).join('');
    const key='g-'+first.id,open=P.groups.has(key),usd=run.map(usdOf),cost=run.every(j=>j.localEdit)?{text:'Local',title:'Ediciones hechas en tu equipo: no tienen coste.'}:usd.every(v=>v!==null)?{text:currency.cost(usd.reduce((a,b)=>a+b,0)),title:'Suma de las '+run.length+' generaciones del grupo.'}:{text:'Varios',title:'Despliega el grupo para ver el coste de cada generación.'};
    const times=run.map(timeOf),range=times[times.length-1]===times[0]?times[0]:times[times.length-1]+'–'+times[0];
