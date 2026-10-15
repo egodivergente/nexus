@@ -1,14 +1,14 @@
 {
   "name": "nexus",
   "status": "CONSOLIDATED_SOURCE_RELEASE_194_AUDIT_IMPROVEMENTS",
-  "verifiedAt": "2026-10-14",
+  "verifiedAt": "2026-10-15",
   "repository": "https://github.com/egodivergente/nexus",
   "canonicalBranch": "main",
   "components": {
     "android": {
       "versionName": "1.9.4-agent-preview",
       "versionCode": 38,
-      "sha256": "e9d4f10c4e1fa528a54f73462694b4a8100e5dd762c6e02c0bc2a4cd0e220986"
+      "sha256": "3a8552ff74ea6677618c75e9a80af43df2cc8d70c086a101998d33aa688dc353"
     },
     "desktop": {
       "versionName": "1.9.4-agent-desktop",
@@ -28,8 +28,8 @@
     "desktopFlowQueueTestsRun": 20,
     "desktopLibraryPdfRegressionRun": "PASS",
     "agentProxyUnitTestsRun": 33,
-    "androidNewVisualOptionsInstalledOnS25": false,
-    "androidNewVisualOptionsDeviceTests": "PENDING",
+    "androidNewVisualOptionsInstalledOnS25": true,
+    "androidNewVisualOptionsDeviceTests": "PASS",
     "paidOperations": 0
   }
 }

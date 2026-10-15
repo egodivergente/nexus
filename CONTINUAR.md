@@ -25,9 +25,9 @@ Al terminar, revisar el diff, ejecutar verificaciones proporcionadas, crear comm
 publicar sin force y verificar el SHA remoto. Conservar trabajos ajenos. No instalar
 ni ejecutar operaciones de pago por compilar o publicar una entrega.
 
-La APK 1.9.4 (`entregas/Nexus-Agent-1.9.4-preview.apk`) está preparada para
-revisión sin instalar todavía en el teléfono; el EliteBook ejecuta Windows
-`1.9.4-agent-desktop` desde `%LOCALAPPDATA%\Programs\NexusStudio`. El código del
-puente AKI y su lanzador están versionados; su sesión y configuración activa
-viven en Termux, fuera de Git.
+La APK `1.9.4-agent-preview` (`versionCode 38`, `entregas/Nexus-Agent-1.9.4-preview.apk`)
+está instalada en el Samsung S25 Ultra (`SM_S938B`) y en el Pixel 8 Pro conservando sus
+datos, y el EliteBook ejecuta Windows `1.9.4-agent-desktop` desde
+`%LOCALAPPDATA%\Programs\NexusStudio`. El código del puente AKI y su lanzador están
+versionados; su sesión y configuración activa viven en Termux, fuera de Git.
 
