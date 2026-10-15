@@ -30,34 +30,38 @@ fun NexusBottomBar(navController: NavController) {
     if(currentRoute?.startsWith("output")==true) return
     val haptic = LocalHapticFeedback.current
     StudioChrome(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=0.dp),
-            verticalAlignment=Alignment.CenterVertically) {
-            Screen.bottomNavItems.forEach { screen ->
-                val selected=currentRoute==screen.route
-                val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
-                Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
-                    .semantics { contentDescription=screen.title }
-                    .selectable(selected=selected,role=Role.Tab,onClick={
-                        if(currentRoute!=screen.route) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState=true }
-                            launchSingleTop=true
-                            // Preserve the fix preventing a return to Assistant from reopening Settings.
-                            restoreState=screen.route !in setOf(Screen.Models.route,Screen.Assistant.route)
+        Column(Modifier.fillMaxWidth()) {
+            HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
+            Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=4.dp),
+                verticalAlignment=Alignment.CenterVertically) {
+                Screen.bottomNavItems.forEach { screen ->
+                    val selected=currentRoute==screen.route
+                    val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
+                    Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
+                        .semantics { contentDescription=screen.title }
+                        .selectable(selected=selected,role=Role.Tab,onClick={
+                            if(currentRoute!=screen.route) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState=true }
+                                launchSingleTop=true
+                                // Preserve the fix preventing a return to Assistant from reopening Settings.
+                                restoreState=screen.route !in setOf(Screen.Models.route,Screen.Assistant.route)
+                            }
+                            }
+                        }),horizontalAlignment=Alignment.CenterHorizontally,
+                        verticalArrangement=Arrangement.spacedBy(0.dp)) {
+                        Box(Modifier.width(56.dp).height(32.dp).clip(NexusTokens.filter)
+                            .background(tone),
+                            contentAlignment=Alignment.Center) {
+                            Icon(screen.icon,contentDescription=null,
+                                tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier=Modifier.size(NexusTokens.space24))
                         }
-                        }
-                    }),horizontalAlignment=Alignment.CenterHorizontally,
-                    verticalArrangement=Arrangement.spacedBy(0.dp)) {
-                    Box(Modifier.width(56.dp).height(32.dp).clip(NexusTokens.filter)
-                        .background(tone),
-                        contentAlignment=Alignment.Center) {
-                        Icon(screen.icon,contentDescription=null,
-                            tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier=Modifier.size(NexusTokens.space24))
+                        Text(if(screen==Screen.Library) "Biblio" else screen.title,style=MaterialTheme.typography.labelMedium,
+                            color=if(selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines=1)
                     }
-                    Text(if(screen==Screen.Library) "Biblio" else screen.title,style=MaterialTheme.typography.labelMedium,
-                        color=if(selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
