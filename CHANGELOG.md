@@ -15,6 +15,8 @@ Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin camb
 - **Ajustes:** tarjetas en columnas sin huecos; temas con vista previa y nombre visibles.
 - **Biblioteca / Lienzo:** buscador con un solo borde; miniaturas de «Producción reciente» con su tamaño real, alineadas con el compositor.
 - **Saldo y gasto:** título y fecha en dos líneas, importe a la derecha.
+- **Asistente:** «Conversaciones» y «Nueva charla» a la vista; «+ Proyecto», «Proyecto», «Referencias» y «Ediciones» en un menú «Más» (cierra con Esc o al elegir).
+- **Historial vacío:** estado diseñado, con «Crear» si no hay generaciones y «Quitar filtros» si la búsqueda no coincide.
 
 ## [1.9.5-agent] - 2026-10-15
 
