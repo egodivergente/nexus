@@ -14,7 +14,7 @@ body.nx-desktop .sidebar,body.nx-desktop:has(.agent-view) .sidebar{width:194px;b
 body.nx-desktop .brand{position:relative;margin:0 12px 28px;gap:8px;flex-wrap:wrap;align-items:center}
 body.nx-desktop .brand .nexus-brand-mark{display:none}
 body.nx-desktop .brand .nexus-brand-logo{display:block;width:96px;height:auto;max-height:92px;object-fit:contain;flex:none}
-body.nx-desktop .brand .nx-brand-version{display:inline-flex;font-size:10px;font-weight:600;letter-spacing:.2px}
+body.nx-desktop .brand .nx-brand-version{display:inline-flex;font-size:11px;font-weight:600;letter-spacing:.2px}
 body.nx-desktop .brand>svg{width:28px;height:28px;color:var(--accent)}
 body.nx-desktop .brand>span{font-size:20px;font-weight:700;letter-spacing:-.6px;color:var(--text)}
 body.nx-desktop .brand>span small{display:none}

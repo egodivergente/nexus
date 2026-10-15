@@ -100,7 +100,7 @@
   jobs.forEach(j=>{
    const output=j.outputs?.[0],url=typeof output==='string'?output:output?.url,valid=isMediaUrl(url),completed=j.status==='COMPLETED';
    const piece=el('button','creative-piece');piece.type='button';piece.dataset.creativeJob=j.id;piece.title=j.name||j.modelId;piece.setAttribute('aria-label','Abrir '+piece.title);
-   piece.innerHTML=valid?(j.modality==='VIDEO'?`<video src="${escape(url)}" muted playsinline preload="none"></video><span>▷</span>`:`<img src="${escape(url)}" alt="${escape(piece.title)}" loading="lazy" decoding="async">`):`<span>${escape(j.status==='FAILED'?'Fallido':'En proceso')}</span>`;
+   piece.innerHTML=valid?(j.modality==='VIDEO'?`<video src="${escape(url)}#t=0.1" muted playsinline preload="metadata" aria-hidden="true"></video><span>▷</span>`:`<img src="${escape(url)}" alt="${escape(piece.title)}" loading="lazy" decoding="async">`):`<span>${escape(j.status==='FAILED'?'Fallido':'En proceso')}</span>`;
    if(valid&&completed&&j.modality==='IMAGE'){piece.draggable=true;piece.addEventListener('dragstart',e=>{e.dataTransfer.setData('application/x-nexus-job',j.id);e.dataTransfer.effectAllowed='copy';});piece.title+=' · Arrastra para usar como referencia';}
    list.append(piece);
   });

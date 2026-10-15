@@ -130,8 +130,8 @@ body.nexus-agent-studio button.primary,
 body.nexus-agent-studio #generate,
 body.nexus-agent-studio [data-agent="send"] {
   background: var(--accent) !important;
-  color: #ffffff !important;
-  border: 1px solid color-mix(in srgb, #ffffff 18%, var(--accent)) !important;
+  color: var(--accent-ink, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-ink, #ffffff) 18%, var(--accent)) !important;
   border-radius: var(--r2) !important;
   font-weight: 600 !important;
   height: 34px;
@@ -285,7 +285,7 @@ body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-mark {
 
 body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-logo {
   display: block !important;
-  width: 72px;
+  width: 40px;
   height: 26px;
   object-fit: contain;
   flex-shrink: 0;
@@ -297,12 +297,13 @@ body.nexus-agent-studio:not(.creative-dock-expanded) .brand .nx-brand-identity {
 
 body.nexus-agent-studio .brand .nx-brand-version {
   display: inline-flex !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   padding: 1px 6px !important;
-  height: 18px !important;
-  min-height: 18px !important;
-  max-width: 68px;
-  overflow: hidden;
+  height: 20px !important;
+  min-height: 20px !important;
+  max-width: none;
+  flex-shrink: 0;
+  overflow: visible;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -469,8 +470,8 @@ body.nexus-agent-studio .tabs {
 }
 
 body.nexus-agent-studio .tabs button {
-  height: 26px !important;
-  min-height: 26px !important;
+  height: 30px !important;
+  min-height: 30px !important;
   padding: 0 10px !important;
   border: 0 !important;
   border-radius: 6px !important;
@@ -482,9 +483,8 @@ body.nexus-agent-studio .tabs button {
 
 body.nexus-agent-studio .tabs button.active {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  color: var(--accent-ink, #ffffff) !important;
   font-weight: 600 !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 /* View 1: Asistente (Chat / Copilot / Agent) */
@@ -820,6 +820,7 @@ body.nexus-agent-studio .history-row {
 }
 
 body.nexus-agent-studio .history-row > img,
+body.nexus-agent-studio .history-row > video.history-thumb,
 body.nexus-agent-studio .history-row > span:first-child {
   width: 44px !important;
   height: 44px !important;
@@ -1068,8 +1069,8 @@ body.nexus-agent-studio .creative-status {
 }
 
 body.nexus-agent-studio .creative-status button {
-  min-height: 22px !important;
-  height: 22px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   min-width: auto !important;
   padding: 0 8px !important;
   font-size: calc(11px * var(--ui-font-scale)) !important;
@@ -1197,4 +1198,57 @@ body.nexus-agent-studio #toast {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── Pasada premium (fase 1): objetivos clicables, texto mínimo y filas de coste ── */
+body.nexus-agent-studio .tabs button,
+body.nexus-agent-studio .creative-dock-toggle,
+body.nexus-agent-studio .gallery-collection-heading button,
+body.nexus-agent-studio .gallery-select,
+body.nexus-agent-studio .gallery-overlay button,
+body.nexus-agent-studio .model .star,
+body.nexus-agent-studio .gallery-balances button,
+body.nexus-agent-studio header button {
+  min-height: 32px;
+}
+
+body.nexus-agent-studio .creative-dock-toggle,
+body.nexus-agent-studio .gallery-collection-heading button,
+body.nexus-agent-studio .gallery-select,
+body.nexus-agent-studio .gallery-overlay button,
+body.nexus-agent-studio .model .star,
+body.nexus-agent-studio .gallery-balances button {
+  min-width: 32px;
+}
+
+body.nexus-agent-studio .nx-version-badge,
+body.nexus-agent-studio .nx-kicker {
+  font-size: 11px !important;
+}
+
+/* Saldo y gasto: título y fecha en dos líneas, importe a la derecha */
+body.nexus-agent-studio .parity-billing article > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+body.nexus-agent-studio .parity-billing .parity-cost {
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body.nexus-agent-studio .parity-billing small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+body.nexus-agent-studio dialog [data-refresh-balances] {
+  margin: 8px 0 16px;
+}
+
+body.nexus-agent-studio dialog .parity-balance-row + h3 {
+  margin-top: 28px;
 }
