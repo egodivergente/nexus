@@ -1,9 +1,13 @@
 import importlib.util
+import contextlib
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import struct
+import zlib
 import unittest
 from unittest.mock import patch
 
@@ -56,6 +60,93 @@ class FakeAndroid:
 
 
 class ExplorerTests(unittest.TestCase):
+    @staticmethod
+    def png():
+        def chunk(kind, data):
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+        raw = b"".join(b"\0" + bytes((30, 80, 150) if y % 20 < 10 else (200, 210, 220)) * 80 for y in range(160))
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 80, 160, 8, 2, 0, 0, 0)) +
+                chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+    def test_agent_cli_detects_phone_and_emits_only_json(self):
+        with tempfile.TemporaryDirectory() as d:
+            device = FakeAndroid()
+            device.screenshot = self.png
+            found = [{"serial": "test", "model": "SM_S938B", "label": "S25"}]
+            output = io.StringIO()
+            with patch.object(e, "Android", return_value=device), patch.object(e, "GitHub", side_effect=AssertionError("Unneeded GitHub call")), \
+                 patch.object(e, "discover_devices", return_value=("", found, [])), patch.object(e, "load_settings", return_value=e.DEFAULT_SETTINGS.copy()), \
+                 contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                e.main(["--inspect", PKG, "--json", "--delay", ".001", "--output", str(Path(d) / "run")])
+            manifest = json.loads(output.getvalue())
+            self.assertEqual(manifest["coverage"]["app_states"], 3)
+            self.assertFalse(manifest["coverage"]["complete"])
+            self.assertTrue(Path(manifest["manifest"]).exists())
+            self.assertTrue(all(s["integrity_verified"] for s in manifest["screens"]))
+
+    def test_agent_apk_infers_package_before_install(self):
+        with tempfile.TemporaryDirectory() as d:
+            apk = Path(d) / "private.apk"
+            apk.write_bytes(b"PKfixture")
+            device = FakeAndroid()
+            device.install = lambda path: None
+            device.screenshot = self.png
+            with patch.object(e, "Android", return_value=device), patch.object(e, "apk_package", return_value=PKG) as infer, \
+                 patch.object(e, "load_settings", return_value=e.DEFAULT_SETTINGS.copy()), contextlib.redirect_stdout(io.StringIO()):
+                e.main(["--inspect", str(apk), "--serial", "test", "--max-states", "1", "--delay", ".001", "--output", str(Path(d) / "run")])
+            infer.assert_called_once_with(apk)
+            report = json.loads((Path(d) / "run/report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["package"], PKG)
+            self.assertIn("sha256", report["apk"])
+
+    def test_breadth_visits_siblings_before_detail(self):
+        class Nested(FakeAndroid):
+            def dump(self):
+                if self.state == "gallery":
+                    return screen("Galería", button("Detalle", 500))
+                if self.state == "detail":
+                    return screen("Detalle")
+                return super().dump()
+
+            def shell(self, *args):
+                if self.state == "gallery" and args[:2] == ("input", "tap"):
+                    self.state = "detail"
+                else:
+                    super().shell(*args)
+        with tempfile.TemporaryDirectory() as d:
+            runner = e.Explorer(Nested(), PKG, Path(d) / "run", delay=.001, strategy="breadth")
+            runner.run()
+            self.assertEqual([x["action"] for x in runner.edges], ["Galería", "Ajustes", "Detalle"])
+
+    def test_bundle_exposes_pending_actions_without_touching_device(self):
+        with tempfile.TemporaryDirectory() as d:
+            device = FakeAndroid()
+            device.screenshot = self.png
+            runner = e.Explorer(device, PKG, Path(d) / "run", max_states=2, delay=.001)
+            runner.run()
+            with patch.object(e, "Android", side_effect=AssertionError("Must not access ADB")):
+                bundle = e.agent_bundle(runner.output)
+            self.assertEqual(bundle["coverage"]["pending_actions"], 1)
+            self.assertEqual(bundle["pending_actions"][0]["label"], "Ajustes")
+            self.assertEqual(bundle["status"], "limit_reached")
+            try:
+                import PIL
+            except ImportError:
+                return
+            self.assertTrue(Path(bundle["overviews"][0]).exists())
+
+    def test_bundle_detects_modified_capture(self):
+        with tempfile.TemporaryDirectory() as d:
+            device = FakeAndroid()
+            device.screenshot = self.png
+            runner = e.Explorer(device, PKG, Path(d) / "run")
+            runner.run(capture_only=True)
+            image = runner.output / "screen-0001.png"
+            image.write_bytes(image.read_bytes() + b"modified")
+            bundle = e.agent_bundle(runner.output)
+            self.assertFalse(bundle["screens"][0]["integrity_verified"])
+            self.assertIn("digest", bundle["screens"][0]["capture_warning"])
+
     def test_preferences_defaults_and_roundtrip(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "settings.json"

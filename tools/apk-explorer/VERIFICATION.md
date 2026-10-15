@@ -1,9 +1,15 @@
 # Verificación · 2026-10-15
 
-- Python 3.12 en Windows: 19 pruebas unitarias pasan. Cubren navegación ramificada,
+- Python 3.12 en Windows: 24 pruebas unitarias pasan. Cubren navegación ramificada,
   recuperación de rutas, límites, persistencia ante error, controles sensibles,
   diálogos externos, keyguard, escape HTML, SSH, descargas GitHub con digest,
-  persistencia de preferencias, detección de móviles y selección con cambio de puerto.
+  persistencia de preferencias, detección de móviles, selección con cambio de puerto,
+  CLI para agentes con JSON limpio, inferencia del package, recorrido por anchura,
+  listado de acciones pendientes y detección de capturas modificadas.
+- Modo agente real en el Pixel: creó `agent.json` y una lámina JPG desde XML/PNG
+  del dispositivo. Marcó `blocked`, captura uniforme y SHA-256 válido; se abrió la
+  lámina y se comprobó que muestra la captura negra con aviso de revisión.
+  No se presenta esa captura como interfaz de la app ni se valida un recorrido real.
 - Detección automática real desde Windows: S25 `192.168.1.134:5555` y Pixel por mDNS.
   La GUI seleccionó el S25 y guardó las preferencias en una carpeta temporal de prueba.
   Esta comprobación solo enumeró dispositivos; no lanzó apps ni exploró sus pantallas.

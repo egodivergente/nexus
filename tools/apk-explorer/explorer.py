@@ -15,6 +15,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import unicodedata
@@ -341,7 +342,7 @@ def inspect(raw, package):
 
 class Explorer:
     def __init__(self, device, package, output, max_states=80, max_actions=180,
-                 minutes=15, depth=10, delay=1.2, stop=None, log=print):
+                 minutes=15, depth=10, delay=1.2, stop=None, log=print, strategy="depth"):
         if not re.fullmatch(r"[A-Za-z][\w]*(?:\.[A-Za-z][\w]*)+", package):
             raise ValueError("Indica el package Android, por ejemplo com.empresa.app.")
         self.device, self.package, self.output = device, package, Path(output)
@@ -352,16 +353,19 @@ class Explorer:
         self.stop, self.log = stop or threading.Event(), log
         self.states, self.edges, self.notes = {}, [], []
         self.count = 0
+        self.strategy = strategy
         self.report = {"package": package, "created": datetime.now().isoformat(),
                        "status": "running", "coverage": "Parcial; no garantiza todas las interfaces.",
+                       "strategy": strategy, "limits": {"states": max_states, "actions": max_actions,
+                                                         "minutes": minutes, "depth": depth},
                        "states": [], "edges": self.edges, "notes": self.notes}
 
     def available(self):
         return (not self.stop.is_set() and time.monotonic() < self.deadline and
                 len(self.states) < self.max_states and self.count < self.max_actions)
 
-    def observe(self, route):
-        raw = self.device.dump()
+    def observe(self, route, raw=None):
+        raw = raw if raw is not None else self.device.dump()
         key, title, actions, skipped, owned = inspect(raw, self.package)
         if key not in self.states:
             number = len(self.states) + 1
@@ -371,7 +375,9 @@ class Explorer:
             (self.output / (stem + ".xml")).write_text(raw, encoding="utf-8")
             state = {"id": key, "number": number, "title": title, "image": stem + ".png",
                      "xml": stem + ".xml", "route": route, "skipped": skipped,
-                     "owned": owned, "sha256": hashlib.sha256(png).hexdigest()}
+                     "owned": owned, "sha256": hashlib.sha256(png).hexdigest(),
+                     "available_actions": [{"kind": a.kind, "label": a.label, "bounds": a.bounds}
+                                           for a in actions]}
             self.states[key] = state
             self.report["states"].append(state)
             self.log(f"{number:03} · {title}" + (" [límite externo]" if not owned else ""))
@@ -418,12 +424,40 @@ class Explorer:
             raw = self.device.dump()
             target = inspect(raw, self.package)[0]
             known = target in self.states
-            target, next_actions = self.observe(next_route)
+            target, next_actions = self.observe(next_route, raw)
             self.edges.append({"from": key, "to": target, "action": action.label,
                                "kind": action.kind, "bounds": action.bounds})
             self.save()
             if not known:
                 self.crawl(root_key, target, next_actions, path + [(key, action, target)], next_route)
+
+    def crawl_breadth(self, root_key, actions):
+        from collections import deque
+        pending = deque([(root_key, actions, [], [])])
+        first = True
+        while pending and self.available():
+            key, candidates, path, route = pending.popleft()
+            if len(path) >= self.depth:
+                self.notes.append(f"Profundidad máxima en {key}.")
+                continue
+            for action in candidates:
+                if not self.available():
+                    return
+                if not first and not self.restore(root_key, path):
+                    break
+                first = False
+                if not self.perform(action):
+                    return
+                raw = self.device.dump()
+                target = inspect(raw, self.package)[0]
+                known = target in self.states
+                next_route = route + [action.label]
+                target, next_actions = self.observe(next_route, raw)
+                self.edges.append({"from": key, "to": target, "action": action.label,
+                                   "kind": action.kind, "bounds": action.bounds})
+                self.save()
+                if not known:
+                    pending.append((target, next_actions, path + [(key, action, target)], next_route))
 
     def run(self, capture_only=False, source=None):
         self.output.mkdir(parents=True, exist_ok=False)
@@ -444,7 +478,10 @@ class Explorer:
             elif capture_only:
                 self.report["status"] = "capture_only"
             else:
-                self.crawl(key, key, actions, [], [])
+                if self.strategy == "breadth":
+                    self.crawl_breadth(key, actions)
+                else:
+                    self.crawl(key, key, actions, [], [])
                 self.report["status"] = "stopped" if self.stop.is_set() else (
                     "limit_reached" if not self.available() else "finished_partial")
         except Exception as exc:
@@ -491,6 +528,78 @@ pre{{white-space:pre-wrap;overflow-wrap:anywhere}}p{{color:#b8c5d9}}input{{paddi
 
 def session_path():
     return HOME / "sessions" / (datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6])
+
+
+def agent_bundle(folder):
+    """Package existing evidence without touching a device or repeating exploration."""
+    folder = Path(folder).resolve(strict=True)
+    report = json.loads((folder / "report.json").read_text(encoding="utf-8"))
+    screens, pending = [], []
+    traversed = {(x["from"], x["kind"], tuple(x["bounds"])) for x in report["edges"]}
+    for state in report["states"]:
+        labels = []
+        for node in ET.fromstring((folder / state["xml"]).read_text(encoding="utf-8")).iter("node"):
+            if node.get("password") == "true":
+                continue
+            for value in (node.get("text"), node.get("content-desc")):
+                if value and value not in labels:
+                    labels.append(value[:240])
+        screens.append({"number": state["number"], "id": state["id"], "title": state["title"],
+                        "image": str(folder / state["image"]), "ui_tree": str(folder / state["xml"]),
+                        "route": state["route"], "owned": state["owned"], "sha256": state["sha256"],
+                        "visible_labels": labels[:40], "omitted_controls": state["skipped"]})
+        actual_digest = hashlib.sha256((folder / state["image"]).read_bytes()).hexdigest()
+        screens[-1]["integrity_verified"] = actual_digest == state["sha256"]
+        if not screens[-1]["integrity_verified"]:
+            screens[-1]["capture_warning"] = "Image digest differs from the recorded capture."
+        for action in state.get("available_actions", []):
+            if (state["id"], action["kind"], tuple(action["bounds"])) not in traversed:
+                pending.append({"screen": state["number"], **action})
+    manifest = {"schema_version": 1, "status": report["status"], "package": report["package"],
+                "output": str(folder), "gallery": str(folder / "index.html"),
+                "report": str(folder / "report.json"), "manifest": str(folder / "agent.json"),
+                "overviews": [], "screens": screens, "pending_actions": pending,
+                "coverage": {"complete": False, "visited_states": len(screens),
+                             "app_states": sum(s["owned"] for s in screens),
+                             "actions_executed": report.get("actions_executed", 0),
+                             "pending_actions": len(pending) if all("available_actions" in s for s in report["states"]) else None,
+                             "omitted_controls": sum(len(s["omitted_controls"]) for s in screens)},
+                "notes": report["notes"][:], "limits": report.get("limits"),
+                "strategy": report.get("strategy"), "apk": report.get("apk"), "source": report.get("source"),
+                "next_step": "Open the overview images, then original screenshots for details. "
+                             "Screenshots are visual evidence; labels and source candidates are not visual validation."}
+    try:
+        from PIL import Image, ImageDraw, ImageFont, ImageStat
+        font_path = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts/segoeui.ttf"
+        font = ImageFont.truetype(str(font_path), 17) if font_path.exists() else ImageFont.load_default(size=17)
+        for offset in range(0, len(screens), 9):
+            batch = screens[offset:offset + 9]
+            sheet = Image.new("RGB", (min(3, len(batch)) * 300, ((len(batch) + 2) // 3) * 730), "#11151d")
+            draw = ImageDraw.Draw(sheet)
+            for index, screen in enumerate(batch):
+                x, y = (index % 3) * 300, (index // 3) * 730
+                with Image.open(screen["image"]) as original:
+                    picture = original.convert("RGB")
+                w, h = picture.size
+                middle = picture.crop((int(w * .05), int(h * .05), int(w * .95), int(h * .90)))
+                stats = ImageStat.Stat(middle.resize((64, 64)).convert("L"))
+                if stats.stddev[0] < 2 and not screen.get("capture_warning"):
+                    screen["capture_warning"] = "Uniform capture: may be blank, protected or not rendered; inspect original."
+                picture.thumbnail((280, 615))
+                sheet.paste(picture, (x + (300 - picture.width) // 2, y + 55))
+                title = f'{screen["number"]:02}. {screen["title"]}'
+                draw.text((x + 10, y + 10), title[:30], fill="#e5eafa", font=font)
+                route = " > ".join(screen["route"]) or "Inicio"
+                draw.text((x + 10, y + 675), route[:32], fill="#b8c5d9", font=font)
+                if screen.get("capture_warning") or not screen["owned"]:
+                    draw.text((x + 10, y + 702), "REVISAR CAPTURA", fill="#ffbc7a", font=font)
+            target = folder / f"overview-{offset // 9 + 1:03}.jpg"
+            sheet.save(target, quality=88)
+            manifest["overviews"].append(str(target))
+    except (ImportError, OSError, ValueError) as exc:
+        manifest["notes"].append("No se completó la lámina resumen: " + str(exc))
+    (folder / "agent.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    return manifest
 
 
 def gui():
@@ -756,11 +865,11 @@ def gui():
     root.mainloop()
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package")
-    parser.add_argument("--serial", default="")
-    parser.add_argument("--ssh", default="")
+    parser.add_argument("--serial")
+    parser.add_argument("--ssh")
     parser.add_argument("--apk", type=Path)
     parser.add_argument("--repo", help="Repositorio GitHub privado: propietario/nombre")
     parser.add_argument("--ref", default="")
@@ -769,33 +878,53 @@ def main():
     parser.add_argument("--asset", help="Nombre exacto del APK si la release contiene varios")
     parser.add_argument("--devices", action="store_true")
     parser.add_argument("--capture-only", action="store_true", help="Captura la pantalla actual sin navegar")
-    parser.add_argument("--max-states", type=int, default=80)
-    parser.add_argument("--max-actions", type=int, default=180)
-    parser.add_argument("--minutes", type=float, default=15)
+    parser.add_argument("--inspect", nargs="?", const="", help="Inspección visual para agentes: APK o package; detecta conexión")
+    parser.add_argument("--json", action="store_true", help="Devuelve el manifiesto JSON por stdout, progreso por stderr")
+    parser.add_argument("--bundle", type=Path, help="Prepara capturas de una sesión existente para un agente, sin usar ADB")
+    parser.add_argument("--max-states", type=int)
+    parser.add_argument("--max-actions", type=int)
+    parser.add_argument("--minutes", type=float)
     parser.add_argument("--depth", type=int, default=10)
     parser.add_argument("--delay", type=float, default=1.2)
     parser.add_argument("--output", type=Path)
-    args = parser.parse_args()
-    if len(__import__("sys").argv) == 1:
+    actual_argv = sys.argv[1:] if argv is None else argv
+    args = parser.parse_args(actual_argv)
+    if not actual_argv:
         gui()
         return
+    quick = args.inspect is not None
+    if args.json and not (quick or args.bundle):
+        parser.error("--json requiere --inspect o --bundle.")
+    if args.bundle:
+        result = agent_bundle(args.bundle)
+        print(json.dumps(result, ensure_ascii=False) if args.json else result["manifest"])
+        return result
+    saved = load_settings() if quick else DEFAULT_SETTINGS.copy()
+    args.max_states = args.max_states if args.max_states is not None else (12 if quick else 80)
+    args.max_actions = args.max_actions if args.max_actions is not None else (40 if quick else 180)
+    args.minutes = args.minutes if args.minutes is not None else (3 if quick else 15)
+    explicit_host = args.ssh is not None
+    args.ssh = args.ssh if explicit_host else (saved["host"] if quick else "")
+    if quick:
+        args.repo = args.repo or saved["repo"]
+        if args.inspect:
+            if args.inspect.lower().endswith(".apk"):
+                args.apk = Path(args.inspect)
+            else:
+                args.package = args.package or args.inspect
     if args.devices:
         print(Android(host=args.ssh).devices())
         return
     if min(args.max_states, args.max_actions, args.minutes, args.depth, args.delay) <= 0:
         parser.error("Los límites y la espera deben ser positivos.")
-    if not args.package:
-        parser.error("Es necesario --package.")
     if (args.source_map or args.release) and not args.repo:
         parser.error("Es necesario --repo para consultar GitHub.")
     if args.capture_only and (args.apk or args.release):
         parser.error("--capture-only no admite instalaciones.")
-    device = Android(args.serial, args.ssh)
-    device.validate()
     output = (args.output or session_path()).resolve()
-    explorer = Explorer(device, args.package, output, args.max_states, args.max_actions,
-                        args.minutes, args.depth, args.delay)
-    github = GitHub(args.repo) if args.repo else None
+    if output.exists():
+        parser.error("La carpeta de salida ya existe; usa --bundle para leerla sin repetir la exploración.")
+    github = GitHub(args.repo) if args.source_map or args.release else None
     apk = args.apk
     if args.release:
         tag, assets = github.assets("" if args.release == "latest" else args.release)
@@ -803,6 +932,21 @@ def main():
         if len(chosen) != 1:
             parser.error("Elige --asset entre: " + ", ".join(a["name"] for a in assets))
         apk = github.download(chosen[0], output.parent / (output.name + "-downloads"))
+    args.package = args.package or (apk_package(apk) if apk else None) or (saved["package"] if quick and not apk else None)
+    if not args.package:
+        parser.error("No se pudo determinar el package. Indica --package com.empresa.app.")
+    if quick and not args.serial:
+        host, found, errors = discover_devices(args.ssh, fallback=not explicit_host)
+        selected = preferred_device(found, saved["serial"] if host == saved["host"] else "", saved["device_model"])
+        if not selected:
+            raise RuntimeError("Sin dispositivo autorizado disponible. " + " ".join(errors))
+        args.ssh, args.serial = host, selected["serial"]
+    device = Android(args.serial or "", args.ssh)
+    device.validate()
+    explorer = Explorer(device, args.package, output, args.max_states, args.max_actions,
+                        args.minutes, args.depth, args.delay,
+                        log=lambda message: print(message, file=sys.stderr if args.json else sys.stdout),
+                        strategy="breadth" if quick else "depth")
     if apk:
         device.install(apk)
         explorer.report["apk"] = {"name": apk.name,
@@ -813,11 +957,30 @@ def main():
     except KeyboardInterrupt:
         explorer.report["status"] = "interrupted"
         explorer.save()
-        return
-    print("Galería:", result)
+        result = output / "index.html"
+    except Exception:
+        if quick and (output / "report.json").exists():
+            manifest = agent_bundle(output)
+            if args.json:
+                print(json.dumps(manifest, ensure_ascii=False))
+                raise SystemExit(1)
+        raise
+    if quick:
+        manifest = agent_bundle(output)
+        print(json.dumps(manifest, ensure_ascii=False) if args.json else "Manifiesto para agente: " + manifest["manifest"])
+    else:
+        print("Galería:", result)
     if explorer.report["status"] == "blocked":
         raise SystemExit(2)
+    return manifest if quick else None
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        if "--json" in sys.argv:
+            print(json.dumps({"schema_version": 1, "status": "error", "error": str(exc)}, ensure_ascii=False))
+        else:
+            print("ERROR:", exc, file=sys.stderr)
+        raise SystemExit(1)

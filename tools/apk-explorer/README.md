@@ -50,6 +50,20 @@ inventario no implica que esas pantallas existan en el binario ni que se hayan v
 
 ## Línea de comandos
 
+Para agentes, usar el [modo de inspección visual](AGENT_USAGE.md):
+
+```powershell
+python tools/apk-explorer/explorer.py --inspect "C:\ruta\app.apk" --json
+```
+
+Ese ejemplo se ejecuta desde la raíz del proyecto. Detecta la conexión y el dispositivo,
+recorre primero las pantallas cercanas al inicio y devuelve láminas de capturas, originales,
+rutas y acciones pendientes. No necesita que el agente maneje la ventana. Las láminas
+usan Pillow si está disponible; los originales y el informe se generan sin esa dependencia.
+Para revisar una sesión anterior sin recorrer otra vez la app, usar `--bundle CARPETA --json`.
+
+Los comandos tradicionales siguientes se ejecutan desde la carpeta de la herramienta:
+
 ```powershell
 python explorer.py --devices
 python explorer.py --ssh vidal@100.112.57.2 --devices
@@ -67,7 +81,8 @@ minutos corresponde a la exploración, no a la descarga/instalación/lectura de 
 
 ## Qué cubre
 
-Exploración por profundidad, pulsaciones, desplazamiento vertical, detección de
+Exploración por profundidad (ventana y CLI tradicional) o por anchura (`--inspect`),
+pulsaciones, desplazamiento vertical, detección de
 estados por árbol de interfaz y reproducción de rutas desde el inicio. Guarda una
 captura por estado encontrado y una huella SHA-256 del PNG. Los estados seleccionados,
 marcados, textos y coordenadas forman parte de la identidad de una pantalla.
