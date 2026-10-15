@@ -61,9 +61,10 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert page.locator('.gallery-lightbox').evaluate('(d)=>d.open')
             assert 'Prompt conservado' in page.locator('.gallery-prompt').inner_text()
             page.locator('[data-gallery=next-output]').click()
-            assert page.locator('.gallery-viewer-top span').inner_text() == '2 / 2'
+            # El contador del visor recorre todas las salidas de la galería (80 encargos × 2 salidas).
+            assert page.locator('.gallery-viewer-top span').inner_text() == '2 / 160'
             page.keyboard.press('ArrowRight')
-            assert page.locator('.gallery-viewer-top span').inner_text() == '1 / 2'
+            assert page.locator('.gallery-viewer-top span').inner_text() == '3 / 160'
             page.keyboard.press('f')
             assert page.evaluate('state.studioGallery.favorites.length') == 1
             page.keyboard.press('Escape')

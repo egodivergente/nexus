@@ -92,7 +92,8 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 assert page.evaluate("state.draft.prompt==='Borrador que debe conservarse'")
                 page.evaluate("()=>{Studio.tab='results';navigate('library');}")
                 capture('library',width,height)
-                assert page.locator('#content .result').count()==2
+                assert page.locator('#content .result').count()==3  # la galería muestra también el encargo en curso
+                assert page.locator('#content .result[data-job=sample-c] .gallery-progress').count()==1
                 page.locator('[data-studio-detail=sample-a]').click()
                 capture('details',width,height)
                 panel=page.locator('.studio-details').bounding_box()
