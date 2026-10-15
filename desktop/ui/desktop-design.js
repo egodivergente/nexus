@@ -10,7 +10,7 @@ function desktopVersionLabel(){
 }
 function syncVersionBadges(){
  const label=desktopVersionLabel();
- document.querySelectorAll('[data-nx-version]').forEach(node=>{if(node.textContent!==label)node.textContent=label;});
+ document.querySelectorAll('[data-nx-version]').forEach(node=>{const short=node.dataset.nxVersion==='short',text=short?label.replace(/-.*$/,''):label;if(node.textContent!==text)node.textContent=text;if(short)node.title='NEXUS Studio '+label;});
 }
 function mountStartupOnboarding(){
  if((typeof initial!=='undefined'&&initial?.qa)||document.getElementById('nx-startup-onboarding'))return;
@@ -44,7 +44,7 @@ function desktopShell(){
  const brand=$('.brand');if(brand&&!brand.querySelector('.nexus-brand-mark')){
   const toggle=brand.querySelector('#creative-dock-toggle')||$('#creative-dock-toggle');
   brand.setAttribute('aria-label','NEXUS Studio');
-  brand.innerHTML='<div class="nx-brand-identity"><img class="nexus-brand-mark" src="branding/nexus-mark.png" alt="NEXUS" width="26" height="26"><img class="nexus-brand-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="32" height="30"><strong class="nx-brand-title">NEXUS</strong><span class="nx-brand-version nx-version-badge" data-nx-version>'+desktopVersionLabel()+'</span></div>';
+  brand.innerHTML='<div class="nx-brand-identity"><img class="nexus-brand-mark" src="branding/nexus-mark.png" alt="NEXUS" width="26" height="26"><img class="nexus-brand-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="32" height="30"><strong class="nx-brand-title">NEXUS</strong><span class="nx-brand-version nx-version-badge" data-nx-version="short">'+desktopVersionLabel()+'</span></div>';
   if(toggle)brand.append(toggle);
  }
  const eyebrow=$('#eyebrow');if(eyebrow)eyebrow.textContent=initial?.qa?'VISTA DE PRUEBA':'MI ESTUDIO · '+desktopVersionLabel();

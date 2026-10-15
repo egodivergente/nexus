@@ -61,9 +61,10 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert page.locator('.gallery-lightbox').evaluate('(d)=>d.open')
             assert 'Prompt conservado' in page.locator('.gallery-prompt').inner_text()
             page.locator('[data-gallery=next-output]').click()
-            assert page.locator('.gallery-viewer-top span').inner_text() == '2 / 2'
+            # El contador del visor recorre todas las salidas de la galería (80 encargos × 2 salidas).
+            assert page.locator('.gallery-viewer-top span').inner_text() == '2 / 160'
             page.keyboard.press('ArrowRight')
-            assert page.locator('.gallery-viewer-top span').inner_text() == '1 / 2'
+            assert page.locator('.gallery-viewer-top span').inner_text() == '3 / 160'
             page.keyboard.press('f')
             assert page.evaluate('state.studioGallery.favorites.length') == 1
             page.keyboard.press('Escape')
@@ -73,7 +74,8 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.locator('.gallery-piece').nth(1).hover()
             page.locator('.gallery-select').nth(1).click()
             assert '2 seleccionados' in page.locator('.gallery-selection').inner_text()
-            assert page.locator('[data-gallery=compare]').count() == 0
+            # Con dos seleccionados se puede comparar A/B.
+            assert page.locator('[data-gallery=compare]').is_enabled()
             page.locator('#creative-dock-toggle').click()
             page.locator('[data-gallery=new-collection]').click()
             page.locator('#gallery-new-collection input').fill('Corto de prueba')
@@ -240,7 +242,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             assert not blocked, blocked
             report={'status':'PASS','errors':errors,'blockedOperations':blocked,'paidCalls':0,
                 'viewerAndOutputs':True,'favoritesPersisted':True,'collectionsPersisted':True,
-                'contextSelection':True,'resultComparatorRemoved':True,'commands':True,'draftPreserved':True,
+                'contextSelection':True,'comparatorAvailable':True,'commands':True,'draftPreserved':True,
                 'savedView':True,'reversibleHide':True,'videoPreviewAndControls':video_checked,'prepareVideo':True,
                 'multiModelConfirmationAndParallelDispatch':True,'videoModelSelection':True,
                 'telemetryPanelLatencyErrorsPauseClearExport':True,

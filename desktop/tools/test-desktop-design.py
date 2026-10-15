@@ -92,12 +92,18 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 assert page.evaluate("state.draft.prompt==='Borrador que debe conservarse'")
                 page.evaluate("()=>{Studio.tab='results';navigate('library');}")
                 capture('library',width,height)
-                assert page.locator('#content .result').count()==2
-                page.locator('[data-studio-detail=sample-a]').click()
+                assert page.locator('#content .result').count()==3  # la galería muestra también el encargo en curso
+                assert page.locator('#content .result[data-job=sample-c] .gallery-progress').count()==1
+                # La galería abre el visor (antes, un panel lateral de detalles).
+                page.wait_for_selector('#content .result[data-job=sample-a][data-gallery-wired]')
+                page.locator('#content .result[data-job=sample-a] .gallery-media').focus()
+                page.keyboard.press('Enter')  # abre el visor también con teclado
+                page.wait_for_selector('.gallery-lightbox[open]')
                 capture('details',width,height)
-                panel=page.locator('.studio-details').bounding_box()
+                panel=page.locator('.gallery-lightbox').bounding_box()
                 assert panel['x']>=0 and panel['x']+panel['width']<=width+1
-                page.locator('.studio-detail-close').click()
+                page.keyboard.press('Escape')
+                assert page.locator('.gallery-lightbox').count()==0
                 page.evaluate("navigate('settings')")
                 capture('settings',width,height)
                 assert page.locator('#studio-settings').get_attribute('aria-current')=='page'
@@ -117,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 assert page.evaluate('document.body.classList.contains("nx-desktop")')
                 assert page.evaluate('(accent)=>document.body.classList.contains(accent)',accent)
             page.evaluate("()=>{state.theme='oled';render();}")
-            assert page.evaluate('getComputedStyle(document.body).getPropertyValue("--nx-bg").trim()')=='#090b0f'
+            assert page.evaluate('getComputedStyle(document.body).getPropertyValue("--nx-bg").trim()').lower()=='#000000'  # tema OLED de interface-themes.js
             page.emulate_media(reduced_motion='reduce')
             assert page.locator('#agent-compose').evaluate('(node)=>getComputedStyle(node).transitionDuration')=='0s'
             assert not errors,errors

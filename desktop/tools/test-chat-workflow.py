@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-chat-workflow-') as folder:
             page.evaluate('navigate("settings")')
             assert page.locator('button[data-interface-theme]').count()==6
             colors=[]
-            for theme in ['graphite','ocean','amber','forest','carbon','oled']:
+            for theme in ['aurora','ocean','quartz','forest','light','oled']:  # ids actuales de interface-themes.js
                 page.locator(f'button[data-interface-theme={theme}]').click()
                 assert page.locator(f'button[data-interface-theme={theme}]').get_attribute('aria-pressed')=='true'
                 page.wait_for_function('document.body.classList.contains("creative-engine")')

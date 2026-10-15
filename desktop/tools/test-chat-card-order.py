@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory() as folder:
             page.evaluate("""()=>{
               Agent.busy=false;Agent.cardAnchors.clear();Agent.items=[{role:'user',text:'Primera petición'}];
               Agent.snapshot={offline:false,mode:'ASSISTANT',skills:[],index:{projects:[]},
-                plans:[{state:'PREPARED',plan:{id:'old-plan',modelName:'Plan anterior',prompt:'Comentario anterior',effectiveParams:{count:28},warnings:[]}}],
+                plans:[{state:'PREPARED',plan:{id:'old-plan',ref:{providerId:'atlas_cloud',modelId:'sample'},modelName:'Plan anterior',prompt:'Comentario anterior',effectiveParams:{count:28},warnings:[]}}],
                 proposals:[{id:'old-proposal',description:'Propuesta anterior'}]};
               view='assistant';render();
               Agent.items.push({role:'assistant',text:'Primera respuesta'},{role:'user',text:'Segunda petición'},{role:'assistant',text:'Segunda respuesta'});

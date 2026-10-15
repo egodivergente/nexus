@@ -130,8 +130,8 @@ body.nexus-agent-studio button.primary,
 body.nexus-agent-studio #generate,
 body.nexus-agent-studio [data-agent="send"] {
   background: var(--accent) !important;
-  color: #ffffff !important;
-  border: 1px solid color-mix(in srgb, #ffffff 18%, var(--accent)) !important;
+  color: var(--accent-ink, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-ink, #ffffff) 18%, var(--accent)) !important;
   border-radius: var(--r2) !important;
   font-weight: 600 !important;
   height: 34px;
@@ -285,7 +285,7 @@ body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-mark {
 
 body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-logo {
   display: block !important;
-  width: 72px;
+  width: 40px;
   height: 26px;
   object-fit: contain;
   flex-shrink: 0;
@@ -297,12 +297,13 @@ body.nexus-agent-studio:not(.creative-dock-expanded) .brand .nx-brand-identity {
 
 body.nexus-agent-studio .brand .nx-brand-version {
   display: inline-flex !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   padding: 1px 6px !important;
-  height: 18px !important;
-  min-height: 18px !important;
-  max-width: 68px;
-  overflow: hidden;
+  height: 20px !important;
+  min-height: 20px !important;
+  max-width: none;
+  flex-shrink: 0;
+  overflow: visible;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -469,8 +470,8 @@ body.nexus-agent-studio .tabs {
 }
 
 body.nexus-agent-studio .tabs button {
-  height: 26px !important;
-  min-height: 26px !important;
+  height: 30px !important;
+  min-height: 30px !important;
   padding: 0 10px !important;
   border: 0 !important;
   border-radius: 6px !important;
@@ -482,9 +483,8 @@ body.nexus-agent-studio .tabs button {
 
 body.nexus-agent-studio .tabs button.active {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  color: var(--accent-ink, #ffffff) !important;
   font-weight: 600 !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 /* View 1: Asistente (Chat / Copilot / Agent) */
@@ -661,7 +661,7 @@ body.nexus-agent-studio .history-filters #parity-history-search {
 body.nexus-agent-studio .catalog-filters .select-wrap,
 body.nexus-agent-studio .catalog-filters select,
 body.nexus-agent-studio .catalog-filters .select-trigger {
-  max-width: 150px;
+  max-width: 220px;
   min-width: 0;
 }
 
@@ -799,7 +799,8 @@ body.nexus-agent-studio .history-list {
   gap: 6px;
 }
 
-body.nexus-agent-studio .history-list > h3 {
+body.nexus-agent-studio .history-list > h3,
+body.nexus-agent-studio .history-list > .history-day {
   font-size: calc(11.5px * var(--ui-font-scale)) !important;
   color: var(--muted);
   text-transform: uppercase;
@@ -820,6 +821,7 @@ body.nexus-agent-studio .history-row {
 }
 
 body.nexus-agent-studio .history-row > img,
+body.nexus-agent-studio .history-row > video.history-thumb,
 body.nexus-agent-studio .history-row > span:first-child {
   width: 44px !important;
   height: 44px !important;
@@ -1068,8 +1070,8 @@ body.nexus-agent-studio .creative-status {
 }
 
 body.nexus-agent-studio .creative-status button {
-  min-height: 22px !important;
-  height: 22px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   min-width: auto !important;
   padding: 0 8px !important;
   font-size: calc(11px * var(--ui-font-scale)) !important;
@@ -1197,4 +1199,389 @@ body.nexus-agent-studio #toast {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── Pasada premium (fase 1): objetivos clicables, texto mínimo y filas de coste ── */
+body.nexus-agent-studio .tabs button,
+body.nexus-agent-studio .creative-dock-toggle,
+body.nexus-agent-studio .gallery-collection-heading button,
+body.nexus-agent-studio .gallery-select,
+body.nexus-agent-studio .gallery-overlay button,
+body.nexus-agent-studio .model .star,
+body.nexus-agent-studio .gallery-balances button,
+body.nexus-agent-studio header button {
+  min-height: 32px;
+}
+
+body.nexus-agent-studio .creative-dock-toggle,
+body.nexus-agent-studio .gallery-collection-heading button,
+body.nexus-agent-studio .gallery-select,
+body.nexus-agent-studio .gallery-overlay button,
+body.nexus-agent-studio .model .star,
+body.nexus-agent-studio .gallery-balances button {
+  min-width: 32px;
+}
+
+body.nexus-agent-studio .nx-version-badge,
+body.nexus-agent-studio .nx-kicker {
+  font-size: 11px !important;
+}
+
+/* Saldo y gasto: título y fecha en dos líneas, importe a la derecha */
+body.nexus-agent-studio .parity-billing article > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+body.nexus-agent-studio .parity-billing .parity-cost {
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body.nexus-agent-studio .parity-billing small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+body.nexus-agent-studio dialog [data-refresh-balances] {
+  margin: 8px 0 16px;
+}
+
+body.nexus-agent-studio dialog .parity-balance-row + h3 {
+  margin-top: 28px;
+}
+
+/* Historial: filas agrupadas (3 o más generaciones idénticas seguidas) */
+body.nexus-agent-studio .history-row.history-group {
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent));
+  border-color: color-mix(in srgb, var(--line) 70%, var(--accent));
+}
+
+body.nexus-agent-studio .history-group-toggle {
+  cursor: pointer;
+}
+
+body.nexus-agent-studio .history-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+body.nexus-agent-studio .history-group-chevron {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+}
+
+body.nexus-agent-studio .history-row.history-sub {
+  margin-left: 28px;
+  min-height: 48px;
+  background: transparent;
+  border-style: dashed;
+}
+
+body.nexus-agent-studio .history-row .parity-cost[title] {
+  cursor: help;
+}
+
+/* Ajustes: tarjetas en columnas sin huecos y temas con su nombre visible */
+body.nexus-agent-studio .settings-layout {
+  display: block;
+  column-width: 380px;
+  column-gap: 16px;
+}
+
+body.nexus-agent-studio .settings-layout > .sheet {
+  break-inside: avoid;
+  margin-bottom: 16px !important;
+}
+
+body.nexus-agent-studio .interface-themes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.nexus-agent-studio .interface-themes button {
+  height: auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px;
+  overflow: visible;
+  position: relative;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview {
+  height: 56px;
+  padding: 8px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview i {
+  height: 26px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview i:first-child {
+  height: 34px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-preview i:last-child {
+  height: 18px;
+}
+
+body.nexus-agent-studio .interface-themes .theme-selected {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  margin: 0;
+}
+
+/* Biblioteca: el buscador tiene un solo borde (el de la etiqueta) y anillo de foco visible */
+body.nexus-agent-studio .gallery-search input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  outline: 0 !important;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+body.nexus-agent-studio .gallery-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Lienzo: las miniaturas de «Producción reciente» recuperan su tamaño (la regla global de botones las aplastaba a 32 px) */
+body.nexus-agent-studio .creative-piece {
+  width: 140px;
+  height: 90px;
+  min-height: 90px;
+  display: block;
+}
+
+body.nexus-agent-studio .creative-piece span {
+  font-size: 11px;
+  color: #fff;
+}
+
+/* Lienzo: «Producción reciente» alineada con la tarjeta del compositor */
+body.nexus-agent-studio .creative-production {
+  width: min(100%, 680px);
+  margin-inline: auto;
+}
+
+/* Asistente: acciones secundarias agrupadas en «Más» */
+body.nexus-agent-studio .nx-more-menu {
+  position: relative;
+}
+
+body.nexus-agent-studio .nx-more-menu > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r2);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  color: var(--text);
+  font-size: calc(12.5px * var(--ui-font-scale));
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.nexus-agent-studio .nx-more-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.nexus-agent-studio .nx-more-menu > summary::after {
+  content: '▾';
+  font-size: 11px;
+  color: var(--muted);
+}
+
+body.nexus-agent-studio .nx-more-menu[open] > summary {
+  border-color: var(--accent);
+}
+
+body.nexus-agent-studio .nx-more-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  background: var(--surface);
+  box-shadow: 0 14px 36px #0006;
+}
+
+body.nexus-agent-studio .nx-more-list button {
+  width: 100%;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+}
+
+body.nexus-agent-studio .nx-more-list button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Biblioteca: el subtítulo del rótulo sobre la miniatura se lee en cualquier tema (va sobre degradado oscuro) */
+body.nexus-agent-studio .gallery-overlay small {
+  color: #dfe5ec !important;
+}
+
+/* Estados de carga: esqueleto al abrir y fondo animado mientras llegan las miniaturas */
+@keyframes nx-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* miniaturas: fondo de reposo fijo (sin animación, para no repintar cientos de tarjetas) */
+body.nexus-agent-studio .gallery-media,
+body.nexus-agent-studio .creative-piece,
+body.nexus-agent-studio .history-row > img,
+body.nexus-agent-studio .history-row > video.history-thumb {
+  background-color: color-mix(in srgb, var(--panel) 85%, var(--text) 5%);
+}
+
+/* esqueleto de arranque: solo existe hasta el primer render */
+.nx-skel {
+  background-image: linear-gradient(100deg, transparent 30%, #ffffff12 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: nx-shimmer 1.4s linear infinite;
+}
+
+.nx-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.nx-boot-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 16px;
+}
+
+.nx-skel {
+  border-radius: 10px;
+  background-color: #ffffff0d;
+}
+
+.nx-skel-bar {
+  height: 34px;
+  width: min(100%, 560px);
+}
+
+.nx-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.nx-skel-tile {
+  aspect-ratio: 4 / 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-skel {
+    animation: none;
+  }
+}
+
+/* Asistente: lectura cómoda, copiar respuesta y notas de uso legibles */
+body.nexus-agent-studio .agent-message:not(.user) .agent-text {
+  max-width: 72ch;
+}
+
+body.nexus-agent-studio .agent-message {
+  position: relative;
+}
+
+body.nexus-agent-studio .agent-message > .hint {
+  font-size: 11px;
+}
+
+body.nexus-agent-studio .agent-copy {
+  margin-top: 6px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+body.nexus-agent-studio .agent-message:hover .agent-copy,
+body.nexus-agent-studio .agent-copy:focus-visible {
+  opacity: 1;
+}
+
+/* Ajustes: interruptor de avisos */
+body.nexus-agent-studio .nx-switch {
+  height: auto;
+  min-height: 36px;
+  padding: 6px 10px 6px 6px;
+  gap: 10px;
+  margin-top: 12px;
+  border-color: transparent;
+  background: transparent;
+  white-space: normal;
+}
+
+body.nexus-agent-studio .nx-switch-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+  transition: background 150ms ease;
+}
+
+body.nexus-agent-studio .nx-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #0005;
+  transition: transform 150ms ease;
+}
+
+body.nexus-agent-studio .nx-switch[aria-checked="true"] .nx-switch-track {
+  background: var(--accent);
+}
+
+body.nexus-agent-studio .nx-switch[aria-checked="true"] .nx-switch-thumb {
+  transform: translateX(16px);
 }
