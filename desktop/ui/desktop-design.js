@@ -41,8 +41,12 @@ function desktopShell(){
   if(button.classList.contains('active')||target==='settings'&&view==='settings')button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
   button.title=button.getAttribute('aria-label');
  });
- const brand=$('.brand');if(brand&&!brand.querySelector('.nexus-brand-mark')){brand.setAttribute('aria-label','NEXUS Studio');brand.innerHTML='<img class="nexus-brand-mark" src="branding/nexus-mark.png" alt="NEXUS" width="36" height="36"><img class="nexus-brand-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="108" height="103"><span class="nx-brand-version nx-version-badge" data-nx-version>'+desktopVersionLabel()+'</span>';}
- if(!$('#nx-sidebar-note'))$('#studio-settings')?.insertAdjacentHTML('beforebegin','<div id="nx-sidebar-note"><span>Un lugar para tus ideas.</span></div>');
+ const brand=$('.brand');if(brand&&!brand.querySelector('.nexus-brand-mark')){
+  const toggle=brand.querySelector('#creative-dock-toggle')||$('#creative-dock-toggle');
+  brand.setAttribute('aria-label','NEXUS Studio');
+  brand.innerHTML='<div class="nx-brand-identity"><img class="nexus-brand-mark" src="branding/nexus-mark.png" alt="NEXUS" width="26" height="26"><img class="nexus-brand-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="32" height="30"><strong class="nx-brand-title">NEXUS</strong><span class="nx-brand-version nx-version-badge" data-nx-version>'+desktopVersionLabel()+'</span></div>';
+  if(toggle)brand.append(toggle);
+ }
  const eyebrow=$('#eyebrow');if(eyebrow)eyebrow.textContent=initial?.qa?'VISTA DE PRUEBA':'MI ESTUDIO · '+desktopVersionLabel();
  syncVersionBadges();
 }
@@ -50,14 +54,7 @@ const desktopAssistantBefore=renderAssistant;
 renderAssistant=function(){
  desktopAssistantBefore();
  const empty=$('.agent-empty');if(empty){empty.classList.add('nx-assistant-welcome');empty.innerHTML=desktopWelcome('assistant')+desktopIdeaButtons('assistant');}
- else{
-  const messages=$('.agent-messages');
-  if(messages&&!messages.querySelector('.nx-chat-brand-banner')){
-   messages.insertAdjacentHTML('afterbegin','<div class="nx-chat-brand-banner"><img src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="76" height="72"><span class="nx-version-badge" data-nx-version>'+desktopVersionLabel()+'</span></div>');
-  }
- }
- const input=$('#agent-input');if(input){input.placeholder='Cuéntame tu idea…';input.setAttribute('aria-label','Tu idea para el asistente');}
- const compose=$('#agent-compose');if(compose&&!compose.querySelector('.nx-compose-hint'))compose.insertAdjacentHTML('beforeend','<span class="nx-compose-hint">Enter para enviar <span>·</span> Mayús + Enter para otra línea</span>');
+ const input=$('#agent-input');if(input){input.placeholder='Escribe un mensaje o describe lo que quieres crear…';input.setAttribute('aria-label','Tu idea para el asistente');}
  document.querySelectorAll('.agent-message .agent-author:not(:has(.nx-avatar))').forEach(author=>{
   author.insertAdjacentHTML('afterbegin','<span class="nx-avatar" aria-hidden="true">'+(author.closest('.user')?'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M5 20v-2a7 7 0 0 1 14 0v2" stroke="currentColor" stroke-width="1.5"/></svg>':desktopSpark)+'</span>');
  });

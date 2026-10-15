@@ -1,16 +1,37 @@
 'use strict';
 // Presentation layer: retain original controls, schema validation and dispatch handlers.
 (()=>{
- let scheduled=false,dockExpanded=true;
+ let scheduled=false,dockExpanded=false,dockSynced=false;
  let trayKey='';
  const el=(tag,cls,html='')=>{const n=document.createElement(tag);n.className=cls;n.innerHTML=html;return n;};
- const text=(n,s)=>{if(n.textContent!==s)n.textContent=s;};
+ const text=(n,s)=>{if(n&&n.textContent!==s)n.textContent=s;};
+ function autoResizeTextarea(t){
+  if(!t||t.tagName!=='TEXTAREA')return;
+  t.style.height='auto';
+  const max=t.id==='prompt'?220:t.id==='agent-input'?160:180;
+  const min=t.id==='prompt'?84:t.id==='agent-input'?44:64;
+  t.style.height=Math.max(min,Math.min(max,t.scrollHeight))+'px';
+ }
  function shell(){
   document.body.classList.add('creative-engine');
+  if(!dockSynced&&typeof initial!=='undefined'&&initial){
+   dockSynced=true;
+   if(!initial.qa)dockExpanded=true;
+  }
   document.body.classList.toggle('creative-dock-expanded',dockExpanded);
-  if(!$('#creative-dock-toggle')){
-   const b=el('button','creative-dock-toggle','☰');b.id='creative-dock-toggle';b.type='button';b.setAttribute('aria-label','Expandir navegación');b.setAttribute('aria-expanded','false');
-   b.onclick=()=>{dockExpanded=!dockExpanded;document.body.classList.toggle('creative-dock-expanded',dockExpanded);b.setAttribute('aria-expanded',String(dockExpanded));b.setAttribute('aria-label',dockExpanded?'Contraer navegación':'Expandir navegación');};$('.sidebar .brand')?.after(b);
+  const brand=$('.sidebar .brand');
+  let toggle=$('#creative-dock-toggle');
+  if(!toggle&&brand){
+   toggle=el('button','creative-dock-toggle','<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>');
+   toggle.id='creative-dock-toggle';toggle.type='button';
+   toggle.onclick=e=>{e.stopPropagation();dockSynced=true;dockExpanded=!dockExpanded;document.body.classList.toggle('creative-dock-expanded',dockExpanded);toggle.setAttribute('aria-expanded',String(dockExpanded));toggle.setAttribute('aria-label',dockExpanded?'Contraer navegación':'Expandir navegación');toggle.title=toggle.getAttribute('aria-label');};
+   brand.append(toggle);
+  }
+  if(toggle){
+   if(brand&&toggle.parentElement!==brand)brand.append(toggle);
+   toggle.setAttribute('aria-expanded',String(dockExpanded));
+   toggle.setAttribute('aria-label',dockExpanded?'Contraer navegación':'Expandir navegación');
+   toggle.title=toggle.getAttribute('aria-label');
   }
   document.querySelectorAll('.sidebar button[data-nav],#studio-settings').forEach(b=>{
    if(b.dataset.creativeLabel)return;
@@ -18,11 +39,13 @@
    const span=el('span','creative-nav-label');[...b.childNodes].filter(n=>n.nodeType===3).forEach(n=>span.append(n));b.append(span);
   });
   if(!$('#creative-status')){
-   const bar=el('footer','creative-status');bar.id='creative-status';bar.innerHTML='<details id="creative-control"><summary aria-label="Abrir estado, saldos y telemetría"><span class="creative-health"></span><span id="creative-status-label">Conectando</span><span class="creative-status-chevron">⌃</span></summary><div class="creative-control-panel"><h2>Estado y consumo</h2><p id="creative-local-status"></p><div id="creative-control-actions"></div></div></details><button type="button" data-gallery="commands" class="creative-shortcut" title="Paleta de comandos">Ctrl K</button>';$('main').append(bar);
+   const bar=el('footer','creative-status');bar.id='creative-status';bar.innerHTML='<details id="creative-control"><summary aria-label="Abrir estado, saldos y telemetría"><span class="creative-health"></span><span id="creative-status-label">Conectando</span><span class="creative-status-chevron">⌃</span></summary><div class="creative-control-panel"><h2>Estado y consumo</h2><p id="creative-local-status"></p><div id="creative-control-actions"></div></div></details><span id="creative-footer-hint" class="creative-footer-hint">Enter para enviar · Mayús+Enter nueva línea</span><button type="button" data-gallery="commands" class="creative-shortcut" title="Paleta de comandos (Ctrl+K)">Ctrl K</button>';$('main').append(bar);
   }
+  const hint=$('#creative-footer-hint');
+  if(hint)text(hint,view==='assistant'?'Enter para enviar · Mayús+Enter otra línea':view==='canvas'?'Enter o Ctrl+Enter para generar · Shift+Enter otra línea':'Ctrl+K comandos rápidos');
   const panel=$('.creative-control-panel'),actions=$('#creative-control-actions');
-  const balances=$('#account-balances');if(balances&&balances.parentElement!==panel)panel.insertBefore(balances,actions);
-  ['telemetry-button','flow-control-button','order-latest','gallery-activity'].forEach(id=>{const b=$('#'+id);if(b&&b.parentElement!==actions)actions.append(b);});
+  const balances=$('#account-balances');if(balances&&panel&&balances.parentElement!==panel)panel.insertBefore(balances,actions);
+  ['telemetry-button','flow-control-button','order-latest','gallery-activity'].forEach(id=>{const b=$('#'+id);if(b&&actions&&b.parentElement!==actions)actions.append(b);});
   const count=initial?.configured?.length||0;
   text($('#creative-status-label'),initial?.qa?'Laboratorio local':`Multi-Cloud · ${count} motores configurados`);
   text($('#creative-local-status'),$('#connection')?.textContent||'Estado local pendiente');
@@ -33,12 +56,12 @@
   const source=$('.canvas .sheet')||$('.studio-start'),prompt=$('#prompt');if(!source||!prompt)return;
   const canvasRoot=$('.canvas');if(canvasRoot)canvasRoot.classList.add('creative-layout');
   const command=el('section','creative-command');command.id='creative-command';command.dataset.provider=loaded?.providerId||'';command.setAttribute('aria-label','Crear con tus modelos');
-  const ver=(typeof initial!=='undefined'&&initial?.version)?('v'+String(initial.version).replace(/^v/i,'')):'v1.9.5-agent-desktop';
-  const heading=el('div','creative-heading','<div class="nx-creative-brand"><img src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="84" height="80"><span class="nx-version-badge" data-nx-version>'+ver+'</span></div><h2>¿Qué quieres crear?</h2><span>Imagen, movimiento, posibilidades.</span>');
-  const input=el('div','creative-input');prompt.setAttribute('aria-label','Describe tu creación');prompt.placeholder='Describe una escena. Añade tus referencias. Dale forma.';input.append(prompt);
+  if(!loaded)command.classList.add('studio-start','nx-create-start');
+  if(loaded){const marker=el('span','nx-selected-label sr-only','MODELO');command.append(marker);}
+  const input=el('div','creative-input');prompt.setAttribute('aria-label','Describe tu creación');prompt.placeholder='Describe la escena, iluminación, composición o movimiento…';prompt.rows=3;input.append(prompt);
   const chips=el('div','creative-chips');
-  const motor=el('button','creative-motor');motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?loaded.displayName:'Elegir motor';motor.title='Elegir modelo';chips.append(motor);
-  const extras=el('details','creative-parameters','<summary>Parámetros y herramientas</summary><div class="creative-parameter-body"></div>');
+  const motor=el('button','creative-motor');motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?loaded.displayName:'Elegir motor';motor.title=loaded?loaded.displayName+' · Cambiar modelo':'Elegir modelo';chips.append(motor);
+  const extras=el('details','creative-parameters','<summary>Más parámetros</summary><div class="creative-parameter-body"></div>');
   const parameterBody=extras.lastElementChild;
   source.querySelectorAll('[data-param]').forEach(control=>{
    const field=control.closest('.field');if(!field)return;
@@ -55,13 +78,16 @@
   source.querySelectorAll('.studio-more').forEach(n=>parameterBody.append(n));
   const send=$('.canvas .sendbar')||el('div','sendbar');
   const action=el('div','creative-split');
-  let generate=$('#generate');if(!generate){generate=el('button','primary','Elegir motor');generate.type='button';generate.dataset.studio='picker';}
+  let generate=$('#generate');if(!generate){generate=el('button','primary','Generar');generate.id='generate';generate.type='button';generate.disabled=true;}
+  generate.title='Generar (Enter / Ctrl+Enter)';
   action.append(generate);
-  const multi=el('details','creative-multi','<summary aria-label="Opciones de generación">⌄</summary><div><button type="button" data-action="chooseCompare">Multi-Run · varios modelos</button><small>Prompt y ajustes propios por modelo</small></div>');action.append(multi);
+  const multi=el('details','creative-multi','<summary aria-label="Opciones de generación" title="Opciones de generación">▾</summary><div><button type="button" data-action="chooseCompare">Multi-Run · varios modelos</button><small>Prompt y ajustes propios por modelo</small></div>');action.append(multi);
   source.querySelectorAll('[data-action="chooseCompare"]').forEach(n=>n.remove());
-  const footer=el('div','creative-command-footer');footer.append(send,action);
-  command.append(heading,input,chips,references);if(parameterBody.children.length)command.append(extras);command.append(footer);
+  const rightTools=el('div','creative-footer-actions');rightTools.append(send,action);
+  const footer=el('div','creative-command-footer');footer.append(chips,rightTools);
+  command.append(input,references);if(parameterBody.children.length)command.append(extras);command.append(footer);
   source.replaceWith(command);
+  autoResizeTextarea(prompt);
   if(canvasRoot){canvasRoot.querySelector('.canvas-right')?.remove();canvasRoot.append(tray());}
   else command.after(tray());
  }
@@ -93,6 +119,7 @@
   const extension=new URL(url,location.href).pathname.split('.').pop().toLowerCase(),mime=({jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',avif:'image/avif',gif:'image/gif'})[extension]||'image/png';
   state.draft.media.push({id:crypto.randomUUID(),name:job.name||'Referencia',mime,size:0,url,remoteUrl:url.startsWith('/media/')?null:url,field:field.key});quote=null;persist();renderCanvas();
  }
+ document.addEventListener('input',e=>{if(e.target?.tagName==='TEXTAREA')autoResizeTextarea(e.target);});
  document.addEventListener('dragover',e=>{if(e.target.closest('#creative-command')&&e.dataTransfer?.types.includes('application/x-nexus-job')){e.preventDefault();e.dataTransfer.dropEffect='copy';}});
  document.addEventListener('drop',e=>{if(!e.target.closest('#creative-command'))return;const id=e.dataTransfer?.getData('application/x-nexus-job');if(id){e.preventDefault();attach(id,e.target.closest('[data-field]')?.dataset.field);}});
  document.addEventListener('keydown',e=>{
@@ -115,3 +142,4 @@
  const previousResponse=parseResponse;parseResponse=function(...args){const result=previousResponse(...args);schedule();return result;};
  window.NexusCreative={version:1,attach};mount();
 })();
+
