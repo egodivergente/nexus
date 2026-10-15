@@ -24,6 +24,14 @@ Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin camb
 - **Corrección:** Enter sobre una tarjeta de Biblioteca abría el visor y lo cerraba al instante.
 - **Tests:** `test-desktop-design`, `test-studio-gallery` y `test-chat-workflow` actualizados a la galería y los temas actuales.
 
+## [Unreleased] - rama `ux/fase2-sistema` (Windows): sistema de diseño
+
+- **`tokens.css`:** fuente única de escalas (espaciado 4–48, radios 6/8/12/16/píldora, texto 11–28, pesos 400/500/600, alturas de control, elevación, movimiento) y colores semánticos (éxito, aviso, error, información) ajustados por tema.
+- **Valores normalizados:** 310 tamaños de letra, 126 radios y 12 pesos pasan a la escala (de 25 tamaños distintos a 8, de 18 radios a 5, de 7 pesos a 3).
+- **Colores:** 114 colores fijos pasan a tokens del tema (tintes de borde y relleno, texto secundario, fondos y líneas). En los temas oscuros el aspecto se mantiene; en Claro deja de haber bordes invisibles.
+- **Tema Claro:** logotipos monocromos (OpenAI, FLUX, Runway, Anthropic…) visibles.
+- **Historial:** cada estado lleva su color semántico.
+
 ## [1.9.5-agent] - 2026-10-15
 
 Release `v1.9.5-agent` (Android `1.9.5-agent-preview` / `versionCode 39` y Windows `1.9.5-agent-desktop`) que incorpora el logo oficial de NEXUS y el indicador de versión en el preview/onboarding de apertura, pantallas de bienvenida y cabeceras en móvil y EliteBook.
