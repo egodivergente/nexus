@@ -661,7 +661,7 @@ body.nexus-agent-studio .history-filters #parity-history-search {
 body.nexus-agent-studio .catalog-filters .select-wrap,
 body.nexus-agent-studio .catalog-filters select,
 body.nexus-agent-studio .catalog-filters .select-trigger {
-  max-width: 150px;
+  max-width: 220px;
   min-width: 0;
 }
 
@@ -1251,4 +1251,45 @@ body.nexus-agent-studio dialog [data-refresh-balances] {
 
 body.nexus-agent-studio dialog .parity-balance-row + h3 {
   margin-top: 28px;
+}
+
+/* Historial: filas agrupadas (3 o más generaciones idénticas seguidas) */
+body.nexus-agent-studio .history-row.history-group {
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent));
+  border-color: color-mix(in srgb, var(--line) 70%, var(--accent));
+}
+
+body.nexus-agent-studio .history-group-toggle {
+  cursor: pointer;
+}
+
+body.nexus-agent-studio .history-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+body.nexus-agent-studio .history-group-chevron {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+}
+
+body.nexus-agent-studio .history-row.history-sub {
+  margin-left: 28px;
+  min-height: 48px;
+  background: transparent;
+  border-style: dashed;
+}
+
+body.nexus-agent-studio .history-row .parity-cost[title] {
+  cursor: help;
 }

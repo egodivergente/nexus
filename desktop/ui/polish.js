@@ -83,19 +83,20 @@ function tidyCatalog() {
   document.querySelectorAll('[data-hide]').forEach(button=>{
     if(button.textContent==='···'){button.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';button.setAttribute('aria-label','Ocultar modelo');}
   });
+  const softPrice=node=>{const before=node.textContent,next=before.replace('Consultar coste','Cotizar antes de usar').replace(/^(?:Desde|Base) (.+?) · (?:base|unidad sin confirmar)$/,'Desde $1 · sin confirmar');if(next!==before)node.textContent=next;if(/sin confirmar$/.test(next))node.title='Precio base del proveedor. La unidad exacta (por imagen, por segundo…) se confirma al cotizar.';else if(next==='Cotizar antes de usar')node.title='Este modelo no publica un precio fijo: se calcula al cotizar tu encargo.';};
   document.querySelectorAll('.model').forEach(card=>{
     const id=card.querySelector('[data-model]')?.dataset.model;
     const provider=card.querySelector('.provider');
     if(!id){
       if(provider)provider.textContent='';
       const cost=card.querySelector('.price');
-      if(cost)cost.textContent=cost.textContent.replace('Consultar coste','Cotizar antes de usar').replace(/^Desde (.+) · base$/,'Base $1 · unidad sin confirmar');
+      if(cost)softPrice(cost);
       return;
     }
     const model=models.find(item=>item.id===id);if(!model)return;
     if(provider)provider.textContent=model.organization==='Atlas Cloud'?'':model.organization;
     const cost=card.querySelector('.price');
-    if(cost)cost.textContent=cost.textContent.replace('Consultar coste','Cotizar antes de usar').replace(/^Desde (.+) · base$/,'Base $1 · unidad sin confirmar');
+    if(cost)softPrice(cost);
     const brief=decisionBrief(model),paragraph=card.querySelector('.description');
     if(paragraph){paragraph.innerHTML=`<strong>Para</strong> ${escape(brief.good)}<br><strong>Evita</strong> ${escape(brief.avoid)}`;paragraph.classList.add('decision-brief');}
   });
