@@ -2,6 +2,16 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.6-agent] - 2026-10-15
+
+- Android vc40: elimina las cuotas fijas locales de 150.000 tokens por mensaje
+  y 500.000 diarios que bloqueaban el chat aunque quedase presupuesto monetario.
+- Conserva el registro de consumo y los importes configurados, sin cambiar modelo,
+  backend, cuentas, claves, proyectos ni conversaciones.
+- Añade regresiones con el consumo real del S25 y sincroniza la política de
+  tokens con el código del agente de Windows.
+- Detalles: [corrección del bloqueo diario](docs/AGENT-TOKEN-QUOTA-FIX-20261015.md).
+
 ## [1.9.5-agent] - 2026-10-15
 
 Release `v1.9.5-agent` (Android `1.9.5-agent-preview` / `versionCode 39` y Windows `1.9.5-agent-desktop`) que incorpora el logo oficial de NEXUS y el indicador de versión en el preview/onboarding de apertura, pantallas de bienvenida y cabeceras en móvil y EliteBook.

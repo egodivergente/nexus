@@ -30,7 +30,7 @@ internal fun AgentBudgetSettings() {
         Text("AWS directo: presupuesto local estimado con margen del 20%. Incluye reservas de envios sin respuesta; no es la factura global de AWS.",style=MaterialTheme.typography.bodySmall)
         StudioTextField(turn,{turn=it},label={Text("Maximo por mensaje · USD")},singleLine=true,modifier=Modifier.fillMaxWidth())
         StudioTextField(daily,{daily=it},label={Text("Maximo diario · USD (UTC)")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        Text("Hasta 8 llamadas por mensaje. 150.000 tokens por mensaje y 500.000 al dia. Los documentos se leen una vez y se reutiliza el resumen.",style=MaterialTheme.typography.bodySmall)
+        Text("Sin cuota fija local de tokens por mensaje ni por día. Se aplican los importes configurados arriba. Los documentos se leen una vez y se reutiliza el resumen.",style=MaterialTheme.typography.bodySmall)
         FilledTonalButton(onClick={
             runCatching {runtime.settings.saveLlmLimits(turn.replace(',','.').toDouble(),daily.replace(',','.').toDouble())}
                 .onSuccess {message="Limites guardados. Se aplican a la siguiente llamada."}

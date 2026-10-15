@@ -1,14 +1,14 @@
 {
   "name": "nexus",
-  "status": "CONSOLIDATED_SOURCE_RELEASE_195_ONBOARDING_AND_GALLERY_RECOVERY",
+  "status": "AGENT_TOKEN_QUOTA_FIXED_196",
   "verifiedAt": "2026-10-15",
   "repository": "https://github.com/egodivergente/nexus",
   "canonicalBranch": "main",
   "components": {
     "android": {
-      "versionName": "1.9.5-agent-preview",
-      "versionCode": 39,
-      "sha256": "197f4db162c193b46d71a905b2781da7dc25634306d8f1d4d9ed1ed1925400b5"
+      "versionName": "1.9.6-agent-preview",
+      "versionCode": 40,
+      "sha256": "b71f0ad40b7146fd7d3922213db22209e5028fdd51025fcaec52f4445b18c4e6"
     },
     "desktop": {
       "versionName": "1.9.5-agent-desktop",
@@ -20,8 +20,8 @@
   },
   "validation": {
     "androidFilesMatchBuiltArtifactSource": 515,
-    "androidUnitTestsRun": "PASS",
-    "agentCoreUnitTestsRun": 129,
+    "androidUnitTestsRun": 279,
+    "agentCoreUnitTestsRun": 131,
     "desktopAgentRuntimeBuiltAndTested": "PASS",
     "desktopHostIntegrityTestsRun": 14,
     "desktopDispatchIntegrityTestsRun": 14,
@@ -30,6 +30,9 @@
     "agentProxyUnitTestsRun": 33,
     "androidNewVisualOptionsInstalledOnS25": true,
     "androidNewVisualOptionsDeviceTests": "PASS",
-    "paidOperations": 0
+    "paidOperations": 0,
+    "s25BudgetFixInstalled": true,
+    "realAgentChatReply": "PASS",
+    "usageLedgerPreserved": true
   }
 }

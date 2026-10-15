@@ -8,6 +8,23 @@ import kotlinx.coroutines.awaitAll
 import kotlin.test.*
 
 class LlmBudgetTest {
+    @Test fun defaultLimitsDoNotBlockChatAfterFiveHundredThousandTokens() {
+        val ledger = LlmBudgetLedger(file())
+        val limits = LlmLimits(perTurnUsd = 10.0, dailyUsd = 20.0)
+        ledger.reserve("previous", 1.6793352, 454_054, limits)
+        // Reproduces the phone: existing history plus the next reserved response.
+        ledger.reserve("hello", 0.4, 72_000, limits)
+        ledger.reserve("more-context", 0.5, 160_000, limits)
+        assertEquals(2.5793352, ledger.spentToday(), 0.000000001)
+    }
+
+    @Test fun explicitlyConfiguredTokenQuotaStillApplies() {
+        val ledger = LlmBudgetLedger(file())
+        val limits = LlmLimits(dailyTokens = 500_000)
+        ledger.reserve("previous", 0.1, 454_054, limits)
+        assertFailsWith<LlmException> { ledger.reserve("hello", 0.1, 72_000, limits) }
+    }
+
     @Test fun newModelsHaveRatesAndStillRespectExistingSpendingLimits() = runTest {
         var calls=0
         val backend=object:LlmProvider {

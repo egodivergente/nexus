@@ -18,7 +18,7 @@ class LlmTurnContext(val turnId: String) : kotlin.coroutines.AbstractCoroutineCo
 }
 
 data class LlmLimits(val perTurnUsd: Double = 1.0, val dailyUsd: Double = 5.0,
-    val perTurnTokens: Long = 150_000, val dailyTokens: Long = 500_000, val perTurnCalls: Int = 8)
+    val perTurnTokens: Long = Long.MAX_VALUE, val dailyTokens: Long = Long.MAX_VALUE, val perTurnCalls: Int = 8)
 
 @Serializable
 internal data class LlmCharge(val id: String, val day: String, val turn: String, val usd: Double, val tokens: Long)

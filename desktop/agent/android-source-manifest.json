@@ -67,7 +67,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt",
-    "sha256": "4426c8a33f509ca230202a4061fb301a38c54697727e9616ceb9d3b1a3933058"
+    "sha256": "dd333462e774919bf1d736dbf3b315250d8194f2438a4a40a984a65fc6c016b9"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OfflinePlannerProvider.kt",
@@ -227,7 +227,7 @@
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LlmBudgetTest.kt",
     "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/LlmBudgetTest.kt",
-    "sha256": "a9d6df8a64edb403980c27c6561ace10f1d1f0094d1b5d3d7ed2d664ba7e3d32"
+    "sha256": "b462635bd6724040f61de4ac0dbe285863777d1c1faa975ae9c92f5a71f59884"
   },
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/MateoJulianFlowTest.kt",

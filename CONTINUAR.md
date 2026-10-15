@@ -1,7 +1,7 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado actual: Android 1.9.5-agent-preview / vc39 y Windows 1.9.5-agent-desktop.
+Estado actual: Android 1.9.6-agent-preview / vc40 y Windows 1.9.5-agent-desktop.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
@@ -30,3 +30,7 @@ datos, y el EliteBook ejecuta Windows `1.9.5-agent-desktop` desde
 versionados; su sesión y configuración activa viven en Termux, fuera de Git.
 
 
+
+El 15 de octubre se corrigió e instaló en el S25 la cuota fija de tokens en 1.9.6/vc40.
+Véase docs/AGENT-TOKEN-QUOTA-FIX-20261015.md. El Pixel continúa en su versión anterior;
+esta tarea no actualizó Windows ni Pixel.

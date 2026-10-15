@@ -1,22 +1,24 @@
 # NEXUS — Android y Windows
 
-Fuente unificada de **Nexus Agent 1.9.3** para Android y **Nexus Studio 1.9.3**
+Fuente unificada de **Nexus Agent 1.9.6** para Android y **Nexus Studio 1.9.5**
 para Windows. La rama principal es `main`.
 
 ## Descargar
 
-[Release 1.9.3: APK Android y paquete Windows](https://github.com/egodivergente/nexus/releases/tag/v1.9.3-agent)
+[Android 1.9.6: corrección del bloqueo diario](https://github.com/egodivergente/nexus/releases/tag/v1.9.6-agent)
+· [Último paquete Windows publicado: 1.9.3](https://github.com/egodivergente/nexus/releases/tag/v1.9.3-agent)
 
-- **Android:** `NEXUS-Agent-1.9.3-opciones-visuales.apk`, paquete
-  `com.vidadomu.nexus.agent`, versionCode 37, con las opciones visuales nuevas,
+- **Android:** `Nexus-Agent-1.9.6-preview.apk`, paquete
+  `com.vidadomu.nexus.agent`, versionCode 40, sin las cuotas fijas locales de tokens,
   compilada y firmada con el certificado de la app existente.
-- **Windows:** `Nexus-Studio-Agent-1.9.3-Windows.zip`, con runtime del agente.
+- **Windows:** el código actual corresponde a 1.9.5; el ZIP publicado en la
+  Release anterior es `Nexus-Studio-Agent-1.9.3-Windows.zip`.
 - **SHA256SUMS.txt:** hashes para comprobar las dos descargas.
 - El código completo se obtiene con **Code → Download ZIP** o clonando `main`.
 
-La APK de opciones visuales aún no se ha instalado en el S25. Su versión coincide
-con la 1.9.3 instalada, que precede a este ajuste visual. La edición Windows 1.9.3
-ya está instalada en el EliteBook. Publicar esta Release no actualiza dispositivos.
+La corrección y sus comprobaciones están documentadas en
+[AGENT-TOKEN-QUOTA-FIX-20261015.md](docs/AGENT-TOKEN-QUOTA-FIX-20261015.md).
+Publicar una Release no actualiza por sí solo las aplicaciones instaladas.
 
 ## Código
 
