@@ -1,0 +1,92 @@
+# APK Explorer
+
+Explorador local para APK Android privadas: recorre elementos accesibles, captura
+pantallas distintas y genera una galería HTML, árboles XML y un mapa de navegación JSON.
+No requiere API de IA, suscripción ni dependencias Python externas.
+
+## Abrir
+
+En Windows, doble clic en `Explorador.cmd`. Requiere Python 3.10+ con Tkinter y
+Android Platform Tools (`adb`). En Linux puede necesitar el paquete `python3-tk`.
+
+1. Conecta un Android con depuración autorizada y la pantalla desbloqueada.
+2. Pulsa **Dispositivos** y copia el serial. Si ADB está en ASUS, indica primero
+   `vidal@100.112.57.2` en SSH; se usan las claves existentes y la clave de host conocida.
+3. Introduce el package de la app, por ejemplo `com.empresa.app`. Al elegir una APK
+   se intenta detectarlo automáticamente con `aapt2`/`aapt` del SDK Android instalado.
+4. Elige una APK para instalarla o deja el campo vacío para usar la app instalada.
+5. Ajusta los límites y pulsa **Explorar**. **Detener** conserva lo ya capturado.
+
+La instalación usa `adb install -r`: no desinstala ni borra datos. Si la firma no
+coincide, falla y muestra el error. Las sesiones se guardan en `sessions/`, excluido
+de Git. Los nombres de botones de la interfaz se muestran en español.
+
+## GitHub privado
+
+Requiere GitHub CLI (`gh`) autenticado: `gh auth login`. Reutiliza su almacén de
+credenciales; no pide ni escribe tokens en archivos del proyecto.
+
+- Introduce `propietario/repositorio` o su URL y pulsa **APK de GitHub**.
+- Selecciona el APK de la última release publicada (incluye prereleases) o indica un
+  tag concreto. Si no hay APK publicada, usa un archivo local.
+- **Leer candidatos de pantallas del código GitHub** consulta la rama predeterminada
+  o la referencia indicada y añade el SHA y un inventario estático parcial al informe.
+  Lee hasta 30 archivos de navegación/pantallas/actividades/manifest mediante la API;
+  no clona ni ejecuta código del repositorio.
+
+La conexión lee repositorios y descarga APK. No publica capturas ni informes en
+GitHub. El acceso depende de los permisos de la cuenta autenticada. El inventario
+del código y la APK seleccionada pueden pertenecer a revisiones diferentes: el
+inventario no implica que esas pantallas existan en el binario ni que se hayan visitado.
+
+## Línea de comandos
+
+```powershell
+python explorer.py --devices
+python explorer.py --ssh vidal@100.112.57.2 --devices
+python explorer.py --serial SERIAL --package com.empresa.app --apk C:\ruta\app.apk
+python explorer.py --ssh vidal@100.112.57.2 --serial SERIAL --package com.empresa.app --max-states 60 --minutes 15
+python explorer.py --serial SERIAL --package com.empresa.app --repo propietario/repo --release latest --asset app.apk --source-map
+python explorer.py --serial SERIAL --package com.empresa.app --capture-only
+```
+
+`--capture-only` captura la pantalla actual sin lanzar la app, tocarla ni instalar.
+`--output` debe señalar una carpeta nueva. `--max-actions` incluye las acciones de
+reproducción de rutas; `--depth` limita la profundidad. Cada comando ADB tiene un
+timeout; detener puede tardar hasta que termine el comando actual. El límite de
+minutos corresponde a la exploración, no a la descarga/instalación/lectura de GitHub.
+
+## Qué cubre
+
+Exploración por profundidad, pulsaciones, desplazamiento vertical, detección de
+estados por árbol de interfaz y reproducción de rutas desde el inicio. Guarda una
+captura por estado encontrado y una huella SHA-256 del PNG. Los estados seleccionados,
+marcados, textos y coordenadas forman parte de la identidad de una pantalla.
+
+No garantiza cobertura completa. No rellena formularios ni contraseñas; no aprueba
+permisos ni explora otras apps. Omite controles con textos/identificadores reconocibles
+de borrar, pagar, generar, enviar, guardar o publicar. Este filtro es heurístico:
+un botón sin etiqueta o una acción con nombre inesperado podría modificar datos.
+Usa una instalación de prueba y datos de prueba para una exploración extensa.
+
+Las rutas se reproducen cerrando y abriendo el proceso de la app, sin borrar sus
+datos. Si el estado inicial o un paso cambia, se registra la ruta no reproducible.
+Las superficies Canvas, juegos, WebViews con poca accesibilidad, gestos especiales,
+desplazamiento horizontal, menús por pulsación larga, variantes de idioma/tema y
+estados dependientes del servidor pueden requerir recorridos específicos.
+Los textos dinámicos pueden producir estados adicionales. Pantallas protegidas
+contra capturas pueden aparecer negras y requieren revisión visual.
+
+Las capturas y árboles XML pueden contener información privada visible en pantalla.
+La galería es un archivo local sin recursos de red. Los artefactos nunca se añaden
+automáticamente al repositorio ni se envían a un servicio externo.
+
+## Pruebas
+
+```powershell
+python -m unittest discover -s tools/apk-explorer -p test_explorer.py -v
+```
+
+Se ejecutan desde la raíz del repositorio. Cubren rutas ramificadas y su recuperación,
+límites, capturas sin navegación, controles sensibles, límites externos, persistencia
+ante desconexión, escape HTML, transporte SSH y rechazo de rutas de descarga inválidas.
