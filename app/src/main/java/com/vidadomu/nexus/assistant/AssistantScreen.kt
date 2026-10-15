@@ -148,7 +148,10 @@ fun AssistantScreen(
             contentDescription="Abrir proyecto"
             stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
         },verticalArrangement=Arrangement.Center) {
-            Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
+                Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
+            }
             if(LocalDensity.current.fontScale<1.3f) Text(listOfNotNull("v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }},actions={IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
@@ -245,13 +248,13 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
             .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Text(active?.name ?: "Proyecto",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+                Text(active?.name ?: "Proyecto",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 IconButton(onClick=onClose) {Icon(Icons.Default.Close,"Cerrar proyecto")}
             }
             Text("Cambiar proyecto",style=MaterialTheme.typography.titleMedium)
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 item {StudioFilterChip(active==null,{vm.selectProject(null)},label={Text("Sin proyecto")},shape=NexusTokens.filter)}
-                items(ui.projects,key={it.id}) {p->StudioFilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name)},shape=NexusTokens.filter)}
+                items(ui.projects,key={it.id}) {p->StudioFilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},shape=NexusTokens.filter)}
             }
             TextButton(onClick={creating=!creating},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}
             if(creating) {
@@ -264,7 +267,7 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
             Text("Conversaciones",style=MaterialTheme.typography.titleMedium)
             TextButton(onClick={vm.newConversation();onClose()},enabled=!ui.thinking) {Icon(Icons.Default.AddComment,null);Text("Nueva conversación",color=TextSecondary)}
             if(conversations.isEmpty()) Text("Aún no hay conversaciones guardadas",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-            conversations.forEach {entry->TextButton(onClick={vm.openConversation(entry.id);onClose()},enabled=!ui.thinking) {Text(entry.title,color=TextSecondary)}}
+            conversations.forEach {entry->TextButton(onClick={vm.openConversation(entry.id);onClose()},enabled=!ui.thinking) {Text(entry.title,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)}}
         }
     }
 }
@@ -316,8 +319,8 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
 private fun UserBubble(item:ChatItem.User) {
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
-        Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.widthIn(max=320.dp).padding(top=NexusTokens.space4,start=NexusTokens.space32)) {
-            Text(item.text,Modifier.padding(NexusTokens.space16),style=MaterialTheme.typography.bodyLarge,color=TextPrimary)
+        Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.widthIn(max=300.dp).padding(top=NexusTokens.space4,start=NexusTokens.space32)) {
+            Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyLarge,color=TextPrimary)
         }
     }
 }
@@ -435,7 +438,7 @@ internal fun PlanCardView(
         Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Column(Modifier.weight(1f)) {
-                    Text(plan.modelName,style=MaterialTheme.typography.titleMedium)
+                    Text(plan.modelName,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     Text(remember(plan.estimate,currencyState) {plan.estimate?.amountUsd?.let(currency::formatCost) ?: "Por confirmar"},style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                     Text(stateLabel(p),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }

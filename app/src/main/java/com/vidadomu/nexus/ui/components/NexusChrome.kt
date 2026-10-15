@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
@@ -117,18 +118,21 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     scrollBehavior: TopAppBarScrollBehavior? = null) {
     val chrome=LocalChrome.current
     StudioChrome(modifier.fillMaxWidth()) {
-    TopAppBar(title=title,modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
-        windowInsets=windowInsets,scrollBehavior=scrollBehavior,
-        expandedHeight=if(LocalDensity.current.fontScale>=1.3f) NexusTokens.minimumTouch+NexusTokens.space8 else NexusTokens.topBarHeight,
-        actions={
-            actions()
-            chrome?.let {
-                NexusBalanceChip()
-                it.openSettings?.let { open -> IconButton(onClick=open) {
-                    Icon(Icons.Outlined.Settings,contentDescription="Ajustes de Nexus")
-                } }
-            }
-        })
+        Column(Modifier.fillMaxWidth()) {
+            TopAppBar(title=title,modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
+                windowInsets=windowInsets,scrollBehavior=scrollBehavior,
+                expandedHeight=if(LocalDensity.current.fontScale>=1.3f) NexusTokens.minimumTouch+NexusTokens.space8 else NexusTokens.topBarHeight,
+                actions={
+                    actions()
+                    chrome?.let {
+                        NexusBalanceChip()
+                        it.openSettings?.let { open -> IconButton(onClick=open) {
+                            Icon(Icons.Outlined.Settings,contentDescription="Ajustes de Nexus")
+                        } }
+                    }
+                })
+            HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
+        }
     }
 }
 
@@ -141,13 +145,19 @@ fun NexusBalanceChip() {
 
 @Composable
 internal fun StudioBalanceChip(balance:String,onClick:()->Unit) {
-        Surface(onClick=onClick,shape=NexusTokens.field,color=MaterialTheme.colorScheme.surfaceVariant,
-            modifier=Modifier.widthIn(max=144.dp).heightIn(min=NexusTokens.minimumTouch).semantics { contentDescription="Saldo y gasto"; stateDescription=balance }) {
-            Box(contentAlignment=androidx.compose.ui.Alignment.Center,modifier=Modifier.padding(horizontal=NexusTokens.space12)) {
+    Box(
+        contentAlignment=androidx.compose.ui.Alignment.Center,
+        modifier=Modifier.widthIn(max=148.dp).heightIn(min=NexusTokens.minimumTouch)
+            .semantics(mergeDescendants=true) { contentDescription="Saldo y gasto"; stateDescription=balance }
+            .clickable(role=androidx.compose.ui.semantics.Role.Button,onClick=onClick)
+    ) {
+        Surface(shape=NexusTokens.filter,color=MaterialTheme.colorScheme.surfaceVariant) {
+            Box(contentAlignment=androidx.compose.ui.Alignment.Center,modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=6.dp)) {
                 Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurface,
-                    maxLines=2,overflow=TextOverflow.Ellipsis)
+                    maxLines=1,overflow=TextOverflow.Ellipsis)
             }
         }
+    }
 }
 
 /** Compact headings in chrome; the user's font scale still applies in full. */

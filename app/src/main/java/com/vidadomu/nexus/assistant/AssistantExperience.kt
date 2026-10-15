@@ -70,18 +70,21 @@ internal fun insertModel(value: TextFieldValue, completion: ModelCompletion, mod
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
-    Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8)) {
+    Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
+        border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f)),
+        modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8)) {
         Column(Modifier.fillMaxWidth().padding(NexusTokens.space8)) {
             completion?.let { suggestions ->
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     items(suggestions.models, key = { it.ref.toString() }) { model ->
-                        AssistChip(onClick = { onInput(insertModel(text, suggestions, model)) }, label = { Text(model.name) })
+                        AssistChip(onClick = { onInput(insertModel(text, suggestions, model)) }, label = { Text(model.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) })
                     }
                 }
             }
             if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 items(ui.pendingAttachments, key = { it.id }) { att ->
-                    InputChip(selected = true, onClick = { onRemove(att.id) }, label = { Text(att.name ?: "Referencia") },
+                    InputChip(selected = true, onClick = { onRemove(att.id) },
+                        label = { Text(att.name ?: "Referencia", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp)) },
                         trailingIcon = { Icon(Icons.Default.Close, "Quitar referencia") })
                 }
             }
@@ -92,8 +95,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     textStyle=MaterialTheme.typography.bodyLarge,shape=NexusTokens.field,colors=TextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surface,unfocusedContainerColor=MaterialTheme.colorScheme.surface,focusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent,unfocusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent),
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }))
-                if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta") }
-                else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje") }
+                if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
+                else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }
         }
     }

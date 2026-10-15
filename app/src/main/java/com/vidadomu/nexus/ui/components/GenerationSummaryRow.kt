@@ -80,11 +80,14 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
         Column(Modifier.weight(1f)) {
             Text(job.prompt.ifBlank {"Sin instrucción textual"},style=MaterialTheme.typography.bodyMedium,color=TextPrimary,
                 maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text("$model · $type · $time",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+            Text("$model · $type · $time",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                maxLines=1,overflow=TextOverflow.Ellipsis)
             if(!finished || job.status==GenerationStatus.FAILED) Text(generationStatusLabel(job),style=MaterialTheme.typography.labelMedium,
-                color=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary)
+                color=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary,
+                maxLines=1,overflow=TextOverflow.Ellipsis)
         }
-        Text(costText,modifier=Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
+        Text(costText,modifier=Modifier.widthIn(max=96.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,
+            maxLines=1,overflow=TextOverflow.Ellipsis)
         Box {
             IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de creación ${job.id}",tint=TextSecondary)}
             DropdownMenu(menuOpen,{menuOpen=false}) { menu {menuOpen=false} }

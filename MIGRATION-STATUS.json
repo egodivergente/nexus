@@ -8,7 +8,7 @@
     "android": {
       "versionName": "1.9.5-agent-preview",
       "versionCode": 39,
-      "sha256": "9298e0bf7d898f0b16b8907f5ca59ee4c039a4207e8185db7aaf427b123c208e"
+      "sha256": "197f4db162c193b46d71a905b2781da7dc25634306d8f1d4d9ed1ed1925400b5"
     },
     "desktop": {
       "versionName": "1.9.5-agent-desktop",
