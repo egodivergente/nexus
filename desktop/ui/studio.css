@@ -25,7 +25,7 @@ body:has(.agent-view) #header-actions{gap:6px}
 .agent-view .agent-session-info button{border:0;min-height:28px;padding:4px 6px;font-size:11px;color:#aaaeb6}
 .agent-view .agent-messages{width:100%;min-height:0;padding:12px max(0px,calc((100% - 760px)/2)) 24px;scrollbar-gutter:stable}
 .agent-view .agent-empty{min-height:0;height:100%;display:flex;align-items:center;justify-content:center}
-.agent-view .agent-empty h2{font-size:26px;font-weight:600;color:#e4e6eb;margin:0}
+.agent-view .agent-empty h2{font-size:26px;font-weight:600;color:var(--text,#e4e6eb);margin:0}
 .agent-view:has(.agent-empty){justify-content:flex-start}
 .agent-view:has(.agent-empty) .agent-messages{flex:0 1 210px;margin-top:auto}
 .agent-view:has(.agent-empty) #agent-compose{margin-bottom:auto}

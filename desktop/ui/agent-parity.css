@@ -1373,6 +1373,7 @@ body.nexus-agent-studio .creative-piece {
 
 body.nexus-agent-studio .creative-piece span {
   font-size: 11px;
+  color: #fff;
 }
 
 /* Lienzo: «Producción reciente» alineada con la tarjeta del compositor */
@@ -1442,4 +1443,9 @@ body.nexus-agent-studio .nx-more-list button {
 
 body.nexus-agent-studio .nx-more-list button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Biblioteca: el subtítulo del rótulo sobre la miniatura se lee en cualquier tema (va sobre degradado oscuro) */
+body.nexus-agent-studio .gallery-overlay small {
+  color: #dfe5ec !important;
 }
