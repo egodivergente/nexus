@@ -96,7 +96,7 @@ public final class Engine implements Runnable {
         StringBuilder s=new StringBuilder();
         if(n.getText()!=null) s.append(n.getText()).append(' ');
         if(n.getContentDescription()!=null) s.append(n.getContentDescription()).append(' ');
-        for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo c=n.getChild(i);if(c!=null)s.append(label(c,depth+1));}
+        for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo c=n.getChild(i);if(c!=null)s.append(label(c,depth+1)).append(' ');}
         return s.toString().trim();
     }
     private static void attr(XmlSerializer x,String key,Object value)throws Exception{x.attribute("",key,value==null?"":value.toString());}
@@ -121,7 +121,11 @@ public final class Engine implements Runnable {
         try {
             report.put("package",pkg).put("coverage_complete",false).put("mode","native_virtual_display");
             open();Thread.sleep(2500);
-            Set<String> visited=new HashSet<>(), attempted=new HashSet<>();
+            List<int[]> frames=new ArrayList<>();
+            List<String> frameKeys=new ArrayList<>();
+            Set<String> attempted=new HashSet<>();
+            Set<String> backedOut=new HashSet<>();
+            int duplicates=0;
             long deadline=System.currentTimeMillis()+180000;
             int count=0;
             while(!stop && states.length()<limit && count<40 && System.currentTimeMillis()<deadline){
@@ -137,19 +141,39 @@ public final class Engine implements Runnable {
                 xml.endTag("","hierarchy");xml.flush();
                 if(!owned){result="external_boundary";break;}
                 String raw=out.toString();
-                String key=Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
-                if(visited.add(key)){
-                    Bitmap bitmap=ui.takeScreenshot();if(bitmap==null)throw new IOException("Captura virtual no disponible");
-                    ByteArrayOutputStream png=new ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.PNG,100,png);bitmap.recycle();
+                Bitmap bitmap=ui.takeScreenshot();if(bitmap==null)throw new IOException("Captura virtual no disponible");
+                Bitmap sampled=Bitmap.createScaledBitmap(bitmap,64,128,true);
+                int[] pixels=new int[64*128];sampled.getPixels(pixels,0,64,0,0,64,128);
+                if(sampled!=bitmap)sampled.recycle();
+                int match=-1;
+                for(int i=0;i<frames.size();i++)if(VisualFingerprint.same(frames.get(i),pixels)){match=i;break;}
+                String key;
+                if(match<0){
+                    ByteArrayOutputStream png=new ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.PNG,100,png);
+                    key=Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(png.toByteArray()));
+                    frames.add(pixels);frameKeys.add(key);
                     String stem=String.format(Locale.ROOT,"screen-%04d",states.length()+1);
                     store(stem+".png",png.toByteArray());store(stem+".xml",raw.getBytes(StandardCharsets.UTF_8));
                     states.put(new JSONObject().put("image",stem+".png").put("xml",stem+".xml").put("id",key));
                     status="Explorando · "+states.length()+" capturas · "+count+" acciones";
-                }
+                }else{key=frameKeys.get(match);duplicates++;}
+                bitmap.recycle();
+                report.put("duplicate_frames_skipped",duplicates);
                 if(states.length()>=limit)break;
                 AccessibilityNodeInfo next=null;String actionLabel="";
-                for(AccessibilityNodeInfo a:actions){Rect b=new Rect();a.getBoundsInScreen(b);String l=label(a,0);String id=key+":"+b+":"+l;if(attempted.add(id)){next=a;actionLabel=l;break;}}
-                if(next==null)break;
+                actions.sort(Comparator.comparingInt(a->{Rect b=new Rect();a.getBoundsInScreen(b);return ActionPolicy.priority(label(a,0),b.top>=1440 && b.bottom-b.top<=160 && b.right-b.left<=360);}));
+                // Semantic action budget is session-wide: layout shifts and accordion
+                // combinations must not make the same action look unexplored again.
+                for(AccessibilityNodeInfo a:actions){String l=label(a,0);String id=ActionPolicy.identity(l);if(!a.isSelected() && attempted.add(id)){next=a;actionLabel=l;break;}}
+                if(next==null){
+                    if(!backedOut.add(key) || count>=39)break;
+                    guard();shell("input","-d",String.valueOf(displayId),"keyevent","KEYCODE_BACK");count++;
+                    edges.put(new JSONObject().put("from",key).put("action","Atrás (pantalla virtual)").put("performed",true));
+                    Thread.sleep(1400);
+                    List<AccessibilityWindowInfo> remaining=ui.getWindowsOnAllDisplays().get(displayId);
+                    if(remaining==null || remaining.isEmpty())break;
+                    continue;
+                }
                 guard();
                 boolean ok=next.performAction(AccessibilityNodeInfo.ACTION_CLICK);count++;
                 edges.put(new JSONObject().put("from",key).put("action",actionLabel).put("performed",ok));

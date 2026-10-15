@@ -10,4 +10,16 @@ public final class ActionPolicy {
         return !s.isEmpty() && !s.equals("+") && !RISK.matcher(s).find();
     }
     public static String html(String s) { return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&#39;"); }
+    public static String identity(String label) {
+        String s=Normalizer.normalize(label,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).trim();
+        return String.join(" ",new java.util.LinkedHashSet<>(java.util.Arrays.asList(s.split("\\s+"))));
+    }
+    public static int priority(String label, boolean bottomTab) {
+        String s=identity(label);
+        if(bottomTab || s.matches("(inicio|home|lienzo|canvas|modelos|models|biblioteca|library|biblio|galeria|gallery|proyectos|projects|agente|agent|explorar|explore)( .*)?"))return 0;
+        if(s.matches(".*(detalle del error|error details|ocultar detalle|hide details).*"))return 90;
+        if(s.matches("(cancelar|cancel|cerrar|close|atras|back)( .*)?"))return 80;
+        if(s.contains("ajustes")||s.contains("settings"))return 40;
+        return 20;
+    }
 }

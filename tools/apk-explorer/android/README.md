@@ -1,4 +1,30 @@
-# APK Explorer para Android — 0.1.0 preview
+# APK Explorer para Android — 0.1.1 preview
+
+## Corrección de capturas repetidas — 2026-10-15
+
+El ZIP aportado por el usuario tenía 19 imágenes: dos eran duplicados exactos y
+la mayoría de las primeras once eran variaciones del mismo chat con detalles de
+errores abiertos/cerrados. El recorrido consumió 25 de 40 acciones en esos detalles.
+La identidad basada en XML y coordenadas reiniciaba el presupuesto de una acción
+cuando cambiaba el layout, y la enumeración del árbol priorizaba el chat antes de
+las pestañas principales.
+
+La versión 0.1.1 prioriza navegación principal y pestañas inferiores, cuenta cada
+acción por su etiqueta normalizada a lo largo de la sesión y compara imágenes
+antes de guardarlas. Cambios mínimos de renderizado no generan otra captura;
+los diálogos y cambios visuales significativos sí se conservan. El informe incluye
+`duplicate_frames_skipped`. Si se agotan los candidatos intenta Atrás en el display
+virtual, con presupuesto limitado. La cobertura sigue siendo parcial.
+
+Verificación: ocho tests JUnit correctos (cinco regresiones nuevas). Prueba del
+motor corregido sobre NEXUS Agent real en el S25: ocho imágenes con hashes distintos,
+dos duplicados descartados y revisión visual de Agente, Lienzo, Modelos, Biblioteca,
+sus filtros y visor de vídeo. No se ejecutaron generaciones. Display liberado.
+Evidencia privada: `../sessions/duplicate-regression/fixed.zip` y
+`fixed-overview.jpg`. No se sube el ZIP del usuario ni sus imágenes a GitHub.
+La prueba ejecutó el motor del APK por shell; no automatizó el flujo de exportación
+de la interfaz Shizuku. El número de servicio ahora sigue el versionCode para evitar
+reutilizar un motor anterior después de actualizar la APK.
 
 App nativa Java para Android 14+, paquete `com.axel.apkexplorer`.
 Selecciona una aplicación instalada y ejecuta una exploración limitada en una
@@ -57,7 +83,7 @@ El servicio usa [Shizuku API 13.1.5](https://github.com/RikkaApps/Shizuku-API),
 su proveedor y el permiso concedido por el usuario. La pantalla se crea directamente
 con DisplayManager y se consulta mediante UiAutomation asociado a su ID.
 
-## Verificación — 2026-10-15
+## Verificación inicial de 0.1.0 — 2026-10-15
 
 - Compilación en AXELPC con JDK 17, SDK 35 y Gradle 8.9: PASS.
 - Tres tests JUnit de política de acciones y escape HTML: PASS.

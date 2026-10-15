@@ -26,7 +26,7 @@ public final class MainActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private File archive;
     private boolean destroyed=false;
-    private final Shizuku.UserServiceArgs serviceArgs=new Shizuku.UserServiceArgs(new ComponentName("com.axel.apkexplorer",ExplorerService.class.getName())).daemon(false).processNameSuffix("engine").version(1);
+    private final Shizuku.UserServiceArgs serviceArgs=new Shizuku.UserServiceArgs(new ComponentName("com.axel.apkexplorer",ExplorerService.class.getName())).daemon(false).processNameSuffix("engine").version(BuildConfig.VERSION_CODE);
     private final ServiceConnection connection=new ServiceConnection(){
         public void onServiceConnected(ComponentName n,IBinder b){service=IExplorer.Stub.asInterface(b);message("Conectado · listo para explorar");}
         public void onServiceDisconnected(ComponentName n){service=null;message("Conexión cerrada. Vuelve a conectar Shizuku.");}
@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         button(root,"Exportar ZIP para un agente",()->{if(!archive.exists()){message("Recupera las capturas primero.");return;}Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/zip").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"apk-explorer-"+System.currentTimeMillis()+".zip");startActivityForResult(i,20);});
         button(root,"Releases de GitHub",()->{EditText repo=new EditText(this);repo.setHint("propietario/repositorio");repo.setText(getPreferences(0).getString("repo",""));new AlertDialog.Builder(this).setTitle("Abrir releases en GitHub").setMessage("Usa tu sesión de GitHub en el navegador para descargar e instalar tu APK; después selecciónala aquí.").setView(repo).setPositiveButton("Abrir",(d,w)->{String r=repo.getText().toString().trim();if(!r.matches("[\\w.-]+/[\\w.-]+")){message("Indica propietario/repositorio");return;}getPreferences(0).edit().putString("repo",r).apply();startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/"+r+"/releases")));}).setNegativeButton("Cancelar",null).show();});
         button(root,"Actualizar lista de apps",this::refreshApps);
-        text(root,"Android 14+ · Vista previa 0.1\nUsa otra app mientras se explora. La cobertura es parcial y los datos de la app son compartidos. No está comprobada la escritura simultánea.",12,Color.parseColor("#B8CDD4"));
+        text(root,"Android 14+ · "+BuildConfig.VERSION_NAME+"\nUsa otra app mientras se explora. La cobertura es parcial y los datos de la app son compartidos. No está comprobada la escritura simultánea.",12,Color.parseColor("#B8CDD4"));
     }
     private void refreshApps(){
         packages.clear();List<String> labels=new ArrayList<>();List<ResolveInfo> found=getPackageManager().queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0);
