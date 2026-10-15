@@ -18,9 +18,9 @@
    panel?.remove();const status=content.querySelector('.empty p');
    status?.setAttribute('role','status');status?.setAttribute('aria-live','polite');return;
   }
-  const host=$('.creative-command .sendbar')||$('.canvas .sendbar')||content;
+  const command=$('.creative-command'),host=command||$('.canvas .sendbar')||content;
   if(panel&&panel.parentElement!==host){panel.remove();panel=null;}
-  if(!panel){panel=document.createElement('section');panel.id='studio-canvas-feedback';panel.setAttribute('aria-label','Estado de la creación');host.prepend(panel);}
+  if(!panel){panel=document.createElement('section');panel.id='studio-canvas-feedback';panel.setAttribute('aria-label','Estado de la creación');if(command)host.append(panel);else host.prepend(panel);}
   const key=JSON.stringify([operation,error,job?.providerId,job?.uncertain]);if(panel.dataset.feedback===key)return;panel.dataset.feedback=key;
   panel.replaceChildren();
   if(operation){const progress=document.createElement('p');progress.className='studio-operation';progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');progress.textContent=operations[operation]||'Comprobando…';panel.append(progress);}

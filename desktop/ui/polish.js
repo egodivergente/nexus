@@ -1,9 +1,19 @@
 /* Native-feeling controls and content cleanup shared by every view. */
 const oldLogo=logo;
 const genericMark='<span class="generic-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V5l16 14V5"/><path d="M4 5h3m10 14h3"/></svg></span>';
+const extraLogos=[['ideogram','ideogram'],['black forest','bfl'],['bfl','bfl'],['pika','pika'],['suno','suno'],['elevenlabs','elevenlabs'],['eleven','elevenlabs'],['claude','claude'],['anthropic','anthropic'],['deepseek','deepseek'],['luma','luma'],['microsoft','microsoft'],['nvidia','nvidia'],['pixverse','pixverse'],['stability','stability'],['stable-diffusion','stability'],['vidu','vidu'],['hailuo','minimax']];
 logo=function(model) {
   const result=oldLogo(model);
-  return result.startsWith('<span class="initial">')?genericMark:result;
+  if(!result.startsWith('<span class="initial">'))return result;
+  const text=[model?.organization,model?.id,model?.displayName,model?.name].filter(Boolean).join(' ').toLowerCase();
+  const hit=extraLogos.find(([key])=>text.includes(key));
+  if(hit)return `<img class="logo" src="logos/${hit[1]}.png" alt="">`;
+  const name=String(model?.displayName||model?.name||model?.organization||'').replace(/^.*\//,'').trim();
+  if(!name)return genericMark;
+  const first=(name.replace(/[^\p{L}\p{N} ]/gu,' ').split(/\s+/).filter(Boolean)[0]||name);
+  const mono=first.slice(0,1).toUpperCase()+first.slice(1,2).toLowerCase();
+  let hue=0;for(const ch of first.toLowerCase())hue=(hue*31+ch.charCodeAt(0))%360;
+  return `<span class="generic-mark nx-monogram" style="--mono-h:${hue}" aria-hidden="true">${escape(mono)}</span>`;
 };
 const reviewedBriefs=new Map(NexusFocus.entries.map(([id,,good,avoid])=>[id,{good,avoid}]));
 function decisionBrief(model) {

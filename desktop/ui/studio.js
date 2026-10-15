@@ -52,14 +52,14 @@ function studioPromptLimits(){
 document.addEventListener('input',e=>{if(e.target.id==='prompt')studioPromptLimits();});
 function studioPicker(){
  Studio.pickerQuery='';Studio.pickerKind=loaded?.modalities[0]||'IMAGE';
- modal('<h2>Modelo</h2><div class="studio-picker-toolbar"><input id="studio-model-search" type="search" placeholder="Buscar modelo o proveedor" aria-label="Buscar modelo"><select id="studio-model-kind" aria-label="Formato">'+pcOptions([['IMAGE','Imagen'],['VIDEO','Video'],['AUDIO','Audio'],['CHAT','Texto']],Studio.pickerKind)+'</select></div><div id="studio-model-list"></div><button data-studio="catalog">Catalogo completo</button>');
+ modal('<h2>Modelo</h2><div class="studio-picker-toolbar"><input id="studio-model-search" type="search" placeholder="Buscar modelo o proveedor" aria-label="Buscar modelo"><select id="studio-model-kind" aria-label="Formato">'+pcOptions([['IMAGE','Imagen'],['VIDEO','Video'],['AUDIO','Audio'],['CHAT','Texto']],Studio.pickerKind)+'</select></div><div id="studio-model-list"></div><button data-studio="catalog">Catálogo completo</button>');
  studioModelList();$('#studio-model-search').focus();
 }
 function studioModelList(){
  const q=Studio.pickerQuery.toLocaleLowerCase();
  const list=models.filter(m=>m.modalities.includes(Studio.pickerKind)&&!state.hidden.includes(m.id)&&(!q||[m.displayName,m.id,providers[m.providerId]].join(' ').toLocaleLowerCase().includes(q)))
  .sort((a,b)=>Number(state.favorites.includes(b.id))-Number(state.favorites.includes(a.id))||Number(state.recent.includes(b.id))-Number(state.recent.includes(a.id)));
- $('#studio-model-list').innerHTML=list.slice(0,50).map(m=>'<button class="studio-model-row" data-studio-model="'+escape(m.id)+'">'+logo(m)+'<span><strong>'+escape(m.displayName)+'</strong><small>'+escape(providers[m.providerId])+' · '+escape(description(m))+'</small></span><span class="studio-price">'+(m.basePriceUsd!=null?'Base '+money(m.basePriceUsd):'Consultar coste')+'</span></button>').join('')||'<p>Sin coincidencias</p>';
+ $('#studio-model-list').innerHTML=list.slice(0,50).map(m=>'<button class="studio-model-row" data-studio-model="'+escape(m.id)+'">'+logo(m)+'<span><strong>'+escape(m.displayName)+'</strong><small>'+escape(providers[m.providerId])+' · '+escape(description(m))+'</small></span><span class="studio-price">'+(m.basePriceUsd!=null?'Desde '+money(m.basePriceUsd):'Consultar coste')+'</span></button>').join('')||'<p>Sin coincidencias</p>';
 }
 const pcJobsBeforeStudio=pcJobs;
 pcJobs=function(){const previous=view;view=Studio.tab==='activity'?'history':'library';try{return pcJobsBeforeStudio();}finally{view=previous;}};
