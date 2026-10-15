@@ -1,5 +1,9 @@
 # APK Explorer
 
+**Pantalla virtual:** explora una APK en el móvil mientras usas otra app en su
+pantalla física. Actívala en la ventana o añade `--virtual` al comando del agente.
+Requisitos, verificación y límites en [VIRTUAL_DISPLAY.md](VIRTUAL_DISPLAY.md).
+
 Explorador local para APK Android privadas: recorre elementos accesibles, captura
 pantallas distintas y genera una galería HTML, árboles XML y un mapa de navegación JSON.
 No requiere API de IA, suscripción ni dependencias Python externas.

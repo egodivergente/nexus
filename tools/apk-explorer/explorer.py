@@ -28,7 +28,7 @@ ASUS_HOST = "vidal@100.112.57.2"
 DEFAULT_SETTINGS = {"host": "", "serial": "", "package": "",
                     "apk": "", "repo": "", "tag": "", "ref": "",
                     "max_states": 60, "minutes": 15, "source": False, "device_model": "",
-                    "project": str(Path.home())}
+                    "project": str(Path.home()), "virtual": False}
 
 
 def settings_path():
@@ -426,6 +426,8 @@ class Explorer:
     def restore(self, root_key, path):
         if not self.available():
             return False
+        if getattr(self.device, "virtual", False):
+            raise RuntimeError("El modo virtual usa navegación continua, sin reiniciar rutas.")
         self.device.shell("am", "force-stop", "--user", "0", self.package)
         self.device.launch(self.package)
         self.stop.wait(self.delay)
@@ -500,10 +502,13 @@ class Explorer:
             self.report["device"] = self.device.validate()
             self.report["serial"] = self.device.serial
             self.report["transport"] = self.device.host or "local"
+            if getattr(self.device, "virtual", False):
+                self.report["isolation"] = self.device.evidence
+                self.device.begin(self.package)
             if source:
                 self.report["source"] = source
-            if not capture_only:
-                if self.strategy == "breadth":
+            if not capture_only or getattr(self.device, "virtual", False):
+                if self.strategy == "breadth" and not getattr(self.device, "virtual", False):
                     self.device.shell("am", "force-stop", "--user", "0", self.package)
                 self.device.launch(self.package)
                 self.stop.wait(self.delay)
@@ -514,7 +519,9 @@ class Explorer:
             elif capture_only:
                 self.report["status"] = "capture_only"
             else:
-                if self.strategy == "breadth":
+                if getattr(self.device, "virtual", False):
+                    self.crawl_virtual(key, actions)
+                elif self.strategy == "breadth":
                     self.crawl_breadth(key, actions)
                 else:
                     self.crawl(key, key, actions, [], [])
@@ -525,9 +532,36 @@ class Explorer:
             self.notes.append(str(exc))
             raise
         finally:
+            if getattr(self.device, "virtual", False):
+                try:
+                    self.device.close()
+                except Exception as exc:
+                    self.notes.append("Error al cerrar pantalla virtual: " + str(exc))
+                    self.report["status"] = "error"
             self.report["actions_executed"] = self.count
             self.save()
         return self.output / "index.html"
+
+    def crawl_virtual(self, key, actions):
+        """Continuous walk: avoid resetting a shared process or replaying old tasks."""
+        self.report["strategy"] = "virtual_continuous"
+        attempted, trail = set(), []
+        while self.available():
+            candidates = [a for a in navigation_first(actions)
+                          if (key, a.kind, a.bounds) not in attempted]
+            if not candidates or len(trail) >= self.depth:
+                # Ending is preferable to leaving the app and operating another surface.
+                return
+            action = candidates[0]
+            attempted.add((key, action.kind, action.bounds))
+            if not self.perform(action):
+                return
+            trail.append(action.label)
+            target, actions = self.observe(trail.copy())
+            self.edges.append({"from": key, "to": target, "action": action.label,
+                               "kind": action.kind, "bounds": action.bounds})
+            key = target
+            self.save()
 
     def save(self):
         self.report["actions_executed"] = self.count
@@ -602,6 +636,7 @@ def agent_bundle(folder):
                              "omitted_controls": sum(len(s["omitted_controls"]) for s in screens)},
                 "notes": report["notes"][:], "limits": report.get("limits"),
                 "strategy": report.get("strategy"), "apk": report.get("apk"), "source": report.get("source"),
+                "isolation": report.get("isolation"),
                 "next_step": "Open the overview images, then original screenshots for details. "
                              "Screenshots are visual evidence; labels and source candidates are not visual validation."}
     try:
@@ -694,6 +729,8 @@ def gui():
     ttk.Spinbox(options, from_=1, to=120, width=6, textvariable=minutes).pack(side="left", padx=8)
     source = tk.BooleanVar(value=saved["source"])
     ttk.Checkbutton(frame, text="Leer candidatos de pantallas del código GitHub", variable=source).pack(anchor="w")
+    virtual = tk.BooleanVar(value=saved["virtual"])
+    ttk.Checkbutton(frame, text="Pantalla virtual: explorar sin ocupar la pantalla del móvil (ADB local)", variable=virtual).pack(anchor="w")
     ttk.Label(frame, text="No sube APK ni capturas. Omite acciones sensibles reconocibles; usa datos de prueba.").pack(anchor="w")
     buttons = ttk.Frame(frame)
     buttons.pack(fill="x", pady=10)
@@ -723,7 +760,7 @@ def gui():
         try:
             updated = values() | {"max_states": limit.get(), "minutes": minutes.get(),
                                   "source": source.get(), "device_model": saved["device_model"],
-                                  "project": saved["project"]}
+                                  "project": saved["project"], "virtual": virtual.get()}
             save_settings(updated)
         except (OSError, tk.TclError) as exc:
             log.insert("end", "No se pudieron guardar las preferencias: " + str(exc) + "\n")
@@ -798,6 +835,7 @@ def gui():
             if not 1 <= n <= 500 or not 1 <= mins <= 120:
                 raise ValueError("Revisa los límites de pantallas y minutos.")
             use_source = source.get()
+            use_virtual = virtual.get()
         except (ValueError, tk.TclError) as exc:
             messagebox.showerror("Límites", str(exc))
             return
@@ -806,7 +844,11 @@ def gui():
         persist()
         stop.clear()
         def work():
-            device = Android(v["serial"], v["host"])
+            if use_virtual:
+                from virtual_device import VirtualAndroid
+                device = VirtualAndroid(v["serial"], v["host"])
+            else:
+                device = Android(v["serial"], v["host"])
             output = session_path()
             explorer = Explorer(device, v["package"], output, max_states=n, minutes=mins,
                                 stop=stop, log=lambda s: messages.put(("log", s)))
@@ -986,6 +1028,8 @@ def main(argv=None):
     parser.add_argument("--asset", help="Nombre exacto del APK si la release contiene varios")
     parser.add_argument("--devices", action="store_true")
     parser.add_argument("--capture-only", action="store_true", help="Captura la pantalla actual sin navegar")
+    parser.add_argument("--virtual", action="store_true", help="Pantalla virtual independiente; requiere scrcpy y ADB local")
+    parser.add_argument("--virtual-size", default="720x1600/320", help="Resolución/densidad virtual (ancho x alto / dpi)")
     parser.add_argument("--inspect", nargs="?", const="", help="Inspección visual para agentes: APK o package; detecta conexión")
     parser.add_argument("--json", action="store_true", help="Devuelve el manifiesto JSON por stdout, progreso por stderr")
     parser.add_argument("--bundle", type=Path, help="Prepara capturas de una sesión existente para un agente, sin usar ADB")
@@ -1027,7 +1071,7 @@ def main(argv=None):
                 for flag, value in [("--serial", args.serial), ("--ssh", args.ssh), ("--package", args.package), ("--max-states", args.max_states), ("--max-actions", args.max_actions), ("--minutes", args.minutes), ("--depth", args.depth), ("--delay", args.delay)]:
                     if value is not None:
                         forwarded += [flag, str(value)]
-                return main(["--inspect", str(project), "--output", str(output / "inspection")] + forwarded + (["--json"] if args.json else []))
+                return main(["--inspect", str(project), "--output", str(output / "inspection")] + forwarded + (["--json"] if args.json else []) + (["--virtual", "--virtual-size", args.virtual_size] if args.virtual else []))
             from source_render import render_source
             result["renders"] = [render_source(project, output / ("render-" + str(i)), item["profile"],
                 host="" if args.render_local else args.render_host,
@@ -1115,7 +1159,11 @@ def main(argv=None):
         if not selected:
             raise RuntimeError("Sin dispositivo autorizado disponible. " + " ".join(errors))
         args.ssh, args.serial = host, selected["serial"]
-    device = Android(args.serial or "", args.ssh)
+    if args.virtual:
+        from virtual_device import VirtualAndroid
+        device = VirtualAndroid(args.serial or "", args.ssh, args.virtual_size)
+    else:
+        device = Android(args.serial or "", args.ssh)
     device.validate()
     explorer = Explorer(device, args.package, output, args.max_states, args.max_actions,
                         args.minutes, args.depth, args.delay,
@@ -1146,6 +1194,8 @@ def main(argv=None):
         print("Galería:", result)
     if explorer.report["status"] == "blocked":
         raise SystemExit(2)
+    if explorer.report["status"] == "error":
+        raise SystemExit(1)
     return manifest if quick else None
 
 

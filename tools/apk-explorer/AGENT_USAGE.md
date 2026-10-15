@@ -1,5 +1,15 @@
 # Inspección visual de APK para agentes
 
+Para dejar disponible la pantalla física, usa una pantalla virtual:
+
+```powershell
+python tools/apk-explorer/explorer.py --inspect com.empresa.app --virtual --json
+```
+
+Este modo navega sin reiniciar la app. Revisa `isolation` en el manifiesto y
+[VIRTUAL_DISPLAY.md](VIRTUAL_DISPLAY.md). Comparte los datos de la app instalada;
+no presupongas compatibilidad universal ni aislamiento completo de sus servicios.
+
 Si tienes las fuentes y quieres evaluar cómo se renderiza el código, usa
 `python tools/apk-explorer/explorer.py --render RUTA_PROYECTO --json`.
 Consulta [renderizado desde fuentes](SOURCE_RENDER.md) para el contrato, estados
