@@ -74,7 +74,8 @@ with tempfile.TemporaryDirectory(prefix='nexus-gallery-') as folder:
             page.locator('.gallery-piece').nth(1).hover()
             page.locator('.gallery-select').nth(1).click()
             assert '2 seleccionados' in page.locator('.gallery-selection').inner_text()
-            assert page.locator('[data-gallery=compare]').count() == 0
+            # Con dos seleccionados se puede comparar A/B.
+            assert page.locator('[data-gallery=compare]').is_enabled()
             page.locator('#creative-dock-toggle').click()
             page.locator('[data-gallery=new-collection]').click()
             page.locator('#gallery-new-collection input').fill('Corto de prueba')

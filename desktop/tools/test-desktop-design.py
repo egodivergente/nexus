@@ -94,11 +94,13 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 capture('library',width,height)
                 assert page.locator('#content .result').count()==3  # la galería muestra también el encargo en curso
                 assert page.locator('#content .result[data-job=sample-c] .gallery-progress').count()==1
-                page.locator('[data-studio-detail=sample-a]').click()
+                # La galería abre el visor (antes, un panel lateral de detalles).
+                page.locator('#content .result[data-job=sample-a] .gallery-media').click()
                 capture('details',width,height)
-                panel=page.locator('.studio-details').bounding_box()
+                panel=page.locator('.gallery-lightbox').bounding_box()
                 assert panel['x']>=0 and panel['x']+panel['width']<=width+1
-                page.locator('.studio-detail-close').click()
+                page.keyboard.press('Escape')
+                assert page.locator('.gallery-lightbox').count()==0
                 page.evaluate("navigate('settings')")
                 capture('settings',width,height)
                 assert page.locator('#studio-settings').get_attribute('aria-current')=='page'
