@@ -3,9 +3,6 @@ package com.axel.apkexplorer;
 import android.app.*;
 import android.content.*;
 import android.content.pm.*;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.*;
 import android.view.*;
@@ -20,94 +17,70 @@ import rikka.shizuku.Shizuku;
 public final class MainActivity extends Activity {
     private IExplorer service;
     private TextView state;
-    private Spinner apps,limits;
-    private final List<String> packages=new ArrayList<>();
+    private ExplorerUi screen;
+    private String selectedPackage="", page="explore";
+    private int captureLimit=12;
+    private boolean active=false, collecting=false;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private File archive;
     private boolean destroyed=false;
     private final Shizuku.UserServiceArgs serviceArgs=new Shizuku.UserServiceArgs(new ComponentName("com.axel.apkexplorer",ExplorerService.class.getName())).daemon(false).processNameSuffix("engine").version(BuildConfig.VERSION_CODE);
     private final ServiceConnection connection=new ServiceConnection(){
-        public void onServiceConnected(ComponentName n,IBinder b){service=IExplorer.Stub.asInterface(b);message("Conectado · listo para explorar");}
-        public void onServiceDisconnected(ComponentName n){service=null;message("Conexión cerrada. Vuelve a conectar Shizuku.");}
+        public void onServiceConnected(ComponentName n,IBinder b){service=IExplorer.Stub.asInterface(b);home();}
+        public void onServiceDisconnected(ComponentName n){service=null;active=false;home();message("Conexión cerrada. Pulsa Preparar conexión.");}
     };
     private final Shizuku.OnRequestPermissionResultListener permission=(code,grant)->{if(grant==PackageManager.PERMISSION_GRANTED)connect();else message("Permiso denegado. Puedes concederlo desde Shizuku.");};
-    private final Runnable poll=new Runnable(){public void run(){if(destroyed)return;if(service!=null)io.execute(()->{try{message(service.status());}catch(Exception e){message("Conexión perdida");service=null;}});handler.postDelayed(this,1600);}};
-    private int dp(int n){return (int)(getResources().getDisplayMetrics().density*n);}
-    private void message(String s){handler.post(()->{if(!destroyed)state.setText(s);});}
-    private TextView text(LinearLayout parent,String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setPadding(0,dp(8),0,dp(8));parent.addView(t);return t;}
-    private void button(LinearLayout parent,String title,Runnable action){Button b=new Button(this);b.setText(title);b.setAllCaps(false);b.setTextColor(Color.parseColor("#10352E"));b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#8EE5CD")));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(56));p.topMargin=dp(9);parent.addView(b,p);b.setOnClickListener(v->action.run());}
-    public void onCreate(Bundle bundle){super.onCreate(bundle);Shizuku.addRequestPermissionResultListener(permission);archive=new File(getFilesDir(),"inspection.zip");home();handler.post(poll);}
-    private void home(){
-        getWindow().setStatusBarColor(Color.parseColor("#10232D"));getWindow().setNavigationBarColor(Color.parseColor("#10232D"));
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.parseColor("#10232D"));
-        LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(24),dp(32),dp(24),dp(28));scroll.addView(root);setContentView(scroll);
-        root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(24),bars.top+dp(20),dp(24),bars.bottom+dp(20));return insets;});
-        text(root,"APK EXPLORER",13,Color.parseColor("#8EE5CD")).setLetterSpacing(.18f);
-        text(root,"Explora en\nsegundo plano",32,Color.WHITE).setTypeface(null,Typeface.BOLD);
-        text(root,"Una pantalla virtual para tus apps. Capturas y mapa visual listos para un agente.",16,Color.parseColor("#B8CDD4"));
-        state=text(root,service==null?"Conecta Shizuku para comenzar.":"Conectado",15,Color.parseColor("#8EE5CD"));
-        button(root,"Conectar Shizuku",this::connect);
-        text(root,"APLICACIÓN INSTALADA",12,Color.parseColor("#B8CDD4"));
-        apps=new Spinner(this);root.addView(apps,new LinearLayout.LayoutParams(-1,dp(56)));refreshApps();
-        apps.setBackgroundColor(Color.parseColor("#E8F0F2"));
-        limits=new Spinner(this);ArrayAdapter<String> values=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"6 capturas","12 capturas","20 capturas"});limits.setAdapter(values);root.addView(limits);limits.setSelection(1);
-        limits.setBackgroundColor(Color.parseColor("#E8F0F2"));
-        button(root,"Explorar en pantalla virtual",()->{
-            if(service==null){message("Primero conecta y autoriza Shizuku.");return;}
-            if(packages.isEmpty()){message("No hay apps disponibles.");return;}
-            String pkg=packages.get(apps.getSelectedItemPosition());getPreferences(0).edit().putString("package",pkg).apply();
-            int count=new int[]{6,12,20}[limits.getSelectedItemPosition()];
-            io.execute(()->{try{message(service.start(pkg,count));}catch(Exception e){message(e.toString());}});
-        });
-        button(root,"Detener",()->io.execute(()->{try{if(service!=null)service.stop();}catch(Exception e){message(e.toString());}}));
-        button(root,"Recuperar y ver capturas",this::retrieve);
-        button(root,"Guardar como referencia de diseño",()->io.execute(()->{try{
-            if(!archive.exists())throw new IOException("Recupera las capturas primero.");
-            String plan=readRoute(archive);
-            org.json.JSONObject data=new org.json.JSONObject(plan);
-            java.nio.file.Files.copy(archive.toPath(),new File(getFilesDir(),"baseline.zip").toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            getPreferences(0).edit().putString("route",plan).apply();
-            message("Referencia guardada: "+data.getString("package")+". Actualiza esa app y pulsa Repetir.");
-        }catch(Exception e){message(e.getMessage());}}));
-        button(root,"Repetir recorrido de referencia",()->{
-            if(service==null){message("Primero conecta Shizuku.");return;}
-            String plan=getPreferences(0).getString("route","");
-            if(plan.isEmpty()){message("Guarda primero una referencia de diseño.");return;}
-            io.execute(()->{try{message(service.replay(plan));}catch(Exception e){message(e.toString());}});
-        });
-        button(root,"Exportar referencia (antes)",()->{
-            if(!new File(getFilesDir(),"baseline.zip").exists()){message("Guarda primero una referencia.");return;}
-            startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/zip").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"apk-explorer-antes.zip"),21);
-        });
-        button(root,"Exportar ZIP para un agente",()->{if(!archive.exists()){message("Recupera las capturas primero.");return;}Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/zip").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"apk-explorer-"+System.currentTimeMillis()+".zip");startActivityForResult(i,20);});
-        button(root,"Releases de GitHub",()->{EditText repo=new EditText(this);repo.setHint("propietario/repositorio");repo.setText(getPreferences(0).getString("repo",""));new AlertDialog.Builder(this).setTitle("Abrir releases en GitHub").setMessage("Usa tu sesión de GitHub en el navegador para descargar e instalar tu APK; después selecciónala aquí.").setView(repo).setPositiveButton("Abrir",(d,w)->{String r=repo.getText().toString().trim();if(!r.matches("[\\w.-]+/[\\w.-]+")){message("Indica propietario/repositorio");return;}getPreferences(0).edit().putString("repo",r).apply();startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/"+r+"/releases")));}).setNegativeButton("Cancelar",null).show();});
-        button(root,"Actualizar lista de apps",this::refreshApps);
-        text(root,"Android 14+ · "+BuildConfig.VERSION_NAME+"\nUsa otra app mientras se explora. La cobertura es parcial y los datos de la app son compartidos. No está comprobada la escritura simultánea.",12,Color.parseColor("#B8CDD4"));
+    private final Runnable poll=new Runnable(){public void run(){if(destroyed)return;if(service!=null)io.execute(()->{try{String value=service.status();handler.post(()->updateStatus(value));}catch(Exception e){handler.post(()->{service=null;active=false;home();message("Conexión perdida");});}});handler.postDelayed(this,1600);}};
+    private void message(String s){handler.post(()->{if(!destroyed){Toast.makeText(this,s,Toast.LENGTH_LONG).show();if(state!=null)state.setText(s);}});}
+    public void onCreate(Bundle bundle){super.onCreate(bundle);Shizuku.addRequestPermissionResultListener(permission);archive=new File(getFilesDir(),"inspection.zip");selectedPackage=getPreferences(0).getString("package","");captureLimit=getPreferences(0).getInt("limit",12);if(bundle!=null)page=bundle.getString("page","explore");home();handler.post(poll);}
+    protected void onSaveInstanceState(Bundle out){out.putString("page",page);super.onSaveInstanceState(out);}
+    private void home(){if(destroyed)return;screen=new ExplorerUi(this,page,selectedPackage,captureLimit,active,service!=null,archive,getPreferences(0).getString("route",""),new ExplorerUi.Events(){
+        public void navigate(String target){page=target;home();}
+        public void choose(String pkg){selectedPackage=pkg;getPreferences(0).edit().putString("package",pkg).apply();home();}
+        public void limit(int count){captureLimit=count;getPreferences(0).edit().putInt("limit",count).apply();home();}
+        public void connect(){MainActivity.this.connect();}
+        public void start(){startRun(false);}
+        public void repeat(){startRun(true);}
+        public void stop(){io.execute(()->{try{if(service!=null)service.stop();}catch(Exception e){message(e.toString());}});}
+        public void gallery(){MainActivity.this.gallery();}
+        public void retrieve(){MainActivity.this.retrieve();}
+        public void export(boolean before){File f=before?new File(getFilesDir(),"baseline.zip"):archive;if(!f.exists()){message("No hay capturas guardadas.");return;}startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/zip").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,before?"apk-explorer-antes.zip":"apk-explorer-"+System.currentTimeMillis()+".zip"),before?21:20);}
+        public void save(){io.execute(()->{try{String plan=readRoute(archive);java.nio.file.Files.copy(archive.toPath(),new File(getFilesDir(),"baseline.zip").toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);getPreferences(0).edit().putString("route",plan).apply();handler.post(()->{page="compare";home();});}catch(Exception e){message(e.getMessage());}});}
+        public void github(){EditText repo=new EditText(MainActivity.this);repo.setHint("propietario/repositorio");repo.setText(getPreferences(0).getString("repo",""));new AlertDialog.Builder(MainActivity.this).setTitle("Repositorio de GitHub").setMessage("Abre las versiones publicadas para descargar tu APK con tu sesión del navegador.").setView(repo).setPositiveButton("Abrir",(d,w)->{String r=repo.getText().toString().trim();if(!r.matches("[\\w.-]+/[\\w.-]+")){message("Indica propietario/repositorio");return;}getPreferences(0).edit().putString("repo",r).apply();startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/"+r+"/releases")));}).setNegativeButton("Cancelar",null).show();}
+    });state=screen.render();}
+    private void startRun(boolean repeat){
+        if(active)return;if(service==null){connect();return;}
+        String pkg=selectedPackage, plan=getPreferences(0).getString("route","");int count=captureLimit;
+        if(!repeat&&pkg.isEmpty())return;
+        active=true;page="explore";home();
+        io.execute(()->{try{String result=repeat?service.replay(plan):service.start(pkg,count);if(!result.startsWith("Explorando")&&!result.startsWith("Repitiendo"))handler.post(()->{active=false;home();message(result);});}catch(Exception e){handler.post(()->{active=false;home();message(e.toString());});}});
     }
-    private void refreshApps(){
-        packages.clear();List<String> labels=new ArrayList<>();List<ResolveInfo> found=getPackageManager().queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0);
-        found.sort(Comparator.comparing(r->r.loadLabel(getPackageManager()).toString(),String.CASE_INSENSITIVE_ORDER));
-        for(ResolveInfo r:found){String p=r.activityInfo.packageName;if(p.equals(getPackageName())||packages.contains(p))continue;packages.add(p);labels.add(r.loadLabel(getPackageManager())+" · "+p);}
-        ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels);apps.setAdapter(adapter);
-        int last=packages.indexOf(getPreferences(0).getString("package",""));if(last>=0)apps.setSelection(last);
+    private void updateStatus(String value){
+        if(destroyed)return;
+        if(active&&value.equals("Sin sesión"))return;
+        boolean running=value.startsWith("Preparando")||value.startsWith("Explorando");
+        if(running&&!active){active=true;home();}
+        if(active&&!running){active=false;home();if(value.startsWith("Terminado")||value.startsWith("Recorrido"))retrieve();else message(value);}
+        else if(active&&state!=null)state.setText(value);
     }
     private void connect(){
         try{
-            if(!Shizuku.pingBinder()){new AlertDialog.Builder(this).setTitle("Inicia Shizuku").setMessage("Shizuku debe estar instalado e iniciado mediante depuración inalámbrica. Después vuelve aquí y pulsa Conectar.").setPositiveButton("Abrir Shizuku",(d,w)->{Intent launch=getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");startActivity(launch!=null?launch:new Intent(Intent.ACTION_VIEW,Uri.parse("https://shizuku.rikka.app/download/")));}).setNegativeButton("Cerrar",null).show();return;}
+            if(!Shizuku.pingBinder()){new AlertDialog.Builder(this).setTitle("Activa la captura en segundo plano").setMessage("Abre Shizuku e inícialo mediante depuración inalámbrica. Después vuelve y pulsa Preparar conexión.").setPositiveButton("Abrir Shizuku",(d,w)->{Intent launch=getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");startActivity(launch!=null?launch:new Intent(Intent.ACTION_VIEW,Uri.parse("https://shizuku.rikka.app/download/")));}).setNegativeButton("Ahora no",null).show();return;}
             if(Shizuku.checkSelfPermission()!=PackageManager.PERMISSION_GRANTED){Shizuku.requestPermission(1);return;}
             Shizuku.bindUserService(serviceArgs,connection);message("Conectando motor local…");
         }catch(Exception e){message(e.toString());}
     }
     private void retrieve(){
         if(service==null){if(archive.exists())gallery();else message("No hay capturas guardadas.");return;}
+        if(collecting)return;collecting=true;
         io.execute(()->{try{
             ParcelFileDescriptor p=service.exportZip();if(p==null){message("La exploración sigue activa o no hay sesión.");return;}
             File tmp=new File(getFilesDir(),"inspection.tmp");
             try(InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(p);OutputStream out=new FileOutputStream(tmp)){in.transferTo(out);}
             if(!tmp.renameTo(archive))throw new IOException("No se pudo guardar el ZIP");
-            handler.post(this::gallery);
-        }catch(Exception e){message(e.toString());}});
+            handler.post(()->{page="results";home();});
+        }catch(Exception e){message(e.toString());}finally{collecting=false;}});
     }
     private void gallery(){
         io.execute(()->{try{

@@ -1,14 +1,38 @@
-# APK Explorer para Android — 0.2.0 preview
+# APK Explorer para Android — 0.3.0 preview
+
+## Interfaz 0.3.0
+
+Tres destinos persistentes: **Explorar**, **Resultados** y **Comparar**. Fondo
+grafito, tarjetas oscuras, acento lavanda, diálogos e icono coherentes. Una acción
+principal por pantalla, selector de apps con búsqueda y elección de 6/12/20
+capturas. La conexión y el inicio se presentan según el estado real del servicio;
+Detener solo aparece durante un recorrido.
+
+Al terminar una sesión observada por la interfaz, se recupera el ZIP y se abre
+Resultados automáticamente, con miniaturas reales. El menú superior conserva
+GitHub, ayuda y recuperación de una sesión anterior si existe conexión. Las
+referencias y los archivos guardados se conservan al actualizar la APK.
+
+Verificación 2026-10-16: APK compilada en AXELPC, ocho tests JUnit correctos e
+instalación 0.3.0 (versionCode 4) confirmada en S25 SM-S938B. Se capturó la interfaz
+real en una pantalla virtual del S25 y se repitió la navegación Explorar →
+Resultados → Comparar, además de abrir el selector de apps. Recorridos terminados
+y displays liberados, sin abrir la interfaz en la pantalla principal. Se revisaron
+las capturas, incluidos los estados sin resultados y sin referencia.
+Evidencia local: `../sessions/ui-redesign/`. El emulador intentado para QA se cerró
+por presión de memoria; no cuenta como validación. La recuperación automática de
+un nuevo recorrido y los resultados con miniaturas no se probaron de extremo a
+extremo en esta revisión; se conservan el motor y el formato de exportación.
 
 ## Referencias de diseño y repetición
 
-1. Explora y pulsa **Recuperar y ver capturas**.
-2. Pulsa **Guardar como referencia de diseño**. Conserva una copia del ZIP antes
+1. Explora y abre **Resultados**.
+2. Pulsa **Usar como referencia de diseño**. Conserva una copia del ZIP antes
    de actualizar la aplicación que estés auditando.
-3. Tras actualizarla, conecta Shizuku y pulsa **Repetir recorrido de referencia**.
+3. Tras actualizarla, conecta Shizuku y pulsa **Repetir recorrido** en Comparar.
    Se utiliza la app de la referencia guardada, independientemente del selector.
-4. Recupera el resultado y exporta ambos ZIP: **Exportar referencia (antes)** y
-   **Exportar ZIP para un agente** (después).
+4. Exporta ambos ZIP: **Exportar referencia · Antes** en Comparar y
+   **Exportar para el agente** en Resultados (después).
 
 Cada ZIP incluye `route.json`, `AUDIT.md`, imágenes, XML y `agent.json` schema 2.
 La ruta usa etiqueta normalizada, resource-id y clase; no coordenadas físicas.
@@ -78,10 +102,10 @@ no requiere Python, scrcpy ni un PC dirigiendo el recorrido.
 
 1. Instala la APK e inicia [Shizuku](https://shizuku.rikka.app/guide/setup/)
    mediante depuración inalámbrica (o el método admitido por tu dispositivo).
-2. Abre APK Explorer, pulsa **Conectar Shizuku** y concede su autorización.
-3. Selecciona una app y el máximo de capturas. Pulsa **Explorar en pantalla virtual**.
-4. Puedes pasar a otra app. **Detener** solicita terminar y liberar la pantalla.
-5. Al finalizar, pulsa **Recuperar y ver capturas**, y después **Exportar ZIP**.
+2. Abre APK Explorer, pulsa **Preparar conexión** y concede su autorización.
+3. Toca la tarjeta de aplicación para buscarla; elige la profundidad y pulsa **Explorar**.
+4. Puedes pasar a otra app. **Detener recorrido** solicita terminar y liberar la pantalla.
+5. Al finalizar se abre **Resultados**; pulsa **Ver capturas** o **Exportar para el agente**.
    Incluye PNG, XML, `index.html` y `agent.json` con estados y acciones.
 
 **GitHub:** el botón abre las releases del repositorio elegido en el navegador,

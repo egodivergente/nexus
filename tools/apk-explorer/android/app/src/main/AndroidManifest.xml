@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent><package android:name="moe.shizuku.privileged.api"/></queries>
-    <application android:label="APK Explorer" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:supportsRtl="true" android:icon="@drawable/icon">
+    <application android:label="APK Explorer" android:theme="@style/ExplorerTheme" android:allowBackup="false" android:supportsRtl="true" android:icon="@drawable/icon">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
