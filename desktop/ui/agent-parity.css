@@ -1,19 +1,19 @@
 /* NEXUS Studio Desktop Design System (Linear / Cursor / Raycast architecture) */
 body.nexus-agent-studio {
   --ui-font-scale: 1;
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 24px;
-  --s6: 28px;
-  --r1: 6px;
-  --r2: 8px;
-  --r3: 12px;
-  --r4: 16px;
+  --s1: var(--space-1);
+  --s2: var(--space-2);
+  --s3: var(--space-3);
+  --s4: var(--space-4);
+  --s5: var(--space-5);
+  --s6: var(--space-6);
+  --r1: var(--radius-xs);
+  --r2: var(--radius-sm);
+  --r3: var(--radius-md);
+  --r4: var(--radius-lg);
   --focus-ring: var(--accent);
   font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  font-size: calc(13.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-md) * var(--ui-font-scale));
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -25,7 +25,7 @@ body.nexus-agent-studio * {
 
 /* Typography Hierarchy */
 body.nexus-agent-studio h1 {
-  font-size: calc(15px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-base) * var(--ui-font-scale)) !important;
   letter-spacing: -0.01em;
   line-height: 1.25;
   font-weight: 600;
@@ -37,7 +37,7 @@ body.nexus-agent-studio h1 {
 
 body.nexus-agent-studio h2,
 body.nexus-agent-studio h3 {
-  font-size: calc(14.5px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-base) * var(--ui-font-scale)) !important;
   line-height: 1.35;
   font-weight: 600;
   text-transform: none;
@@ -47,13 +47,13 @@ body.nexus-agent-studio h3 {
 
 body.nexus-agent-studio p,
 body.nexus-agent-studio .agent-text {
-  font-size: calc(13.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-md) * var(--ui-font-scale));
   line-height: 1.55;
 }
 
 body.nexus-agent-studio textarea,
 body.nexus-agent-studio .agent-message .agent-text {
-  font-size: calc(14px * var(--ui-font-scale));
+  font-size: calc(var(--text-base) * var(--ui-font-scale));
   line-height: 1.6;
 }
 
@@ -69,7 +69,7 @@ body.nexus-agent-studio .status,
 body.nexus-agent-studio .provider,
 body.nexus-agent-studio .card-meta,
 body.nexus-agent-studio summary {
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
   line-height: 1.45;
   color: var(--muted);
   text-transform: none;
@@ -89,7 +89,7 @@ body.nexus-agent-studio .select-trigger {
   background: color-mix(in srgb, var(--panel) 60%, transparent);
   color: var(--text);
   padding: 0 11px;
-  font-size: calc(12.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-sm) * var(--ui-font-scale));
   font-weight: 500;
   display: inline-flex;
   align-items: center;
@@ -160,12 +160,12 @@ body.nexus-agent-studio .agent-session-info span {
   min-height: 24px !important;
   height: 24px !important;
   padding: 0 8px !important;
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
   font-weight: 500;
   color: var(--muted) !important;
   background: color-mix(in srgb, var(--surface) 55%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--line) 55%, transparent) !important;
-  border-radius: 999px !important;
+  border-radius: var(--radius-pill) !important;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -191,7 +191,7 @@ body.nexus-agent-studio select {
   height: 32px;
   padding: 0 10px;
   min-width: 0;
-  font-size: calc(12.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-sm) * var(--ui-font-scale));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -297,7 +297,7 @@ body.nexus-agent-studio:not(.creative-dock-expanded) .brand .nx-brand-identity {
 
 body.nexus-agent-studio .brand .nx-brand-version {
   display: inline-flex !important;
-  font-size: 11px !important;
+  font-size: var(--text-xs) !important;
   padding: 1px 6px !important;
   height: 20px !important;
   min-height: 20px !important;
@@ -316,7 +316,7 @@ body.nexus-agent-studio .sidebar #creative-dock-toggle {
   padding: 0 !important;
   margin: 0 !important;
   border: 0 !important;
-  border-radius: 6px !important;
+  border-radius: var(--radius-xs) !important;
   background: transparent !important;
   color: var(--muted) !important;
   flex-shrink: 0;
@@ -348,7 +348,7 @@ body.nexus-agent-studio #studio-settings {
   border-radius: var(--r2) !important;
   background: transparent !important;
   color: var(--muted);
-  font-size: calc(13px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-md) * var(--ui-font-scale)) !important;
   font-weight: 500;
   text-align: left;
   margin: 0;
@@ -428,13 +428,13 @@ body.nexus-agent-studio #parity-library-tools {
 
 body.nexus-agent-studio #parity-balance-chip {
   font-variant-numeric: tabular-nums;
-  border-radius: 999px !important;
+  border-radius: var(--radius-pill) !important;
   background: color-mix(in srgb, var(--panel) 80%, transparent);
   border: 1px solid var(--line);
   height: 28px !important;
   min-height: 28px !important;
   padding: 0 10px !important;
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
   white-space: nowrap;
 }
 
@@ -474,10 +474,10 @@ body.nexus-agent-studio .tabs button {
   min-height: 30px !important;
   padding: 0 10px !important;
   border: 0 !important;
-  border-radius: 6px !important;
+  border-radius: var(--radius-xs) !important;
   background: transparent !important;
   color: var(--muted);
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
   font-weight: 500;
 }
 
@@ -528,7 +528,7 @@ body.nexus-agent-studio .agent-toolbar button:not(.tabs button) {
   height: 30px !important;
   min-height: 30px !important;
   padding: 0 10px !important;
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
 }
 
 body.nexus-agent-studio .agent-mode-description {
@@ -562,12 +562,12 @@ body.nexus-agent-studio .agent-message.user {
   padding: 10px 14px !important;
   background: var(--surface) !important;
   border: 1px solid var(--line) !important;
-  border-radius: 12px 12px 3px 12px !important;
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-xs) var(--radius-md) !important;
   box-shadow: none !important;
 }
 
 body.nexus-agent-studio .agent-author {
-  font-size: calc(11.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-xs) * var(--ui-font-scale));
   color: var(--muted);
   margin-bottom: 4px;
 }
@@ -672,7 +672,7 @@ body.nexus-agent-studio .catalog-filters button {
 
 body.nexus-agent-studio .catalog-filters .check {
   white-space: nowrap;
-  font-size: calc(12px * var(--ui-font-scale));
+  font-size: calc(var(--text-sm) * var(--ui-font-scale));
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -740,7 +740,7 @@ body.nexus-agent-studio .model .model-title-group {
 }
 
 body.nexus-agent-studio .model .top h3 {
-  font-size: calc(13.5px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-md) * var(--ui-font-scale)) !important;
   margin: 0;
   white-space: nowrap !important;
   overflow: hidden !important;
@@ -759,7 +759,7 @@ body.nexus-agent-studio .model .description {
   min-height: 0;
   margin: 0 !important;
   color: var(--muted);
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -801,7 +801,7 @@ body.nexus-agent-studio .history-list {
 
 body.nexus-agent-studio .history-list > h3,
 body.nexus-agent-studio .history-list > .history-day {
-  font-size: calc(11.5px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-xs) * var(--ui-font-scale)) !important;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -852,7 +852,7 @@ body.nexus-agent-studio .history-row strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(13px * var(--ui-font-scale));
+  font-size: calc(var(--text-md) * var(--ui-font-scale));
 }
 
 body.nexus-agent-studio .history-row small {
@@ -890,7 +890,7 @@ body.nexus-agent-studio #gallery-collections button {
   height: 28px !important;
   min-width: 28px !important;
   padding: 0 8px !important;
-  font-size: calc(12px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-sm) * var(--ui-font-scale)) !important;
 }
 
 /* View 6: Ajustes (Settings Unified Grid) */
@@ -937,7 +937,7 @@ body.nexus-agent-studio .agent-error {
   color: var(--danger) !important;
   border-radius: var(--r2);
   padding: 10px 14px;
-  font-size: calc(12.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-sm) * var(--ui-font-scale));
   display: flex;
   gap: 10px;
   align-items: center;
@@ -1066,7 +1066,7 @@ body.nexus-agent-studio .creative-status {
   min-height: 30px;
   height: 30px;
   padding: 0 var(--s6);
-  font-size: calc(11.5px * var(--ui-font-scale)) !important;
+  font-size: calc(var(--text-xs) * var(--ui-font-scale)) !important;
 }
 
 body.nexus-agent-studio .creative-status button {
@@ -1074,8 +1074,8 @@ body.nexus-agent-studio .creative-status button {
   height: 26px !important;
   min-width: auto !important;
   padding: 0 8px !important;
-  font-size: calc(11px * var(--ui-font-scale)) !important;
-  border-radius: 5px !important;
+  font-size: calc(var(--text-xs) * var(--ui-font-scale)) !important;
+  border-radius: var(--radius-xs) !important;
 }
 
 body.nexus-agent-studio .agent-empty {
@@ -1143,7 +1143,7 @@ body.nexus-agent-studio .nx-create-welcome {
 body.nexus-agent-studio #toast {
   background: var(--surface);
   color: var(--text);
-  font-size: calc(12.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-sm) * var(--ui-font-scale));
   max-width: calc(100vw - 48px);
   z-index: 10000;
 }
@@ -1224,7 +1224,7 @@ body.nexus-agent-studio .gallery-balances button {
 
 body.nexus-agent-studio .nx-version-badge,
 body.nexus-agent-studio .nx-kicker {
-  font-size: 11px !important;
+  font-size: var(--text-xs) !important;
 }
 
 /* Saldo y gasto: título y fecha en dos líneas, importe a la derecha */
@@ -1243,7 +1243,7 @@ body.nexus-agent-studio .parity-billing .parity-cost {
 
 body.nexus-agent-studio .parity-billing small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 body.nexus-agent-studio dialog [data-refresh-balances] {
@@ -1268,10 +1268,10 @@ body.nexus-agent-studio .history-count {
   display: inline-block;
   margin-left: 6px;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
   vertical-align: 1px;
 }
@@ -1372,7 +1372,7 @@ body.nexus-agent-studio .creative-piece {
 }
 
 body.nexus-agent-studio .creative-piece span {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: #fff;
 }
 
@@ -1398,7 +1398,7 @@ body.nexus-agent-studio .nx-more-menu > summary {
   border-radius: var(--r2);
   background: color-mix(in srgb, var(--panel) 60%, transparent);
   color: var(--text);
-  font-size: calc(12.5px * var(--ui-font-scale));
+  font-size: calc(var(--text-sm) * var(--ui-font-scale));
   font-weight: 500;
   cursor: pointer;
   user-select: none;
@@ -1410,7 +1410,7 @@ body.nexus-agent-studio .nx-more-menu > summary::-webkit-details-marker {
 
 body.nexus-agent-studio .nx-more-menu > summary::after {
   content: '▾';
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -1488,7 +1488,7 @@ body.nexus-agent-studio .history-row > video.history-thumb {
 }
 
 .nx-skel {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background-color: #ffffff0d;
 }
 
@@ -1523,7 +1523,7 @@ body.nexus-agent-studio .agent-message {
 }
 
 body.nexus-agent-studio .agent-message > .hint {
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 body.nexus-agent-studio .agent-copy {
@@ -1531,7 +1531,7 @@ body.nexus-agent-studio .agent-copy {
   height: 26px;
   min-height: 26px;
   padding: 0 9px;
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--muted);
   border-color: transparent;
   background: transparent;
@@ -1561,7 +1561,7 @@ body.nexus-agent-studio .nx-switch-track {
   width: 36px;
   height: 20px;
   flex: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--muted) 45%, transparent);
   transition: background 150ms ease;
 }

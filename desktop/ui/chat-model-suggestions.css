@@ -1,5 +1,5 @@
-.chat-model-suggestions{position:fixed;z-index:80;overflow:auto;padding:6px;border-radius:14px;border:1px solid var(--line);background:var(--surface);box-shadow:0 16px 48px #0008;overscroll-behavior:contain}
+.chat-model-suggestions{position:fixed;z-index:80;overflow:auto;padding:6px;border-radius:var(--radius-lg);border:1px solid var(--line);background:var(--surface);box-shadow:0 16px 48px #0008;overscroll-behavior:contain}
 .chat-model-suggestions[hidden]{display:none!important}
 body.nx-desktop .chat-model-suggestions button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;width:100%;text-align:left;padding:10px 12px;border:0;background:transparent;color:var(--text);min-height:52px}
-.chat-model-suggestions button small{font-size:11px;color:var(--muted)}
+.chat-model-suggestions button small{font-size:var(--text-xs);color:var(--muted)}
 body.nx-desktop .chat-model-suggestions button[aria-selected=true],body.nx-desktop .chat-model-suggestions button:hover{background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--accent)}

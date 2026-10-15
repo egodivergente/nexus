@@ -1,0 +1,62 @@
+/*
+ * NEXUS Studio · sistema de diseño (fase 2)
+ * Fuente única de escalas. Las demás hojas usan estas variables; los temas
+ * (interface-themes.js) solo redefinen colores.
+ */
+:root {
+  /* Espaciado: 4 · 8 · 12 · 16 · 24 · 32 · 48 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Radios: 6 (miniaturas, insignias) · 8 (controles) · 12 (tarjetas) · 16 (paneles) · píldora */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Texto: 11 (mínimo) · 12 · 13 · 14 (cuerpo) · 16 · 20 · 24 · 28 */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 28px;
+
+  /* Peso: 400 · 500 · 600 */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Altura de control: compacto · estándar · principal */
+  --control-sm: 32px;
+  --control-md: 36px;
+  --control-lg: 44px;
+
+  /* Elevación: tarjeta · panel flotante · modal */
+  --elevation-1: 0 1px 2px #0000002e;
+  --elevation-2: 0 12px 32px #00000052;
+  --elevation-3: 0 24px 64px #0000007a;
+
+  /* Movimiento */
+  --duration-fast: 120ms;
+  --duration-standard: 180ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+
+  /* Colores semánticos (tema oscuro por defecto; interface-themes.js los ajusta) */
+  --success: #7fd4a0;
+  --success-soft: #7fd4a01f;
+  --warning: #e8c27a;
+  --warning-soft: #e8c27a1f;
+  --danger: #e6a5aa;
+  --danger-soft: #e6a5aa1f;
+  --info: #8fc7f0;
+  --info-soft: #8fc7f01f;
+}

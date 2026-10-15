@@ -20,20 +20,20 @@ body.nx-desktop .studio-library .result:hover .studio-compare,
 body.nx-desktop .studio-library .result .studio-compare:focus-visible,
 body.nx-desktop .studio-library .results:has(.studio-compare[aria-pressed=true]) .studio-compare{opacity:.95}
 body.nx-desktop .studio-library .result .studio-compare[aria-pressed=true]{opacity:1;background:var(--accent);border-color:var(--accent);color:#06201c}
-body.nx-desktop .studio-library .result .studio-compare[aria-pressed=true]::before{content:"\2713";font-size:14px;font-weight:700}
+body.nx-desktop .studio-library .result .studio-compare[aria-pressed=true]::before{content:"\2713";font-size:var(--text-base);font-weight:600}
 
 /* Legibility: raise the smallest sizes and the weakest greys */
 :root{--nx-soft:#9ba4b6}
-body.nx-desktop .account-balance>span,body.nx-desktop .account-balance small{font-size:11px}
-body.nx-desktop .studio-detail-button small,body.nx-desktop .agent-view .agent-author{font-size:11px}
-body.nx-desktop .eyebrow{font-size:11px}
+body.nx-desktop .account-balance>span,body.nx-desktop .account-balance small{font-size:var(--text-xs)}
+body.nx-desktop .studio-detail-button small,body.nx-desktop .agent-view .agent-author{font-size:var(--text-xs)}
+body.nx-desktop .eyebrow{font-size:var(--text-xs)}
 body.nx-desktop .account-balance strong{font-variant-numeric:tabular-nums}
 
 /* Keyboard focus */
 body.nx-desktop button:focus-visible,body.nx-desktop input:focus-visible,body.nx-desktop textarea:focus-visible,body.nx-desktop select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Detail panel: media first */
-.nx-detail-media{margin:4px 0 16px;border-radius:12px;overflow:hidden;background:#000;border:1px solid #ffffff10}
+.nx-detail-media{margin:4px 0 16px;border-radius:var(--radius-md);overflow:hidden;background:#000;border:1px solid #ffffff10}
 .nx-detail-media img,.nx-detail-media video{display:block;width:100%;max-height:44vh;object-fit:contain;background:#000}
 
 /* Respect reduced motion */
