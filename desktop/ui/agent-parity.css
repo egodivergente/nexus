@@ -1756,3 +1756,23 @@ body.nexus-agent-studio #toast .nx-toast-action {
   background: transparent;
   font-weight: var(--weight-semibold);
 }
+
+/* Lienzo: el aviso de error ocupa su propia fila bajo los controles, con color semántico */
+body.nexus-agent-studio .creative-command > #studio-canvas-feedback {
+  margin: var(--space-3) 0 0;
+}
+
+body.nexus-agent-studio #studio-canvas-feedback:empty {
+  display: none;
+}
+
+body.nexus-agent-studio .studio-recovery-notice {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: var(--danger-soft);
+}
+
+body.nexus-agent-studio .studio-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
