@@ -1489,7 +1489,7 @@ body.nexus-agent-studio .history-row > video.history-thumb {
 
 .nx-skel {
   border-radius: var(--radius-md);
-  background-color: #ffffff0d;
+  background-color: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .nx-skel-bar {
@@ -1585,3 +1585,41 @@ body.nexus-agent-studio .nx-switch[aria-checked="true"] .nx-switch-track {
 body.nexus-agent-studio .nx-switch[aria-checked="true"] .nx-switch-thumb {
   transform: translateX(16px);
 }
+
+/* Tema Claro: los logotipos monocromos blancos se invierten para que se vean sobre fondo claro */
+body[data-interface-theme="light"] img[src$="logos/anthropic.png"],
+body[data-interface-theme="light"] img[src$="logos/atlascloud.png"],
+body[data-interface-theme="light"] img[src$="logos/bfl.png"],
+body[data-interface-theme="light"] img[src$="logos/elevenlabs.png"],
+body[data-interface-theme="light"] img[src$="logos/flux.png"],
+body[data-interface-theme="light"] img[src$="logos/ideogram.png"],
+body[data-interface-theme="light"] img[src$="logos/openai.png"],
+body[data-interface-theme="light"] img[src$="logos/pika.png"],
+body[data-interface-theme="light"] img[src$="logos/runway.png"],
+body[data-interface-theme="light"] img[src$="logos/suno.png"] {
+  filter: invert(1) brightness(.35);
+}
+
+/* Historial: estados con color semántico (no solo número) */
+body.nexus-agent-studio .history-header-bar [data-parity-status="COMPLETED"]::before,
+body.nexus-agent-studio .history-header-bar [data-parity-status="PROCESSING"]::before,
+body.nexus-agent-studio .history-header-bar [data-parity-status="QUEUED"]::before,
+body.nexus-agent-studio .history-header-bar [data-parity-status="FAILED"]::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  margin-right: 6px;
+  display: inline-block;
+  vertical-align: 1px;
+}
+
+body.nexus-agent-studio .history-header-bar [data-parity-status="COMPLETED"]::before { background: var(--success); }
+body.nexus-agent-studio .history-header-bar [data-parity-status="PROCESSING"]::before { background: var(--info); }
+body.nexus-agent-studio .history-header-bar [data-parity-status="QUEUED"]::before { background: var(--muted); }
+body.nexus-agent-studio .history-header-bar [data-parity-status="FAILED"]::before { background: var(--danger); }
+
+/* Avisos de saldo y estados de la galería con los tokens semánticos */
+body.nexus-agent-studio .gallery-balances .is-warning::before { background: var(--warning); }
+body.nexus-agent-studio .gallery-balances .is-warning strong { color: var(--warning) !important; }
+body.nexus-agent-studio .gallery-status.warning { color: var(--danger); }
