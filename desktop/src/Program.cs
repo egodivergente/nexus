@@ -186,7 +186,7 @@ class MainWindow : Form {
         switch(op) {
             case "init":
                 var p=Path.Combine(Program.Data,"state.json");
-                return new { qa=Program.Qa,configured=keys.Keys.ToArray(),state=File.Exists(p)?Program.Json.DeserializeObject(File.ReadAllText(p)):null, version="1.7.0-agent-desktop",platform="HP EliteBook · Windows x64" };
+                return new { qa=Program.Qa,configured=keys.Keys.ToArray(),state=File.Exists(p)?Program.Json.DeserializeObject(File.ReadAllText(p)):null, version="1.9.5-agent-desktop",platform="HP EliteBook · Windows x64" };
             case "save": Program.Atomic("state.json",Program.Json.Serialize(a));return true;
             case "pick":
                 using(var dialog=new OpenFileDialog { Multiselect=true,Filter="Multimedia|*.png;*.jpg;*.jpeg;*.webp;*.mp4;*.mov;*.webm;*.mp3;*.wav;*.m4a|Todos los archivos|*.*" }) {

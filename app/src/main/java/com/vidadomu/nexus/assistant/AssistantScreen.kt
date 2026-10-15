@@ -135,12 +135,21 @@ fun AssistantScreen(
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={
-        NexusTopAppBar(title={Column(Modifier.heightIn(min=NexusTokens.minimumTouch).clickable {showProject=true}.semantics {
+        NexusTopAppBar(
+            navigationIcon = {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_mark),
+                    contentDescription = "Logo de NEXUS",
+                    modifier = Modifier.padding(start = 12.dp, end = 4.dp).size(26.dp),
+                    contentScale = ContentScale.Fit
+                )
+            },
+            title={Column(Modifier.heightIn(min=NexusTokens.minimumTouch).clickable {showProject=true}.semantics {
             contentDescription="Abrir proyecto"
-            stateDescription=listOfNotNull(activeProject?.name ?: "Agente",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
+            stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
         },verticalArrangement=Arrangement.Center) {
             Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            if(LocalDensity.current.fontScale<1.3f) Text(listOfNotNull(ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+            if(LocalDensity.current.fontScale<1.3f) Text(listOfNotNull("v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }},actions={IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
@@ -190,7 +199,36 @@ fun AssistantScreen(
 
 @Composable
 private fun EmptyHint() {
-    Column(Modifier.fillMaxWidth().padding(top = NexusTokens.space24, start = NexusTokens.space8, end = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = NexusTokens.space24, start = NexusTokens.space8, end = NexusTokens.space8),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
+    ) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_logo),
+            contentDescription = "Logo oficial de NEXUS",
+            modifier = Modifier.sizeIn(maxWidth = 118.dp, maxHeight = 112.dp),
+            contentScale = ContentScale.Fit
+        )
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
+        ) {
+            Text(
+                text = "v${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · build ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+        }
+        Text(
+            text = "Las buenas ideas empiezan aquí.",
+            style = MaterialTheme.typography.titleMedium,
+            color = TextPrimary
+        )
         Text("¿Una imagen, un vídeo o una idea por desarrollar?", color = TextMuted)
     }
 }

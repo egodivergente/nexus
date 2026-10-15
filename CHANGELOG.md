@@ -2,6 +2,24 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.5-agent] - 2026-10-15
+
+Release `v1.9.5-agent` (Android `1.9.5-agent-preview` / `versionCode 39` y Windows `1.9.5-agent-desktop`) que incorpora el logo oficial de NEXUS y el indicador de versión en el preview/onboarding de apertura, pantallas de bienvenida y cabeceras en móvil y EliteBook.
+
+### Logo oficial de NEXUS y versión en preview / onboarding (Android y Windows)
+1. **Android (`1.9.5-agent-preview` · `versionCode 39`)**:
+   - Incorporados los recursos gráficos oficiales `drawable/nexus_logo.png` (isotipo + wordmark NEXUS) y `drawable/nexus_mark.png`, y actualizado el icono adaptativo `mipmap-anydpi-v26/ic_launcher.xml` para usar el isotipo oficial.
+   - Añadido `NexusStartupOnboardingOverlay` en `MainActivity.kt`, que muestra al abrir la aplicación (y al regresar tras segundo plano) una tarjeta de preview/onboarding con el logo oficial de NEXUS y el badge de versión `v1.9.5-agent-preview · build 39` (se desvanece suavemente o se cierra al tocar; desactivado en `BuildConfig.OFFLINE_QA`).
+   - Actualizado `AssistantScreen.kt` (`EmptyHint` y `NexusTopAppBar`) para mostrar el logo oficial completo y la píldora de versión `v1.9.5-agent-preview · build 39` en el onboarding del asistente y en la barra superior.
+2. **Windows (`1.9.5-agent-desktop` en HP EliteBook)**:
+   - Añadido `mountStartupOnboarding()` (`#nx-startup-onboarding`) en `desktop/ui/desktop-design.js` y `desktop-design.css`, que muestra el logo oficial `branding/nexus-logo.png` y el badge `v1.9.5-agent-desktop` cada vez que se abre Nexus Studio.
+   - Actualizados el onboarding de bienvenida (`desktopWelcome`), el banner superior de conversaciones activas (`.nx-chat-brand-banner`), el lienzo de previsualización (`.studio-blank`), la guía de primeros pasos (`#studio-start-guide`), la cabecera de Crear (`.nx-creative-brand`), la marca lateral (`.sidebar .brand`) y la barra superior (`#parity-version-chip` en `agent-parity.js` / `agent-parity.css`) para presentar el logo oficial completo sin recortes junto con la versión activa `v1.9.5-agent-desktop`.
+3. **Recuperación automática de vistas previas en Biblioteca (`studio-gallery.js`, `polish.js`, `local_host.py`)**:
+   - Priorización de copias locales `/media/...` y URLs permanentes frente a URLs temporales firmadas de 24 h (`X-Tos-Expires=`, `Expires=`) en `merge_jobs` y `studio-gallery.js`.
+   - En `polish.js`, cuando falla la carga de una imagen en `.result img`, antes de mostrar «Vista previa no disponible» se prueban el resto de salidas de `job.outputs` y, para tareas de `atlas_cloud` con `remoteId`, se consulta `/api/v1/model/prediction/{remoteId}` para recuperar y persistir la URL permanente archivada en `atlas-media.oss-us-west-1.aliyuncs.com/assetd-history/v1/...`.
+
+---
+
 ## [1.9.4-agent] - 2026-10-14
 
 Release `v1.9.4-agent` (Android `1.9.4-agent` / `versionCode 38` y Windows `1.9.4-agent-desktop`) con las mejoras de seguridad de cobro, idempotencia, concurrencia, puentes (Flow y Sol/AKI), paridad entre núcleos del asistente y las correcciones de la revisión del commit `b5401b8`, conservando intactos los artefactos de la Release `v1.9.3-agent`.

@@ -29,8 +29,40 @@ description=function(model) {return decisionBrief(model).good||oldDescription(mo
 document.addEventListener('error',event=>{
   if(event.target instanceof HTMLImageElement && event.target.matches('img.logo')) event.target.outerHTML=genericMark;
   if(event.target instanceof HTMLImageElement && event.target.matches('.result img')) {
-    const fallback=document.createElement('div');fallback.className='media-unavailable';fallback.textContent='Vista previa no disponible';
-    event.target.replaceWith(fallback);
+    const img=event.target, card=img.closest('[data-job]'), jobId=card?.dataset?.job;
+    const job=jobId&&typeof state!=='undefined'&&Array.isArray(state?.jobs)?state.jobs.find(j=>j.id===jobId):null;
+    const showUnavailable=()=>{if(!img.isConnected)return;const fallback=document.createElement('div');fallback.className='media-unavailable';fallback.textContent='Vista previa no disponible';img.replaceWith(fallback);};
+    if(job&&Array.isArray(job.outputs)){
+      const tried=new Set((img.dataset.triedUrls||'').split('|').filter(Boolean));
+      const currentAttr=img.getAttribute('src')||'';
+      if(currentAttr)tried.add(currentAttr);
+      if(img.src)tried.add(img.src);
+      const candidates=job.outputs.map(o=>typeof o==='string'?o:o?.url).filter(Boolean);
+      const nextUrl=candidates.find(u=>!tried.has(u));
+      if(nextUrl){
+        tried.add(nextUrl);
+        img.dataset.triedUrls=[...tried].join('|');
+        img.src=nextUrl;
+        return;
+      }
+      if(job.remoteId&&(!job.providerId||job.providerId==='atlas_cloud')&&!job._archiveRefreshed&&typeof rpc==='function'){
+        job._archiveRefreshed=true;
+        rpc('request',{provider:'atlas_cloud',path:'/api/v1/model/prediction/'+encodeURIComponent(job.remoteId),method:'GET'}).then(r=>{
+          const d=r?.data||r, fresh=(d?.outputs||[]).map(o=>typeof o==='string'?o:o?.url).filter(u=>typeof u==='string'&&u.startsWith('https://'));
+          const novel=fresh.find(u=>!tried.has(u));
+          if(novel){
+            const locals=candidates.filter(u=>u.startsWith('/media/'));
+            job.outputs=[...locals,...fresh.filter(u=>!locals.includes(u))];
+            if(typeof persist==='function')persist();
+            tried.add(novel);
+            img.dataset.triedUrls=[...tried].join('|');
+            img.src=novel;
+          }else showUnavailable();
+        }).catch(()=>showUnavailable());
+        return;
+      }
+    }
+    showUnavailable();
   }
 },true);
 

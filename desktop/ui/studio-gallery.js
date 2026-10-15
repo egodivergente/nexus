@@ -3,7 +3,8 @@
 (()=>{
  const G={collection:'',favorites:false,sort:'recent',limit:36,selected:new Map(),viewer:null,observer:null,flowStatus:null,flowSince:0};
  const prefs=()=>state.studioGallery||(state.studioGallery={favorites:[],collections:[],members:{},hidden:[],size:240});
- const media=(j,i=outputSelection.get(j.id)||0)=>{const o=j.outputs?.[i];return typeof o==='string'?o:o?.url;};
+ const isExpiringUrl=u=>typeof u==='string'&&(/X-Tos-Expires=|Expires=/i.test(u));
+ const media=(j,i=outputSelection.get(j.id)||0)=>{const list=(j.outputs||[]).map(o=>typeof o==='string'?o:o?.url).filter(Boolean);if(!outputSelection.has(j.id)&&i===0&&list.length>1&&isExpiringUrl(list[0])){const better=list.find(u=>u.startsWith('/media/')||!isExpiringUrl(u));if(better)return better;}return list[i];};
  const name=j=>j.name||models.find(m=>m.id===j.modelId)?.displayName||j.modelId;
  const entries=()=>pcJobs().filter(j=>!prefs().hidden.includes(j.id)&&(!G.favorites||prefs().favorites.includes(j.id))&&(!G.collection||prefs().members[j.id]===G.collection)).sort((a,b)=>G.sort==='name'?name(a).localeCompare(name(b),'es'):(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
  const button=(action,label,extra='')=>`<button type="button" data-gallery="${action}" ${extra}>${label}</button>`;

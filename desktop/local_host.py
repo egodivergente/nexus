@@ -147,6 +147,14 @@ def merge_jobs(incoming, previous, deleted_ids=()):
             elif old.get('outputs'):
                 outputs = list(old['outputs'])
                 outputs.extend(output for output in job.get('outputs', []) if output not in outputs)
+                def _output_rank(item):
+                    u = item if isinstance(item, str) else (item.get('url', '') if isinstance(item, dict) else '')
+                    if isinstance(u, str) and u.startswith('/media/'):
+                        return 0
+                    if isinstance(u, str) and ('X-Tos-Expires=' in u or 'Expires=' in u):
+                        return 2
+                    return 1
+                outputs.sort(key=_output_rank)
                 current['outputs'] = outputs
             if current.get('status') == 'COMPLETED':
                 current.pop('error', None)
@@ -469,7 +477,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '1.9.4-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
+                'version': '1.9.5-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
                 'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -818,7 +826,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.4-agent-desktop'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.5-agent-desktop'}),
         encoding='utf-8',
     )
     if options.headless:

@@ -3,8 +3,8 @@ from pathlib import Path
 import hashlib, json, shutil, zipfile
 root=Path(__file__).resolve().parents[2]
 desktop=root/'desktop'
-output=root/'entregas/Nexus-Studio-Agent-1.9.4-Windows.zip'
-output_x64=root/'entregas/Nexus-Studio-1.9.4-Windows-x64.zip'
+output=root/'entregas/Nexus-Studio-Agent-1.9.5-Windows.zip'
+output_x64=root/'entregas/Nexus-Studio-1.9.5-Windows-x64.zip'
 output.parent.mkdir(exist_ok=True)
 files=[]
 for path in desktop.rglob('*'):
@@ -30,6 +30,6 @@ with zipfile.ZipFile(output) as archive:
 shutil.copy2(output, output_x64)
 sha=hashlib.sha256(output.read_bytes()).hexdigest()
 assert hashlib.sha256(output_x64.read_bytes()).hexdigest()==sha
-report={'package':str(output),'packageX64':str(output_x64),'files':len(files),'sha256':sha,'bytes':output.stat().st_size,'version':'1.9.4-agent-desktop'}
+report={'package':str(output),'packageX64':str(output_x64),'files':len(files),'sha256':sha,'bytes':output.stat().st_size,'version':'1.9.5-agent-desktop'}
 (root/'outputs/desktop-agent-parity/package.json').write_text(json.dumps(report),encoding='utf-8');print(json.dumps(report))
 

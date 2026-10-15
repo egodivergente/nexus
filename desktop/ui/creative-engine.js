@@ -33,7 +33,8 @@
   const source=$('.canvas .sheet')||$('.studio-start'),prompt=$('#prompt');if(!source||!prompt)return;
   const canvasRoot=$('.canvas');if(canvasRoot)canvasRoot.classList.add('creative-layout');
   const command=el('section','creative-command');command.id='creative-command';command.dataset.provider=loaded?.providerId||'';command.setAttribute('aria-label','Crear con tus modelos');
-  const heading=el('div','creative-heading','<h2>¿Qué quieres crear?</h2><span>Imagen, movimiento, posibilidades.</span>');
+  const ver=(typeof initial!=='undefined'&&initial?.version)?('v'+String(initial.version).replace(/^v/i,'')):'v1.9.5-agent-desktop';
+  const heading=el('div','creative-heading','<div class="nx-creative-brand"><img src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="84" height="80"><span class="nx-version-badge" data-nx-version>'+ver+'</span></div><h2>¿Qué quieres crear?</h2><span>Imagen, movimiento, posibilidades.</span>');
   const input=el('div','creative-input');prompt.setAttribute('aria-label','Describe tu creación');prompt.placeholder='Describe una escena. Añade tus referencias. Dale forma.';input.append(prompt);
   const chips=el('div','creative-chips');
   const motor=el('button','creative-motor');motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?loaded.displayName:'Elegir motor';motor.title='Elegir modelo';chips.append(motor);

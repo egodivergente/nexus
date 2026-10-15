@@ -23,7 +23,7 @@
   const nav=$('#navigation');if(nav){const destinations=[['assistant','Asistente'],['canvas','Lienzo'],['catalog','Modelos'],['history','Historial'],['library','Biblioteca']];if(nav.dataset.parityView!==view||nav.querySelectorAll('[data-nav]').length!==5){nav.dataset.parityView=view;nav.innerHTML=destinations.map(([id,label])=>`<button data-nav="${id}" data-creative-label="${label}" aria-label="${label}" class="${view===id?'active':''}" ${view===id?'aria-current="page"':''}>${id==='assistant'?aiIcon('chat'):icon(id)}<span class="creative-nav-label">${label}</span></button>`).join('');}}
   const heading=$('#title'),title={assistant:'Asistente',canvas:'Lienzo',catalog:'Modelos',history:'Historial',library:'Biblioteca',settings:'Ajustes'}[view]||'Nexus Studio';if(heading&&heading.textContent!==title)heading.textContent=title;
   const actions=$('#header-actions');
-  if(actions&&!$('#parity-balance-chip')){const item=typeof AccountBalances!=='undefined'?AccountBalances.values.atlas_cloud:null;actions.insertAdjacentHTML('beforeend',`<button id="parity-balance-chip" data-parity="balances" aria-label="Abrir saldo y gasto">${item?.value!=null?escape(currency.cost(item.value)):'Saldo y gasto'}</button><button data-parity="settings" aria-label="Abrir ajustes" title="Ajustes">${icon('settings')}</button>`);}
+  if(actions&&!$('#parity-balance-chip')){const item=typeof AccountBalances!=='undefined'?AccountBalances.values.atlas_cloud:null;const ver=(typeof desktopVersionLabel==='function')?desktopVersionLabel():'v'+(initial?.version||'1.9.5-agent-desktop');actions.insertAdjacentHTML('beforeend',`<span id="parity-version-chip" class="nx-version-badge" data-nx-version>${escape(ver)}</span><button id="parity-balance-chip" data-parity="balances" aria-label="Abrir saldo y gasto">${item?.value!=null?escape(currency.cost(item.value)):'Saldo y gasto'}</button><button data-parity="settings" aria-label="Abrir ajustes" title="Ajustes">${icon('settings')}</button>`);}
  }
  async function balances(){
   const configured=initial?.configured||[],values=typeof AccountBalances!=='undefined'?AccountBalances.values:{};
@@ -187,6 +187,6 @@
    if(form.id==='parity-rename'||form.id==='parity-convert'){const result=await native(form.id==='parity-rename'?'rename_asset_file':'convert_image_asset',form.id==='parity-rename'?{asset_id:data.id,file_name:data.name}:{asset_id:data.id,format:data.format,max_dimension:Number(data.max_dimension)},assets());if(result._assets)await agentCall('importAssets',{assets:result._assets});toast('Archivo guardado.');await assetView(result.asset?.id||data.id);}
   }catch(reason){error(reason);}finally{if(submit?.isConnected)submit.disabled=false;}
  });
- window.NexusAgentParity={version:'1.9.3',native,editor,project,mediaJobs,history,currency};
+ window.NexusAgentParity={version:'1.9.5',native,editor,project,mediaJobs,history,currency};
  render();syncMediaJobs();const notifications=document.createElement('script');notifications.src='desktop-notifications.js';document.head.append(notifications);
 })();

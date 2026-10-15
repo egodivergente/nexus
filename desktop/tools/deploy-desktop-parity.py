@@ -9,9 +9,9 @@ if pid > 0:
     command=subprocess.check_output(['powershell','-NoProfile','-Command',f'$p = Get-CimInstance Win32_Process -Filter "ProcessId = {pid}" -ErrorAction SilentlyContinue; if ($p) {{ $p.CommandLine }}'],text=True)
     if command.strip() and 'local_host.py' not in command and 'NexusStudio' not in command:
         raise ValueError('The session PID is not the expected Nexus desktop host.')
-package=root/'entregas/Nexus-Studio-Agent-1.9.4-Windows.zip'
+package=root/'entregas/Nexus-Studio-Agent-1.9.5-Windows.zip'
 digest=hashlib.sha256(package.read_bytes()).hexdigest()
-install=Path(os.environ['LOCALAPPDATA'])/'Programs/NexusStudio'/('1.9.4-'+digest[:8])
+install=Path(os.environ['LOCALAPPDATA'])/'Programs/NexusStudio'/('1.9.5-'+digest[:8])
 install.mkdir(parents=True,exist_ok=True)
 with zipfile.ZipFile(package) as archive:
     assert archive.testzip() is None
@@ -44,7 +44,7 @@ for _ in range(40):
     except (OSError,ValueError):time.sleep(.25)
 else:raise RuntimeError('The installed host did not start. Backup and previous source remain available.')
 live_session=json.loads((data/'local-session.json').read_text('utf-8'))
-report={'installed':True,'directory':str(desktop),'pid':int(live_session.get('pid',spawned_pid)),'port':int(live_session.get('port',port)),'packageSha256':digest,'version':live_session.get('version','1.9.4-agent-desktop')}
+report={'installed':True,'directory':str(desktop),'pid':int(live_session.get('pid',spawned_pid)),'port':int(live_session.get('port',port)),'packageSha256':digest,'version':live_session.get('version','1.9.5-agent-desktop')}
 (root/'outputs/desktop-agent-parity/deployment.json').write_text(json.dumps(report),encoding='utf-8')
 print(json.dumps(report))
 

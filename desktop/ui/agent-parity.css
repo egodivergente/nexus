@@ -18,9 +18,13 @@ body.nexus-agent-studio .sidebar{width:216px;background:var(--bg);border:0;paddi
 body.nexus-agent-studio.creative-dock-expanded .sidebar{width:216px!important;padding:var(--s5) var(--s4)!important}
 body.nexus-agent-studio:not(.creative-dock-expanded) .sidebar{width:80px!important;padding:var(--s5) var(--s2)!important}
 body.nexus-agent-studio:not(.creative-dock-expanded) #navigation .creative-nav-label{display:none!important}
-body.nexus-agent-studio.creative-dock-expanded .brand{min-height:48px;margin:0 0 var(--s5);justify-content:flex-start}
-body.nexus-agent-studio .brand .nexus-brand-mark{display:block!important;width:36px;height:36px}
-body.nexus-agent-studio .brand .nexus-brand-logo{display:none!important}
+body.nexus-agent-studio.creative-dock-expanded .brand{min-height:48px;margin:0 0 var(--s4);justify-content:flex-start;flex-wrap:wrap;gap:8px}
+body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-mark{display:none!important}
+body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-logo{display:block!important;width:96px;height:auto;max-height:92px;object-fit:contain}
+body.nexus-agent-studio:not(.creative-dock-expanded) .brand{flex-direction:column;align-items:center;gap:6px;margin:0 0 var(--s4)}
+body.nexus-agent-studio:not(.creative-dock-expanded) .brand .nexus-brand-mark{display:block!important;width:40px;height:40px}
+body.nexus-agent-studio:not(.creative-dock-expanded) .brand .nexus-brand-logo{display:none!important}
+body.nexus-agent-studio .brand .nx-brand-version{display:inline-flex!important;font-size:10px!important;padding:2px 7px!important}
 body.nexus-agent-studio #navigation button{font-size:calc(14px * var(--ui-font-scale))!important;min-height:48px!important}
 body.nexus-agent-studio .agent-toolbar button{font-size:calc(14px * var(--ui-font-scale))!important;min-height:48px!important}
 body.nexus-agent-studio .agent-session-info,body.nexus-agent-studio .agent-session-info button,body.nexus-agent-studio .creative-status{font-size:calc(12px * var(--ui-font-scale))!important}
@@ -36,7 +40,8 @@ body.nexus-agent-studio .sidebar nav button.active{background:color-mix(in srgb,
 body.nexus-agent-studio main{min-width:0;background:var(--bg)}
 body.nexus-agent-studio main>header{min-height:56px;padding:var(--s2) var(--s5);display:flex;align-items:center;justify-content:space-between;gap:var(--s4);border:0;background:var(--bg)}
 body.nexus-agent-studio main>header h1{margin:0}
-body.nexus-agent-studio #eyebrow,body.nexus-agent-studio .nx-welcome,body.nexus-agent-studio .nx-selected-label,body.nexus-agent-studio .section-label{display:none}
+body.nexus-agent-studio .nx-welcome,body.nexus-agent-studio .nx-selected-label,body.nexus-agent-studio .section-label{display:none}
+body.nexus-agent-studio #eyebrow{display:block;font-size:10px;letter-spacing:1.4px;color:var(--muted);margin-bottom:2px}
 body.nexus-agent-studio #header-actions{display:flex;gap:var(--s2);flex-wrap:wrap;justify-content:flex-end}
 body.nexus-agent-studio #content{padding:var(--s4) var(--s5) var(--s5);min-height:0;scrollbar-gutter:stable}
 body.nexus-agent-studio #account-balances{display:none!important}

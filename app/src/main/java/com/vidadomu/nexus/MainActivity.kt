@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,6 +51,20 @@ class MainActivity : ComponentActivity() {
     private var initialSharedText by mutableStateOf<String?>(null)
     private var initialDeepLinkJobId by mutableStateOf<String?>(null)
     private var agentDraft by mutableStateOf<com.vidadomu.nexus.agent.AgentDraft?>(null)
+    private var startupPreviewEpoch by mutableIntStateOf(if (BuildConfig.OFFLINE_QA) 0 else 1)
+    private var lastStoppedAtMs: Long = 0L
+
+    override fun onStart() {
+        super.onStart()
+        if (!BuildConfig.OFFLINE_QA && lastStoppedAtMs > 0L && System.currentTimeMillis() - lastStoppedAtMs > 3_000L) {
+            startupPreviewEpoch++
+        }
+    }
+
+    override fun onStop() {
+        lastStoppedAtMs = System.currentTimeMillis()
+        super.onStop()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -238,6 +254,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+                NexusStartupOnboardingOverlay(epoch = startupPreviewEpoch)
             }
         }
     }
@@ -281,3 +298,82 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+@Composable
+private fun NexusStartupOnboardingOverlay(epoch: Int) {
+    if (epoch <= 0) return
+    var visible by remember(epoch) { mutableStateOf(true) }
+    LaunchedEffect(epoch) {
+        kotlinx.coroutines.delay(1900)
+        visible = false
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)),
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(380))
+    ) {
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) { visible = false },
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = ScreenBackground.copy(alpha = 0.96f)
+            ) {}
+            androidx.compose.material3.Surface(
+                shape = com.vidadomu.nexus.ui.theme.NexusTokens.sheet,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
+                border = androidx.compose.foundation.BorderStroke(1.dp, com.vidadomu.nexus.ui.theme.BorderSubtle),
+                tonalElevation = 6.dp,
+                modifier = Modifier.padding(horizontal = 28.dp)
+            ) {
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 28.dp),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.nexus_logo),
+                        contentDescription = "Logo oficial de NEXUS",
+                        modifier = Modifier
+                            .padding(bottom = 4.dp)
+                            .padding(horizontal = 8.dp)
+                            .sizeIn(maxWidth = 148.dp, maxHeight = 142.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                    androidx.compose.material3.Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        )
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = "v${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}",
+                            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                        )
+                    }
+                    androidx.compose.material3.Text(
+                        text = "TU ESPACIO CREATIVO",
+                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                        color = com.vidadomu.nexus.ui.theme.TextMuted
+                    )
+                    androidx.compose.material3.Text(
+                        text = "Las buenas ideas empiezan aquí.",
+                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                        color = com.vidadomu.nexus.ui.theme.TextPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
