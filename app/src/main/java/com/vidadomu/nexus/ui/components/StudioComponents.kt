@@ -96,10 +96,13 @@ fun StudioToolChip(label: String, description: String = label, enabled: Boolean 
             contentColor = if(enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             shape = NexusTokens.filter, modifier = Modifier
                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                .heightIn(min=NexusTokens.minimumTouch)
+                .height(36.dp)
                 .semantics { contentDescription = description; if(description!=label) stateDescription=label }) {
-            Text(label, Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
-                style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // 36 dp visibles dentro de 48 dp táctiles, con el texto centrado: todas las pastillas igual de altas.
+            Box(contentAlignment = Alignment.Center) {
+                Text(label, Modifier.padding(horizontal = NexusTokens.space12),
+                    style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

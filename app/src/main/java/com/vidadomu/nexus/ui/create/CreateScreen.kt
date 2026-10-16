@@ -985,8 +985,10 @@ private fun SingleMediaSlotCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (media != null) {
-                if(media.mimeType.startsWith("image/")) AsyncImage(
-                    model = Uri.parse(media.uriString), contentDescription = title,
+                if(media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")) AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(Uri.parse(media.uriString))
+                        .apply {if(media.mimeType.startsWith("video/")) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}}.build(),
+                    contentDescription = title,
                     modifier = Modifier.size(54.dp).clip(NexusTokens.thumbnail),contentScale = ContentScale.Crop)
                 else Box(Modifier.size(54.dp).clip(NexusTokens.thumbnail).background(SurfaceVariantDark),contentAlignment=Alignment.Center) {
                     Icon(if(media.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Movie,title,tint=TextSecondary)
@@ -1746,10 +1748,17 @@ private fun parameterSummary(state:CreateUiState):String {
 
 @Composable
 private fun CanvasMediaThumbnail(media:AttachedMedia,onRemove:()->Unit) {
+    val context=androidx.compose.ui.platform.LocalContext.current
     Box(Modifier.size(88.dp).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer)) {
         if(media.mimeType.startsWith("image/")) AsyncImage(Uri.parse(media.uriString),media.fileName ?: "Referencia",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-        else Icon(if(media.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Movie,
-            "Medio adjunto",Modifier.align(Alignment.Center),tint=TextSecondary)
+        // Fotograma real del vídeo adjunto en vez de un icono genérico.
+        else if(media.mimeType.startsWith("video/")) {
+            AsyncImage(coil.request.ImageRequest.Builder(context).data(Uri.parse(media.uriString)).crossfade(120)
+                .decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}.build(),
+                media.fileName ?: "Vídeo adjunto",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            Icon(Icons.Default.PlayArrow,null,Modifier.align(Alignment.BottomStart).padding(4.dp).size(18.dp),tint=com.vidadomu.nexus.ui.theme.MediaForeground)
+        }
+        else Icon(Icons.Default.GraphicEq,"Medio adjunto",Modifier.align(Alignment.Center),tint=TextSecondary)
         StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
     }
 }

@@ -126,7 +126,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 modifier=Modifier.fillMaxSize().padding(padding))
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
                 Text(if(family != null) family.orEmpty()
                     else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
@@ -292,7 +292,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
     Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,
         onLongClickLabel="Opciones de $title",onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
-        Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(family=family,size=28.dp,containerSize=40.dp,shape=NexusTokens.field)
                 Column(Modifier.weight(1f)) {
@@ -306,8 +306,8 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 }
                 if(!grid) Text(displayPrice ?: "Ver coste",
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
+                // Opciones al mantener pulsado: sin ⋮ en cada fila de la lista.
                 if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=TextSecondary)}
-                else if(!grid) IconButton(onClick=onLongClick) {Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)}
             }
             if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {

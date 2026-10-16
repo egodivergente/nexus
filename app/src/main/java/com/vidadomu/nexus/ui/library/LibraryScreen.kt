@@ -152,6 +152,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
         DropdownMenuItem(text={Text("Buscar")},leadingIcon={Icon(Icons.Default.Search,null)},modifier=Modifier.semantics {contentDescription="Buscar en Biblioteca"},onClick={moreVisible=false;searchVisible=!searchVisible})
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
+        DropdownMenuItem(text={Text("Imágenes del proyecto")},leadingIcon={Icon(Icons.Default.PhotoLibrary,null)},onClick={moreVisible=false;projectLibrary.launch(arrayOf("image/*"))})
         DropdownMenuItem(text={Text("Abrir Alexia")},leadingIcon={Icon(Icons.Default.FolderSpecial,null)},onClick={moreVisible=false;try {
             val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
                 component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")
@@ -173,32 +174,15 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 }
                 item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Text("Favoritos")})}
                 if(hidden.isNotEmpty() || showHidden) item {StudioFilterChip(showHidden,{showHidden=!showHidden},label={Text("Ocultos")})}
-                item {
-                    StudioFilterChip(false,{projectLibrary.launch(arrayOf("image/*"))},
-                        label={Text("Imágenes del proyecto · Gestionar",maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
-                        leadingIcon={Icon(Icons.Default.PhotoLibrary,null,Modifier.size(16.dp))},shape=NexusTokens.filter)
-                }
             }
-            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
-                item {Text("Origen",style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
-                items(LibraryOriginFilter.values().toList(),key={it.name}) {origin ->
-                    StudioFilterChip(originFilter==origin,{originFilter=origin},label={Text(origin.label)},shape=NexusTokens.filter)
-                }
-            }
+            // Sin fila «Origen» ni etiquetas Generado/Importado: el origen no ayuda a encontrar un archivo.
             if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
                 Text(if(query.isNotBlank()) "No hay resultados." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
             } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
-                if(pending.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text("En curso · ${pending.size}",Modifier.padding(NexusTokens.screenMargin),style=MaterialTheme.typography.titleSmall)
-                }
-                items(pending,key={"pending:${it.id}"},span={GridItemSpan(maxLineSpan)}) {job ->
-                    Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin).clickable {onNavigateToOutput(job.id)}) {
-                        Text(job.prompt.ifBlank {"Preparando creación"},maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall)
-                        com.vidadomu.nexus.ui.components.GenerationProgressPanel(job,Modifier.fillMaxWidth(),compact=true)
-                    }
-                }
+                // Trabajos en curso: una línea por trabajo (modelo, estado y tiempo), no una tarjeta.
+                items(pending,key={"pending:${it.id}"},span={GridItemSpan(maxLineSpan)}) {job -> PendingJobRow(job) {onNavigateToOutput(job.id)}}
                 listOf(LibraryOriginFilter.IMPORTED,LibraryOriginFilter.EDITED,LibraryOriginFilter.SHARED,LibraryOriginFilter.GENERATED).forEach {origin ->
                     val assets=localAssetGroups[origin].orEmpty()
                     if(assets.isNotEmpty()) {
@@ -246,16 +230,8 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
                 imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
             if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
-        IconButton(onClick=onActions,modifier=Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
-            Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.55f),shape=NexusTokens.filter) {
-                Icon(Icons.Default.MoreVert,"Opciones del archivo",Modifier.size(22.dp),tint=MediaForeground)
-            }
-        }
+        // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
         if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
-        Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.72f),contentColor=MediaForeground,shape=NexusTokens.filter,
-            modifier=Modifier.align(Alignment.BottomStart).padding(NexusTokens.space4)) {
-            Text("Generado",Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4),style=MaterialTheme.typography.labelMedium)
-        }
         if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.78f),contentColor=MediaForeground,
             shape=NexusTokens.thumbnail,modifier=Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space4)) {
             Row(Modifier.padding(NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
@@ -263,5 +239,25 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
                 if(duration!=null) Text(duration,style=MaterialTheme.typography.labelMedium.tabularMoney())
             }
         }
+    }
+}
+
+
+/** Un trabajo en curso en una sola línea: progreso, modelo, estado y tiempo transcurrido. */
+@Composable
+private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit) {
+    val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val model=remember(job.modelId) {app.modelCatalogRepository.getModelById(job.modelId)?.displayName
+        ?: job.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')}
+    var now by remember {mutableStateOf(System.currentTimeMillis())}
+    LaunchedEffect(job.id) {while(true) {kotlinx.coroutines.delay(1000);now=System.currentTimeMillis()}}
+    val elapsed=((now-job.startedAt)/1000).coerceAtLeast(0).let {s -> if(s>=60) "${s/60} min" else "$s s"}
+    Row(Modifier.fillMaxWidth().clickable(onClick=onOpen).padding(horizontal=NexusTokens.screenMargin,vertical=6.dp),
+        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+        val progress=job.progress
+        if(progress!=null) CircularProgressIndicator(progress={progress.coerceIn(0f,1f)},modifier=Modifier.size(18.dp),strokeWidth=2.dp)
+        else CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
+        Text(model,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
+        Text("${com.vidadomu.nexus.ui.components.generationStatusLabel(job)} · $elapsed",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1)
     }
 }

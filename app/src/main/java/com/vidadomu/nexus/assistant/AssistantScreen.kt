@@ -355,7 +355,7 @@ private fun UserBubble(item:ChatItem.User) {
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
         Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.widthIn(max=300.dp).padding(top=NexusTokens.space4,start=NexusTokens.space32)) {
-            Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyLarge,color=TextPrimary)
+            Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=6.dp),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
         }
     }
 }

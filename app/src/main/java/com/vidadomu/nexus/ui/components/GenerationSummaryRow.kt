@@ -63,13 +63,22 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
     val time=remember(job.startedAt) {SimpleDateFormat("HH:mm",Locale("es","ES")).format(Date(job.startedAt))}
     val finished=job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)
     var menuOpen by remember {mutableStateOf(false)}
-    Row(Modifier.fillMaxWidth().heightIn(min=72.dp).clickable(onClick=onOpen)
-        .padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),
-        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+    val context=LocalContext.current
+    // Título útil: el texto del encargo o, si no tiene (upscalers, herramientas), el modelo.
+    val title=job.prompt.trim().ifBlank {model}
+    val detail=listOfNotNull(model.takeIf {job.prompt.isNotBlank()},type,
+        generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time).joinToString(" · ")
+    // Solo un coste real; un trabajo fallido o en curso no muestra «Por confirmar».
+    val cost=costText.takeIf {job.status==GenerationStatus.COMPLETED && it!="Por confirmar"}
+    Row(Modifier.fillMaxWidth().heightIn(min=60.dp).clickable(onClick=onOpen)
+        .padding(start=NexusTokens.screenMargin,end=NexusTokens.space4,top=6.dp,bottom=6.dp),
+        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         Box(Modifier.size(NexusTokens.minimumTouch).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer),contentAlignment=Alignment.Center) {
             val output=job.outputs.firstOrNull()
-            if(job.status==GenerationStatus.COMPLETED && output!=null && job.modality==Modality.IMAGE) {
-                AsyncImage(Uri.parse(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            if(job.status==GenerationStatus.COMPLETED && output!=null && job.modality in setOf(Modality.IMAGE,Modality.VIDEO)) {
+                AsyncImage(coil.request.ImageRequest.Builder(context).data(Uri.parse(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url)).crossfade(120)
+                    .apply {if(job.modality==Modality.VIDEO) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}}.build(),
+                    null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
             } else if(!finished) CircularProgressIndicator(Modifier.size(NexusTokens.space24),strokeWidth=2.dp)
             else Icon(when(job.status) {
                 GenerationStatus.FAILED->Icons.Default.ErrorOutline
@@ -78,16 +87,12 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
             },generationStatusLabel(job),tint=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary)
         }
         Column(Modifier.weight(1f)) {
-            Text(job.prompt.ifBlank {"Sin instrucción textual"},style=MaterialTheme.typography.bodyMedium,color=TextPrimary,
-                maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text("$model · $type · $time",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                maxLines=1,overflow=TextOverflow.Ellipsis)
-            if(!finished || job.status==GenerationStatus.FAILED) Text(generationStatusLabel(job),style=MaterialTheme.typography.labelMedium,
-                color=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary,
-                maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(title,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(detail,style=MaterialTheme.typography.labelMedium,maxLines=1,overflow=TextOverflow.Ellipsis,
+                color=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary)
         }
-        Text(costText,modifier=Modifier.widthIn(max=96.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,
-            maxLines=1,overflow=TextOverflow.Ellipsis)
+        cost?.let {Text(it,modifier=Modifier.widthIn(max=96.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,
+            maxLines=1,overflow=TextOverflow.Ellipsis)}
         Box {
             IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de creación ${job.id}",tint=TextSecondary)}
             DropdownMenu(menuOpen,{menuOpen=false}) { menu {menuOpen=false} }

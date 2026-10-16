@@ -61,9 +61,10 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
             .semantics { contentDescription = "Prompt de creación" }
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            minLines = 4, maxLines = if(expanded) 18 else 8,
+            // Crece con el texto: vacío ocupa 2 líneas, no un bloque fijo de 4.
+            minLines = 2, maxLines = if(expanded) 18 else 8,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,

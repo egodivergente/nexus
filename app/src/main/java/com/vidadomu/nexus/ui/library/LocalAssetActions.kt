@@ -47,7 +47,9 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,onPreview:()->Unit,on
                 Icon(if(asset.type==AssetType.AUDIO) Icons.Default.GraphicEq else Icons.Default.Description,null)
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            IconButton(onClick=onActions,modifier=Modifier.align(Alignment.TopEnd)) {Icon(Icons.Default.MoreVert,"Opciones de ${asset.displayName}")}
+            // Opciones al mantener pulsado: sin ⋮ encima de la miniatura. Los vídeos llevan un ▶ discreto.
+            if(asset.type==AssetType.VIDEO) Icon(Icons.Default.PlayArrow,null,Modifier.align(Alignment.BottomStart).padding(4.dp).size(18.dp),
+                tint=androidx.compose.ui.graphics.Color.White)
         }
     }
 }
