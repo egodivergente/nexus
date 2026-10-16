@@ -2,6 +2,14 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.9-agent] - 2026-10-16
+
+- Android vc43: los avisos que remiten a Historial llevan un acceso directo
+  «Abrir Historial» (chat, tarjetas de encargo y visor de resultados), que abre
+  la misma pestaña de la barra. Las compilaciones anteriores a 1.9.8 tenían solo
+  cuatro destinos y no podían llegar a Historial aunque el código definía su ruta.
+- Alcance y comprobación: [navegación de Historial](docs/HISTORIAL-NAVEGACION-199-20261016.md).
+
 ## [1.9.8-agent] - 2026-10-16
 
 - Android vc42 mantiene el turno del asistente en un servicio de primer plano

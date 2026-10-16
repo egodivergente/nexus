@@ -31,6 +31,7 @@ import com.vidadomu.nexus.ui.library.LibraryScreen
 import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
 import com.vidadomu.nexus.ui.navigation.Screen
+import com.vidadomu.nexus.ui.navigation.openHistoryTab
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
 import com.vidadomu.nexus.ui.settings.FlowCreateScreen
 import com.vidadomu.nexus.ui.settings.SettingsScreen
@@ -142,6 +143,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onOpenSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
+                                onOpenHistory = { navController.openHistoryTab() },
                                 vm = assistantViewModel
                             )
                         }
@@ -197,6 +199,7 @@ class MainActivity : ComponentActivity() {
                                 jobId = jobId,
                                 initialOutputIndex = backStackEntry.arguments?.getInt("index") ?: 0,
                                 onBack = { navController.popBackStack() },
+                                onOpenHistory = { navController.openHistoryTab() },
                                 onReuseAsInput = { content ->
                                     if (content.startsWith("http://") || content.startsWith("https://") || content.startsWith("content://") || content.startsWith("file://")) {
                                         // User clicked "Animar" on an image: switch to video & attach image as input

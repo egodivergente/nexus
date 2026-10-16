@@ -55,7 +55,7 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Unit,initialOutputIndex:Int=0) {
+fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Unit,initialOutputIndex:Int=0,onOpenHistory:(()->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -101,7 +101,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
             val ratio=output?.let {o->if(o.width!=null && o.height!=null && o.width>0 && o.height>0) o.width.toFloat()/o.height else null}
             Box(Modifier.fillMaxWidth().aspectRatio((ratio ?: if(job.modality==Modality.VIDEO) 16f/9f else 1f).coerceIn(.55f,2f)).background(SurfaceDark),contentAlignment=Alignment.Center) {
                 if(output!=null) key(output.id) {when(job.modality) {
-                    Modality.IMAGE->ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto)
+                    Modality.IMAGE->ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory)
                     Modality.VIDEO->NativeVideoPlayer(trustedLocal ?: output.url)
                     Modality.AUDIO->NativeAudioPlayer(trustedLocal ?: output.url)
                     Modality.CHAT->TextOutputViewer(output.url)
@@ -175,7 +175,7 @@ private fun ViewerDetail(label:String,value:String) {
 }
 
 @Composable
-internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onNavigate: ((Int)->Unit)? = null) {
+internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onNavigate: ((Int)->Unit)? = null, onOpenHistory: (() -> Unit)? = null) {
     val navigate by rememberUpdatedState(onNavigate)
     var scale by remember(imageUrl, localUri) { mutableStateOf(1f) }
     var offsetX by remember(imageUrl, localUri) { mutableStateOf(0f) }
@@ -252,8 +252,10 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
         if(failed) Column(Modifier.padding(NexusTokens.space24),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.BrokenImage,null,modifier=Modifier.size(40.dp),tint=TextSecondary)
             Text("No se puede cargar la imagen",style=MaterialTheme.typography.titleMedium)
-            Text("El enlace puede haber caducado o no estar disponible. La tarea sigue guardada en tu historial.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            Text("El enlace puede haber caducado o no estar disponible. La tarea sigue guardada en Historial.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             OutlinedButton(onClick={failed=false;loading=true;retry++}) {Text("Volver a intentar")}
+            // El visor oculta la barra inferior: acceso directo a la pestaña que menciona el aviso.
+            onOpenHistory?.let { open -> TextButton(onClick=open) {Text("Abrir Historial")} }
         }
         if(scale>1f) Surface(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space16),
             shape=NexusTokens.filter,color=MaterialTheme.colorScheme.scrim.copy(alpha=.72f)) {

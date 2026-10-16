@@ -75,6 +75,8 @@ fun AssistantScreen(
     onOpenInCanvas: (CreateUiState) -> Unit,
     onNavigateToOutput: (String) -> Unit,
     onOpenSettings: () -> Unit = {},
+    /** Abre la pestaña Historial: los avisos que la mencionan llevan aquí en un toque. */
+    onOpenHistory: () -> Unit = {},
     vm: AssistantViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsState()
@@ -179,8 +181,8 @@ fun AssistantScreen(
                 items(visibleItems, key = { it.id }) { item ->
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
-                        is ChatItem.Assistant -> AssistantBubble(item)
-                        is ChatItem.Notice -> NoticeRow(item)
+                        is ChatItem.Assistant -> AssistantBubble(item, onOpenHistory)
+                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory)
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -203,6 +205,7 @@ fun AssistantScreen(
                                 onDirtyChanged = {dirtyPlans[p.plan.id]=it},
                                 onOpenCanvas = { scope.launch { vm.canvasState(p.plan.id)?.let(onOpenInCanvas) } },
                                 onOpenOutput = { p.jobId?.let(onNavigateToOutput) },
+                                onOpenHistory = onOpenHistory,
                                 onDiagnoseFailure = { vm.diagnoseFailure(p.plan.id) }) })
                         }
                     }
@@ -343,7 +346,7 @@ private fun UserBubble(item:ChatItem.User) {
 }
 
 @Composable
-private fun AssistantBubble(item:ChatItem.Assistant) {
+private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
@@ -369,6 +372,7 @@ private fun AssistantBubble(item:ChatItem.Assistant) {
                 }
             }
         }
+        if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             items(item.media,key={it.id}) { AssistantMediaPreview(it) }
         }
@@ -467,14 +471,31 @@ private fun formatMediaDuration(seconds:Double):String {
 }
 
 @Composable
-private fun NoticeRow(item: ChatItem.Notice) {
+private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}) {
+    val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     if(item.error) {
         var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
         Column(Modifier.animateContentSize()) {
-            TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle del error" else "Ver detalle del error",color=TextSecondary)}
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle del error" else "Ver detalle del error",color=TextSecondary)}
+                if(history) HistoryLinkButton(onOpenHistory)
+            }
             if(expanded) Text(item.text,style=MaterialTheme.typography.bodySmall,color=TextSecondary)
         }
-    } else Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+    } else Column {
+        Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+        if(history) HistoryLinkButton(onOpenHistory)
+    }
+}
+
+/** Acceso directo a la pestaña Historial desde un aviso que la menciona. */
+@Composable
+private fun HistoryLinkButton(onOpenHistory: () -> Unit) {
+    TextButton(onClick=onOpenHistory) {
+        Icon(Icons.Default.Timelapse,null,Modifier.size(18.dp))
+        Spacer(Modifier.width(NexusTokens.space4))
+        Text("Abrir Historial")
+    }
 }
 
 @Composable
@@ -537,6 +558,7 @@ internal fun PlanCardView(
     showDiscard:Boolean=true,
     onDirtyChanged:(Boolean)->Unit={},
     onDiagnoseFailure:()->Unit={},
+    onOpenHistory:()->Unit={},
 ) {
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency=app.currencyManager
@@ -586,10 +608,16 @@ internal fun PlanCardView(
             else if(assistantBusy) Text("Espera a que el asistente termine de ajustar el plan.",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
             if(plan.warnings.isNotEmpty()) InlineNotice("Revisa los avisos del plan.",technicalDetails=plan.warnings.joinToString("\n"),isError=false)
             if(p.issues.isNotEmpty()) InlineNotice("Faltan datos para preparar este encargo.",technicalDetails=p.issues.joinToString("\n"))
-            p.error?.let {InlineNotice(noticeMessage(it,"No se pudo completar el encargo."),technicalDetails=it)}
+            p.error?.takeIf { p.state!=PlanState.UNCERTAIN }?.let {
+                val history=com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(it)
+                InlineNotice(noticeMessage(it,"No se pudo completar el encargo."),technicalDetails=it,
+                    actionLabel=if(history) "Abrir Historial" else null,onAction=if(history) onOpenHistory else null)
+            }
             if(p.state==PlanState.UNCERTAIN) {
-                InlineNotice("Envío sin confirmar. Revisa Historial antes de generar otra vez.",technicalDetails="Este plan queda bloqueado para evitar un doble pago.",isError=false)
-                if(p.jobId!=null) FilledTonalButton(onClick=onOpenOutput) {Text("Ver en Nexus",color=TextSecondary)}
+                InlineNotice("Envío sin confirmar. Revisa Historial antes de generar otra vez.",
+                    technicalDetails=listOfNotNull(p.error,"Este plan queda bloqueado para evitar un doble pago.").joinToString("\n"),isError=false,
+                    actionLabel="Abrir Historial",onAction=onOpenHistory)
+                if(p.jobId!=null) FilledTonalButton(onClick=onOpenOutput) {Text("Ver este trabajo",color=TextSecondary)}
             } else if(p.state==PlanState.SUBMITTED) {
                 if(p.jobStatus=="PENDING" || p.jobStatus=="PROCESSING") {
                     if(p.jobProgress!=null) LinearProgressIndicator(progress={p.jobProgress.coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())
