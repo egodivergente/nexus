@@ -42,11 +42,17 @@ fun NexusBottomBar(navController: NavController) {
                         .selectable(selected=selected,role=Role.Tab,onClick={
                             if(currentRoute!=screen.route) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState=true }
-                                launchSingleTop=true
-                                // Preserve the fix preventing a return to Assistant from reopening Settings.
-                                restoreState=screen.route !in setOf(Screen.Models.route,Screen.Assistant.route)
+                            // Settings/Flow are pushed over the current tab. Return to that exact
+                            // tab when possible; restoring a saved tab stack here could put Settings
+                            // back on top and make the tab appear not to respond.
+                            val poppedToExistingTab = currentRoute !in Screen.bottomNavItems.map { it.route } &&
+                                navController.popBackStack(screen.route, inclusive = false)
+                            if (!poppedToExistingTab) navController.navigate(screen.route) {
+                                val fromTab = currentRoute in Screen.bottomNavItems.map { it.route }
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = fromTab }
+                                launchSingleTop = true
+                                // Only restore saved state when switching between actual tabs.
+                                restoreState = fromTab && screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
                             }
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,

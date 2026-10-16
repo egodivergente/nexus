@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.put
 
 internal fun JsonObjectBuilder.putMemory(p: Project) {
@@ -88,9 +89,12 @@ class UpdateProjectMemoryTool(private val d: ToolDeps) : BaseTool(
                 n = n.copy(rules = n.rules.filterNot { r -> remove.any { it.isNotEmpty() && it in AssetIndex.norm(r) } })
                 if (n.rules.size != before) changed += "reglas quitadas: ${before - n.rules.size}"
             }
-            input.strList("add_rules").takeIf { it.isNotEmpty() }?.let { n = n.copy(rules = n.rules + it); changed += "reglas" }
+            input.strList("add_rules").takeIf { it.isNotEmpty() }?.let { n = n.copy(rules = (n.rules + it).distinctBy(AssetIndex::norm)); changed += "reglas" }
             if (input.containsKey("preferred_models")) { n = n.copy(preferredModels = input.strList("preferred_models")); changed += "modelos preferidos" }
-            input.str("add_note")?.let { n = n.copy(notes = n.notes + ProjectNote(now, it.take(600))); changed += "nota" }
+            input.str("add_note")?.take(600)?.let { note ->
+                if(n.notes.none {AssetIndex.norm(it.text)==AssetIndex.norm(note)}) n = n.copy(notes = n.notes + ProjectNote(now,note))
+                changed += "nota"
+            }
             n
         }
         val chars = input.objList("characters").mapNotNull { c ->

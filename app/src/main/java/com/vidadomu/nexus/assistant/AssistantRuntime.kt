@@ -68,7 +68,7 @@ data class AssistantSettings(
     fun toConfig() = AgentConfig(
         provider = when { offline -> "offline"; direct -> "bedrock-direct"; else -> "bedrock-proxy" },
         modelId = modelId.ifBlank { "offline" }, region = region,
-        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 7, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
+        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 20, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
     )
 
     companion object {
@@ -169,9 +169,13 @@ class AssistantSettingsStore(private val app: NexusApplication) {
     fun excludedFamilies(): Set<String> =
         AssistantSettings.parseFamilies(prefs.getString("excluded_families", AssistantSettings.DEFAULT_EXCLUDED).orEmpty())
 
-    fun llmLimits(): com.vidadomu.nexus.agent.core.llm.LlmLimits = com.vidadomu.nexus.agent.core.llm.LlmLimits(
+    fun budgetEnabled() = prefs.getBoolean("llm_budget_enabled",false)
+    fun setBudgetEnabled(enabled:Boolean) {prefs.edit().putBoolean("llm_budget_enabled",enabled).apply()}
+    fun configuredLlmLimits(): com.vidadomu.nexus.agent.core.llm.LlmLimits = com.vidadomu.nexus.agent.core.llm.LlmLimits(
+        perTurnCalls = Int.MAX_VALUE,
         perTurnUsd = prefs.getString("llm_turn_usd", "1.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 1.0,
         dailyUsd = prefs.getString("llm_daily_usd", "5.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 5.0)
+    fun llmLimits() = configuredLlmLimits().let { if(budgetEnabled()) it else it.copy(perTurnUsd=Double.MAX_VALUE,dailyUsd=Double.MAX_VALUE) }
     fun saveLlmLimits(turn: Double, daily: Double) {
         require(turn.isFinite() && daily.isFinite() && turn in 0.01..100.0 && daily in turn..1000.0)
         check(prefs.edit().putString("llm_turn_usd", turn.toString()).putString("llm_daily_usd", daily.toString()).commit())
@@ -246,7 +250,7 @@ class AssistantRuntime(private val app: NexusApplication) {
     fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(
         llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { AgentDocuments.load(it) },
-        images = if (s.sendImages && !s.offline) AttachmentImageLoader { AgentMediaStore.thumbnail(it) } else null,
+        images = if (s.sendImages && !s.offline) AttachmentImageLoader { AgentMediaStore.thumbnail(app,it) } else null,
         videos = if (s.sendImages && !s.offline) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
         uiContext = { orders.turnContext(guard) },
         verifiedOrders = { orders.all() },

@@ -11,6 +11,8 @@ enum class NexusAppearance(val label: String, val description: String) {
     QUARTZ("Cuarzo negro", "Oscuro cálido · champán · títulos editoriales"),
     OCEAN("Océano", "Azul noche · cian"),
     FOREST("Bosque", "Verde profundo · salvia"),
+    SAND("Arena", "Crema cálida · terracota · luz suave"),
+    ROSE("Rosa", "Marfil rosado · ciruela · superficies claras"),
     LIGHT("Claro", "Marfil · azul tinta · tarjetas blancas")
 }
 

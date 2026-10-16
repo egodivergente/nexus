@@ -11,6 +11,7 @@ import com.vidadomu.nexus.agent.core.assets.AssetIndex
 import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.agent.core.tools.AgentSession
+import com.vidadomu.nexus.agent.core.tools.Attachment
 import com.vidadomu.nexus.agent.core.tools.ToolInputException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -100,8 +101,8 @@ internal class AgentFileOperations(private val app: NexusApplication, private va
         } catch (error: Exception) { rollback?.invoke(); throw error }
     }
 
-    suspend fun convert(input: JsonObject): JsonObject = lock.withLock {
-        val source = asset(input)
+    suspend fun convert(input: JsonObject, session: AgentSession): JsonObject = lock.withLock {
+        val source = AgentVideoOperations(app).source(input.requiredText("asset_id"))
         if (source.type != AssetType.IMAGE) throw ToolInputException("Selecciona una imagen; esta herramienta no transcodifica vídeo.")
         val format = input.requiredText("format").lowercase()
         val encoding = when (format) {
@@ -118,12 +119,6 @@ internal class AgentFileOperations(private val app: NexusApplication, private va
         }
         val uri = Uri.parse(source.uri)
         if (uri.scheme !in setOf("file", "content")) throw ToolInputException("Descarga la imagen antes de convertirla.")
-        if (uri.scheme == "file") {
-            val file = File(uri.path ?: throw ToolInputException("Ruta inválida.")).canonicalFile
-            val roots = listOf(File(app.filesDir, "agent_media"), File(app.filesDir, "agent_exports"))
-            if (roots.none { file.path.startsWith(it.canonicalPath + File.separator) })
-                throw ToolInputException("Importa esta imagen en Nexus antes de convertirla.")
-        }
         fun options(bounds: Boolean, sample: Int = 1) = BitmapFactory.Options().apply { inJustDecodeBounds = bounds; inSampleSize = sample }
         val bounds = options(true)
         app.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -171,6 +166,8 @@ internal class AgentFileOperations(private val app: NexusApplication, private va
             val result = assets.addAsset(source.copy(id = "", uri = Uri.fromFile(destination).toString(), displayName = destination.name,
                 mimeType = "image/${if (format == "jpeg") "jpeg" else format}", width = encoded.width, height = encoded.height,
                 source = AssetSource.IMPORTED, parentAssetId = source.id, generationId = null, createdAt = System.currentTimeMillis()))
+            session.showMedia(Attachment(result.id,result.uri,result.mimeType ?: "image/$format",result.displayName,
+                result.width,result.height,result.durationSec,result.id))
             buildJsonObject {
                 put("asset_id", result.id); put("uri", result.uri); put("format", format)
                 put("width", encoded.width); put("height", encoded.height); put("original_preserved", true)

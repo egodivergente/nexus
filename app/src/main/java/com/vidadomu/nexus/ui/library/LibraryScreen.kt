@@ -55,6 +55,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
+    var importing by remember {mutableStateOf(false)}
     val prefs=remember {context.getSharedPreferences("library_actions_v1",0)}
     var hidden by remember {mutableStateOf(prefs.getStringSet("hidden",emptySet())!!.toSet())}
     var favorites by remember {mutableStateOf(prefs.getStringSet("favorites",emptySet())!!.toSet())}
@@ -70,17 +71,36 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val index by runtime.assets.changes.collectAsState()
     val projectLibrary=rememberProjectMediaPicker(managementOnly=true) {}
     LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
+    val importPicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) {uris ->
+        if(uris.isNotEmpty()) { importing=true; scope.launch {
+            var imported=0
+            try { for(uri in uris) {
+                try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,context.contentResolver.getType(uri),runtime.settings.activeProjectId()); imported++ }
+                catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                catch(_:Exception) { }
+            }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos") }
+            finally {importing=false}
+        } }
+    }
     val removed=remember(index) {index.assets.filter {it.libraryDeleted}.map {it.uri}.toSet()}
     var query by rememberSaveable {mutableStateOf("")}
     var searchVisible by rememberSaveable {mutableStateOf(false)}
+    var moreVisible by remember {mutableStateOf(false)}
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden) {jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
         .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}}
     val pending=remember(jobs,filter,query,showHidden,favoriteOnly) {if(showHidden || favoriteOnly) emptyList() else jobs.filter {
-        it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.CANCELLED) &&
-        (it.status!=GenerationStatus.FAILED || it.parameters["__tracking_paused"]=="true" || it.parameters["__submission_uncertain"]=="true") &&
+        it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.CANCELLED,GenerationStatus.FAILED) &&
         (filter==null || it.modality==filter) && matchesCreationSearch(it,query)
     }.sortedByDescending {it.startedAt}}
+    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs) {
+        val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
+        index.assets.filter { a -> !a.libraryDeleted && a.uri !in generatedUris &&
+            (filter==null || a.type.name==filter?.name) && a.displayName.contains(query,true) &&
+            ("asset:"+a.id in hidden)==showHidden && (!favoriteOnly || "asset:"+a.id in favorites) }.sortedByDescending {it.createdAt}
+    }
+    var localTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
+    localTarget?.let {asset -> LocalAssetActions(asset,{localTarget=null}) {message -> scope.launch {snackbar.showSnackbar(message)}} }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
     val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
@@ -103,24 +123,36 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 scope.launch {if(snackbar.showSnackbar(if(wasHidden) "Archivo restaurado" else "Archivo ocultado","Deshacer",withDismissAction=true)==SnackbarResult.ActionPerformed) {
                     hidden=if(wasHidden) hidden+token else hidden-token;prefs.edit().putStringSet("hidden",hidden).apply()
                 }}
-            },onError={message -> scope.launch {snackbar.showSnackbar(message)}})
+            },onDelete={scope.launch {
+                val assets=index.assets.filter {it.uri==output.url || it.uri==output.localUri}
+                runtime.assets.deleteLibraryAssets(assets.map {it.id}.toSet())
+                hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
+                snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
+            }},onError={message -> scope.launch {snackbar.showSnackbar(message)}})
     }
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={
         Column(verticalArrangement=Arrangement.Center) {
             Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text("${completed.sumOf {it.outputs.size}} archivos · ${completed.size} creaciones",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text("${completed.sumOf {it.outputs.size}+localAssets.size} archivos",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
     },actions={
-        IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Biblioteca",tint=TextSecondary)}
-        IconButton(onClick={showLocalEdits=true}) {Icon(Icons.Default.Movie,"Ediciones locales",tint=TextSecondary)}
-        IconButton(onClick={try {
+        IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
+        Box {
+        IconButton(onClick={moreVisible=true}) {Icon(Icons.Default.MoreVert,"Más opciones de biblioteca",tint=TextSecondary)}
+        DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
+        DropdownMenuItem(text={Text("Buscar")},leadingIcon={Icon(Icons.Default.Search,null)},modifier=Modifier.semantics {contentDescription="Buscar en Biblioteca"},onClick={moreVisible=false;searchVisible=!searchVisible})
+        DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
+        DropdownMenuItem(text={Text("Abrir Alexia")},leadingIcon={Icon(Icons.Default.FolderSpecial,null)},onClick={moreVisible=false;try {
             val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
                 component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")
                 flags=Intent.FLAG_ACTIVITY_NEW_TASK
             };context.startActivity(intent)
-        } catch (_:Exception) {}}) {Icon(Icons.Default.FolderSpecial,"Abrir Alexia",tint=TextSecondary)}
+        } catch (_:Exception) {scope.launch {snackbar.showSnackbar("No se pudo abrir Alexia")}}})
+        }
+        }
     })}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if(importing) LinearProgressIndicator(Modifier.fillMaxWidth())
             if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
@@ -137,7 +169,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         leadingIcon={Icon(Icons.Default.PhotoLibrary,null,Modifier.size(16.dp))},shape=NexusTokens.filter)
                 }
             }
-            if(completed.isEmpty() && pending.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
+            if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
                 Text(if(query.isNotBlank()) "No hay resultados." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
             } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
@@ -151,6 +183,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         com.vidadomu.nexus.ui.components.GenerationProgressPanel(job,Modifier.fillMaxWidth(),compact=true)
                     }
                 }
+                if(localAssets.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {Text("Importados y ediciones · ${localAssets.size}",style=MaterialTheme.typography.labelMedium,modifier=Modifier.padding(NexusTokens.space16))}
+                items(localAssets,key={"asset:"+it.id}) {asset -> LocalAssetTile(asset,imageLoader) {localTarget=asset} }
                 groups.forEach {(day,entries) ->
                     item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}

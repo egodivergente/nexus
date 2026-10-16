@@ -38,11 +38,22 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
     comparisonId?.let { id -> com.vidadomu.nexus.ui.create.ComparisonResultsDialog(id,{comparisonId=null},onNavigateToOutput) }
     val currencyManager=app.currencyManager
     val scope=rememberCoroutineScope()
-    var statusFilter by rememberSaveable {mutableStateOf("ALL")}
+    var statusFilter by rememberSaveable {mutableStateOf("VISIBLE")}
+    val archivePrefs=remember {context.getSharedPreferences("history_archive_v1",0)}
+    var archived by remember {mutableStateOf(archivePrefs.getStringSet("ids",emptySet())!!.toSet())}
+    DisposableEffect(archivePrefs) {
+        val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs,key ->
+            if(key=="ids") archived=prefs.getStringSet("ids",emptySet())!!.toSet()
+        }
+        archivePrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {archivePrefs.unregisterOnSharedPreferenceChangeListener(listener)}
+    }
     var selectedTechnicalJob by remember {mutableStateOf<GenerationJob?>(null)}
     var pendingCancelJob by remember {mutableStateOf<GenerationJob?>(null)}
-    val filteredJobs = remember(jobs, statusFilter,searchQuery) {
+    val filteredJobs = remember(jobs, statusFilter,searchQuery,archived) {
         when (statusFilter) {
+            "VISIBLE" -> jobs.filter {it.id !in archived}
+            "ARCHIVED" -> jobs.filter {it.id in archived}
             "ACTIVE" -> jobs.filter {
                 it.status == GenerationStatus.QUEUED ||
                 it.status == GenerationStatus.GENERATING ||
@@ -61,6 +72,10 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
 
     Scaffold(containerColor=ScreenBackground,topBar={
         TopAppBar(title={Text("Historial",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
+            IconButton(onClick={
+                archived=archived+jobs.filter {it.status in setOf(GenerationStatus.FAILED,GenerationStatus.CANCELLED)}.map {it.id}
+                archivePrefs.edit().putStringSet("ids",archived).apply()
+            }) {Icon(Icons.Default.Inventory2,"Archivar fallidos y cancelados")}
             IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,"Buscar en Historial")}
         },colors=TopAppBarDefaults.topAppBarColors(containerColor=BackgroundDark))
     }) { padding ->
@@ -74,9 +89,11 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                 placeholder={Text("Buscar modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={IconButton(onClick={searchQuery="";searchVisible=false}) {Icon(Icons.Default.Close,"Cerrar búsqueda")}})
             LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                val choices=listOf("ALL" to "Todos","ACTIVE" to "En curso","COMPLETED" to "Completados","FAILED" to "Fallidos","COMPARISONS" to "Comparativas")
+                val choices=listOf("VISIBLE" to "Recientes","ALL" to "Todos","ARCHIVED" to "Archivados","ACTIVE" to "En curso","COMPLETED" to "Completados","FAILED" to "Fallidos","COMPARISONS" to "Comparativas")
                 items(choices) { (key,label) ->
                     val count=when(key) {
+                        "VISIBLE" -> jobs.count {it.id !in archived}
+                        "ARCHIVED" -> jobs.count {it.id in archived}
                         "ACTIVE" -> jobs.count {it.status in setOf(GenerationStatus.QUEUED,GenerationStatus.GENERATING,GenerationStatus.PROCESSING,GenerationStatus.RENDERING,GenerationStatus.UPLOADING)}
                         "COMPLETED" -> jobs.count {it.status==GenerationStatus.COMPLETED}
                         "FAILED" -> jobs.count {it.status==GenerationStatus.FAILED}
@@ -140,6 +157,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                         pendingCancelJob = job
                                     })
                                 }
+                                DropdownMenuItem(text={Text(if(job.id in archived) "Restaurar en recientes" else "Archivar")},onClick={close();archived=if(job.id in archived) archived-job.id else archived+job.id;archivePrefs.edit().putStringSet("ids",archived).apply()})
                                 DropdownMenuItem(text={Text("Diagnóstico")},onClick={close();selectedTechnicalJob=job})
                                 if(isTerminal) DropdownMenuItem(text={Text("Eliminar del historial")},onClick={close();
                                     scope.launch {

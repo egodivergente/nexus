@@ -4,6 +4,7 @@ import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.agent.core.tools.AgentSession
 import com.vidadomu.nexus.agent.core.tools.NativeOperations
 import com.vidadomu.nexus.agent.core.tools.ToolInputException
+import com.vidadomu.nexus.agent.core.tools.assetJson
 import com.vidadomu.nexus.core.model.GenerationJob
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.core.work.GenerationPollingWorker
@@ -32,6 +33,41 @@ class NexusNativeOperations(
     override suspend fun run(operation: String, input: JsonObject, session: AgentSession): JsonObject =
         withContext(Dispatchers.IO) {
             when (operation) {
+                "create_document" -> AgentArtifacts(app,runtime.assets).create(input,session)
+                "read_library_text" -> AgentArtifacts(app,runtime.assets).read(input)
+                "analyze_audio_asset" -> MediaEditJobs(app).start("analyze_audio",input,session)
+                "list_library_assets" -> {
+                    runtime.importHistory()
+                    val found=runtime.assets.changes.value.assets.filter {!it.libraryDeleted && (input.text("query")?.let {q->it.displayName.contains(q,true)} ?: true)}.sortedByDescending {it.createdAt}
+                    val offset=input.integer("offset",0,0..Int.MAX_VALUE); val limit=input.integer("limit",50,1..100)
+                    buildJsonObject {put("total",found.size);put("assets",JsonArray(found.drop(offset).take(limit).map {runtime.assets.assetJson(it)}));if(offset+limit<found.size) put("next_offset",offset+limit)}
+                }
+                "view_library_asset", "inspect_image_quality" -> {
+                    val a=runtime.assets.asset(input.requiredText("asset_id"))?.takeIf {!it.libraryDeleted} ?: throw ToolInputException("Archivo desconocido.")
+                    if(a.type==com.vidadomu.nexus.agent.core.assets.AssetType.AUDIO) throw ToolInputException("Usa transcribe_media_asset y analyze_audio_asset para analizar sonido.")
+                    val local=AgentVideoOperations(app).source(a.id)
+                    val mime=local.mimeType ?: when(local.type) {
+                        com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE -> "image/jpeg"
+                        com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO -> "video/mp4"
+                        else -> "application/octet-stream"
+                    }
+                    val quality=if(operation=="inspect_image_quality") AgentImageQuality.inspect(app,local) else null
+                    val attachment=com.vidadomu.nexus.agent.core.tools.Attachment(local.id,local.uri,mime,local.displayName,local.width,local.height,local.durationSec,local.id)
+                    session.attachments.removeAll {it.id==a.id}
+                    session.attachments.add(attachment)
+                    session.showMedia(attachment)
+                    quality ?: buildJsonObject {put("asset_id",a.id);put("requested_context_load",true)}
+                }
+                "delete_library_assets" -> {
+                    val ids=(input["asset_ids"] as? JsonArray)?.map {it.jsonPrimitive.content}?.toSet() ?: throw ToolInputException("Indica asset_ids.")
+                    buildJsonObject {put("removed",runtime.assets.deleteLibraryAssets(ids));put("originals_preserved",true)}
+                }
+                "archive_failed_generations" -> {
+                    val prefs=app.getSharedPreferences("history_archive_v1",0)
+                    val ids=app.generationRepository.allJobs.value.filter {it.status in setOf(GenerationStatus.FAILED,GenerationStatus.CANCELLED)}.map {it.id}.toSet()
+                    prefs.edit().putStringSet("ids",prefs.getStringSet("ids",emptySet())!!.toSet()+ids).commit()
+                    buildJsonObject {put("archived",ids.size);put("history_preserved",true)}
+                }
                 "web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools", "call_mcp_tool", "disconnect_mcp_server" -> internet.run(operation,input)
                 "get_active_generations" -> active(input)
                 "recover_generation" -> recover(input.requiredText("job_id"))
@@ -40,14 +76,14 @@ class NexusNativeOperations(
                 "get_nexus_settings" -> settings()
                 "update_nexus_settings" -> updateSettings(input)
                 "rename_asset_file" -> media.rename(input, session)
-                "convert_image_asset" -> media.convert(input)
+                "convert_image_asset" -> media.convert(input,session)
                 "inspect_media_asset" -> AgentVideoOperations(app).inspect(input.requiredText("asset_id"))
                 "get_whisper_status" -> WhisperModelStore(app).status()
                 "prepare_whisper_model" -> WhisperModelStore(app).enqueue()
                 "edit_video_assets" -> MediaEditJobs(app).start(input.requiredText("action"),input,session)
                 "extract_video_frames" -> MediaEditJobs(app).start("frames",input,session)
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
-                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20))
+                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
                 "atlas_get_balance" -> atlasBalance()
                 else -> throw ToolInputException("Operación desconocida.")
             }

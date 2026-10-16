@@ -390,7 +390,7 @@ fun CreateScreen(
     // Modal Bottom Sheet para Seleccionar Modelo
     if (showModelPickerSheet) {
         ModelPickerSheet(
-            availableModels = state.availableModels,
+            availableModels = (LocalContext.current.applicationContext as NexusApplication).modelCatalogRepository.models.collectAsState().value,
             selectedModel = state.selectedModel,
             currencyManager = currencyManager,
             onSelectModel = { model ->
@@ -1450,9 +1450,10 @@ private fun ModelPickerSheet(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedOrg by remember { mutableStateOf<String?>(null) }
+    var modalityFilter by remember { mutableStateOf<Modality?>(null) }
 
-    val filteredModels = remember(availableModels, searchQuery, selectedOrg) {
-        var list = availableModels
+    val filteredModels = remember(availableModels, searchQuery, selectedOrg, modalityFilter) {
+        var list = availableModels.filter { modalityFilter == null || modalityFilter in it.modalities }
         if (!selectedOrg.isNullOrBlank()) {
             list = list.filter { it.organization.equals(selectedOrg, ignoreCase = true) }
         }
@@ -1506,7 +1507,13 @@ private fun ModelPickerSheet(
                 )
             }
 
-            // Search Bar (Slim 46dp)
+            LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                item { FilterChip(modalityFilter==null,{modalityFilter=null;selectedOrg=null},label={Text("Todos los tipos")}) }
+                items(listOf(Modality.IMAGE to "Imagen", Modality.VIDEO to "Vídeo", Modality.AUDIO to "Audio")) { (value,label) ->
+                    FilterChip(modalityFilter==value,{modalityFilter=value;selectedOrg=null},label={Text(label)})
+                }
+            }
+            // Search all modalities without returning to the catalog.
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()

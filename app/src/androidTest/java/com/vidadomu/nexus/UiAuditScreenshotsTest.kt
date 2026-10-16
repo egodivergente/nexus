@@ -39,7 +39,7 @@ class UiAuditScreenshotsTest {
         check(BuildConfig.OFFLINE_QA)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext.applicationContext as NexusApplication
-        check(app.packageName.endsWith(".uiqa"))
+        check(listOf(".qa",".mediaqa",".uiqa").any(app.packageName::endsWith))
         runBlocking { app.ready.await(); app.database.loading.first { !it } }
         app.providerRegistry.setMockMode(true)
         app.modelCatalogRepository.refreshModels()
@@ -81,7 +81,7 @@ class UiAuditScreenshotsTest {
         val originalTheme = preferences.theme()
         val args = InstrumentationRegistry.getArguments()
         val phase = args.getString("audit_phase") ?: "before"
-        val themes = if(phase=="after") NexusAppearance.entries
+        val themes = args.getString("audit_themes")?.split(",")?.map(NexusAppearance::valueOf) ?: if(phase=="after") NexusAppearance.entries
             else listOf(NexusAppearance.LIGHT)
         val scales = when(phase) { "before" -> listOf(1f,1.3f); "after" -> listOf(1f,1.3f,1.5f); else -> listOf(1.3f) }
         val scenes=args.getString("audit_scenes")?.split(",")

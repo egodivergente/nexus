@@ -373,17 +373,20 @@ object AgentMediaStore {
     }
 
     /** Miniatura JPEG ≤1024 px para que el LLM vea el keyframe (solo si el usuario lo permite). */
-    suspend fun thumbnail(att: Attachment): ContentBlock.Image? = withContext(Dispatchers.IO) {
+    suspend fun thumbnail(context:Context,att: Attachment): ContentBlock.Image? = withContext(Dispatchers.IO) {
         if (!att.mimeType.startsWith("image/")) return@withContext null
-        val path = Uri.parse(att.uri).path ?: return@withContext null
+        val uri = Uri.parse(att.uri)
+        if(uri.scheme !in setOf("file","content")) return@withContext null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(path, bounds)
+        context.contentResolver.openInputStream(uri)?.use {BitmapFactory.decodeStream(it,null,bounds)}
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1024) sample *= 2
-        val bmp = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return@withContext null
+        val bmp = context.contentResolver.openInputStream(uri)?.use {BitmapFactory.decodeStream(it,null,BitmapFactory.Options().apply { inSampleSize = sample })} ?: return@withContext null
         val scale = 1024f / maxOf(bmp.width, bmp.height)
         val sized = if (scale < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp
-        val bytes = ByteArrayOutputStream().use { sized.compress(Bitmap.CompressFormat.JPEG, 85, it); it.toByteArray() }
-        ContentBlock.Image("jpeg", bytes)
+        try {
+            val bytes = ByteArrayOutputStream().use { sized.compress(Bitmap.CompressFormat.JPEG, 85, it); it.toByteArray() }
+            ContentBlock.Image("jpeg", bytes)
+        } finally {if(sized!==bmp) sized.recycle();bmp.recycle()}
     }
 }

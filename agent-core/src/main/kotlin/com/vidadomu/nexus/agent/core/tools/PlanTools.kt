@@ -8,6 +8,7 @@ import com.vidadomu.nexus.agent.core.spend.PlanState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.put
 
 internal fun GenerationPlan.cardJson(state: PlanState?): JsonObject = buildJsonObject {
@@ -59,6 +60,33 @@ internal fun resolveMedia(input: JsonObject, session: AgentSession, assets: Asse
         ?: throw ToolInputException("Cada medio necesita attachment_id o asset_id.")
     val mime = asset.mimeType ?: when (asset.type) { AssetType.IMAGE -> "image/*"; AssetType.VIDEO -> "video/*"; AssetType.AUDIO -> "audio/*"; else -> null }
     MediaRequest(role, asset.uri, mime, asset.id)
+}
+
+class PrepareImageUpscaleTool(private val d: ToolDeps) : BaseTool(
+    "prepare_image_upscale", ToolCategory.PLAN,
+    "Prepara upscale IA de una imagen de Biblioteca con un modelo upscaler real del catálogo. Conserva el original y valida schema/coste mediante el pipeline de generación. No es redimensionado bilineal ni envía una generación por sí solo.",
+    schema {
+        string("asset_id", "Imagen de la biblioteca.", required=true)
+        string("model_id", "Id exacto de un upscaler del registro.", required=true)
+        string("provider_id", "Proveedor del modelo.")
+        freeObject("params", "Factor, resolución o modo solo según el schema del modelo.")
+    },
+) {
+    override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
+        val image=d.assets.asset(input.req("asset_id")) ?: return fail("Busca primero la imagen en Biblioteca.")
+        if(image.type!=AssetType.IMAGE || image.libraryDeleted) return fail("Selecciona una imagen disponible en Biblioteca.")
+        val model=d.resolveModel(input)
+        if("IMAGE" !in model.modalities || !(model.ref.modelId.contains("upscal",true) || model.capabilities.any {it.contains("upscal",true)}))
+            return fail("Elige un modelo de upscale de imagen del catálogo; no un generador de imágenes genérico.")
+        return PrepareGenerationTool(d).run(buildJsonObject {
+            put("model_id",model.ref.modelId);put("provider_id",model.ref.providerId);put("task","upscale")
+            input["params"]?.let {put("params",it)}
+            image.projectId?.let {put("project",it)}
+            image.generationId?.let {put("parent_generation_id",it)}
+            put("media",buildJsonArray {add(buildJsonObject {put("role","first_frame");put("asset_id",image.id)})})
+            put("rationale","Ampliar la imagen conservando su composición y el archivo original.")
+        },session)
+    }
 }
 
 class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(

@@ -10,6 +10,8 @@ import com.vidadomu.nexus.ui.components.noticeMessage
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import android.net.Uri
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,12 +42,18 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.FileProvider
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.cost.CostConfidence
@@ -341,6 +349,9 @@ private fun UserBubble(item:ChatItem.User) {
 private fun AssistantBubble(item:ChatItem.Assistant) {
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         if(item.text.isNotBlank()) ChatMarkdownView(item.text)
+        if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+            items(item.media,key={it.id}) { AssistantMediaPreview(it) }
+        }
         if(item.toolCalls.isNotEmpty()) {
             var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
             Column(Modifier.animateContentSize()) {
@@ -351,6 +362,88 @@ private fun AssistantBubble(item:ChatItem.Assistant) {
             }
         }
     }
+}
+
+@Composable
+internal fun AssistantMediaPreview(media: Attachment) {
+    val context=LocalContext.current
+    when {
+        media.mimeType.startsWith("image/") -> AsyncImage(
+            model=media.uri,
+            contentDescription=media.name ?: "Imagen del asistente",
+            contentScale=ContentScale.Fit,
+            modifier=Modifier.widthIn(max=280.dp).heightIn(max=260.dp).clip(NexusTokens.card),
+        )
+        media.mimeType.startsWith("video/") -> {
+            val player=remember(media.uri) {
+                ExoPlayer.Builder(context).build().apply {
+                    setMediaItem(MediaItem.fromUri(Uri.parse(media.uri)))
+                    prepare()
+                    playWhenReady=false
+                }
+            }
+            DisposableEffect(player) { onDispose { player.release() } }
+            AndroidView(
+                factory={viewContext -> PlayerView(viewContext).apply { this.player=player; useController=true }},
+                update={it.player=player},
+                modifier=Modifier.width(280.dp).aspectRatio(16f/9f).clip(NexusTokens.card),
+            )
+        }
+        media.mimeType.startsWith("audio/") -> {
+            val player=remember(media.uri) {
+                ExoPlayer.Builder(context).build().apply { setMediaItem(MediaItem.fromUri(Uri.parse(media.uri))); prepare() }
+            }
+            var playing by remember(media.uri) { mutableStateOf(false) }
+            DisposableEffect(player) {
+                val listener=object:Player.Listener { override fun onIsPlayingChanged(isPlaying:Boolean) { playing=isPlaying } }
+                player.addListener(listener)
+                onDispose { player.removeListener(listener); player.release() }
+            }
+            Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.field,modifier=Modifier.widthIn(min=220.dp,max=280.dp)) {
+                Row(Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically) {
+                    Icon(Icons.Default.GraphicEq,null,tint=MaterialTheme.colorScheme.primary)
+                    Column(Modifier.weight(1f).padding(horizontal=NexusTokens.space8)) {
+                        Text(media.name ?: "Audio",maxLines=1,style=MaterialTheme.typography.bodyMedium)
+                        media.durationSec?.let { Text(formatMediaDuration(it),style=MaterialTheme.typography.labelMedium,color=TextSecondary) }
+                    }
+                    IconButton(onClick={if(playing) player.pause() else player.play()}) {
+                        Icon(if(playing) Icons.Default.Pause else Icons.Default.PlayArrow,if(playing) "Pausar audio" else "Reproducir audio")
+                    }
+                }
+            }
+        }
+        else -> Surface(
+            color=MaterialTheme.colorScheme.surfaceVariant,
+            shape=NexusTokens.field,
+            modifier=Modifier.widthIn(min=220.dp,max=280.dp).clickable { openAssistantMedia(context,media) },
+        ) {
+            Row(Modifier.padding(NexusTokens.space12),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Icon(Icons.Default.Description,"Abrir archivo")
+                Column(Modifier.weight(1f)) {
+                    Text(media.name ?: "Archivo del asistente",maxLines=2,style=MaterialTheme.typography.bodyMedium)
+                    Text(media.mimeType,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                }
+                Icon(Icons.Default.OpenInNew,"Abrir")
+            }
+        }
+    }
+}
+
+private fun openAssistantMedia(context:android.content.Context,media:Attachment) {
+    runCatching {
+        val original=Uri.parse(media.uri)
+        val uri=if(original.scheme=="file") FileProvider.getUriForFile(
+            context,"${com.vidadomu.nexus.BuildConfig.APPLICATION_ID}.fileprovider",java.io.File(original.path!!)) else original
+        val view=Intent(Intent.ACTION_VIEW).setDataAndType(uri,media.mimeType)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(view,media.name ?: "Abrir archivo"))
+    }.onFailure { Toast.makeText(context,"No hay una aplicación compatible para abrir este archivo.",Toast.LENGTH_SHORT).show() }
+}
+
+private fun formatMediaDuration(seconds:Double):String {
+    val total=seconds.toInt().coerceAtLeast(0)
+    return if(total>=3600) "%d:%02d:%02d".format(total/3600,(total%3600)/60,total%60)
+        else "%d:%02d".format(total/60,total%60)
 }
 
 @Composable
@@ -482,6 +575,10 @@ internal fun PlanCardView(
                     else LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 if(p.jobStatus=="COMPLETED") FilledTonalButton(onClick=onOpenOutput) {Text("Ver resultado")}
+                if(p.jobStatus in setOf("FAILED","CANCELLED")) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    TextButton(onClick=onDiscard) {Text("Quitar tarjeta",color=TextSecondary)}
+                    TextButton(onClick=onOpenOutput) {Text("Ver detalle",color=TextSecondary)}
+                }
             } else if(p.state!=PlanState.DISCARDED) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 TextButton(onClick=onOpenCanvas,enabled=!p.busy) {Text("Abrir en el Lienzo",color=TextSecondary)}
                 if(showDiscard) TextButton(onClick=onDiscard,enabled=!p.busy) {Text("Descartar",color=TextSecondary)}

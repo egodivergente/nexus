@@ -1,7 +1,7 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado actual: Android 1.9.6-agent-preview / vc40 y Windows 1.9.5-agent-desktop.
+Estado actual: Android 1.9.8-agent-preview / vc42 en el S25 y Windows 1.9.5-agent-desktop.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
@@ -34,3 +34,17 @@ versionados; su sesión y configuración activa viven en Termux, fuera de Git.
 El 15 de octubre se corrigió e instaló en el S25 la cuota fija de tokens en 1.9.6/vc40.
 Véase docs/AGENT-TOKEN-QUOTA-FIX-20261015.md. El Pixel continúa en su versión anterior;
 esta tarea no actualizó Windows ni Pixel.
+
+El 16 de octubre se instaló en el S25 Android 1.9.7-agent-preview/vc41 con temas
+cálidos, importación y acciones de Biblioteca, búsqueda entre modalidades, edición
+de archivos, PDF con imágenes, análisis de audio local, upscale y revisión visual,
+memoria de proyecto consultable y menor repetición de contexto. Véase
+docs/EXPERIENCE-197-20261016.md. No se ejecutaron pruebas adicionales tras la
+petición del usuario; la compilación final de la APK sí terminó correctamente.
+
+El 16 de octubre se instaló en el S25 Android 1.9.8-agent-preview/vc42. Mantiene los
+turnos del asistente al minimizar Nexus, corrige el retorno desde Ajustes/Flow a la
+pestaña elegida y representa en el chat los medios abiertos o creados por el agente.
+El APK se instaló encima de vc41 con firma compatible y datos conservados. No se
+ejecutaron pruebas conversacionales ni controles de esos flujos por petición del
+usuario. Véase `docs/AGENT-BACKGROUND-TURN-198-20261016.md`.

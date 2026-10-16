@@ -17,7 +17,7 @@ internal data class MediaEditSpec(
     val projectId: String? = null,
 ) {
     companion object {
-        val ACTIONS = setOf("trim", "concat", "remove_audio", "replace_audio", "mix_audio", "extract_audio", "frames", "transcribe")
+        val ACTIONS = setOf("trim", "concat", "remove_audio", "replace_audio", "mix_audio", "extract_audio", "frames", "transcribe", "analyze_audio")
         fun parse(action: String, input: JsonObject, projectId: String?): MediaEditSpec {
             if(action !in ACTIONS) throw ToolInputException("Operación de edición no admitida.")
             val allowed=setOf("action","asset_id","asset_ids","start_ms","end_ms","audio_asset_id","timestamps_ms","max_dimension")
@@ -40,7 +40,7 @@ internal data class MediaEditSpec(
             val start=ms("start_ms",0)!!; val end=ms("end_ms")
             if(end!=null && end<=start) throw ToolInputException("El final debe ser posterior al inicio.")
             if(action=="trim" && end==null) throw ToolInputException("Indica end_ms para recortar.")
-            if(action !in setOf("trim","transcribe") && (start!=0L || end!=null)) throw ToolInputException("El intervalo sólo se aplica al recorte o la transcripción.")
+            if(action !in setOf("trim","transcribe","analyze_audio") && (start!=0L || end!=null)) throw ToolInputException("El intervalo sólo se aplica al recorte o la transcripción.")
             val audio=input.text("audio_asset_id")
             if(action in setOf("replace_audio","mix_audio") && audio==null) throw ToolInputException("Indica la pista audio_asset_id.")
             if(action !in setOf("replace_audio","mix_audio") && audio!=null) throw ToolInputException("Esta operación no usa una pista adicional.")

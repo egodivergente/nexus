@@ -40,7 +40,8 @@ sealed interface ChatItem {
     @kotlinx.serialization.Serializable
     data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
     @kotlinx.serialization.Serializable
-    data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String) : ChatItem
+    data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
+        val media: List<Attachment> = emptyList()) : ChatItem
     /** Una tarjeta por encargo: [orderId] es persistente y [planId] apunta al plan vigente. */
     @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String, val orderId: String? = null) : ChatItem
@@ -159,6 +160,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             return false
         }
         failedTurn = null
+        conversation.session.clearRenderedMedia()
         val latestSettings = runtime.settings.load()
         if (latestSettings != _ui.value.settings) {
             // Native settings tools affect the next request without dropping conversation, plans or proposals.
@@ -168,6 +170,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
         _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, scrollRequest = it.scrollRequest + 1) }
+        // A ViewModel coroutine keeps the turn alive across navigation, but Android may reclaim
+        // the app once its Activity is backgrounded. Promote the user-started request first.
+        runCatching { AssistantTurnService.start(app) }
+            .onFailure { android.util.Log.w("NexusAssistant", "Could not promote agent turn", it) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -178,7 +184,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
-                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop)) }
+                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
+                        conv.session.renderedMedia.values.toList())) }
                 }
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
                 r.verifiedNotes.forEach { notice(it, error = false) }
@@ -196,6 +203,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 failedTurn = clean to atts
                 notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
             } finally {
+                AssistantTurnService.stop(app)
                 _ui.update { state ->
                     // Solo las tarjetas NUEVAS de este turno van tras la respuesta; las existentes
                     // se actualizan en su sitio y no saltan de posición.
@@ -565,9 +573,19 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun discardPlan(planId: String) {
         val p = _ui.value.plans[planId] ?: return
         val order = orderOf(planId)
-        val failedOrder = order?.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED
-        if (p.busy || p.state == PlanState.UNCERTAIN || (p.state == PlanState.SUBMITTED && !failedOrder)) return
-        runCatching { order?.let { runtime.orders.discard(it.id) } }.onFailure { return }
+        if (order != null) {
+            // Un encargo fallido se puede descartar; el plan enviado y su job se conservan en Historial.
+            val failedOrder = order.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED
+            if (p.busy || p.state == PlanState.UNCERTAIN || (p.state == PlanState.SUBMITTED && !failedOrder)) return
+            runCatching { runtime.orders.discard(order.id) }.onFailure { return }
+        } else {
+            if (!p.busy && p.state == PlanState.SUBMITTED && p.jobStatus in setOf("FAILED", "CANCELLED")) {
+                // Dismiss only the presentation. Keep the submitted plan and its job/receipt intact.
+                _ui.update { state -> state.copy(items = state.items.filterNot { it is ChatItem.PlanCard && it.planId == planId }) }
+                return
+            }
+            if (p.busy || p.state == PlanState.SUBMITTED || p.state == PlanState.UNCERTAIN) return
+        }
         runtime.guard.discard(planId)
         setPlan(planId) { it.copy(state = PlanState.DISCARDED) }
     }
