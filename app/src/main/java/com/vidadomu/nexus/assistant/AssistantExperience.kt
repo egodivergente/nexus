@@ -73,8 +73,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
         border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f)),
-        modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8)) {
-        Column(Modifier.fillMaxWidth().padding(NexusTokens.space8)) {
+        modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             completion?.let { suggestions ->
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     items(suggestions.models, key = { it.ref.toString() }) { model ->
@@ -92,10 +92,19 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             Row(verticalAlignment = Alignment.Bottom) {
                 IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar") }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
-                TextField(text, onInput, modifier = Modifier.weight(1f), placeholder = { Text("Escribe a Nexus…") },
-                    textStyle=MaterialTheme.typography.bodyLarge,shape=NexusTokens.field,colors=TextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surface,unfocusedContainerColor=MaterialTheme.colorScheme.surface,focusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent,unfocusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent),
-                    minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }))
+                // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
+                val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+                androidx.compose.foundation.text.BasicTextField(text, onInput, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)
+                    .semantics { contentDescription = "Mensaje para Nexus" },
+                    textStyle = style, cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                    minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
+                    decorationBox = { inner ->
+                        Box(Modifier.padding(vertical = 13.dp), contentAlignment = Alignment.CenterStart) {
+                            if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            inner()
+                        }
+                    })
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }

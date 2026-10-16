@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class,androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class,androidx.compose.material3.ExperimentalMaterial3Api::class,androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.vidadomu.nexus.assistant
 
@@ -17,6 +17,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -177,7 +178,8 @@ fun AssistantScreen(
         Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState,
+                contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty()) item { EmptyHint() }
                 items(visibleItems, key = { it.id }) { item ->
                     when (item) {
@@ -363,13 +365,12 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
-    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+    var showSteps by rememberSaveable(item.id) {mutableStateOf(false)}
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         if(item.text.isNotBlank()) {
-            ChatMarkdownView(item.text)
-            Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.CenterEnd) {
-                IconButton(onClick={actionsExpanded=true},modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
-                    Icon(Icons.Default.MoreVert,"Acciones de la respuesta")
-                }
+            // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
+            Box(Modifier.fillMaxWidth().combinedClickable(onClick={},onLongClick={actionsExpanded=true},onLongClickLabel="Acciones de la respuesta")) {
+                ChatMarkdownView(item.text)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
@@ -382,21 +383,15 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
                             context.startActivity(Intent.createChooser(intent,"Compartir respuesta"))
                         }.onFailure {Toast.makeText(context,"No se pudo compartir la respuesta",Toast.LENGTH_SHORT).show()}
                     })
+                    if(item.toolCalls.isNotEmpty()) DropdownMenuItem(text={Text(if(showSteps) "Ocultar pasos" else "Ver pasos (${item.toolCalls.size})")},
+                        leadingIcon={Icon(Icons.Default.Build,null)},onClick={showSteps=!showSteps;actionsExpanded=false})
                 }
             }
         }
+        if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             items(item.media,key={it.id}) { AssistantMediaPreview(it) }
-        }
-        if(item.toolCalls.isNotEmpty()) {
-            var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
-            Column(Modifier.animateContentSize()) {
-                StudioToolChip("⚙ ${item.toolCalls.size} llamadas a herramientas",selected=expanded) {expanded=!expanded}
-                if(expanded) Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.field) {
-                    Text(item.toolCalls.joinToString("\n"),Modifier.padding(12.dp),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
-                }
-            }
         }
     }
 }

@@ -187,6 +187,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
                         put("plan", plan.cardJson(d.guard.state(plan.id)))
                         put("reused", existing != null)
                         put("updated_existing_card", target != null)
+                        ModelGuidance.forPlan(d, plan.ref.modelId, plan.task, session)?.let { put("model_guidance", it) }
                         put("next", if (d.directFlow && plan.ref.providerId == "google_flow") "Si el usuario pidió generar, llama a submit_generation: Flow se envía directamente sin confirmación."
                             else "Tarjeta ${order.id} ${if (target != null) "actualizada en su sitio" else "mostrada"}: PREPARADA, NO enviada. El envío solo ocurre cuando el usuario pulsa el botón de la tarjeta. Para cambiarla usa update_plan(order_id=${order.id}).")
                     },

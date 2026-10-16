@@ -304,6 +304,16 @@ class TencentUpscaleFlowTest {
         assertNull(ErrorDiagnosis.diagnose("fps must be an integer between 1 and 100", TENCENT_SCHEMA, plan)!!.fix, "si ya se envió un fps no se inventa otro")
     }
 
+    @Test fun `preparar un encargo entrega la guia especifica del modelo una sola vez`() = runTest {
+        val h = harness(); val att = video(h); val s = AgentSession("c", AgentMode.AGENT).apply { attachments += att }
+        val first = prepare(h, s, att).result.jsonObject["model_guidance"]!!.jsonObject
+        assertEquals("tencent-video-upscaler", first["skill"]!!.jsonPrimitive.content)
+        assertTrue("short=0" in first["constraints"]!!.jsonPrimitive.content, first.toString())
+        assertTrue("prompt" in first["common_mistakes"]!!.jsonPrimitive.content)
+        val again = prepare(h, s, att, extra = ""","new_copy":true""").result.jsonObject["model_guidance"]!!.jsonObject
+        assertNull(again["constraints"], "no se repite en la misma conversación")
+    }
+
     @Test fun `la skill de Tencent cubre el modelo y explica que no hay prompt`() {
         val skill = assertNotNull(realSkills().forModel(TENCENT.modelId))
         assertEquals("tencent-video-upscaler", skill.id)

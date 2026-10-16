@@ -55,6 +55,8 @@ class AgentSession(
     /** Acciones de organización propuestas en modo Copiloto, pendientes de que el usuario las aplique. */
     val pendingActions = linkedMapOf<String, PendingAction>()
     var flowSubmittedResults = 0
+    /** Skills de modelo cuya guía ya recibió el agente en esta conversación (no se repite). */
+    val deliveredSkills = mutableSetOf<String>()
 
     fun attachment(id: String): Attachment? = attachments.firstOrNull { it.id == id }
 }

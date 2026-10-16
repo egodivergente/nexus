@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -124,57 +125,84 @@ internal fun OrderCard(
     var editParam by remember { mutableStateOf<Pair<String, String>?>(null) }
     editParam?.let { (k, v) -> ParamEditDialogCompact(k, v, onSave = { nv -> editParam = null; onEdit(PlanEdit(params = mapOf(k to nv))) }, onDismiss = { editParam = null }) }
 
+    var menu by remember { mutableStateOf(false) }
+    val running = order.status in setOf(OrderStatus.SUBMITTING, OrderStatus.PROCESSING)
     Card(Modifier.fillMaxWidth().animateContentSize().semantics { contentDescription = "Encargo ${plan.modelName}"; stateDescription = shown.status }, shape = NexusTokens.card) {
-        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+        Column(Modifier.padding(start = NexusTokens.space12, end = NexusTokens.space4, top = NexusTokens.space8, bottom = NexusTokens.space8),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Cabecera en una línea: qué, quién factura, cuánto, estado y controles secundarios plegados.
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(plan.modelName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(billingLabel(plan.ref.providerId), cost ?: "coste por confirmar".takeIf { order.status == OrderStatus.AWAITING_CONFIRMATION })
-                        .joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(billingLabel(plan.ref.providerId), cost ?: "coste por confirmar".takeIf { order.status == OrderStatus.AWAITING_CONFIRMATION },
+                        "intento ${order.attempt}".takeIf { order.attempt > 1 }).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 StatusPill(shown.status, shown.error)
-            }
-            if (order.status in setOf(OrderStatus.SUBMITTING, OrderStatus.PROCESSING)) {
-                val progress = order.progress
-                if (progress != null) LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                else LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-            shown.headline?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = if (shown.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface) }
-            shown.detail?.takeIf { it.isNotBlank() }?.let {
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis)
+                IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(40.dp)) {
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (expanded) "Ocultar detalles" else "Detalles", tint = TextSecondary)
+                }
+                Box {
+                    IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.MoreVert, "Más opciones", tint = TextSecondary) }
+                    DropdownMenu(menu, { menu = false }) {
+                        if (order.status.editable) DropdownMenuItem({ Text("Abrir en el Lienzo") }, { menu = false; onOpenCanvas() }, enabled = !p.busy)
+                        if (order.status.editable) DropdownMenuItem({ Text("Descartar") }, { menu = false; onDiscard() }, enabled = !p.busy && !assistantBusy)
+                        DropdownMenuItem({ Text("Abrir Historial") }, { menu = false; onOpenHistory() })
+                    }
                 }
             }
-            if (outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                items(outputs) { uri ->
-                    if (plan.modality == "IMAGE") AsyncImage(uri, "Resultado generado", Modifier.width(220.dp).aspectRatio(16f / 9f)
-                        .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
-                    else OutlinedButton(onClick = onOpenOutput) { Icon(Icons.Default.PlayArrow, null); Text("Abrir vídeo") }
+            Column(Modifier.padding(end = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (running) {
+                    val progress = order.progress
+                    if (progress != null) LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
+                shown.headline?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = if (shown.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis) }
+                shown.detail?.takeIf { it.isNotBlank() }?.let {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                // El resultado es el contenido: miniatura que abre el visor, sin botón aparte.
+                if (outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                    items(outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput) }
+                }
+                if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
+                    val click = when (shown.action) {
+                        CardAction.GENERATE, CardAction.RETRY -> onGenerate
+                        CardAction.APPLY_FIX -> onApplyFix
+                        CardAction.ASK_AGENT -> onAskAgent
+                        CardAction.VIEW_RESULT -> onOpenOutput
+                        CardAction.CHECK_HISTORY -> onOpenHistory
+                        CardAction.REVIEW -> ({ expanded = true })
+                        CardAction.SENDING, CardAction.NONE -> ({})
+                    }
+                    Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+                        contentPadding = PaddingValues(horizontal = NexusTokens.space16, vertical = 8.dp)) {
+                        Text(shown.actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                if (expanded) OrderDetails(order, p, prompt, { prompt = it }, dirty, onEdit, onOpenCanvas, currency) { k, v -> editParam = k to v }
             }
-            // La única acción del encargo, a ancho completo para que su texto (con el coste) no se corte.
-            if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
-                val click = when (shown.action) {
-                    CardAction.GENERATE, CardAction.RETRY -> onGenerate
-                    CardAction.APPLY_FIX -> onApplyFix
-                    CardAction.ASK_AGENT -> onAskAgent
-                    CardAction.VIEW_RESULT -> onOpenOutput
-                    CardAction.CHECK_HISTORY -> onOpenHistory
-                    CardAction.REVIEW -> ({ expanded = true })
-                    CardAction.SENDING, CardAction.NONE -> ({})
-                }
-                Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth()) {
-                    Text(shown.actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { expanded = !expanded }, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
-                    Text(if (expanded) "Ocultar detalles" else "Detalles"); Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
-                }
-                if (order.status.editable) TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) { Text("Descartar") }
-                if (order.attempt > 1) Text("Intento ${order.attempt}", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-            }
-            if (expanded) OrderDetails(order, p, prompt, { prompt = it }, dirty, onEdit, onOpenCanvas, currency) { k, v -> editParam = k to v }
+        }
+    }
+}
+
+/** Miniatura 16:9 del resultado (fotograma para vídeo) con indicador de reproducción. */
+@Composable
+private fun ResultThumb(uri: String, modality: String, onOpen: () -> Unit) {
+    val context = LocalContext.current
+    val video = modality == "VIDEO"
+    Box(Modifier.width(240.dp).aspectRatio(16f / 9f).clip(NexusTokens.field).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = coil.request.ImageRequest.Builder(context).data(uri).crossfade(160)
+                .apply { if (video) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }.build(),
+            contentDescription = if (video) "Abrir vídeo generado" else "Abrir imagen generada",
+            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
+        )
+        if (video) Surface(shape = NexusTokens.filter, color = MaterialTheme.colorScheme.scrim.copy(alpha = .55f), contentColor = com.vidadomu.nexus.ui.theme.MediaForeground) {
+            Icon(Icons.Default.PlayArrow, null, Modifier.padding(8.dp).size(28.dp))
         }
     }
 }
@@ -228,7 +256,6 @@ private fun OrderDetails(order: Order, p: PlanUi, prompt: String, onPrompt: (Str
             Text("${plan.ref.providerId}:${plan.ref.modelId}\nEncargo ${order.id} · intento ${order.attempt} · plan ${plan.id}" + (order.jobId?.let { " · job $it" } ?: ""),
                 style = MaterialTheme.typography.labelSmall, color = TextSecondary)
         }
-        if (order.status.editable) TextButton(onClick = onOpenCanvas, enabled = !p.busy) { Text("Abrir en el Lienzo", color = TextSecondary) }
     }
 }
 
