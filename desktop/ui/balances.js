@@ -34,6 +34,7 @@ function parseAccountBalance(provider,response){
 function balanceText(item){
  if(!item)return 'Pendiente';
  if(item.value==null)return 'No disponible';
+ if(item.currency==='USD'&&window.NexusCurrency)return window.NexusCurrency.cost(item.value);
  const value=new Intl.NumberFormat('es-ES',{maximumFractionDigits:4}).format(item.value);
  return value+(item.currency==='credits'?' créditos':' '+item.currency);
 }
@@ -46,7 +47,7 @@ function renderBalances(){
   const item=AccountBalances.values[id],supported=!!balanceRoutes[id];
   const isFlow=id==='google_flow',label=isFlow?flowConnectionText():!supported?'Saldo sin consultar':item?balanceText(item):AccountBalances.busy?'Consultando…':'Pendiente';
   const time=item?.time?new Date(item.time).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
-  const title=isFlow?flowConnectionHelp() : !supported?'La consulta de saldo no está implementada. Este mensaje no indica el estado de conexión del proveedor.':item?.error||'Saldo devuelto por el proveedor'+(item?.time?' · '+new Date(item.time).toLocaleString('es-ES'):'');
+  const title=isFlow?flowConnectionHelp() : !supported?'La consulta de saldo no está implementada. Este mensaje no indica el estado de conexión del proveedor.':item?.error||'Saldo devuelto por el proveedor'+(item?.currency==='USD'?' ('+new Intl.NumberFormat('es-ES',{maximumFractionDigits:4}).format(item.value)+' USD, convertido a euros)':'')+(item?.time?' · '+new Date(item.time).toLocaleString('es-ES'):'');
   const settingsBalance=$('#balance-'+id);if(settingsBalance&&supported&&item)settingsBalance.textContent='Saldo: '+balanceText(item)+(item.error?' · Última consulta fallida':'');
   const connecting=['refreshing','signing_in'].includes(FlowConnection.value?.status);
   const flowAction=isFlow?(FlowConnection.value?.status==='auth_required'?'<button type="button" data-connect-flow style="width:auto;min-width:70px;font-size:var(--text-xs);padding:4px 10px" '+(FlowConnection.busy?'disabled':'')+'>Conectar</button>':'<button type="button" data-refresh-flow title="Renovar sesión de Flow" aria-label="Renovar sesión de Flow" '+(FlowConnection.busy||connecting?'disabled':'')+'>&#8635;</button>'):'';

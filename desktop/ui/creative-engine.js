@@ -79,8 +79,9 @@
   const send=$('.canvas .sendbar')||el('div','sendbar');
   const action=el('div','creative-split');
   let generate=$('#generate');if(!generate){generate=el('button','primary','Generar');generate.id='generate';generate.type='button';generate.disabled=true;}
-  generate.title='Generar (Enter / Ctrl+Enter)';
+  generate.title=loaded?'Generar (Enter / Ctrl+Enter)':'Elige un motor para poder generar';
   action.append(generate);
+  if(!loaded)action.append(el('small','nx-generate-hint','Elige un motor para generar'));
   const multi=el('details','creative-multi','<summary aria-label="Opciones de generación" title="Opciones de generación">▾</summary><div><button type="button" data-action="chooseCompare">Multi-Run · varios modelos</button><small>Prompt y ajustes propios por modelo</small></div>');action.append(multi);
   source.querySelectorAll('[data-action="chooseCompare"]').forEach(n=>n.remove());
   const rightTools=el('div','creative-footer-actions');rightTools.append(send,action);
@@ -99,9 +100,11 @@
   const jobs=productionJobs();
   jobs.forEach(j=>{
    const output=j.outputs?.[0],url=typeof output==='string'?output:output?.url,valid=isMediaUrl(url),completed=j.status==='COMPLETED';
-   const piece=el('button','creative-piece');piece.type='button';piece.dataset.creativeJob=j.id;piece.title=j.name||j.modelId;piece.setAttribute('aria-label','Abrir '+piece.title);
+   const piece=el('button','creative-piece');piece.type='button';piece.dataset.creativeJob=j.id;if(valid)piece.classList.add('is-loading');piece.title=j.name||j.modelId;piece.setAttribute('aria-label','Abrir '+piece.title);
    piece.innerHTML=valid?(j.modality==='VIDEO'?`<video src="${escape(url)}#t=0.1" muted playsinline preload="metadata" aria-hidden="true"></video><span>▷</span>`:`<img src="${escape(url)}" alt="${escape(piece.title)}" loading="lazy" decoding="async">`):`<span>${escape(j.status==='FAILED'?'Fallido':'En proceso')}</span>`;
    if(valid&&completed&&j.modality==='IMAGE'){piece.draggable=true;piece.addEventListener('dragstart',e=>{e.dataTransfer.setData('application/x-nexus-job',j.id);e.dataTransfer.effectAllowed='copy';});piece.title+=' · Arrastra para usar como referencia';}
+   const thumb=piece.querySelector('video,img');
+   if(thumb){const done=()=>piece.classList.remove('is-loading');thumb.addEventListener('loadeddata',done,{once:true});thumb.addEventListener('load',done,{once:true});thumb.addEventListener('error',()=>{piece.classList.remove('is-loading');piece.classList.add('is-broken');thumb.remove();piece.insertAdjacentHTML('afterbegin','<span>No disponible</span>');},{once:true});}
    list.append(piece);
   });
   if(!jobs.length)list.innerHTML='<p class="creative-tray-empty">Tu próxima creación empieza arriba. Aquí aparecerán tus resultados.</p>';

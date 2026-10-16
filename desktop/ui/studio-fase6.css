@@ -1,0 +1,31 @@
+/* Fase 6 — auditoría UX: objetivos táctiles, estados de carga y navegación estrecha. */
+:root{--text-xs:12px}
+
+/* Barra de estado: controles de al menos 32 px. */
+footer.creative-status button,footer.creative-status summary,footer.creative-status .nx-meta-chip{min-height:32px;min-width:32px}
+footer.creative-status{row-gap:2px}
+
+/* Miniaturas de «Producción reciente»: esqueleto mientras llega el fotograma. */
+.creative-piece{position:relative;overflow:hidden}
+.creative-piece.is-loading::before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,#ffffff12 50%,transparent 80%) 0 0/200% 100%,#ffffff08;animation:nx-shimmer 1.4s linear infinite}
+.creative-piece.is-broken{opacity:.7}
+@keyframes nx-shimmer{to{background-position:-200% 0}}
+
+/* Motivo del botón Generar apagado. */
+.nx-generate-hint{color:var(--muted);font-size:var(--text-sm);margin-left:8px;white-space:nowrap}
+
+/* Estado del asistente: un único indicador. */
+.agent-status{display:inline-flex;align-items:center;gap:6px}
+.agent-status.offline{color:var(--danger,#f87171)}
+
+/* Historial: acción directa junto a los tres puntos. */
+.history-row .history-reuse{min-width:32px;min-height:32px}
+
+/* Ajustes: estado de cada proveedor. */
+.provider-dot{display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;vertical-align:middle;background:var(--muted,#9aa4b8)}
+.provider-dot.on{background:var(--success,#34d399)}
+
+/* Navegación estrecha: pestañas de Ajustes con desplazamiento horizontal. */
+.settings-tabs,.settings-nav,#settings-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+.settings-tabs>*,.settings-nav>*,#settings-tabs>*{flex:none}
+@media(max-width:860px){.sidebar nav button{position:relative}}

@@ -8,7 +8,19 @@
   details(usd){return Number.isFinite(usd)?this.decimals(usd,4)+' USD':'—';},
   credits(value){return Number.isFinite(value)?this.decimals(value,0)+' créditos':'—';}
  };
+ currency.ensureRate=async(force=false)=>{
+  if(currency.rateBusy||(typeof initial!=='undefined'&&initial?.qa))return;
+  const fresh=Number.isFinite(state.usdToEurRate)&&state.usdToEurRate>0&&Date.now()-(state.exchangeRateFetchedAt||0)<6*36e5;
+  if(!force&&fresh)return;
+  currency.rateBusy=true;
+  try{const rate=await rpc('exchangeRate');if(rate?.rate>0){Object.assign(state,{usdToEurRate:rate.rate,exchangeRateUpdated:rate.date,exchangeRateFetchedAt:Date.now()});persist();render();}}
+  catch(error){}
+  finally{currency.rateBusy=false;}
+ };
  window.NexusCurrency=currency;
+ if(!state.currency){state.currency='EUR';}
+ setTimeout(()=>currency.ensureRate(),0);
+ window.addEventListener('focus',()=>currency.ensureRate());
  const native=(operation,input={},assets)=>rpc('nativeOperation',{operation,input,...(assets?{assets}:{} )});
  const assets=()=> (Agent.snapshot?.index.assets||[]).filter(a=>!a.libraryDeleted);
  const localAssets=()=>assets().filter(a=>a.uri?.startsWith('/media/'));
@@ -88,10 +100,10 @@
   const dayLabel=job=>{const d=new Date(job.startedAt||0),t=new Date(),y=new Date(Date.now()-864e5),same=(a,b)=>a.toDateString()===b.toDateString();return same(d,t)?'Hoy · '+dayOf(job):same(d,y)?'Ayer · '+dayOf(job):dayOf(job);};
   const sig=job=>[dayOf(job),shortPrompt(job.prompt),modelName(job),job.status,job.localEdit?'L':''].join('|');
   const usdOf=job=>Number.isFinite(job.actualCostUsd)?job.actualCostUsd:job.estimated&&!['credits','flow_credits','flow_account','unknown'].includes(job.estimated.currency)&&Number.isFinite(Number(job.estimated.amount))?Number(job.estimated.amount):job.localEdit?0:null;
-  const costOf=job=>job.actualCostUsd!=null?{text:currency.cost(job.actualCostUsd)}:job.estimated?{text:amount(job.estimated)}:job.localEdit?{text:'Local',title:'Edición hecha en tu equipo: no tiene coste.'}:{text:'No informado',title:'El proveedor no ha informado del coste de esta generación.'};
+  const costOf=job=>job.actualCostUsd!=null?{text:currency.cost(job.actualCostUsd)}:job.estimated?{text:amount(job.estimated)}:job.localEdit?{text:'Local',title:'Edición hecha en tu equipo: no tiene coste.'}:{text:'Coste pendiente',title:'El proveedor no ha informado aún del coste. Pulsa ··· → Actualizar para consultarlo.'};
   const thumb=job=>{const output=job.outputs?.[0],url=typeof output==='string'?output:output?.url;return job.modality==='IMAGE'&&url?`<img src="${escape(url)}" alt="" loading="lazy">`:job.modality==='VIDEO'&&url&&job.status==='COMPLETED'?`<video class="history-thumb" src="${escape(url)}#t=0.1" muted playsinline preload="metadata" aria-hidden="true"></video>`:`<span aria-label="${escape(statusName(job))}">${job.status==='FAILED'?'!':job.modality==='VIDEO'?'▷':job.modality==='AUDIO'?'♪':'◷'}</span>`;};
   const costCell=cost=>`<span class="parity-cost"${cost.title?` title="${escape(cost.title)}"`:''}>${escape(cost.text)}</span>`;
-  const row=(job,extra='')=>{const cost=costOf(job);return `<article class="history-row${extra}" data-job="${escape(job.id)}">${thumb(job)}<button class="history-open" data-studio-detail="${escape(job.id)}"><strong>${escape(shortPrompt(job.prompt))}</strong><small>${escape(modelName(job))} · ${escape(statusName(job))} · ${timeOf(job)}</small></button>${costCell(cost)}<button data-parity-job="${escape(job.id)}" aria-label="Acciones de la generación">···</button></article>`;};
+  const row=(job,extra='')=>{const cost=costOf(job);return `<article class="history-row${extra}" data-job="${escape(job.id)}">${thumb(job)}<button class="history-open" data-studio-detail="${escape(job.id)}"><strong>${escape(shortPrompt(job.prompt))}</strong><small>${escape(modelName(job))} · ${escape(statusName(job))} · ${timeOf(job)}</small></button>${costCell(cost)}<button class="history-reuse" data-reuse="${escape(job.id)}" title="Preparar de nuevo" aria-label="Preparar de nuevo">↻</button><button data-parity-job="${escape(job.id)}" aria-label="Acciones de la generación">···</button></article>`;};
   const visible=jobs.slice(0,200),items=[];
   for(let i=0;i<visible.length;){let j=i+1;while(j<visible.length&&sig(visible[j])===sig(visible[i]))j++;items.push(visible.slice(i,j));i=j;}
   let previous='';
@@ -126,7 +138,7 @@
  function settingsExtras(){
   if(view!=='settings'||$('#parity-settings'))return;
   const host=$('#settings-container')||$('#content');
-  host.insertAdjacentHTML('beforeend',`<section id="parity-settings" class="sheet parity-section"><h2>Agente y herramientas</h2><p class="hint">Configura el modelo conversacional, la transcripción local con Whisper y las conexiones MCP.</p><div class="toolbar"><button data-agent="settings">Modelo y conexión</button><button data-parity="whisper">Edición y Whisper</button><button data-parity="internet">Internet y MCP</button><button data-parity="diagnostics">Diagnóstico del sistema</button></div></section><section class="sheet parity-section"><h2>Lectura y moneda</h2><div class="fields"><label>Tamaño del texto<select id="parity-font"><option value="1">Normal · 100 %</option><option value="1.3">Grande · 130 %</option><option value="1.5">Muy grande · 150 %</option></select></label><label>Moneda<select id="parity-currency"><option value="USD">USD</option><option value="EUR">EUR</option></select></label></div><p class="hint" id="parity-rate">${state.usdToEurRate?'1 USD = '+currency.decimals(state.usdToEurRate,4)+' EUR · '+(state.exchangeRateUpdated||'Tasa guardada'):'Se necesita consultar el cambio para mostrar euros.'}</p><button data-parity="exchange-rate">Actualizar cambio</button></section>`);
+  host.insertAdjacentHTML('beforeend',`<section id="parity-settings" class="sheet parity-section"><h2>Agente y herramientas</h2><p class="hint">Configura el modelo conversacional, la transcripción local con Whisper y las conexiones MCP.</p><div class="toolbar"><button data-agent="settings">Modelo y conexión</button><button data-parity="whisper">Edición y Whisper</button><button data-parity="internet">Internet y MCP</button><button data-parity="diagnostics">Diagnóstico del sistema</button></div></section><section class="sheet parity-section"><h2>Lectura y moneda</h2><div class="fields"><label>Tamaño del texto<select id="parity-font"><option value="1">Normal · 100 %</option><option value="1.3">Grande · 130 %</option><option value="1.5">Muy grande · 150 %</option></select></label><label>Moneda<select id="parity-currency"><option value="USD">USD</option><option value="EUR">EUR</option></select></label></div><p class="hint" id="parity-rate">${state.usdToEurRate?'1 USD = '+currency.decimals(state.usdToEurRate,4)+' EUR · '+('BCE · '+(state.exchangeRateUpdated||'Tasa guardada')):'Se necesita consultar el cambio para mostrar euros.'}</p><button data-parity="exchange-rate">Actualizar cambio</button></section>`);
   $('#parity-font').value=String(state.fontScale||1);$('#parity-currency').value=state.currency||'USD';
   settingsNav();
  }

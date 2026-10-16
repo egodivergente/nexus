@@ -2,7 +2,21 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
-## [Unreleased] - rama `ux/premium-10` (Windows)
+## [Unreleased] - rama `ux/fase6-auditoria` (Windows)
+
+Mejoras de la auditoría UX de Nexus Studio (solo `desktop/ui` y una prueba nueva):
+
+- **Clic derecho integrado:** menú contextual propio (`context-menu.js`) con acciones directas según el elemento: creaciones (abrir, preparar de nuevo, copiar prompt/enlace, favorito, seleccionar, consultar estado, diagnóstico), modelos, mensajes del asistente, campos de texto (cortar/copiar/pegar) y fondo (ir a cada sección, paleta, saldos). Teclado completo (flechas, Esc); Mayús + clic derecho conserva el menú nativo.
+- **Moneda en euros:** euros por defecto; el cambio del BCE se refresca solo (cada 6 h y al volver a la ventana) y los saldos en USD se muestran convertidos, con el importe original en el tooltip. «No informado» pasa a «Coste pendiente» con cómo consultarlo.
+- **Asistente:** un único estado de conexión (Conectando / Sin conexión) con «Reintentar»; el envío se desactiva mientras no haya conexión y el texto se conserva.
+- **Lienzo:** motivo visible del botón Generar apagado y esqueleto de carga en «Producción reciente».
+- **Historial y Ajustes:** botón «Preparar de nuevo» visible en cada fila; punto de estado por proveedor.
+- **Accesibilidad:** objetivos de 32 px en la barra de estado, texto mínimo 12 px, tooltips en la barra lateral contraída.
+- **Pendiente:** consolidar las 18 hojas de estilo superpuestas en una sola capa de componentes; elegir motor recomendado por defecto en el Lienzo.
+
+Prueba nueva: `desktop/tools/test-fase6-ux.py`.
+
+## Anterior - rama `ux/premium-10` (Windows)
 
 Pasada de pulido UX/UI de Nexus Studio para Windows (solo `desktop/ui`, sin cambios de lógica ni de datos):
 
