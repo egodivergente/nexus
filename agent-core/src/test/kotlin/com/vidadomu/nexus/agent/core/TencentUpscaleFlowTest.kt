@@ -255,6 +255,14 @@ class TencentUpscaleFlowTest {
         assertEquals(0, h.backend.submitted.size, "el agente nunca envía")
     }
 
+    @Test fun `la skill de Tencent cubre el modelo y explica que no hay prompt`() {
+        val skill = assertNotNull(realSkills().forModel(TENCENT.modelId))
+        assertEquals("tencent-video-upscaler", skill.id)
+        val upscale = assertNotNull(skill.subsection("Plantillas por tarea", com.vidadomu.nexus.agent.core.skills.TASK_TEMPLATE_KEYS.getValue("upscale")))
+        assertTrue("template" in upscale, upscale)
+        assertTrue("SIN `prompt`" in skill.section("Estructura de prompt")!!)
+    }
+
     @Test fun `get_ui_state expone lo que pinta la tarjeta y el error literal`() = runTest {
         val h = harness(); val att = video(h); val s = AgentSession("c", AgentMode.AGENT).apply { attachments += att }
         prepare(h, s, att)

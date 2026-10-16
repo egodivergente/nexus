@@ -1,0 +1,116 @@
+package com.vidadomu.nexus.assistant
+
+import com.vidadomu.nexus.agent.core.orders.FailureKind
+import com.vidadomu.nexus.agent.core.orders.Order
+import com.vidadomu.nexus.agent.core.orders.OrderBook
+import com.vidadomu.nexus.agent.core.orders.OrderFailure
+import com.vidadomu.nexus.agent.core.orders.OrderStatus
+import com.vidadomu.nexus.agent.core.orders.SuggestedFix
+import com.vidadomu.nexus.agent.core.registry.ModelRef
+import com.vidadomu.nexus.agent.core.spend.GenerationPlan
+import com.vidadomu.nexus.agent.core.spend.MediaRef
+import com.vidadomu.nexus.agent.core.spend.PlanState
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class OrderCardLogicTest {
+    private val ref = ModelRef("atlas_cloud", "tencent/video/upscaler")
+    private fun plan(id: String, video: String = "file:///clip.mp4", template: String = "live-action-enhance-4k") = GenerationPlan(
+        id = id, ref = ref, modelName = "Tencent Video Upscaler", modality = "VIDEO", prompt = "",
+        params = mapOf("template" to template), effectiveParams = mapOf("template" to template, "resolution" to "4k"),
+        media = listOf(MediaRef("video", video, "video/mp4", null, "video_url")), createdAt = 1,
+    )
+    private fun order(status: OrderStatus, failure: OrderFailure? = null, jobId: String? = null) = Order(
+        id = "ord_1", planId = "p1", status = status, modelName = "Tencent Video Upscaler", modelRef = ref.toString(), modality = "VIDEO",
+        jobId = jobId, failures = listOfNotNull(failure), createdAt = 0, updatedAt = 0,
+    )
+    private fun fail(kind: FailureKind, message: String, fix: SuggestedFix? = null) = OrderFailure(kind, message, 0, "p1", 1, fix, "Atlas exige resolution.")
+
+    @Test fun everyStateShowsAtMostOneActionAndHonestLabels() {
+        val awaiting = presentOrder(order(OrderStatus.AWAITING_CONFIRMATION), "1,00 €", busy = false, assistantBusy = false, dirty = false)
+        assertEquals(CardAction.GENERATE, awaiting.action)
+        assertEquals("Generar · 1,00 €", awaiting.actionLabel)
+        assertTrue(awaiting.enabled)
+        assertFalse(presentOrder(order(OrderStatus.AWAITING_CONFIRMATION), null, busy = false, assistantBusy = true, dirty = false).enabled)
+        assertFalse(presentOrder(order(OrderStatus.AWAITING_CONFIRMATION), null, busy = true, assistantBusy = false, dirty = false).enabled)
+
+        val sending = presentOrder(order(OrderStatus.SUBMITTING), null, busy = true, assistantBusy = false, dirty = false)
+        assertEquals(CardAction.SENDING, sending.action); assertFalse("bloquea pulsaciones repetidas", sending.enabled)
+        assertNull(presentOrder(order(OrderStatus.PROCESSING), null, false, false, false).actionLabel)
+        assertEquals(CardAction.VIEW_RESULT, presentOrder(order(OrderStatus.COMPLETED), null, false, false, false).action)
+
+        val uncertain = presentOrder(order(OrderStatus.UNCERTAIN, jobId = "job_1"), null, false, false, false)
+        assertEquals(CardAction.CHECK_HISTORY, uncertain.action)
+        assertTrue(uncertain.headline!!.contains("no lo repetirá"))
+    }
+
+    @Test fun failureShowsTheLiteralErrorAndTheConcreteFix() {
+        val withFix = presentOrder(order(OrderStatus.FAILED, fail(FailureKind.PROVIDER_REJECTED, "resolution is required (720p, 1080p, 1440p or 4k)",
+            SuggestedFix("Fijar Resolución = 4k", mapOf("resolution" to "4k")))), null, false, false, false)
+        assertEquals(CardAction.APPLY_FIX, withFix.action)
+        assertEquals("Error", withFix.status)
+        assertTrue(withFix.detail!!.startsWith("resolution is required"))
+        assertTrue("dice si se cobró", withFix.headline!!.contains("No se ha cobrado"))
+        assertEquals(CardAction.RETRY, presentOrder(order(OrderStatus.FAILED, fail(FailureKind.PROVIDER_REJECTED, "HTTP 503 unavailable")), null, false, false, false).action)
+        val jobFailed = presentOrder(order(OrderStatus.FAILED, fail(FailureKind.JOB_FAILED, "content policy")), null, false, false, false)
+        assertEquals(CardAction.ASK_AGENT, jobFailed.action)
+        assertTrue(jobFailed.headline!!.contains("decide si cobra"))
+        assertTrue(withFix.rendered.startsWith("Error · botón «Aplicar corrección»"))
+    }
+
+    @Test fun savedChatWithTriplicatedCardsShowsOneCardPerOrder() {
+        val p1 = PlanUi(plan("p1", template = "anime-enhance-4k"), true, PlanState.PREPARED)
+        val p2 = PlanUi(plan("p2"), true, PlanState.AWAITING_CONFIRMATION)
+        val done = PlanUi(plan("p3", video = "file:///otro.mp4"), false, PlanState.SUBMITTED, jobId = "job_9", jobStatus = "COMPLETED")
+        val saved = SavedAssistantChat(
+            items = listOf(
+                ChatItem.User("u1", "Haz upscale de este vídeo a 4K con Tencent", emptyList()),
+                ChatItem.PlanCard("c1", "p1"), ChatItem.PlanCard("c2", "p1"), ChatItem.PlanCard("c3", "p1"),
+                ChatItem.Assistant("a1", "Listo", emptyList(), "END_TURN"),
+                ChatItem.PlanCard("c4", "p2"),
+                ChatItem.PlanCard("c5", "p3"), ChatItem.PlanCard("c6", "p3"),
+            ),
+            plans = mapOf("p1" to p1, "p2" to p2, "p3" to done),
+        )
+        val r = ChatRestore.clean(saved, now = 5)
+        val cards = r.items.filterIsInstance<ChatItem.PlanCard>()
+        assertEquals("p1 y p2 eran el mismo encargo (mismo modelo y vídeo); p3 otro", listOf("p2", "p3"), cards.map { it.planId })
+        assertEquals(setOf("p1"), r.discardedPlanIds)
+        assertTrue(cards.all { it.orderId != null })
+        assertEquals(2, r.orders.orders.size)
+        assertEquals(OrderStatus.AWAITING_CONFIRMATION, r.orders.orders.first { it.planId == "p2" }.status)
+        assertEquals(OrderStatus.COMPLETED, r.orders.orders.first { it.planId == "p3" }.status)
+        assertEquals(setOf("p2", "p3"), r.plans.keys)
+        // Una segunda limpieza es estable: no crea encargos nuevos.
+        val again = ChatRestore.clean(SavedAssistantChat(r.items, r.plans, orders = r.orders), now = 6)
+        assertEquals(r.orders.orders.map { it.id }.toSet(), again.orders.orders.map { it.id }.toSet())
+        assertEquals(cards, again.items.filterIsInstance<ChatItem.PlanCard>())
+    }
+
+    @Test fun legacyFailedCardBecomesAFailedOrderWithItsError() {
+        val failed = PlanUi(plan("p1"), true, PlanState.PREPARED, error = "No se envió: resolution is required (720p, 1080p, 1440p or 4k)")
+        val r = ChatRestore.clean(SavedAssistantChat(listOf(ChatItem.PlanCard("c1", "p1")), mapOf("p1" to failed)), now = 1)
+        val o = r.orders.orders.single()
+        assertEquals(OrderStatus.FAILED, o.status)
+        assertTrue(o.lastFailure!!.message.contains("resolution is required"))
+    }
+
+    @Test fun ordersSurviveSerializationAndOldChatsStillLoad() {
+        val json = Json { ignoreUnknownKeys = true }
+        val old = """{"items":[{"type":"com.vidadomu.nexus.assistant.ChatItem.PlanCard","id":"c1","planId":"p1"}],"plans":{}}"""
+        val decoded = json.decodeFromString<SavedAssistantChat>(old)
+        assertNull((decoded.items.single() as ChatItem.PlanCard).orderId)
+        assertNull(decoded.orders)
+        val book = OrderBook { 1 }
+        val o = book.upsertPlan(plan("p1"))
+        val chat = SavedAssistantChat(listOf(ChatItem.PlanCard("c1", "p1", o.id)), mapOf("p1" to PlanUi(plan("p1"), true, PlanState.PREPARED)), orders = book.snapshot())
+        val back = json.decodeFromString<SavedAssistantChat>(json.encodeToString(chat))
+        assertEquals(o.id, back.orders!!.orders.single().id)
+        assertEquals(o.id, (back.items.single() as ChatItem.PlanCard).orderId)
+    }
+}

@@ -61,7 +61,9 @@ internal object ChatRestore {
             PlanState.UNCERTAIN -> OrderStatus.UNCERTAIN
             PlanState.DISCARDED -> OrderStatus.DISCARDED
         }
-        val failure = if (status == OrderStatus.FAILED || (status == OrderStatus.AWAITING_CONFIRMATION && p.error != null))
+        // Solo un envío rechazado («No se envió: …») es un error del encargo; otros avisos no.
+        val rejected = p.error?.startsWith("No se envió") == true
+        val failure = if (status == OrderStatus.FAILED || (status == OrderStatus.AWAITING_CONFIRMATION && rejected))
             listOf(OrderFailure(if (p.state == PlanState.SUBMITTED) FailureKind.JOB_FAILED else FailureKind.PROVIDER_REJECTED,
                 p.error ?: "El proveedor devolvió un error sin detalle.", now, p.plan.id, 1)) else emptyList()
         return Order(id = OrderBook.newId(), planId = p.plan.id, status = if (failure.isNotEmpty()) OrderStatus.FAILED else status,
