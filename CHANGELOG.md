@@ -2,6 +2,28 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.18-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+
+- Android vc52, los pendientes de la auditoría:
+  - Biblioteca: **una sola hoja** al abrir un archivo importado (antes dos hojas seguidas con «Abrir»
+    repetido), con vista previa, ficha, **«Usar en Lienzo»** (entra como entrada del modelo, igual que
+    «compartir con Nexus»), **«Al Agente»** (lo adjunta al chat), Abrir, Compartir, Guardar y Quitar.
+    Mantener pulsado marca (el menú de un archivo suelto está en «Más opciones» de la selección).
+  - Chat: **micrófono** cuando no hay nada que enviar. Usa el reconocimiento de voz del sistema
+    (sin permisos ni descarga de 148 MB) y el texto se inserta SIN enviar, para revisarlo. Es una decisión
+    consciente frente a Whisper local, que solo transcribe ficheros grabados y exigiría una grabadora propia
+    y el modelo descargado; el reconocedor del sistema puede procesar el audio fuera del móvil.
+  - Agente: herramienta **`suggest_replies`** (32 herramientas). El modelo da 2–4 opciones y salen como
+    botones sobre el campo, solo bajo su última respuesta; pulsar uno las envía como tu mensaje. No se
+    deduce del texto: es un bloque estructurado (sin duplicados, rótulos ≤40, textos ≤300).
+  - Trabajos atascados: a partir de 10 min la fila de Biblioteca dice «Tarda más de lo normal» en ámbar con
+    **consultar estado** (solo consulta, nunca reenvía) y **dejar de seguir** (no cancela en el proveedor y lo
+    avisa). En Historial, 3 o más fallos seguidos del mismo modelo y texto se pliegan en una fila.
+- Windows: `desktop/agent/core` sincronizado con agent-core (148 ficheros, 165 pruebas, 0 fallos) y JAR
+  recompilados. El host solo pinta progreso: no muestra encargos ni botones, así que `suggest_replies` no
+  se ofrece allí. El test de cobertura de skills ahora encuentra el catálogo también desde `desktop/agent/core`.
+- Sin capturar en el S25 (estaba en uso): la hoja única y el micrófono. En el Pixel se vio el chat con el
+  micrófono y las respuestas en tarjeta.
 ## [1.9.17-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
 - Android vc51, a partir de una auditoría de las capturas del S25 (cotejada con el código):

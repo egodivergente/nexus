@@ -233,7 +233,7 @@ fun AssistantScreen(
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
-                onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment)
+                onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) })
         }
     }
 }

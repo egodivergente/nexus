@@ -16,10 +16,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil.ImageLoader
@@ -40,15 +42,15 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,m
     val haptic=LocalHapticFeedback.current
     val visual=asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)
     Surface(shape=NexusTokens.thumbnail,modifier=Modifier.aspectRatio(1f).combinedClickable(
-        role=androidx.compose.ui.semantics.Role.Button,onClickLabel="Previsualizar ${asset.displayName}",onClick=onPreview,
-        onLongClickLabel="Opciones de ${asset.displayName}",onLongClick={haptic.performHapticFeedback(HapticFeedbackType.LongPress);onActions()})) {
+        role=Role.Button,onClickLabel="Previsualizar ${asset.displayName}",onClick=onPreview,
+        onLongClickLabel="Marcar ${asset.displayName}",onLongClick={haptic.performHapticFeedback(HapticFeedbackType.LongPress);onActions()})) {
         Box(contentAlignment=Alignment.Center) {
             if(visual) AsyncImage(asset.uri,asset.displayName,imageLoader=loader,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
             else Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(8.dp).padding(bottom=if(showDetails) 24.dp else 0.dp)) {
                 Icon(if(asset.type==AssetType.AUDIO) Icons.Default.GraphicEq else Icons.Default.Description,null)
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            // Opciones al mantener pulsado: sin ⋮ encima de la miniatura. ▶ y duración arriba; metadatos abajo.
+            // Mantener pulsado marca; ▶ y duración arriba; metadatos abajo.
             if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
             if(asset.type in setOf(AssetType.VIDEO,AssetType.AUDIO))
                 TileMediaBadge(asset.type==AssetType.VIDEO,mediaDuration(asset.durationSec?.toFloat()),Modifier.align(Alignment.TopEnd))
@@ -67,7 +69,7 @@ private fun Asset.mimeOrDefault():String = mimeType?.takeIf {it.isNotBlank()} ?:
     AssetType.IMAGE->"image/*";AssetType.VIDEO->"video/*";AssetType.AUDIO->"audio/*";else->"application/octet-stream"
 }
 
-/** «1080p · 12,4 MB · 16 oct · 07:14 · video/mp4» para la hoja de vista previa. */
+/** «1080p · 12,4 MB · 16 oct · 07:14 · video/mp4» bajo el título de la hoja. */
 @Composable
 private fun LocalAssetFacts(asset:Asset) {
     val visual=asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)
@@ -82,64 +84,35 @@ private fun LocalAssetFacts(asset:Asset) {
     Text(line,Modifier.fillMaxWidth(),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun shareableUri(context:android.content.Context,asset:Asset):Uri {
+    val raw=Uri.parse(asset.uri)
+    return if(raw.scheme=="file") FileProvider.getUriForFile(context,context.packageName+".fileprovider",File(raw.path!!)) else raw
+}
+
+/** Un icono con su rótulo, para la fila de acciones secundarias. */
 @Composable
-internal fun LocalAssetPreviewSheet(asset:Asset,onDismiss:()->Unit,onMoreOptions:()->Unit) {
-    val context=LocalContext.current
-    val mime=asset.mimeType ?: "application/octet-stream"
-    ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
-            .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12),
-            horizontalAlignment=Alignment.CenterHorizontally) {
-            Column(Modifier.fillMaxWidth()) {
-                Text(asset.displayName,Modifier.fillMaxWidth(),style=MaterialTheme.typography.titleMedium,maxLines=2,
-                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                LocalAssetFacts(asset)
-            }
-            if(asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO,AssetType.AUDIO)) {
-                AssistantMediaPreview(Attachment(asset.id,asset.uri,mime,asset.displayName,assetId=asset.id))
-            } else {
-                Surface(Modifier.fillMaxWidth(),shape=NexusTokens.field,color=MaterialTheme.colorScheme.surfaceVariant) {
-                    Column(Modifier.padding(NexusTokens.space16),horizontalAlignment=Alignment.CenterHorizontally,
-                        verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        Icon(Icons.Default.Description,null,Modifier.size(NexusTokens.space32),tint=MaterialTheme.colorScheme.primary)
-                        Text(mime,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
-                        Text("Abre este documento con una aplicación compatible para ver su contenido.",
-                            style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                OutlinedButton(onClick=onMoreOptions,modifier=Modifier.weight(1f)) {Text("Más opciones")}
-                Button(onClick={
-                    if(!openLocalAssetExternally(context,asset))
-                        android.widget.Toast.makeText(context,"No hay una aplicación disponible para abrir este archivo",android.widget.Toast.LENGTH_SHORT).show()
-                },modifier=Modifier.weight(1f)) {Text("Abrir archivo")}
-            }
-        }
+private fun SheetAction(icon:ImageVector,label:String,modifier:Modifier=Modifier,enabled:Boolean=true,onClick:()->Unit) {
+    Column(modifier.heightIn(min=NexusTokens.minimumTouch).clickable(enabled=enabled,role=Role.Button,onClick=onClick).padding(vertical=6.dp),
+        horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
+        Icon(icon,null,Modifier.size(22.dp),tint=if(enabled) MaterialTheme.colorScheme.onSurface else TextSecondary.copy(alpha=.5f))
+        Text(label,style=MaterialTheme.typography.labelMedium,color=if(enabled) MaterialTheme.colorScheme.onSurface else TextSecondary.copy(alpha=.5f),maxLines=1)
     }
 }
 
-private fun openLocalAssetExternally(context:android.content.Context,asset:Asset):Boolean = runCatching {
-    val raw=Uri.parse(asset.uri)
-    val uri=if(raw.scheme=="file") FileProvider.getUriForFile(context,context.packageName+".fileprovider",File(raw.path!!)) else raw
-    val intent=Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri,asset.mimeType ?: "application/octet-stream")
-        clipData=android.content.ClipData.newRawUri(asset.displayName,uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent,"Abrir archivo"))
-}.isSuccess
-
+/**
+ * Una sola hoja para un archivo importado: vista previa y ficha, dos acciones creativas de un toque
+ * (Lienzo y Agente) y las de siempre (abrir, compartir, guardar copia, quitar de la biblioteca).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LocalAssetActions(asset:Asset,onDismiss:()->Unit,onMessage:(String)->Unit) {
+internal fun LocalAssetSheet(asset:Asset,onDismiss:()->Unit,onMessage:(String)->Unit,
+    onUseInCanvas:((Asset)->Unit)?,onSendToAgent:((Asset)->Unit)?) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val scope=rememberCoroutineScope()
     var busy by remember {mutableStateOf(false)}
-    val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(asset.mimeType ?: "application/octet-stream")) {destination ->
+    val mime=asset.mimeType ?: "application/octet-stream"
+    val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) {destination ->
         if(destination!=null) {busy=true;scope.launch {
             try {withContext(Dispatchers.IO) {
                 context.contentResolver.openInputStream(Uri.parse(asset.uri))!!.use {input ->
@@ -156,8 +129,7 @@ internal fun LocalAssetActions(asset:Asset,onDismiss:()->Unit,onMessage:(String)
     }
     fun open(share:Boolean) {
         runCatching {
-            val raw=Uri.parse(asset.uri)
-            val uri=if(raw.scheme=="file") FileProvider.getUriForFile(context,context.packageName+".fileprovider",File(raw.path!!)) else raw
+            val uri=shareableUri(context,asset)
             val intent=Intent(if(share) Intent.ACTION_SEND else Intent.ACTION_VIEW).apply {
                 if(share) {type=asset.mimeType;putExtra(Intent.EXTRA_STREAM,uri)} else setDataAndType(uri,asset.mimeType ?: "application/octet-stream")
                 clipData=android.content.ClipData.newRawUri(asset.displayName,uri)
@@ -166,17 +138,47 @@ internal fun LocalAssetActions(asset:Asset,onDismiss:()->Unit,onMessage:(String)
             context.startActivity(Intent.createChooser(intent,if(share) "Compartir" else "Abrir archivo"))
         }.onFailure {onMessage("No hay una aplicación disponible para abrir este archivo")}
     }
+    val canvasOk=asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)
     ModalBottomSheet(onDismissRequest={if(!busy) onDismiss()},shape=NexusTokens.sheet) {
         NexusSheetSystemBars()
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
-            Text(asset.displayName,style=MaterialTheme.typography.titleMedium)
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
+            .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12),
+            horizontalAlignment=Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth()) {
+                Text(asset.displayName,Modifier.fillMaxWidth(),style=MaterialTheme.typography.titleMedium,maxLines=2,
+                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                LocalAssetFacts(asset)
+            }
             if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            ListItem(headlineContent={Text("Abrir")},leadingContent={Icon(Icons.Default.OpenInNew,null)},modifier=Modifier.clickable(enabled=!busy) {open(false)})
-            ListItem(headlineContent={Text("Descargar archivo")},leadingContent={Icon(Icons.Default.Download,null)},modifier=Modifier.clickable(enabled=!busy) {save.launch(asset.displayName)})
-            ListItem(headlineContent={Text("Compartir")},leadingContent={Icon(Icons.Default.Share,null)},modifier=Modifier.clickable(enabled=!busy) {open(true)})
-            ListItem(headlineContent={Text("Eliminar de la biblioteca")},supportingContent={Text("Conserva los originales y las referencias anteriores")},leadingContent={Icon(Icons.Default.DeleteOutline,null)},modifier=Modifier.clickable(enabled=!busy) {
-                scope.launch {AssistantRuntime.get(app).assets.deleteLibraryAssets(setOf(asset.id));onMessage("Eliminado de la biblioteca");onDismiss()}
-            })
+            if(asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO,AssetType.AUDIO)) {
+                AssistantMediaPreview(Attachment(asset.id,asset.uri,mime,asset.displayName,assetId=asset.id))
+            } else {
+                Surface(Modifier.fillMaxWidth(),shape=NexusTokens.field,color=MaterialTheme.colorScheme.surfaceVariant) {
+                    Column(Modifier.padding(NexusTokens.space16),horizontalAlignment=Alignment.CenterHorizontally,
+                        verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        Icon(Icons.Default.Description,null,Modifier.size(NexusTokens.space32),tint=MaterialTheme.colorScheme.primary)
+                        Text(mime,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        Text("Abre este documento con una aplicación compatible para ver su contenido.",
+                            style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                if(onUseInCanvas!=null) FilledTonalButton(onClick={onUseInCanvas(asset);onDismiss()},enabled=canvasOk && !busy,modifier=Modifier.weight(1f)) {
+                    Icon(Icons.Default.AutoAwesome,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Usar en Lienzo",maxLines=1)
+                }
+                if(onSendToAgent!=null) Button(onClick={onSendToAgent(asset);onDismiss()},enabled=!busy,modifier=Modifier.weight(1f)) {
+                    Icon(Icons.Default.SmartToy,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Al Agente",maxLines=1)
+                }
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                SheetAction(Icons.Default.OpenInNew,"Abrir",Modifier.weight(1f),!busy) {open(false)}
+                SheetAction(Icons.Default.Share,"Compartir",Modifier.weight(1f),!busy) {open(true)}
+                SheetAction(Icons.Default.Download,"Guardar",Modifier.weight(1f),!busy) {save.launch(asset.displayName)}
+                SheetAction(Icons.Default.DeleteOutline,"Quitar",Modifier.weight(1f),!busy) {
+                    scope.launch {AssistantRuntime.get(app).assets.deleteLibraryAssets(setOf(asset.id));onMessage("Eliminado de la biblioteca (los originales se conservan)");onDismiss()}
+                }
+            }
         }
     }
 }

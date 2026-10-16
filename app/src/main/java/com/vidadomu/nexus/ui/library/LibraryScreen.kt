@@ -46,13 +46,18 @@ import com.vidadomu.nexus.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+/** Un trabajo en curso se considera atascado a partir de 10 minutos. */
+internal const val STUCK_AFTER_MS=10*60*1000L
+
 internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinite() && it>=0}?.toLong()?.let {
     "%d:%02d".format(Locale.ROOT,it/60,it%60)
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Composable
-fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null) {
+fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
+    onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
+    onSendToAgent:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -119,12 +124,10 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             ("asset:"+a.id in hidden)==showHidden && (!favoriteOnly || "asset:"+a.id in favorites) }.sortedByDescending {it.createdAt}
     }
     val localAssetGroups=remember(localAssets) {localAssets.groupBy(::libraryOrigin)}
+    // Una sola hoja por archivo importado (vista previa, ficha, Lienzo, Agente y acciones).
     var localTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
-    localTarget?.let {asset -> LocalAssetActions(asset,{localTarget=null}) {message -> scope.launch {snackbar.showSnackbar(message)}} }
-    var localPreviewTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
-    localPreviewTarget?.let {asset -> LocalAssetPreviewSheet(asset,
-        onDismiss={localPreviewTarget=null},
-        onMoreOptions={localPreviewTarget=null;localTarget=asset}) }
+    localTarget?.let {asset -> LocalAssetSheet(asset,{localTarget=null},{message -> scope.launch {snackbar.showSnackbar(message)}},
+        onUseInCanvas,onSendToAgent) }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
     // Solo cuenta y actúa sobre lo marcado que sigue visible con los filtros actuales.
@@ -276,14 +279,25 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
                 // Trabajos en curso: una línea por trabajo (modelo, estado y tiempo), no una tarjeta.
-                items(pending,key={"pending:${it.id}"},span={GridItemSpan(maxLineSpan)}) {job -> PendingJobRow(job) {onNavigateToOutput(job.id)}}
+                items(pending,key={"pending:${it.id}"},span={GridItemSpan(maxLineSpan)}) {job -> PendingJobRow(job,{onNavigateToOutput(job.id)},
+                    // Solo consulta el estado: nunca reenvía la generación.
+                    onRefresh={scope.launch {
+                        val result=app.generationRepository.pollJob(job.id)
+                        snackbar.showSnackbar(if(result.isFailure) "No se pudo consultar el proveedor. El trabajo se conserva sin reenviarlo."
+                            else "Estado: "+com.vidadomu.nexus.ui.components.generationStatusLabel(result.getOrThrow()))
+                    }},
+                    onStopTracking={scope.launch {
+                        val stopped=app.generationRepository.stopTrackingJob(job.id)
+                        snackbar.showSnackbar(if(stopped) "Dejas de seguirlo aquí. No se ha cancelado en el proveedor: puede terminar y cobrarse."
+                            else "No se pudo dejar de seguir este trabajo")
+                    }})}
                 listOf(LibraryOriginFilter.IMPORTED,LibraryOriginFilter.EDITED,LibraryOriginFilter.SHARED,LibraryOriginFilter.GENERATED).forEach {origin ->
                     val assets=localAssetGroups[origin].orEmpty()
                     if(assets.isNotEmpty()) {
                         items(assets,key={"asset:"+it.id}) {asset ->
                             val token="asset:"+asset.id
                             LocalAssetTile(asset,imageLoader,showDetails,mark=if(selecting) token in marked else null,
-                                onPreview={if(selecting) toggleMark(token) else localPreviewTarget=asset},onActions={toggleMark(token)})
+                                onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
                         }
                     }
                 }
@@ -347,7 +361,7 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
 
 /** Un trabajo en curso en una sola línea: progreso, modelo, estado y tiempo transcurrido. */
 @Composable
-private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit) {
+private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit,onRefresh:()->Unit,onStopTracking:()->Unit) {
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val model=remember(job.modelId) {app.modelCatalogRepository.getModelById(job.modelId)?.displayName
         ?: job.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')}
@@ -360,6 +374,13 @@ private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit) {
         if(progress!=null) CircularProgressIndicator(progress={progress.coerceIn(0f,1f)},modifier=Modifier.size(18.dp),strokeWidth=2.dp)
         else CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
         Text(model,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
-        Text("${com.vidadomu.nexus.ui.components.generationStatusLabel(job)} · $elapsed",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1)
+        // Pasados ~10 min el trabajo «tarda más de lo normal»: se tiñe de ámbar y ofrece consultar o dejar de seguirlo.
+        val stuck=(now-job.startedAt)>=STUCK_AFTER_MS
+        Text(if(stuck) "Tarda más de lo normal · $elapsed" else "${com.vidadomu.nexus.ui.components.generationStatusLabel(job)} · $elapsed",
+            style=MaterialTheme.typography.labelMedium,color=if(stuck) AccentAmber else TextSecondary,maxLines=1)
+        if(stuck) {
+            IconButton(onClick=onRefresh,Modifier.size(40.dp)) {Icon(Icons.Default.Refresh,"Consultar estado en el proveedor",Modifier.size(20.dp),tint=AccentAmber)}
+            IconButton(onClick=onStopTracking,Modifier.size(40.dp)) {Icon(Icons.Default.Close,"Dejar de seguir este trabajo",Modifier.size(20.dp),tint=TextSecondary)}
+        }
     }
 }

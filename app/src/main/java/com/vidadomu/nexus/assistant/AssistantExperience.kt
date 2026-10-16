@@ -67,14 +67,31 @@ internal fun insertModel(value: TextFieldValue, completion: ModelCompletion, mod
     return TextFieldValue(text, TextRange(completion.start + model.name.length + separator.length))
 }
 
+/** Añade lo dictado tras el texto que ya hubiera (con un espacio si hace falta) y deja el cursor al final. */
+internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldValue {
+    val base = current.text
+    val glue = if (base.isEmpty() || base.last().isWhitespace()) "" else " "
+    val text = base + glue + spoken.trim()
+    return TextFieldValue(text, TextRange(text.length))
+}
+
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
-    onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit) {
+    onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
+    onReply: (String) -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
         border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f)),
         modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
+            // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
+            if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
+                items(ui.replies, key = { it.label }) { reply ->
+                    AssistChip(onClick = { onReply(reply.text) }, label = { Text(reply.label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 220.dp)) }, modifier = Modifier.semantics { contentDescription = "Responder: ${reply.text}" })
+                }
+            }
             completion?.let { suggestions ->
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     items(suggestions.models, key = { it.ref.toString() }) { model ->
@@ -106,6 +123,26 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         }
                     })
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
+                else if(!canSend && !ui.attaching) {
+                    // Nada que enviar: el botón es el micrófono. El dictado se inserta en el campo SIN enviarlo.
+                    val context = LocalContext.current
+                    val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                        val spoken = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
+                        if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrBlank()) onInput(dictatedText(text, spoken))
+                    }
+                    IconButton(onClick = {
+                        try {
+                            dictate.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
+                                putExtra(android.speech.RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                                putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Habla; podrás revisar el texto antes de enviarlo")
+                            })
+                        } catch (_: android.content.ActivityNotFoundException) {
+                            android.widget.Toast.makeText(context, "Este móvil no tiene reconocimiento de voz disponible", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }) { Icon(Icons.Default.Mic, "Dictar mensaje", tint = MaterialTheme.colorScheme.primary) }
+                }
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }
         }

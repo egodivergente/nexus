@@ -79,6 +79,8 @@ data class AssistantUiState(
     /** Estado verificado de cada encargo (misma fuente que ve el agente). */
     val orders: Map<String, com.vidadomu.nexus.agent.core.orders.Order> = emptyMap(),
     val thinking: Boolean = false,
+    /** Respuestas rápidas de la última respuesta del agente; se borran al enviar cualquier mensaje. */
+    val replies: List<com.vidadomu.nexus.agent.core.tools.SuggestedReply> = emptyList(),
     val scrollRequest: Long = 0,
     val lastLatencyMs: Long? = null,
     val catalog: List<com.vidadomu.nexus.agent.core.registry.ModelSummary> = emptyList(),
@@ -169,7 +171,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         // A ViewModel coroutine keeps the turn alive across navigation, but Android may reclaim
         // the app once its Activity is backgrounded. Promote the user-started request first.
         runCatching { AssistantTurnService.start(app) }
@@ -254,6 +256,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 setPlan(ev.plan.id) { it.copy(state = PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING") }
             }
             is UiEvent.Info -> notice(ev.text)
+            is UiEvent.Replies -> _ui.update { it.copy(replies = ev.replies) }
         }
     }
 
@@ -275,7 +278,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = current.activeProjectId)
                 // Los encargos pertenecen a su conversación: el agente no ve los de otro chat.
                 runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
             } catch(error: Exception) {
                 _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }

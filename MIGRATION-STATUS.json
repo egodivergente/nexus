@@ -1,15 +1,15 @@
 ﻿{
     "name":  "nexus",
-    "status":  "AUDIT_FIXES_MULTISELECT_ZIP_1917_INSTALLED_S25_PIXEL",
+    "status":  "PENDING_AUDIT_ITEMS_1918_INSTALLED_S25_PIXEL",
     "verifiedAt":  "2026-10-16",
     "repository":  "https://github.com/egodivergente/nexus",
     "canonicalBranch":  "main",
     "branch":  "fix/encargo-unico-agente-ui",
     "components":  {
                        "android":  {
-                                       "versionName":  "1.9.17-agent-preview",
-                                       "versionCode":  51,
-                                       "sha256":  "366D033F8BD8CC8025C4541167A05DF4F9D3D3643150BC0A138048E5610BD05F",
+                                       "versionName":  "1.9.18-agent-preview",
+                                       "versionCode":  52,
+                                       "sha256":  "3E21CAD73A5DEAAC79E4490DBD7B78327C457501F5C40CA33761A927C5DB7D4C",
                                        "signingCertificateSha256":  "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
                                        "includes":  [
                                                         "codex/agent-experience-197-20261016",
@@ -20,7 +20,7 @@
                        "desktop":  {
                                        "versionName":  "1.9.5-agent-desktop",
                                        "sha256":  "e3d22a980804513da2f5aa7a2bcad8f16710fe9d908c127e93f9b1997caa868e",
-                                       "agentCoreSynced":  false
+                                       "agentCoreSynced":  true
                                    },
                        "termuxWidget":  {
                                             "source":  "1d8c0ec7648d67628c263816a62f970fa53bdaaa"
@@ -29,14 +29,14 @@
     "devices":  {
                     "s25Ultra":  {
                                      "model":  "SM-S938B",
-                                     "installed":  "1.9.17-agent-preview vc51, 2026-10-16T08:2x, actualización en sitio con datos conservados (vc49 estuvo instalada unos minutos)",
+                                     "installed":  "1.9.18-agent-preview vc52, 2026-10-16T11:4x, actualización en sitio con datos conservados (vc49 estuvo instalada unos minutos)",
                                      "note":  "Sustituye a las dos builds distintas que compartían 1.9.9/vc43."
                                  },
-                    "pixel8Pro":  {"model": "Pixel 8 Pro", "transport": "ADB inalámbrico (mDNS adb-tls-connect)", "installed": "1.9.17-agent-preview vc51, 2026-10-16T08:2x, encima de vc39 con datos conservados (chat previo intacto)"}
+                    "pixel8Pro":  {"model": "Pixel 8 Pro", "transport": "ADB inalámbrico (mDNS adb-tls-connect)", "installed": "1.9.18-agent-preview vc52, 2026-10-16T11:4x, encima de vc39 con datos conservados (chat previo intacto)"}
                 },
     "validation":  {
-                       "agentCoreUnitTestsRun":  160,
-                       "androidUnitTestsRun":  303,
+                       "agentCoreUnitTestsRun":  165,
+                       "androidUnitTestsRun":  309,
                        "agentPreviewBuild":  "PASS",
                        "androidRegexGuard":  "PASS (detecta (?U) real; ignora comentarios)",
                        "s25AppOpensChatWithoutCrash":  "PASS",
@@ -47,7 +47,7 @@
                        "agentReplyAfterRegexFix":  "PASS (respuesta real en el S25, sin cierres)",
                        "paidOperationsByAgentOrTests":  0,
                        "paidOperationsByUserDuringValidation":  2,
-                       "desktopSync":  "NOT_DONE (desktop/tools/sync-agent-core.py; UI de escritorio sin encargos)",
+                       "desktopSync":  "DONE_CORE_ONLY (148 ficheros, 165 pruebas, JAR recompilados; el host solo pinta progreso, sin tarjetas ni botones; no probado en el EliteBook)",
                        "catalogGeneratorsWithSkill":  "400/400",
                        "compactChatOnDevice":  "PASS",
                        "llmProvidersAnthropicOpenAi":  "UNIT_TESTED (servidor simulado); sin probar con claves reales",

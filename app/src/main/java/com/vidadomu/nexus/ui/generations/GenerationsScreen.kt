@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.ui.generations
 
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -48,6 +49,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
         archivePrefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose {archivePrefs.unregisterOnSharedPreferenceChangeListener(listener)}
     }
+    var expandedRuns by remember {mutableStateOf(emptySet<String>())}
     var selectedTechnicalJob by remember {mutableStateOf<GenerationJob?>(null)}
     var pendingCancelJob by remember {mutableStateOf<GenerationJob?>(null)}
     val filteredJobs = remember(jobs, statusFilter,searchQuery,archived) {
@@ -121,7 +123,25 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                     item(key="day-$day") {Text(day.replaceFirstChar {it.titlecase()},
                         Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),
                         style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
-                    items(dayJobs,key={it.id}) {job ->
+                    val rows=if(statusFilter=="COMPARISONS") dayJobs.map {HistoryRow.Job(it)} else groupFailedRuns(dayJobs,expandedRuns)
+                    items(rows,key={it.key}) {row ->
+                      if(row is HistoryRow.Header) {
+                        // Racha de fallos del mismo intento: una fila que se despliega, en vez de un muro de errores.
+                        val first=row.jobs.first();val last=row.jobs.last()
+                        val name=remember(first.modelId) {app.modelCatalogRepository.getModelById(first.modelId)?.displayName ?: first.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')}
+                        val timeFormat=remember {SimpleDateFormat("HH:mm",Locale("es","ES"))}
+                        val open=row.runId in expandedRuns
+                        ListItem(headlineContent={Text("$name · ${row.jobs.size} intentos fallidos",maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
+                            supportingContent={Text("${timeFormat.format(Date(last.startedAt))}–${timeFormat.format(Date(first.startedAt))} · ${if(open) "toca para plegar" else "toca para ver los intentos"}",style=MaterialTheme.typography.labelMedium)},
+                            leadingContent={Icon(Icons.Default.ErrorOutline,null,tint=MaterialTheme.colorScheme.error)},
+                            trailingContent={Icon(if(open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)},
+                            colors=ListItemDefaults.colors(containerColor=ScreenBackground),
+                            modifier=Modifier.clickable(onClickLabel=if(open) "Plegar intentos" else "Ver intentos") {
+                                expandedRuns=if(open) expandedRuns-row.runId else expandedRuns+row.runId
+                            })
+                        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                      } else {
+                        val job=(row as HistoryRow.Job).job
                         if(statusFilter=="COMPARISONS") {
                             val id=job.parameters[com.vidadomu.nexus.ui.create.ComparisonPlan.ID]!!
                             val group=jobs.filter {it.parameters[com.vidadomu.nexus.ui.create.ComparisonPlan.ID]==id}
@@ -178,6 +198,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                 }
                             })
                         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                      }
                     }
                 }
             }

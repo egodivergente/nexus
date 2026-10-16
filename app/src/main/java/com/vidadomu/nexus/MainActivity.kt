@@ -176,7 +176,20 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Library.route) {
                             LibraryScreen(
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
-                                onNavigateToResult = { jobId, index -> navController.navigate("output/$jobId?index=$index") }
+                                onNavigateToResult = { jobId, index -> navController.navigate("output/$jobId?index=$index") },
+                                onUseInCanvas = { asset ->
+                                    // Igual que «compartir con Nexus»: entra como entrada del modelo elegido en el Lienzo.
+                                    if (asset.type == com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO)
+                                        createViewModel.selectModality(com.vidadomu.nexus.core.model.Modality.VIDEO)
+                                    createViewModel.setMediaInput(Uri.parse(asset.uri),
+                                        asset.mimeType ?: if (asset.type == com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO) "video/mp4" else "image/jpeg")
+                                    navController.navigate(Screen.Create.route) { launchSingleTop = true }
+                                },
+                                onSendToAgent = { asset ->
+                                    assistantViewModel.attach(listOf(Uri.parse(asset.uri)))
+                                    if (!navController.popBackStack(Screen.Assistant.route, inclusive = false))
+                                        navController.navigate(Screen.Assistant.route) { launchSingleTop = true }
+                                }
                             )
                         }
                         composable(Screen.Settings.route) {

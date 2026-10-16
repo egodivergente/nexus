@@ -1,7 +1,7 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado actual: Android 1.9.16-agent-preview / vc50 en el S25 y en el Pixel 8 Pro (rama
+Estado actual: Android 1.9.18-agent-preview / vc52 en el S25 y en el Pixel 8 Pro (rama
 `fix/encargo-unico-agente-ui`, sin fusionar en `main`) y Windows 1.9.5-agent-desktop.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
@@ -71,5 +71,10 @@ mostrar al pie de cada miniatura la resolución, el tamaño y la fecha y hora, y
 filtro «Origen ▾» (Generado por Nexus / Importado por ti) sin etiquetas sobre las
 miniaturas. Está instalada con los datos conservados en el S25 y en el Pixel 8 Pro, que
 volvió a estar disponible por ADB inalámbrico y pasa de vc39 a vc50. La Biblioteca y el
-filtro se verificaron en el Pixel. Pruebas: app 300. Pendiente: probar las claves reales
-de los LLM nuevos, capturar Modelos y sincronizar `desktop/agent/core`.
+filtro se verificaron en el Pixel. Después (1.9.17/vc51 y 1.9.18/vc52): marcado rápido y
+exportación a ZIP, hoja única para archivos importados («Usar en Lienzo», «Al Agente»),
+micrófono con el reconocedor del sistema, botones de respuesta rápida del agente
+(`suggest_replies`), trabajos atascados con acción y fallos repetidos plegados, y
+`desktop/agent/core` sincronizado (el host de Windows solo pinta progreso). Pruebas: app 309,
+agent-core 165, núcleo de escritorio 165. Pendiente: probar las claves reales de los LLM nuevos,
+capturar Modelos, la hoja única y el micrófono en el S25 (estaba en uso) y pintar encargos en Windows.

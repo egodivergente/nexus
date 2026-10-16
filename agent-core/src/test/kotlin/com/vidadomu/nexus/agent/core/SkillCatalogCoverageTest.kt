@@ -14,8 +14,10 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 class SkillCatalogCoverageTest {
     @Test fun `todos los generadores del catalogo tienen una skill especifica`() {
-        val catalog = File("../app/src/main/assets/atlas_catalog_snapshot.json")
-        assertTrue(catalog.isFile)
+        // Desde agent-core el catálogo está en ../app; desde la copia de escritorio (desktop/agent/core), en ../../../app.
+        val catalog = listOf("../app", "../../../app").map { File("$it/src/main/assets/atlas_catalog_snapshot.json") }.firstOrNull { it.isFile }
+            ?: File("../app/src/main/assets/atlas_catalog_snapshot.json")
+        assertTrue(catalog.isFile, "No se encuentra el catálogo de Atlas desde ${File(".").absoluteFile.normalize()}")
         val models = Json.parseToJsonElement(catalog.readText()).jsonObject["data"]!!.jsonArray.map { it.jsonObject }
             .filter { it["type"]?.jsonPrimitive?.content in setOf("Image", "Video", "Audio") }
             .map { it["model"]!!.jsonPrimitive.content }

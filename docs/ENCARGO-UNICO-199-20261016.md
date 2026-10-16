@@ -75,7 +75,11 @@ Rama: `fix/encargo-unico-agente-ui` (desde `main` + 1.9.7, 1.9.8 y la 1.9.9 de H
 
 ## Pendiente conocido
 
-- Windows: `desktop/agent/core` es una copia importada con `desktop/tools/sync-agent-core.py`. No se sincronizó:
-  su UI aún no pinta encargos y cambiaría el comportamiento del agente de escritorio sin validarlo.
+- Windows (actualizado en 1.9.18): `desktop/agent/core` se sincronizó con `desktop/tools/sync-agent-core.py`
+  (148 ficheros) y compila con 165 pruebas en verde, igual que `agent-core`. El host de escritorio
+  (`DesktopAgent.kt`) solo pinta el progreso (`UiEvent.Info`): **no muestra tarjetas de encargo ni botones de
+  respuesta rápida**. Por eso `suggest_replies` se quita de su caja de herramientas. El agente de escritorio ya usa
+  el libro de encargos (idempotencia, sin reenvíos inciertos) y los contratos nuevos, pero no los dibuja; pintarlos
+  sigue pendiente y NO se ha probado a mano en el EliteBook (no se instaló nada allí).
 - No se ha hecho ninguna generación real de pago: el campo `resolution` que exige Atlas se deriva del error real
   observado; su aceptación por el backend se confirmará en el primer envío del usuario.
