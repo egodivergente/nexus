@@ -181,7 +181,11 @@ object NativeModelSchema {
         val nativeCapabilities=if(video!=null && first!=null && "character_orientation" in props)
             model.capabilities.filterNot {it in setOf(ModelCapability.TEXT_TO_VIDEO,ModelCapability.IMAGE_TO_VIDEO)}+ModelCapability.MOTION_CONTROL
             else model.capabilities
+        conditionsByModel[model.id] = parseConditions(props)
+        // El prompt solo existe si el schema lo declara; solo es obligatorio si está en required.
+        val promptDeclared = props["prompt"] is JsonObject
         return NativeConfiguration(model.copy(capabilities=nativeCapabilities,parameters = FormContract.normalize(parameters), contractMedia=extraMedia, inputMode = mode, nativeRequiredFields = effectiveRequired,
+            promptAccepted = promptDeclared, promptRequired = promptDeclared && "prompt" in effectiveRequired,
             firstFrameField = first, inputImageField = first, lastFrameField = last,
             imagesArrayField = images, structuredImageReferences = structuredImages, videoField = video, videosArrayField = videos,
             maxImages = if(structuredImages) {
@@ -197,6 +201,53 @@ object NativeModelSchema {
             supportsImageInput = first != null || images != null, supportsLastFrame = last != null,
             supportsFirstFrame = first != null, supportsReferenceImages = images != null,
             supportsVideoInput = video != null || videos != null), unsupported, notices)
+    }
+
+    private val conditionsByModel = java.util.concurrent.ConcurrentHashMap<String, Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>>>()
+
+    /** Rangos x-depends-on publicados por el schema: {campo → condiciones}. */
+    fun conditions(modelId: String): Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>> = conditionsByModel[modelId].orEmpty()
+
+    internal fun parseConditions(props: JsonObject): Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>> =
+        props.mapNotNull { (key, raw) ->
+            val dep = (raw as? JsonObject)?.get("x-depends-on") as? JsonObject ?: return@mapNotNull null
+            val field = dep["field"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val list = (dep["conditions"] as? JsonArray).orEmpty().mapNotNull { c ->
+                val o = c as? JsonObject ?: return@mapNotNull null
+                val values = (o["when"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+                if (values.isEmpty()) null else com.vidadomu.nexus.agent.core.registry.ParamCondition(field, values,
+                    (o["minimum"] as? JsonPrimitive)?.doubleOrNull, (o["maximum"] as? JsonPrimitive)?.doubleOrNull,
+                    (o["description"] as? JsonPrimitive)?.contentOrNull)
+            }
+            if (list.isEmpty()) null else key to list
+        }.toMap()
+
+    private fun conditionProblem(model: NexusModel, key: String, value: String, values: Map<String, String>): String? {
+        val number = value.toDoubleOrNull() ?: return null
+        val name = model.parameters.firstOrNull { it.key == key }?.displayName ?: key
+        for (c in conditions(model.id)[key].orEmpty()) {
+            val controlling = values[c.field]?.takeIf { it.isNotBlank() } ?: model.parameters.firstOrNull { it.key == c.field }?.defaultValue ?: continue
+            if (controlling !in c.values) continue
+            if ((c.min != null && number < c.min!!) || (c.max != null && number > c.max!!)) {
+                val range = listOfNotNull(c.min, c.max).joinToString("–") { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }
+                return "«$name» debe estar en $range con $controlling."
+            }
+        }
+        return null
+    }
+
+    /**
+     * Valores que de verdad se envían: quita defaults publicados incompatibles con la opción
+     * elegida (p. ej. short=0 con una plantilla 4K) y añade los campos que Atlas exige y Nexus
+     * deduce (resolution desde template). Un valor elegido fuera de rango NO se toca: lo rechaza
+     * [validate].
+     */
+    fun reconcile(model: NexusModel, values: Map<String, String>): Map<String, String> {
+        val kept = values.filter { (key, value) ->
+            val p = model.parameters.firstOrNull { it.key == key } ?: return@filter true
+            !(value == p.defaultValue && !p.isRequired && conditionProblem(model, key, value, values) != null)
+        }
+        return kept + AtlasContractOverrides.derivedValues(model, kept)
     }
 
     fun referenceCountProblem(model: NexusModel, count: Int): String? {
@@ -226,6 +277,13 @@ object NativeModelSchema {
             return null
         }
         checkProperties(input)?.let { return it }
+        if (!model.promptAccepted && !values["prompt"].isNullOrBlank()) return "Este modelo no recibe instrucciones de texto: configura sus opciones."
+        for ((key, value) in values) {
+            val p = model.parameters.firstOrNull { it.key == key } ?: continue
+            if (value == p.defaultValue && !p.isRequired) continue // reconcile() no lo enviará si es incompatible
+            conditionProblem(model, key, value, values)?.let { return it }
+        }
+        AtlasContractOverrides.problem(model, values)?.let { return it }
         for(raw in (input["allOf"] as? JsonArray).orEmpty()) {
             val rule = raw as? JsonObject ?: continue
             val condition = rule["if"] as? JsonObject ?: continue

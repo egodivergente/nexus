@@ -5,7 +5,7 @@ object NexusToolkit {
     fun all(d: ToolDeps): List<AgentTool> = listOf(
         ListModelsTool(d), SearchModelsTool(d), GetModelTool(d), GetModelSchemaTool(d), RecommendModelsTool(d),
         ValidateParametersTool(d), EstimateCostTool(d), ListSkillsTool(d), LoadSkillTool(d), CreateGenerationPromptTool(d), CompareModelFamiliesTool(d),
-        PrepareGenerationTool(d), UpdatePlanTool(d), SubmitGenerationTool(d), GetGenerationStatusTool(d), CancelGenerationTool(d),
+        PrepareGenerationTool(d), UpdatePlanTool(d), SubmitGenerationTool(d), GetGenerationStatusTool(d), CancelGenerationTool(d), GetUiStateTool(d),
         ListProjectsTool(d), CreateProjectTool(d), OpenProjectTool(d), UpdateProjectMemoryTool(d), SearchAssetsTool(d), InspectAssetTool(d), ListShotsTool(d),
         GenerationHistoryTool(d), AssociateAssetTool(d), MoveAssetTool(d), RenameAssetTool(d),
     ) + (d.nativeOperations?.let(NativeOperationTools::all) ?: emptyList())

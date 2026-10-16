@@ -121,8 +121,17 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
         private val MEDIA_TYPES = setOf(ParameterType.IMAGE, ParameterType.VIDEO, ParameterType.AUDIO, ParameterType.FILE,
             ParameterType.FIRST_FRAME, ParameterType.LAST_FRAME, ParameterType.REFERENCE_IMAGES, ParameterType.MASK)
 
-        fun toSchema(ref: ModelRef, m: NexusModel, unsupported: List<String>, source: String?): ModelSchema = ModelSchema(
+        fun toSchema(ref: ModelRef, m: NexusModel, unsupported: List<String>, source: String?): ModelSchema {
+            val conditions = if (m.providerId == AtlasCloudProvider.PROVIDER_ID) NativeModelSchema.conditions(m.id) else emptyMap()
+            return toSchemaWith(ref, m, unsupported, source, conditions)
+        }
+
+        /** Mismo contrato que el formulario: rangos condicionales, campos derivados y si hay prompt. */
+        fun toSchemaWith(ref: ModelRef, m: NexusModel, unsupported: List<String>, source: String?,
+            conditions: Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>>): ModelSchema = ModelSchema(
             ref = ref,
+            promptAccepted = m.promptAccepted,
+            derived = if (m.providerId == AtlasCloudProvider.PROVIDER_ID) com.vidadomu.nexus.provider.atlas.AtlasContractOverrides.derived(m) else emptyList(),
             parameters = FormContract.normalize(m.parameters).filter { it.type !in MEDIA_TYPES }.map { p ->
                 ParamSpec(
                     key = p.key, displayName = p.displayName, uiType = p.type.name,
@@ -135,6 +144,7 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
                     options = p.options, min = p.minValue?.toDouble(), max = p.maxValue?.toDouble(), step = p.step?.toDouble(),
                     default = p.defaultValue.takeIf { FormContract.token(it) }, required = p.isRequired, advanced = p.isAdvanced,
                     description = p.description.takeIf { it.isNotBlank() },
+                    conditions = conditions[p.key].orEmpty(),
                 )
             },
             media = MediaSpec(
@@ -154,6 +164,9 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
 class NexusQuoteEstimator(private val registry: NexusModelRegistry) : CostEstimator {
     override suspend fun estimate(model: ModelSummary, params: Map<String, String>): CostEstimate {
         if (model.ref.providerId != AtlasCloudProvider.PROVIDER_ID) return CostEstimate(null, CostConfidence.UNKNOWN, "Sin calculadora para ${model.ref.providerId}.")
+        // Tarifa por nivel de plantilla (Tencent): la base del catálogo es solo la de 720P.
+        if (com.vidadomu.nexus.agent.core.cost.TieredTariffs.covers(model.ref.modelId))
+            return com.vidadomu.nexus.agent.core.cost.PublishedRateEstimator.tiered(model.ref.modelId, params)
         val native = registry.configuredModel(model.ref)
         val images = if (native.supportsImageInput) 1 else 0
         val q = AtlasPriceQuote.fetch(native, params, images) ?: return CostEstimate(null, CostConfidence.UNKNOWN, "Atlas no devolvió cotización.")
@@ -295,7 +308,7 @@ object AgentMediaStore {
         val existing = runtime.assets.assetByUri(uri.toString())
         if (existing != null && (projectId == null || existing.projectId == projectId) && uri.scheme == "file" && File(uri.path.orEmpty()).isFile) {
             return@withContext Attachment(existing.id, existing.uri, existing.mimeType ?: mime ?: "image/*",
-                existing.displayName, existing.width, existing.height, assetId = existing.id)
+                existing.displayName, existing.width, existing.height, existing.durationSec, assetId = existing.id)
         }
         var resolved = mime?.takeIf { it.isNotBlank() && it != "application/octet-stream" } ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
         val name = runCatching {
@@ -329,7 +342,21 @@ object AgentMediaStore {
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(target.path, o); w = o.outWidth.takeIf { it > 0 }; h = o.outHeight.takeIf { it > 0 }
         }
-        val attachment = Attachment("att_" + UUID.randomUUID().toString().take(8), Uri.fromFile(target).toString(), resolved, name, w, h)
+        // La duración del vídeo de entrada fija el coste de los modelos que cobran por segundo de origen.
+        var seconds: Double? = null
+        if (resolved.startsWith("video/") || resolved.startsWith("audio/")) runCatching {
+            android.media.MediaMetadataRetriever().apply {
+                try {
+                    setDataSource(target.path)
+                    seconds = extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0 }?.div(1000.0)
+                    if (resolved.startsWith("video/")) {
+                        w = extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
+                        h = extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
+                    }
+                } finally { release() }
+            }
+        }
+        val attachment = Attachment("att_" + UUID.randomUUID().toString().take(8), Uri.fromFile(target).toString(), resolved, name, w, h, seconds)
         val saved = runtime.assets.addAsset(com.vidadomu.nexus.agent.core.assets.Asset(
             id = attachment.id, uri = attachment.uri,
             type = when {
@@ -339,7 +366,7 @@ object AgentMediaStore {
                 else -> com.vidadomu.nexus.agent.core.assets.AssetType.OTHER
             },
             role = com.vidadomu.nexus.agent.core.assets.AssetRole.REFERENCE,
-            displayName = name, mimeType = resolved, width = w, height = h,
+            displayName = name, mimeType = resolved, width = w, height = h, durationSec = seconds,
             projectId = projectId, createdAt = System.currentTimeMillis(),
         ))
         attachment.copy(id = saved.id, assetId = saved.id)

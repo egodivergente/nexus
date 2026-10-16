@@ -79,7 +79,7 @@ class FakeRegistry(private val models: List<ModelSummary> = MODELS, private val 
     override suspend fun schema(ref: ModelRef): ModelSchema { schemaCalls++; return schemas[ref] ?: error("sin schema para $ref") }
 }
 
-class FakeBackend : GenerationBackend {
+open class FakeBackend : GenerationBackend {
     val submitted = mutableListOf<GenerationPlan>()
     val statuses = mutableMapOf<String, JobStatus>()
     var failNext: Exception? = null

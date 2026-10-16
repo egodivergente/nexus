@@ -32,6 +32,7 @@ import com.vidadomu.nexus.agent.core.spend.GuardedExecutor
 import com.vidadomu.nexus.agent.core.spend.SpendGuard
 import com.vidadomu.nexus.agent.core.tools.NexusToolkit
 import com.vidadomu.nexus.agent.core.tools.ToolDeps
+import com.vidadomu.nexus.agent.core.tools.turnContext
 import com.vidadomu.nexus.core.model.GenerationStatus
 import java.io.File
 
@@ -196,6 +197,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     val registry = NexusModelRegistry(app)
     val assets = AssetIndex(File(app.filesDir, "assistant/index.json"))
     val guard = SpendGuard()
+    /** Encargos del chat actual: estado compartido por UI, agente y envío (sobrevive a recargar skills). */
+    val orders = com.vidadomu.nexus.agent.core.orders.OrderBook()
     val backend = NexusGenerationBackend(app, registry)
     private val executor = GuardedExecutor(backend, guard)
     private val published = runCatching {
@@ -221,6 +224,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         router = ModelRouter(registry, skills, published, excludedFamilies = { settings.excludedFamilies() }),
         guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app), directFlow = true,
         nativeOperations = NexusNativeOperations(app, this),
+        orders = orders,
         adaptPrompt = { text, schema, target ->
             val current = settings.load()
             com.vidadomu.nexus.agent.core.llm.PromptAdapter({ llm(current) }, { current.modelId })
@@ -244,6 +248,8 @@ class AssistantRuntime(private val app: NexusApplication) {
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { AgentDocuments.load(it) },
         images = if (s.sendImages && !s.offline) AttachmentImageLoader { AgentMediaStore.thumbnail(it) } else null,
         videos = if (s.sendImages && !s.offline) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
+        uiContext = { orders.turnContext(guard) },
+        verifiedOrders = { orders.all() },
     )
 
     /** Indexa (sin tocar nexus.db ni archivos) las creaciones ya terminadas, para buscarlas por prompt/modelo. */

@@ -105,22 +105,22 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
 @Composable
 internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=false, onGenerate: () -> Unit) {
     val prepared = ui.plans.values.filter { it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
-    if(prepared.isEmpty()) return
     val pending = prepared.filter { it.includeInBatch }
+    // Con un solo encargo, su tarjeta tiene el único botón: no se repite GENERAR abajo.
+    if(pending.size < 2) return
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currencyState by app.currencyManager.state.collectAsState()
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if(pending.isEmpty()) "Selecciona los encargos" else "${pending.size} de ${prepared.size} seleccionados", style = MaterialTheme.typography.labelLarge)
+                Text("${pending.size} encargos pendientes de confirmar", style = MaterialTheme.typography.labelLarge)
                 if(blockedByDraft) Text("Aplica o deshaz los cambios antes de generar el lote.",style=MaterialTheme.typography.labelMedium)
                 val estimated = pending.mapNotNull { it.plan.estimate?.amountUsd }
-                Text(if(pending.isEmpty()) "Marca «Incluir en lote» en las tarjetas" else if(estimated.size == pending.size) remember(estimated,currencyState) {app.currencyManager.formatCost(estimated.sum())} else "Incluye coste sin estimación",
+                Text(if(estimated.size == pending.size) remember(estimated,currencyState) {app.currencyManager.formatCost(estimated.sum())} else "Incluye coste sin estimación",
                     style = MaterialTheme.typography.labelSmall)
             }
-            val enabled=pending.isNotEmpty() && !ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
-            if(pending.size>=2) Button(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar ${minOf(pending.size,20)}")}
-            else FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar ${minOf(pending.size,20)}")}
+            val enabled=!ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
+            FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,20)}")}
         }
     }
 }
@@ -133,10 +133,6 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(p.includeInBatch, { onToggleBatch() }, enabled = !p.busy && !assistantBusy)
-                Text("Incluir en lote", Modifier.clickable(enabled = !p.busy && !assistantBusy, onClick = onToggleBatch), style = MaterialTheme.typography.bodySmall)
-            }
             FlowRow(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 TextButton(onClick = { picker.launch(arrayOf("image/*")) }, enabled = !p.busy && !assistantBusy) {
                     Icon(Icons.Default.AttachFile, null, Modifier.size(16.dp))

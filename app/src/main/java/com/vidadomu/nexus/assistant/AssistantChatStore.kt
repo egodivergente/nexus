@@ -11,7 +11,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
-internal data class SavedAssistantChat(val items: List<ChatItem>, val plans: Map<String, PlanUi>, val attachments: List<com.vidadomu.nexus.agent.core.tools.Attachment> = emptyList(), val sessionAttachments: List<com.vidadomu.nexus.agent.core.tools.Attachment> = emptyList())
+internal data class SavedAssistantChat(val items: List<ChatItem>, val plans: Map<String, PlanUi>, val attachments: List<com.vidadomu.nexus.agent.core.tools.Attachment> = emptyList(), val sessionAttachments: List<com.vidadomu.nexus.agent.core.tools.Attachment> = emptyList(),
+    /** Encargos de la conversación (1.9.7+). Ausente en chats antiguos: se migran al abrirlos. */
+    val orders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null)
 
 /** Private, atomic snapshot. Restoring history never repeats a provider submission. */
 internal data class AssistantChatEntry(val id: String, val title: String)
@@ -59,14 +61,14 @@ internal class AssistantChatStore(private val context: Context) {
 
     private fun knownAttachments(state: AssistantUiState) = (state.items.filterIsInstance<ChatItem.User>().flatMap { it.attachments } + state.pendingAttachments).distinctBy { it.id }
 
-    suspend fun archive(state: AssistantUiState) = lock.withLock { withContext(Dispatchers.IO) {
+    suspend fun archive(state: AssistantUiState, orders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null) = lock.withLock { withContext(Dispatchers.IO) {
         if(state.items.isEmpty()) return@withContext
         val folder = File(context.filesDir, "assistant/conversations").apply { mkdirs() }
         val id = state.items.first().id.replace(Regex("[^A-Za-z0-9_-]"), "_")
         val archived = AtomicFile(File(folder, "$id.json"))
         val stream = archived.startWrite()
         try {
-            stream.write(json.encodeToString(SavedAssistantChat(state.items,state.plans,state.pendingAttachments, knownAttachments(state))).toByteArray(Charsets.UTF_8))
+            stream.write(json.encodeToString(SavedAssistantChat(state.items,state.plans,state.pendingAttachments, knownAttachments(state), orders)).toByteArray(Charsets.UTF_8))
             archived.finishWrite(stream)
         } catch(error: Exception) { archived.failWrite(stream); throw error }
     } }
@@ -84,10 +86,10 @@ internal class AssistantChatStore(private val context: Context) {
         return runCatching { json.decodeFromString<SavedAssistantChat>(File(context.filesDir,"assistant/conversations/$id.json").readText()) }.getOrNull()
     }
 
-    suspend fun save(state: AssistantUiState) = lock.withLock { withContext(Dispatchers.IO) {
+    suspend fun save(state: AssistantUiState, orders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null) = lock.withLock { withContext(Dispatchers.IO) {
         val items = state.items
         val ids = items.filterIsInstance<ChatItem.PlanCard>().map { it.planId }.toSet()
-        val snapshot = SavedAssistantChat(items, state.plans.filterKeys { it in ids }, state.pendingAttachments, knownAttachments(state))
+        val snapshot = SavedAssistantChat(items, state.plans.filterKeys { it in ids }, state.pendingAttachments, knownAttachments(state), orders)
         if (snapshot == previous) return@withContext
         val stream = file.startWrite()
         try {

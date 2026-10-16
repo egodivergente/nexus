@@ -57,7 +57,33 @@ data class ParamSpec(
     val required: Boolean = false,
     val advanced: Boolean = false,
     val description: String? = null,
+    /** Rangos que dependen de otro campo (x-depends-on del schema), p. ej. short según template. */
+    val conditions: List<ParamCondition> = emptyList(),
 )
+
+/** Cuando [field] vale uno de [values], este parámetro debe estar en [min]..[max]. */
+@Serializable
+data class ParamCondition(
+    val field: String,
+    val values: List<String>,
+    val min: Double? = null,
+    val max: Double? = null,
+    val description: String? = null,
+)
+
+/**
+ * Campo que el proveedor exige pero que se deduce de otro (no lo elige el usuario ni el agente):
+ * p. ej. resolution a partir del sufijo de template. [mapping] va de valor de [from] a valor enviado.
+ */
+@Serializable
+data class DerivedParam(
+    val key: String,
+    val from: String,
+    val mapping: Map<String, String>,
+    val note: String,
+) {
+    fun valueFor(source: String?): String? = source?.let { mapping[it] }
+}
 
 @Serializable
 data class MediaSpec(
@@ -93,8 +119,12 @@ data class ModelSchema(
     /** Origen del schema, p. ej. la schemaUrl oficial. */
     val source: String? = null,
     val textLimits: Map<String, TextLimit> = emptyMap(),
+    /** false si el schema no tiene campo prompt: no se envía texto libre a la API. */
+    val promptAccepted: Boolean = true,
+    val derived: List<DerivedParam> = emptyList(),
 ) {
     fun param(key: String): ParamSpec? = parameters.firstOrNull { it.key == key }
+    fun derivedParam(key: String): DerivedParam? = derived.firstOrNull { it.key == key }
 }
 
 interface ModelRegistry {

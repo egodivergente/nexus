@@ -83,7 +83,8 @@ fun AssistantScreen(
 
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
-    val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && ui.plans[it.planId]?.state==PlanState.DISCARDED}
+    val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
+        it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
     val latestVisible by rememberUpdatedState(visibleItems)
     val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
@@ -172,7 +173,18 @@ fun AssistantScreen(
                             }
                         }
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
-                        is ChatItem.PlanCard -> ui.plans[item.planId]?.let { p ->
+                        is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
+                            val p = ui.plans.getValue(item.planId)
+                            OrderCard(order, p, vm.outputs(p.jobId ?: order.jobId), assistantBusy = ui.thinking,
+                                onGenerate = { vm.generate(p.plan.id, p.plan.fingerprint()) },
+                                onApplyFix = { vm.applyFix(order.id) },
+                                onAskAgent = { vm.askAgentToFix(order.id) },
+                                onEdit = { vm.editPlan(p.plan.id, it) },
+                                onDiscard = { vm.discardPlan(p.plan.id) },
+                                onOpenCanvas = { scope.launch { vm.canvasState(p.plan.id)?.let(onOpenInCanvas) } },
+                                onOpenOutput = { (p.jobId ?: order.jobId)?.let(onNavigateToOutput) },
+                                onRendered = { vm.cardRendered(order.id, it) })
+                        } ?: ui.plans[item.planId]?.let { p ->
                             CompactGeneration(p, vm.outputs(p.jobId),
                                 onOpenOutput = { p.jobId?.let(onNavigateToOutput) },
                                 onAttach = { vm.attachPlanImages(p.plan.id, it) }, onDiscard = { vm.discardPlan(p.plan.id) },

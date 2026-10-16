@@ -64,6 +64,9 @@ class PlanBuilder(
         }
         val issues = mutableListOf<ValidationIssue>()
         if (schema.promptRequired && prompt.isBlank()) issues += ValidationIssue("prompt", "El modelo exige prompt.")
+        // Los ajustes de API (plantilla, resolución…) son parámetros; un modelo sin campo prompt no recibe texto libre.
+        if (!schema.promptAccepted && prompt.isNotBlank())
+            issues += ValidationIssue("prompt", "${model.name} no tiene campo prompt: omite el prompt y expresa la configuración con sus parámetros (${schema.parameters.joinToString { it.key }}).")
         val placed = placeMedia(schema, model, media, issues)
 
         // En Nexus el prompt negativo viaja como parámetro del schema; si el modelo no lo tiene, no se puede enviar.
@@ -80,11 +83,14 @@ class PlanBuilder(
         issues += v.issues
         if (issues.any { it.severity == ValidationIssue.Severity.ERROR }) return PlanBuild.Invalid(issues)
 
-        val fittedPrompt = try { adaptPrompt?.invoke(prompt, schema, model.name) ?: prompt.trim() }
+        val fittedPrompt = try { if (prompt.isBlank()) "" else adaptPrompt?.invoke(prompt, schema, model.name) ?: prompt.trim() }
         catch (e: Exception) { return PlanBuild.Invalid(listOf(ValidationIssue("prompt", e.message ?: "No se pudo adaptar el prompt; el original se conserva."))) }
 
         val effective = ParameterValidator.effective(schema, v.normalized)
-        val estimate = runCatching { cost.estimate(model, effective) }.getOrNull()
+        // La duración del vídeo de origen solo sirve para estimar el coste; nunca se envía.
+        val sourceSeconds = placed.firstOrNull { it.role == "video" }?.assetId?.let { assets.asset(it)?.durationSec }
+        val costParams = if (sourceSeconds != null) effective + (SOURCE_SECONDS_KEY to sourceSeconds.toString()) else effective
+        val estimate = runCatching { cost.estimate(model, costParams) }.getOrNull()
         val warnings = buildList {
             issues.filter { it.severity == ValidationIssue.Severity.WARNING }.forEach { add(it.message) }
             when (estimate?.confidence) {
@@ -180,5 +186,7 @@ class PlanBuilder(
 
     companion object {
         val ROLES = listOf("first_frame", "last_frame", "reference", "video")
+        /** Pista local para el estimador de coste (segundos del vídeo de entrada). */
+        const val SOURCE_SECONDS_KEY = "__source_video_seconds"
     }
 }

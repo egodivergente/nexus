@@ -31,8 +31,9 @@ data class Attachment(
 
 /** Eventos para la UI: tarjetas de plan, propuestas a aplicar, etc. */
 sealed interface UiEvent {
-    data class PlanReady(val plan: GenerationPlan, val executable: Boolean) : UiEvent
-    data class GenerationSubmitted(val plan: GenerationPlan, val jobId: String) : UiEvent
+    /** [orderId]: la tarjeta (encargo) que se crea o se actualiza EN SU SITIO con este plan. */
+    data class PlanReady(val plan: GenerationPlan, val executable: Boolean, val orderId: String? = null) : UiEvent
+    data class GenerationSubmitted(val plan: GenerationPlan, val jobId: String, val orderId: String? = null) : UiEvent
     data class AwaitingConfirmation(val planId: String) : UiEvent
     data class ProposedAction(val id: String, val description: String) : UiEvent
     data class Info(val text: String) : UiEvent

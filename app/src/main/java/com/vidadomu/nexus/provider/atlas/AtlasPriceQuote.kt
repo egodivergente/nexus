@@ -96,6 +96,14 @@ object AtlasPriceQuote {
             catch(_: Exception) { return@withContext AtlasPublishedPrice.fetch(model) ?: VideoPricePreview.fallback(model) }
             else model
         val values = params ?: VideoPricePreview.initialValues(native)
+        // Tarifa que depende del nivel de la plantilla: nunca la base de 720P para un 4K.
+        if(com.vidadomu.nexus.agent.core.cost.TieredTariffs.covers(native.id)) {
+            val effective = native.parameters.associate { it.key to it.defaultValue }.filterValues { it.isNotBlank() } + values
+            val q = com.vidadomu.nexus.agent.core.cost.TieredTariffs.quote(native.id, effective, videoSeconds) ?: return@withContext null
+            val total = q.usd
+            return@withContext if(total != null) PriceQuote(total, q.basis, System.currentTimeMillis(), unitUsd = q.usdPerSecond)
+                else PriceQuote(q.usdPerSecond, q.basis, System.currentTimeMillis(), unit = "s", unitUsd = q.usdPerSecond)
+        }
         // Use the supported provider default when five seconds is unavailable; still request a quote.
         // The web calculator requires a remote media URL for these models. Keep private
         // media local, show the published unit rate and a clearly labelled local estimate.

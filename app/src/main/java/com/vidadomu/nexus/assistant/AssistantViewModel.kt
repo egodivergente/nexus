@@ -41,8 +41,9 @@ sealed interface ChatItem {
     data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
     @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String) : ChatItem
+    /** Una tarjeta por encargo: [orderId] es persistente y [planId] apunta al plan vigente. */
     @kotlinx.serialization.Serializable
-    data class PlanCard(override val id: String, val planId: String) : ChatItem
+    data class PlanCard(override val id: String, val planId: String, val orderId: String? = null) : ChatItem
     @kotlinx.serialization.Serializable
     data class Proposal(override val id: String, val actionId: String, val description: String, val state: ProposalState = ProposalState.PENDING, val result: String? = null) : ChatItem
     @kotlinx.serialization.Serializable
@@ -74,6 +75,8 @@ data class PlanUi(
 data class AssistantUiState(
     val items: List<ChatItem> = emptyList(),
     val plans: Map<String, PlanUi> = emptyMap(),
+    /** Estado verificado de cada encargo (misma fuente que ve el agente). */
+    val orders: Map<String, com.vidadomu.nexus.agent.core.orders.Order> = emptyMap(),
     val thinking: Boolean = false,
     val scrollRequest: Long = 0,
     val lastLatencyMs: Long? = null,
@@ -112,6 +115,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private val synced = mutableSetOf<String>()
     private var completedSeen = -1
     private var msgSeq = 0L
+    // Declarado antes de init: init lo asigna y no debe pisarse después.
+    private var removeOrderListener: () -> Unit = {}
+    private val reportedJobStates = mutableSetOf<String>()
 
     init {
         val s = runtime.settings.load()
@@ -125,9 +131,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { app.modelCatalogRepository.models.collect { models ->
             _ui.update { it.copy(catalog = (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary)) }
         } }
-        viewModelScope.launch { ui.collect { state -> chatStore.save(state) } }
+        removeOrderListener = runtime.orders.onChange { publishOrders() }
+        publishOrders()
+        viewModelScope.launch { ui.collect { state -> chatStore.save(state, runtime.orders.snapshot()) } }
         viewModelScope.launch { app.generationRepository.allJobs.collect { jobs -> onJobs(jobs) } }
     }
+
+    override fun onCleared() { removeOrderListener(); super.onCleared() }
+
+    private fun publishOrders() = _ui.update { it.copy(orders = runtime.orders.all().associateBy { o -> o.id }) }
 
     // ---- conversación -------------------------------------------------------------------------
 
@@ -154,6 +166,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _ui.update { it.copy(settings = latestSettings) }
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
+        val itemsBefore = _ui.value.items.map { it.id }.toSet()
         _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
@@ -167,6 +180,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop)) }
                 }
+                // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
+                r.verifiedNotes.forEach { notice(it, error = false) }
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 failedTurn = clean to atts
@@ -182,8 +197,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
             } finally {
                 _ui.update { state ->
+                    // Solo las tarjetas NUEVAS de este turno van tras la respuesta; las existentes
+                    // se actualizan en su sitio y no saltan de posición.
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
-                        state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
+                        card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
                     state.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         items = state.items.filterNot { it in cards } + cards)
@@ -198,23 +215,35 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun stop() { turnJob?.cancel() }
 
+    /**
+     * Muestra [plan] en la tarjeta de su encargo. Si la tarjeta existe se actualiza EN SU SITIO
+     * (mismo item, misma posición); solo un encargo nuevo añade una tarjeta.
+     */
+    private fun showPlan(plan: GenerationPlan, orderId: String?, executable: Boolean = true) = _ui.update { s ->
+        val state = runtime.guard.state(plan.id) ?: PlanState.PREPARED
+        val previous = s.items.firstOrNull { it is ChatItem.PlanCard && ((orderId != null && it.orderId == orderId) || it.planId == plan.id) } as ChatItem.PlanCard?
+        val carried = s.plans[plan.id] ?: previous?.let { s.plans[it.planId] }
+        val ui = (carried ?: PlanUi(plan, executable, state, includeInBatch = true)).copy(plan = plan, executable = executable, state = state,
+            issues = emptyList(), error = null, busy = false, submitting = false,
+            jobId = if (carried?.plan?.id == plan.id) carried.jobId else null, jobStatus = if (carried?.plan?.id == plan.id) carried.jobStatus else null)
+        val items = if (previous != null) s.items.map { if (it.id == previous.id) previous.copy(planId = plan.id, orderId = orderId ?: previous.orderId) else it }
+            else s.items + ChatItem.PlanCard(newId(), plan.id, orderId)
+        val stale = previous?.planId?.takeIf { it != plan.id }
+        s.copy(plans = (if (stale != null) s.plans - stale else s.plans) + (plan.id to ui), items = items)
+    }
+
     private fun onEvent(ev: UiEvent) {
         when (ev) {
-            is UiEvent.PlanReady -> _ui.update { s ->
-                val state = runtime.guard.state(ev.plan.id) ?: PlanState.PREPARED
-                val existing = s.plans[ev.plan.id]
-                val ui = (existing ?: PlanUi(ev.plan, ev.executable, state, includeInBatch = true)).copy(plan = ev.plan, executable = ev.executable, state = state, issues = emptyList(), error = null)
-                val items = if (s.items.any { it is ChatItem.PlanCard && it.planId == ev.plan.id }) s.items else s.items + ChatItem.PlanCard(newId(), ev.plan.id)
-                s.copy(plans = s.plans + (ev.plan.id to ui), items = items)
-            }
+            is UiEvent.PlanReady -> showPlan(ev.plan, ev.orderId, ev.executable)
             is UiEvent.AwaitingConfirmation -> _ui.update { s ->
                 val p = s.plans[ev.planId] ?: return@update s
                 s.copy(plans = s.plans + (ev.planId to p.copy(state = runtime.guard.state(ev.planId) ?: p.state)))
             }
             is UiEvent.ProposedAction -> _ui.update { it.copy(items = it.items + ChatItem.Proposal(newId(), ev.id, ev.description)) }
-            is UiEvent.GenerationSubmitted -> _ui.update { state ->
-                state.copy(plans = state.plans + (ev.plan.id to PlanUi(ev.plan, false, PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING")),
-                    items = state.items + ChatItem.PlanCard(newId(), ev.plan.id))
+            is UiEvent.GenerationSubmitted -> {
+                // Antes añadía SIEMPRE otra tarjeta: ahora actualiza la del encargo.
+                showPlan(ev.plan, ev.orderId, executable = false)
+                setPlan(ev.plan.id) { it.copy(state = PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING") }
             }
             is UiEvent.Info -> notice(ev.text)
         }
@@ -232,10 +261,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         _ui.update { it.copy(thinking = true) }
         viewModelScope.launch {
             try {
-                chatStore.archive(current)
+                chatStore.archive(current, runtime.orders.snapshot())
                 current.plans.filterValues { it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED) }.keys.forEach { runtime.guard.discard(it) }
                 val saved = if(id == null) null else chatStore.conversation(id) ?: error("No se pudo abrir la conversación.")
                 conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = current.activeProjectId)
+                // Los encargos pertenecen a su conversación: el agente no ve los de otro chat.
+                runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
                 _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
             } catch(error: Exception) {
@@ -360,13 +391,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun restoreSavedChat(saved: SavedAssistantChat) {
-        val plans = saved.plans.mapValues { (_, p) ->
+        val cleaned = ChatRestore.clean(saved)
+        cleaned.discardedPlanIds.forEach { runtime.guard.discard(it) }
+        val plans = cleaned.plans.mapValues { (_, p) ->
             if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, includeInBatch = false, error = "La app se cerró durante el envío. Comprueba Historial antes de repetir.")
             else if (p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) {
                 runtime.guard.register(p.plan); p.copy(state = PlanState.PREPARED, busy = false, includeInBatch = false)
             } else p.copy(busy = false, includeInBatch = false)
         }
-        _ui.update { it.copy(items = saved.items, plans = plans, pendingAttachments = saved.attachments) }
+        runtime.orders.restore(cleaned.orders, plans.values.map { it.plan })
+        // Planes fallidos tras envío (SUBMITTED): el guard debe conocerlos para corregir en el mismo encargo.
+        plans.values.filter { it.state == PlanState.SUBMITTED }.forEach { runtime.guard.registerSubmitted(it.plan) }
+        _ui.update { it.copy(items = cleaned.items, plans = plans, pendingAttachments = saved.attachments) }
         // Recheck only the old reference-validation failures; never submit restored plans.
         viewModelScope.launch {
             for ((id, p) in plans) {
@@ -415,6 +451,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     /** Edición del usuario (prompt o parámetros). Se revalida contra el schema e invalida confirmaciones previas. */
     fun editPlan(planId: String, edit: PlanEdit) {
         val p = _ui.value.plans[planId] ?: return
+        val order = orderOf(planId)
+        if (order != null) { reviseOrder(order.id, edit); return }
         if (p.state == PlanState.SUBMITTED || p.state == PlanState.DISCARDED || p.state == PlanState.UNCERTAIN || p.busy) return
         setPlan(planId) { it.copy(busy = true, error = null, issues = emptyList()) }
         viewModelScope.launch {
@@ -431,6 +469,50 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 setPlan(planId) { it.copy(busy = false, error = e.message?.take(200) ?: "No se pudo actualizar el plan.") }
             }
         }
+    }
+
+    private fun orderOf(planId: String) = runtime.orders.byPlan(planId)?.takeIf { it.planId == planId }
+
+    /** Edición del usuario sobre el encargo: misma tarjeta, revalidada; nunca envía. */
+    private fun reviseOrder(orderId: String, edit: PlanEdit, onDone: (String?) -> Unit = {}) {
+        val order = runtime.orders.get(orderId) ?: return
+        if (_ui.value.plans[order.planId]?.busy == true) return
+        setPlan(order.planId) { it.copy(busy = true, error = null, issues = emptyList()) }
+        viewModelScope.launch {
+            try {
+                val (updated, built) = runtime.deps.reviseOrder(orderId, edit, com.vidadomu.nexus.agent.core.orders.Actor.USER)
+                when (built) {
+                    is PlanBuild.Ready -> { showPlan(built.plan, updated.id); onDone(null) }
+                    is PlanBuild.Invalid -> {
+                        val issues = built.issues.map { i -> "${i.key}: ${i.message}" }
+                        setPlan(order.planId) { it.copy(busy = false, issues = issues) }
+                        onDone(issues.joinToString("\n"))
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                val text = Redactor.redact(e.message?.take(200) ?: "No se pudo actualizar el encargo.")
+                setPlan(order.planId) { it.copy(busy = false, error = text) }
+                onDone(text)
+            }
+        }
+    }
+
+    /** Aplica la corrección diagnosticada sobre el MISMO encargo; el usuario vuelve a confirmar el coste. */
+    fun applyFix(orderId: String) {
+        val fix = runtime.orders.get(orderId)?.lastFailure?.fix ?: return
+        reviseOrder(orderId, PlanEdit(params = fix.params))
+    }
+
+    /** Sin corrección automática: el agente recibe el encargo con su error real y lo corrige en su sitio. */
+    fun askAgentToFix(orderId: String) {
+        val order = runtime.orders.get(orderId) ?: return
+        send("Corrige el encargo ${order.modelName} (${order.id}): falló con «${order.lastFailure?.message?.take(300) ?: "error sin detalle"}». Corrígelo en la misma tarjeta, sin crear otra.")
+    }
+
+    /** La tarjeta declara lo que ha pintado; el agente lo ve tal cual en su contexto. */
+    fun cardRendered(orderId: String, shown: String) {
+        runCatching { runtime.orders.rendered(orderId, shown) }
     }
 
     fun toggleBatchPlan(planId: String) {
@@ -458,6 +540,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 val keep = current.plan.media.filter { it.role !in setOf("reference", "first_frame") }
                     .map { com.vidadomu.nexus.agent.core.tools.MediaRequest(it.role, it.uri, it.mimeType, it.assetId) }
+                val order = orderOf(planId)
+                if (order != null) {
+                    val (updated, built) = runtime.deps.reviseOrder(order.id, PlanEdit(media = keep + selected), com.vidadomu.nexus.agent.core.orders.Actor.USER)
+                    when (built) {
+                        is PlanBuild.Ready -> showPlan(built.plan, updated.id)
+                        is PlanBuild.Invalid -> setPlan(planId) { it.copy(busy = false, issues = built.issues.map { issue -> issue.message }) }
+                    }
+                    return@launch
+                }
                 when(val result = runtime.deps.plans.rebuild(current.plan, PlanEdit(media = keep + selected))) {
                     is PlanBuild.Ready -> {
                         runtime.guard.replace(result.plan)
@@ -473,7 +564,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun discardPlan(planId: String) {
         val p = _ui.value.plans[planId] ?: return
-        if (p.busy || p.state == PlanState.SUBMITTED || p.state == PlanState.UNCERTAIN) return
+        val order = orderOf(planId)
+        val failedOrder = order?.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED
+        if (p.busy || p.state == PlanState.UNCERTAIN || (p.state == PlanState.SUBMITTED && !failedOrder)) return
+        runCatching { order?.let { runtime.orders.discard(it.id) } }.onFailure { return }
         runtime.guard.discard(planId)
         setPlan(planId) { it.copy(state = PlanState.DISCARDED) }
     }
@@ -485,15 +579,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun generate(planId: String, shownFingerprint: String) {
         val p = _ui.value.plans[planId] ?: return
         if (_ui.value.thinking) { setPlan(planId) { it.copy(error = "Espera a que el asistente termine antes de generar.") }; return }
+        // Bloqueo de pulsaciones repetidas: solo un envío por intento del encargo.
+        val order = orderOf(planId)
+        if (order != null && order.status !in setOf(com.vidadomu.nexus.agent.core.orders.OrderStatus.AWAITING_CONFIRMATION, com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED)) return
         if (p.busy || !p.executable || p.state !in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) return
         setPlan(planId) { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
-                chatStore.save(_ui.value)
+                chatStore.save(_ui.value, runtime.orders.snapshot())
                 val r = submitSlots.withPermit {
                     suspend fun submitNow(): com.vidadomu.nexus.agent.core.spend.SubmitResult {
                         setPlan(planId) { it.copy(submitting = true) }
-                        chatStore.save(_ui.value)
+                        chatStore.save(_ui.value, runtime.orders.snapshot())
                         return runtime.deps.lifecycle.confirmAndSubmit(planId, shownFingerprint)
                     }
                     if (p.plan.ref.providerId == "google_flow") flowLane.withLock { submitNow() }
@@ -501,17 +598,22 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 val sent = runtime.guard.plan(planId) ?: p.plan
                 setPlan(planId) { it.copy(plan = sent, busy = false, submitting = false, state = PlanState.SUBMITTED, jobId = r.jobId, jobStatus = "PENDING") }
-                notice("Enviado a ${sent.modelName}. Lo verás en Historial; aquí se actualiza el estado." + (r.note?.takeIf { "lineage" in it }?.let { " $it" } ?: ""))
+                // La tarjeta muestra «Procesando»: sin avisos extra en el chat salvo un fallo del índice.
+                r.note?.takeIf { "lineage" in it }?.let { notice(it) }
                 onJobs(app.generationRepository.allJobs.value)
             } catch (e: SubmissionUncertain) {
                 setPlan(planId) { it.copy(busy = false, submitting = false, state = PlanState.UNCERTAIN, jobId = e.jobId, error = e.message) }
+            } catch (e: com.vidadomu.nexus.agent.core.orders.DuplicateSubmission) {
+                // Segunda pulsación sobre un envío en curso: se ignora sin tocar el estado del primero.
+                setPlan(planId) { it.copy(busy = it.submitting) }
             } catch (e: SpendViolation) {
                 val current = runtime.guard.plan(planId)
                 setPlan(planId) { it.copy(plan = current ?: it.plan, busy = false, submitting = false, state = runtime.guard.state(planId) ?: it.state, error = e.message) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                setPlan(planId) { it.copy(busy = false, submitting = false, state = runtime.guard.state(planId) ?: PlanState.PREPARED, error = "No se envió: " + Redactor.redact(e.message?.take(200) ?: e.javaClass.simpleName)) }
+                // El encargo ya registró el error literal, su diagnóstico y la corrección disponible.
+                setPlan(planId) { it.copy(busy = false, submitting = false, state = runtime.guard.state(planId) ?: PlanState.PREPARED, error = "No se envió: " + Redactor.redact(e.message?.take(300) ?: e.javaClass.simpleName)) }
             }
         }
     }
@@ -538,6 +640,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         completedSeen = completed
         for(job in jobs) {
             val planId = job.parameters[NexusGenerationBackend.PLAN_KEY] ?: continue
+            syncOrder(planId, job)
             val plan = _ui.value.plans[planId] ?: continue
             if(plan.jobId == null && job.providerJobId != null) setPlan(planId) { it.copy(jobId = job.id, state = PlanState.SUBMITTED, busy = false, submitting = false) }
         }
@@ -554,6 +657,30 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             if (st == "COMPLETED" || st == "FAILED" || st == "CANCELLED") {
                 val jid = p.jobId!!
                 if (synced.add(jid)) viewModelScope.launch { runCatching { runtime.deps.lifecycle.sync(jid) } }
+            }
+        }
+    }
+
+    /**
+     * Lleva al encargo el estado VERIFICADO del trabajo en nexus.db. Mientras se envía, el ciclo
+     * de envío es el dueño del estado. Un registro «incierto» sin id del proveedor no resuelve nada:
+     * así un envío dudoso nunca pasa a «error» corregible (lo que permitiría pagar dos veces).
+     */
+    private fun syncOrder(planId: String, job: com.vidadomu.nexus.core.model.GenerationJob) {
+        val order = orderOf(planId) ?: return
+        if (order.status !in setOf(com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING, com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN)) return
+        if (order.jobId != null && order.jobId != job.id) return
+        if (order.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN && job.providerJobId == null) return
+        val st = when (job.status) {
+            GenerationStatus.COMPLETED -> "COMPLETED"; GenerationStatus.FAILED -> "FAILED"; GenerationStatus.CANCELLED -> "CANCELLED"
+            GenerationStatus.UPLOADING, GenerationStatus.QUEUED -> "PENDING"; else -> "PROCESSING"
+        }
+        if (!reportedJobStates.add("${job.id}:$st:${job.progress}")) return
+        viewModelScope.launch {
+            runCatching {
+                if (order.jobId == null) runtime.orders.accepted(order.id, job.id)
+                runtime.deps.lifecycle.reportJob(job.id, com.vidadomu.nexus.agent.core.spend.JobStatus(job.id, st, job.progress,
+                    job.outputs.map { it.localUri ?: it.url }, job.error, job.actualCostUsd))
             }
         }
     }

@@ -60,6 +60,15 @@ object ParameterValidator {
                 issues += ValidationIssue(key, "«$key» es un campo de medios: adjunta el archivo en lugar de pasarlo como parámetro.")
                 continue
             }
+            val derived = schema.derivedParam(key)
+            if (derived != null) {
+                // Lo calcula Nexus: se acepta si coincide; nunca se envía un valor contradictorio.
+                val source = (params[derived.from]?.takeUnless(::isBlankLike) ?: schema.param(derived.from)?.default)?.trim()
+                val expected = derived.valueFor(source)
+                if (expected != null && !expected.equals(value, ignoreCase = true))
+                    issues += ValidationIssue(key, "«$key» se deduce de «${derived.from}» ($source → $expected). Cambia «${derived.from}» en lugar de «$key».")
+                continue
+            }
             val spec = schema.param(key)
             if (spec == null) {
                 issues += ValidationIssue(key, "«$key» no existe en el schema de ${schema.ref.modelId}.")
@@ -80,16 +89,47 @@ object ParameterValidator {
                 issues += ValidationIssue(spec.key, "Falta «${spec.displayName}», que es obligatorio.")
             }
         }
+        // Rangos condicionales: un valor elegido fuera de rango es un error; un default
+        // publicado incompatible no se envía (el proveedor usa el de la plantilla).
+        for (spec in schema.parameters) {
+            val explicit = out[spec.key] ?: continue
+            conditionProblem(schema, spec, explicit, out)?.let { issues += ValidationIssue(spec.key, it) }
+        }
+        for (d in schema.derived) {
+            val source = out[d.from] ?: schema.param(d.from)?.default?.takeUnless(::isBlankLike)
+            if (d.valueFor(source) == null)
+                issues += ValidationIssue(d.from, "El proveedor exige «${d.key}» y Nexus lo deduce de «${d.from}», pero «${source ?: "vacío"}» no permite deducirlo. Elige una de: ${d.mapping.keys.joinToString(", ")}.")
+        }
         return ValidationResult(out, issues, dropped)
     }
 
-    /** Valores efectivos para mostrar: defaults del schema + lo elegido. Nunca muestra vacíos. */
+    /** Mensaje si [value] incumple el rango que impone otro campo (con los valores efectivos). */
+    fun conditionProblem(schema: ModelSchema, spec: ParamSpec, value: String, chosen: Map<String, String>): String? {
+        val number = value.toDoubleOrNull() ?: return null
+        for (c in spec.conditions) {
+            val controlling = chosen[c.field] ?: schema.param(c.field)?.default ?: continue
+            if (controlling !in c.values) continue
+            val low = c.min; val high = c.max
+            if ((low != null && number < low) || (high != null && number > high)) {
+                val range = listOfNotNull(low?.let(::fmt), high?.let(::fmt)).joinToString("–")
+                return "«${spec.displayName}» debe estar en $range con ${c.field}=$controlling."
+            }
+        }
+        return null
+    }
+
+    /** Valores efectivos para mostrar: defaults del schema + lo elegido + derivados. Nunca muestra vacíos. */
     fun effective(schema: ModelSchema, normalized: Map<String, String>): Map<String, String> {
         val result = linkedMapOf<String, String>()
         for (spec in schema.parameters) {
-            val v = normalized[spec.key] ?: spec.default
-            if (!isBlankLike(v)) result[spec.key] = v!!
+            val chosen = normalized[spec.key]
+            val v = chosen ?: spec.default
+            if (isBlankLike(v)) continue
+            // Un default incompatible con la opción elegida no se envía: tampoco se muestra.
+            if (chosen == null && conditionProblem(schema, spec, v!!, normalized) != null) continue
+            result[spec.key] = v!!
         }
+        for (d in schema.derived) d.valueFor(result[d.from])?.let { result[d.key] = it }
         return result
     }
 

@@ -168,6 +168,8 @@ data class NexusModel(
     val contractMedia: List<ContractMediaField> = emptyList(),
     val contractDefaults: Map<String,String> = emptyMap(),
     val promptRequired: Boolean = true,
+    /** false si el schema no tiene campo prompt (upscalers, herramientas): no se envía texto libre. */
+    val promptAccepted: Boolean = true,
     val contractPromptField:String = "promptText"
 ) {
     val canonicalFamily: String

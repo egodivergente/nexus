@@ -81,7 +81,7 @@ class ExecutionTicket internal constructor(
     val expiresAt: Long,
 )
 
-class SpendViolation(message: String) : SecurityException(message)
+open class SpendViolation(message: String) : SecurityException(message)
 
 /**
  * Guardián de gasto. Regla absoluta: ninguna generación de pago sin confirmación explícita para ESA
@@ -102,6 +102,14 @@ class SpendGuard(
         plans[plan.id] = plan
         states[plan.id] = PlanState.PREPARED
         return plan
+    }
+
+    /** Plan ya enviado en una sesión anterior (al restaurar un chat): consultable, nunca reenviable. */
+    @Synchronized
+    fun registerSubmitted(plan: GenerationPlan) {
+        if (plans.containsKey(plan.id)) return
+        plans[plan.id] = plan
+        states[plan.id] = PlanState.SUBMITTED
     }
 
     fun plan(id: String): GenerationPlan? = plans[id]

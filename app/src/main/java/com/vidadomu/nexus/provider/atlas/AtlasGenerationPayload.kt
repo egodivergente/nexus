@@ -14,7 +14,11 @@ object AtlasGenerationPayload {
             put("model", modelIdToSend)
             if(request.modality==Modality.CHAT) {
                 put("messages",AtlasChatProtocol.userMessages(request.prompt))
-            } else put("prompt", request.prompt)
+            } else if(request.parameters["__prompt_accepted"] != "false" &&
+                !(request.prompt.isBlank() && request.parameters["__prompt_optional"] == "true")) {
+                // Sin campo prompt en el schema (upscalers) no se envía texto libre.
+                put("prompt", request.prompt)
+            }
             if (request.negativePrompt.isNotBlank()) {
                 put("negative_prompt", request.negativePrompt)
             }

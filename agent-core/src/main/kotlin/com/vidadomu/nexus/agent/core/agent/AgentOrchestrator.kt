@@ -65,6 +65,10 @@ data class TurnResult(
     val toolCalls: List<String>,
     /** END_TURN, MAX_ROUNDS, MAX_TOKENS… */
     val stop: String,
+    /** Estado real que contradice la respuesta y que el agente no corrigió: la UI lo muestra. */
+    val verifiedNotes: List<String> = emptyList(),
+    /** true si el agente tuvo que rehacer su respuesta por contradecir el estado verificado. */
+    val selfCorrected: Boolean = false,
 )
 
 /**
@@ -86,6 +90,10 @@ class AgentOrchestrator(
     private val today: () -> String = { LocalDate.now().toString() },
     private val documents: AttachmentDocumentLoader? = null,
     private val videos: AttachmentVideoLoader? = null,
+    /** Estado real de la interfaz (encargos, errores, eventos) que se adjunta a cada turno. */
+    private val uiContext: (() -> String?)? = null,
+    /** Encargos verificados para contrastar lo que el agente afirma. */
+    private val verifiedOrders: (() -> List<com.vidadomu.nexus.agent.core.orders.Order>)? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -120,6 +128,7 @@ class AgentOrchestrator(
 
         val blocks = mutableListOf<ContentBlock>()
         blocks += ContentBlock.Text(userText(text, newAttachments))
+        runCatching { uiContext?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(MAX_UI_CONTEXT_CHARS)) }
         val loader = images
         if (config.sendImagesToLlm && loader != null) {
             newAttachments.filter { it.mimeType.startsWith("image/") }.take(MAX_IMAGES_PER_TURN).forEach { a ->
@@ -163,6 +172,7 @@ class AgentOrchestrator(
         var llmCalls = 0
         var input = 0; var output = 0; var rounds = 0
         var stop = "END_TURN"
+        var selfCorrected = false
         val turnTexts = mutableListOf<String>()
         val tools = if (config.toolUse) toolsFor(session.mode) else emptyList()
         val specs = tools.map { ToolSpec(it.name, it.description, it.inputSchema) }
@@ -213,7 +223,20 @@ class AgentOrchestrator(
                 continue
             }
             val uses = msg.toolUses()
-            if (uses.isEmpty()) { stop = response.stopReason.name; break }
+            if (uses.isEmpty()) {
+                stop = response.stopReason.name
+                // Una sola revisión por turno: si la respuesta contradice el estado verificado,
+                // el agente la rehace con el estado real delante (puede consultar herramientas).
+                val contradictions = if (selfCorrected || response.stopReason != StopReason.END_TURN) emptyList()
+                    else runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(msg.text(), it) }.orEmpty()
+                if (contradictions.isNotEmpty() && llmCalls < config.maxToolRounds + 1) {
+                    selfCorrected = true
+                    logger.log("W", "respuesta contradice el estado verificado: ${contradictions.joinToString { it.claim.name }}")
+                    conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text(verificationPrompt(contradictions))))
+                    continue
+                }
+                break
+            }
 
             if (rounds >= config.maxToolRounds) {
                 // Contestar a las llamadas pendientes para que el historial siga siendo válido, y parar.
@@ -252,8 +275,18 @@ class AgentOrchestrator(
             rounds++
             if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
         }
-        TurnResult(turnTexts.lastOrNull().orEmpty(), events, Usage(input, output), rounds, calls, stop)
+        val finalText = turnTexts.lastOrNull().orEmpty()
+        val unresolved = runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(finalText, it) }.orEmpty()
+        TurnResult(finalText, events, Usage(input, output), rounds, calls, stop,
+            verifiedNotes = unresolved.map { "Estado verificado: ${it.truth}" }.distinct(), selfCorrected = selfCorrected)
     } }
+
+    private fun verificationPrompt(c: List<ClaimVerifier.Contradiction>): String = buildString {
+        appendLine("[Verificación automática de Nexus — no es un mensaje del usuario]")
+        c.forEach { appendLine("Tu respuesta dice «${it.sentence.take(200)}», pero el estado verificado es: ${it.truth}.") }
+        append("Reescribe tu respuesta al usuario en 1–3 frases ajustadas al estado real: no afirmes envíos ni resultados que no existan. ")
+        append("Si un encargo falló, di el error literal, su causa y la corrección concreta (usa update_plan con su order_id; no crees otro encargo).")
+    }
 
     private fun capToolResult(element: JsonElement): JsonElement {
         val raw = element.toString()
@@ -372,6 +405,7 @@ class AgentOrchestrator(
         const val MAX_VIDEOS_PER_TURN = 2
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
         const val MAX_TOOL_RESULT_CHARS = 32_000
+        const val MAX_UI_CONTEXT_CHARS = 4_000
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }
