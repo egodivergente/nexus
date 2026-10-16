@@ -49,6 +49,8 @@ data class LlmRequest(
     val maxTokens: Int,
     val temperature: Double? = null,
     val turnId: String? = null,
+    /** Stable per-chat id used by remote providers that keep server-side conversation sessions. */
+    val conversationId: String? = null,
 )
 
 enum class StopReason { END_TURN, TOOL_USE, MAX_TOKENS, STOP_SEQUENCE, GUARDRAIL, CONTENT_FILTERED, OTHER }
@@ -61,6 +63,12 @@ interface LlmProvider {
     val id: String
     suspend fun complete(request: LlmRequest): LlmResponse
     suspend fun countInputTokens(request: LlmRequest): Int? = null
+}
+
+/** Optional incremental text transport. The default agent loop still accepts ordinary providers. */
+interface StreamingLlmProvider : LlmProvider {
+    suspend fun completeStreaming(request: LlmRequest, onTextDelta: (String) -> Unit): LlmResponse
+    override suspend fun complete(request: LlmRequest): LlmResponse = completeStreaming(request) {}
 }
 
 /** Error de proveedor con mensaje apto para el usuario (sin secretos ni cuerpos de petición). */

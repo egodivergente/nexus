@@ -84,7 +84,10 @@ fun AssistantScreen(
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && ui.plans[it.planId]?.state==PlanState.DISCARDED}
-    val latestVisible by rememberUpdatedState(visibleItems)
+    val displayItems = visibleItems + listOfNotNull(ui.streamingText.takeIf { it.isNotBlank() }?.let {
+        ChatItem.Assistant(STREAMING_ITEM_ID, it, emptyList(), "")
+    })
+    val latestVisible by rememberUpdatedState(displayItems)
     val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
         if(latestVisible.isEmpty()) return
@@ -109,7 +112,7 @@ fun AssistantScreen(
             if (following) followLast()
         }
     }
-    LaunchedEffect(ui.items.size, ui.thinking, ui.plans, ui.scrollRequest) {
+    LaunchedEffect(ui.items.size, ui.thinking, ui.plans, ui.scrollRequest, ui.streamingText) {
         if (following) followLast()
     }
     LaunchedEffect(ui.scrollRequest) {
@@ -159,8 +162,8 @@ fun AssistantScreen(
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
-                if (ui.items.isEmpty()) item { EmptyHint() }
-                items(visibleItems, key = { it.id }) { item ->
+                if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
+                items(displayItems, key = { it.id }) { item ->
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item)
@@ -548,6 +551,8 @@ private fun AttachmentThumb(a: Attachment, onRemove: (() -> Unit)? = null) {
     }
 }
 
+private const val STREAMING_ITEM_ID = "__nexus_assistant_stream__"
+
 // ---- ajustes ---------------------------------------------------------------------------------
 
 @Composable
@@ -559,6 +564,8 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var clearSecret by remember { mutableStateOf(false) }
     var endpoint by remember { mutableStateOf(s.endpoint) }
     var modelId by remember { mutableStateOf(s.modelId) }
+    var antigravityEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
+    var antigravityModelId by remember { mutableStateOf(s.antigravityModelId) }
     var region by remember { mutableStateOf(s.region) }
     var token by remember { mutableStateOf("") }
     var clearToken by remember { mutableStateOf(false) }
@@ -576,36 +583,52 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 MediaEditingSettings()
                 AgentInternetSettings()
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock",AssistantSettings.BACKEND_PROXY to "Proxy").forEachIndexed { index, (value,label) ->
-                        SegmentedButton(selected=backend==value,onClick={backend=value},
-                            shape=SegmentedButtonDefaults.itemShape(index,2),border=BorderStroke(0.dp,androidx.compose.ui.graphics.Color.Transparent)) {Text(label)}
+                    listOf(
+                        AssistantSettings.BACKEND_DIRECT to "Bedrock",
+                        AssistantSettings.BACKEND_PROXY to "Proxy",
+                        AssistantSettings.BACKEND_ANTIGRAVITY to "AGY",
+                    ).forEachIndexed { index, (value,label) ->
+                        val selected = when (value) {
+                            AssistantSettings.BACKEND_DIRECT -> backend != AssistantSettings.BACKEND_PROXY && backend != AssistantSettings.BACKEND_ANTIGRAVITY
+                            else -> backend == value
+                        }
+                        SegmentedButton(selected=selected,onClick={backend=value},
+                            shape=SegmentedButtonDefaults.itemShape(index,3),border=BorderStroke(0.dp,androidx.compose.ui.graphics.Color.Transparent)) {Text(label)}
                     }
                 }
-                if (backend != AssistantSettings.BACKEND_PROXY) {
-                    Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    StudioCredentialField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
-                    StudioCredentialField(secret, { secret = it; clearSecret = false }, shape=NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
-                        singleLine = true)
-                    if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
+                when (backend) {
+                    AssistantSettings.BACKEND_PROXY -> {
+                        Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        StudioTextField(endpoint, { endpoint = it }, shape=NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true)
+                        StudioCredentialField(token, { token = it; clearToken = false }, shape=NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") }, singleLine = true)
+                        if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
-                    StudioTextField(region, { region = it }, shape=NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true)
-                } else {
-                    Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    StudioTextField(endpoint, { endpoint = it }, shape=NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true)
-                    StudioCredentialField(token, { token = it; clearToken = false }, shape=NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
-                        singleLine = true)
-                    if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
+                    AssistantSettings.BACKEND_ANTIGRAVITY -> {
+                        Text("AGY usa la sesión autenticada del CLI en el bridge AXEL. Nexus no guarda credenciales de Google ni altera las de Bedrock. Para una URL remota usa HTTPS; HTTP solo funciona en localhost o con túnel local.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        StudioTextField(antigravityEndpoint, { antigravityEndpoint = it.trim() }, shape=NexusTokens.field, label = { Text("URL del bridge (127.0.0.1:8788)") }, singleLine = true)
+                        StudioTextField(antigravityModelId, { antigravityModelId = it.trim() }, shape=NexusTokens.field, label = { Text("Modelo AGY (por defecto: gemini-fast)") }, singleLine = true)
+                    }
+                    else -> {
+                        Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        StudioCredentialField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
+                        StudioCredentialField(secret, { secret = it; clearSecret = false }, shape=NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") }, singleLine = true)
+                        if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
+                        }
+                        StudioTextField(region, { region = it }, shape=NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true)
                     }
                 }
-                StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, label = { Text("Model ID / inference profile") }, singleLine = true)
-                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    AssistantSettings.KNOWN_MODELS.forEach { (id,name) ->
-                        FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)})
+                if (backend != AssistantSettings.BACKEND_ANTIGRAVITY) {
+                    StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, label = { Text("Model ID / inference profile") }, singleLine = true)
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        AssistantSettings.KNOWN_MODELS.forEach { (id,name) ->
+                            FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)})
+                        }
                     }
+                    if(modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 }
-                if(modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                     StudioTextField(temperature, { temperature = it }, shape=NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
@@ -632,7 +655,8 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 if (t.isNotEmpty() && temp == null) { error = "Temperatura no válida (0–1)."; return@TextButton }
                 val newToken = when { clearToken -> ""; token.isNotBlank() -> token; else -> null }
                 val newSecret = when { clearSecret -> ""; secret.isNotBlank() -> secret; else -> null }
-                error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
+                error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId,
+                    antigravityEndpoint = antigravityEndpoint, antigravityModelId = antigravityModelId, region = region, temperature = temp,
                     maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded), newToken, newSecret)
                 if (error == null) onDismiss()
             }) { Text("Guardar") }

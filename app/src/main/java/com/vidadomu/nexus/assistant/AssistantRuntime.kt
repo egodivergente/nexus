@@ -46,6 +46,9 @@ data class AssistantSettings(
     val backend: String = BACKEND_DIRECT,
     val endpoint: String = "",
     val modelId: String = DEFAULT_MODEL,
+    /** Separate from Bedrock so changing providers never overwrites its model selection. */
+    val antigravityEndpoint: String = DEFAULT_ANTIGRAVITY_ENDPOINT,
+    val antigravityModelId: String = DEFAULT_ANTIGRAVITY_MODEL,
     val region: String = DEFAULT_REGION,
     val temperature: Double? = null,
     val maxTokens: Int = 4096,
@@ -58,22 +61,30 @@ data class AssistantSettings(
     val excludedFamilies: String = DEFAULT_EXCLUDED,
 ) {
     val excludedSet: Set<String> get() = parseFamilies(excludedFamilies)
-    val direct: Boolean get() = backend != BACKEND_PROXY
+    val direct: Boolean get() = backend != BACKEND_PROXY && backend != BACKEND_ANTIGRAVITY
+    val antigravity: Boolean get() = backend == BACKEND_ANTIGRAVITY
 
-    /** Sin credenciales del backend elegido se usa el planificador local (sin LLM). */
-    val offline: Boolean get() = modelId.isBlank() || if (direct) awsAccessKeyId.isBlank() || maskedAwsSecret.isBlank() || region.isBlank()
-        else endpoint.isBlank() || maskedToken.isBlank()
+    /** El bridge AGY se selecciona de forma explícita; no sustituye los fallbacks de Bedrock. */
+    val offline: Boolean get() = when {
+        antigravity -> false
+        modelId.isBlank() -> true
+        direct -> awsAccessKeyId.isBlank() || maskedAwsSecret.isBlank() || region.isBlank()
+        else -> endpoint.isBlank() || maskedToken.isBlank()
+    }
 
     fun toConfig() = AgentConfig(
-        provider = when { offline -> "offline"; direct -> "bedrock-direct"; else -> "bedrock-proxy" },
-        modelId = modelId.ifBlank { "offline" }, region = region,
+        provider = when { offline -> "offline"; direct -> "bedrock-direct"; antigravity -> "antigravity"; else -> "bedrock-proxy" },
+        modelId = (if (antigravity) antigravityModelId else modelId).ifBlank { if (antigravity) DEFAULT_ANTIGRAVITY_MODEL else "offline" }, region = region,
         endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 7, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
     )
 
     companion object {
         const val BACKEND_DIRECT = "direct"
         const val BACKEND_PROXY = "proxy"
+        const val BACKEND_ANTIGRAVITY = "antigravity"
         const val DEFAULT_MODEL = "us.anthropic.claude-sonnet-4-6"
+        const val DEFAULT_ANTIGRAVITY_MODEL = com.vidadomu.nexus.agent.core.llm.AntigravityProvider.DEFAULT_MODEL
+        const val DEFAULT_ANTIGRAVITY_ENDPOINT = "http://127.0.0.1:8788"
         const val DEFAULT_REGION = "us-east-1"
         const val DEFAULT_EXCLUDED = "veo"
         /** Official Bedrock profiles; account availability is separate from catalog support. */
@@ -120,6 +131,8 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         awsAccessKeyId = runCatching { secure.getProviderApiKey(AWS_ACCESS_ID) }.getOrDefault(""),
         maskedAwsSecret = masked(AWS_SECRET_ID),
         excludedFamilies = prefs.getString("excluded_families", AssistantSettings.DEFAULT_EXCLUDED).orEmpty(),
+        antigravityEndpoint = prefs.getString("antigravity_endpoint", AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT).orEmpty(),
+        antigravityModelId = prefs.getString("antigravity_model_id", AssistantSettings.DEFAULT_ANTIGRAVITY_MODEL).orEmpty(),
     )
 
     /** Proyecto activo, persistido entre sesiones (lo generado mientras está activo se etiqueta con él). */
@@ -128,14 +141,27 @@ class AssistantSettingsStore(private val app: NexusApplication) {
 
     private fun masked(id: String) = runCatching { secure.getMaskedProviderApiKey(id).takeIf { secure.hasProviderApiKey(id) }.orEmpty() }.getOrDefault("")
 
+    private fun safeAntigravityEndpoint(value: String): Boolean = runCatching {
+        val uri = java.net.URI(value)
+        val localHttp = uri.scheme.equals("http", true) && uri.host in setOf("127.0.0.1", "localhost")
+        (uri.scheme.equals("https", true) || localHttp) && !uri.host.isNullOrBlank() &&
+            uri.userInfo == null && uri.query == null && uri.fragment == null
+    }.getOrDefault(false)
+
     /** [newToken] / [newAwsSecret]: null = no tocar; "" = borrar. */
     fun save(s: AssistantSettings, newToken: String?, newAwsSecret: String? = null) {
         val endpoint = s.endpoint.trim().trimEnd('/')
+        val antigravityEndpoint = s.antigravityEndpoint.trim().trimEnd('/')
         require(endpoint.isBlank() || endpoint.startsWith("https://") || LOCAL.matches(endpoint)) {
             "El proxy debe usar https:// (o http://127.0.0.1 con adb reverse en depuración)."
         }
+        require(!s.antigravity || antigravityEndpoint.isBlank() || safeAntigravityEndpoint(antigravityEndpoint)) {
+            "AGY requiere HTTPS; HTTP solo se permite para 127.0.0.1 o localhost."
+        }
         require(s.region.isBlank() || REGION.matches(s.region.trim())) { "Región de AWS no válida (p. ej. us-east-1)." }
-        prefs.edit().putString("backend", s.backend).putString("endpoint", endpoint).putString("model_id", s.modelId.trim()).putString("region", s.region.trim())
+        prefs.edit().putString("backend", s.backend).putString("endpoint", endpoint).putString("model_id", s.modelId.trim())
+            .putString("antigravity_endpoint", antigravityEndpoint).putString("antigravity_model_id", s.antigravityModelId.trim())
+            .putString("region", s.region.trim())
             .putString("temperature", s.temperature?.toString()).putInt("max_tokens", s.maxTokens.coerceIn(256, 32_000))
             .putString("mode", s.mode.name).putBoolean("send_images", s.sendImages)
             .putString("excluded_families", AssistantSettings.parseFamilies(s.excludedFamilies).joinToString(", ")).apply()
@@ -236,6 +262,7 @@ class AssistantRuntime(private val app: NexusApplication) {
             s.offline -> OfflinePlannerProvider()
             s.direct -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
                 BedrockDirectProvider(s.region.trim(), { settings.awsCredentials() }), llmBudget, { settings.llmLimits() })
+            s.antigravity -> com.vidadomu.nexus.agent.core.llm.AntigravityProvider(s.antigravityEndpoint)
             else -> BedrockProxyProvider(s.endpoint, { settings.token() })
         }
 

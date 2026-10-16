@@ -188,7 +188,12 @@ class AgentOrchestrator(
             }) }
             val response = try {
                 llmCalls++
-                llm.complete(LlmRequest(config.modelId, requestSystem, requestMessages, if(readingDocuments) emptyList() else specs, config.maxTokens, config.temperature, turnId))
+                val llmRequest = LlmRequest(config.modelId, requestSystem, requestMessages, if(readingDocuments) emptyList() else specs,
+                    config.maxTokens, config.temperature, turnId, session.id)
+                if (llm is com.vidadomu.nexus.agent.core.llm.StreamingLlmProvider) {
+                    onEvent(UiEvent.StreamingText("", reset = true))
+                    llm.completeStreaming(llmRequest) { delta -> if (delta.isNotEmpty()) onEvent(UiEvent.StreamingText(delta)) }
+                } else llm.complete(llmRequest)
             } catch (e: LlmException) {
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
                 if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)

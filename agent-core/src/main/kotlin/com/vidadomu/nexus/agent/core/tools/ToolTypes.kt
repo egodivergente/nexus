@@ -36,6 +36,8 @@ sealed interface UiEvent {
     data class AwaitingConfirmation(val planId: String) : UiEvent
     data class ProposedAction(val id: String, val description: String) : UiEvent
     data class Info(val text: String) : UiEvent
+    /** Ephemeral assistant text; reset marks the start of the next streamed LLM round. */
+    data class StreamingText(val text: String, val reset: Boolean = false) : UiEvent
 }
 
 class ToolOutcome(val result: JsonElement, val isError: Boolean = false, val events: List<UiEvent> = emptyList())

@@ -75,6 +75,8 @@ data class AssistantUiState(
     val items: List<ChatItem> = emptyList(),
     val plans: Map<String, PlanUi> = emptyMap(),
     val thinking: Boolean = false,
+    /** Temporary provider stream, rendered through the same assistant bubble and never saved to history. */
+    val streamingText: String = "",
     val scrollRequest: Long = 0,
     val lastLatencyMs: Long? = null,
     val catalog: List<com.vidadomu.nexus.agent.core.registry.ModelSummary> = emptyList(),
@@ -154,7 +156,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _ui.update { it.copy(settings = latestSettings) }
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, scrollRequest = it.scrollRequest + 1) }
+        val userMessageId = newId()
+        if (conversation.history().isEmpty()) {
+            val firstUserId = _ui.value.items.filterIsInstance<ChatItem.User>().firstOrNull()?.id ?: userMessageId
+            conversation = orchestrator.newConversation(
+                id = stableBridgeSessionId(firstUserId), mode = _ui.value.mode, activeProjectId = _ui.value.activeProjectId,
+            )
+        }
+        _ui.update { it.copy(items = it.items + ChatItem.User(userMessageId, shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -165,7 +174,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
-                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop)) }
+                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop), streamingText = "") }
                 }
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -185,7 +194,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
-                    state.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
+                    state.copy(thinking = false, streamingText = "", lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
@@ -217,6 +226,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     items = state.items + ChatItem.PlanCard(newId(), ev.plan.id))
             }
             is UiEvent.Info -> notice(ev.text)
+            is UiEvent.StreamingText -> _ui.update { state ->
+                state.copy(streamingText = if (ev.reset) "" else state.streamingText + ev.text)
+            }
         }
     }
 
@@ -236,7 +248,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 current.plans.filterValues { it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED) }.keys.forEach { runtime.guard.discard(it) }
                 val saved = if(id == null) null else chatStore.conversation(id) ?: error("No se pudo abrir la conversación.")
                 conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = current.activeProjectId)
-                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
             } catch(error: Exception) {
                 _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
@@ -360,6 +372,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun restoreSavedChat(saved: SavedAssistantChat) {
+        saved.items.filterIsInstance<ChatItem.User>().firstOrNull()?.id?.let { firstMessageId ->
+            conversation = orchestrator.newConversation(
+                id = stableBridgeSessionId(firstMessageId), mode = _ui.value.mode, activeProjectId = _ui.value.activeProjectId,
+            )
+        }
         val plans = saved.plans.mapValues { (_, p) ->
             if (p.submitting && p.jobId == null) p.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, includeInBatch = false, error = "La app se cerró durante el envío. Comprueba Historial antes de repetir.")
             else if (p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) {
@@ -584,6 +601,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun notice(text: String, error: Boolean = false) = _ui.update { it.copy(items = it.items + ChatItem.Notice(newId(), text, error)) }
 
     private fun msg(text: String) = (++msgSeq) to text
+
+    private fun stableBridgeSessionId(firstMessageId: String) =
+        "nexus-${firstMessageId.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100)}"
 
     private fun newId() = UUID.randomUUID().toString()
 }
