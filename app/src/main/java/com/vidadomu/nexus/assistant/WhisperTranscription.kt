@@ -39,7 +39,7 @@ internal class WhisperTranscription(private val app:NexusApplication) {
             } finally {stage.delete()}
         }
     }
-    private suspend fun decode(file:File):FloatArray {
+    internal suspend fun decode(file:File):FloatArray {
         val extractor=MediaExtractor();var decoder:MediaCodec?=null
         try {
             extractor.setDataSource(file.path)

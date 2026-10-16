@@ -54,6 +54,23 @@ object StudioPalette {
 }
 
 internal fun palette(theme: NexusAppearance): ColorScheme {
+    if (theme == NexusAppearance.SAND || theme == NexusAppearance.ROSE) {
+        val rose = theme == NexusAppearance.ROSE
+        val bg = Color(if(rose) 0xFFFFF6F3 else 0xFFFFF8ED)
+        val surface = Color(if(rose) 0xFFFFFBF9 else 0xFFFFFCF5)
+        val layer = Color(if(rose) 0xFFF1DDD9 else 0xFFF0E2CD)
+        val ink = Color(if(rose) 0xFF362225 else 0xFF33291E)
+        val muted = Color(if(rose) 0xFF72565A else 0xFF6B5948)
+        val accent = Color(if(rose) 0xFF814654 else 0xFF8C4B2D)
+        return lightColorScheme(primary=accent,onPrimary=Color.White,secondary=accent,onSecondary=Color.White,
+            primaryContainer=layer,onPrimaryContainer=ink,secondaryContainer=layer,onSecondaryContainer=ink,
+            tertiary=accent,onTertiary=Color.White,tertiaryContainer=layer,onTertiaryContainer=ink,
+            background=bg,onBackground=ink,surface=surface,onSurface=ink,surfaceVariant=layer,onSurfaceVariant=muted,
+            surfaceContainerLowest=bg,surfaceContainerLow=surface,surfaceContainer=surface,
+            surfaceContainerHigh=layer,surfaceContainerHighest=layer,surfaceDim=layer,surfaceBright=surface,
+            outline=muted,outlineVariant=layer,error=Color(0xFF9C3038),onError=Color.White,
+            errorContainer=Color(0xFFFFDAD8),onErrorContainer=Color(0xFF410008),surfaceTint=accent)
+    }
     val light = theme == NexusAppearance.LIGHT
     val quartz = theme == NexusAppearance.QUARTZ
     val accent = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Accent else Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF4EBAE8)

@@ -320,6 +320,11 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     }
 
     /** One atomic, project-scoped library removal. Never invalidates historical file references. */
+    suspend fun deleteLibraryAssets(ids: Set<String>): Int = edit { d ->
+        val targets=d.assets.filter {it.id in ids && !it.libraryDeleted}.map {it.id}.toSet()
+        d.copy(assets=d.assets.map {if(it.id in targets) it.copy(libraryDeleted=true) else it}) to targets.size
+    }
+
     suspend fun deleteFromLibrary(projectId: String, ids: Set<String>): Int = edit { d ->
         val targets = d.assets.filter { it.id in ids && it.projectId == projectId && !it.libraryDeleted }.map { it.id }.toSet()
         d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = true) else it }) to targets.size

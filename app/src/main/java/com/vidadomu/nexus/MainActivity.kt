@@ -51,23 +51,10 @@ class MainActivity : ComponentActivity() {
     private var initialSharedText by mutableStateOf<String?>(null)
     private var initialDeepLinkJobId by mutableStateOf<String?>(null)
     private var agentDraft by mutableStateOf<com.vidadomu.nexus.agent.AgentDraft?>(null)
-    private var startupPreviewEpoch by mutableIntStateOf(if (BuildConfig.OFFLINE_QA) 0 else 1)
-    private var lastStoppedAtMs: Long = 0L
-
-    override fun onStart() {
-        super.onStart()
-        if (!BuildConfig.OFFLINE_QA && lastStoppedAtMs > 0L && System.currentTimeMillis() - lastStoppedAtMs > 3_000L) {
-            startupPreviewEpoch++
-        }
-    }
-
-    override fun onStop() {
-        lastStoppedAtMs = System.currentTimeMillis()
-        super.onStop()
-    }
-
+    private var startupPreviewEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!BuildConfig.OFFLINE_QA && savedInstanceState == null && StartupPreview.consume()) startupPreviewEpoch = 1
         enableEdgeToEdge()
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
@@ -377,3 +364,8 @@ private fun NexusStartupOnboardingOverlay(epoch: Int) {
     }
 }
 
+
+private object StartupPreview {
+    private var shown = false
+    @Synchronized fun consume(): Boolean = if (shown) false else { shown = true; true }
+}

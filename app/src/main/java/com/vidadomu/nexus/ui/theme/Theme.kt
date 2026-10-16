@@ -44,8 +44,8 @@ fun NexusTheme(content: @Composable () -> Unit) {
             window.statusBarColor=scheme.background.toArgb()
             window.navigationBarColor=scheme.background.toArgb()
             WindowCompat.getInsetsController(window,view).apply {
-                isAppearanceLightStatusBars=theme==NexusAppearance.LIGHT
-                isAppearanceLightNavigationBars=theme==NexusAppearance.LIGHT
+                isAppearanceLightStatusBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
+                isAppearanceLightNavigationBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
             }
         }
     }

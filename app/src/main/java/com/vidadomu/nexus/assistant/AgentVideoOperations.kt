@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
 /** On-device Media3 edits. New files only; no provider, shell, arbitrary filters or uploads. */
 internal class AgentVideoOperations(private val app:NexusApplication) {
     private val assets get()=AssistantRuntime.get(app).assets
-    private fun source(id:String):Asset {
+    internal fun source(id:String):Asset {
         var asset=assets.asset(id) ?: throw ToolInputException("Archivo desconocido; usa search_assets primero.")
         // A completed generation may have been indexed before its download finished.
         // Resolve its current trusted local output without rewriting history or fetching any URL.
@@ -78,22 +78,22 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
     }
     fun validate(spec:MediaEditSpec) {
         val infos=spec.assetIds.map(::inspect)
-        val wantsVideo=spec.action!="transcribe"
+        val wantsVideo=spec.action !in setOf("transcribe","analyze_audio")
         infos.forEach {info ->
             val tracks=info["tracks"]!!.jsonArray.map {it.jsonObject["mime"]!!.jsonPrimitive.content}
             if(wantsVideo && tracks.none {it.startsWith("video/")}) throw ToolInputException("Esta operación necesita vídeo.")
-            if(spec.action in setOf("extract_audio","transcribe") && tracks.none {it.startsWith("audio/")})
+            if(spec.action in setOf("extract_audio","transcribe","analyze_audio") && tracks.none {it.startsWith("audio/")})
                 throw ToolInputException("El archivo no contiene una pista de audio.")
         }
         val d=infos.first()["duration_ms"]!!.jsonPrimitive.long
         if(spec.startMs>=d || (spec.endMs ?: 0)>d) throw ToolInputException("El intervalo está fuera de la duración del archivo.")
         if(spec.framesMs.any {it>=d}) throw ToolInputException("Un fotograma está fuera de la duración del vídeo.")
-        if(spec.action=="transcribe") {
+        if(spec.action in setOf("transcribe","analyze_audio")) {
             val audio=infos.first()["tracks"]!!.jsonArray.first {it.jsonObject["mime"]!!.jsonPrimitive.content.startsWith("audio/")}.jsonObject
             if(audio[MediaFormat.KEY_CHANNEL_COUNT]?.jsonPrimitive?.int !in 1..2)
                 throw ToolInputException("Whisper local admite audio mono o estéreo. Prepara otra pista para este archivo.")
             if((spec.endMs ?: d)-spec.startMs>900_000) throw ToolInputException("Transcribe como máximo 15 minutos por encargo; puedes seleccionar un intervalo.")
-            WhisperModelStore(app).requireModel()
+            if(spec.action=="transcribe") WhisperModelStore(app).requireModel()
         }
         spec.audioAssetId?.let {id ->
             if(inspect(id)["tracks"]!!.jsonArray.none {it.jsonObject["mime"]!!.jsonPrimitive.content.startsWith("audio/")})
@@ -110,7 +110,7 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
         val folder=File(app.filesDir,"agent_exports").apply {mkdirs()}
         if(spec.action=="frames") return frames(job,first,folder,onProgress)
         val stage=File(folder,"edit_${job.id}.part.mp4")
-        val output=File(folder,"edit_${job.id}.${if(spec.action in setOf("extract_audio","transcribe")) "m4a" else "mp4"}")
+        val output=File(folder,"edit_${job.id}.${if(spec.action in setOf("extract_audio","transcribe","analyze_audio")) "m4a" else "mp4"}")
         // A stopped export is rebuilt from its private partial file, never from the original.
         stage.delete()
         val videoItems=spec.assetIds.map {id ->
@@ -120,8 +120,8 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
                     .setStartPositionMs(spec.startMs).apply {spec.endMs?.let {setEndPositionMs(it)}}.build())
             }.build()
             EditedMediaItem.Builder(item).setRemoveAudio(spec.action in setOf("remove_audio","replace_audio"))
-                .setRemoveVideo(spec.action in setOf("extract_audio","transcribe")).apply {
-                    if(spec.action=="transcribe") {
+                .setRemoveVideo(spec.action in setOf("extract_audio","transcribe","analyze_audio")).apply {
+                    if(spec.action in setOf("transcribe","analyze_audio")) {
                         val mono=ChannelMixingAudioProcessor().apply {
                             for(channels in 1..2) putChannelMixingMatrix(ChannelMixingMatrix.create(channels,1))
                         }
@@ -144,8 +144,8 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             if(!stage.isFile || stage.length()==0L) throw ToolInputException("La exportación no produjo un archivo válido.")
             val info=inspectFile(stage)
             if(!stage.renameTo(output)) throw ToolInputException("No se pudo guardar el resultado.")
-            if(spec.action=="transcribe") {
-                try {return WhisperTranscription(app).transcribe(job,output,first,onProgress)}
+            if(spec.action in setOf("transcribe","analyze_audio")) {
+                try {return if(spec.action=="analyze_audio") AgentAudioAnalysis(app).analyze(job,output,first) else WhisperTranscription(app).transcribe(job,output,first,onProgress)}
                 finally {output.delete()}
             }
             val type=if(spec.action=="extract_audio") AssetType.AUDIO else AssetType.VIDEO

@@ -306,11 +306,14 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     fun selectModel(model: NexusModel) {
         mediaSession.reset()
-        app.secureStorage.setLastModelId(_uiState.value.selectedModality, model.id)
+        val modality = _uiState.value.selectedModality.takeIf { it in model.modalities } ?: model.modalities.first()
+        app.secureStorage.setLastModelId(modality, model.id)
         val defaultParams = model.parameters.associate { it.key to it.defaultValue }
         _uiState.update { current ->
             current.copy(
                 selectedModel = model,
+                selectedModality = modality,
+                availableModels = modelCatalogRepo.models.value.filter { modality in it.modalities },
                 parameters = defaultParams,
                 showAdvanced = false,
                 attachedMedia = current.attachedMedia,

@@ -2,6 +2,23 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.7-agent] - 2026-10-16
+
+- Android vc41: bienvenida una sola vez por arranque del proceso; temas claros
+  Arena y Rosa; selector del Lienzo entre modalidades sin perder prompt ni adjuntos.
+- Biblioteca con importación visible, archivos locales/documentos/ediciones,
+  descarga y eliminación accesibles desde el menú. Los fallidos se retiran de
+  «En curso», se pueden archivar y sus tarjetas se pueden quitar del chat.
+- El agente puede listar y abrir la biblioteca durante un turno, crear PDF con
+  imágenes y archivos de código, y analizar niveles y bandas de audio local.
+  La conversión de imágenes incluye resultados guardados en la galería.
+- Investigación web explícita para recomendar modelos, con evidencia de la
+  variante y fuentes actuales; presupuesto monetario local sólo si se activa.
+- Preparación de upscale IA con modelos del catálogo, revisión visual con medidas
+  locales, panorama del proyecto y búsqueda de decisiones antiguas. Caché por
+  encargo y reducción del contexto técnico antiguo para evitar trabajo repetido.
+- Alcance y validación: [experiencia 1.9.7](docs/EXPERIENCE-197-20261016.md).
+
 ## [1.9.6-agent] - 2026-10-15
 
 - Android vc40: elimina las cuotas fijas locales de 150.000 tokens por mensaje

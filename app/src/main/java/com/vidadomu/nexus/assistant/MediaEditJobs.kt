@@ -58,7 +58,7 @@ internal class MediaEditJobs(private val app:NexusApplication) {
             put("outputs",JsonArray(job.outputAssetIds.mapNotNull(assets::asset).map {asset -> buildJsonObject {
                 put("asset_id",asset.id);put("name",asset.displayName);put("uri",asset.uri);put("type",asset.type.name)
             }}))
-            if(job.spec.action=="transcribe" && job.state=="COMPLETED") {
+            if(job.spec.action in setOf("transcribe","analyze_audio") && job.state=="COMPLETED") {
                 job.outputAssetIds.mapNotNull(assets::asset).firstOrNull {it.mimeType=="text/plain"}?.let {asset ->
                     val file=File(android.net.Uri.parse(asset.uri).path.orEmpty())
                     val text=file.bufferedReader().use {reader ->
@@ -66,7 +66,7 @@ internal class MediaEditJobs(private val app:NexusApplication) {
                         while(count<chars.size) {val n=reader.read(chars,count,chars.size-count);if(n<0) break;count+=n}
                         String(chars,0,count)
                     }
-                    put("transcript",text.take(16000));put("transcript_may_be_truncated",text.length>16000)
+                    put(if(job.spec.action=="transcribe") "transcript" else "analysis",text.take(16000));put("transcript_may_be_truncated",text.length>16000)
                 }
             }
             job.error?.let {put("error",it)}

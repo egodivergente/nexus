@@ -17,6 +17,16 @@ import java.util.UUID
 
 /** Runs only on isolated OfflineQa, with bundled synthetic clips/public speech. No LLM/provider calls. */
 class LocalMediaEditingTest {
+    @Test fun audioAnalysisMeasuresBundledToneAndCreatesReadableReportWithoutWhisper() = runBlocking {
+        val source=asset("red.mp4")
+        val report=run("analyze_audio",listOf(source)).single()
+        val measured=Json.parseToJsonElement(File(android.net.Uri.parse(report.uri).path!!).readText()).jsonObject
+        assertTrue(measured["duration_seconds"]!!.jsonPrimitive.double in 2.8..3.3)
+        val bands=measured["bands"]!!.jsonArray
+        assertTrue(bands[1].jsonObject["relative_energy_percent"]!!.jsonPrimitive.double>95)
+        assertTrue(measured["rms_dbfs"]!!.jsonPrimitive.double in -45.0..-3.0)
+        assertTrue(measured["limits"]!!.jsonPrimitive.content.contains("No mide LUFS"))
+    }
     @Test fun failedEditDoesNotBlockTheNextQueuedEdit()=runBlocking {
         app.ready.await()
         val source=asset("red.mp4")
@@ -39,14 +49,14 @@ class LocalMediaEditingTest {
     }
     private var activity:ActivityScenario<MainActivity>?=null
     @Before fun foreground() {
-        check(BuildConfig.OFFLINE_QA && app.packageName.endsWith(".mediaqa"))
+        check(BuildConfig.OFFLINE_QA && listOf(".qa",".mediaqa",".uiqa").any(app.packageName::endsWith))
         if(InstrumentationRegistry.getArguments().getString("background")!="true")
             activity=ActivityScenario.launch(MainActivity::class.java)
     }
     @After fun closeActivity() {activity?.close()}
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as NexusApplication
     private suspend fun asset(name:String):Asset {
-        check(BuildConfig.OFFLINE_QA && app.packageName.endsWith(".mediaqa"))
+        check(BuildConfig.OFFLINE_QA && listOf(".qa",".mediaqa",".uiqa").any(app.packageName::endsWith))
         app.ready.await()
         val file=File(app.filesDir,"agent_media/qa_${UUID.randomUUID()}_$name").apply {parentFile!!.mkdirs()}
         InstrumentationRegistry.getInstrumentation().context.assets.open("media-edit/$name").use {input ->file.outputStream().use {out ->input.copyTo(out)}}
@@ -190,7 +200,7 @@ class LocalMediaEditingTest {
         catch(e:com.vidadomu.nexus.agent.core.tools.ToolInputException) {assertEquals(count,folder.listFiles()!!.size)}
     }
     @Test fun preloadedWhisperTranscribesPublicSpeechAndProducesLocalTextAndSubtitles() = runBlocking {
-        check(BuildConfig.OFFLINE_QA && app.packageName.endsWith(".mediaqa"))
+        check(BuildConfig.OFFLINE_QA && listOf(".qa",".mediaqa",".uiqa").any(app.packageName::endsWith))
         // OfflineQa deliberately has no INTERNET permission: preload public weights before running.
         assertTrue("Preload the pinned ggml-base.bin in files/whisper_models before this test",WhisperModelStore(app).verifyExisting())
         assertTrue(WhisperModelStore(app).ready())

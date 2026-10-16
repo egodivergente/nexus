@@ -2,8 +2,8 @@
 id: model_router
 kind: expertise
 title: Enrutador de modelos
-version: 2
-updated: 2026-10-02
+version: 3
+updated: 2026-10-16
 applies_to: [VIDEO, IMAGE]
 triggers: [qué modelo, qué generador, recomiéndame, cuál es mejor, generar vídeo, generar imagen, elegir modelo, para este prompt]
 ---
@@ -21,9 +21,9 @@ El usuario decide. Si nombra un modelo o una familia, se usa ese (como mucho un 
    - si hay texto legible en la imagen (carteles, logos, rótulos);
    - personajes recurrentes del proyecto (identidad) y cuántos aparecen a la vez;
    - complejidad de cámara y de acción, duración prevista, estilo (fotorreal vs. estilizado), y presupuesto.
-2. Haz una lista corta de 2-4 familias con la matriz orientativa de abajo, sin las excluidas.
+2. Haz una lista corta de 2-4 familias con documentación actual verificable de abajo, sin las excluidas.
 3. Llama a compare_model_families con esa lista y la tarea, y a recommend_models con el TaskSpec (prioridades = los rasgos que de verdad importan en ESTE prompt, en orden).
-4. Elige la variante concreta del registro: la generación más reciente de la familia salvo motivo (coste, una capacidad que solo tiene la anterior). Usa las tiers fast/turbo/mini/lite para pruebas y la pro/max/4K para la toma final.
+4. Elige la variante concreta con evidencia para la tarea. No deduzcas calidad, velocidad o compatibilidad del nombre fast/pro/max ni de que sea la versión más reciente: verifica capacidades, coste y comparativas disponibles.
 5. Responde así (breve):
    - **Recomendado:** familia + id de la variante. Por qué: 2-3 razones ligadas a ESTE prompt (no marketing).
    - **Alternativa:** otra familia real y su contrapartida (más barata, mejor en X, peor en Y).
@@ -37,27 +37,18 @@ El usuario decide. Si nombra un modelo o una familia, se usa ese (como mucho un 
 4. Revísalo con create_generation_prompt y corrige los avisos (duración, ratio y resolución van en parámetros, no en el texto; prompt negativo solo si el schema lo admite).
 5. Entrégalo listo para pegar, en un bloque, con el negativo aparte si aplica, y una línea con los parámetros sugeridos.
 
-## Matriz orientativa (confírmala con compare_model_families; las skills de familia mandan)
-Vídeo:
-- Diálogo, voz o canto con lipsync en la misma pasada: Seedance 2.x, Kling 2.6+/3.0, MiniMax H3, Gemini Omni, Grok Imagine vídeo, LTX con audio. Avatar desde foto + audio propio: skill avatar-lipsync (OmniHuman, Kling avatar, Fabric, InfiniteTalk).
-- Identidad de personaje desde varias fotos: Kling O3 reference-to-video, Seedance 2.x reference, Vidu Q2/Q3 reference, Wan 2.7/3.0 reference, MiniMax H3 reference.
-- Copiar el movimiento de un vídeo: Kling motion control (2.6/3.0), Wan 2.2 animate, Runway Act-Two (actuación facial y corporal).
-- Editar un vídeo existente: Runway Aleph 2, Kling O3 video-edit, Gemini Omni video-edit, Wan 2.7 video-edit, HappyHorse video-edit, Grok Imagine edit, Luma Ray v2v, Seedance vía runway/…/v2v.
-- Extender un clip: Seedance 2.5, Gemini Omni, Wan 2.5, LTX, PixVerse v6, FLUX 3, Grok Imagine.
-- Fotograma inicial y final: Kling, Vidu, PixVerse, FLUX 3 first-last.
-- Cámara compleja escrita en prosa y look cinematográfico: Kling 3.0, Runway Gen-4.5, Seedance 2.x.
-- Iterar barato: tiers fast/turbo/mini/lite (Wan, PixVerse, Vidu turbo, LTX fast, Seedance mini, Kling turbo/std).
-Imagen:
-- Texto legible y diseño gráfico (pósters, logos, rótulos): Ideogram v4, GPT Image 2.x, Nano Banana Pro, Qwen-Image.
-- Editar preservando identidad o producto: Nano Banana (2/Pro), GPT Image edit, Seedream 4.x/5 edit, FLUX Kontext, Qwen-Image edit.
-- Serie coherente de imágenes (storyboard, variaciones de un personaje): Seedream sequential, Nano Banana multi-referencia.
-- Estética artística, «look» de autor: Midjourney v8.x (Youchuan).
-- Fotorrealismo general: Seedream 5 Pro, Nano Banana Pro, MAI-Image, FLUX.2 Pro, GPT Image 2.5 [ranking sin verificar: compáralas].
-- Separar en capas: Seedream 5 Pro layer-decomposition.
+## Investigación obligatoria por tarea
+No uses una matriz estática de ganadores. Las familias, versiones y prestaciones cambian.
 
-## Errores a evitar
-- Recomendar una versión vieja cuando existe una más reciente de la misma familia sin decir por qué.
-- Dar 4 alternativas: una buena basta.
-- Justificar con adjetivos genéricos («mejor calidad») en vez de con lo que pide el prompt.
-- Escribir el prompt antes de cargar la skill de la familia elegida.
-- Proponer una familia excluida.
+1. Extrae requisitos verificables: duración, resolución, audio, fotogramas inicial/final, número de referencias, continuidad, edición o movimiento. Separa requisitos imprescindibles de preferencias.
+2. Obtén candidatos del catálogo real y verifica el schema de cada variante. Anota el ID exacto y proveedor: dos endpoints de una familia pueden admitir cosas distintas.
+3. Usa web_search con el nombre exacto de la variante y la capacidad concreta. Abre la documentación oficial o notas de lanzamiento con read_web_page. Una descripción del buscador por sí sola no basta.
+4. Por cada afirmación decisiva conserva URL, fecha de consulta, versión y evidencia que la respalda. La documentación demuestra soporte; no demuestra que sea mejor que un rival.
+5. Para afirmar superioridad visual exige una evaluación comparable (misma tarea, referencias, parámetros y versiones). Si no existe, presenta la elección como candidata compatible con tus requisitos, no como hecho probado.
+6. Comprueba el coste en el esquema/configuración real, distinguiendo estimación y tarifa. No conviertas una unidad desconocida a segundos.
+7. Entrega recomendación breve con razón concreta, alternativa y enlaces. Si la documentación o el buscador fallan, explica el dato que queda sin verificar y busca otra fuente primaria.
+
+## Ejemplos de preguntas que requieren pruebas
+- «Mejor para dos personajes abrazándose»: comprobar múltiples referencias/identidad y evidencia de interacción corporal; no confundir resolución con consistencia.
+- «Mejor para doblaje»: comprobar vídeo+audio de entrada, sincronía labial, idiomas y duración. Audio nativo no implica doblaje de un vídeo existente.
+- «Mejor para editar un plano»: comprobar endpoint video-to-video/edit, conservación de duración y controles; text-to-video no demuestra edición.

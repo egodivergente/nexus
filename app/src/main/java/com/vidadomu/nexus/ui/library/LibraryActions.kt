@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,17 +24,25 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LibraryActions(job:GenerationJob,output:GenerationOutput,localUri:String?,favorite:Boolean,hidden:Boolean,
-    onDismiss:()->Unit,onOpen:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onError:(String)->Unit) {
+    onDismiss:()->Unit,onOpen:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onDelete:()->Unit,onError:(String)->Unit) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
+    val exporter:com.vidadomu.nexus.ui.output.OutputExportViewModel=androidx.lifecycle.viewmodel.compose.viewModel()
+    val export by exporter.state.collectAsState()
+    val savePicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument(output.mimeType.ifBlank {"application/octet-stream"})) {exporter.save(it)}
+    LaunchedEffect(export.message) {export.message?.let {onError(it);exporter.dismissMessage()}}
     ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet) {
         NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space24)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space24)) {
             Text("Opciones del archivo",style=MaterialTheme.typography.titleMedium)
             ListItem(headlineContent={Text("Abrir")},leadingContent={Icon(Icons.Default.OpenInFull,null)},
                 modifier=Modifier.actionClick {onDismiss();onOpen()})
             ListItem(headlineContent={Text(if(favorite) "Quitar de favoritos" else "Marcar favorito")},leadingContent={Icon(Icons.Default.Star,null)},
                 modifier=Modifier.actionClick {onFavorite();onDismiss()})
+            ListItem(headlineContent={Text(if(export.busy) "Guardando…" else "Descargar archivo")},leadingContent={Icon(Icons.Default.Download,null)},
+                modifier=Modifier.actionClick {if(!export.busy) {exporter.prepare(output,localUri);savePicker.launch("Nexus-${output.id}."+(android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(output.mimeType) ?: "bin"))}})
+            ListItem(headlineContent={Text("Eliminar de la biblioteca")},leadingContent={Icon(Icons.Default.DeleteOutline,null)},
+                modifier=Modifier.actionClick {onDismiss();onDelete()})
             ListItem(headlineContent={Text("Copiar prompt")},leadingContent={Icon(Icons.Default.ContentCopy,null)},
                 modifier=Modifier.actionClick {clipboard.setText(AnnotatedString(job.prompt));onDismiss()})
             ListItem(headlineContent={Text(if(localUri==null) "Compartir enlace" else "Compartir archivo")},leadingContent={Icon(Icons.Default.Share,null)},

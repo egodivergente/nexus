@@ -473,6 +473,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun discardPlan(planId: String) {
         val p = _ui.value.plans[planId] ?: return
+        if (!p.busy && p.state == PlanState.SUBMITTED && p.jobStatus in setOf("FAILED", "CANCELLED")) {
+            // Dismiss only the presentation. Keep the submitted plan and its job/receipt intact.
+            _ui.update { state -> state.copy(items = state.items.filterNot { it is ChatItem.PlanCard && it.planId == planId }) }
+            return
+        }
         if (p.busy || p.state == PlanState.SUBMITTED || p.state == PlanState.UNCERTAIN) return
         runtime.guard.discard(planId)
         setPlan(planId) { it.copy(state = PlanState.DISCARDED) }

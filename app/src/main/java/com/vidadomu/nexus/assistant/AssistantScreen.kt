@@ -470,6 +470,10 @@ internal fun PlanCardView(
                     else LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 if(p.jobStatus=="COMPLETED") FilledTonalButton(onClick=onOpenOutput) {Text("Ver resultado")}
+                if(p.jobStatus in setOf("FAILED","CANCELLED")) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    TextButton(onClick=onDiscard) {Text("Quitar tarjeta",color=TextSecondary)}
+                    TextButton(onClick=onOpenOutput) {Text("Ver detalle",color=TextSecondary)}
+                }
             } else if(p.state!=PlanState.DISCARDED) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 TextButton(onClick=onOpenCanvas,enabled=!p.busy) {Text("Abrir en el Lienzo",color=TextSecondary)}
                 if(showDiscard) TextButton(onClick=onDiscard,enabled=!p.busy) {Text("Descartar",color=TextSecondary)}

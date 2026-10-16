@@ -16,6 +16,27 @@ import org.junit.Test
 class CanvasMinimalUiTest {
     @get:Rule val compose=createComposeRule()
 
+    @Test fun changingModelAcrossModalitiesKeepsThePromptAndAttachments() {
+        check(BuildConfig.OFFLINE_QA)
+        val app=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as NexusApplication
+        runBlocking {app.ready.await();app.database.loading.first {!it}}
+        val image=LocalQaFixture.model(app,"references")
+        val video=LocalQaFixture.model(app,"motion")
+        val media=LocalQaFixture.media(app,image,1)
+        compose.runOnIdle {
+            val vm=CreateViewModel(app)
+            vm.loadLocalPreview(image,media)
+            vm.updatePrompt("Conservar este encuadre")
+            vm.selectModel(video)
+            assertEquals(Modality.VIDEO,vm.uiState.value.selectedModality)
+            assertEquals(video.id,vm.uiState.value.selectedModel?.id)
+            assertEquals("Conservar este encuadre",vm.uiState.value.prompt)
+            assertEquals(media,vm.uiState.value.attachedMedia)
+            vm.selectModel(image)
+            assertEquals(Modality.IMAGE,vm.uiState.value.selectedModality)
+        }
+    }
+
     @Test fun parametersRestoreMediaAndCatalogRemainReachableWithoutGeneration() {
         check(BuildConfig.OFFLINE_QA)
         val app=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as NexusApplication
