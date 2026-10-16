@@ -79,6 +79,8 @@ data class AssistantUiState(
     /** Estado verificado de cada encargo (misma fuente que ve el agente). */
     val orders: Map<String, com.vidadomu.nexus.agent.core.orders.Order> = emptyMap(),
     val thinking: Boolean = false,
+    /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
+    val streamingText: String = "",
     /** Respuestas rápidas de la última respuesta del agente; se borran al enviar cualquier mensaje. */
     val replies: List<com.vidadomu.nexus.agent.core.tools.SuggestedReply> = emptyList(),
     val scrollRequest: Long = 0,
@@ -171,7 +173,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         // A ViewModel coroutine keeps the turn alive across navigation, but Android may reclaim
         // the app once its Activity is backgrounded. Promote the user-started request first.
         runCatching { AssistantTurnService.start(app) }
@@ -187,7 +189,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
-                        conv.session.renderedMedia.values.toList())) }
+                        conv.session.renderedMedia.values.toList()), streamingText = "") }
                 }
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
                 r.verifiedNotes.forEach { notice(it, error = false) }
@@ -212,7 +214,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
-                    state.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
+                    state.copy(thinking = false, streamingText = "", lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
@@ -256,6 +258,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 setPlan(ev.plan.id) { it.copy(state = PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING") }
             }
             is UiEvent.Info -> notice(ev.text)
+            is UiEvent.StreamingText -> _ui.update { it.copy(streamingText = ev.text) }
             is UiEvent.Replies -> _ui.update { it.copy(replies = ev.replies) }
         }
     }
@@ -278,7 +281,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = current.activeProjectId)
                 // Los encargos pertenecen a su conversación: el agente no ve los de otro chat.
                 runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
             } catch(error: Exception) {
                 _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
@@ -780,6 +783,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     // ---- ajustes ------------------------------------------------------------------------------
 
     fun maskedApiKey(backend: String): String = runtime.settings.maskedApiKey(backend)
+    fun savedModelFor(backend: String): String = runtime.settings.savedModelFor(backend)
 
     fun saveSettings(s: AssistantSettings, newToken: String?, newAwsSecret: String? = null, newApiKey: String? = null): String? = try {
         runtime.settings.save(s, newToken, newAwsSecret, newApiKey)

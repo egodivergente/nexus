@@ -2,7 +2,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt",
-    "sha256": "8da61ee804830e868cbfc03779288041957d95423c38f5572f7b2c92fd4d563d"
+    "sha256": "83d4250e8164b7c68aaeb92ab56a0175361f4b2f43273a86957c2172e2993e03"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ClaimVerifier.kt",
@@ -55,6 +55,11 @@
     "sha256": "bb87918f76eb4432369709d0c62b7e3aa681062c6f0227e875baeb45915e5ecc"
   },
   {
+    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProvider.kt",
+    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProvider.kt",
+    "sha256": "a1f271899727847fbb2dd140765b74107f36312a9b4512853c6adf721e5d0fd5"
+  },
+  {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt",
     "sha256": "6d425c5d4521120ecf7ad86dd71b17a5121764e207b013b493f956160a96d914"
@@ -77,7 +82,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt",
-    "sha256": "985fced7648bf105075b5e2f5129a53c3d11efc42b39b72fbdf6a1794adf2a64"
+    "sha256": "7833fede8750ea087a8282f956e4f3cb52e2df2a21e7cab6946a1bcd86a3b35e"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt",
@@ -212,7 +217,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolTypes.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolTypes.kt",
-    "sha256": "acd7b49f9a0cc5932bb3d41283bc50f30ada2cbc8a70f08e3980a2135929d8da"
+    "sha256": "2b7dc2086054cb5151bf008e7b56267490fb3c5b867aee9d3cefa6d1cb6b3a85"
   },
   {
     "source": "agent-core/src/test/resources/atlas_published_prices.json",
@@ -383,6 +388,11 @@
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/VideoAttachmentsTest.kt",
     "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/VideoAttachmentsTest.kt",
     "sha256": "23bfd2ee67a9c2e46d3cea933a162213b20cdca4ae41983c542ec2385ac634dc"
+  },
+  {
+    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProviderTest.kt",
+    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProviderTest.kt",
+    "sha256": "58b6ce435fb3cc62ff9d7b6623c3bff9725dd6d3ddc1d904a27b6a2e26e50c99"
   },
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttpTest.kt",

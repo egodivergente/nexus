@@ -10,6 +10,7 @@ import com.vidadomu.nexus.agent.core.llm.LlmProvider
 import com.vidadomu.nexus.agent.core.llm.LlmRequest
 import com.vidadomu.nexus.agent.core.llm.Role
 import com.vidadomu.nexus.agent.core.llm.StopReason
+import com.vidadomu.nexus.agent.core.llm.StreamingLlmProvider
 import com.vidadomu.nexus.agent.core.llm.ToolSpec
 import com.vidadomu.nexus.agent.core.llm.Usage
 import com.vidadomu.nexus.agent.core.log.AgentLogger
@@ -206,7 +207,22 @@ class AgentOrchestrator(
             }) }
             val response = try {
                 llmCalls++
-                llm.complete(LlmRequest(config.modelId, requestSystem, requestMessages, if(readingDocuments) emptyList() else specs, config.maxTokens, config.temperature, turnId))
+                val req = LlmRequest(
+                    modelId = config.modelId,
+                    system = requestSystem,
+                    messages = requestMessages,
+                    tools = if (readingDocuments) emptyList() else specs,
+                    maxTokens = config.maxTokens,
+                    temperature = config.temperature,
+                    turnId = turnId,
+                    conversationId = session.id,
+                )
+                if (llm is StreamingLlmProvider) {
+                    onEvent(UiEvent.StreamingText(""))
+                    llm.completeStreaming(req) { delta -> onEvent(UiEvent.StreamingText(delta)) }
+                } else {
+                    llm.complete(req)
+                }
             } catch (e: LlmException) {
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
                 if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)

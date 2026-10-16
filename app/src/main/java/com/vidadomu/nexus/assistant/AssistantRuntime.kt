@@ -17,6 +17,7 @@ import com.vidadomu.nexus.agent.core.config.AgentConfig
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.cost.ChainedCostEstimator
 import com.vidadomu.nexus.agent.core.cost.PublishedRateEstimator
+import com.vidadomu.nexus.agent.core.llm.AntigravityProvider
 import com.vidadomu.nexus.agent.core.llm.BedrockProxyProvider
 import com.vidadomu.nexus.agent.core.llm.BedrockDirectProvider
 import com.vidadomu.nexus.agent.core.llm.AwsCredentials
@@ -37,10 +38,13 @@ import com.vidadomu.nexus.core.model.GenerationStatus
 import java.io.File
 
 /**
- * Configuración del asistente. Dos backends:
+ * Configuración del asistente. Proveedores disponibles:
  *  - «direct» (por defecto, decisión del usuario 02-10): la app firma con SigV4 y llama a Bedrock con sus claves de AWS,
  *    guardadas cifradas en SecureStorage.
+ *  - «anthropic»: API oficial de Claude (Anthropic).
+ *  - «openai»: cualquier endpoint compatible con OpenAI.
  *  - «proxy»: APK → proxy → Bedrock con un token de dispositivo.
+ *  - «antigravity»: puente local AXEL/Termux hacia Antigravity CLI (`127.0.0.1:8788`).
  * Sin credenciales del backend elegido se usa el planificador local (sin LLM).
  */
 data class AssistantSettings(
@@ -64,9 +68,12 @@ data class AssistantSettings(
     /** USD por millón de tokens de entrada/salida para modelos sin tarifa conocida (opcional). */
     val inputUsdPerM: Double? = null,
     val outputUsdPerM: Double? = null,
+    /** Endpoint del puente local de Antigravity CLI (por defecto http://127.0.0.1:8788). */
+    val antigravityEndpoint: String = DEFAULT_ANTIGRAVITY_ENDPOINT,
 ) {
     val excludedSet: Set<String> get() = parseFamilies(excludedFamilies)
     val direct: Boolean get() = backend == BACKEND_DIRECT
+    val antigravity: Boolean get() = backend == BACKEND_ANTIGRAVITY
 
     /** Sin credenciales del backend elegido se usa el planificador local (sin LLM). */
     val offline: Boolean get() = modelId.isBlank() || when (backend) {
@@ -74,13 +81,22 @@ data class AssistantSettings(
         BACKEND_ANTHROPIC -> maskedApiKey.isBlank()
         // Un servidor local puede no pedir clave; uno remoto sí.
         BACKEND_OPENAI -> llmBaseUrl.isBlank() || (maskedApiKey.isBlank() && !LOCAL_URL.matches(llmBaseUrl.trim()))
+        BACKEND_ANTIGRAVITY -> antigravityEndpoint.isBlank()
         else -> awsAccessKeyId.isBlank() || maskedAwsSecret.isBlank() || region.isBlank()
     }
 
     fun toConfig() = AgentConfig(
-        provider = when { offline -> "offline"; backend == BACKEND_PROXY -> "bedrock-proxy"; backend == BACKEND_ANTHROPIC -> "anthropic"; backend == BACKEND_OPENAI -> "openai-compatible"; else -> "bedrock-direct" },
+        provider = when {
+            offline -> "offline"
+            backend == BACKEND_PROXY -> "bedrock-proxy"
+            backend == BACKEND_ANTHROPIC -> "anthropic"
+            backend == BACKEND_OPENAI -> "openai-compatible"
+            backend == BACKEND_ANTIGRAVITY -> "antigravity"
+            else -> "bedrock-direct"
+        },
         modelId = modelId.ifBlank { "offline" }, region = region,
-        endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 20, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
+        endpoint = if (backend == BACKEND_ANTIGRAVITY) antigravityEndpoint else endpoint,
+        temperature = temperature, maxTokens = maxTokens, maxToolRounds = 20, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
     )
 
     companion object {
@@ -88,9 +104,20 @@ data class AssistantSettings(
         const val BACKEND_PROXY = "proxy"
         const val BACKEND_ANTHROPIC = "anthropic"
         const val BACKEND_OPENAI = "openai"
+        const val BACKEND_ANTIGRAVITY = "antigravity"
+        const val DEFAULT_ANTIGRAVITY_ENDPOINT = AntigravityProvider.DEFAULT_ENDPOINT
+        const val DEFAULT_ANTIGRAVITY_MODEL = AntigravityProvider.DEFAULT_MODEL
         val LOCAL_URL = Regex("^http://(127\\.0\\.0\\.1|localhost)(:\\d+)?(/.*)?$")
         /** Modelos de Claude para la API de Anthropic (ids oficiales). */
         val ANTHROPIC_MODELS = listOf("claude-sonnet-5-5" to "Sonnet 5.5", "claude-opus-5-5" to "Opus 5.5", "claude-haiku-5-5" to "Haiku 5.5")
+        /** Modelos expuestos por el puente de Antigravity CLI (`/root/axel-native-v2/bridge/server.ts`). */
+        val ANTIGRAVITY_MODELS = listOf(
+            "gemini-3.8-flash" to "Gemini 3.8 Flash",
+            "gemini-3.1-pro" to "Gemini 3.1 Pro",
+            "claude-sonnet-4-6" to "Claude Sonnet 4.6",
+            "claude-opus-4-6-thinking" to "Opus 4.6 Thinking",
+            "gemini-fast" to "Auto (Rápido)",
+        )
         /** Puntos de acceso compatibles con OpenAI más habituales; el modelo lo escribe el usuario. */
         val OPENAI_PRESETS = listOf(
             "OpenAI" to "https://api.openai.com/v1",
@@ -127,15 +154,17 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         if (BuildConfig.BEDROCK_ACCESS_KEY.isNotBlank() && (!secure.hasProviderApiKey(AWS_SECRET_ID) || !secure.hasProviderApiKey(AWS_ACCESS_ID) || !prefs.getBoolean("bedrock_direct_seeded_v2", false))) {
             secure.saveProviderApiKey(AWS_ACCESS_ID, BuildConfig.BEDROCK_ACCESS_KEY)
             secure.saveProviderApiKey(AWS_SECRET_ID, BuildConfig.BEDROCK_SECRET_KEY)
+            val seededModel = BuildConfig.BEDROCK_MODEL.ifBlank { AssistantSettings.DEFAULT_MODEL }
             prefs.edit().putString("backend", AssistantSettings.BACKEND_DIRECT)
                 .putString("region", BuildConfig.BEDROCK_REGION.ifBlank { AssistantSettings.DEFAULT_REGION })
-                .putString("model_id", BuildConfig.BEDROCK_MODEL.ifBlank { AssistantSettings.DEFAULT_MODEL })
+                .putString("model_id", seededModel)
+                .putString("model_id_direct", seededModel)
                 .putBoolean("bedrock_direct_seeded_v2", true).apply()
         }
     }
 
     fun load() = AssistantSettings(
-        backend = prefs.getString("backend", AssistantSettings.BACKEND_DIRECT).orEmpty(),
+        backend = prefs.getString("backend", AssistantSettings.BACKEND_DIRECT).orEmpty().ifBlank { AssistantSettings.BACKEND_DIRECT },
         endpoint = prefs.getString("endpoint", "").orEmpty(),
         modelId = prefs.getString("model_id", AssistantSettings.DEFAULT_MODEL).orEmpty(),
         region = prefs.getString("region", AssistantSettings.DEFAULT_REGION).orEmpty(),
@@ -151,7 +180,23 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         maskedApiKey = apiKeyId(prefs.getString("backend", AssistantSettings.BACKEND_DIRECT).orEmpty())?.let(::masked).orEmpty(),
         inputUsdPerM = prefs.getString("llm_input_usd_m", null)?.toDoubleOrNull(),
         outputUsdPerM = prefs.getString("llm_output_usd_m", null)?.toDoubleOrNull(),
+        antigravityEndpoint = prefs.getString("antigravity_endpoint", AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT)
+            .orEmpty().ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
     )
+
+    /** Devuelve el último modelo guardado para [backend] sin perder la configuración de los demás proveedores. */
+    fun savedModelFor(backend: String): String = when (backend) {
+        AssistantSettings.BACKEND_ANTIGRAVITY ->
+            prefs.getString("model_id_antigravity", AssistantSettings.DEFAULT_ANTIGRAVITY_MODEL).orEmpty().ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_MODEL }
+        AssistantSettings.BACKEND_ANTHROPIC ->
+            prefs.getString("model_id_anthropic", AssistantSettings.ANTHROPIC_MODELS.first().first).orEmpty().ifBlank { AssistantSettings.ANTHROPIC_MODELS.first().first }
+        AssistantSettings.BACKEND_OPENAI ->
+            prefs.getString("model_id_openai", "").orEmpty()
+        AssistantSettings.BACKEND_PROXY ->
+            prefs.getString("model_id_proxy", AssistantSettings.DEFAULT_MODEL).orEmpty().ifBlank { AssistantSettings.DEFAULT_MODEL }
+        else ->
+            prefs.getString("model_id_direct", AssistantSettings.DEFAULT_MODEL).orEmpty().ifBlank { AssistantSettings.DEFAULT_MODEL }
+    }
 
     /** Cada proveedor guarda su propia clave cifrada: cambiar de uno a otro no borra la del anterior. */
     private fun apiKeyId(backend: String): String? = when (backend) {
@@ -188,9 +233,13 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         require(baseUrl.isBlank() || baseUrl.startsWith("https://") || LOCAL.matches(baseUrl)) {
             "La URL de la API debe usar https:// (o http://127.0.0.1 para un servidor local)."
         }
+        val agyEndpoint = s.antigravityEndpoint.trim().trimEnd('/').ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }
+        require(AntigravityProvider.isAllowedEndpoint(agyEndpoint)) {
+            "El puente Antigravity debe usar http://127.0.0.1:8788, una IP de Tailscale (100.x.y.z) o https://."
+        }
         require((s.inputUsdPerM == null) == (s.outputUsdPerM == null)) { "Indica la tarifa de entrada y la de salida, o ninguna." }
         listOfNotNull(s.inputUsdPerM, s.outputUsdPerM).forEach { require(it.isFinite() && it in 0.0..1000.0) { "Tarifa no válida (USD por millón de tokens, 0–1000)." } }
-        val edit = prefs.edit().putString("llm_base_url", baseUrl)
+        val edit = prefs.edit().putString("llm_base_url", baseUrl).putString("antigravity_endpoint", agyEndpoint)
         if (s.inputUsdPerM != null && s.outputUsdPerM != null) edit.putString("llm_input_usd_m", s.inputUsdPerM.toString()).putString("llm_output_usd_m", s.outputUsdPerM.toString())
         else edit.remove("llm_input_usd_m").remove("llm_output_usd_m")
         edit.apply()
@@ -202,7 +251,10 @@ class AssistantSettingsStore(private val app: NexusApplication) {
             }
         }
         require(s.region.isBlank() || REGION.matches(s.region.trim())) { "Región de AWS no válida (p. ej. us-east-1)." }
-        prefs.edit().putString("backend", s.backend).putString("endpoint", endpoint).putString("model_id", s.modelId.trim()).putString("region", s.region.trim())
+        val trimmedModel = s.modelId.trim()
+        prefs.edit().putString("backend", s.backend).putString("endpoint", endpoint).putString("model_id", trimmedModel)
+            .putString("model_id_${s.backend}", trimmedModel)
+            .putString("region", s.region.trim())
             .putString("temperature", s.temperature?.toString()).putInt("max_tokens", s.maxTokens.coerceIn(256, 32_000))
             .putString("mode", s.mode.name).putBoolean("send_images", s.sendImages)
             .putString("excluded_families", AssistantSettings.parseFamilies(s.excludedFamilies).joinToString(", ")).apply()
@@ -223,7 +275,14 @@ class AssistantSettingsStore(private val app: NexusApplication) {
     /** Whitelisted settings only: never rewrites SecureStorage credentials. */
     fun updateOperational(model: String?, tokens: Int?, images: Boolean?, excluded: String?) {
         val edit = prefs.edit()
-        model?.let { require(AssistantSettings.KNOWN_MODELS.any { pair -> pair.first == it }); edit.putString("model_id", it) }
+        model?.let {
+            require(
+                AssistantSettings.KNOWN_MODELS.any { pair -> pair.first == it } ||
+                    AssistantSettings.ANTHROPIC_MODELS.any { pair -> pair.first == it } ||
+                    AssistantSettings.ANTIGRAVITY_MODELS.any { pair -> pair.first == it }
+            )
+            edit.putString("model_id", it)
+        }
         tokens?.let { require(it in 256..32000); edit.putInt("max_tokens", it) }
         images?.let { edit.putBoolean("send_images", it) }
         excluded?.let { edit.putString("excluded_families", AssistantSettings.parseFamilies(it).joinToString(", ")) }
@@ -311,6 +370,9 @@ class AssistantRuntime(private val app: NexusApplication) {
     fun llm(s: AssistantSettings): LlmProvider =
         when {
             s.offline -> OfflinePlannerProvider()
+            s.backend == AssistantSettings.BACKEND_ANTIGRAVITY -> AntigravityProvider(
+                s.antigravityEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
+            )
             s.backend == AssistantSettings.BACKEND_ANTHROPIC -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
                 com.vidadomu.nexus.agent.core.llm.AnthropicProvider({ settings.apiKey(AssistantSettings.BACKEND_ANTHROPIC) }), llmBudget,
                 customRates = { settings.customRates() }, limits = { settings.llmLimits() })

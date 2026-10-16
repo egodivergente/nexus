@@ -104,10 +104,11 @@ fun AssistantScreen(
     val latestVisible by rememberUpdatedState(visibleItems)
     val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
-        if(latestVisible.isEmpty()) return
+        if(latestVisible.isEmpty() && latestUi.streamingText.isBlank()) return
         automaticScroll = true
         try {
-            listState.scrollToItem(latestVisible.size - 1 + if(latestUi.thinking) 1 else 0)
+            val extra = (if(latestUi.streamingText.isNotBlank()) 1 else 0) + (if(latestUi.thinking) 1 else 0)
+            listState.scrollToItem((latestVisible.size + extra - 1).coerceAtLeast(0))
             val layout=listState.layoutInfo
             layout.visibleItemsInfo.lastOrNull()?.let { last ->
                 listState.scrollBy((last.offset+last.size-layout.viewportEndOffset).coerceAtLeast(0).toFloat())
@@ -126,7 +127,7 @@ fun AssistantScreen(
             if (following) followLast()
         }
     }
-    LaunchedEffect(ui.items.size, ui.thinking, ui.plans, ui.scrollRequest) {
+    LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest) {
         if (following) followLast()
     }
     LaunchedEffect(ui.scrollRequest) {
@@ -183,7 +184,7 @@ fun AssistantScreen(
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                if (ui.items.isEmpty()) item { EmptyHint() }
+                if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(visibleItems, key = { it.id }) { item ->
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
@@ -226,6 +227,11 @@ fun AssistantScreen(
                                 onOpenHistory = onOpenHistory,
                                 onDiagnoseFailure = { vm.diagnoseFailure(p.plan.id) }) })
                         }
+                    }
+                }
+                if (ui.streamingText.isNotBlank()) {
+                    item(key = "streaming_assistant_preview") {
+                        AssistantBubble(ChatItem.Assistant("streaming_assistant_preview", ui.streamingText, emptyList(), "STREAMING"), onOpenHistory)
                     }
                 }
                 if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(NexusTokens.space8)); Text("Pensando…", color = TextMuted) } }
@@ -746,6 +752,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var clearApiKey by remember { mutableStateOf(false) }
     var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
+    var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
     val maskedKey = remember(backend) { vm.maskedApiKey(backend) }
     var error by remember { mutableStateOf<String?>(null) }
     ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
@@ -758,16 +765,18 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 AgentInternetSettings()
                 Text("Proveedor del LLM", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock", AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
-                        AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI", AssistantSettings.BACKEND_PROXY to "Proxy").forEach { (value, label) ->
+                    listOf(
+                        AssistantSettings.BACKEND_DIRECT to "Bedrock",
+                        AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
+                        AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI",
+                        AssistantSettings.BACKEND_PROXY to "Proxy",
+                        AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity (AGY)",
+                    ).forEach { (value, label) ->
                         FilterChip(selected = backend == value, onClick = {
                             if (backend != value) { backend = value; apiKey = ""; clearApiKey = false
-                                // Un modelo de otro proveedor no sirve: se propone uno válido del nuevo.
-                                modelId = when (value) {
-                                    AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS.first().first
-                                    AssistantSettings.BACKEND_OPENAI -> if (modelId.startsWith("us.anthropic.") || modelId.startsWith("claude-")) "" else modelId
-                                    else -> if (modelId.startsWith("us.anthropic.")) modelId else AssistantSettings.DEFAULT_MODEL
-                                } }
+                                // Se recupera el modelo guardado para el nuevo proveedor o un valor por defecto válido.
+                                modelId = vm.savedModelFor(value)
+                            }
                         }, label = { Text(label) })
                     }
                 }
@@ -796,6 +805,11 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                         }
                     }
+                } else if (backend == AssistantSettings.BACKEND_ANTIGRAVITY) {
+                    Text("Conecta con el puente local de Antigravity CLI (AGY) en el dispositivo o por túnel (127.0.0.1:8788).",
+                        style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                    StudioTextField(agyEndpoint, { agyEndpoint = it.trim() }, shape=NexusTokens.field,
+                        label = { Text("Endpoint del puente AGY (http://127.0.0.1:8788)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 } else if (backend != AssistantSettings.BACKEND_PROXY) {
                     Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                     StudioCredentialField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
@@ -815,9 +829,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     }
                 }
                 StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, singleLine = true,
-                    label = { Text(when (backend) { AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"; AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"; else -> "Model ID / inference profile" }) })
+                    label = { Text(when (backend) {
+                        AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"
+                        AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"
+                        AssistantSettings.BACKEND_ANTIGRAVITY -> "Modelo de Antigravity (AGY)"
+                        else -> "Model ID / inference profile"
+                    }) })
                 val modelChips = when (backend) {
                     AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS
+                    AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
                     AssistantSettings.BACKEND_OPENAI -> emptyList()
                     else -> AssistantSettings.KNOWN_MODELS
                 }
@@ -857,7 +877,8 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 if (modelId.isBlank()) { error = "Escribe el id del modelo."; return@TextButton }
                 error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
                     maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
-                    llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate), newToken, newSecret, newApiKey)
+                    llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate,
+                    antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }), newToken, newSecret, newApiKey)
                 if (error == null) onDismiss()
             }) { Text("Guardar") }
                 TextButton(onClick=onDismiss) {Text("Cerrar",color=TextSecondary)}
