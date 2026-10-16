@@ -12,9 +12,9 @@ import com.vidadomu.nexus.agent.core.orders.OrderStatus
 object ClaimVerifier {
     enum class Claim { SUBMITTED, COMPLETED }
 
-    private val SUBMITTED = Regex("""(?U)\b(enviad[oa]s?|lo he enviado|he lanzado|lanzad[oa]s?|en marcha|se est[aá] generando|est[aá] generando|generándose|procesándose|en proceso|en cola)\b""", RegexOption.IGNORE_CASE)
-    private val COMPLETED = Regex("""(?U)\b(ya est[aá] (?:listo|hecho|terminado|generado)|terminad[oa]s?|completad[oa]s?|ya tienes (?:el|la|tu|los|las)|aqu[ií] tienes (?:el|la|tu) (?:resultado|v[ií]deo|imagen)|resultado listo|upscale listo|ha finalizado)\b""", RegexOption.IGNORE_CASE)
-    private val NEGATION = Regex("""(?U)\b(no|sin|todav[ií]a no|aún no|aun no|nada|ni|cuando|si|hasta que|antes de|en cuanto|al pulsar|para que)\b[^.;:\n]{0,40}$""", RegexOption.IGNORE_CASE)
+    private val SUBMITTED = Regex("""\b(enviad[oa]s?|lo he enviado|he lanzado|lanzad[oa]s?|en marcha|se est[aá] generando|est[aá] generando|generándose|procesándose|en proceso|en cola)\b""", RegexOption.IGNORE_CASE)
+    private val COMPLETED = Regex("""\b(ya est[aá] (?:listo|hecho|terminado|generado)|terminad[oa]s?|completad[oa]s?|ya tienes (?:el|la|tu|los|las)|aqu[ií] tienes (?:el|la|tu) (?:resultado|v[ií]deo|imagen)|resultado listo|upscale listo|ha finalizado)\b""", RegexOption.IGNORE_CASE)
+    private val NEGATION = Regex("""\b(no|sin|todav[ií]a no|aún no|aun no|nada|ni|cuando|si|hasta que|antes de|en cuanto|al pulsar|para que)\b[^.;:\n]{0,40}$""", RegexOption.IGNORE_CASE)
 
     data class Contradiction(val claim: Claim, val sentence: String, val truth: String)
 
