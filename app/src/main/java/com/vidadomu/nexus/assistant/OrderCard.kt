@@ -76,9 +76,8 @@ internal fun presentOrder(order: Order, costLabel: String?, busy: Boolean, assis
                 headline = (failure?.explanation ?: "No se generó.") + if (failure?.kind == FailureKind.CANCELLED) "" else charged,
                 detail = message + (failure?.fix?.let { "\nCorrección propuesta: ${it.description}." } ?: ""), error = true)
         }
-        OrderStatus.UNCERTAIN -> CardPresentation("Envío sin confirmar", if (order.jobId != null) CardAction.CHECK_HISTORY else CardAction.NONE,
-            if (order.jobId != null) "Ver en Historial" else null, true,
-            headline = "No se sabe si el proveedor lo recibió: podría haberse cobrado. Nexus no lo repetirá.", error = true)
+        OrderStatus.UNCERTAIN -> CardPresentation("Envío sin confirmar", CardAction.CHECK_HISTORY, "Abrir Historial", true,
+            headline = "No se sabe si el proveedor lo recibió: podría haberse cobrado. Nexus no lo repetirá; compruébalo en Historial.", error = true)
         OrderStatus.DISCARDED -> CardPresentation("Descartado", CardAction.NONE, null, false)
     }
 }
@@ -109,6 +108,7 @@ internal fun OrderCard(
     onOpenCanvas: () -> Unit,
     onOpenOutput: () -> Unit,
     onRendered: (String) -> Unit,
+    onOpenHistory: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency = app.currencyManager
@@ -158,7 +158,8 @@ internal fun OrderCard(
                     CardAction.GENERATE, CardAction.RETRY -> onGenerate
                     CardAction.APPLY_FIX -> onApplyFix
                     CardAction.ASK_AGENT -> onAskAgent
-                    CardAction.VIEW_RESULT, CardAction.CHECK_HISTORY -> onOpenOutput
+                    CardAction.VIEW_RESULT -> onOpenOutput
+                    CardAction.CHECK_HISTORY -> onOpenHistory
                     CardAction.REVIEW -> ({ expanded = true })
                     CardAction.SENDING, CardAction.NONE -> ({})
                 }

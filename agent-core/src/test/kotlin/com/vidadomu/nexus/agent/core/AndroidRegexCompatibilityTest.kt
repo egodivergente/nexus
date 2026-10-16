@@ -16,7 +16,11 @@ class AndroidRegexCompatibilityTest {
         val roots = listOf("src/main", "../app/src/main").map(::File).filter { it.isDirectory }
         assertTrue(roots.isNotEmpty())
         val offenders = roots.flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList() }
-            .flatMap { file -> file.readLines().mapIndexedNotNull { i, line -> if (unsupported.containsMatchIn(line)) "${file.path}:${i + 1}" else null } }
+            .flatMap { file -> file.readLines().mapIndexedNotNull { i, line ->
+                val code = line.trimStart()
+                val comment = code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")
+                if (!comment && unsupported.containsMatchIn(line.substringBefore("//"))) "${file.path}:${i + 1}" else null
+            } }
         assertTrue(offenders.isEmpty(), "(?U) no funciona en Android:\n" + offenders.joinToString("\n"))
     }
 }

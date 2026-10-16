@@ -2,9 +2,12 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
-## [1.9.9-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+## [1.9.10-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
-- Android vc43: una sola tarjeta por encargo con id persistente; reintentos, correcciones
+- Android vc44: integra 1.9.9 (acceso a Historial, Biblioteca sin etiquetas de origen
+  en las miniaturas) y corrige un cierre al enviar mensajes: el flag de regex `(?U)`
+  no existe en Android; una prueba lo vigila en agent-core y en la app.
+- Una sola tarjeta por encargo con id persistente; reintentos, correcciones
   y recargas la actualizan en su sitio. Estados borrador → pendiente → enviando →
   procesando → completado / error / incierto, con un único botón por estado y
   bloqueo de pulsaciones repetidas (idempotencia por intento).
@@ -17,7 +20,15 @@ Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Wi
   original (Atlas lo exige aunque el schema permite omitirlo) y tarifa por nivel y fps.
 - Los chats antiguos se limpian al abrirlos: tarjetas duplicadas/triplicadas y
   envíos fallidos repetidos del mismo vídeo pasan a un encargo con historial.
-- Alcance y validación: [encargo único 1.9.9](docs/ENCARGO-UNICO-199-20261016.md).
+- Alcance y validación: [encargo único 1.9.10](docs/ENCARGO-UNICO-199-20261016.md).
+
+## [1.9.9-agent] - 2026-10-16
+
+- Android vc43: los avisos que remiten a Historial llevan un acceso directo
+  «Abrir Historial» (chat, tarjetas de encargo y visor de resultados), que abre
+  la misma pestaña de la barra. Las compilaciones anteriores a 1.9.8 tenían solo
+  cuatro destinos y no podían llegar a Historial aunque el código definía su ruta.
+- Alcance y comprobación: [navegación de Historial](docs/HISTORIAL-NAVEGACION-199-20261016.md).
 
 ## [1.9.8-agent] - 2026-10-16
 

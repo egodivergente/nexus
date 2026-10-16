@@ -13,8 +13,6 @@ import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
@@ -41,7 +39,7 @@ import java.util.Locale
 import com.vidadomu.nexus.ui.theme.*
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     val context = LocalContext.current
@@ -51,17 +49,6 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val appearance = rememberAppearancePreferences()
     val selectedTheme by appearance.themeState()
-    var defaultSetting by remember {mutableStateOf<String?>(null)}
-    defaultSetting?.let { setting ->
-        val isAppearance=setting=="Apariencia"
-        AlertDialog(onDismissRequest={defaultSetting=null},title={Text(setting)},
-            text={Text("Predeterminado: "+if(isAppearance) NexusAppearance.AURORA.label else CurrencyPreference.EUR_SMART.displayName)},
-            confirmButton={TextButton(onClick={
-                if(isAppearance) appearance.setTheme(NexusAppearance.AURORA) else currencyManager.setPreference(CurrencyPreference.EUR_SMART)
-                defaultSetting=null
-            }) {Text("Restaurar predeterminado")}},dismissButton={TextButton(onClick={defaultSetting=null}) {Text("Cerrar")}})
-    }
-
     val currencyState by currencyManager.state.collectAsState()
 
     var accountBalance by remember { mutableStateOf<AccountBalance?>(app.secureStorage.getCachedBalance()) }
@@ -103,8 +90,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())})}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(NexusTokens.screenMargin),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             item {Text("Personalización",style=MaterialTheme.typography.titleMedium)}
-            item {SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true},{defaultSetting="Apariencia"})}
-            item {SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true},{defaultSetting="Moneda"})}
+            item {SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true})}
+            item {SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true})}
             item {HorizontalDivider();FlowRecoverySettings(onCreateInFlow)}
             item {HorizontalDivider();Text("Cuenta Atlas",style=MaterialTheme.typography.titleMedium)}
             item {Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -164,11 +151,27 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Text("Apariencia",style=MaterialTheme.typography.titleLarge)
-            NexusAppearance.entries.forEach {option->Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)})
-                .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
-                RadioButton(selectedTheme==option,null)
-                Column(Modifier.weight(1f)) {Text(option.label,style=MaterialTheme.typography.bodyLarge);Text(option.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
-            }}
+            NexusAppearance.entries.forEach {option->
+                val preview = remember(option) { palette(option) }
+                Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)})
+                    .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
+                    RadioButton(selectedTheme==option,null)
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                        Text(option.label,style=MaterialTheme.typography.bodyLarge)
+                        Text(option.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                        Surface(shape=NexusTokens.field,color=preview.background) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4),
+                                verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                                Surface(shape=NexusTokens.thumbnail,color=preview.surface,modifier=Modifier.size(22.dp)) {}
+                                Surface(shape=NexusTokens.thumbnail,color=preview.primary,modifier=Modifier.size(22.dp)) {}
+                                Text("Aa",style=MaterialTheme.typography.labelMedium,color=preview.onBackground)
+                                Spacer(Modifier.weight(1f))
+                                Text("Vista previa",style=MaterialTheme.typography.labelSmall,color=preview.onBackground.copy(alpha=.72f))
+                            }
+                        }
+                    }
+                }
+            }
             TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado",color=TextSecondary)}
             TextButton(onClick={appearanceOpen=false}) {Text("Cerrar apariencia",color=TextSecondary)}
         }
@@ -177,7 +180,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Text("Moneda",style=MaterialTheme.typography.titleLarge)
-            CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth().combinedClickable(onClick={currencyManager.setPreference(pref)},onLongClick={defaultSetting="Moneda"})
+            CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth().clickable { currencyManager.setPreference(pref) }
                 .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
                 RadioButton(currencyState.preference==pref,{currencyManager.setPreference(pref)})
                 Column(Modifier.weight(1f)) {Text(pref.displayName,style=MaterialTheme.typography.bodyLarge);Text(pref.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
@@ -385,10 +388,9 @@ private fun ProviderCredentialCard(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SettingRow(title:String,subtitle:String,onClick:()->Unit,onLongClick:(()->Unit)?=null) {
-    Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).combinedClickable(role=Role.Button,onClick=onClick,onLongClick=onLongClick)
+private fun SettingRow(title:String,subtitle:String,onClick:()->Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).clickable(role=Role.Button,onClick=onClick)
         .padding(vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         Column(Modifier.weight(1f)) {Text(title,style=MaterialTheme.typography.bodyLarge);Text(subtitle,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
         Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)

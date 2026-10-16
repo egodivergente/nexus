@@ -87,20 +87,30 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var searchVisible by rememberSaveable {mutableStateOf(false)}
     var moreVisible by remember {mutableStateOf(false)}
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
-    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden) {jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
-        .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}}
-    val pending=remember(jobs,filter,query,showHidden,favoriteOnly) {if(showHidden || favoriteOnly) emptyList() else jobs.filter {
+    var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
+    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter) {
+        if(originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList()
+        else jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
+            .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}
+    }
+    val pending=remember(jobs,filter,query,showHidden,favoriteOnly,originFilter) {if(showHidden || favoriteOnly || originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList() else jobs.filter {
         it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.CANCELLED,GenerationStatus.FAILED) &&
         (filter==null || it.modality==filter) && matchesCreationSearch(it,query)
     }.sortedByDescending {it.startedAt}}
-    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs) {
+    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs,originFilter) {
         val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
         index.assets.filter { a -> !a.libraryDeleted && a.uri !in generatedUris &&
+            a.matchesLibraryOrigin(originFilter) &&
             (filter==null || a.type.name==filter?.name) && a.displayName.contains(query,true) &&
             ("asset:"+a.id in hidden)==showHidden && (!favoriteOnly || "asset:"+a.id in favorites) }.sortedByDescending {it.createdAt}
     }
+    val localAssetGroups=remember(localAssets) {localAssets.groupBy(::libraryOrigin)}
     var localTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
     localTarget?.let {asset -> LocalAssetActions(asset,{localTarget=null}) {message -> scope.launch {snackbar.showSnackbar(message)}} }
+    var localPreviewTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
+    localPreviewTarget?.let {asset -> LocalAssetPreviewSheet(asset,
+        onDismiss={localPreviewTarget=null},
+        onMoreOptions={localPreviewTarget=null;localTarget=asset}) }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
     val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
@@ -169,6 +179,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         leadingIcon={Icon(Icons.Default.PhotoLibrary,null,Modifier.size(16.dp))},shape=NexusTokens.filter)
                 }
             }
+            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+                item {Text("Origen",style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+                items(LibraryOriginFilter.values().toList(),key={it.name}) {origin ->
+                    StudioFilterChip(originFilter==origin,{originFilter=origin},label={Text(origin.label)},shape=NexusTokens.filter)
+                }
+            }
             if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
                 Text(if(query.isNotBlank()) "No hay resultados." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
             } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
@@ -183,8 +199,14 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         com.vidadomu.nexus.ui.components.GenerationProgressPanel(job,Modifier.fillMaxWidth(),compact=true)
                     }
                 }
-                if(localAssets.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {Text("Importados y ediciones · ${localAssets.size}",style=MaterialTheme.typography.labelMedium,modifier=Modifier.padding(NexusTokens.space16))}
-                items(localAssets,key={"asset:"+it.id}) {asset -> LocalAssetTile(asset,imageLoader) {localTarget=asset} }
+                listOf(LibraryOriginFilter.IMPORTED,LibraryOriginFilter.EDITED,LibraryOriginFilter.SHARED,LibraryOriginFilter.GENERATED).forEach {origin ->
+                    val assets=localAssetGroups[origin].orEmpty()
+                    if(assets.isNotEmpty()) {
+                        items(assets,key={"asset:"+it.id}) {asset ->
+                            LocalAssetTile(asset,imageLoader,onPreview={localPreviewTarget=asset},onActions={localTarget=asset})
+                        }
+                    }
+                }
                 groups.forEach {(day,entries) ->
                     item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
@@ -230,6 +252,10 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
             }
         }
         if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
+        Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.72f),contentColor=MediaForeground,shape=NexusTokens.filter,
+            modifier=Modifier.align(Alignment.BottomStart).padding(NexusTokens.space4)) {
+            Text("Generado",Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4),style=MaterialTheme.typography.labelMedium)
+        }
         if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.78f),contentColor=MediaForeground,
             shape=NexusTokens.thumbnail,modifier=Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space4)) {
             Row(Modifier.padding(NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {

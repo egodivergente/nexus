@@ -46,7 +46,9 @@ class OrderCardLogicTest {
 
         val uncertain = presentOrder(order(OrderStatus.UNCERTAIN, jobId = "job_1"), null, false, false, false)
         assertEquals(CardAction.CHECK_HISTORY, uncertain.action)
+        assertEquals("Abrir Historial", uncertain.actionLabel)
         assertTrue(uncertain.headline!!.contains("no lo repetirá"))
+        assertTrue("el aviso que menciona Historial lleva su acceso aunque no haya job", presentOrder(order(OrderStatus.UNCERTAIN), null, false, false, false).action == CardAction.CHECK_HISTORY)
     }
 
     @Test fun failureShowsTheLiteralErrorAndTheConcreteFix() {

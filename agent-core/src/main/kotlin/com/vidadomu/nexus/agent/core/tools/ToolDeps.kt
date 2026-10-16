@@ -24,6 +24,8 @@ data class HistoryEntry(
     val createdAt: Long,
     val costUsd: Double? = null,
     val outputs: List<String> = emptyList(),
+    val error: String? = null,
+    val technicalDetails: String? = null,
 )
 
 fun interface GenerationHistorySource {
