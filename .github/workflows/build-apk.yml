@@ -19,6 +19,39 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Configure established Nexus signing identities
+        env:
+          NEXUS_MAIN_KEYSTORE_B64: ${{ secrets.NEXUS_MAIN_KEYSTORE_B64 }}
+          NEXUS_AGENT_KEYSTORE_B64: ${{ secrets.NEXUS_AGENT_KEYSTORE_B64 }}
+          NEXUS_MAIN_STORE_PASSWORD: ${{ secrets.NEXUS_MAIN_STORE_PASSWORD }}
+          NEXUS_MAIN_KEY_PASSWORD: ${{ secrets.NEXUS_MAIN_KEY_PASSWORD }}
+          NEXUS_AGENT_STORE_PASSWORD: ${{ secrets.NEXUS_AGENT_STORE_PASSWORD }}
+          NEXUS_AGENT_KEY_PASSWORD: ${{ secrets.NEXUS_AGENT_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$NEXUS_MAIN_KEYSTORE_B64"
+          test -n "$NEXUS_AGENT_KEYSTORE_B64"
+          test -n "$NEXUS_MAIN_STORE_PASSWORD"
+          test -n "$NEXUS_MAIN_KEY_PASSWORD"
+          test -n "$NEXUS_AGENT_STORE_PASSWORD"
+          test -n "$NEXUS_AGENT_KEY_PASSWORD"
+          signing_dir="$HOME/.gradle/nexus-signing"
+          install -d -m 700 "$signing_dir"
+          printf '%s' "$NEXUS_MAIN_KEYSTORE_B64" | base64 --decode > "$signing_dir/main.keystore"
+          printf '%s' "$NEXUS_AGENT_KEYSTORE_B64" | base64 --decode > "$signing_dir/agent.keystore"
+          chmod 600 "$signing_dir"/*.keystore
+          umask 077
+          cat > "$HOME/.gradle/nexus-signing.properties" <<EOF
+          nexus.main.storeFile=$signing_dir/main.keystore
+          nexus.main.storePassword=$NEXUS_MAIN_STORE_PASSWORD
+          nexus.main.keyAlias=androiddebugkey
+          nexus.main.keyPassword=$NEXUS_MAIN_KEY_PASSWORD
+          nexus.agent.storeFile=$signing_dir/agent.keystore
+          nexus.agent.storePassword=$NEXUS_AGENT_STORE_PASSWORD
+          nexus.agent.keyAlias=androiddebugkey
+          nexus.agent.keyPassword=$NEXUS_AGENT_KEY_PASSWORD
+          EOF
+
       - name: Install Android SDK platform 35
         # Usa el Android SDK que ya trae el runner de GitHub
         run: |
@@ -29,16 +62,18 @@ jobs:
       - name: Set up Gradle (wrapper)
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build debug APK
+      - name: Build stable and agent APKs with established signers
         run: |
           set -o pipefail
-          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee -a gradle.log
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleAgentPreview 2>&1 | tee -a gradle.log
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: NEXUS-signed-apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/agentPreview/*.apk
           if-no-files-found: error
 
       - name: Run unit tests
