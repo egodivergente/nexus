@@ -132,6 +132,7 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
             ref = ref,
             promptAccepted = m.promptAccepted,
             derived = if (m.providerId == AtlasCloudProvider.PROVIDER_ID) com.vidadomu.nexus.provider.atlas.AtlasContractOverrides.derived(m) else emptyList(),
+            sourceParams = if (m.providerId == AtlasCloudProvider.PROVIDER_ID) com.vidadomu.nexus.provider.atlas.AtlasContractOverrides.sourceParams(m) else emptyMap(),
             parameters = FormContract.normalize(m.parameters).filter { it.type !in MEDIA_TYPES }.map { p ->
                 ParamSpec(
                     key = p.key, displayName = p.displayName, uiType = p.type.name,
@@ -370,6 +371,34 @@ object AgentMediaStore {
             projectId = projectId, createdAt = System.currentTimeMillis(),
         ))
         attachment.copy(id = saved.id, assetId = saved.id)
+    }
+
+    /**
+     * Fotogramas por segundo del vídeo (pista de vídeo de MediaExtractor; si no lo declara,
+     * fotogramas totales / duración). Solo lee el archivo local; null si no se puede medir.
+     */
+    suspend fun frameRate(context: Context, uri: String): Double? = withContext(Dispatchers.IO) {
+        val parsed = Uri.parse(uri)
+        runCatching {
+            val extractor = android.media.MediaExtractor()
+            try {
+                if (parsed.scheme == "file") extractor.setDataSource(requireNotNull(parsed.path)) else extractor.setDataSource(context, parsed, null)
+                (0 until extractor.trackCount).map { extractor.getTrackFormat(it) }
+                    .firstOrNull { it.getString(android.media.MediaFormat.KEY_MIME)?.startsWith("video/") == true }
+                    ?.takeIf { it.containsKey(android.media.MediaFormat.KEY_FRAME_RATE) }
+                    ?.let { f -> runCatching { f.getInteger(android.media.MediaFormat.KEY_FRAME_RATE).toDouble() }.getOrElse { f.getFloat(android.media.MediaFormat.KEY_FRAME_RATE).toDouble() } }
+            } finally { extractor.release() }
+        }.getOrNull()?.takeIf { it > 0 } ?: runCatching {
+            if (android.os.Build.VERSION.SDK_INT < 28) return@runCatching null
+            android.media.MediaMetadataRetriever().run {
+                try {
+                    if (parsed.scheme == "file") setDataSource(parsed.path) else setDataSource(context, parsed)
+                    val frames = extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT)?.toLongOrNull()
+                    val ms = extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                    if (frames != null && ms != null && frames > 0 && ms > 0) frames * 1000.0 / ms else null
+                } finally { release() }
+            }
+        }.getOrNull()
     }
 
     /** Miniatura JPEG ≤1024 px para que el LLM vea el keyframe (solo si el usuario lo permite). */

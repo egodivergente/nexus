@@ -229,6 +229,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app), directFlow = true,
         nativeOperations = NexusNativeOperations(app, this),
         orders = orders,
+        probeFrameRate = { uri -> AgentMediaStore.frameRate(app, uri) },
         adaptPrompt = { text, schema, target ->
             val current = settings.load()
             com.vidadomu.nexus.agent.core.llm.PromptAdapter({ llm(current) }, { current.modelId })

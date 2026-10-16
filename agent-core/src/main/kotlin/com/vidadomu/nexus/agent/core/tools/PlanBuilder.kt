@@ -40,6 +40,8 @@ class PlanBuilder(
     private val assets: AssetIndex,
     private val clock: () -> Long,
     private val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
+    /** Fotogramas por segundo medidos del vídeo local (null si no se pueden leer). */
+    private val probeFrameRate: (suspend (String) -> Double?)? = null,
 ) {
 
     suspend fun build(
@@ -83,7 +85,8 @@ class PlanBuilder(
             } else params + ("negative_prompt" to (params["negative_prompt"]?.takeUnless { ParameterValidator.isBlankLike(it) } ?: negative))
         } else params
         val aspect = schema.parameters.firstOrNull { it.uiType == "ASPECT_RATIO" || it.key == "aspect_ratio" }
-        val preferred = if (aspect != null && "16:9" in aspect.options && allParams[aspect.key].isNullOrBlank()) allParams + (aspect.key to "16:9") else allParams
+        val withAspect = if (aspect != null && "16:9" in aspect.options && allParams[aspect.key].isNullOrBlank()) allParams + (aspect.key to "16:9") else allParams
+        val preferred = fillFromSource(schema, withAspect, placed, issues)
         val v = ParameterValidator.validate(schema, preferred)
         issues += v.issues
         if (issues.any { it.severity == ValidationIssue.Severity.ERROR }) return PlanBuild.Invalid(issues)
@@ -155,6 +158,36 @@ class PlanBuilder(
             // Un texto nuevo del agente o del usuario se valida; el del plan antiguo se retira si sobra.
             dropUnacceptedPrompt = edit.prompt == null,
         )
+    }
+
+    /**
+     * Rellena con la medida real del vídeo de entrada los parámetros que el proveedor exige y nadie
+     * eligió (p. ej. fps para conservar los del original). Es un valor explícito y visible: entra en
+     * la huella, en el coste y en la tarjeta. Si no se puede medir, el plan no es enviable.
+     */
+    private suspend fun fillFromSource(schema: ModelSchema, params: Map<String, String?>, media: List<MediaRef>, issues: MutableList<ValidationIssue>): Map<String, String?> {
+        if (schema.sourceParams.isEmpty()) return params
+        val out = params.toMutableMap()
+        for ((key, property) in schema.sourceParams) {
+            if (!ParameterValidator.isBlankLike(out[key])) continue
+            val spec = schema.param(key) ?: continue
+            val video = media.firstOrNull { it.role == "video" } ?: continue
+            val measured = when (property) {
+                "video_fps" -> runCatching { probeFrameRate?.invoke(video.uri) }.getOrNull()
+                else -> null
+            }
+            if (measured == null || !measured.isFinite() || measured <= 0) {
+                issues += ValidationIssue(key, "El proveedor exige «${spec.displayName}» y Nexus no pudo medirlo en el vídeo. Indícalo (p. ej. 24, 25, 30 o 60 para conservar el original).")
+                continue
+            }
+            val low = spec.min ?: 1.0
+            val high = spec.max ?: Double.MAX_VALUE
+            val value = Math.round(measured).toDouble().coerceIn(low, high).toLong()
+            if (value.toDouble() != Math.round(measured).toDouble())
+                issues += ValidationIssue(key, "El vídeo tiene ${"%.2f".format(java.util.Locale.ROOT, measured)} fps; el proveedor admite como máximo ${spec.max?.toLong()}: se enviará $value.", ValidationIssue.Severity.WARNING)
+            out[key] = value.toString()
+        }
+        return out
     }
 
     private fun placeMedia(schema: ModelSchema, model: ModelSummary, media: List<MediaRequest>, issues: MutableList<ValidationIssue>): List<MediaRef> {

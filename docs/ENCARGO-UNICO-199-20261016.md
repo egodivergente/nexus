@@ -49,9 +49,20 @@ que ya estaba instalada en el S25 como 1.9.8/vc42). Android `1.9.9-agent-preview
 
 ## Validación
 
-Ver `MIGRATION-STATUS.json` para los resultados de esta entrega. Pruebas sin red de pago:
-`TencentUpscaleFlowTest` (flujo de chat completo con LLM de guion: el agente miente, se autocorrige, ve el rechazo
-real, corrige el mismo encargo), `OrderBookTest`, `TencentContractTest` (schema público real), `OrderCardLogicTest`.
+- Compilación en AXELPC: `:app:assembleAgentPreview` correcta. APK refirmada con el `debug.keystore` del ASUS
+  (certificado `8b75db0f…`, el mismo de la app instalada) para actualizar sin desinstalar.
+- Pruebas: agent-core 153/153 y app (agentPreview) 293/293, sin red de pago. Destacan `TencentUpscaleFlowTest`
+  (flujo de chat completo con LLM de guion: el agente afirma un envío falso, se autocorrige, recibe el rechazo real y
+  corrige el mismo encargo; doble pulsación concurrente = un envío), `OrderBookTest`, `TencentContractTest`
+  (schema público real) y `OrderCardLogicTest` (datos reales del S25).
+- S25 Ultra (SM-S938B), con los datos del usuario conservados: el chat real con tres envíos de Tencent fallidos se
+  mostró como UNA tarjeta («Intento 3»), con el error literal, el diagnóstico y «Aplicar corrección».
+- Envío real hecho por el usuario (no por Nexus ni por el agente): tras «Aplicar corrección» y su pulsación en
+  Generar, Atlas aceptó el trabajo con `resolution=4k` y ya no devolvió «resolution is required»; el trabajo falló
+  con `fps must be an integer between 1 and 100`. Esta entrega añade `fps` medido del vídeo original
+  (comprobado en pruebas; pendiente de un envío real).
+- Incidencia: la reinstalación de las 05:30 cortó un turno del agente lanzado desde el teléfono, que quedó sin respuesta.
+- Pixel 8 Pro: offline en Tailscale desde hace 8 días; no probado.
 
 ## Pendiente conocido
 

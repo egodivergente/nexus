@@ -60,11 +60,11 @@ val TENCENT_SCHEMA = ModelSchema(
         ParamSpec("template", "Plantilla", "ENUM", "string", options = TEMPLATES, default = "anime-enhance-4k"),
         ParamSpec("short", "Lado corto", "INTEGER", "integer", min = 0.0, max = 2160.0, default = "0", advanced = true,
             conditions = TIERS.map { (tier, range) -> ParamCondition("template", TEMPLATES.filter { it.endsWith(tier) }, range.first, range.second) }),
-        ParamSpec("fps", "FPS", "INTEGER", "integer", min = 1.0, advanced = true),
+        ParamSpec("fps", "FPS", "INTEGER", "integer", min = 1.0, max = 100.0),
         ParamSpec("keep_metadata", "Conservar metadatos", "BOOLEAN", "boolean", default = "true", advanced = true),
     ),
     MediaSpec(inputMode = "VIDEO_INPUT", videoField = "video_url", maxVideos = 1, mediaRequired = true),
-    promptRequired = false, promptAccepted = false,
+    promptRequired = false, promptAccepted = false, sourceParams = mapOf("fps" to "video_fps"),
     derived = listOf(DerivedParam("resolution", "template",
         TEMPLATES.associateWith { mapOf("720p" to "720p", "1080p" to "1080p", "2k" to "1440p", "4k" to "4k").getValue(it.substringAfterLast('-')) },
         "Atlas exige resolution; Nexus la deduce de la plantilla.")),
@@ -96,7 +96,7 @@ class TencentUpscaleFlowTest {
         assertFalse(out.isError, out.result.toString())
         val plan = h.guard.plans().single()
         assertEquals("", plan.prompt)
-        assertEquals(mapOf("template" to "live-action-enhance-4k"), plan.params, "short=0 por defecto no se envía con plantilla 4K")
+        assertEquals(mapOf("template" to "live-action-enhance-4k", "fps" to "30"), plan.params, "short=0 por defecto no se envía con plantilla 4K; fps medidos del original")
         assertEquals("4k", plan.effectiveParams["resolution"])
         assertNull(plan.effectiveParams["short"])
         val order = h.deps.orders.all().single()
@@ -279,6 +279,29 @@ class TencentUpscaleFlowTest {
         assertEquals(listOf("file:///clip.mp4"), plan.media.map { it.uri })
         assertTrue(plan.id != old.id, "el plan enviado no se reutiliza")
         assertEquals(0, h.backend.submitted.size)
+    }
+
+    /** Error real del intento 4 en el S25 (2026-10-16): el backend exige fps aunque el schema permite omitirlo. */
+    @Test fun `fps se mide del video original, cambia la tarifa y sin medida no se envia`() = runTest {
+        val h = harness(); val att = video(h); val s = AgentSession("c", AgentMode.AGENT).apply { attachments += att }
+        h.frameRate = 59.94
+        prepare(h, s, att)
+        val sixty = h.guard.plans().single()
+        assertEquals("60", sixty.params["fps"])
+        assertTrue(abs(sixty.estimate!!.amountUsd!! - 30 * 0.036542 * 2) < 1e-9, "más de 30 fps duplica la tarifa publicada")
+        h.frameRate = null
+        val unknown = PrepareGenerationTool(h.deps).run(json("""{"model_id":"${TENCENT.modelId}","params":{"template":"anime-enhance-4k"},"media":[{"role":"video","attachment_id":"${att.id}"}],"new_copy":true}"""), s)
+        assertTrue(unknown.isError, "sin fps medidos el encargo no es enviable")
+        assertTrue("fps" in unknown.result.toString())
+        val chosen = PrepareGenerationTool(h.deps).run(json("""{"model_id":"${TENCENT.modelId}","params":{"template":"anime-enhance-4k","fps":24},"media":[{"role":"video","attachment_id":"${att.id}"}],"new_copy":true}"""), s)
+        assertFalse(chosen.isError, "un fps elegido explícitamente no necesita medida")
+        val plan = (chosen.events.single() as UiEvent.PlanReady).plan
+        assertEquals("24", plan.params["fps"])
+        val d = assertNotNull(ErrorDiagnosis.diagnose("generate task failed, tencent-upscaler: fps must be an integer between 1 and 100",
+            TENCENT_SCHEMA, plan.copy(params = plan.params - "fps")))
+        assertEquals("fps", d.field)
+        assertNotNull(d.fix, "ofrece preparar de nuevo con los fps del original")
+        assertNull(ErrorDiagnosis.diagnose("fps must be an integer between 1 and 100", TENCENT_SCHEMA, plan)!!.fix, "si ya se envió un fps no se inventa otro")
     }
 
     @Test fun `la skill de Tencent cubre el modelo y explica que no hay prompt`() {

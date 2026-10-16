@@ -48,3 +48,13 @@ pestaña elegida y representa en el chat los medios abiertos o creados por el ag
 El APK se instaló encima de vc41 con firma compatible y datos conservados. No se
 ejecutaron pruebas conversacionales ni controles de esos flujos por petición del
 usuario. Véase `docs/AGENT-BACKGROUND-TURN-198-20261016.md`.
+
+El 16 de octubre, en la rama `fix/encargo-unico-agente-ui` (main + 1.9.7 + 1.9.8), se
+reconstruyeron el chat y las tarjetas (un encargo por tarjeta, estado compartido
+UI↔agente, autocorrección de afirmaciones falsas) y el contrato de Tencent Video
+Upscaler (sin prompt, `resolution` deducida, `fps` medido, tarifa por nivel). Pruebas:
+agent-core 153 y app 293, todas correctas. La APK `1.9.9-agent-preview`/vc43
+(SHA-256 `309B2F33…CDE8`) se refirmó con el `debug.keystore` del ASUS y se instaló en el
+S25 conservando datos, pero a las 05:35 otra sesión instaló otra build con el mismo
+versionCode desde la rama de Historial. Antes de instalar de nuevo hay que integrar
+ambas ramas en un versionCode nuevo. Véase `docs/ENCARGO-UNICO-199-20261016.md`.

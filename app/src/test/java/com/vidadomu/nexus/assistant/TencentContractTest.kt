@@ -52,7 +52,7 @@ class TencentContractTest {
 
     @Test fun payloadCarriesApiFieldsAndNoPrompt() {
         val m = model()
-        val form = FormContract.restoredValues(m, mapOf("template" to "live-action-enhance-4k"))
+        val form = FormContract.restoredValues(m, mapOf("template" to "live-action-enhance-4k", "fps" to "30"))
         val video = MediaInput(Modality.VIDEO, "file:///clip.mp4", "video/mp4", remoteUrl = "https://cdn.example/clip.mp4", slotType = MediaSlotType.VIDEO_INPUT)
         val payload = AtlasGenerationPayload.build(NativeGenerationRequest.build(m, Modality.VIDEO, "", form, listOf(video), "job_1"))
         assertFalse("sin campo prompt en el schema", payload.containsKey("prompt"))
@@ -60,16 +60,22 @@ class TencentContractTest {
         assertEquals("4k", payload["resolution"]!!.jsonPrimitive.content)
         assertEquals("https://cdn.example/clip.mp4", payload["video_url"]!!.jsonPrimitive.content)
         assertFalse(payload.containsKey("short"))
+        assertEquals("30", payload["fps"]!!.jsonPrimitive.content)
+        assertFalse("fps viaja como entero", payload["fps"]!!.jsonPrimitive.isString)
         assertEquals("tencent/video/upscaler", payload["model"]!!.jsonPrimitive.content)
     }
 
     @Test fun formValidationMatchesTheAgent() {
         val m = model()
-        assertNull(NativeModelSchema.validate(m, FormContract.restoredValues(m, mapOf("template" to "live-action-enhance-4k"))))
-        val wrongShort = NativeModelSchema.validate(m, mapOf("template" to "live-action-enhance-4k", "short" to "1000"))
+        val fps = mapOf("fps" to "30")
+        assertNull(NativeModelSchema.validate(m, FormContract.restoredValues(m, mapOf("template" to "live-action-enhance-4k") + fps)))
+        val noFps = NativeModelSchema.validate(m, FormContract.restoredValues(m, mapOf("template" to "live-action-enhance-4k")))
+        assertNotNull("sin fps Atlas rechaza el trabajo (error real del S25)", noFps); assertTrue(noFps!!, "fps" in noFps)
+        val wrongShort = NativeModelSchema.validate(m, mapOf("template" to "live-action-enhance-4k", "short" to "1000") + fps)
         assertNotNull(wrongShort); assertTrue(wrongShort!!, "1441" in wrongShort)
-        assertNull(NativeModelSchema.validate(m, mapOf("template" to "live-action-enhance-4k", "short" to "2160")))
-        assertNotNull("un texto libre no tiene dónde ir", NativeModelSchema.validate(m, mapOf("template" to "live-action-enhance-4k", "prompt" to "upscale 4k")))
+        assertNull(NativeModelSchema.validate(m, mapOf("template" to "live-action-enhance-4k", "short" to "2160") + fps))
+        assertNotNull("un texto libre no tiene dónde ir", NativeModelSchema.validate(m, mapOf("template" to "live-action-enhance-4k", "prompt" to "upscale 4k") + fps))
+        assertNotNull("el backend admite 1–100 fps", com.vidadomu.nexus.core.model.FormContract.invalidValue(m.parameters, mapOf("fps" to "120")))
     }
 
     @Test fun agentSchemaIsTheSameContract() {
@@ -81,6 +87,8 @@ class TencentContractTest {
         assertEquals("1440p", schema.derivedParam("resolution")!!.valueFor("seedance2-enhance-2k"))
         assertEquals(4, schema.param("short")!!.conditions.size)
         assertEquals("video_url", schema.media.videoField)
+        assertEquals(mapOf("fps" to "video_fps"), schema.sourceParams)
+        assertEquals(100.0, schema.param("fps")!!.max!!, 0.0)
     }
 
     @Test fun priceUsesTheTemplateTierNotThe720pBase() = runBlocking {

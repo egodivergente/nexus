@@ -184,7 +184,7 @@ object NativeModelSchema {
         conditionsByModel[model.id] = parseConditions(props)
         // El prompt solo existe si el schema lo declara; solo es obligatorio si está en required.
         val promptDeclared = props["prompt"] is JsonObject
-        return NativeConfiguration(model.copy(capabilities=nativeCapabilities,parameters = FormContract.normalize(parameters), contractMedia=extraMedia, inputMode = mode, nativeRequiredFields = effectiveRequired,
+        return NativeConfiguration(model.copy(capabilities=nativeCapabilities,parameters = AtlasContractOverrides.adjustParameters(model.id, FormContract.normalize(parameters)), contractMedia=extraMedia, inputMode = mode, nativeRequiredFields = effectiveRequired,
             promptAccepted = promptDeclared, promptRequired = promptDeclared && "prompt" in effectiveRequired,
             firstFrameField = first, inputImageField = first, lastFrameField = last,
             imagesArrayField = images, structuredImageReferences = structuredImages, videoField = video, videosArrayField = videos,

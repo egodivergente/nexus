@@ -2,6 +2,23 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.9-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+
+- Android vc43: una sola tarjeta por encargo con id persistente; reintentos, correcciones
+  y recargas la actualizan en su sitio. Estados borrador → pendiente → enviando →
+  procesando → completado / error / incierto, con un único botón por estado y
+  bloqueo de pulsaciones repetidas (idempotencia por intento).
+- El agente recibe en cada turno el estado real de la interfaz (tarjetas, lo que
+  muestran, pulsaciones, errores literales y diagnóstico), dispone de `get_ui_state`,
+  corrige con `update_plan(order_id)` sin crear tarjetas y rehace su respuesta si
+  afirma un envío o resultado que el estado no respalda.
+- Tencent Video Upscaler: sin prompt (el schema no lo tiene), `resolution` deducida
+  de la plantilla, `short` por defecto incompatible omitido, `fps` medido del vídeo
+  original (Atlas lo exige aunque el schema permite omitirlo) y tarifa por nivel y fps.
+- Los chats antiguos se limpian al abrirlos: tarjetas duplicadas/triplicadas y
+  envíos fallidos repetidos del mismo vídeo pasan a un encargo con historial.
+- Alcance y validación: [encargo único 1.9.9](docs/ENCARGO-UNICO-199-20261016.md).
+
 ## [1.9.8-agent] - 2026-10-16
 
 - Android vc42 mantiene el turno del asistente en un servicio de primer plano

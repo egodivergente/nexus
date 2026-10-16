@@ -46,8 +46,10 @@ class ToolDeps(
     val nativeOperations: NativeOperations? = null,
     /** Encargos visibles: estado compartido por UI, agente y envío. Sobrevive a reconstruir las deps. */
     val orders: com.vidadomu.nexus.agent.core.orders.OrderBook = com.vidadomu.nexus.agent.core.orders.OrderBook(clock),
+    /** Mide los fps de un vídeo local (la app usa MediaMetadataRetriever). */
+    val probeFrameRate: (suspend (String) -> Double?)? = null,
 ) {
-    val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt)
+    val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock, orders) { plan, message ->
         com.vidadomu.nexus.agent.core.schema.ErrorDiagnosis.diagnose(message, runCatching { registry.schema(plan.ref) }.getOrNull(), plan)
     }

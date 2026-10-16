@@ -122,6 +122,11 @@ data class ModelSchema(
     /** false si el schema no tiene campo prompt: no se envía texto libre a la API. */
     val promptAccepted: Boolean = true,
     val derived: List<DerivedParam> = emptyList(),
+    /**
+     * Parámetros que el proveedor exige y que, si nadie los elige, Nexus toma del vídeo de entrada
+     * para conservarlo tal cual: clave → propiedad medida (p. ej. "fps" → "video_fps").
+     */
+    val sourceParams: Map<String, String> = emptyMap(),
 ) {
     fun param(key: String): ParamSpec? = parameters.firstOrNull { it.key == key }
     fun derivedParam(key: String): DerivedParam? = derived.firstOrNull { it.key == key }

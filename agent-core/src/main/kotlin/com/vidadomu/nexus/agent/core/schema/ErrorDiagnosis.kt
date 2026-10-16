@@ -16,6 +16,7 @@ object ErrorDiagnosis {
         Regex("""["'`]?([A-Za-z_][A-Za-z0-9_]*)["'`]?\s+(?:is|are)\s+required(?:\s*[(:]\s*([^)]*)\)?)?""", RegexOption.IGNORE_CASE),
         Regex("""missing\s+(?:required\s+)?(?:field|parameter|property|argument)s?\s*[:=]?\s*["'`]?([A-Za-z_][A-Za-z0-9_]*)["'`]?(?:\s*\(([^)]*)\))?""", RegexOption.IGNORE_CASE),
     )
+    private val BETWEEN = Regex("""["'`]?([A-Za-z_][A-Za-z0-9_]*)["'`]?\s+must\s+be\s+(?:an?\s+)?(?:integer|number|value)?\s*between\s+(-?[0-9.]+)\s+and\s+(-?[0-9.]+)""", RegexOption.IGNORE_CASE)
     private val ONE_OF = Regex("""["'`]?([A-Za-z_][A-Za-z0-9_]*)["'`]?\s+(?:must|should)\s+be\s+(?:one\s+of|in)\s*[:\[(]?\s*([^\])]+)""", RegexOption.IGNORE_CASE)
 
     fun splitAllowed(raw: String?): List<String> = raw.orEmpty()
@@ -23,6 +24,20 @@ object ErrorDiagnosis {
         .map { it.trim().trim('"', '\'', '`', '.', '[', ']') }.filter { it.isNotEmpty() && it.length <= 40 }
 
     fun diagnose(message: String, schema: ModelSchema?, plan: GenerationPlan): Diagnosis? {
+        BETWEEN.find(message)?.let { m ->
+            val key = m.groupValues[1]
+            val range = "${m.groupValues[2]}–${m.groupValues[3]}"
+            val spec = schema?.param(key)
+            val sent = plan.params[key]
+            return when {
+                spec == null -> Diagnosis(key, emptyList(), "El proveedor exige «$key» ($range), pero el schema publicado no declara ese campo; Nexus no puede enviarlo con seguridad.", null)
+                sent == null && schema.sourceParams.containsKey(key) -> Diagnosis(key, emptyList(),
+                    "El proveedor exige «${spec.displayName}» ($range) aunque el schema permite omitirlo; este envío no lo incluía. Nexus lo mide en el vídeo original.",
+                    SuggestedFix("Preparar de nuevo con ${spec.displayName} del vídeo original"))
+                sent == null -> Diagnosis(key, emptyList(), "El proveedor exige «${spec.displayName}» ($range); este envío no lo incluía. Indica un valor.", null)
+                else -> Diagnosis(key, emptyList(), "El proveedor no acepta ${spec.displayName}=$sent; debe estar en $range.", null)
+            }
+        }
         val (field, allowed, verb) = REQUIRED.firstNotNullOfOrNull { r -> r.find(message)?.let { Triple(it.groupValues[1], splitAllowed(it.groupValues.getOrNull(2)), "exige") } }
             ?: ONE_OF.find(message)?.let { Triple(it.groupValues[1], splitAllowed(it.groupValues[2]), "no acepta el valor de") }
             ?: return null
