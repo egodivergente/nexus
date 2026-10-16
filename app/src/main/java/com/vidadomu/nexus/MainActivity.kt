@@ -16,12 +16,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Scaffold
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import kotlin.math.abs
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -54,7 +49,7 @@ class MainActivity : ComponentActivity() {
     private var startupPreviewEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!BuildConfig.OFFLINE_QA && savedInstanceState == null && StartupPreview.consume()) startupPreviewEpoch = 1
+        if (!BuildConfig.OFFLINE_QA && savedInstanceState == null && StartupPreview.consume(this)) startupPreviewEpoch = 1
         enableEdgeToEdge()
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
@@ -68,7 +63,6 @@ class MainActivity : ComponentActivity() {
             NexusTheme {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
-                val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
                 val createViewModel: CreateViewModel = viewModel()
                 // Ligado a la actividad (como el Lienzo): la conversación y el plan pendiente sobreviven a «Atrás» y al cambio de pestaña.
                 val assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel = viewModel()
@@ -139,28 +133,6 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = Screen.Assistant.route,
                         modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
-                            .pointerInput(activeEntry?.destination?.route, swipeThreshold) {
-                                val index = Screen.bottomNavItems.indexOfFirst { it.route == activeEntry?.destination?.route }
-                                if(index >= 0) {
-                                    var distance = 0f
-                                    detectHorizontalDragGestures(
-                                        onDragStart = { distance = 0f },
-                                        onHorizontalDrag = { _, delta -> distance += delta },
-                                        onDragCancel = { distance = 0f },
-                                        onDragEnd = {
-                                            if(abs(distance) >= swipeThreshold) {
-                                                val target = Screen.bottomNavItems.getOrNull(index + if(distance < 0) 1 else -1)
-                                                target?.let { screen -> navController.navigate(screen.route) {
-                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
-                                                } }
-                                            }
-                                            distance = 0f
-                                        }
-                                    )
-                                }
-                            }
                     ) {
                         composable(Screen.Assistant.route) {
                             com.vidadomu.nexus.assistant.AssistantScreen(
@@ -366,6 +338,19 @@ private fun NexusStartupOnboardingOverlay(epoch: Int) {
 
 
 private object StartupPreview {
-    private var shown = false
-    @Synchronized fun consume(): Boolean = if (shown) false else { shown = true; true }
+    private const val PREFS = "nexus_startup_v1"
+    private const val KEY_SEEN = "preview_seen"
+
+    @Synchronized
+    fun consume(context: android.content.Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+        if (prefs.contains(KEY_SEEN)) return false
+
+        // Only a genuinely new installation gets the preview. Existing installs that upgrade
+        // before this preference existed should not be interrupted by it.
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        val freshInstall = packageInfo.firstInstallTime >= packageInfo.lastUpdateTime - 30_000L
+        prefs.edit().putBoolean(KEY_SEEN, true).apply()
+        return freshInstall
+    }
 }

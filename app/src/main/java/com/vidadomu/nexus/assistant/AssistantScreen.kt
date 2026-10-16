@@ -42,6 +42,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -160,7 +162,13 @@ fun AssistantScreen(
                 Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
                 Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
             }
-            if(LocalDensity.current.fontScale<1.3f) Text(listOfNotNull("v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            val projectContext=listOfNotNull(
+                ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},
+                ui.projectAssets.size.takeIf {it>0}?.let {"$it referencias"}
+            ).joinToString(" · ")
+            if(LocalDensity.current.fontScale<1.3f && projectContext.isNotBlank()) Text(projectContext,
+                style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,
+                overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }},actions={IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
@@ -335,8 +343,31 @@ private fun UserBubble(item:ChatItem.User) {
 
 @Composable
 private fun AssistantBubble(item:ChatItem.Assistant) {
+    val context=LocalContext.current
+    val clipboard=LocalClipboardManager.current
+    var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        if(item.text.isNotBlank()) ChatMarkdownView(item.text)
+        if(item.text.isNotBlank()) {
+            ChatMarkdownView(item.text)
+            Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.CenterEnd) {
+                IconButton(onClick={actionsExpanded=true},modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
+                    Icon(Icons.Default.MoreVert,"Acciones de la respuesta")
+                }
+                DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
+                    DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
+                        clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
+                        Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()
+                    })
+                    DropdownMenuItem(text={Text("Compartir respuesta")},leadingIcon={Icon(Icons.Default.Share,null)},onClick={
+                        actionsExpanded=false
+                        runCatching {
+                            val intent=Intent(Intent.ACTION_SEND).apply {type="text/plain";putExtra(Intent.EXTRA_TEXT,item.text)}
+                            context.startActivity(Intent.createChooser(intent,"Compartir respuesta"))
+                        }.onFailure {Toast.makeText(context,"No se pudo compartir la respuesta",Toast.LENGTH_SHORT).show()}
+                    })
+                }
+            }
+        }
         if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             items(item.media,key={it.id}) { AssistantMediaPreview(it) }
         }

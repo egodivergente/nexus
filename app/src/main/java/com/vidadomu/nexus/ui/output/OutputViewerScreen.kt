@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -180,11 +181,33 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
     var scale by remember(imageUrl, localUri) { mutableStateOf(1f) }
     var offsetX by remember(imageUrl, localUri) { mutableStateOf(0f) }
     var offsetY by remember(imageUrl, localUri) { mutableStateOf(0f) }
+    var viewportSize by remember(imageUrl,localUri) {mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)}
+    var imageSize by remember(imageUrl,localUri) {mutableStateOf(androidx.compose.ui.geometry.Size.Unspecified)}
+
+    fun clampPan(targetScale:Float,x:Float,y:Float):androidx.compose.ui.geometry.Offset {
+        val viewportWidth=viewportSize.width.toFloat().coerceAtLeast(1f)
+        val viewportHeight=viewportSize.height.toFloat().coerceAtLeast(1f)
+        val sourceWidth=imageSize.width.takeIf {it.isFinite() && it>0f} ?: viewportWidth
+        val sourceHeight=imageSize.height.takeIf {it.isFinite() && it>0f} ?: viewportHeight
+        val fit=minOf(viewportWidth/sourceWidth,viewportHeight/sourceHeight)
+        val maxX=((sourceWidth*fit*targetScale-viewportWidth)/2f).coerceAtLeast(0f)
+        val maxY=((sourceHeight*fit*targetScale-viewportHeight)/2f).coerceAtLeast(0f)
+        return androidx.compose.ui.geometry.Offset(x.coerceIn(-maxX,maxX),y.coerceIn(-maxY,maxY))
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(imageUrl, localUri) {
+            .onSizeChanged {viewportSize=it}
+            .pointerInput(imageUrl,localUri,scale,viewportSize,imageSize) {
+                detectTapGestures(onDoubleTap={
+                    val target=if(scale>1f) 1f else 2f
+                    scale=target
+                    if(target==1f) {offsetX=0f;offsetY=0f}
+                    else clampPan(target,offsetX,offsetY).let {offsetX=it.x;offsetY=it.y}
+                })
+            }
+            .pointerInput(imageUrl,localUri,viewportSize,imageSize) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed=false)
                     var horizontal=0f;var vertical=0f;var transformed=false
@@ -194,8 +217,10 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
                         val pan=event.calculatePan()
                         if(event.changes.count {it.pressed}>1 || scale>1f) {
                             transformed=true
-                            scale=(scale*zoom).coerceIn(1f,5f)
-                            if(scale>1f) {offsetX+=pan.x;offsetY+=pan.y} else {offsetX=0f;offsetY=0f}
+                            val nextScale=(scale*zoom).coerceIn(1f,5f)
+                            scale=nextScale
+                            if(nextScale>1f) clampPan(nextScale,offsetX+pan.x,offsetY+pan.y).let {offsetX=it.x;offsetY=it.y}
+                            else {offsetX=0f;offsetY=0f}
                             event.changes.forEach {it.consume()}
                         } else {
                             horizontal+=pan.x;vertical+=pan.y
@@ -213,10 +238,15 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
         var retry by remember(imageUrl,localUri) { mutableIntStateOf(0) }
         var useLocal by remember(imageUrl,localUri) { mutableStateOf(localUri!=null) }
         key(imageUrl,localUri,retry,useLocal) {
-            AsyncImage(model=if(useLocal) localUri else imageUrl,contentDescription="Resultado generado",
+            AsyncImage(model=if(useLocal) localUri else imageUrl,
+                contentDescription="Resultado generado. Pellizca para ampliar; doble toque para ajustar.",
                 modifier=Modifier.fillMaxSize().testTag("output_image").graphicsLayer(scaleX=scale,scaleY=scale,translationX=offsetX,translationY=offsetY),
                 contentScale=ContentScale.Fit,
-                onLoading={loading=true;failed=false},onSuccess={loading=false;failed=false},
+                onLoading={loading=true;failed=false},onSuccess={result->
+                    loading=false;failed=false
+                    imageSize=result.painter.intrinsicSize
+                    clampPan(scale,offsetX,offsetY).let {offsetX=it.x;offsetY=it.y}
+                },
                 onError={if(useLocal){useLocal=false}else{loading=false;failed=true}})
         }
         if(loading && !failed) CircularProgressIndicator(Modifier.testTag("output_loading"))
@@ -225,6 +255,12 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
             Text("No se puede cargar la imagen",style=MaterialTheme.typography.titleMedium)
             Text("El enlace puede haber caducado o no estar disponible. La tarea sigue guardada en tu historial.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             OutlinedButton(onClick={failed=false;loading=true;retry++}) {Text("Volver a intentar")}
+        }
+        if(scale>1f) Surface(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space16),
+            shape=NexusTokens.filter,color=MaterialTheme.colorScheme.scrim.copy(alpha=.72f)) {
+            TextButton(onClick={scale=1f;offsetX=0f;offsetY=0f}) {
+                Text("Ajustar · ${(scale*100).toInt()}%",color=MediaForeground)
+            }
         }
     }
 }

@@ -19,6 +19,6 @@ enum class Screen(
     Flow("flow", "Crear en Flow", Icons.Default.AutoAwesome);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Create, Models, Library)
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Create, Models, Generations, Library)
     }
 }

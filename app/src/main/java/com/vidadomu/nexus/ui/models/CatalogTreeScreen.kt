@@ -290,7 +290,8 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     val currency by app.currencyManager.state.collectAsState()
     val price=routes.mapNotNull(::referencePrice).minOrNull()
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
-    Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
+    Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,
+        onLongClickLabel="Opciones de $title",onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
         Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(family=family,size=28.dp,containerSize=40.dp,shape=NexusTokens.field)
@@ -306,11 +307,16 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 if(!grid) Text(displayPrice ?: "Ver coste",
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=TextSecondary)}
-                else if(!grid) Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)
+                else if(!grid) IconButton(onClick=onLongClick) {Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)}
             }
-            if(grid) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter) {
-                Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",Modifier.padding(horizontal=10.dp,vertical=5.dp),
-                    style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
+            if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
+                    Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",Modifier.padding(horizontal=10.dp,vertical=5.dp),
+                        style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
+                }
+                if(dragModifier==null) IconButton(onClick=onLongClick,modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
+                    Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)
+                }
             }
             highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
             onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}

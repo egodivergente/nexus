@@ -101,6 +101,10 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }
     var localTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
     localTarget?.let {asset -> LocalAssetActions(asset,{localTarget=null}) {message -> scope.launch {snackbar.showSnackbar(message)}} }
+    var localPreviewTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
+    localPreviewTarget?.let {asset -> LocalAssetPreviewSheet(asset,
+        onDismiss={localPreviewTarget=null},
+        onMoreOptions={localPreviewTarget=null;localTarget=asset}) }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
     val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
@@ -184,7 +188,9 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     }
                 }
                 if(localAssets.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {Text("Importados y ediciones · ${localAssets.size}",style=MaterialTheme.typography.labelMedium,modifier=Modifier.padding(NexusTokens.space16))}
-                items(localAssets,key={"asset:"+it.id}) {asset -> LocalAssetTile(asset,imageLoader) {localTarget=asset} }
+                items(localAssets,key={"asset:"+it.id}) {asset ->
+                    LocalAssetTile(asset,imageLoader,onPreview={localPreviewTarget=asset},onActions={localTarget=asset})
+                }
                 groups.forEach {(day,entries) ->
                     item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
