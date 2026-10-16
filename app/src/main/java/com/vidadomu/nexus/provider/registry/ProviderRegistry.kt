@@ -27,6 +27,11 @@ class ProviderRegistry(
         MockNexusProvider.PROVIDER_ID to mockNexusProvider
     )
 
+    /** Proveedores multimedia definidos por el usuario. Se suman a los de arriba; nunca los sustituyen. */
+    private val _custom = MutableStateFlow<List<NexusProvider>>(emptyList())
+    val customProviders: StateFlow<List<NexusProvider>> = _custom.asStateFlow()
+    fun setCustomProviders(list: List<NexusProvider>) { _custom.value = list.filter { it.id !in providers.keys } }
+
     private val _activeProviderId = MutableStateFlow(
         if (secureStorage.isMockModeEnabled()) MockNexusProvider.PROVIDER_ID else AtlasCloudProvider.PROVIDER_ID
     )
@@ -38,17 +43,17 @@ class ProviderRegistry(
     }
 
     fun getProviderById(providerId: String): NexusProvider? {
-        return providers[providerId]
+        return providers[providerId] ?: _custom.value.firstOrNull { it.id == providerId }
     }
 
     fun getAllProviders(): List<NexusProvider> {
-        return providers.values.toList()
+        return providers.values.toList() + _custom.value
     }
 
     fun getCatalogProviders(): List<NexusProvider> = if (secureStorage.isMockModeEnabled()) {
         listOf(mockNexusProvider)
     } else {
-        providers.values.filterNot { it.id in setOf(MockNexusProvider.PROVIDER_ID, FlowBridgeProvider.PROVIDER_ID) }
+        providers.values.filterNot { it.id in setOf(MockNexusProvider.PROVIDER_ID, FlowBridgeProvider.PROVIDER_ID) } + _custom.value
     }
 
     fun setMockMode(enabled: Boolean) {

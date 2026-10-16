@@ -21,32 +21,47 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+/** Opciones de Chat Completions; el valor por defecto reproduce exactamente el comportamiento anterior. */
+data class ChatOptions(
+    val reasoningEffort: String? = null,
+    val thinking: String? = null,
+    /** null = automático (`max_completion_tokens` solo en api.openai.com). */
+    val maxTokensField: String? = null,
+    val extraBody: JsonObject? = null,
+    /** false = no se envían herramientas (el proveedor no soporta function calling). */
+    val sendTools: Boolean = true,
+)
+
 /**
  * Cualquier API compatible con Chat Completions de OpenAI: OpenAI, OpenRouter, Gemini (endpoint
- * OpenAI), DeepSeek, Groq, Mistral o un servidor local. Las herramientas del agente viajan como
+ * OpenAI), DeepSeek, Groq, Mistral, BytePlus o un servidor local. Las herramientas del agente viajan como
  * `tools` de tipo function; los resultados, como mensajes `tool`.
  */
-class OpenAiCompatibleProvider(
-    private val baseUrl: String,
-    private val apiKey: () -> String,
-    private val extraHeaders: Map<String, String> = emptyMap(),
-    private val client: OkHttpClient = BedrockProxyProvider.defaultClient(),
+open class OpenAiCompatibleProvider(
+    protected val target: HttpTarget,
+    protected val options: ChatOptions = ChatOptions(),
+    protected val client: OkHttpClient = BedrockProxyProvider.defaultClient(),
+    protected val who: String = "el proveedor",
 ) : LlmProvider {
+    constructor(
+        baseUrl: String,
+        apiKey: () -> String,
+        extraHeaders: Map<String, String> = emptyMap(),
+        client: OkHttpClient = BedrockProxyProvider.defaultClient(),
+    ) : this(HttpTarget(chatEndpoint(baseUrl), BrainAuth(), apiKey, extraHeaders), ChatOptions(), client)
+
     override val id: String = "openai-compatible"
 
-    private val endpoint: String = baseUrl.trim().trimEnd('/').let { if (it.endsWith("/chat/completions")) it else "$it/chat/completions" }
+    protected fun body(request: LlmRequest, stream: Boolean) =
+        OpenAiCodec.encode(request, maxCompletionTokens = options.maxTokensField?.let { it == "max_completion_tokens" } ?: ("api.openai.com" in target.url),
+            options = options, stream = stream).toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
     override suspend fun complete(request: LlmRequest): LlmResponse = withContext(Dispatchers.IO) {
-        val body = OpenAiCodec.encode(request, maxCompletionTokens = "api.openai.com" in endpoint).toString()
-            .toRequestBody("application/json; charset=utf-8".toMediaType())
-        val http = Request.Builder().url(endpoint).post(body).apply {
-            apiKey().trim().takeIf { it.isNotEmpty() }?.let { header("Authorization", "Bearer $it") }
-            extraHeaders.forEach { (k, v) -> header(k, v) }
-        }.build()
+        val http = target.request().post(body(request, stream = false)).build()
         try {
             client.newCall(http).awaitBody().use { resp ->
                 val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) throw LlmHttpErrors.map(resp.code, text, "el proveedor")
+                if (!resp.isSuccessful) throw LlmHttpErrors.map(resp.code, text, who)
                 val json = runCatching { Json.parseToJsonElement(text).jsonObject }
                     .getOrElse { throw LlmException(LlmException.Kind.PROTOCOL, "El proveedor devolvió una respuesta no válida.") }
                 OpenAiCodec.decode(json)
@@ -55,11 +70,82 @@ class OpenAiCompatibleProvider(
             throw LlmException(LlmException.Kind.NETWORK, "No se pudo contactar con el proveedor del LLM (${e.javaClass.simpleName}).")
         }
     }
+
+    companion object {
+        fun chatEndpoint(baseUrl: String): String =
+            baseUrl.trim().trimEnd('/').let { if (it.endsWith("/chat/completions")) it else "$it/chat/completions" }
+    }
 }
 
+/** Chat Completions con `stream:true`: entrega el texto según llega y reensambla las llamadas a herramientas. */
+class OpenAiCompatibleStreamingProvider(
+    target: HttpTarget, options: ChatOptions = ChatOptions(),
+    client: OkHttpClient = BedrockProxyProvider.defaultClient(), who: String = "el proveedor",
+) : OpenAiCompatibleProvider(target, options, client, who), StreamingLlmProvider {
+    override suspend fun complete(request: LlmRequest): LlmResponse = completeStreaming(request) { }
+
+    override suspend fun completeStreaming(request: LlmRequest, onTextDelta: (String) -> Unit): LlmResponse = withContext(Dispatchers.IO) {
+        val http = target.request().header("Accept", "text/event-stream").post(body(request, stream = true)).build()
+        try {
+            SseStream.open(client, http).use { resp ->
+                if (!resp.isSuccessful) throw LlmHttpErrors.map(resp.code, resp.body?.string().orEmpty(), who)
+                val text = StringBuilder()
+                val calls = sortedMapOf<Int, Triple<StringBuilder, StringBuilder, StringBuilder>>() // id, nombre, argumentos
+                var finish: String? = null
+                var usage: JsonObject? = null
+                var sawChunk = false
+                SseStream.read(resp) { ev ->
+                    if (ev.data == "[DONE]") return@read false
+                    val chunk = runCatching { Json.parseToJsonElement(ev.data).jsonObject }.getOrNull() ?: return@read true
+                    (chunk["error"] as? JsonObject)?.let { throw ResponsesCodec.failure(it, who) }
+                    sawChunk = true
+                    (chunk["usage"] as? JsonObject)?.let { usage = it }
+                    val choice = (chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return@read true
+                    choice["finish_reason"]?.jsonPrimitive?.contentOrNull?.let { finish = it }
+                    val delta = choice["delta"] as? JsonObject ?: return@read true
+                    (delta["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }?.let { text.append(it); onTextDelta(it) }
+                    (delta["tool_calls"] as? JsonArray)?.forEach { tc ->
+                        val o = tc as? JsonObject ?: return@forEach
+                        val slot = calls.getOrPut(o["index"]?.jsonPrimitive?.intOrNull ?: calls.size) { Triple(StringBuilder(), StringBuilder(), StringBuilder()) }
+                        o["id"]?.jsonPrimitive?.contentOrNull?.let { slot.first.append(it) }
+                        (o["function"] as? JsonObject)?.let { fn ->
+                            fn["name"]?.jsonPrimitive?.contentOrNull?.let { slot.second.append(it) }
+                            fn["arguments"]?.jsonPrimitive?.contentOrNull?.let { slot.third.append(it) }
+                        }
+                    }
+                    true
+                }
+                if (!sawChunk) throw LlmException(LlmException.Kind.PROTOCOL, "La respuesta en streaming terminó sin contenido.")
+                OpenAiCodec.decode(buildJsonObject {
+                    put("choices", buildJsonArray { add(buildJsonObject {
+                        put("message", buildJsonObject {
+                            put("content", text.toString())
+                            if (calls.isNotEmpty()) put("tool_calls", buildJsonArray {
+                                calls.values.forEach { (cid, name, args) -> add(buildJsonObject {
+                                    put("id", cid.toString()); put("type", "function")
+                                    put("function", buildJsonObject { put("name", name.toString()); put("arguments", args.toString()) })
+                                }) }
+                            })
+                        })
+                        finish?.let { put("finish_reason", it) }
+                    }) })
+                    usage?.let { put("usage", it) }
+                })
+            }
+        } catch (e: IOException) {
+            throw LlmException(LlmException.Kind.NETWORK, "Se perdió la conexión con $who (${e.javaClass.simpleName}).")
+        }
+    }
+}
 /** Traducción entre los tipos propios del agente y Chat Completions. */
 object OpenAiCodec {
-    fun encode(request: LlmRequest, maxCompletionTokens: Boolean = false): JsonObject = buildJsonObject {
+    fun encode(request: LlmRequest, maxCompletionTokens: Boolean = false, options: ChatOptions = ChatOptions(), stream: Boolean = false): JsonObject {
+        val base = encodeBase(request, maxCompletionTokens, options, stream)
+        val extra = options.extraBody?.filterKeys { it !in BrainProfile.RESERVED_BODY_KEYS && it !in base }.orEmpty()
+        return JsonObject(base + extra)
+    }
+
+    private fun encodeBase(request: LlmRequest, maxCompletionTokens: Boolean, options: ChatOptions, stream: Boolean): JsonObject = buildJsonObject {
         put("model", request.modelId)
         put("messages", buildJsonArray {
             if (request.system.isNotEmpty()) add(buildJsonObject { put("role", "system"); put("content", request.system.joinToString("\n\n")) })
@@ -106,7 +192,7 @@ object OpenAiCodec {
                 }
             }
         })
-        if (request.tools.isNotEmpty()) put("tools", JsonArray(request.tools.map { t ->
+        if (request.tools.isNotEmpty() && options.sendTools) put("tools", JsonArray(request.tools.map { t ->
             buildJsonObject {
                 put("type", "function")
                 put("function", buildJsonObject { put("name", t.name); put("description", t.description); put("parameters", t.inputSchema) })
@@ -114,6 +200,10 @@ object OpenAiCodec {
         }))
         put(if (maxCompletionTokens) "max_completion_tokens" else "max_tokens", request.maxTokens)
         request.temperature?.let { put("temperature", it) }
+        // Mismo criterio que la Responses API: pensamiento desactivado y esfuerzo se excluyen (400 en ModelArk).
+        if (options.thinking != null) put("thinking", buildJsonObject { put("type", options.thinking) })
+        if (options.reasoningEffort != null && options.thinking != "disabled") put("reasoning_effort", options.reasoningEffort)
+        if (stream) { put("stream", true); put("stream_options", buildJsonObject { put("include_usage", true) }) }
     }
 
     fun decode(json: JsonObject): LlmResponse {

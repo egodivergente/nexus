@@ -159,8 +159,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
-        if(atts.count {AgentDocuments.format(it.mimeType,it.name)!=null}>5) {
-            _ui.update {it.copy(message=msg("Bedrock admite 5 documentos por mensaje. Quita alguno y envíalo en el siguiente; tu borrador se conserva."))}
+        // Límites del usuario (Ajustes → Límites), con los propios del cerebro activo si los tiene.
+        val limits = runtime.settings.let { it.effectiveLimits(it.load()) }
+        if(atts.count {AgentDocuments.format(it.mimeType,it.name)!=null}>limits.documents) {
+            _ui.update {it.copy(message=msg("Tu límite actual es de ${limits.maxDocumentsPerTurn} documentos por mensaje (se cambia en Ajustes → Límites). Quita alguno y envíalo en el siguiente; tu borrador se conserva."))}
             return false
         }
         failedTurn = null
@@ -184,9 +186,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val started = android.os.SystemClock.elapsedRealtime()
         turnJob = viewModelScope.launch {
             try {
-                val r = kotlinx.coroutines.withTimeout(if(atts.any {AgentDocuments.format(it.mimeType,it.name)!=null}) 240_000L else 600_000L) {
+                val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
                     orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
                 }
+                // Tiempo máximo por mensaje = ajuste del usuario; 0 = sin límite.
+                val r = limits.turnTimeoutMillis?.let { ms -> kotlinx.coroutines.withTimeout(ms) { run() } } ?: run()
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
                         conv.session.renderedMedia.values.toList()), streamingText = "") }

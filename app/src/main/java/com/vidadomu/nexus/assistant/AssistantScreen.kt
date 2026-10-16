@@ -18,6 +18,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import com.vidadomu.nexus.agent.core.llm.BrainAuthMode
+import com.vidadomu.nexus.agent.core.llm.BrainProfile
+import com.vidadomu.nexus.agent.core.llm.BrainProtocol
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.onLongClick
@@ -753,6 +756,13 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
     var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
+    // Cerebros personalizados y BytePlus: el selector los muestra junto a los de siempre.
+    val brainStore = vm.runtime.settings.brains
+    var brainTick by remember { mutableStateOf(0) }
+    val brains = remember(brainTick) { brainStore.all() }
+    var editingBrain by remember { mutableStateOf<BrainProfile?>(null) }
+    var addingBrain by remember { mutableStateOf(false) }
+    val isCustom = backend.startsWith(BrainStore.PREFIX)
     val maskedKey = remember(backend) { vm.maskedApiKey(backend) }
     var error by remember { mutableStateOf<String?>(null) }
     ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
@@ -761,6 +771,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
                 AgentStatus(ui,{})
                 AgentBudgetSettings()
+                AgentLimitsSettings()
                 MediaEditingSettings()
                 AgentInternetSettings()
                 Text("Proveedor del LLM", style = MaterialTheme.typography.titleSmall)
@@ -779,8 +790,25 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                             }
                         }, label = { Text(label) })
                     }
+                    brains.forEach { b ->
+                        FilterChip(selected = backend == BrainStore.backendFor(b.id), onClick = {
+                            backend = BrainStore.backendFor(b.id); apiKey = ""; clearApiKey = false; modelId = b.modelId
+                        }, label = { Text(b.name) })
+                    }
+                    AssistChip(onClick = { addingBrain = true }, label = { Text("+ Añadir") })
                 }
-                if (backend == AssistantSettings.BACKEND_ANTHROPIC || backend == AssistantSettings.BACKEND_OPENAI) {
+                if (isCustom) {
+                    val brain = brains.firstOrNull { BrainStore.backendFor(it.id) == backend }
+                    if (brain == null) Text("Este proveedor ya no existe. Elige otro y guarda.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    else {
+                        val hasKey = brainStore.hasKey(brain.id)
+                        Text(listOf(brain.modelId.ifBlank { "sin modelo" }, when (brain.protocol) { BrainProtocol.OPENAI_RESPONSES -> "Responses API"; BrainProtocol.CUSTOM_REST -> "REST"; else -> "Chat Completions" },
+                            if (hasKey || brain.auth.mode == BrainAuthMode.NONE) "clave lista" else "falta la clave").joinToString(" · "),
+                            style = MaterialTheme.typography.bodyMedium, color = if (hasKey || brain.auth.mode == BrainAuthMode.NONE) TextSecondary else MaterialTheme.colorScheme.error)
+                        if (!brain.capabilities.tools) Text("Sin herramientas: solo conversa, no prepara encargos.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        TextButton(onClick = { editingBrain = brain }, contentPadding = PaddingValues(0.dp)) { Text("Editar proveedor, clave y límites") }
+                    }
+                } else if (backend == AssistantSettings.BACKEND_ANTHROPIC || backend == AssistantSettings.BACKEND_OPENAI) {
                     Text(if (backend == AssistantSettings.BACKEND_ANTHROPIC) "Claude con tu clave de la API de Anthropic (se guarda cifrada en el teléfono)."
                         else "Cualquier API compatible con OpenAI: elige un acceso rápido o escribe la URL. La clave se guarda cifrada y es distinta para cada proveedor.",
                         style = MaterialTheme.typography.bodySmall, color = TextMuted)
@@ -828,7 +856,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, singleLine = true,
+                if (!isCustom) StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, singleLine = true,
                     label = { Text(when (backend) {
                         AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"
                         AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"
@@ -841,10 +869,10 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     AssistantSettings.BACKEND_OPENAI -> emptyList()
                     else -> AssistantSettings.KNOWN_MODELS
                 }
-                if (modelChips.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                if (!isCustom && modelChips.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     modelChips.forEach { (id,name) -> FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)}) }
                 }
-                if(modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                if(!isCustom && modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                     StudioTextField(temperature, { temperature = it }, shape=NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
@@ -867,14 +895,14 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 error?.let {InlineNotice(noticeMessage(it,"Revisa los ajustes antes de guardar."),technicalDetails=it)}
             TextButton(onClick = {
                 val t = temperature.replace(',', '.').trim()
-                val temp = if (t.isEmpty()) null else t.toDoubleOrNull()?.coerceIn(0.0, 1.0)
-                if (t.isNotEmpty() && temp == null) { error = "Temperatura no válida (0–1)."; return@TextButton }
+                val temp = if (t.isEmpty()) null else t.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+                if (t.isNotEmpty() && temp == null) { error = "Temperatura no válida (número ≥ 0; el máximo lo decide el modelo)."; return@TextButton }
                 val newToken = when { clearToken -> ""; token.isNotBlank() -> token; else -> null }
                 val newSecret = when { clearSecret -> ""; secret.isNotBlank() -> secret; else -> null }
                 val newApiKey = when { clearApiKey -> ""; apiKey.isNotBlank() -> apiKey; else -> null }
                 val inRate = inputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de entrada no válida."; return@TextButton } }
                 val outRate = outputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de salida no válida."; return@TextButton } }
-                if (modelId.isBlank()) { error = "Escribe el id del modelo."; return@TextButton }
+                if (!isCustom && modelId.isBlank()) { error = "Escribe el id del modelo."; return@TextButton }
                 error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
                     maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
                     llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate,
@@ -883,5 +911,10 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
             }) { Text("Guardar") }
                 TextButton(onClick=onDismiss) {Text("Cerrar",color=TextSecondary)}
             }
+    }
+    if (addingBrain || editingBrain != null) BrainEditorDialog(editingBrain, brainStore) { saved ->
+        addingBrain = false; editingBrain = null; brainTick++
+        // Un proveedor recién guardado queda elegido; hay que guardar los ajustes para activarlo.
+        if (saved != null) brainStore.get(saved)?.let { backend = BrainStore.backendFor(it.id); modelId = it.modelId; apiKey = ""; clearApiKey = false }
     }
 }

@@ -139,6 +139,10 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                     }
                 }
             }
+            item {HorizontalDivider();Text("Cerebros del agente",style=MaterialTheme.typography.titleMedium)}
+            item {BrainsSettingsSection()}
+            item {HorizontalDivider();Text("Generadores personalizados",style=MaterialTheme.typography.titleMedium)}
+            item {MediaProvidersSettingsSection()}
             item {HorizontalDivider();Text("Pruebas y sistema",style=MaterialTheme.typography.titleMedium)}
             item {Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos de Atlas.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}

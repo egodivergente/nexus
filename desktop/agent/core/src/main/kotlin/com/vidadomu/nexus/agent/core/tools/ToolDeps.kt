@@ -50,6 +50,8 @@ class ToolDeps(
     val orders: com.vidadomu.nexus.agent.core.orders.OrderBook = com.vidadomu.nexus.agent.core.orders.OrderBook(clock),
     /** Mide los fps de un vídeo local (la app usa MediaMetadataRetriever). */
     val probeFrameRate: (suspend (String) -> Double?)? = null,
+    /** Límites vigentes del usuario, leídos en cada uso para que un cambio de ajustes aplique sin reiniciar. */
+    val limits: () -> com.vidadomu.nexus.agent.core.config.AgentLimits = { com.vidadomu.nexus.agent.core.config.AgentLimits() },
 ) {
     val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock, orders) { plan, message ->

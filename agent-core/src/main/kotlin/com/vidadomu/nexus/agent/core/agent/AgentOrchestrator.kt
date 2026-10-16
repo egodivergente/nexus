@@ -121,7 +121,7 @@ class AgentOrchestrator(
     ): TurnResult = conv.mutex.withLock { kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(AssetIndex.newId("turn"))) {
         if (conv.reasoningModelId != null && conv.reasoningModelId != config.modelId)
             throw LlmException(LlmException.Kind.BAD_REQUEST, "Has cambiado el modelo. Abre una nueva conversación para usarlo; este chat se conserva.")
-        if (conv.reasoningModelId != null && conv.messages.size > MAX_MESSAGES)
+        if (conv.reasoningModelId != null && conv.messages.size > config.limits.messages)
             throw LlmException(LlmException.Kind.BAD_REQUEST, "Este chat ha alcanzado su límite de contexto. Abre una nueva conversación; el proyecto y sus archivos se conservan.")
         val session = conv.session
         session.flowSubmittedResults = 0
@@ -136,10 +136,10 @@ class AgentOrchestrator(
             return imageCache[key]
         }
         blocks += ContentBlock.Text(userText(text, newAttachments))
-        runCatching { uiContext?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(MAX_UI_CONTEXT_CHARS)) }
+        runCatching { uiContext?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(config.limits.uiContextChars)) }
         val loader = images
         if (config.sendImagesToLlm && loader != null) {
-            newAttachments.filter { it.mimeType.startsWith("image/") }.take(MAX_IMAGES_PER_TURN).forEach { a ->
+            newAttachments.filter { it.mimeType.startsWith("image/") }.take(config.limits.images).forEach { a ->
                 try {imageFor(a)?.let {blocks+=it}} catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) { }
             }
         }
@@ -147,8 +147,8 @@ class AgentOrchestrator(
         if (videoAttachments.isNotEmpty()) {
             val videoLoader = videos
             if (config.sendImagesToLlm && videoLoader != null) {
-                require(videoAttachments.size <= MAX_VIDEOS_PER_TURN) {
-                    "Puedes analizar hasta 2 vídeos por mensaje. Envía los demás en otro turno; los originales se conservan."
+                require(videoAttachments.size <= config.limits.videos) {
+                    "Tu límite actual es de ${config.limits.maxVideosPerTurn} vídeos por mensaje (puedes cambiarlo en Ajustes → Límites). Envía los demás en otro turno; los originales se conservan."
                 }
                 for (attachment in videoAttachments) {
                     val frames = videoLoader.load(attachment)
@@ -165,7 +165,7 @@ class AgentOrchestrator(
         }
         documents?.let { loader ->
             val docs = newAttachments.filter { !it.mimeType.startsWith("image/") && !it.mimeType.startsWith("video/") && !it.mimeType.startsWith("audio/") }
-            require(docs.size <= 5) { "Bedrock admite hasta 5 documentos por mensaje. Envía los demás en el siguiente." }
+            require(docs.size <= config.limits.documents) { "Tu límite actual es de ${config.limits.maxDocumentsPerTurn} documentos por mensaje (puedes cambiarlo en Ajustes → Límites). Envía los demás en el siguiente." }
             for (attachment in docs) {
                 onEvent(UiEvent.Info("Preparando documento ${docs.indexOf(attachment)+1}/${docs.size}: ${attachment.name ?: "archivo"}"))
                 loader.load(attachment)?.let { blocks += it }
@@ -336,11 +336,12 @@ class AgentOrchestrator(
 
     private fun capToolResult(element: JsonElement): JsonElement {
         val raw = element.toString()
-        if (raw.length <= MAX_TOOL_RESULT_CHARS) return element
+        val cap = config.limits.toolResultChars
+        if (raw.length <= cap) return element
         return buildJsonObject {
             put("truncated", true)
             put("original_chars", raw.length)
-            put("preview", raw.take(MAX_TOOL_RESULT_CHARS))
+            put("preview", raw.take(cap))
         }
     }
 
@@ -441,13 +442,13 @@ class AgentOrchestrator(
             val content = m[i].content.toMutableList()
             for (j in content.indices.reversed()) {
                 val doc = content[j] as? ContentBlock.Document ?: continue
-                if (doc.name in retainedDocuments || retainedDocuments.size >= 5) {
+                if (doc.name in retainedDocuments || retainedDocuments.size >= config.limits.documents) {
                     content[j] = ContentBlock.Text("[Documento anterior ${doc.name}: contenido retirado del contexto; vuelve a adjuntarlo desde las referencias si necesitas consultarlo.]")
                 } else retainedDocuments.add(doc.name)
             }
             m[i] = m[i].copy(content = content)
         }
-        while (m.size > MAX_MESSAGES || (m.isNotEmpty() && !isPlainUser(m.first()))) {
+        while (m.size > config.limits.messages || (m.isNotEmpty() && !isPlainUser(m.first()))) {
             m.removeAt(0)
             if (m.isEmpty()) break
         }
@@ -456,12 +457,7 @@ class AgentOrchestrator(
     private fun isPlainUser(msg: LlmMessage) = msg.role == Role.USER && msg.content.none { it is ContentBlock.ToolResult }
 
     companion object {
-        const val MAX_MESSAGES = 60
-        const val MAX_IMAGES_PER_TURN = 4
-        const val MAX_VIDEOS_PER_TURN = 2
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
-        const val MAX_TOOL_RESULT_CHARS = 32_000
-        const val MAX_UI_CONTEXT_CHARS = 4_000
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

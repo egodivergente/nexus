@@ -14,7 +14,10 @@ import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.agent.core.assets.GenerationRecord
 import com.vidadomu.nexus.agent.core.config.AgentConfig
+import com.vidadomu.nexus.agent.core.config.AgentLimits
 import com.vidadomu.nexus.agent.core.config.AgentMode
+import com.vidadomu.nexus.agent.core.llm.BrainFactory
+import com.vidadomu.nexus.agent.core.llm.BrainProfile
 import com.vidadomu.nexus.agent.core.cost.ChainedCostEstimator
 import com.vidadomu.nexus.agent.core.cost.PublishedRateEstimator
 import com.vidadomu.nexus.agent.core.llm.AntigravityProvider
@@ -70,13 +73,23 @@ data class AssistantSettings(
     val outputUsdPerM: Double? = null,
     /** Endpoint del puente local de Antigravity CLI (por defecto http://127.0.0.1:8788). */
     val antigravityEndpoint: String = DEFAULT_ANTIGRAVITY_ENDPOINT,
+    /** Cerebro personalizado activo (backend «custom:<id>»): BytePlus o uno añadido por el usuario. */
+    val brain: BrainProfile? = null,
+    val brainHasKey: Boolean = false,
+    /** Límites globales del usuario (Ajustes → Límites). El cerebro activo puede sustituir algunos. */
+    val limits: AgentLimits = AgentLimits(),
 ) {
     val excludedSet: Set<String> get() = parseFamilies(excludedFamilies)
     val direct: Boolean get() = backend == BACKEND_DIRECT
     val antigravity: Boolean get() = backend == BACKEND_ANTIGRAVITY
+    val isCustom: Boolean get() = backend.startsWith(BrainStore.PREFIX)
+    /** Límites efectivos: los globales con lo que defina el cerebro activo por encima. */
+    val effectiveLimits: AgentLimits get() = brain?.let { limits.with(it.limits) } ?: limits
+    /** Imágenes y vídeo solo van al LLM si el ajuste está activo y, en un cerebro propio, declara visión. */
+    val visionEnabled: Boolean get() = sendImages && !offline && (brain?.vision ?: true)
 
     /** Sin credenciales del backend elegido se usa el planificador local (sin LLM). */
-    val offline: Boolean get() = modelId.isBlank() || when (backend) {
+    val offline: Boolean get() = if (isCustom) brain?.usable(brainHasKey) != true else modelId.isBlank() || when (backend) {
         BACKEND_PROXY -> endpoint.isBlank() || maskedToken.isBlank()
         BACKEND_ANTHROPIC -> maskedApiKey.isBlank()
         // Un servidor local puede no pedir clave; uno remoto sí.
@@ -88,6 +101,7 @@ data class AssistantSettings(
     fun toConfig() = AgentConfig(
         provider = when {
             offline -> "offline"
+            isCustom -> "custom"
             backend == BACKEND_PROXY -> "bedrock-proxy"
             backend == BACKEND_ANTHROPIC -> "anthropic"
             backend == BACKEND_OPENAI -> "openai-compatible"
@@ -96,7 +110,8 @@ data class AssistantSettings(
         },
         modelId = modelId.ifBlank { "offline" }, region = region,
         endpoint = if (backend == BACKEND_ANTIGRAVITY) antigravityEndpoint else endpoint,
-        temperature = temperature, maxTokens = maxTokens, maxToolRounds = 20, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
+        temperature = brain?.temperature ?: temperature, maxTokens = effectiveLimits.maxTokens, maxToolRounds = effectiveLimits.rounds,
+        mode = AgentMode.AGENT, sendImagesToLlm = visionEnabled, limits = effectiveLimits,
     )
 
     companion object {
@@ -146,6 +161,52 @@ data class AssistantSettings(
 class AssistantSettingsStore(private val app: NexusApplication) {
     private val prefs = app.getSharedPreferences("assistant_config_v1", Context.MODE_PRIVATE)
     private val secure get() = app.secureStorage
+    /** Cerebros personalizados y BytePlus. */
+    val brains = BrainStore(app)
+
+    /** Límites globales del usuario. «Máx. tokens» es el mismo ajuste de siempre (clave `max_tokens`). */
+    fun limits(): AgentLimits {
+        val d = AgentLimits()
+        return AgentLimits(
+            maxToolRounds = prefs.getInt("lim_rounds", d.maxToolRounds),
+            turnTimeoutSeconds = prefs.getInt("lim_turn_timeout_s", d.turnTimeoutSeconds),
+            maxTokens = prefs.getInt("max_tokens", d.maxTokens).coerceAtLeast(1),
+            flowMaxResults = prefs.getInt("lim_flow_results", d.flowMaxResults).coerceAtLeast(1),
+            maxImagesPerTurn = prefs.getInt("lim_images", d.maxImagesPerTurn),
+            maxVideosPerTurn = prefs.getInt("lim_videos", d.maxVideosPerTurn),
+            maxDocumentsPerTurn = prefs.getInt("lim_documents", d.maxDocumentsPerTurn),
+            maxMessages = prefs.getInt("lim_messages", d.maxMessages),
+            maxToolResultChars = prefs.getInt("lim_tool_chars", d.maxToolResultChars),
+            maxUiContextChars = prefs.getInt("lim_ui_chars", d.maxUiContextChars),
+            jobTrackingMinutes = prefs.getInt("lim_tracking_min", d.jobTrackingMinutes),
+        )
+    }
+
+    /** Guarda los límites tal cual (solo se rechazan negativos): 0 = sin límite donde aplica. */
+    fun saveLimits(l: AgentLimits) {
+        l.problems().firstOrNull()?.let { throw IllegalArgumentException(it) }
+        check(prefs.edit().putInt("lim_rounds", l.maxToolRounds).putInt("lim_turn_timeout_s", l.turnTimeoutSeconds).putInt("max_tokens", l.maxTokens)
+            .putInt("lim_flow_results", l.flowMaxResults).putInt("lim_images", l.maxImagesPerTurn).putInt("lim_videos", l.maxVideosPerTurn)
+            .putInt("lim_documents", l.maxDocumentsPerTurn).putInt("lim_messages", l.maxMessages).putInt("lim_tool_chars", l.maxToolResultChars)
+            .putInt("lim_ui_chars", l.maxUiContextChars).putInt("lim_tracking_min", l.jobTrackingMinutes).commit()) { "No se pudieron guardar los límites." }
+        com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes = l.jobTrackingMinutes
+    }
+
+    fun effectiveLimits(s: AssistantSettings): AgentLimits = s.effectiveLimits
+
+    /**
+     * Límites de gasto del cerebro [p]: lo que él defina manda; lo demás, los globales (que pueden estar desactivados).
+     * 0 = sin límite.
+     */
+    fun brainLlmLimits(p: BrainProfile): com.vidadomu.nexus.agent.core.llm.LlmLimits {
+        val base = llmLimits()
+        fun usd(v: Double?, fallback: Double) = if (v == null) fallback else if (v <= 0.0) Double.MAX_VALUE else v
+        return base.copy(
+            perTurnUsd = usd(p.limits.turnUsd, base.perTurnUsd),
+            dailyUsd = usd(p.limits.dailyUsd, base.dailyUsd),
+            perTurnCalls = p.limits.maxCallsPerTurn?.let { if (it <= 0) Int.MAX_VALUE else it } ?: base.perTurnCalls,
+        )
+    }
 
     init { seedFromBuild() }
 
@@ -163,10 +224,19 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         }
     }
 
-    fun load() = AssistantSettings(
-        backend = prefs.getString("backend", AssistantSettings.BACKEND_DIRECT).orEmpty().ifBlank { AssistantSettings.BACKEND_DIRECT },
+    fun load(): AssistantSettings {
+        val backend = prefs.getString("backend", AssistantSettings.BACKEND_DIRECT).orEmpty().ifBlank { AssistantSettings.BACKEND_DIRECT }
+        // Un cerebro personalizado que ya no existe no deja la app sin respuesta: vuelve al predeterminado.
+        val brain = if (backend.startsWith(BrainStore.PREFIX)) brains.get(backend.removePrefix(BrainStore.PREFIX)) else null
+        val effectiveBackend = if (backend.startsWith(BrainStore.PREFIX) && brain == null) AssistantSettings.BACKEND_DIRECT else backend
+        return loadFor(effectiveBackend, brain)
+    }
+
+    private fun loadFor(backend: String, brain: BrainProfile?) = AssistantSettings(
+        backend = backend,
+        brain = brain, brainHasKey = brain?.let { brains.hasKey(it.id) } ?: false, limits = limits(),
         endpoint = prefs.getString("endpoint", "").orEmpty(),
-        modelId = prefs.getString("model_id", AssistantSettings.DEFAULT_MODEL).orEmpty(),
+        modelId = brain?.modelId ?: prefs.getString("model_id", AssistantSettings.DEFAULT_MODEL).orEmpty(),
         region = prefs.getString("region", AssistantSettings.DEFAULT_REGION).orEmpty(),
         temperature = prefs.getString("temperature", null)?.toDoubleOrNull(),
         maxTokens = prefs.getInt("max_tokens", 4096),
@@ -255,7 +325,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         prefs.edit().putString("backend", s.backend).putString("endpoint", endpoint).putString("model_id", trimmedModel)
             .putString("model_id_${s.backend}", trimmedModel)
             .putString("region", s.region.trim())
-            .putString("temperature", s.temperature?.toString()).putInt("max_tokens", s.maxTokens.coerceIn(256, 32_000))
+            .putString("temperature", s.temperature?.toString()).putInt("max_tokens", s.maxTokens.coerceAtLeast(1))
             .putString("mode", s.mode.name).putBoolean("send_images", s.sendImages)
             .putString("excluded_families", AssistantSettings.parseFamilies(s.excludedFamilies).joinToString(", ")).apply()
         val access = s.awsAccessKeyId.trim()
@@ -298,11 +368,12 @@ class AssistantSettingsStore(private val app: NexusApplication) {
     fun setBudgetEnabled(enabled:Boolean) {prefs.edit().putBoolean("llm_budget_enabled",enabled).apply()}
     fun configuredLlmLimits(): com.vidadomu.nexus.agent.core.llm.LlmLimits = com.vidadomu.nexus.agent.core.llm.LlmLimits(
         perTurnCalls = Int.MAX_VALUE,
-        perTurnUsd = prefs.getString("llm_turn_usd", "1.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 1.0,
-        dailyUsd = prefs.getString("llm_daily_usd", "5.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 5.0)
+        perTurnUsd = prefs.getString("llm_turn_usd", "1.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }?.let { if (it == 0.0) Double.MAX_VALUE else it } ?: 1.0,
+        dailyUsd = prefs.getString("llm_daily_usd", "5.0")?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }?.let { if (it == 0.0) Double.MAX_VALUE else it } ?: 5.0)
     fun llmLimits() = configuredLlmLimits().let { if(budgetEnabled()) it else it.copy(perTurnUsd=Double.MAX_VALUE,dailyUsd=Double.MAX_VALUE) }
     fun saveLlmLimits(turn: Double, daily: Double) {
-        require(turn.isFinite() && daily.isFinite() && turn in 0.01..100.0 && daily in turn..1000.0)
+        // Solo se rechazan negativos y no numéricos: 0 = sin límite y cualquier importe positivo es decisión del usuario.
+        require(turn.isFinite() && daily.isFinite() && turn >= 0.0 && daily >= 0.0)
         check(prefs.edit().putString("llm_turn_usd", turn.toString()).putString("llm_daily_usd", daily.toString()).commit())
     }
 
@@ -357,6 +428,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         nativeOperations = NexusNativeOperations(app, this),
         orders = orders,
         probeFrameRate = { uri -> AgentMediaStore.frameRate(app, uri) },
+        limits = { settings.limits() },
         adaptPrompt = { text, schema, target ->
             val current = settings.load()
             com.vidadomu.nexus.agent.core.llm.PromptAdapter({ llm(current) }, { current.modelId })
@@ -373,6 +445,11 @@ class AssistantRuntime(private val app: NexusApplication) {
             s.backend == AssistantSettings.BACKEND_ANTIGRAVITY -> AntigravityProvider(
                 s.antigravityEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
             )
+            // BytePlus y cerebros propios: todo sale del perfil (protocolo, auth, razonamiento, límites propios).
+            s.isCustom -> s.brain!!.let { p -> com.vidadomu.nexus.agent.core.llm.budgeted(
+                BrainFactory.create(p, { settings.brains.apiKey(p.id) }), llmBudget,
+                customRates = { p.inputUsdPerM?.let { i -> p.outputUsdPerM?.let { o -> i to o } } ?: settings.customRates() },
+                limits = { settings.brainLlmLimits(p) }) }
             s.backend == AssistantSettings.BACKEND_ANTHROPIC -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
                 com.vidadomu.nexus.agent.core.llm.AnthropicProvider({ settings.apiKey(AssistantSettings.BACKEND_ANTHROPIC) }), llmBudget,
                 customRates = { settings.customRates() }, limits = { settings.llmLimits() })
@@ -389,8 +466,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(
         llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { AgentDocuments.load(it) },
-        images = if (s.sendImages && !s.offline) AttachmentImageLoader { AgentMediaStore.thumbnail(app,it) } else null,
-        videos = if (s.sendImages && !s.offline) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
+        images = if (s.visionEnabled) AttachmentImageLoader { AgentMediaStore.thumbnail(app,it) } else null,
+        videos = if (s.visionEnabled) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
         uiContext = { orders.turnContext(guard) },
         verifiedOrders = { orders.all() },
     )

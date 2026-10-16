@@ -29,8 +29,10 @@ internal fun GenerationPlan.cardJson(state: PlanState?): JsonObject = buildJsonO
 private suspend fun submitAccountFlow(d: ToolDeps, plan: GenerationPlan, session: AgentSession, orderId: String? = null): ToolOutcome {
     val count = (plan.params["count"] ?: plan.effectiveParams["count"] ?: "1").toIntOrNull()
         ?: throw ToolInputException("Cantidad no válida.")
-    if (count !in 1..20 || session.flowSubmittedResults + count > 20)
-        throw ToolInputException("Puedes pedir hasta 20 resultados de Flow en este encargo.")
+    // El máximo es un ajuste del usuario (Ajustes → Límites), no una cifra fija.
+    val flowMax = d.limits().flowMaxResults
+    if (count !in 1..flowMax || session.flowSubmittedResults + count > flowMax)
+        throw ToolInputException("Tu límite actual es de $flowMax resultados de Flow por encargo (se cambia en Ajustes → Límites).")
     if (d.guard.state(plan.id) in listOf(PlanState.SUBMITTED, PlanState.UNCERTAIN, PlanState.DISCARDED, PlanState.CONFIRMED))
         throw ToolInputException("Este trabajo ya se envió o se descartó; consulta su estado.")
     val job = try { d.lifecycle.confirmAndSubmit(plan.id, plan.fingerprint()) }
@@ -91,7 +93,7 @@ class PrepareImageUpscaleTool(private val d: ToolDeps) : BaseTool(
 
 class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
     "prepare_generation", ToolCategory.PLAN,
-    "Valida modelo, prompt, parámetros y medios contra el schema real y muestra UNA tarjeta por encargo (order_id persistente). Repetir con el mismo modelo y archivos actualiza la tarjeta existente; nunca la duplica. Para Google Flow con acceso directo y una petición de generar, execute=true envía sin confirmación; count permite hasta 20 resultados. Para proveedores de pago la tarjeta queda PREPARADA (no enviada) hasta que el usuario pulse su botón.",
+    "Valida modelo, prompt, parámetros y medios contra el schema real y muestra UNA tarjeta por encargo (order_id persistente). Repetir con el mismo modelo y archivos actualiza la tarjeta existente; nunca la duplica. Para Google Flow con acceso directo y una petición de generar, execute=true envía sin confirmación; count permite hasta el máximo de resultados que el usuario haya configurado (ver LÍMITES CONFIGURADOS). Para proveedores de pago la tarjeta queda PREPARADA (no enviada) hasta que el usuario pulse su botón.",
     schema {
         string("model_id", "Id exacto del registro.", required = true)
         string("provider_id", "Proveedor del modelo.")

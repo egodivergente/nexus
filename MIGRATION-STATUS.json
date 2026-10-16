@@ -1,15 +1,15 @@
 ﻿{
     "name":  "nexus",
-    "status":  "PENDING_AUDIT_ITEMS_1918_INSTALLED_S25_PIXEL",
+    "status":  "BYTEPLUS_CUSTOM_PROVIDERS_LIMITS_1923_INSTALLED_PIXEL",
     "verifiedAt":  "2026-10-16",
     "repository":  "https://github.com/egodivergente/nexus",
     "canonicalBranch":  "main",
-    "branch":  "fix/encargo-unico-agente-ui",
+    "branch":  "feat/byteplus-custom-providers-20261017",
     "components":  {
                        "android":  {
-                                       "versionName":  "1.9.18-agent-preview",
-                                       "versionCode":  52,
-                                       "sha256":  "3E21CAD73A5DEAAC79E4490DBD7B78327C457501F5C40CA33761A927C5DB7D4C",
+                                       "versionName":  "1.9.23-agent-preview",
+                                       "versionCode":  57,
+                                       "sha256":  "E584B46B7B0D27CF965FD451177F604CC7031329C0CA2C77136FCEDC19036F56",
                                        "signingCertificateSha256":  "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
                                        "includes":  [
                                                         "codex/agent-experience-197-20261016",
@@ -30,13 +30,13 @@
                     "s25Ultra":  {
                                      "model":  "SM-S938B",
                                      "installed":  "1.9.18-agent-preview vc52, 2026-10-16T11:4x, actualización en sitio con datos conservados (vc49 estuvo instalada unos minutos)",
-                                     "note":  "Sustituye a las dos builds distintas que compartían 1.9.9/vc43."
+                                     "note":  "Sigue en 1.9.18/vc52: el S25 no estaba alcanzable por ADB ni Tailscale al terminar 1.9.23. APK lista en entregas/Nexus-Agent-1.9.23-preview.apk (misma firma, actualiza en sitio)."
                                  },
-                    "pixel8Pro":  {"model": "Pixel 8 Pro", "transport": "ADB inalámbrico (mDNS adb-tls-connect)", "installed": "1.9.18-agent-preview vc52, 2026-10-16T11:4x, encima de vc39 con datos conservados (chat previo intacto)"}
+                    "pixel8Pro":  {"model": "Pixel 8 Pro", "transport": "ADB inalámbrico (mDNS adb-tls-connect)", "installed": "1.9.23-agent-preview vc57, 2026-10-17T01:3x, encima de la anterior con datos conservados; editores revisados en pantalla"}
                 },
     "validation":  {
-                       "agentCoreUnitTestsRun":  165,
-                       "androidUnitTestsRun":  309,
+                       "agentCoreUnitTestsRun":  218,
+                       "androidUnitTestsRun":  332,
                        "agentPreviewBuild":  "PASS",
                        "androidRegexGuard":  "PASS (detecta (?U) real; ignora comentarios)",
                        "s25AppOpensChatWithoutCrash":  "PASS",
@@ -51,6 +51,8 @@
                        "catalogGeneratorsWithSkill":  "400/400",
                        "compactChatOnDevice":  "PASS",
                        "llmProvidersAnthropicOpenAi":  "UNIT_TESTED (servidor simulado); sin probar con claves reales",
+                       "bytePlusRealApi":  "clave válida y /models devuelve 58 modelos; dola-seed-2-1-turbo-260628 sin activar en la cuenta (ModelNotOpen): flujo completo SOLO probado con servidor simulado",
+                       "customProvidersMocked":  "PASS (Responses/Chat con herramientas y streaming, descubrimiento, prueba de conexión, REST, motor multimedia síncrono/asíncrono, límites, persistencia)",
                        "uiReviewOnDevice":  "Biblioteca, Historial, Lienzo y Chat verificados en capturas; Modelos sin captura",
                        "libraryMetadataAndOriginFilterPixel":  "PASS (pie 1024×1024 · 503 KB / 6 oct · 10:09; Origen: Importado → vacío con mensaje, Generado → 1 archivo; menú ⋮ ocultar detalles)",
                        "libraryMetadataOnS25":  "NOT_CAPTURED (el usuario estaba usando el navegador en el S25)"

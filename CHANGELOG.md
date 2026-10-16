@@ -2,6 +2,45 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.23-agent] - 2026-10-17 (rama `feat/byteplus-custom-providers-20261017`, sobre la de Antigravity `b1bc7b0`)
+
+- **BytePlus ModelArk como cerebro** (Android vc57). Preconfigurado con `https://ark.ap-southeast.bytepluses.com/api/v3`,
+  modelo `dola-seed-2-1-turbo-260628` y **Responses API** (también Chat Completions): razonamiento (`thinking` /
+  `reasoning_effort`, excluyentes como exige ModelArk), streaming, imágenes, function calling con todas las herramientas
+  del agente, y continuidad del contexto reenviando la conversación completa (no depende de `previous_response_id`).
+  Se elige en Ajustes → Cerebros del agente o en los chips del asistente; la clave se guarda cifrada.
+- **Proveedores LLM propios** (Ajustes → Cerebros del agente → «Añadir proveedor personalizado»): nombre, URL y endpoint,
+  autenticación (Bearer, cabecera con prefijo, parámetro o ninguna), protocolo (Chat Completions, Responses, REST de solo
+  texto), descubrimiento de modelos por `/models` o ID a mano, capacidades (herramientas, visión, razonamiento, streaming,
+  JSON), parámetros extra, cabeceras, tarifas y límites. **Probar conexión** hace dos cosas: lista modelos y lanza una
+  petición mínima al modelo elegido (un modelo puede aparecer en la lista sin estar activado). Guardar, editar, duplicar y
+  eliminar; aparecen al momento en el selector y usan el agente real. El REST personalizado es solo texto: sin
+  herramientas ni imágenes (se dice en pantalla).
+- **Generadores multimedia propios** (Ajustes → Generadores personalizados → «Añadir proveedor API»): URL, autenticación,
+  modelos con capacidad (texto→imagen, imagen→imagen, texto→vídeo, imagen→vídeo, escalar imagen/vídeo), plantilla JSON de la
+  petición con marcadores, parámetros editables (una línea por parámetro), rutas para extraer la respuesta, trabajos
+  síncronos o asíncronos (id de tarea, consulta, estados de éxito/fallo, progreso, error) y subida de adjuntos (incrustados o a
+  un endpoint). Sus modelos entran en el Lienzo y para el agente, y sus resultados usan las tarjetas, el Historial y la
+  Biblioteca de siempre. Plantillas orientativas (genérico síncrono/asíncrono, estilo Atlas, estilo Runway, estilo fal.ai);
+  **no** se promete compatibilidad con protocolos que necesiten un adaptador propio (firmas, subidas en varios pasos, WebSocket).
+- **Todos los límites son tuyos** (Ajustes del asistente → «Límites del agente» y, por proveedor, «Límites de este
+  proveedor»; 0 = sin límite): pasos por mensaje, tiempo por mensaje, tokens, resultados de Flow, imágenes/vídeos/documentos
+  por mensaje, historial, tamaño de resultados de herramienta, contexto de la interfaz y minutos de seguimiento de un trabajo.
+  Antes estaban fijos (20 pasos, 600/240 s, recorte 256–32 000 tokens, «hasta 20» de Flow, 4 imágenes, 2 vídeos, 5 documentos,
+  60 mensajes, pausa de seguimiento a los 30 min…). El prompt ya no fija cifras: recibe un bloque «LÍMITES CONFIGURADOS POR EL
+  USUARIO» que prevalece sobre cualquier otra. Presupuesto de gasto: acepta 0 (sin límite) y cualquier importe; la temperatura
+  ya no se recorta a 0–1. Los valores por defecto son los de siempre, así que sin tocar nada el comportamiento no cambia.
+- Seguridad: claves cifradas con SecureStorage (una por proveedor, fuera del perfil); URLs solo `https://` (o `127.0.0.1` /
+  `localhost`) y sin credenciales incrustadas; cabeceras sin saltos de línea; los parámetros extra no pueden pisar modelo,
+  mensajes ni herramientas; nada de claves en logs, repositorio ni APK.
+- Sin regresiones: Bedrock, Claude API, OpenAI-compatible, Proxy y Antigravity, y Atlas, Crun, Runway, Flow y el simulado no se
+  tocan (los proveedores propios se **suman** al registro). El proveedor OpenAI-compatible conserva su comportamiento por defecto.
+- Pruebas: agent-core 218 (4 son pruebas reales opt-in), app 332, núcleo de escritorio 218, todas sin fallos.
+- **Validación real de BytePlus**: la clave autentica y `/models` devuelve 58 modelos, pero `dola-seed-2-1-turbo-260628` **no
+  está activado en la cuenta** (`ModelNotOpen`), así que el flujo completo (chat, herramientas, streaming, razonamiento) está
+  probado solo con servidor simulado. `BytePlusLiveTest` lo comprobará con la clave real en cuanto se active el modelo.
+- No validado en el S25 (no estaba alcanzable por ADB ni Tailscale al terminar). En el Pixel se revisaron los editores; la
+  integración del catálogo en pantalla no se pudo observar porque otro proceso (Termux) tomó el primer plano.
 ## [1.9.18-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
 - Android vc52, los pendientes de la auditoría:

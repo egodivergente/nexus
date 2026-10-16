@@ -79,7 +79,7 @@ class VideoAttachmentsTest {
         val error = assertFailsWith<IllegalArgumentException> {
             o.send(conv, "Describe", listOf(video("one"), video("two"), video("three")))
         }
-        assertTrue(error.message.orEmpty().contains("hasta 2"))
+        assertTrue(error.message.orEmpty().contains("límite actual es de 2 vídeos"), error.message)
         assertTrue(conv.history().isEmpty())
         assertEquals(3, conv.session.attachments.size)
     }

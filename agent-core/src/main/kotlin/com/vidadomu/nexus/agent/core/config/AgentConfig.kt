@@ -39,4 +39,6 @@ data class AgentConfig(
     val sendImagesToLlm: Boolean = true,
     /** Sustituye el prompt de sistema base (las reglas de gasto se añaden siempre). */
     val systemPromptOverride: String? = null,
+    /** Límites del usuario (imágenes, vídeos, documentos, historial, resultados…). `maxToolRounds` y `maxTokens` siguen siendo los autoritativos. */
+    val limits: AgentLimits = AgentLimits(),
 )

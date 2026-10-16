@@ -51,6 +51,9 @@ class NexusApplication : Application() {
         private set
     lateinit var settingsRepository: SettingsRepository
         private set
+    /** Proveedores multimedia añadidos por el usuario (Ajustes → Generadores). */
+    lateinit var customMediaStore: com.vidadomu.nexus.provider.custom.CustomMediaStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -66,6 +69,8 @@ class NexusApplication : Application() {
         }
 
         secureStorage = SecureStorage(this)
+        // Ventana de seguimiento de trabajos: ajuste del usuario (Ajustes → Límites), 30 min por defecto, 0 = sin límite.
+        com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes = getSharedPreferences("assistant_config_v1", MODE_PRIVATE).getInt("lim_tracking_min", com.vidadomu.nexus.core.model.TrackingPolicy.DEFAULT_MINUTES)
         database = NexusDatabase(this)
 
         val okHttpClient = OkHttpClientFactory.create(secureStorage)
@@ -85,6 +90,9 @@ class NexusApplication : Application() {
             mockProvider,
             secureStorage
         )
+        // Los proveedores API del usuario se registran ANTES de crear el catálogo para que entren en la primera carga.
+        customMediaStore = com.vidadomu.nexus.provider.custom.CustomMediaStore(this, okHttpClient)
+        providerRegistry.setCustomProviders(customMediaStore.providers())
         val catalogCache = com.vidadomu.nexus.data.repository.ModelCatalogCache(this)
         modelCatalogRepository = ModelCatalogRepository(providerRegistry, currencyManager, catalogCache, getSharedPreferences("catalog_customization_v1", 0))
         generationRepository = GenerationRepository(this, database, providerRegistry)

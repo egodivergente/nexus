@@ -58,7 +58,11 @@ class LlmBudgetLedger(private val file: File, private val today: () -> String = 
     }
 }
 
-class BudgetedLlmProvider(private val delegate: LlmProvider, private val ledger: LlmBudgetLedger,
+/**
+ * Envuelve un proveedor con el registro de consumo. Si el proveedor hace streaming, [BudgetedStreamingLlmProvider]
+ * lo conserva; los demás siguen exactamente como antes (sin streaming).
+ */
+open class BudgetedLlmProvider(protected val delegate: LlmProvider, private val ledger: LlmBudgetLedger,
     /** Tarifa (USD por millón de tokens entrada/salida) que el usuario fija para modelos que no son Claude. */
     private val customRates: () -> Pair<Double, Double>? = { null },
     private val limits: () -> LlmLimits,
@@ -77,7 +81,9 @@ class BudgetedLlmProvider(private val delegate: LlmProvider, private val ledger:
             else -> customRates() ?: (0.0 to 0.0)
         }
     }
-    override suspend fun complete(request: LlmRequest): LlmResponse {
+    override suspend fun complete(request: LlmRequest): LlmResponse = guarded(request) { delegate.complete(request) }
+
+    protected suspend fun guarded(request: LlmRequest, call: suspend () -> LlmResponse): LlmResponse {
         val (inputRate, outputRate) = rates(request.modelId)
         val counted = delegate.countInputTokens(request)
         val hasDocument = request.messages.any { m -> m.content.any { it is ContentBlock.Document } }
@@ -88,7 +94,7 @@ class BudgetedLlmProvider(private val delegate: LlmProvider, private val ledger:
         val reserved = input * inputRate / 1_000_000 + request.maxTokens * outputRate / 1_000_000
         val ticket = ledger.reserve(request.turnId ?: kotlin.coroutines.coroutineContext[LlmTurnContext]?.turnId ?: UUID.randomUUID().toString(), reserved, input + request.maxTokens, limits())
         try {
-            val response = delegate.complete(request)
+            val response = call()
             if(response.usage.inputTokens + response.usage.outputTokens > 0) ledger.settle(ticket, response.usage.inputTokens * inputRate / 1_000_000 + response.usage.outputTokens * outputRate / 1_000_000,
                 response.usage.inputTokens.toLong() + response.usage.outputTokens)
             return response
@@ -99,3 +105,17 @@ class BudgetedLlmProvider(private val delegate: LlmProvider, private val ledger:
         }
     }
 }
+
+/** Igual que [BudgetedLlmProvider] pero conserva el streaming del proveedor envuelto. */
+class BudgetedStreamingLlmProvider(private val streamingDelegate: StreamingLlmProvider, ledger: LlmBudgetLedger,
+    customRates: () -> Pair<Double, Double>? = { null },
+    limits: () -> LlmLimits,
+) : BudgetedLlmProvider(streamingDelegate, ledger, customRates, limits), StreamingLlmProvider {
+    override suspend fun completeStreaming(request: LlmRequest, onTextDelta: (String) -> Unit): LlmResponse =
+        guarded(request) { streamingDelegate.completeStreaming(request, onTextDelta) }
+}
+
+/** Elige el envoltorio adecuado según el proveedor sea o no de streaming. */
+fun budgeted(delegate: LlmProvider, ledger: LlmBudgetLedger, customRates: () -> Pair<Double, Double>? = { null }, limits: () -> LlmLimits): LlmProvider =
+    if (delegate is StreamingLlmProvider) BudgetedStreamingLlmProvider(delegate, ledger, customRates, limits)
+    else BudgetedLlmProvider(delegate, ledger, customRates, limits)

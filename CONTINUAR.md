@@ -1,8 +1,7 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado actual: Android 1.9.18-agent-preview / vc52 en el S25 y en el Pixel 8 Pro (rama
-`fix/encargo-unico-agente-ui`, sin fusionar en `main`) y Windows 1.9.5-agent-desktop.
+Estado actual: Android 1.9.23-agent-preview / vc57 (BytePlus, cerebros y generadores propios, límites del usuario) en el Pixel; el S25 sigue en 1.9.18/vc52 (no estaba alcanzable). Rama eat/byteplus-custom-providers-20261017 (sobre la de Antigravity eat/agy-provider-s25-20261016), sin fusionar en main; Windows 1.9.5-agent-desktop.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
@@ -78,3 +77,5 @@ micrófono con el reconocedor del sistema, botones de respuesta rápida del agen
 `desktop/agent/core` sincronizado (el host de Windows solo pinta progreso). Pruebas: app 309,
 agent-core 165, núcleo de escritorio 165. Pendiente: probar las claves reales de los LLM nuevos,
 capturar Modelos, la hoja única y el micrófono en el S25 (estaba en uso) y pintar encargos en Windows.
+
+El 17 de octubre se añadió BytePlus ModelArk (Responses API, modelo dola-seed-2-1-turbo-260628), proveedores LLM y multimedia definidos por el usuario y límites configurables en todo el agente (ver CHANGELOG 1.9.23). Pendiente: **activar el modelo en la consola de Ark** (la cuenta devuelve ModelNotOpen) y repetir BytePlusLiveTest con la clave real; instalar en el S25 cuando esté conectado; y comprobar en pantalla que los modelos de un generador propio aparecen en el Lienzo.

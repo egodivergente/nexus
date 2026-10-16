@@ -20,8 +20,8 @@ internal fun AgentBudgetSettings() {
     val limits=remember {runtime.settings.configuredLlmLimits()}
     var enabled by remember {mutableStateOf(runtime.settings.budgetEnabled())}
     var expanded by remember {mutableStateOf(false)}
-    var turn by remember {mutableStateOf(limits.perTurnUsd.toString().replace('.',','))}
-    var daily by remember {mutableStateOf(limits.dailyUsd.toString().replace('.',','))}
+    var turn by remember {mutableStateOf(limits.perTurnUsd.let { if (it >= Double.MAX_VALUE / 2) "0" else it.toString().replace('.',',') })}
+    var daily by remember {mutableStateOf(limits.dailyUsd.let { if (it >= Double.MAX_VALUE / 2) "0" else it.toString().replace('.',',') })}
     var message by remember {mutableStateOf("")}
     val spent=remember {runCatching {runtime.llmBudget.spentToday()}.getOrNull()}
     val spendingLabel=remember(spent,currencyState) {spent?.let {app.currencyManager.formatCost(it)} ?: "registro no disponible"}
@@ -32,13 +32,13 @@ internal fun AgentBudgetSettings() {
         Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Text("Límite de gasto voluntario",Modifier.weight(1f));Switch(enabled,{enabled=it;runtime.settings.setBudgetEnabled(it)}) }
         Text(if(enabled) "Se aplican tus importes locales." else "Sin límite monetario local. El consumo depende de tu cuenta y sus créditos.",style=MaterialTheme.typography.bodyMedium)
         if(enabled) Column {
-        StudioTextField(turn,{turn=it},label={Text("Maximo por mensaje · USD")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        StudioTextField(daily,{daily=it},label={Text("Maximo diario · USD (UTC)")},singleLine=true,modifier=Modifier.fillMaxWidth())
+        StudioTextField(turn,{turn=it},label={Text("Máximo por mensaje · USD (0 = sin límite)")},singleLine=true,modifier=Modifier.fillMaxWidth())
+        StudioTextField(daily,{daily=it},label={Text("Máximo diario · USD (UTC, 0 = sin límite)")},singleLine=true,modifier=Modifier.fillMaxWidth())
         Text("Sin cuota fija local de tokens por mensaje ni por día. Se aplican los importes configurados arriba.",style=MaterialTheme.typography.bodySmall)
         FilledTonalButton(onClick={
             runCatching {runtime.settings.saveLlmLimits(turn.replace(',','.').toDouble(),daily.replace(',','.').toDouble())}
                 .onSuccess {message="Limites guardados. Se aplican a la siguiente llamada."}
-                .onFailure {message="Indica importes positivos; el limite diario debe cubrir el de un mensaje."}
+                .onFailure {message="Indica importes numéricos (0 = sin límite)."}
         }) {Text("Guardar limites")}
         }
         if(message.isNotEmpty()) InlineNotice(message,isError=!message.startsWith("Limites guardados"))

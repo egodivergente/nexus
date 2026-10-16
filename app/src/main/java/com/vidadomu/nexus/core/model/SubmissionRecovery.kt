@@ -7,10 +7,16 @@ fun GenerationJob.recoverInterruptedSubmission(): GenerationJob =
             parameters = parameters + ("__submission_uncertain" to "true"))
     else this
 
-fun GenerationJob.pauseExpiredTracking(now: Long = System.currentTimeMillis()): GenerationJob {
+/** Cuánto se sigue consultando un trabajo en curso antes de pausar el seguimiento. Ajuste del usuario; 0 = sin límite. */
+object TrackingPolicy {
+    const val DEFAULT_MINUTES = 30
+    @Volatile var windowMinutes: Int = DEFAULT_MINUTES
+}
+
+fun GenerationJob.pauseExpiredTracking(now: Long = System.currentTimeMillis(), windowMinutes: Int = TrackingPolicy.windowMinutes): GenerationJob {
     val since = parameters["__tracking_started_at"]?.toLongOrNull() ?: startedAt
-    if (status !in setOf(GenerationStatus.QUEUED, GenerationStatus.GENERATING, GenerationStatus.PROCESSING, GenerationStatus.RENDERING) ||
-        providerJobId.isNullOrBlank() || providerJobId.startsWith("queue_") || now - since < 30 * 60_000L) return this
+    if (windowMinutes <= 0 || status !in setOf(GenerationStatus.QUEUED, GenerationStatus.GENERATING, GenerationStatus.PROCESSING, GenerationStatus.RENDERING) ||
+        providerJobId.isNullOrBlank() || providerJobId.startsWith("queue_") || now - since < windowMinutes * 60_000L) return this
     return copy(status = GenerationStatus.FAILED, parameters = parameters + ("__tracking_paused" to "true"),
-        error = "Seguimiento pausado tras 30 minutos. El proveedor puede seguir trabajando; usa Recuperar para consultar sin generar otra vez.")
+        error = "Seguimiento pausado tras $windowMinutes minutos (ajustable en Ajustes → Límites). El proveedor puede seguir trabajando; usa Recuperar para consultar sin generar otra vez.")
 }
