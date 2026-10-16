@@ -2,6 +2,19 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.16-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+
+- Android vc50, Biblioteca: vuelven los metadatos y el filtro de origen, sin etiquetas
+  sobre las miniaturas. (vc49/1.9.15 era lo mismo con un pie menos contrastado sobre
+  fotos claras; estuvo instalada unos minutos en el S25 y el Pixel.)
+  - Cada miniatura lleva al pie resolución · tamaño («1080p · 12,4 MB», «2048×2048 · 3,1 MB»)
+    y fecha y hora («16 oct · 07:14»). Se miden del fichero local una sola vez. Se ocultan
+    desde ⋮ → «Ocultar detalles de miniaturas». El ▶ y la duración pasan arriba a la derecha.
+  - «Origen ▾» en la fila de filtros: Todo, Generado por Nexus, Importado por ti (y
+    Editado/Compartido si hay). Favoritos pasa a una estrella para que quepa en la fila.
+  - La vista previa de un archivo importado muestra resolución, tamaño, duración, fecha
+    y formato. La hoja de un resultado generado sigue con su ficha completa.
+
 ## [1.9.14-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
 - Android vc48, revisada pestaña por pestaña con capturas del S25:

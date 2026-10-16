@@ -36,22 +36,49 @@ import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,onPreview:()->Unit,onActions:()->Unit) {
+internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,onPreview:()->Unit,onActions:()->Unit) {
     val haptic=LocalHapticFeedback.current
+    val visual=asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)
     Surface(shape=NexusTokens.thumbnail,modifier=Modifier.aspectRatio(1f).combinedClickable(
         role=androidx.compose.ui.semantics.Role.Button,onClickLabel="Previsualizar ${asset.displayName}",onClick=onPreview,
         onLongClickLabel="Opciones de ${asset.displayName}",onLongClick={haptic.performHapticFeedback(HapticFeedbackType.LongPress);onActions()})) {
         Box(contentAlignment=Alignment.Center) {
-            if(asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)) AsyncImage(asset.uri,asset.displayName,imageLoader=loader,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-            else Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(8.dp)) {
+            if(visual) AsyncImage(asset.uri,asset.displayName,imageLoader=loader,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            else Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(8.dp).padding(bottom=if(showDetails) 24.dp else 0.dp)) {
                 Icon(if(asset.type==AssetType.AUDIO) Icons.Default.GraphicEq else Icons.Default.Description,null)
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            // Opciones al mantener pulsado: sin ⋮ encima de la miniatura. Los vídeos llevan un ▶ discreto.
-            if(asset.type==AssetType.VIDEO) Icon(Icons.Default.PlayArrow,null,Modifier.align(Alignment.BottomStart).padding(4.dp).size(18.dp),
-                tint=androidx.compose.ui.graphics.Color.White)
+            // Opciones al mantener pulsado: sin ⋮ encima de la miniatura. ▶ y duración arriba; metadatos abajo.
+            if(asset.type in setOf(AssetType.VIDEO,AssetType.AUDIO))
+                TileMediaBadge(asset.type==AssetType.VIDEO,mediaDuration(asset.durationSec?.toFloat()),Modifier.align(Alignment.TopEnd))
+            if(showDetails) {
+                val known=asset.width?.takeIf {it>0}!=null && asset.height?.takeIf {it>0}!=null
+                val facts=rememberTileFacts(asset.uri,asset.mimeOrDefault(),dimensions=visual && !known)
+                TileDetailsCaption(
+                    quality=if(visual) tileQuality(asset.type==AssetType.IMAGE,asset.width?.takeIf {it>0} ?: facts?.width,asset.height?.takeIf {it>0} ?: facts?.height) else null,
+                    bytes=facts?.bytes,epochMillis=asset.createdAt,modifier=Modifier.align(Alignment.BottomCenter))
+            }
         }
     }
+}
+
+private fun Asset.mimeOrDefault():String = mimeType?.takeIf {it.isNotBlank()} ?: when(type) {
+    AssetType.IMAGE->"image/*";AssetType.VIDEO->"video/*";AssetType.AUDIO->"audio/*";else->"application/octet-stream"
+}
+
+/** «1080p · 12,4 MB · 16 oct · 07:14 · video/mp4» para la hoja de vista previa. */
+@Composable
+private fun LocalAssetFacts(asset:Asset) {
+    val visual=asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)
+    val facts=rememberTileFacts(asset.uri,asset.mimeOrDefault(),dimensions=visual)
+    val line=listOfNotNull(
+        if(visual) tileQuality(asset.type==AssetType.IMAGE,asset.width?.takeIf {it>0} ?: facts?.width,asset.height?.takeIf {it>0} ?: facts?.height) else null,
+        facts?.bytes?.let(::tileSize),
+        mediaDuration(asset.durationSec?.toFloat() ?: facts?.durationSeconds),
+        tileDateTime(asset.createdAt),
+        asset.mimeType,
+    ).joinToString(" · ")
+    Text(line,Modifier.fillMaxWidth(),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,8 +91,11 @@ internal fun LocalAssetPreviewSheet(asset:Asset,onDismiss:()->Unit,onMoreOptions
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
             .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12),
             horizontalAlignment=Alignment.CenterHorizontally) {
-            Text(asset.displayName,Modifier.fillMaxWidth(),style=MaterialTheme.typography.titleMedium,maxLines=2,
-                overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Column(Modifier.fillMaxWidth()) {
+                Text(asset.displayName,Modifier.fillMaxWidth(),style=MaterialTheme.typography.titleMedium,maxLines=2,
+                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                LocalAssetFacts(asset)
+            }
             if(asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO,AssetType.AUDIO)) {
                 AssistantMediaPreview(Attachment(asset.id,asset.uri,mime,asset.displayName,assetId=asset.id))
             } else {

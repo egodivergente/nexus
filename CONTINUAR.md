@@ -1,7 +1,8 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado actual: Android 1.9.8-agent-preview / vc42 en el S25 y Windows 1.9.5-agent-desktop.
+Estado actual: Android 1.9.16-agent-preview / vc50 en el S25 y en el Pixel 8 Pro (rama
+`fix/encargo-unico-agente-ui`, sin fusionar en `main`) y Windows 1.9.5-agent-desktop.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
@@ -60,3 +61,15 @@ Android `1.9.10-agent-preview`/vc44 (SHA-256 `4D18F43A…E5B5`, firmada con el
 agent-core 154 y app 295. Atlas completó un upscale real con `resolution=4k` + `fps`
 y sin prompt. Pendiente: comprobar en el teléfono una respuesta del agente tras el
 arreglo de `(?U)`. Véase `docs/ENCARGO-UNICO-199-20261016.md`.
+
+Después, en la misma rama: el agente respondió en el S25 sin cierres tras quitar `(?U)`
+(vc46). Hay skills para los 400 generadores del catálogo y se puede elegir LLM: Bedrock,
+Claude API, compatible con OpenAI o proxy. Los dos proveedores nuevos solo se han probado
+con un servidor simulado. También hay una revisión de todas las pestañas con capturas
+(vc48). En 1.9.16/vc50 (SHA-256 `67D5240A…77FB`, clave del ASUS) la Biblioteca vuelve a
+mostrar al pie de cada miniatura la resolución, el tamaño y la fecha y hora, y tiene el
+filtro «Origen ▾» (Generado por Nexus / Importado por ti) sin etiquetas sobre las
+miniaturas. Está instalada con los datos conservados en el S25 y en el Pixel 8 Pro, que
+volvió a estar disponible por ADB inalámbrico y pasa de vc39 a vc50. La Biblioteca y el
+filtro se verificaron en el Pixel. Pruebas: app 300. Pendiente: probar las claves reales
+de los LLM nuevos, capturar Modelos y sincronizar `desktop/agent/core`.

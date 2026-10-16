@@ -1,15 +1,15 @@
 ﻿{
     "name":  "nexus",
-    "status":  "UX_REVIEW_LLM_PROVIDERS_1914_INSTALLED_S25",
+    "status":  "LIBRARY_METADATA_ORIGIN_1916_INSTALLED_S25_PIXEL",
     "verifiedAt":  "2026-10-16",
     "repository":  "https://github.com/egodivergente/nexus",
     "canonicalBranch":  "main",
     "branch":  "fix/encargo-unico-agente-ui",
     "components":  {
                        "android":  {
-                                       "versionName":  "1.9.14-agent-preview",
-                                       "versionCode":  48,
-                                       "sha256":  "F9EE896B52C59C6D27C2E84DCE91B8B9FC8887797849F359D418927B677FE5DE",
+                                       "versionName":  "1.9.16-agent-preview",
+                                       "versionCode":  50,
+                                       "sha256":  "67D5240A123EAC27683BFD0C0F2663F1E0B0CFE143716EEBCF9E6D9FCF4777FB",
                                        "signingCertificateSha256":  "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
                                        "includes":  [
                                                         "codex/agent-experience-197-20261016",
@@ -29,14 +29,14 @@
     "devices":  {
                     "s25Ultra":  {
                                      "model":  "SM-S938B",
-                                     "installed":  "1.9.14-agent-preview vc48, 2026-10-16T07:1x, actualización en sitio con datos conservados",
+                                     "installed":  "1.9.16-agent-preview vc50, 2026-10-16T07:4x, actualización en sitio con datos conservados (vc49 estuvo instalada unos minutos)",
                                      "note":  "Sustituye a las dos builds distintas que compartían 1.9.9/vc43."
                                  },
-                    "pixel8Pro":  "offline en Tailscale desde hace 8 días; no probado"
+                    "pixel8Pro":  {"model": "Pixel 8 Pro", "transport": "ADB inalámbrico (mDNS adb-tls-connect)", "installed": "1.9.16-agent-preview vc50, 2026-10-16T07:4x, encima de vc39 con datos conservados (chat previo intacto)"}
                 },
     "validation":  {
                        "agentCoreUnitTestsRun":  160,
-                       "androidUnitTestsRun":  296,
+                       "androidUnitTestsRun":  300,
                        "agentPreviewBuild":  "PASS",
                        "androidRegexGuard":  "PASS (detecta (?U) real; ignora comentarios)",
                        "s25AppOpensChatWithoutCrash":  "PASS",
@@ -51,6 +51,8 @@
                        "catalogGeneratorsWithSkill":  "400/400",
                        "compactChatOnDevice":  "PASS",
                        "llmProvidersAnthropicOpenAi":  "UNIT_TESTED (servidor simulado); sin probar con claves reales",
-                       "uiReviewOnDevice":  "Biblioteca, Historial, Lienzo y Chat verificados en capturas; Modelos sin captura"
+                       "uiReviewOnDevice":  "Biblioteca, Historial, Lienzo y Chat verificados en capturas; Modelos sin captura",
+                       "libraryMetadataAndOriginFilterPixel":  "PASS (pie 1024×1024 · 503 KB / 6 oct · 10:09; Origen: Importado → vacío con mensaje, Generado → 1 archivo; menú ⋮ ocultar detalles)",
+                       "libraryMetadataOnS25":  "NOT_CAPTURED (el usuario estaba usando el navegador en el S25)"
                    }
 }

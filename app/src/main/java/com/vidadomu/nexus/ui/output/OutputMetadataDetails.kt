@@ -40,8 +40,11 @@ internal data class OutputFileFacts(
     val durationSeconds: Float? = null,
 )
 
-/** Metadatos locales únicamente; no descarga ni consulta el enlace remoto del proveedor. */
-internal suspend fun inspectOutputFile(context: Context, localUri: String, mimeType: String): OutputFileFacts =
+/**
+ * Metadatos locales únicamente; no descarga ni consulta el enlace remoto del proveedor.
+ * Con [dimensions] = false solo mide el tamaño (las miniaturas que ya conocen la resolución).
+ */
+internal suspend fun inspectOutputFile(context: Context, localUri: String, mimeType: String, dimensions: Boolean = true): OutputFileFacts =
     withContext(Dispatchers.IO) {
         val uri = Uri.parse(localUri)
         val bytes = runCatching {
@@ -51,7 +54,8 @@ internal suspend fun inspectOutputFile(context: Context, localUri: String, mimeT
             }
         }.getOrNull()
 
-        if (mimeType.startsWith("image/")) {
+        if (!dimensions) OutputFileFacts(bytes)
+        else if (mimeType.startsWith("image/")) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } }
             OutputFileFacts(bytes, bounds.outWidth.takeIf { it > 0 }, bounds.outHeight.takeIf { it > 0 })

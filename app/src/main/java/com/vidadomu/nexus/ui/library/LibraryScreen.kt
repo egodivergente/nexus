@@ -61,6 +61,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var favorites by remember {mutableStateOf(prefs.getStringSet("favorites",emptySet())!!.toSet())}
     var showHidden by rememberSaveable {mutableStateOf(false)}
     var favoriteOnly by rememberSaveable {mutableStateOf(false)}
+    // Resolución, tamaño y fecha al pie de cada miniatura; se puede ocultar desde ⋮.
+    var showDetails by remember {mutableStateOf(prefs.getBoolean("tile_details",true))}
     var actionTarget by remember {mutableStateOf<Pair<GenerationJob,GenerationOutput>?>(null)}
     val scope=rememberCoroutineScope()
     val snackbar=remember {SnackbarHostState()}
@@ -88,6 +90,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var moreVisible by remember {mutableStateOf(false)}
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
+    var originMenu by remember {mutableStateOf(false)}
+    // Editado/Compartido solo se ofrecen si hay algo de ese origen; Nexus e Importado, siempre.
+    val origins=remember(index) {
+        val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
+        LibraryOriginFilter.values().filter {it in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED,LibraryOriginFilter.IMPORTED) || it in present}
+    }
     val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter) {
         if(originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList()
         else jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
@@ -143,7 +151,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={
         Column(verticalArrangement=Arrangement.Center) {
             Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text("${completed.sumOf {it.outputs.size}+localAssets.size} archivos",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            val count=completed.sumOf {it.outputs.size}+localAssets.size
+            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
     },actions={
         IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
@@ -151,6 +160,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         IconButton(onClick={moreVisible=true}) {Icon(Icons.Default.MoreVert,"Más opciones de biblioteca",tint=TextSecondary)}
         DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
         DropdownMenuItem(text={Text("Buscar")},leadingIcon={Icon(Icons.Default.Search,null)},modifier=Modifier.semantics {contentDescription="Buscar en Biblioteca"},onClick={moreVisible=false;searchVisible=!searchVisible})
+        DropdownMenuItem(text={Text(if(showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas")},leadingIcon={Icon(Icons.Default.Info,null)},onClick={
+            moreVisible=false;showDetails=!showDetails;prefs.edit().putBoolean("tile_details",showDetails).apply()})
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
         DropdownMenuItem(text={Text("Imágenes del proyecto")},leadingIcon={Icon(Icons.Default.PhotoLibrary,null)},onClick={moreVisible=false;projectLibrary.launch(arrayOf("image/*"))})
         DropdownMenuItem(text={Text("Abrir Alexia")},leadingIcon={Icon(Icons.Default.FolderSpecial,null)},onClick={moreVisible=false;try {
@@ -172,12 +183,26 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
                 }
-                item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Text("Favoritos")})}
+                // Origen como un único desplegable dentro de esta fila (sin etiquetas en las miniaturas).
+                item {Box {
+                    StudioFilterChip(originFilter!=LibraryOriginFilter.ALL,{originMenu=true},
+                        label={Row(verticalAlignment=Alignment.CenterVertically) {
+                            Text(if(originFilter==LibraryOriginFilter.ALL) "Origen" else originFilter.shortLabel())
+                            Icon(Icons.Default.ArrowDropDown,null,Modifier.size(NexusTokens.space16))
+                        }},modifier=Modifier.semantics {contentDescription="Filtrar por origen: ${originFilter.label}"})
+                    DropdownMenu(expanded=originMenu,onDismissRequest={originMenu=false}) {
+                        origins.forEach {origin -> DropdownMenuItem(text={Text(origin.label)},
+                            trailingIcon={if(origin==originFilter) Icon(Icons.Default.Check,null,tint=MaterialTheme.colorScheme.primary)},
+                            onClick={originFilter=origin;originMenu=false})}
+                    }
+                }}
+                item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Icon(Icons.Default.Star,null,Modifier.size(NexusTokens.space16))},
+                    modifier=Modifier.semantics {contentDescription="Solo favoritos"})}
                 if(hidden.isNotEmpty() || showHidden) item {StudioFilterChip(showHidden,{showHidden=!showHidden},label={Text("Ocultos")})}
             }
-            // Sin fila «Origen» ni etiquetas Generado/Importado: el origen no ayuda a encontrar un archivo.
             if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
-                Text(if(query.isNotBlank()) "No hay resultados." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
+                val filtered=query.isNotBlank() || filter!=null || originFilter!=LibraryOriginFilter.ALL || favoriteOnly || showHidden
+                Text(if(filtered) "No hay resultados con estos filtros." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
             } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
@@ -187,7 +212,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     val assets=localAssetGroups[origin].orEmpty()
                     if(assets.isNotEmpty()) {
                         items(assets,key={"asset:"+it.id}) {asset ->
-                            LocalAssetTile(asset,imageLoader,onPreview={localPreviewTarget=asset},onActions={localTarget=asset})
+                            LocalAssetTile(asset,imageLoader,showDetails,onPreview={localPreviewTarget=asset},onActions={localTarget=asset})
                         }
                     }
                 }
@@ -196,7 +221,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     entries.forEach {job ->
                         items(job.outputs.size,key={index->"${job.id}:${job.outputs[index].id}:$index"}) {index ->
-                            LibraryTile(job,job.outputs[index],conflicts,imageLoader,OutputFiles.token(job.outputs[index]) in favorites,
+                            LibraryTile(job,job.outputs[index],conflicts,imageLoader,OutputFiles.token(job.outputs[index]) in favorites,showDetails,
                                 onActions={actionTarget=job to job.outputs[index]}) {
                                 if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(job.outputs[index])) else onNavigateToOutput(job.id)
                             }
@@ -210,7 +235,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,onActions:()->Unit,onOpen:()->Unit) {
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,onActions:()->Unit,onOpen:()->Unit) {
     val context=LocalContext.current
     val haptic=LocalHapticFeedback.current
     val interaction=remember {MutableInteractionSource()}
@@ -232,12 +257,14 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
         // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
         if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
-        if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.78f),contentColor=MediaForeground,
-            shape=NexusTokens.thumbnail,modifier=Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space4)) {
-            Row(Modifier.padding(NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                Icon(if(output.type==Modality.VIDEO) Icons.Default.PlayArrow else Icons.Default.GraphicEq,null,Modifier.size(NexusTokens.space16))
-                if(duration!=null) Text(duration,style=MaterialTheme.typography.labelMedium.tabularMoney())
-            }
+        if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration,Modifier.align(Alignment.TopEnd))
+        if(showDetails) {
+            val known=output.width?.takeIf {it>0}!=null && output.height?.takeIf {it>0}!=null
+            val mime=output.mimeType.ifBlank {when(output.type) {Modality.IMAGE->"image/*";Modality.VIDEO->"video/*";Modality.AUDIO->"audio/*";else->"application/octet-stream"}}
+            val facts=rememberTileFacts(local,mime,dimensions=!known && output.type in listOf(Modality.IMAGE,Modality.VIDEO))
+            TileDetailsCaption(
+                quality=if(output.type in listOf(Modality.IMAGE,Modality.VIDEO)) tileQuality(output.type==Modality.IMAGE,output.width?.takeIf {it>0} ?: facts?.width,output.height?.takeIf {it>0} ?: facts?.height) else null,
+                bytes=facts?.bytes,epochMillis=job.completedAt ?: job.startedAt,modifier=Modifier.align(Alignment.BottomCenter))
         }
     }
 }
