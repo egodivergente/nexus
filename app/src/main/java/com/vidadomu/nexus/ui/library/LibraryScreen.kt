@@ -202,15 +202,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 listOf(LibraryOriginFilter.IMPORTED,LibraryOriginFilter.EDITED,LibraryOriginFilter.SHARED,LibraryOriginFilter.GENERATED).forEach {origin ->
                     val assets=localAssetGroups[origin].orEmpty()
                     if(assets.isNotEmpty()) {
-                        item(span={GridItemSpan(maxLineSpan)}) {Text("${origin.label} · ${assets.size}",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                            modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                         items(assets,key={"asset:"+it.id}) {asset ->
                             LocalAssetTile(asset,imageLoader,onPreview={localPreviewTarget=asset},onActions={localTarget=asset})
                         }
                     }
                 }
-                if(groups.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {Text("Generado por Nexus · ${completed.sumOf {it.outputs.size}}",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                    modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                 groups.forEach {(day,entries) ->
                     item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
