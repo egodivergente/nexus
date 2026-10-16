@@ -1,18 +1,21 @@
 {
   "name": "nexus",
-  "status": "ENCARGO_UNICO_199_BUILT_PENDING_INTEGRATION",
+  "status": "ENCARGO_UNICO_1910_INSTALLED_S25",
   "verifiedAt": "2026-10-16",
   "repository": "https://github.com/egodivergente/nexus",
   "canonicalBranch": "main",
   "branch": "fix/encargo-unico-agente-ui",
   "components": {
     "android": {
-      "versionName": "1.9.9-agent-preview",
-      "versionCode": 43,
-      "sha256": "309B2F334536DBCF6EF95D1513DDBB6B84ED3AB4140B8BA72611F3437066CDE8",
+      "versionName": "1.9.10-agent-preview",
+      "versionCode": 44,
+      "sha256": "4D18F43A3ECE90F2D4B9B73577433E5ED0F9E3D162ED4C0A69EC4122CF48E5B5",
       "signingCertificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
-      "includes": ["codex/agent-experience-197-20261016", "codex/agent-background-media-198-20261016"],
-      "notIncluded": ["codex/android-ux-polish-20261016 (Historial, orígenes de Biblioteca)"]
+      "includes": [
+        "codex/agent-experience-197-20261016",
+        "codex/agent-background-media-198-20261016",
+        "codex/android-ux-polish-20261016 @ 4512d93 (Historial, Biblioteca sin etiquetas de origen)"
+      ]
     },
     "desktop": {
       "versionName": "1.9.5-agent-desktop",
@@ -26,23 +29,24 @@
   "devices": {
     "s25Ultra": {
       "model": "SM-S938B",
-      "installedThisBuild": "2026-10-16T05:30:34 (datos conservados)",
-      "currentlyInstalled": "otra build también etiquetada 1.9.9/vc43 (SHA DDF0120C…, rama de Historial), instalada a las 05:35:47",
-      "note": "Dos builds distintas con el mismo versionCode: integrar ambas ramas en vc44 antes de volver a instalar."
+      "installed": "1.9.10-agent-preview vc44, 2026-10-16T05:56:56, actualización en sitio con datos conservados",
+      "note": "Sustituye a las dos builds distintas que compartían 1.9.9/vc43."
     },
     "pixel8Pro": "offline en Tailscale desde hace 8 días; no probado"
   },
   "validation": {
-    "agentCoreUnitTestsRun": 153,
-    "androidUnitTestsRun": 293,
+    "agentCoreUnitTestsRun": 154,
+    "androidUnitTestsRun": 295,
     "agentPreviewBuild": "PASS",
+    "androidRegexGuard": "PASS (detecta (?U) real; ignora comentarios)",
+    "s25AppOpensChatWithoutCrash": "PASS",
+    "s25FiveTabNavigationHistorial": "PASS",
     "s25RealChatSingleOrderCard": "PASS",
-    "s25RealChatDiagnosisAndFix": "PASS",
-    "tencentResolutionAcceptedByAtlas": "PASS (envío real hecho por el usuario; el trabajo falló después por fps)",
-    "tencentFpsFix": "UNIT_TESTED_NOT_YET_SUBMITTED",
+    "tencentRealJobsEvidence": "4 FAILED sin resolution; 1 FAILED con resolution sin fps; 1 COMPLETED con resolution=4k + fps=25 y sin prompt (job_631e3d5f…, 0,33 €)",
+    "tencentFpsMeasuredAutomatically": "UNIT_TESTED; el envío completado llevaba fps=25 elegido en el teléfono",
+    "agentReplyAfterRegexFix": "NOT_RUN (el usuario estaba en otra app; no se forzó Nexus a primer plano)",
     "paidOperationsByAgentOrTests": 0,
-    "paidOperationsByUserDuringValidation": 1,
-    "agentTurnInterruptedByReinstall": 1,
+    "paidOperationsByUserDuringValidation": 2,
     "desktopSync": "NOT_DONE (desktop/tools/sync-agent-core.py; UI de escritorio sin encargos)"
   }
 }

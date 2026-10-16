@@ -52,9 +52,11 @@ usuario. Véase `docs/AGENT-BACKGROUND-TURN-198-20261016.md`.
 El 16 de octubre, en la rama `fix/encargo-unico-agente-ui` (main + 1.9.7 + 1.9.8), se
 reconstruyeron el chat y las tarjetas (un encargo por tarjeta, estado compartido
 UI↔agente, autocorrección de afirmaciones falsas) y el contrato de Tencent Video
-Upscaler (sin prompt, `resolution` deducida, `fps` medido, tarifa por nivel). Pruebas:
-agent-core 153 y app 293, todas correctas. La APK `1.9.9-agent-preview`/vc43
-(SHA-256 `309B2F33…CDE8`) se refirmó con el `debug.keystore` del ASUS y se instaló en el
-S25 conservando datos, pero a las 05:35 otra sesión instaló otra build con el mismo
-versionCode desde la rama de Historial. Antes de instalar de nuevo hay que integrar
-ambas ramas en un versionCode nuevo. Véase `docs/ENCARGO-UNICO-199-20261016.md`.
+Upscaler (sin prompt, `resolution` deducida, `fps` medido, tarifa por nivel). Se
+integró la rama de Historial (`codex/android-ux-polish-20261016` @ `4512d93`, Biblioteca
+sin etiquetas de origen) y se quitó el flag `(?U)`, que cerraba la app en Android.
+Android `1.9.10-agent-preview`/vc44 (SHA-256 `4D18F43A…E5B5`, firmada con el
+`debug.keystore` del ASUS) está instalada en el S25 con datos conservados. Pruebas:
+agent-core 154 y app 295. Atlas completó un upscale real con `resolution=4k` + `fps`
+y sin prompt. Pendiente: comprobar en el teléfono una respuesta del agente tras el
+arreglo de `(?U)`. Véase `docs/ENCARGO-UNICO-199-20261016.md`.

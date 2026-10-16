@@ -1,7 +1,7 @@
-# 1.9.9-agent — Encargo único, agente consciente de su interfaz y contrato Tencent (2026-10-16)
+# 1.9.10-agent — Encargo único, agente consciente de su interfaz y contrato Tencent (2026-10-16)
 
-Rama: `fix/encargo-unico-agente-ui` (desde `main` + integración de `codex/agent-background-media-198-20261016`,
-que ya estaba instalada en el S25 como 1.9.8/vc42). Android `1.9.9-agent-preview` / `versionCode 43`.
+Rama: `fix/encargo-unico-agente-ui` (desde `main` + 1.9.7, 1.9.8 y la 1.9.9 de Historial,
+`codex/android-ux-polish-20261016` @ `4512d93`). Android `1.9.10-agent-preview` / `versionCode 44`.
 
 ## Causas raíz encontradas
 
@@ -61,7 +61,16 @@ que ya estaba instalada en el S25 como 1.9.8/vc42). Android `1.9.9-agent-preview
   Generar, Atlas aceptó el trabajo con `resolution=4k` y ya no devolvió «resolution is required»; el trabajo falló
   con `fps must be an integer between 1 and 100`. Esta entrega añade `fps` medido del vídeo original
   (comprobado en pruebas; pendiente de un envío real).
-- Incidencia: la reinstalación de las 05:30 cortó un turno del agente lanzado desde el teléfono, que quedó sin respuesta.
+- Incidencia corregida: los mensajes al agente quedaban sin respuesta porque `(?U)` en `ClaimVerifier` no existe en
+  el motor de regex de Android (ICU) y la app se cerraba al verificar la respuesta. Se quitó y una prueba vigila
+  `(?U)` en agent-core y en la app.
+- Integración vc44 (1.9.10): incluye la rama de Historial (5 pestañas, «Abrir Historial») y la Biblioteca sin
+  etiquetas de origen en las miniaturas. Instalada en el S25 a las 05:56 con datos conservados; el chat abre sin
+  cierres y la pestaña Historial funciona.
+- Evidencia real en `nexus.db` del S25: cuatro trabajos fallaron sin `resolution`; uno con `resolution=4k` y sin
+  `fps` falló por `fps`; uno con `resolution=4k` + `fps=25` y sin prompt se COMPLETÓ (0,33 €).
+- Pendiente en el teléfono: una respuesta del agente tras el arreglo de `(?U)` (no se forzó Nexus a primer plano
+  mientras el usuario usaba otra app).
 - Pixel 8 Pro: offline en Tailscale desde hace 8 días; no probado.
 
 ## Pendiente conocido
