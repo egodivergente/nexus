@@ -47,6 +47,11 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,onPreview:()->Unit,on
                 Icon(if(asset.type==AssetType.AUDIO) Icons.Default.GraphicEq else Icons.Default.Description,null)
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
+            Surface(color=MaterialTheme.colorScheme.scrim.copy(alpha=.72f),contentColor=MediaForeground,shape=NexusTokens.filter,
+                modifier=Modifier.align(Alignment.BottomStart).padding(NexusTokens.space4)) {
+                Text(libraryOrigin(asset).shortLabel(),Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4),
+                    style=MaterialTheme.typography.labelMedium)
+            }
             IconButton(onClick=onActions,modifier=Modifier.align(Alignment.TopEnd)) {Icon(Icons.Default.MoreVert,"Opciones de ${asset.displayName}")}
         }
     }
