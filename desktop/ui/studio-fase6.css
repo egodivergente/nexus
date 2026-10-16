@@ -49,7 +49,7 @@ html body.creative-engine:not(.creative-dock-expanded) .sidebar :is(nav button,#
 }
 
 /* Cabecera: las acciones pasan a otra línea en lugar de montarse sobre el contenido. */
-html body.creative-engine.nx-desktop main>header{display:flex;flex-wrap:wrap;align-items:center;column-gap:12px;row-gap:6px;height:auto!important;max-height:none!important;min-height:56px;padding-top:8px;padding-bottom:8px}
+html body.creative-engine.nx-desktop main>header{display:flex;flex-wrap:wrap;align-items:center;column-gap:12px;row-gap:6px;height:auto!important;max-height:none!important;min-height:56px;padding-top:12px;padding-bottom:10px}
 html body.creative-engine.nx-desktop main>header>div:first-child{min-width:0;flex:0 1 auto}
 html body.creative-engine.nx-desktop #header-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;min-width:0;max-width:100%;margin-left:auto}
 html body.creative-engine.nx-desktop #header-actions .toolbar{flex-wrap:wrap;justify-content:flex-end}
