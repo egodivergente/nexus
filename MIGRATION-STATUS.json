@@ -1,52 +1,54 @@
-{
-  "name": "nexus",
-  "status": "ENCARGO_UNICO_1910_INSTALLED_S25",
-  "verifiedAt": "2026-10-16",
-  "repository": "https://github.com/egodivergente/nexus",
-  "canonicalBranch": "main",
-  "branch": "fix/encargo-unico-agente-ui",
-  "components": {
-    "android": {
-      "versionName": "1.9.10-agent-preview",
-      "versionCode": 44,
-      "sha256": "4D18F43A3ECE90F2D4B9B73577433E5ED0F9E3D162ED4C0A69EC4122CF48E5B5",
-      "signingCertificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
-      "includes": [
-        "codex/agent-experience-197-20261016",
-        "codex/agent-background-media-198-20261016",
-        "codex/android-ux-polish-20261016 @ 4512d93 (Historial, Biblioteca sin etiquetas de origen)"
-      ]
-    },
-    "desktop": {
-      "versionName": "1.9.5-agent-desktop",
-      "sha256": "e3d22a980804513da2f5aa7a2bcad8f16710fe9d908c127e93f9b1997caa868e",
-      "agentCoreSynced": false
-    },
-    "termuxWidget": {
-      "source": "1d8c0ec7648d67628c263816a62f970fa53bdaaa"
-    }
-  },
-  "devices": {
-    "s25Ultra": {
-      "model": "SM-S938B",
-      "installed": "1.9.10-agent-preview vc44, 2026-10-16T05:56:56, actualización en sitio con datos conservados",
-      "note": "Sustituye a las dos builds distintas que compartían 1.9.9/vc43."
-    },
-    "pixel8Pro": "offline en Tailscale desde hace 8 días; no probado"
-  },
-  "validation": {
-    "agentCoreUnitTestsRun": 154,
-    "androidUnitTestsRun": 295,
-    "agentPreviewBuild": "PASS",
-    "androidRegexGuard": "PASS (detecta (?U) real; ignora comentarios)",
-    "s25AppOpensChatWithoutCrash": "PASS",
-    "s25FiveTabNavigationHistorial": "PASS",
-    "s25RealChatSingleOrderCard": "PASS",
-    "tencentRealJobsEvidence": "4 FAILED sin resolution; 1 FAILED con resolution sin fps; 1 COMPLETED con resolution=4k + fps=25 y sin prompt (job_631e3d5f…, 0,33 €)",
-    "tencentFpsMeasuredAutomatically": "UNIT_TESTED; el envío completado llevaba fps=25 elegido en el teléfono",
-    "agentReplyAfterRegexFix": "NOT_RUN (el usuario estaba en otra app; no se forzó Nexus a primer plano)",
-    "paidOperationsByAgentOrTests": 0,
-    "paidOperationsByUserDuringValidation": 2,
-    "desktopSync": "NOT_DONE (desktop/tools/sync-agent-core.py; UI de escritorio sin encargos)"
-  }
+﻿{
+    "name":  "nexus",
+    "status":  "UX_SKILLS_1911_INSTALLED_S25",
+    "verifiedAt":  "2026-10-16",
+    "repository":  "https://github.com/egodivergente/nexus",
+    "canonicalBranch":  "main",
+    "branch":  "fix/encargo-unico-agente-ui",
+    "components":  {
+                       "android":  {
+                                       "versionName":  "1.9.11-agent-preview",
+                                       "versionCode":  45,
+                                       "sha256":  "89D0BA60EE8AF615DA6476616CC89FEE8A21348FCA604A60B2E72A23DB2B75B5",
+                                       "signingCertificateSha256":  "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+                                       "includes":  [
+                                                        "codex/agent-experience-197-20261016",
+                                                        "codex/agent-background-media-198-20261016",
+                                                        "codex/android-ux-polish-20261016 @ 4512d93 (Historial, Biblioteca sin etiquetas de origen)"
+                                                    ]
+                                   },
+                       "desktop":  {
+                                       "versionName":  "1.9.5-agent-desktop",
+                                       "sha256":  "e3d22a980804513da2f5aa7a2bcad8f16710fe9d908c127e93f9b1997caa868e",
+                                       "agentCoreSynced":  false
+                                   },
+                       "termuxWidget":  {
+                                            "source":  "1d8c0ec7648d67628c263816a62f970fa53bdaaa"
+                                        }
+                   },
+    "devices":  {
+                    "s25Ultra":  {
+                                     "model":  "SM-S938B",
+                                     "installed":  "1.9.11-agent-preview vc45, 2026-10-16T06:20:11, actualización en sitio con datos conservados",
+                                     "note":  "Sustituye a las dos builds distintas que compartían 1.9.9/vc43."
+                                 },
+                    "pixel8Pro":  "offline en Tailscale desde hace 8 días; no probado"
+                },
+    "validation":  {
+                       "agentCoreUnitTestsRun":  156,
+                       "androidUnitTestsRun":  295,
+                       "agentPreviewBuild":  "PASS",
+                       "androidRegexGuard":  "PASS (detecta (?U) real; ignora comentarios)",
+                       "s25AppOpensChatWithoutCrash":  "PASS",
+                       "s25FiveTabNavigationHistorial":  "PASS",
+                       "s25RealChatSingleOrderCard":  "PASS",
+                       "tencentRealJobsEvidence":  "4 FAILED sin resolution; 1 FAILED con resolution sin fps; 1 COMPLETED con resolution=4k + fps=25 y sin prompt (job_631e3d5f…, 0,33 €)",
+                       "tencentFpsMeasuredAutomatically":  "UNIT_TESTED; el envío completado llevaba fps=25 elegido en el teléfono",
+                       "agentReplyAfterRegexFix":  "NOT_RUN (el usuario estaba en otra app; no se forzó Nexus a primer plano)",
+                       "paidOperationsByAgentOrTests":  0,
+                       "paidOperationsByUserDuringValidation":  2,
+                       "desktopSync":  "NOT_DONE (desktop/tools/sync-agent-core.py; UI de escritorio sin encargos)",
+                       "catalogGeneratorsWithSkill":  "400/400",
+                       "compactChatOnDevice":  "NOT_YET_SEEN (el usuario estaba en otra app)"
+                   }
 }

@@ -2,6 +2,19 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.11-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+
+- Android vc45: chat más compacto. La tarjeta pone estado, detalles (chevron) y un
+  menú ⋮ (Lienzo, Descartar, Historial) en la cabecera; el resultado se ve como
+  miniatura 16:9 que abre el visor; un único botón de 40 dp. Las respuestas del
+  agente ya no añaden una fila ⋮ ni la pastilla de herramientas: copiar, compartir
+  y ver pasos se abren manteniendo pulsado. Barra de entrada más baja.
+- Skills nuevas para los 43 generadores que no tenían (upscalers, voz, música, 3D,
+  NVIDIA Cosmos, Atlas Studio, ERNIE), escritas desde su README o schema oficial;
+  una prueba exige skill para los 400 generadores del catálogo. Al preparar un
+  encargo, el agente recibe las restricciones, los errores habituales, la estructura
+  de prompt y la plantilla de la tarea de ese modelo.
+
 ## [1.9.10-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
 - Android vc44: integra 1.9.9 (acceso a Historial, Biblioteca sin etiquetas de origen
