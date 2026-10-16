@@ -54,3 +54,5 @@ html body.creative-engine.nx-desktop main>header>div:first-child{min-width:0;fle
 html body.creative-engine.nx-desktop #header-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;min-width:0;max-width:100%;margin-left:auto}
 html body.creative-engine.nx-desktop #header-actions .toolbar{flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:700px){html body.creative-engine.nx-desktop main>header{padding-left:16px;padding-right:16px}html body.creative-engine.nx-desktop #header-actions{margin-left:0;justify-content:flex-start;width:100%}}
+/* Título de página: tamaño de cabecera, no de texto normal. */
+html body.creative-engine.nx-desktop main>header h1,html body.creative-engine.nx-desktop:has(.agent-view) main>header h1{font-size:calc(var(--text-xl) * var(--ui-font-scale,1))!important;line-height:1.2;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}

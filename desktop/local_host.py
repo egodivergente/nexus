@@ -458,10 +458,11 @@ def dispatch(keys, operation, args):
         native = agent_host().native
         return sorted([json.loads(path.read_text('utf-8')) for path in native.directory.glob('*.json')], key=lambda item: item['createdAt'], reverse=True)[:100]
     if operation == 'openAlexia':
-        adb=Path(os.environ['LOCALAPPDATA'])/'Android/Sdk/platform-tools/adb.exe'
-        result=subprocess.run([str(adb),'-s','100.119.88.105:5555','shell','am','start','-n','com.axel.library/.MainActivity'],capture_output=True,text=True,timeout=15,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        import adb_device
+        serial=adb_device.find_serial()
+        result=subprocess.run([str(adb_device.adb_path()),'-s',serial,'shell','am','start','-n','com.axel.library/.MainActivity'],capture_output=True,text=True,timeout=15,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         if result.returncode or 'Error' in result.stdout:
-            raise ValueError('No se pudo abrir Alexia en el S25. Comprueba su conexión por Tailscale.')
+            raise ValueError('No se pudo abrir Alexia en el S25 conectado ('+serial+').')
         return {'opened':True,'device':'S25'}
     if operation == 'agent':
         if args.get('op') == 'reload':

@@ -13,6 +13,8 @@ Mejoras de la auditoría UX de Nexus Studio (solo `desktop/ui` y una prueba nuev
 - **Lienzo:** motivo visible del botón Generar apagado y esqueleto de carga en «Producción reciente».
 - **Historial y Ajustes:** botón «Preparar de nuevo» visible en cada fila; punto de estado por proveedor.
 - **Barra lateral y cabecera (corrección):** un único sistema de carril de iconos (64 px) en cualquier ancho; contraída o por debajo de 700 px ya no se filtran «Colecciones», la etiqueta de Ajustes ni el estado de conexión, y las acciones de la cabecera pasan a otra línea en lugar de salirse. Prueba: `desktop/tools/test-fase6-layout.py` (7 anchos × 2 estados).
+- **Título de página:** 20 px (antes 14 px, tamaño de texto normal).
+- **S25 por modelo, no por IP:** nuevo `desktop/adb_device.py` elige el S25 conectado por ADB (modelo SM_S938B). El botón de Alexia y `migrate-agent-s25.py` ya no usan la IP Tailscale antigua. Prueba: `test-adb-device.py`.
 - **Accesibilidad:** objetivos de 32 px en la barra de estado, texto mínimo 12 px, tooltips en la barra lateral contraída.
 - **Pendiente:** consolidar las 18 hojas de estilo superpuestas en una sola capa de componentes; elegir motor recomendado por defecto en el Lienzo.
 

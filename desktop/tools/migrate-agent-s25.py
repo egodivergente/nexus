@@ -21,9 +21,11 @@ sys.path.insert(0,str(root/'desktop'))
 import local_host
 from native_operations import atomic_json, WHISPER_SHA
 parser=argparse.ArgumentParser()
-parser.add_argument('--serial',default='100.119.88.105:5555')
+parser.add_argument('--serial',default=None,help='Serial ADB; por defecto se elige el S25 conectado por modelo.')
 parser.add_argument('--apply',action='store_true')
 args=parser.parse_args()
+import adb_device
+args.serial=adb_device.find_serial(preferred=args.serial) if not args.serial else args.serial
 adb=[str(Path(os.environ['LOCALAPPDATA'])/'Android/Sdk/platform-tools/adb.exe'),'-s',args.serial]
 package='com.vidadomu.nexus.agent'
 data=Path(os.environ['LOCALAPPDATA'])/'NexusDesktop'
