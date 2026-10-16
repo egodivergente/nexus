@@ -2,6 +2,20 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.14-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+
+- Android vc48, revisada pestaña por pestaña con capturas del S25:
+  - Biblioteca sin fila «Origen» ni etiqueta «Generado», sin menú encima de cada
+    miniatura (mantener pulsado) y trabajos en curso en una línea.
+  - Historial: título útil, fotograma de los vídeos, dos líneas y coste solo si es real.
+  - Lienzo: fotograma del vídeo adjunto, pastillas iguales de 36 dp y prompt que crece.
+  - Modelos: filas más compactas y sin menú por fila.
+  - Chat: burbujas del usuario en texto medio.
+- 1.9.12/vc46: elegir el LLM. «Claude API» con tu clave de Anthropic y «Compatible
+  OpenAI» (OpenAI, OpenRouter, Gemini, DeepSeek, Groq, Mistral o servidor local), clave
+  cifrada por proveedor y tarifa opcional para el límite de consumo. Icono de la APK
+  sin fondo. Selector de fotos con fotogramas reales y selección en la esquina.
+
 ## [1.9.11-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
 - Android vc45: chat más compacto. La tarjeta pone estado, detalles (chevron) y un
