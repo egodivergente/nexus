@@ -73,6 +73,7 @@ internal class AgentArtifacts(private val app:NexusApplication,private val asset
             val mime=when(format) {"pdf"->"application/pdf";"html"->"text/html";"json"->"application/json";else->"text/plain"}
             val asset=assets.addAsset(Asset(id="",uri=Uri.fromFile(output).toString(),type=AssetType.OTHER,role=AssetRole.OUTPUT,
                 displayName=output.name,mimeType=mime,projectId=session.activeProjectId,createdAt=System.currentTimeMillis()))
+            session.showMedia(Attachment(asset.id,asset.uri,mime,asset.displayName,asset.width,asset.height,asset.durationSec,asset.id))
             buildJsonObject {put("asset_id",asset.id);put("name",asset.displayName);put("uri",asset.uri);put("bytes",output.length());put("pages",pages);put("location","Biblioteca → Importados y ediciones");put("script_executed",false)}
         } catch(e:Exception) {output.delete();throw e}
     }

@@ -1,14 +1,14 @@
 {
   "name": "nexus",
-  "status": "AGENT_EXPERIENCE_197_INSTALLED_S25",
+  "status": "AGENT_BACKGROUND_TURN_198_INSTALLED_S25",
   "verifiedAt": "2026-10-16",
   "repository": "https://github.com/egodivergente/nexus",
   "canonicalBranch": "main",
   "components": {
     "android": {
-      "versionName": "1.9.7-agent-preview",
-      "versionCode": 41,
-      "sha256": "d078329b4fec7992ffe7a4573e08d6acb9152c5d8345f0cf654f4a7cb2d064fc"
+      "versionName": "1.9.8-agent-preview",
+      "versionCode": 42,
+      "sha256": "D1A7F57A45439DFE2690D864EF02BFAFC4C65EC4227B834AF7C89DF787D58E68"
     },
     "desktop": {
       "versionName": "1.9.5-agent-desktop",
@@ -34,9 +34,14 @@
     "s25BudgetFixInstalled": true,
     "realAgentChatReply": "PASS",
     "usageLedgerPreserved": true,
-    "agentPreviewBuild": "PASS",
+    "agentPreviewBuild": "PENDING",
+    "assistantBackgroundServiceS25Install": "PASS",
+    "s25UpdateInstalledInPlace": true,
+    "assistantBackgroundRealTurn": "NOT_RUN_AT_USER_REQUEST",
+    "libraryNavigationRuntimeCheck": "NOT_RUN_AT_USER_REQUEST",
+    "inlineMediaRuntimeCheck": "NOT_RUN_AT_USER_REQUEST",
     "additionalTestsAfterLatestFeatures": "NOT_RUN_AT_USER_REQUEST",
     "additionalDeviceTests": "NOT_RUN_AT_USER_REQUEST",
-    "apkSha256": "d078329b4fec7992ffe7a4573e08d6acb9152c5d8345f0cf654f4a7cb2d064fc"
+    "apkSha256": "D1A7F57A45439DFE2690D864EF02BFAFC4C65EC4227B834AF7C89DF787D58E68"
   }
 }

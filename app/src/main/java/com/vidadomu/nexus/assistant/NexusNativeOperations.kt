@@ -55,6 +55,7 @@ class NexusNativeOperations(
                     val attachment=com.vidadomu.nexus.agent.core.tools.Attachment(local.id,local.uri,mime,local.displayName,local.width,local.height,local.durationSec,local.id)
                     session.attachments.removeAll {it.id==a.id}
                     session.attachments.add(attachment)
+                    session.showMedia(attachment)
                     quality ?: buildJsonObject {put("asset_id",a.id);put("requested_context_load",true)}
                 }
                 "delete_library_assets" -> {
@@ -75,14 +76,14 @@ class NexusNativeOperations(
                 "get_nexus_settings" -> settings()
                 "update_nexus_settings" -> updateSettings(input)
                 "rename_asset_file" -> media.rename(input, session)
-                "convert_image_asset" -> media.convert(input)
+                "convert_image_asset" -> media.convert(input,session)
                 "inspect_media_asset" -> AgentVideoOperations(app).inspect(input.requiredText("asset_id"))
                 "get_whisper_status" -> WhisperModelStore(app).status()
                 "prepare_whisper_model" -> WhisperModelStore(app).enqueue()
                 "edit_video_assets" -> MediaEditJobs(app).start(input.requiredText("action"),input,session)
                 "extract_video_frames" -> MediaEditJobs(app).start("frames",input,session)
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
-                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20))
+                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
                 "atlas_get_balance" -> atlasBalance()
                 else -> throw ToolInputException("Operación desconocida.")
             }

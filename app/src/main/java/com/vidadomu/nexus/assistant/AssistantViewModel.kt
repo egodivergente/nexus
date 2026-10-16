@@ -40,7 +40,8 @@ sealed interface ChatItem {
     @kotlinx.serialization.Serializable
     data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
     @kotlinx.serialization.Serializable
-    data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String) : ChatItem
+    data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
+        val media: List<Attachment> = emptyList()) : ChatItem
     @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String) : ChatItem
     @kotlinx.serialization.Serializable
@@ -147,6 +148,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             return false
         }
         failedTurn = null
+        conversation.session.clearRenderedMedia()
         val latestSettings = runtime.settings.load()
         if (latestSettings != _ui.value.settings) {
             // Native settings tools affect the next request without dropping conversation, plans or proposals.
@@ -155,6 +157,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
         _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, scrollRequest = it.scrollRequest + 1) }
+        // A ViewModel coroutine keeps the turn alive across navigation, but Android may reclaim
+        // the app once its Activity is backgrounded. Promote the user-started request first.
+        runCatching { AssistantTurnService.start(app) }
+            .onFailure { android.util.Log.w("NexusAssistant", "Could not promote agent turn", it) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -165,7 +171,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
-                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop)) }
+                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
+                        conv.session.renderedMedia.values.toList())) }
                 }
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -181,6 +188,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 failedTurn = clean to atts
                 notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
             } finally {
+                AssistantTurnService.stop(app)
                 _ui.update { state ->
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)

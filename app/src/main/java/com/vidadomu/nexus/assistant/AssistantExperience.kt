@@ -35,6 +35,7 @@ import com.vidadomu.nexus.agent.core.assets.Asset
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.registry.ModelSummary
 import com.vidadomu.nexus.agent.core.spend.PlanState
+import com.vidadomu.nexus.agent.core.tools.Attachment
 
 internal data class ModelCompletion(val start: Int, val end: Int, val models: List<ModelSummary>)
 
@@ -148,9 +149,12 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
         if(p.busy || p.jobStatus in listOf("PENDING", "PROCESSING")) LinearProgressIndicator(Modifier.fillMaxWidth())
         if(outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(outputs) { uri ->
-                if(p.plan.modality == "IMAGE") AsyncImage(uri, "Resultado generado", Modifier.width(240.dp).aspectRatio(16f/9f)
-                    .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
-                else OutlinedButton(onClick = onOpenOutput) { Icon(Icons.Default.PlayArrow, null); Text("Abrir vídeo") }
+                when(p.plan.modality) {
+                    "IMAGE" -> AsyncImage(uri, "Resultado generado", Modifier.width(240.dp).aspectRatio(16f/9f)
+                        .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
+                    "AUDIO" -> AssistantMediaPreview(Attachment(uri,uri,"audio/mpeg","Resultado de audio"))
+                    else -> AssistantMediaPreview(Attachment(uri,uri,"video/mp4","Resultado de vídeo"))
+                }
             }
         }
 

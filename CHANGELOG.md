@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.8-agent] - 2026-10-16
+
+- Android vc42 mantiene el turno del asistente en un servicio de primer plano
+  mientras Nexus está minimizado. Una notificación silenciosa indica que sigue
+  trabajando y permite volver a la conversación; el servicio se cierra al acabar,
+  al producirse un error o cuando el usuario pulsa «Parar».
+- Volver desde Ajustes/Flow a una pestaña recupera esa pestaña en vez de restaurar
+  Ajustes encima. Las respuestas del agente muestran medios abiertos o creados:
+  imágenes, vídeo y audio reproducibles, y documentos/archivos abribles.
+- Alcance y validación: [turnos del asistente en segundo plano](docs/AGENT-BACKGROUND-TURN-198-20261016.md).
+
 ## [1.9.7-agent] - 2026-10-16
 
 - Android vc41: bienvenida una sola vez por arranque del proceso; temas claros

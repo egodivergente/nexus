@@ -47,6 +47,10 @@ class AgentSession(
     var activeProjectId: String? = null,
 ) {
     val attachments = mutableListOf<Attachment>()
+    /** Media explicitly opened or created by tools during this turn for inline chat display. */
+    val renderedMedia = linkedMapOf<String, Attachment>()
+    fun showMedia(attachment: Attachment) { renderedMedia[attachment.id] = attachment }
+    fun clearRenderedMedia() { renderedMedia.clear() }
     /** Acciones de organización propuestas en modo Copiloto, pendientes de que el usuario las aplique. */
     val pendingActions = linkedMapOf<String, PendingAction>()
     var flowSubmittedResults = 0
