@@ -70,7 +70,7 @@ internal fun presentOrder(order: Order, costLabel: String?, busy: Boolean, assis
             val (action, label) = when {
                 failure?.fix != null -> CardAction.APPLY_FIX to "Aplicar corrección"
                 failure?.kind in OrderBook.RETRYABLE && TRANSIENT.containsMatchIn(message) -> CardAction.RETRY to "Reintentar"
-                else -> CardAction.ASK_AGENT to "Corregir con el agente"
+                else -> CardAction.ASK_AGENT to "Pedir corrección al agente"
             }
             CardPresentation("Error", action, label, !busy && !assistantBusy,
                 headline = (failure?.explanation ?: "No se generó.") + if (failure?.kind == FailureKind.CANCELLED) "" else charged,
@@ -152,23 +152,26 @@ internal fun OrderCard(
                     else OutlinedButton(onClick = onOpenOutput) { Icon(Icons.Default.PlayArrow, null); Text("Abrir vídeo") }
                 }
             }
+            // La única acción del encargo, a ancho completo para que su texto (con el coste) no se corte.
+            if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
+                val click = when (shown.action) {
+                    CardAction.GENERATE, CardAction.RETRY -> onGenerate
+                    CardAction.APPLY_FIX -> onApplyFix
+                    CardAction.ASK_AGENT -> onAskAgent
+                    CardAction.VIEW_RESULT, CardAction.CHECK_HISTORY -> onOpenOutput
+                    CardAction.REVIEW -> ({ expanded = true })
+                    CardAction.SENDING, CardAction.NONE -> ({})
+                }
+                Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth()) {
+                    Text(shown.actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { expanded = !expanded }, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
                     Text(if (expanded) "Ocultar detalles" else "Detalles"); Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
                 }
                 if (order.status.editable) TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) { Text("Descartar") }
-                Spacer(Modifier.weight(1f))
-                if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
-                    val click = when (shown.action) {
-                        CardAction.GENERATE, CardAction.RETRY -> onGenerate
-                        CardAction.APPLY_FIX -> onApplyFix
-                        CardAction.ASK_AGENT -> onAskAgent
-                        CardAction.VIEW_RESULT, CardAction.CHECK_HISTORY -> onOpenOutput
-                        CardAction.REVIEW -> ({ expanded = true })
-                        CardAction.SENDING, CardAction.NONE -> ({})
-                    }
-                    Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field) { Text(shown.actionLabel, maxLines = 1) }
-                }
+                if (order.attempt > 1) Text("Intento ${order.attempt}", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             }
             if (expanded) OrderDetails(order, p, prompt, { prompt = it }, dirty, onEdit, onOpenCanvas, currency) { k, v -> editParam = k to v }
         }

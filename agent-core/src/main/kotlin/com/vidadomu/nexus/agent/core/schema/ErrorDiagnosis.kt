@@ -32,8 +32,10 @@ object ErrorDiagnosis {
         val derived = schema?.derivedParam(key)
         if (derived != null) {
             val value = derived.valueFor(effective[derived.from])
+            // La corrección no cambia parámetros: el nuevo intento ya incluye el campo deducido.
             return Diagnosis(key, allowed, "El proveedor $verb «$key». Nexus lo deduce de «${derived.from}»" +
-                (value?.let { " (= $it); este envío no lo incluía. Repite el encargo y se añadirá." } ?: ", pero el valor actual no lo permite."), null)
+                (value?.let { " (= $it); este envío no lo incluía. Prepararlo de nuevo lo añade." } ?: ", pero el valor actual no lo permite."),
+                value?.let { SuggestedFix("Preparar de nuevo con $key=$it (deducido de ${derived.from})") })
         }
         val spec = schema?.param(key)
         if (spec == null) {

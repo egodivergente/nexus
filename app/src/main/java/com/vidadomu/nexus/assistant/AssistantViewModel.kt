@@ -408,6 +408,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             } else p.copy(busy = false, includeInBatch = false)
         }
         runtime.orders.restore(cleaned.orders, plans.values.map { it.plan })
+        // Errores guardados por versiones anteriores: causa y corrección con el schema real (lectura pública, sin gasto).
+        viewModelScope.launch {
+            for (o in runtime.orders.all().filter { it.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED && it.lastFailure?.explanation == null }) {
+                val plan = plans[o.planId]?.plan ?: continue
+                val schema = runCatching { runtime.registry.schema(plan.ref) }.getOrNull() ?: continue
+                val d = com.vidadomu.nexus.agent.core.schema.ErrorDiagnosis.diagnose(o.lastFailure!!.message, schema, plan) ?: continue
+                runCatching { runtime.orders.annotateFailure(o.id, d.explanation, d.fix) }
+            }
+        }
         // Planes fallidos tras envío (SUBMITTED): el guard debe conocerlos para corregir en el mismo encargo.
         plans.values.filter { it.state == PlanState.SUBMITTED }.forEach { runtime.guard.registerSubmitted(it.plan) }
         _ui.update { it.copy(items = cleaned.items, plans = plans, pendingAttachments = saved.attachments) }

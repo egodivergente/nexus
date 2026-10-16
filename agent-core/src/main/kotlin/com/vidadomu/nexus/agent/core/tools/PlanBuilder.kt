@@ -58,6 +58,8 @@ class PlanBuilder(
         characters: List<String> = emptyList(),
         parentGenerationId: String? = null,
         originalPrompt: String? = null,
+        /** Al reconstruir un plan antiguo: retira el texto que el schema no admite en vez de fallar. */
+        dropUnacceptedPrompt: Boolean = false,
     ): PlanBuild {
         val schema = runCatching { registry.schema(model.ref) }.getOrElse {
             return PlanBuild.Invalid(listOf(ValidationIssue("schema", "Nexus no pudo cargar el schema de ${model.ref.modelId}: ${it.message ?: it.javaClass.simpleName}. Sin schema no se prepara la generación.")))
@@ -65,8 +67,11 @@ class PlanBuilder(
         val issues = mutableListOf<ValidationIssue>()
         if (schema.promptRequired && prompt.isBlank()) issues += ValidationIssue("prompt", "El modelo exige prompt.")
         // Los ajustes de API (plantilla, resolución…) son parámetros; un modelo sin campo prompt no recibe texto libre.
-        if (!schema.promptAccepted && prompt.isNotBlank())
+        val droppedPrompt = !schema.promptAccepted && prompt.isNotBlank() && dropUnacceptedPrompt
+        if (!schema.promptAccepted && prompt.isNotBlank() && !droppedPrompt)
             issues += ValidationIssue("prompt", "${model.name} no tiene campo prompt: omite el prompt y expresa la configuración con sus parámetros (${schema.parameters.joinToString { it.key }}).")
+        if (droppedPrompt) issues += ValidationIssue("prompt", "Se retiró el texto del prompt: ${model.name} no tiene ese campo y no se envía.", ValidationIssue.Severity.WARNING)
+        @Suppress("NAME_SHADOWING") val prompt = if (droppedPrompt) "" else prompt
         val placed = placeMedia(schema, model, media, issues)
 
         // En Nexus el prompt negativo viaja como parámetro del schema; si el modelo no lo tiene, no se puede enviar.
@@ -147,6 +152,8 @@ class PlanBuilder(
             projectId = plan.projectId, sceneCode = plan.sceneCode, shotCode = plan.shotCode,
             characters = plan.characters, parentGenerationId = plan.parentGenerationId,
             originalPrompt = if (edit.prompt == null || edit.prompt == plan.prompt) plan.originalPrompt else null,
+            // Un texto nuevo del agente o del usuario se valida; el del plan antiguo se retira si sobra.
+            dropUnacceptedPrompt = edit.prompt == null,
         )
     }
 

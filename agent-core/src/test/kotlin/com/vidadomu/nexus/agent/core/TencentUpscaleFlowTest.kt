@@ -255,6 +255,32 @@ class TencentUpscaleFlowTest {
         assertEquals(0, h.backend.submitted.size, "el agente nunca envía")
     }
 
+    @Test fun `un envio antiguo fallido se corrige con un toque sin perder el video`() = runTest {
+        val h = harness()
+        // Plan de 1.9.8 tal como está en el S25: prompt sobrante, enviado y fallido.
+        val old = GenerationPlan("plan_old", TENCENT, "Tencent Video Upscaler", "VIDEO", prompt = "Upscale to 4K",
+            params = mapOf("template" to "live-action-enhance-4k", "keep_metadata" to "true", "short" to "2160"),
+            effectiveParams = mapOf("template" to "live-action-enhance-4k"), media = listOf(MediaRef("video", "file:///clip.mp4", "video/mp4", null, "video_url")), createdAt = 0)
+        h.guard.registerSubmitted(old)
+        val order = h.deps.orders.upsertPlan(old)
+        h.deps.orders.beginSubmit(order.id, order.fingerprint); h.deps.orders.accepted(order.id, "job_old")
+        h.deps.orders.jobUpdate(order.id, "FAILED", error = "generate task failed, tencent-upscaler: resolution is required (720p, 1080p, 1440p or 4k)")
+        val d = assertNotNull(ErrorDiagnosis.diagnose(h.deps.orders.get(order.id)!!.lastFailure!!.message, TENCENT_SCHEMA, old))
+        val fix = assertNotNull(d.fix, "un campo deducido ofrece «preparar de nuevo»")
+        h.deps.orders.annotateFailure(order.id, d.explanation, fix)
+        val (revised, built) = h.deps.reviseOrder(order.id, com.vidadomu.nexus.agent.core.tools.PlanEdit(params = fix.params), com.vidadomu.nexus.agent.core.orders.Actor.USER)
+        val plan = (built as com.vidadomu.nexus.agent.core.tools.PlanBuild.Ready).plan
+        assertEquals(order.id, revised.id)
+        assertEquals(OrderStatus.AWAITING_CONFIRMATION, revised.status)
+        assertEquals(2, revised.attempt)
+        assertEquals("", plan.prompt, "el prompt sobrante se retira, no bloquea")
+        assertEquals("4k", plan.effectiveParams["resolution"])
+        assertEquals("2160", plan.params["short"], "short válido en 4K se conserva")
+        assertEquals(listOf("file:///clip.mp4"), plan.media.map { it.uri })
+        assertTrue(plan.id != old.id, "el plan enviado no se reutiliza")
+        assertEquals(0, h.backend.submitted.size)
+    }
+
     @Test fun `la skill de Tencent cubre el modelo y explica que no hay prompt`() {
         val skill = assertNotNull(realSkills().forModel(TENCENT.modelId))
         assertEquals("tencent-video-upscaler", skill.id)

@@ -92,6 +92,38 @@ class OrderCardLogicTest {
         assertEquals(cards, again.items.filterIsInstance<ChatItem.PlanCard>())
     }
 
+    /** Datos reales del S25 (2026-10-16): tres envíos de Tencent fallidos del mismo vídeo + avisos «Enviado…». */
+    @Test fun repeatedFailedSubmissionsOfTheSameVideoBecomeOneOrderWithAttempts() {
+        val error = "generate task failed, tencent-upscaler: resolution is required (720p, 1080p, 1440p or 4k)"
+        fun failed(id: String) = PlanUi(plan(id).copy(prompt = "Upscale to 4K"), false, PlanState.SUBMITTED, jobId = "job_$id", jobStatus = "FAILED", error = error)
+        val completed = PlanUi(plan("img", video = "file:///foto.png").copy(ref = ModelRef("atlas_cloud", "tencent/image/upscaler")), false, PlanState.SUBMITTED, jobId = "job_img", jobStatus = "COMPLETED")
+        val saved = SavedAssistantChat(
+            items = listOf(
+                ChatItem.PlanCard("c0", "img"),
+                ChatItem.PlanCard("c1", "a"), ChatItem.Notice("n1", "Enviado a Tencent Video Upscaler. Lo verás en Historial; aquí se actualiza el estado."),
+                ChatItem.PlanCard("c2", "b"), ChatItem.Notice("n2", "Enviado a Tencent Video Upscaler. Lo verás en Historial; aquí se actualiza el estado."),
+                ChatItem.PlanCard("c3", "c"), ChatItem.Notice("n3", "Error real", error = true),
+            ),
+            plans = mapOf("img" to completed, "a" to failed("a"), "b" to failed("b"), "c" to failed("c")),
+        )
+        val r = ChatRestore.clean(saved, now = 9)
+        assertEquals(listOf("img", "c"), r.items.filterIsInstance<ChatItem.PlanCard>().map { it.planId })
+        assertTrue("los envíos fallidos conservan su job: no se anulan", r.discardedPlanIds.isEmpty())
+        assertFalse(r.items.any { it is ChatItem.Notice && it.text.startsWith("Enviado a") })
+        assertTrue("los errores reales se conservan", r.items.any { it is ChatItem.Notice && it.error })
+        val tencent = r.orders.orders.single { it.planId == "c" }
+        assertEquals(OrderStatus.FAILED, tencent.status)
+        assertEquals(3, tencent.attempt)
+        assertEquals(listOf(1, 2, 3), tencent.failures.map { it.attempt })
+        assertEquals(listOf("a", "b"), tencent.previousPlanIds)
+        assertTrue(tencent.lastFailure!!.message.contains("resolution is required"))
+        // El chat ya migrado una vez (dos encargos guardados) también se agrupa al reabrirlo.
+        val half = ChatRestore.clean(saved.copy(items = saved.items.filterNot { it is ChatItem.PlanCard && it.planId == "c" }), now = 9)
+        val reopened = ChatRestore.clean(SavedAssistantChat(half.items + ChatItem.PlanCard("c3", "c"), saved.plans, orders = half.orders), now = 10)
+        assertEquals(listOf("img", "c"), reopened.items.filterIsInstance<ChatItem.PlanCard>().map { it.planId })
+        assertEquals(3, reopened.orders.orders.single { it.planId == "c" }.failures.size)
+    }
+
     @Test fun legacyFailedCardBecomesAFailedOrderWithItsError() {
         val failed = PlanUi(plan("p1"), true, PlanState.PREPARED, error = "No se envió: resolution is required (720p, 1080p, 1440p or 4k)")
         val r = ChatRestore.clean(SavedAssistantChat(listOf(ChatItem.PlanCard("c1", "p1")), mapOf("p1" to failed)), now = 1)

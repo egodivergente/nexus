@@ -295,6 +295,13 @@ class OrderBook(private val clock: () -> Long = System::currentTimeMillis) {
         o.copy(status = OrderStatus.DISCARDED)
     }
 
+    /** Añade a un error ya registrado (p. ej. de un chat antiguo) su diagnóstico y corrección. */
+    fun annotateFailure(orderId: String, explanation: String?, fix: SuggestedFix?) = update(orderId) { o ->
+        val last = o.lastFailure ?: return@update o
+        if (o.status != OrderStatus.FAILED || (last.explanation != null && last.fix != null)) return@update o
+        o.copy(failures = o.failures.dropLast(1) + last.copy(explanation = last.explanation ?: explanation, fix = last.fix ?: fix))
+    }
+
     /** La UI declara lo que ha pintado (estado y botón). El agente lo ve tal cual. */
     fun rendered(orderId: String, shown: String) = update(orderId) { o ->
         if (o.rendered == shown) return@update o
