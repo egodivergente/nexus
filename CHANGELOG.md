@@ -7,6 +7,7 @@ Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Wi
 Mejoras de la auditoría UX de Nexus Studio (solo `desktop/ui` y una prueba nueva):
 
 - **Clic derecho integrado:** menú contextual propio (`context-menu.js`) con acciones directas según el elemento: creaciones (abrir, preparar de nuevo, copiar prompt/enlace, favorito, seleccionar, consultar estado, diagnóstico), modelos, mensajes del asistente, campos de texto (cortar/copiar/pegar) y fondo (ir a cada sección, paleta, saldos). Teclado completo (flechas, Esc); Mayús + clic derecho conserva el menú nativo.
+- **Cambio de moneda (corrección):** `local_host.py` ahora envía un `User-Agent`; Frankfurter respondía 403 al de urllib y el PC nunca podía actualizar el cambio.
 - **Moneda en euros:** euros por defecto; el cambio del BCE se refresca solo (cada 6 h y al volver a la ventana) y los saldos en USD se muestran convertidos, con el importe original en el tooltip. «No informado» pasa a «Coste pendiente» con cómo consultarlo.
 - **Asistente:** un único estado de conexión (Conectando / Sin conexión) con «Reintentar»; el envío se desactiva mientras no haya conexión y el texto se conserva.
 - **Lienzo:** motivo visible del botón Generar apagado y esqueleto de carga en «Producción reciente».

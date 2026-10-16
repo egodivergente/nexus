@@ -426,7 +426,9 @@ def dispatch(keys, operation, args):
         if OFFLINE_QA:
             raise ValueError('Laboratorio: consulta de cambio bloqueada.')
         url = 'https://api.frankfurter.dev/v1/latest?from=USD&symbols=EUR'
-        with urllib.request.urlopen(url, timeout=20) as response:
+        # Frankfurter rechaza el User-Agent por defecto de urllib con 403.
+        request = urllib.request.Request(url, headers={'User-Agent': 'NexusStudio/1.9.5', 'Accept': 'application/json'})
+        with urllib.request.urlopen(request, timeout=20) as response:
             value = json.load(response)
         rate = value.get('rates', {}).get('EUR')
         if not isinstance(rate, (int, float)) or not math.isfinite(rate) or rate <= 0:
