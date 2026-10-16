@@ -40,6 +40,8 @@ class PlanBuilder(
     private val assets: AssetIndex,
     private val clock: () -> Long,
     private val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
+    /** Fotogramas por segundo medidos del vídeo local (null si no se pueden leer). */
+    private val probeFrameRate: (suspend (String) -> Double?)? = null,
 ) {
 
     suspend fun build(
@@ -58,12 +60,20 @@ class PlanBuilder(
         characters: List<String> = emptyList(),
         parentGenerationId: String? = null,
         originalPrompt: String? = null,
+        /** Al reconstruir un plan antiguo: retira el texto que el schema no admite en vez de fallar. */
+        dropUnacceptedPrompt: Boolean = false,
     ): PlanBuild {
         val schema = runCatching { registry.schema(model.ref) }.getOrElse {
             return PlanBuild.Invalid(listOf(ValidationIssue("schema", "Nexus no pudo cargar el schema de ${model.ref.modelId}: ${it.message ?: it.javaClass.simpleName}. Sin schema no se prepara la generación.")))
         }
         val issues = mutableListOf<ValidationIssue>()
         if (schema.promptRequired && prompt.isBlank()) issues += ValidationIssue("prompt", "El modelo exige prompt.")
+        // Los ajustes de API (plantilla, resolución…) son parámetros; un modelo sin campo prompt no recibe texto libre.
+        val droppedPrompt = !schema.promptAccepted && prompt.isNotBlank() && dropUnacceptedPrompt
+        if (!schema.promptAccepted && prompt.isNotBlank() && !droppedPrompt)
+            issues += ValidationIssue("prompt", "${model.name} no tiene campo prompt: omite el prompt y expresa la configuración con sus parámetros (${schema.parameters.joinToString { it.key }}).")
+        if (droppedPrompt) issues += ValidationIssue("prompt", "Se retiró el texto del prompt: ${model.name} no tiene ese campo y no se envía.", ValidationIssue.Severity.WARNING)
+        @Suppress("NAME_SHADOWING") val prompt = if (droppedPrompt) "" else prompt
         val placed = placeMedia(schema, model, media, issues)
 
         // En Nexus el prompt negativo viaja como parámetro del schema; si el modelo no lo tiene, no se puede enviar.
@@ -75,16 +85,20 @@ class PlanBuilder(
             } else params + ("negative_prompt" to (params["negative_prompt"]?.takeUnless { ParameterValidator.isBlankLike(it) } ?: negative))
         } else params
         val aspect = schema.parameters.firstOrNull { it.uiType == "ASPECT_RATIO" || it.key == "aspect_ratio" }
-        val preferred = if (aspect != null && "16:9" in aspect.options && allParams[aspect.key].isNullOrBlank()) allParams + (aspect.key to "16:9") else allParams
+        val withAspect = if (aspect != null && "16:9" in aspect.options && allParams[aspect.key].isNullOrBlank()) allParams + (aspect.key to "16:9") else allParams
+        val preferred = fillFromSource(schema, withAspect, placed, issues)
         val v = ParameterValidator.validate(schema, preferred)
         issues += v.issues
         if (issues.any { it.severity == ValidationIssue.Severity.ERROR }) return PlanBuild.Invalid(issues)
 
-        val fittedPrompt = try { adaptPrompt?.invoke(prompt, schema, model.name) ?: prompt.trim() }
+        val fittedPrompt = try { if (prompt.isBlank()) "" else adaptPrompt?.invoke(prompt, schema, model.name) ?: prompt.trim() }
         catch (e: Exception) { return PlanBuild.Invalid(listOf(ValidationIssue("prompt", e.message ?: "No se pudo adaptar el prompt; el original se conserva."))) }
 
         val effective = ParameterValidator.effective(schema, v.normalized)
-        val estimate = runCatching { cost.estimate(model, effective) }.getOrNull()
+        // La duración del vídeo de origen solo sirve para estimar el coste; nunca se envía.
+        val sourceSeconds = placed.firstOrNull { it.role == "video" }?.assetId?.let { assets.asset(it)?.durationSec }
+        val costParams = if (sourceSeconds != null) effective + (SOURCE_SECONDS_KEY to sourceSeconds.toString()) else effective
+        val estimate = runCatching { cost.estimate(model, costParams) }.getOrNull()
         val warnings = buildList {
             issues.filter { it.severity == ValidationIssue.Severity.WARNING }.forEach { add(it.message) }
             when (estimate?.confidence) {
@@ -141,7 +155,39 @@ class PlanBuilder(
             projectId = plan.projectId, sceneCode = plan.sceneCode, shotCode = plan.shotCode,
             characters = plan.characters, parentGenerationId = plan.parentGenerationId,
             originalPrompt = if (edit.prompt == null || edit.prompt == plan.prompt) plan.originalPrompt else null,
+            // Un texto nuevo del agente o del usuario se valida; el del plan antiguo se retira si sobra.
+            dropUnacceptedPrompt = edit.prompt == null,
         )
+    }
+
+    /**
+     * Rellena con la medida real del vídeo de entrada los parámetros que el proveedor exige y nadie
+     * eligió (p. ej. fps para conservar los del original). Es un valor explícito y visible: entra en
+     * la huella, en el coste y en la tarjeta. Si no se puede medir, el plan no es enviable.
+     */
+    private suspend fun fillFromSource(schema: ModelSchema, params: Map<String, String?>, media: List<MediaRef>, issues: MutableList<ValidationIssue>): Map<String, String?> {
+        if (schema.sourceParams.isEmpty()) return params
+        val out = params.toMutableMap()
+        for ((key, property) in schema.sourceParams) {
+            if (!ParameterValidator.isBlankLike(out[key])) continue
+            val spec = schema.param(key) ?: continue
+            val video = media.firstOrNull { it.role == "video" } ?: continue
+            val measured = when (property) {
+                "video_fps" -> runCatching { probeFrameRate?.invoke(video.uri) }.getOrNull()
+                else -> null
+            }
+            if (measured == null || !measured.isFinite() || measured <= 0) {
+                issues += ValidationIssue(key, "El proveedor exige «${spec.displayName}» y Nexus no pudo medirlo en el vídeo. Indícalo (p. ej. 24, 25, 30 o 60 para conservar el original).")
+                continue
+            }
+            val low = spec.min ?: 1.0
+            val high = spec.max ?: Double.MAX_VALUE
+            val value = Math.round(measured).toDouble().coerceIn(low, high).toLong()
+            if (value.toDouble() != Math.round(measured).toDouble())
+                issues += ValidationIssue(key, "El vídeo tiene ${"%.2f".format(java.util.Locale.ROOT, measured)} fps; el proveedor admite como máximo ${spec.max?.toLong()}: se enviará $value.", ValidationIssue.Severity.WARNING)
+            out[key] = value.toString()
+        }
+        return out
     }
 
     private fun placeMedia(schema: ModelSchema, model: ModelSummary, media: List<MediaRequest>, issues: MutableList<ValidationIssue>): List<MediaRef> {
@@ -180,5 +226,7 @@ class PlanBuilder(
 
     companion object {
         val ROLES = listOf("first_frame", "last_frame", "reference", "video")
+        /** Pista local para el estimador de coste (segundos del vídeo de entrada). */
+        const val SOURCE_SECONDS_KEY = "__source_video_seconds"
     }
 }

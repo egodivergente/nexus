@@ -31,12 +31,18 @@ data class Attachment(
 
 /** Eventos para la UI: tarjetas de plan, propuestas a aplicar, etc. */
 sealed interface UiEvent {
-    data class PlanReady(val plan: GenerationPlan, val executable: Boolean) : UiEvent
-    data class GenerationSubmitted(val plan: GenerationPlan, val jobId: String) : UiEvent
+    /** [orderId]: la tarjeta (encargo) que se crea o se actualiza EN SU SITIO con este plan. */
+    data class PlanReady(val plan: GenerationPlan, val executable: Boolean, val orderId: String? = null) : UiEvent
+    data class GenerationSubmitted(val plan: GenerationPlan, val jobId: String, val orderId: String? = null) : UiEvent
     data class AwaitingConfirmation(val planId: String) : UiEvent
     data class ProposedAction(val id: String, val description: String) : UiEvent
     data class Info(val text: String) : UiEvent
+    /** Botones de respuesta de un toque bajo la última respuesta del agente. Pulsar uno envía [SuggestedReply.text] como mensaje del usuario. */
+    data class Replies(val replies: List<SuggestedReply>) : UiEvent
 }
+
+/** Una respuesta rápida: [label] es lo que lleva el botón y [text] lo que se envía al pulsarlo. */
+data class SuggestedReply(val label: String, val text: String)
 
 class ToolOutcome(val result: JsonElement, val isError: Boolean = false, val events: List<UiEvent> = emptyList())
 
@@ -47,9 +53,15 @@ class AgentSession(
     var activeProjectId: String? = null,
 ) {
     val attachments = mutableListOf<Attachment>()
+    /** Media explicitly opened or created by tools during this turn for inline chat display. */
+    val renderedMedia = linkedMapOf<String, Attachment>()
+    fun showMedia(attachment: Attachment) { renderedMedia[attachment.id] = attachment }
+    fun clearRenderedMedia() { renderedMedia.clear() }
     /** Acciones de organización propuestas en modo Copiloto, pendientes de que el usuario las aplique. */
     val pendingActions = linkedMapOf<String, PendingAction>()
     var flowSubmittedResults = 0
+    /** Skills de modelo cuya guía ya recibió el agente en esta conversación (no se repite). */
+    val deliveredSkills = mutableSetOf<String>()
 
     fun attachment(id: String): Attachment? = attachments.firstOrNull { it.id == id }
 }

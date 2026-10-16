@@ -16,7 +16,7 @@ import kotlinx.serialization.json.put
 private val TYPES = AssetType.entries.map { it.name }
 private val ROLES = AssetRole.entries.map { it.name }
 
-private fun AssetIndex.assetJson(a: Asset): JsonObject {
+fun AssetIndex.assetJson(a: Asset): JsonObject {
     val d = snapshot()
     return buildJsonObject {
         put("asset_id", a.id)

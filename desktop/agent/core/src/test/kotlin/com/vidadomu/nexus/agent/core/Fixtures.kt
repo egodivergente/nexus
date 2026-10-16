@@ -79,7 +79,7 @@ class FakeRegistry(private val models: List<ModelSummary> = MODELS, private val 
     override suspend fun schema(ref: ModelRef): ModelSchema { schemaCalls++; return schemas[ref] ?: error("sin schema para $ref") }
 }
 
-class FakeBackend : GenerationBackend {
+open class FakeBackend : GenerationBackend {
     val submitted = mutableListOf<GenerationPlan>()
     val statuses = mutableMapOf<String, JobStatus>()
     var failNext: Exception? = null
@@ -105,11 +105,13 @@ class Harness(
     val backend: FakeBackend = FakeBackend(),
     val assets: AssetIndex = AssetIndex(null),
     var now: Long = 1_790_000_000_000L,
+    /** fps medidos del vídeo de entrada (29,97 como un móvil NTSC). */
+    var frameRate: Double? = 29.97,
 ) {
     val skills = realSkills()
     val cost = prices()
     val guard = SpendGuard(clock = { now })
     val executor = GuardedExecutor(backend, guard)
     val router = ModelRouter(registry, skills, cost)
-    val deps = ToolDeps(registry, skills, cost, router, guard, executor, assets, clock = { now })
+    val deps = ToolDeps(registry, skills, cost, router, guard, executor, assets, clock = { now }, probeFrameRate = { frameRate })
 }

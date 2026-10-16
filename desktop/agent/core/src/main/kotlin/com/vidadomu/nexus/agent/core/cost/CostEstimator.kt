@@ -54,6 +54,7 @@ class PublishedRateEstimator(prices: List<PublishedPrice>) : CostEstimator {
     private val byId = prices.filter { it.status == null || it.status == "ok" }.associateBy { it.id }
 
     override suspend fun estimate(model: ModelSummary, params: Map<String, String>): CostEstimate {
+        if (model.ref.providerId == ATLAS && TieredTariffs.covers(model.ref.modelId)) return tiered(model.ref.modelId, params)
         val p = if (model.ref.providerId == ATLAS) byId[model.ref.modelId] else null
         if (p != null) {
             val checked = p.checkedAt?.let { DATE.format(Instant.ofEpochMilli(it)) }
@@ -97,6 +98,19 @@ class PublishedRateEstimator(prices: List<PublishedPrice>) : CostEstimator {
 
     companion object {
         const val ATLAS = "atlas_cloud"
+
+        /** Tarifa por nivel de la opción elegida; sin nivel o sin duración no se inventa un total. */
+        fun tiered(modelId: String, params: Map<String, String>): CostEstimate {
+            val seconds = params[com.vidadomu.nexus.agent.core.tools.PlanBuilder.SOURCE_SECONDS_KEY]?.toDoubleOrNull()
+            val q = TieredTariffs.quote(modelId, params, seconds) ?: return CostEstimate(
+                null, CostConfidence.UNKNOWN, "La tarifa depende de la plantilla elegida y no se pudo determinar.",
+                notes = listOf("Elige una plantilla válida para ver el coste por segundo."),
+            )
+            val notes = listOf("Tarifa publicada por Atlas (consultada ${TieredTariffs.checkedAt(modelId)}); el cargo real lo confirma Atlas tras medir el vídeo.")
+            return if (q.usd != null) CostEstimate(q.usd, CostConfidence.PUBLISHED_RATE, q.basis, q.usdPerSecond, "second", q.source, TieredTariffs.checkedAt(modelId), notes)
+            else CostEstimate(null, CostConfidence.BASE_ONLY, q.basis, q.usdPerSecond, "second", q.source, TieredTariffs.checkedAt(modelId), notes)
+        }
+
         private val DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC)
         private val JSON = Json { ignoreUnknownKeys = true }
 

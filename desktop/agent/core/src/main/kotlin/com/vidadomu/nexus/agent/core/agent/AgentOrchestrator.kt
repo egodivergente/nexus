@@ -25,6 +25,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -65,6 +66,10 @@ data class TurnResult(
     val toolCalls: List<String>,
     /** END_TURN, MAX_ROUNDS, MAX_TOKENS… */
     val stop: String,
+    /** Estado real que contradice la respuesta y que el agente no corrigió: la UI lo muestra. */
+    val verifiedNotes: List<String> = emptyList(),
+    /** true si el agente tuvo que rehacer su respuesta por contradecir el estado verificado. */
+    val selfCorrected: Boolean = false,
 )
 
 /**
@@ -86,6 +91,10 @@ class AgentOrchestrator(
     private val today: () -> String = { LocalDate.now().toString() },
     private val documents: AttachmentDocumentLoader? = null,
     private val videos: AttachmentVideoLoader? = null,
+    /** Estado real de la interfaz (encargos, errores, eventos) que se adjunta a cada turno. */
+    private val uiContext: (() -> String?)? = null,
+    /** Encargos verificados para contrastar lo que el agente afirma. */
+    private val verifiedOrders: (() -> List<com.vidadomu.nexus.agent.core.orders.Order>)? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -119,11 +128,18 @@ class AgentOrchestrator(
         newAttachments.forEach { a -> if (session.attachment(a.id) == null) session.attachments += a }
 
         val blocks = mutableListOf<ContentBlock>()
+        val imageCache=mutableMapOf<String,ContentBlock.Image?>()
+        suspend fun imageFor(a:Attachment):ContentBlock.Image? {
+            val key=a.id+"|"+a.uri
+            if(!imageCache.containsKey(key)) imageCache[key]=images?.load(a)
+            return imageCache[key]
+        }
         blocks += ContentBlock.Text(userText(text, newAttachments))
+        runCatching { uiContext?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(MAX_UI_CONTEXT_CHARS)) }
         val loader = images
         if (config.sendImagesToLlm && loader != null) {
             newAttachments.filter { it.mimeType.startsWith("image/") }.take(MAX_IMAGES_PER_TURN).forEach { a ->
-                runCatching { loader.load(a) }.getOrNull()?.let { blocks += it }
+                try {imageFor(a)?.let {blocks+=it}} catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) { }
             }
         }
         val videoAttachments = newAttachments.filter { it.mimeType.startsWith("video/") }
@@ -163,9 +179,11 @@ class AgentOrchestrator(
         var llmCalls = 0
         var input = 0; var output = 0; var rounds = 0
         var stop = "END_TURN"
+        var selfCorrected = false
         val turnTexts = mutableListOf<String>()
         val tools = if (config.toolUse) toolsFor(session.mode) else emptyList()
         val specs = tools.map { ToolSpec(it.name, it.description, it.inputSchema) }
+        val readCache=mutableMapOf<String,Triple<JsonElement,Boolean,List<UiEvent>>>()
         val system = SystemPrompt.build(
             session.mode, config.systemPromptOverride, skills.catalogText(),
             session.activeProjectId?.let { assets.findProject(it)?.name ?: it }, today(),
@@ -213,7 +231,20 @@ class AgentOrchestrator(
                 continue
             }
             val uses = msg.toolUses()
-            if (uses.isEmpty()) { stop = response.stopReason.name; break }
+            if (uses.isEmpty()) {
+                stop = response.stopReason.name
+                // Una sola revisión por turno: si la respuesta contradice el estado verificado,
+                // el agente la rehace con el estado real delante (puede consultar herramientas).
+                val contradictions = if (selfCorrected || response.stopReason != StopReason.END_TURN) emptyList()
+                    else runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(msg.text(), it) }.orEmpty()
+                if (contradictions.isNotEmpty() && llmCalls < config.maxToolRounds + 1) {
+                    selfCorrected = true
+                    logger.log("W", "respuesta contradice el estado verificado: ${contradictions.joinToString { it.claim.name }}")
+                    conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text(verificationPrompt(contradictions))))
+                    continue
+                }
+                break
+            }
 
             if (rounds >= config.maxToolRounds) {
                 // Contestar a las llamadas pendientes para que el historial siga siendo válido, y parar.
@@ -224,6 +255,7 @@ class AgentOrchestrator(
                 turnTexts += "He parado tras ${config.maxToolRounds} pasos para no entrar en bucle. Dime cómo seguir."
                 break
             }
+            val knownAttachmentIds = session.attachments.map {it.id}.toSet()
             val results = mutableListOf<ContentBlock.ToolResult>()
             try {
                 for (use in uses) {
@@ -231,7 +263,9 @@ class AgentOrchestrator(
                     val (result, isError, evs) = if (response.stopReason == StopReason.MAX_TOKENS) {
                         Triple(buildJsonObject { put("error", "Llamada a herramienta truncada por límite de tokens (MAX_TOKENS).") }, true, emptyList())
                     } else {
-                        runTool(use, session)
+                        val cacheable=use.name in setOf("get_model_schema","get_model","load_skill","list_skills")
+                        val key=use.name+":"+use.input.toString()
+                        readCache[key]?.takeIf {cacheable} ?: runTool(use, session).also {if(cacheable && !it.second) readCache[key]=it}
                     }
                     evs.forEach { events += it; onEvent(it) }
                     results += ContentBlock.ToolResult(use.id, capToolResult(result), isError)
@@ -248,12 +282,41 @@ class AgentOrchestrator(
                 conv.messages += LlmMessage(Role.USER, results)
                 throw e
             }
-            conv.messages += LlmMessage(Role.USER, results)
+            val loaded = mutableListOf<ContentBlock>()
+            val requestedAssetIds = uses.filter { use ->
+                use.name in setOf("view_library_asset","inspect_image_quality") && results.any { it.toolUseId == use.id && !it.isError }
+            }.mapNotNull { (it.input["asset_id"] as? JsonPrimitive)?.content }.toSet()
+            for(a in session.attachments.filter {it.id !in knownAttachmentIds || it.id in requestedAssetIds}) {
+                try {
+                    loaded += ContentBlock.Text("Archivo solicitado de la biblioteca: ${a.name ?: a.id}")
+                    when {
+                        a.mimeType.startsWith("image/") && config.sendImagesToLlm && images!=null -> loaded += imageFor(a) ?: ContentBlock.Text("No se pudo cargar esta imagen; no afirmes haberla visto.")
+                        a.mimeType.startsWith("video/") && config.sendImagesToLlm && videos!=null -> {loaded += ContentBlock.Text("Muestra visual de fotogramas; no incluye audio.");loaded += videos.load(a)}
+                        !a.mimeType.startsWith("image/") && !a.mimeType.startsWith("video/") && documents!=null -> loaded += documents.load(a) ?: ContentBlock.Text("Formato no legible; usa read_library_text.")
+                        else -> loaded += ContentBlock.Text("Lectura visual desactivada en los ajustes del agente.")
+                    }
+                } catch(e:kotlinx.coroutines.CancellationException) {
+                    conv.messages += LlmMessage(Role.USER, results + loaded)
+                    throw e
+                }
+                catch(e:Exception) {loaded += ContentBlock.Text("No se pudo cargar ${a.name ?: a.id}; no se ha analizado su contenido.")}
+            }
+            conv.messages += LlmMessage(Role.USER, results + loaded)
             rounds++
             if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
         }
-        TurnResult(turnTexts.lastOrNull().orEmpty(), events, Usage(input, output), rounds, calls, stop)
+        val finalText = turnTexts.lastOrNull().orEmpty()
+        val unresolved = runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(finalText, it) }.orEmpty()
+        TurnResult(finalText, events, Usage(input, output), rounds, calls, stop,
+            verifiedNotes = unresolved.map { "Estado verificado: ${it.truth}" }.distinct(), selfCorrected = selfCorrected)
     } }
+
+    private fun verificationPrompt(c: List<ClaimVerifier.Contradiction>): String = buildString {
+        appendLine("[Verificación automática de Nexus — no es un mensaje del usuario]")
+        c.forEach { appendLine("Tu respuesta dice «${it.sentence.take(200)}», pero el estado verificado es: ${it.truth}.") }
+        append("Reescribe tu respuesta al usuario en 1–3 frases ajustadas al estado real: no afirmes envíos ni resultados que no existan. ")
+        append("Si un encargo falló, di el error literal, su causa y la corrección concreta (usa update_plan con su order_id; no crees otro encargo).")
+    }
 
     private fun capToolResult(element: JsonElement): JsonElement {
         val raw = element.toString()
@@ -339,6 +402,16 @@ class AgentOrchestrator(
             return
         }
         // Imágenes solo en los dos últimos mensajes de usuario: ahorra tokens sin perder el contexto textual.
+        val recentTurnStart=m.indices.filter {isPlainUser(m[it])}.takeLast(2).firstOrNull() ?: 0
+        for(i in 0 until recentTurnStart) {
+            m[i]=m[i].copy(content=m[i].content.map { block ->
+                if(block is ContentBlock.ToolResult && block.content.toString().length>6000) block.copy(content=buildJsonObject {
+                    put("context_compacted",true)
+                    put("preview",block.content.toString().take(1800))
+                    put("note","Resultado técnico de un turno anterior abreviado. Repite la consulta si necesitas el detalle exacto; no es un resultado completo.")
+                }) else block
+            })
+        }
         val userIdx = m.indices.filter { m[it].role == Role.USER }
         userIdx.dropLast(2).forEach { i ->
             if (m[i].content.any { it is ContentBlock.Image }) {
@@ -372,6 +445,7 @@ class AgentOrchestrator(
         const val MAX_VIDEOS_PER_TURN = 2
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
         const val MAX_TOOL_RESULT_CHARS = 32_000
+        const val MAX_UI_CONTEXT_CHARS = 4_000
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

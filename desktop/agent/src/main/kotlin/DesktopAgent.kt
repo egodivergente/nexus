@@ -124,7 +124,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             maxToolRounds = 7,
             temperature = settings["temperature"]?.jsonPrimitive?.doubleOrNull,
             mode = mode, sendImagesToLlm = settings["sendImages"]?.jsonPrimitive?.booleanOrNull ?: true
-        ), NexusToolkit.all(deps) +
+        ), NexusToolkit.all(deps).filterNot { it.name == "suggest_replies" } + // Windows no pinta botones de respuesta rápida
             ExpertBriefTool(registry, knowledge) { settings.text("excludedFamilies", "veo").split(',', ';').map { it.trim().lowercase() }.toSet() },
             skills, assets, images = AttachmentImageLoader { attachment ->
             val response = callback("thumbnail", encoded(attachment)).jsonObject
