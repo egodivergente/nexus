@@ -2,6 +2,26 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.17-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
+
+- Android vc51, a partir de una auditoría de las capturas del S25 (cotejada con el código):
+  - Biblioteca: **marcado rápido**. Mantener pulsado marca; con algo marcado, tocar suma o
+    quita; vaciar la selección la cierra (también con Atrás). La barra muestra «N marcados»,
+    marcar todo lo visible, **exportar en ZIP** (se guarda donde elijas; los archivos sin copia
+    local se omiten y se avisa), favorito, ocultar y «Más opciones del archivo». El buscador
+    pasa a la barra de arriba.
+  - Chat: las respuestas del agente llevan un fondo suave, como tus mensajes. Se quita el
+    toque vacío de la respuesta (queda la pulsación larga, con etiqueta para TalkBack).
+  - Lienzo: el prompt ya no tiene altura fija; la 8.ª línea, «Expandir» y el contador de
+    tokens dejan de recortarse.
+  - Historial: estado y hora van primero en la línea (un modelo largo ya no los esconde),
+    «Todos» sustituye a «Recientes/Todos», los filtros sin contenido se ocultan y usan el
+    mismo chip sin borde que el resto; el menú de cada fila ya no lee el UUID del trabajo.
+  - Barra inferior: «Biblioteca» entera y sin leerse dos veces; Modelos sin el «Ejemplo:»
+    repetido.
+- Pendiente de la auditoría: micrófono en el chat (hoy Whisper solo transcribe ficheros, no
+  hay captura en vivo), respuestas rápidas con opciones estructuradas, hoja única al abrir un
+  archivo importado con «Usar en Lienzo/Agente», y trabajo atascado con acción rápida.
 ## [1.9.16-agent] - 2026-10-16 (rama `fix/encargo-unico-agente-ui`)
 
 - Android vc50, Biblioteca: vuelven los metadatos y el filtro de origen, sin etiquetas

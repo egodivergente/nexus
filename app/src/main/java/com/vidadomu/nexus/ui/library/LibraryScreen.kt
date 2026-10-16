@@ -10,6 +10,7 @@ import android.content.Intent
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.assistant.LocalMediaEditsSheet
 import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -64,6 +65,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     // Resolución, tamaño y fecha al pie de cada miniatura; se puede ocultar desde ⋮.
     var showDetails by remember {mutableStateOf(prefs.getBoolean("tile_details",true))}
     var actionTarget by remember {mutableStateOf<Pair<GenerationJob,GenerationOutput>?>(null)}
+    // Marcado rápido: mantener pulsado marca; con algo marcado, tocar suma o quita. Vaciar la selección la cierra.
+    var marked by remember {mutableStateOf(emptySet<String>())}
+    val selecting=marked.isNotEmpty()
+    fun toggleMark(token:String) {marked=if(token in marked) marked-token else marked+token}
+    BackHandler(enabled=selecting) {marked=emptySet()}
     val scope=rememberCoroutineScope()
     val snackbar=remember {SnackbarHostState()}
     val haptic=LocalHapticFeedback.current
@@ -121,6 +127,50 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         onMoreOptions={localPreviewTarget=null;localTarget=asset}) }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
+    // Solo cuenta y actúa sobre lo marcado que sigue visible con los filtros actuales.
+    val visibleTokens=remember(completed,localAssets) {
+        completed.flatMap {job -> job.outputs.map {OutputFiles.token(it)}}.toSet()+localAssets.map {"asset:"+it.id}.toSet()
+    }
+    val markedVisible=marked.intersect(visibleTokens)
+    var exportItems by remember {mutableStateOf<List<ExportItem>>(emptyList())}
+    var exportSkipped by remember {mutableStateOf(0)}
+    val exportLauncher=androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) {destination ->
+        if(destination!=null) scope.launch {
+            val written=try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(destination,"w")!!.use {writeZip(context,it,exportItems)}
+                }
+            } catch(e:kotlinx.coroutines.CancellationException) {throw e}
+            catch(e:Exception) {
+                runCatching {android.provider.DocumentsContract.deleteDocument(context.contentResolver,destination)}
+                snackbar.showSnackbar("No se pudo crear el ZIP");return@launch
+            }
+            marked=emptySet()
+            snackbar.showSnackbar(when {
+                written==0 -> "No se pudo leer ningún archivo marcado"
+                written<exportItems.size+exportSkipped -> "ZIP guardado con $written de ${exportItems.size+exportSkipped} archivos (sin copia local no se pueden incluir)"
+                else -> "ZIP guardado con $written ${if(written==1) "archivo" else "archivos"}"
+            })
+        }
+    }
+    fun startExport() {
+        val items=buildList {
+            completed.forEach {job -> job.outputs.forEachIndexed {i,o ->
+                if(OutputFiles.token(o) in markedVisible) OutputFiles.trustedLocalUri(o,conflicts)?.let {uri ->
+                    val kind=o.type.name.lowercase()
+                    val base=job.modelId.substringAfterLast('/')+"_"+job.id.takeLast(6)+if(job.outputs.size>1) "_${i+1}" else ""
+                    add(ExportItem(uri,base+"."+exportExtension(o.mimeType,uri,kind)))
+                }
+            }}
+            localAssets.forEach {a -> if("asset:"+a.id in markedVisible)
+                add(ExportItem(a.uri,if('.' in a.displayName.takeLast(6)) a.displayName else a.displayName+"."+exportExtension(a.mimeType,a.uri,a.type.name.lowercase())))}
+        }
+        exportSkipped=markedVisible.size-items.size
+        if(items.isEmpty()) {scope.launch {snackbar.showSnackbar("Lo marcado no tiene copia local que exportar")};return}
+        exportItems=items
+        exportLauncher.launch("Nexus-"+SimpleDateFormat("yyyyMMdd-HHmm",Locale.ROOT).format(Date())+".zip")
+    }
     val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
         .decoderDispatcher(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(2))
         .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.08).build()}.build()}
@@ -148,7 +198,26 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
             }},onError={message -> scope.launch {snackbar.showSnackbar(message)}})
     }
-    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(title={
+    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={if(selecting) LibrarySelectionBar(markedVisible.size,markedVisible.size==1,
+        favoritesOn=markedVisible.isNotEmpty() && markedVisible.all {it in favorites},
+        onClose={marked=emptySet()},onSelectAll={marked=visibleTokens},onExport={startExport()},
+        onFavorite={
+            val allFav=markedVisible.all {it in favorites}
+            favorites=if(allFav) favorites-markedVisible else favorites+markedVisible
+            prefs.edit().putStringSet("favorites",favorites).apply()
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        },onHide={
+            val hide=!showHidden
+            hidden=if(hide) hidden+markedVisible else hidden-markedVisible
+            prefs.edit().putStringSet("hidden",hidden).apply()
+            val count=markedVisible.size;marked=emptySet()
+            scope.launch {snackbar.showSnackbar(if(hide) "$count ocultados" else "$count restaurados")}
+        },onOptions={
+            val token=markedVisible.first()
+            if(token.startsWith("asset:")) localTarget=localAssets.firstOrNull {"asset:"+it.id==token}
+            else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
+            marked=emptySet()
+        }) else TopAppBar(title={
         Column(verticalArrangement=Arrangement.Center) {
             Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             val count=completed.sumOf {it.outputs.size}+localAssets.size
@@ -212,7 +281,9 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     val assets=localAssetGroups[origin].orEmpty()
                     if(assets.isNotEmpty()) {
                         items(assets,key={"asset:"+it.id}) {asset ->
-                            LocalAssetTile(asset,imageLoader,showDetails,onPreview={localPreviewTarget=asset},onActions={localTarget=asset})
+                            val token="asset:"+asset.id
+                            LocalAssetTile(asset,imageLoader,showDetails,mark=if(selecting) token in marked else null,
+                                onPreview={if(selecting) toggleMark(token) else localPreviewTarget=asset},onActions={toggleMark(token)})
                         }
                     }
                 }
@@ -221,9 +292,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     entries.forEach {job ->
                         items(job.outputs.size,key={index->"${job.id}:${job.outputs[index].id}:$index"}) {index ->
-                            LibraryTile(job,job.outputs[index],conflicts,imageLoader,OutputFiles.token(job.outputs[index]) in favorites,showDetails,
-                                onActions={actionTarget=job to job.outputs[index]}) {
-                                if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(job.outputs[index])) else onNavigateToOutput(job.id)
+                            val token=OutputFiles.token(job.outputs[index])
+                            LibraryTile(job,job.outputs[index],conflicts,imageLoader,token in favorites,showDetails,
+                                mark=if(selecting) token in marked else null,
+                                onActions={toggleMark(token)}) {
+                                if(selecting) toggleMark(token)
+                                else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(job.outputs[index])) else onNavigateToOutput(job.id)
                             }
                         }
                     }
@@ -235,7 +309,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,onActions:()->Unit,onOpen:()->Unit) {
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,onActions:()->Unit,onOpen:()->Unit) {
     val context=LocalContext.current
     val haptic=LocalHapticFeedback.current
     val interaction=remember {MutableInteractionSource()}
@@ -256,7 +330,8 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
             if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
         // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
-        if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
+        if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
+        else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
         if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration,Modifier.align(Alignment.TopEnd))
         if(showDetails) {
             val known=output.width?.takeIf {it>0}!=null && output.height?.takeIf {it>0}!=null

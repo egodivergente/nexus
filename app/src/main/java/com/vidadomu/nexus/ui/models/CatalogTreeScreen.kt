@@ -171,7 +171,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { _ ->
                         val brief=section.models.firstNotNullOfOrNull(CatalogFocus::forModel)
-                        NavigationCard(section.family,section.family,brief?.let {"${children.size} modelos · Ejemplo: ${it.good}"} ?: "${children.size} modelos",section.models,modality,
+                        NavigationCard(section.family,section.family,brief?.let {"${children.size} modelos · ${it.good}"} ?: "${children.size} modelos",section.models,modality,
                             onClick={family=section.family;filters=false}, compact=compactCards,grid=useGrid,
                             onLongClick={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,

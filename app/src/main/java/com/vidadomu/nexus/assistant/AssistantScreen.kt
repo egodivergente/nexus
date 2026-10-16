@@ -18,6 +18,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -369,7 +372,11 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         if(item.text.isNotBlank()) {
             // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
-            Box(Modifier.fillMaxWidth().combinedClickable(onClick={},onLongClick={actionsExpanded=true},onLongClickLabel="Acciones de la respuesta")) {
+            // Fondo propio, como el de tus mensajes pero más suave, para separar quién habla.
+            Surface(color=MaterialTheme.colorScheme.surfaceContainer,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
+                .pointerInput(Unit) {detectTapGestures(onLongPress={actionsExpanded=true})}
+                .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
+              Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 ChatMarkdownView(item.text)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
@@ -386,6 +393,7 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
                     if(item.toolCalls.isNotEmpty()) DropdownMenuItem(text={Text(if(showSteps) "Ocultar pasos" else "Ver pasos (${item.toolCalls.size})")},
                         leadingIcon={Icon(Icons.Default.Build,null)},onClick={showSteps=!showSteps;actionsExpanded=false})
                 }
+              }
             }
         }
         if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)

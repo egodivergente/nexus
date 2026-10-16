@@ -36,7 +36,7 @@ import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,onPreview:()->Unit,onActions:()->Unit) {
+internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,mark:Boolean?,onPreview:()->Unit,onActions:()->Unit) {
     val haptic=LocalHapticFeedback.current
     val visual=asset.type in setOf(AssetType.IMAGE,AssetType.VIDEO)
     Surface(shape=NexusTokens.thumbnail,modifier=Modifier.aspectRatio(1f).combinedClickable(
@@ -49,6 +49,7 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,o
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             // Opciones al mantener pulsado: sin ⋮ encima de la miniatura. ▶ y duración arriba; metadatos abajo.
+            if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
             if(asset.type in setOf(AssetType.VIDEO,AssetType.AUDIO))
                 TileMediaBadge(asset.type==AssetType.VIDEO,mediaDuration(asset.durationSec?.toFloat()),Modifier.align(Alignment.TopEnd))
             if(showDetails) {

@@ -35,7 +35,6 @@ class LibraryMinimalUiTest {
             selected.value?.let {OutputViewerScreen(it.first,{}, {},initialOutputIndex=it.second)} ?: LibraryScreen({}, {job,index->opened=job to index;selected.value=opened})
         }}}
         compose.onNodeWithContentDescription("Importar archivos").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Más opciones de biblioteca").performClick()
         compose.onNodeWithContentDescription("Buscar en Biblioteca").performClick()
         compose.onNodeWithText("Buscar por modelo o descripción").performTextInput("Prueba dos resultados")
         compose.onAllNodesWithContentDescription("Imagen · Prueba dos resultados").assertCountEquals(2)

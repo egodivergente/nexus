@@ -30,10 +30,10 @@ class HistoryMinimalUiTest {
         val initial=app.generationRepository.allJobs.value.map {it.id}
         compose.onNodeWithContentDescription("Buscar en Historial").performClick()
         compose.onNodeWithText("Buscar modelo o descripción").performTextInput("Prueba de historial")
-        compose.onNodeWithContentDescription("Opciones de creación ${fixture.id}").performClick()
+        compose.onNodeWithContentDescription("Opciones de «Prueba de historial»",substring=true).performClick()
         compose.onNodeWithText("Preparar de nuevo").performClick()
         compose.runOnIdle {assertEquals(fixture.id,prepared?.id)}
-        compose.onNodeWithContentDescription("Opciones de creación ${fixture.id}").performClick()
+        compose.onNodeWithContentDescription("Opciones de «Prueba de historial»",substring=true).performClick()
         compose.onNodeWithText("Diagnóstico").performClick()
         compose.onNodeWithText("Diagnóstico de la tarea").assertIsDisplayed()
         compose.onNodeWithText("ID Tarea: ${fixture.id}").assertExists()

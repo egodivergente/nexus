@@ -66,8 +66,9 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
     val context=LocalContext.current
     // Título útil: el texto del encargo o, si no tiene (upscalers, herramientas), el modelo.
     val title=job.prompt.trim().ifBlank {model}
-    val detail=listOfNotNull(model.takeIf {job.prompt.isNotBlank()},type,
-        generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time).joinToString(" · ")
+    // Estado y hora primero: un nombre de modelo largo no puede empujarlos fuera de la línea.
+    val detail=listOfNotNull(generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time,type,
+        model.takeIf {job.prompt.isNotBlank()}).joinToString(" · ")
     // Solo un coste real; un trabajo fallido o en curso no muestra «Por confirmar».
     val cost=costText.takeIf {job.status==GenerationStatus.COMPLETED && it!="Por confirmar"}
     Row(Modifier.fillMaxWidth().heightIn(min=60.dp).clickable(onClick=onOpen)
@@ -94,7 +95,7 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
         cost?.let {Text(it,modifier=Modifier.widthIn(max=96.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,
             maxLines=1,overflow=TextOverflow.Ellipsis)}
         Box {
-            IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de creación ${job.id}",tint=TextSecondary)}
+            IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de «${title.take(40)}», $time",tint=TextSecondary)}
             DropdownMenu(menuOpen,{menuOpen=false}) { menu {menuOpen=false} }
         }
     }

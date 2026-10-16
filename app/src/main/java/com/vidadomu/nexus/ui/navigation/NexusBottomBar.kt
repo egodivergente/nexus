@@ -14,7 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -64,9 +66,12 @@ fun NexusBottomBar(navController: NavController) {
                                 tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier=Modifier.size(NexusTokens.space24))
                         }
-                        Text(if(screen==Screen.Library) "Biblio" else screen.title,style=MaterialTheme.typography.labelMedium,
+                        // «Biblioteca» cabe entera en 1/5 de 360 dp; solo con letra grande del sistema se abrevia.
+                        // El texto no se anuncia: la pestaña ya lleva su nombre (antes se leía «Biblioteca Biblio»).
+                        val compactLabel=screen==Screen.Library && LocalDensity.current.fontScale>1.15f
+                        Text(if(compactLabel) "Biblio" else screen.title,style=MaterialTheme.typography.labelMedium,
                             color=if(selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines=1)
+                            maxLines=1,softWrap=false,modifier=Modifier.clearAndSetSemantics {})
                     }
                 }
             }

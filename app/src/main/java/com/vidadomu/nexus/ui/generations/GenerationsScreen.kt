@@ -89,8 +89,16 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                 placeholder={Text("Buscar modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={IconButton(onClick={searchQuery="";searchVisible=false}) {Icon(Icons.Default.Close,"Cerrar búsqueda")}})
             LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                val choices=listOf("VISIBLE" to "Recientes","ALL" to "Todos","ARCHIVED" to "Archivados","ACTIVE" to "En curso","COMPLETED" to "Completados","FAILED" to "Fallidos","COMPARISONS" to "Comparativas")
-                items(choices) { (key,label) ->
+                // «Todos» = sin archivar. Los filtros vacíos no ocupan sitio (salvo el que esté elegido).
+                val choices=listOf("VISIBLE" to "Todos","ACTIVE" to "En curso","COMPLETED" to "Completados","FAILED" to "Fallidos","COMPARISONS" to "Comparativas","ARCHIVED" to "Archivados")
+                items(choices.filter {(key,_) -> key=="VISIBLE" || key==statusFilter || when(key) {
+                    "ARCHIVED" -> jobs.any {it.id in archived}
+                    "ACTIVE" -> jobs.any {it.status in setOf(GenerationStatus.QUEUED,GenerationStatus.GENERATING,GenerationStatus.PROCESSING,GenerationStatus.RENDERING,GenerationStatus.UPLOADING)}
+                    "COMPLETED" -> jobs.any {it.status==GenerationStatus.COMPLETED}
+                    "FAILED" -> jobs.any {it.status==GenerationStatus.FAILED}
+                    "COMPARISONS" -> jobs.any {it.parameters.containsKey(com.vidadomu.nexus.ui.create.ComparisonPlan.ID)}
+                    else -> true
+                }}) { (key,label) ->
                     val count=when(key) {
                         "VISIBLE" -> jobs.count {it.id !in archived}
                         "ARCHIVED" -> jobs.count {it.id in archived}
@@ -100,7 +108,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         "COMPARISONS" -> jobs.mapNotNull {it.parameters[com.vidadomu.nexus.ui.create.ComparisonPlan.ID]}.distinct().size
                         else -> jobs.size
                     }
-                    FilterChip(statusFilter==key,{statusFilter=key},label={Text("$label · $count",style=MaterialTheme.typography.labelMedium)},
+                    com.vidadomu.nexus.ui.components.StudioFilterChip(statusFilter==key,{statusFilter=key},label={Text("$label · $count",style=MaterialTheme.typography.labelMedium)},
                         shape=NexusTokens.filter,modifier=Modifier.heightIn(min=NexusTokens.minimumTouch))
                 }
             }

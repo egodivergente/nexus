@@ -234,8 +234,8 @@ fun CreateScreen(
             item { CompactModelSelectionCard(state.selectedModel,currencyManager) { showModelPickerSheet=true } }
             item {
                 StudioPromptField(state.prompt, viewModel::updatePrompt,
-                    if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
-                    modifier=Modifier.fillParentMaxHeight(if(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp<600) .32f else .24f))
+                    if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…")
+                // Sin altura fija: con una caja del 32 % de la pantalla la 8.ª línea, «Expandir» y el contador quedaban recortados.
             }
 
             // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
