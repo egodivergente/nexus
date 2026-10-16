@@ -22,9 +22,11 @@ fun NavController.openHistoryTab() {
  * conserva») ni la reindexación del agente («Indexar historial»).
  */
 object HistoryLinks {
-    private val SCREEN_NAME = Regex("""(?U)\bHistorial\b""")
-    private val CHECK_HISTORY = Regex("""(?iU)\b(revisa|revisar|comprueba|compruébalo en|compruébala en|consulta|ver en|aparece en|disponible en|guardad[ao] en tu)\s+(el\s+|su\s+|tu\s+)?historial\b""")
-    private val NOT_THE_SCREEN = Regex("""(?iU)historial (se conserva|indexado)|indexar historial""")
+    // Sin el flag (?U): el motor de regex de Android (ICU) no lo admite y lanza
+    // PatternSyntaxException al inicializar la clase. ICU ya trata \b con letras Unicode.
+    private val SCREEN_NAME = Regex("""\bHistorial\b""")
+    private val CHECK_HISTORY = Regex("""\b(revisa|revisar|comprueba|compruébalo en|compruébala en|consulta|ver en|aparece en|disponible en|guardad[ao] en tu)\s+(el\s+|su\s+|tu\s+)?historial\b""", RegexOption.IGNORE_CASE)
+    private val NOT_THE_SCREEN = Regex("""historial (se conserva|indexado)|indexar historial""", RegexOption.IGNORE_CASE)
 
     fun mentionsHistoryScreen(text: String?): Boolean {
         if (text.isNullOrBlank() || NOT_THE_SCREEN.containsMatchIn(text)) return false

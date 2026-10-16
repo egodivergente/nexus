@@ -25,6 +25,22 @@ Por tanto, una interfaz con cuatro destinos corresponde a una APK compilada ante
 - **Pixel 8 Pro**: no estaba conectado por ADB. Según `CONTINUAR.md` tenía 1.9.5 vc39
   (cuatro destinos, sin Historial).
 
+### 1.9.9 vc43 instalada en el S25 (2026-10-16, 05:35)
+
+- **Firma.** La primera APK compilada en AXELPC se rechazó con
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: las APK del proyecto (1.9.6, 1.9.7, 1.9.8) llevan
+  el certificado de depuración `8b75db0f…cd7127`, que es `~/.android/debug.keystore` del
+  servidor ASUS. El keystore de AXELPC (`287a0c42…`) es otro. La 1.9.9 se firmó con la
+  clave del ASUS y se instaló con `adb install -r`, conservando los datos
+  (`firstInstallTime` sigue en 2026-10-02). El keystore no está en Git.
+- **Cierre al abrir el chat (corregido).** La primera 1.9.9 se cerraba al pintar un aviso
+  (`PatternSyntaxException` en `HistoryLinks.<clinit>`): el flag de regex `(?U)` funciona
+  en la JVM pero no en el motor de Android (ICU). Se quitó. La APK corregida
+  (SHA-256 `ddf0120cdc896a3bd15b9df50b50e63cc56e3a2a1e94253b8e2281d51dfedfc3`) arranca
+  sin errores en el registro de fallos.
+- **Barra visible.** La jerarquía de la pantalla (uiautomator) y una captura muestran
+  cinco destinos: Agente, Lienzo, Modelos, **Historial** `[864,2867][1152,3049]` y Biblio.
+
 ## Avisos que mencionan Historial
 
 Con la barra inferior, Historial está a un toque en todas las pantallas salvo dos:
