@@ -34,7 +34,10 @@ internal fun ModelSummary.compact(skill: Skill?): JsonObject = buildJsonObject {
     releaseMonth?.let { put("release", it) }
     if (isFlagship) put("flagship", true)
     skill?.let { put("skill", it.id) }
-    basePriceUsd?.let { put("base_price_usd", it); priceUnit?.let { u -> put("price_unit", u + if (priceUnitVerified) "" else " (sin verificar)") } }
+    if (com.vidadomu.nexus.agent.core.cost.TieredTariffs.covers(ref.modelId)) {
+        // El precio base del catálogo es solo el nivel más bajo: nunca lo presentes como «el» precio.
+        put("price_note", com.vidadomu.nexus.agent.core.cost.TieredTariffs.summary(ref.modelId))
+    } else basePriceUsd?.let { put("base_price_usd", it); priceUnit?.let { u -> put("price_unit", u + if (priceUnitVerified) "" else " (sin verificar)") } }
 }
 
 private val MODALITIES = listOf("VIDEO", "IMAGE", "AUDIO", "CHAT", "THREE_D")

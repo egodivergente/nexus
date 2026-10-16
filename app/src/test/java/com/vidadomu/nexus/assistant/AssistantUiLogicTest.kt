@@ -48,6 +48,18 @@ class AssistantUiLogicTest {
         assertTrue(online.toConfig().sendImagesToLlm)
     }
 
+    @Test fun otherLlmApisNeedTheirOwnKeyAndModel() {
+        val anthropic = AssistantSettings(backend = AssistantSettings.BACKEND_ANTHROPIC, modelId = "claude-sonnet-5-5")
+        assertTrue("sin clave no hay LLM", anthropic.offline)
+        assertEquals("anthropic", anthropic.copy(maskedApiKey = "••••").toConfig().provider)
+        val openRouter = AssistantSettings(backend = AssistantSettings.BACKEND_OPENAI, modelId = "openai/gpt-4o", llmBaseUrl = "https://openrouter.ai/api/v1")
+        assertTrue(openRouter.offline)
+        assertEquals("openai-compatible", openRouter.copy(maskedApiKey = "••••").toConfig().provider)
+        assertFalse("un servidor local puede no pedir clave", openRouter.copy(llmBaseUrl = "http://127.0.0.1:11434/v1").offline)
+        assertTrue("sin modelo tampoco", openRouter.copy(maskedApiKey = "••••", modelId = "").offline)
+        assertFalse(anthropic.direct)
+    }
+
     @Test fun directBedrockNeedsBothAwsKeysAndIsTheDefault() {
         val d = AssistantSettings()
         assertTrue(d.direct); assertTrue(d.offline)

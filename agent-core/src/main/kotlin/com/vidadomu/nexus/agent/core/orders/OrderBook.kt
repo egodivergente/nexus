@@ -302,6 +302,11 @@ class OrderBook(private val clock: () -> Long = System::currentTimeMillis) {
         o.copy(failures = o.failures.dropLast(1) + last.copy(explanation = last.explanation ?: explanation, fix = last.fix ?: fix))
     }
 
+    /** Resultados verificados de un encargo ya completado (p. ej. migrado sin ellos). */
+    fun attachOutputs(orderId: String, outputs: List<String>) = update(orderId) { o ->
+        if (o.status != OrderStatus.COMPLETED || outputs.isEmpty() || o.outputs == outputs) o else o.copy(outputs = outputs)
+    }
+
     /** La UI declara lo que ha pintado (estado y botón). El agente lo ve tal cual. */
     fun rendered(orderId: String, shown: String) = update(orderId) { o ->
         if (o.rendered == shown) return@update o

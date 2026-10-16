@@ -59,22 +59,30 @@ class LlmBudgetLedger(private val file: File, private val today: () -> String = 
 }
 
 class BudgetedLlmProvider(private val delegate: LlmProvider, private val ledger: LlmBudgetLedger,
-    private val limits: () -> LlmLimits) : LlmProvider {
+    /** Tarifa (USD por millón de tokens entrada/salida) que el usuario fija para modelos que no son Claude. */
+    private val customRates: () -> Pair<Double, Double>? = { null },
+    private val limits: () -> LlmLimits,
+) : LlmProvider {
     override val id = delegate.id
     // Standard geo/in-region prices with a 20% margin over global list price; no cache discount assumed.
-    private fun rates(model: String): Pair<Double, Double> = when {
-        "claude-sonnet-5-5" in model -> 2.4 to 12.0
-        "claude-opus-5-5" in model -> 4.8 to 24.0
-        "claude-sonnet-4-6" in model -> 3.6 to 18.0
-        "claude-opus-4-6" in model -> 6.0 to 30.0
-        "claude-haiku-4-5" in model -> 1.2 to 6.0
-        else -> throw LlmException(LlmException.Kind.BUDGET, "Ese modelo no tiene tarifa configurada para el limite local de consumo.")
+    private fun rates(model: String): Pair<Double, Double> {
+        val m = model.replace('.', '-')
+        return when {
+            "claude-sonnet-5-5" in m -> 2.4 to 12.0
+            "claude-opus-5-5" in m -> 4.8 to 24.0
+            "claude-sonnet-4-6" in m -> 3.6 to 18.0
+            "claude-opus-4-6" in m -> 6.0 to 30.0
+            "claude-haiku-4-5" in m -> 1.2 to 6.0
+            // Sin tarifa conocida: la del usuario o, si no la indicó, solo los límites de llamadas por mensaje.
+            else -> customRates() ?: (0.0 to 0.0)
+        }
     }
     override suspend fun complete(request: LlmRequest): LlmResponse {
         val (inputRate, outputRate) = rates(request.modelId)
         val counted = delegate.countInputTokens(request)
         val hasDocument = request.messages.any { m -> m.content.any { it is ContentBlock.Document } }
-        if (counted == null && hasDocument) throw LlmException(LlmException.Kind.BUDGET,
+        // Solo Bedrock cuenta tokens antes de enviar; en los demás proveedores se estima por tamaño.
+        if (counted == null && hasDocument && delegate.id.startsWith("bedrock")) throw LlmException(LlmException.Kind.BUDGET,
             "Bedrock no pudo contar el documento antes de enviarlo. Revisa el permiso bedrock:CountTokens y la compatibilidad del modelo; el archivo sigue guardado.")
         val input = counted?.toLong() ?: (ConverseCodec.encodeRequest(request).toString().toByteArray().size.toLong() + 1024)
         val reserved = input * inputRate / 1_000_000 + request.maxTokens * outputRate / 1_000_000

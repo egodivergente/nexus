@@ -733,6 +733,12 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var maxTokens by remember { mutableStateOf(s.maxTokens.toString()) }
     var sendImages by remember { mutableStateOf(s.sendImages) }
     var excluded by remember { mutableStateOf(s.excludedFamilies) }
+    var baseUrl by remember { mutableStateOf(s.llmBaseUrl) }
+    var apiKey by remember { mutableStateOf("") }
+    var clearApiKey by remember { mutableStateOf(false) }
+    var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
+    var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
+    val maskedKey = remember(backend) { vm.maskedApiKey(backend) }
     var error by remember { mutableStateOf<String?>(null) }
     ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         NexusSheetSystemBars()
@@ -742,13 +748,47 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 AgentBudgetSettings()
                 MediaEditingSettings()
                 AgentInternetSettings()
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock",AssistantSettings.BACKEND_PROXY to "Proxy").forEachIndexed { index, (value,label) ->
-                        SegmentedButton(selected=backend==value,onClick={backend=value},
-                            shape=SegmentedButtonDefaults.itemShape(index,2),border=BorderStroke(0.dp,androidx.compose.ui.graphics.Color.Transparent)) {Text(label)}
+                Text("Proveedor del LLM", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    listOf(AssistantSettings.BACKEND_DIRECT to "Bedrock", AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
+                        AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI", AssistantSettings.BACKEND_PROXY to "Proxy").forEach { (value, label) ->
+                        FilterChip(selected = backend == value, onClick = {
+                            if (backend != value) { backend = value; apiKey = ""; clearApiKey = false
+                                // Un modelo de otro proveedor no sirve: se propone uno válido del nuevo.
+                                modelId = when (value) {
+                                    AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS.first().first
+                                    AssistantSettings.BACKEND_OPENAI -> if (modelId.startsWith("us.anthropic.") || modelId.startsWith("claude-")) "" else modelId
+                                    else -> if (modelId.startsWith("us.anthropic.")) modelId else AssistantSettings.DEFAULT_MODEL
+                                } }
+                        }, label = { Text(label) })
                     }
                 }
-                if (backend != AssistantSettings.BACKEND_PROXY) {
+                if (backend == AssistantSettings.BACKEND_ANTHROPIC || backend == AssistantSettings.BACKEND_OPENAI) {
+                    Text(if (backend == AssistantSettings.BACKEND_ANTHROPIC) "Claude con tu clave de la API de Anthropic (se guarda cifrada en el teléfono)."
+                        else "Cualquier API compatible con OpenAI: elige un acceso rápido o escribe la URL. La clave se guarda cifrada y es distinta para cada proveedor.",
+                        style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                    if (backend == AssistantSettings.BACKEND_OPENAI) {
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            AssistantSettings.OPENAI_PRESETS.forEach { (name, url) -> FilterChip(selected = baseUrl.trimEnd('/') == url, onClick = { baseUrl = url }, label = { Text(name) }) }
+                        }
+                        StudioTextField(baseUrl, { baseUrl = it.trim() }, shape=NexusTokens.field, label = { Text("URL de la API (https://…/v1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    StudioCredentialField(apiKey, { apiKey = it; clearApiKey = false }, shape=NexusTokens.field,
+                        label = { Text(if (maskedKey.isNotBlank()) "Clave de API ($maskedKey)" else "Clave de API") }, singleLine = true)
+                    if (maskedKey.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(clearApiKey, { clearApiKey = it }); Text("Borrar la clave guardada", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (backend == AssistantSettings.BACKEND_OPENAI) {
+                        Text("Tarifa para el límite de consumo (opcional, USD por millón de tokens). Sin ella solo se limita el número de llamadas por mensaje.",
+                            style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                            StudioTextField(inputRate, { inputRate = it }, shape=NexusTokens.field, label = { Text("Entrada") }, singleLine = true, modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                            StudioTextField(outputRate, { outputRate = it }, shape=NexusTokens.field, label = { Text("Salida") }, singleLine = true, modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                        }
+                    }
+                } else if (backend != AssistantSettings.BACKEND_PROXY) {
                     Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                     StudioCredentialField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
                     StudioCredentialField(secret, { secret = it; clearSecret = false }, shape=NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
@@ -766,11 +806,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, label = { Text("Model ID / inference profile") }, singleLine = true)
-                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    AssistantSettings.KNOWN_MODELS.forEach { (id,name) ->
-                        FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)})
-                    }
+                StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, singleLine = true,
+                    label = { Text(when (backend) { AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"; AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"; else -> "Model ID / inference profile" }) })
+                val modelChips = when (backend) {
+                    AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS
+                    AssistantSettings.BACKEND_OPENAI -> emptyList()
+                    else -> AssistantSettings.KNOWN_MODELS
+                }
+                if (modelChips.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    modelChips.forEach { (id,name) -> FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)}) }
                 }
                 if(modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
@@ -799,8 +843,13 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 if (t.isNotEmpty() && temp == null) { error = "Temperatura no válida (0–1)."; return@TextButton }
                 val newToken = when { clearToken -> ""; token.isNotBlank() -> token; else -> null }
                 val newSecret = when { clearSecret -> ""; secret.isNotBlank() -> secret; else -> null }
+                val newApiKey = when { clearApiKey -> ""; apiKey.isNotBlank() -> apiKey; else -> null }
+                val inRate = inputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de entrada no válida."; return@TextButton } }
+                val outRate = outputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de salida no válida."; return@TextButton } }
+                if (modelId.isBlank()) { error = "Escribe el id del modelo."; return@TextButton }
                 error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
-                    maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded), newToken, newSecret)
+                    maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
+                    llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate), newToken, newSecret, newApiKey)
                 if (error == null) onDismiss()
             }) { Text("Guardar") }
                 TextButton(onClick=onDismiss) {Text("Cerrar",color=TextSecondary)}

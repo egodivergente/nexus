@@ -753,6 +753,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
      */
     private fun syncOrder(planId: String, job: com.vidadomu.nexus.core.model.GenerationJob) {
         val order = orderOf(planId) ?: return
+        if (order.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED && order.outputs.isEmpty() && job.status == GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) {
+            runCatching { runtime.orders.attachOutputs(order.id, job.outputs.map { it.localUri ?: it.url }) }
+            return
+        }
         if (order.status !in setOf(com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING, com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN)) return
         if (order.jobId != null && order.jobId != job.id) return
         if (order.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN && job.providerJobId == null) return
@@ -772,8 +776,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ---- ajustes ------------------------------------------------------------------------------
 
-    fun saveSettings(s: AssistantSettings, newToken: String?, newAwsSecret: String? = null): String? = try {
-        runtime.settings.save(s, newToken, newAwsSecret)
+    fun maskedApiKey(backend: String): String = runtime.settings.maskedApiKey(backend)
+
+    fun saveSettings(s: AssistantSettings, newToken: String?, newAwsSecret: String? = null, newApiKey: String? = null): String? = try {
+        runtime.settings.save(s, newToken, newAwsSecret, newApiKey)
         val loaded = runtime.settings.load()
         orchestrator = runtime.orchestrator(loaded)
         _ui.update { it.copy(settings = loaded, mode = loaded.mode) }

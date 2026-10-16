@@ -5,6 +5,8 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -168,7 +170,13 @@ internal fun ProjectMediaPickerSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(horizontal = NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-            Text(if (managing) "Biblioteca del proyecto" else "Importar fotografías y archivos", style = MaterialTheme.typography.titleMedium)
+            // Título y «Gestionar» en la misma línea: sin una fila solo para el enlace.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (managing) "Biblioteca del proyecto" else "Fotos y archivos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (!managementOnly) TextButton(onClick = { managing = !managing; selected = emptyList() }, enabled = !busy) {
+                    Text(if (managing) "Volver" else "Gestionar")
+                }
+            }
             if (managementOnly) Box {
                 TextButton(onClick = { projectMenu = true }, enabled = !busy && projects.isNotEmpty()) {
                     Text(projectName?.let { "Proyecto: $it ▾" } ?: "Elegir proyecto ▾")
@@ -181,14 +189,6 @@ internal fun ProjectMediaPickerSheet(
             } else FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 StudioFilterChip(recent,{recent=true;selected=emptyList()},label={Text("Recientes")})
                 if(projectId!=null) StudioFilterChip(!recent,{recent=false;selected=emptyList()},label={Text(projectName ?: "Proyecto")})
-            }
-            if (!managementOnly) TextButton(onClick = { managing = !managing; selected = emptyList() }, enabled = !busy) {
-                Text(if (managing) "Volver a importar" else "Gestionar biblioteca")
-            }
-            if (!managing) FilledTonalButton(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.AddPhotoAlternate, null)
-                Spacer(Modifier.width(NexusTokens.space8))
-                Text("Importar desde el dispositivo")
             }
             if (busy) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -206,27 +206,22 @@ internal fun ProjectMediaPickerSheet(
                 }
             }
             StudioTextField(query, { query = it }, placeholder = { Text("Buscar archivos") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            if (filtered.isEmpty()) {
-                Text(if (projectId == null && managing) "Elige un proyecto para gestionar sus imágenes." else if (projectId == null) "Todavía no tienes recientes. Importa un archivo una vez para reutilizarlo aquí." else if (all.isEmpty()) "Este proyecto todavía no tiene imágenes guardadas." else "No hay fotografías con ese nombre.", style = MaterialTheme.typography.bodyMedium)
+            if (filtered.isEmpty() && managing) {
+                Text(if (projectId == null) "Elige un proyecto para gestionar sus imágenes." else if (all.isEmpty()) "Este proyecto todavía no tiene imágenes guardadas." else "No hay fotografías con ese nombre.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-            } else LazyVerticalGrid(columns = GridCells.Adaptive(104.dp), modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+            } else LazyVerticalGrid(columns = GridCells.Adaptive(100.dp), modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Importar es la primera casilla de la cuadrícula, no un botón de ancho completo.
+                if (!managing) item(key = "import") { ImportTile(enabled = !busy, onClick = onImport) }
                 items(filtered, key = { it.id }) { asset ->
                     val checked = asset.id in selected
-                    Column(Modifier.clip(NexusTokens.field).semantics {contentDescription=asset.displayName}.toggleable(value = checked, role = Role.Checkbox,
-                        enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum),
-                        onValueChange = { select -> selected = if (!select) selected - asset.id else if (!managing && maximum == 1) listOf(asset.id) else selected + asset.id })) {
-                        if(asset.mimeType?.startsWith("image/")==true) AsyncImage(asset.uri, null, Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Crop)
-                        else Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,modifier=Modifier.fillMaxWidth().aspectRatio(1f)) {
-                            Box(contentAlignment=Alignment.Center) {Icon(if(asset.mimeType?.startsWith("video/")==true) Icons.Default.Movie else Icons.Default.Description,null,Modifier.size(32.dp))}
-                        }
-                        Row {
-                            Checkbox(checked, null)
-                            Text(asset.displayName, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(top = NexusTokens.space8))
-                        }
+                    MediaTile(asset, checked, enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum)) { select ->
+                        selected = if (!select) selected - asset.id else if (!managing && maximum == 1) listOf(asset.id) else selected + asset.id
                     }
                 }
             }
+            if (filtered.isEmpty() && !managing) Text(if (projectId == null) "Importa un archivo una vez para reutilizarlo aquí." else "No hay archivos con ese nombre.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (managing) {
                 Button(onClick = { onExport(chosen) }, enabled = chosen.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
                     Text("ZIP de seleccionadas · ${chosen.size}")
@@ -239,5 +234,55 @@ internal fun ProjectMediaPickerSheet(
             }
             Spacer(Modifier.height(NexusTokens.space8))
         }
+    }
+}
+
+
+/** Casilla de importación con el mismo tamaño que las miniaturas. */
+@Composable
+private fun ImportTile(enabled: Boolean, onClick: () -> Unit) {
+    Column {
+        Surface(onClick = onClick, enabled = enabled, shape = NexusTokens.thumbnail, color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f).semantics { contentDescription = "Importar desde el dispositivo" }) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary) }
+        }
+        Text("Importar", style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/**
+ * Miniatura real (fotograma para vídeo), selección como círculo en la esquina y nombre en una
+ * línea: misma información con menos alto y sin casillas descolocadas.
+ */
+@Composable
+private fun MediaTile(asset: Asset, checked: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val mime = asset.mimeType.orEmpty()
+    val video = mime.startsWith("video/")
+    val primary = MaterialTheme.colorScheme.primary
+    Column(Modifier.semantics { contentDescription = asset.displayName }.toggleable(value = checked, role = Role.Checkbox, enabled = enabled, onValueChange = onToggle)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(NexusTokens.thumbnail)
+            .then(if (checked) Modifier.border(2.dp, primary, NexusTokens.thumbnail) else Modifier)) {
+            if (mime.startsWith("image/") || video) AsyncImage(
+                model = coil.request.ImageRequest.Builder(context).data(asset.uri).crossfade(120)
+                    .apply { if (video) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }.build(),
+                contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxSize()) {
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Description, null, Modifier.size(28.dp)) }
+            }
+            if (video) Row(Modifier.align(Alignment.BottomStart).padding(4.dp).clip(NexusTokens.filter)
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .55f)).padding(horizontal = 5.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(12.dp), tint = androidx.compose.ui.graphics.Color.White)
+                asset.durationSec?.let { s -> Text("%d:%02d".format((s / 60).toInt(), (s % 60).toInt()), style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White) }
+            }
+            Box(Modifier.align(Alignment.TopEnd).padding(5.dp).size(20.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(if (checked) primary else androidx.compose.ui.graphics.Color.Black.copy(alpha = .35f))
+                .border(1.5.dp, androidx.compose.ui.graphics.Color.White, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                if (checked) Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimary)
+            }
+        }
+        Text(asset.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
     }
 }

@@ -57,16 +57,28 @@ data class AssistantSettings(
     val maskedAwsSecret: String = "",
     /** Familias que no se recomiendan, separadas por comas. Por defecto «veo»: el usuario lo tiene gratis en otro sitio. */
     val excludedFamilies: String = DEFAULT_EXCLUDED,
+    /** URL base de la API compatible con OpenAI (OpenAI, OpenRouter, Gemini, DeepSeek, Groq, Mistral, local…). */
+    val llmBaseUrl: String = "",
+    /** Clave de API del proveedor elegido (Anthropic u OpenAI-compatible), enmascarada. */
+    val maskedApiKey: String = "",
+    /** USD por millón de tokens de entrada/salida para modelos sin tarifa conocida (opcional). */
+    val inputUsdPerM: Double? = null,
+    val outputUsdPerM: Double? = null,
 ) {
     val excludedSet: Set<String> get() = parseFamilies(excludedFamilies)
-    val direct: Boolean get() = backend != BACKEND_PROXY
+    val direct: Boolean get() = backend == BACKEND_DIRECT
 
     /** Sin credenciales del backend elegido se usa el planificador local (sin LLM). */
-    val offline: Boolean get() = modelId.isBlank() || if (direct) awsAccessKeyId.isBlank() || maskedAwsSecret.isBlank() || region.isBlank()
-        else endpoint.isBlank() || maskedToken.isBlank()
+    val offline: Boolean get() = modelId.isBlank() || when (backend) {
+        BACKEND_PROXY -> endpoint.isBlank() || maskedToken.isBlank()
+        BACKEND_ANTHROPIC -> maskedApiKey.isBlank()
+        // Un servidor local puede no pedir clave; uno remoto sí.
+        BACKEND_OPENAI -> llmBaseUrl.isBlank() || (maskedApiKey.isBlank() && !LOCAL_URL.matches(llmBaseUrl.trim()))
+        else -> awsAccessKeyId.isBlank() || maskedAwsSecret.isBlank() || region.isBlank()
+    }
 
     fun toConfig() = AgentConfig(
-        provider = when { offline -> "offline"; direct -> "bedrock-direct"; else -> "bedrock-proxy" },
+        provider = when { offline -> "offline"; backend == BACKEND_PROXY -> "bedrock-proxy"; backend == BACKEND_ANTHROPIC -> "anthropic"; backend == BACKEND_OPENAI -> "openai-compatible"; else -> "bedrock-direct" },
         modelId = modelId.ifBlank { "offline" }, region = region,
         endpoint = endpoint, temperature = temperature, maxTokens = maxTokens, maxToolRounds = 20, mode = AgentMode.AGENT, sendImagesToLlm = sendImages && !offline,
     )
@@ -74,6 +86,20 @@ data class AssistantSettings(
     companion object {
         const val BACKEND_DIRECT = "direct"
         const val BACKEND_PROXY = "proxy"
+        const val BACKEND_ANTHROPIC = "anthropic"
+        const val BACKEND_OPENAI = "openai"
+        val LOCAL_URL = Regex("^http://(127\\.0\\.0\\.1|localhost)(:\\d+)?(/.*)?$")
+        /** Modelos de Claude para la API de Anthropic (ids oficiales). */
+        val ANTHROPIC_MODELS = listOf("claude-sonnet-5-5" to "Sonnet 5.5", "claude-opus-5-5" to "Opus 5.5", "claude-haiku-5-5" to "Haiku 5.5")
+        /** Puntos de acceso compatibles con OpenAI más habituales; el modelo lo escribe el usuario. */
+        val OPENAI_PRESETS = listOf(
+            "OpenAI" to "https://api.openai.com/v1",
+            "OpenRouter" to "https://openrouter.ai/api/v1",
+            "Gemini" to "https://generativelanguage.googleapis.com/v1beta/openai",
+            "DeepSeek" to "https://api.deepseek.com/v1",
+            "Groq" to "https://api.groq.com/openai/v1",
+            "Mistral" to "https://api.mistral.ai/v1",
+        )
         const val DEFAULT_MODEL = "us.anthropic.claude-sonnet-4-6"
         const val DEFAULT_REGION = "us-east-1"
         const val DEFAULT_EXCLUDED = "veo"
@@ -121,7 +147,30 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         awsAccessKeyId = runCatching { secure.getProviderApiKey(AWS_ACCESS_ID) }.getOrDefault(""),
         maskedAwsSecret = masked(AWS_SECRET_ID),
         excludedFamilies = prefs.getString("excluded_families", AssistantSettings.DEFAULT_EXCLUDED).orEmpty(),
+        llmBaseUrl = prefs.getString("llm_base_url", "").orEmpty(),
+        maskedApiKey = apiKeyId(prefs.getString("backend", AssistantSettings.BACKEND_DIRECT).orEmpty())?.let(::masked).orEmpty(),
+        inputUsdPerM = prefs.getString("llm_input_usd_m", null)?.toDoubleOrNull(),
+        outputUsdPerM = prefs.getString("llm_output_usd_m", null)?.toDoubleOrNull(),
     )
+
+    /** Cada proveedor guarda su propia clave cifrada: cambiar de uno a otro no borra la del anterior. */
+    private fun apiKeyId(backend: String): String? = when (backend) {
+        AssistantSettings.BACKEND_ANTHROPIC -> ANTHROPIC_KEY_ID
+        AssistantSettings.BACKEND_OPENAI -> OPENAI_KEY_ID
+        else -> null
+    }
+
+    fun apiKey(backend: String): String = apiKeyId(backend)?.let { runCatching { secure.getProviderApiKey(it) }.getOrDefault("") }.orEmpty()
+
+    /** Máscara de la clave guardada para [backend] (la UI la muestra al cambiar de proveedor). */
+    fun maskedApiKey(backend: String): String = apiKeyId(backend)?.let(::masked).orEmpty()
+
+    fun customRates(): Pair<Double, Double>? {
+        val s = load()
+        val input = s.inputUsdPerM ?: return null
+        val output = s.outputUsdPerM ?: return null
+        return input to output
+    }
 
     /** Proyecto activo, persistido entre sesiones (lo generado mientras está activo se etiqueta con él). */
     fun activeProjectId(): String? = prefs.getString("active_project", null)?.takeIf { it.isNotBlank() }
@@ -130,10 +179,27 @@ class AssistantSettingsStore(private val app: NexusApplication) {
     private fun masked(id: String) = runCatching { secure.getMaskedProviderApiKey(id).takeIf { secure.hasProviderApiKey(id) }.orEmpty() }.getOrDefault("")
 
     /** [newToken] / [newAwsSecret]: null = no tocar; "" = borrar. */
-    fun save(s: AssistantSettings, newToken: String?, newAwsSecret: String? = null) {
+    fun save(s: AssistantSettings, newToken: String?, newAwsSecret: String? = null, newApiKey: String? = null) {
         val endpoint = s.endpoint.trim().trimEnd('/')
         require(endpoint.isBlank() || endpoint.startsWith("https://") || LOCAL.matches(endpoint)) {
             "El proxy debe usar https:// (o http://127.0.0.1 con adb reverse en depuración)."
+        }
+        val baseUrl = s.llmBaseUrl.trim().trimEnd('/')
+        require(baseUrl.isBlank() || baseUrl.startsWith("https://") || LOCAL.matches(baseUrl)) {
+            "La URL de la API debe usar https:// (o http://127.0.0.1 para un servidor local)."
+        }
+        require((s.inputUsdPerM == null) == (s.outputUsdPerM == null)) { "Indica la tarifa de entrada y la de salida, o ninguna." }
+        listOfNotNull(s.inputUsdPerM, s.outputUsdPerM).forEach { require(it.isFinite() && it in 0.0..1000.0) { "Tarifa no válida (USD por millón de tokens, 0–1000)." } }
+        val edit = prefs.edit().putString("llm_base_url", baseUrl)
+        if (s.inputUsdPerM != null && s.outputUsdPerM != null) edit.putString("llm_input_usd_m", s.inputUsdPerM.toString()).putString("llm_output_usd_m", s.outputUsdPerM.toString())
+        else edit.remove("llm_input_usd_m").remove("llm_output_usd_m")
+        edit.apply()
+        apiKeyId(s.backend)?.let { id ->
+            when {
+                newApiKey == null -> Unit
+                newApiKey.isBlank() -> secure.clearProviderApiKey(id)
+                else -> secure.saveProviderApiKey(id, newApiKey.trim())
+            }
         }
         require(s.region.isBlank() || REGION.matches(s.region.trim())) { "Región de AWS no válida (p. ej. us-east-1)." }
         prefs.edit().putString("backend", s.backend).putString("endpoint", endpoint).putString("model_id", s.modelId.trim()).putString("region", s.region.trim())
@@ -189,6 +255,8 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         const val TOKEN_ID = "nexus_assistant_proxy"
         const val AWS_ACCESS_ID = "nexus_bedrock_access_key"
         const val AWS_SECRET_ID = "nexus_bedrock_secret_key"
+        const val ANTHROPIC_KEY_ID = "nexus_llm_anthropic_key"
+        const val OPENAI_KEY_ID = "nexus_llm_openai_compatible_key"
         private val LOCAL = Regex("^http://(127\\.0\\.0\\.1|localhost)(:\\d+)?(/.*)?$")
         private val REGION = Regex("^[a-z]{2}(-[a-z]+)+-\\d$")
     }
@@ -243,8 +311,16 @@ class AssistantRuntime(private val app: NexusApplication) {
     fun llm(s: AssistantSettings): LlmProvider =
         when {
             s.offline -> OfflinePlannerProvider()
+            s.backend == AssistantSettings.BACKEND_ANTHROPIC -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
+                com.vidadomu.nexus.agent.core.llm.AnthropicProvider({ settings.apiKey(AssistantSettings.BACKEND_ANTHROPIC) }), llmBudget,
+                customRates = { settings.customRates() }, limits = { settings.llmLimits() })
+            s.backend == AssistantSettings.BACKEND_OPENAI -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
+                com.vidadomu.nexus.agent.core.llm.OpenAiCompatibleProvider(s.llmBaseUrl, { settings.apiKey(AssistantSettings.BACKEND_OPENAI) },
+                    // OpenRouter pide identificar la app; el resto lo ignora.
+                    extraHeaders = mapOf("HTTP-Referer" to "https://github.com/egodivergente/nexus", "X-Title" to "Nexus")), llmBudget,
+                customRates = { settings.customRates() }, limits = { settings.llmLimits() })
             s.direct -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
-                BedrockDirectProvider(s.region.trim(), { settings.awsCredentials() }), llmBudget, { settings.llmLimits() })
+                BedrockDirectProvider(s.region.trim(), { settings.awsCredentials() }), llmBudget, limits = { settings.llmLimits() })
             else -> BedrockProxyProvider(s.endpoint, { settings.token() })
         }
 

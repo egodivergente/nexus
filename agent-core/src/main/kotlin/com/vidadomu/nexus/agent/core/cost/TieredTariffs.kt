@@ -61,4 +61,11 @@ object TieredTariffs {
     }
 
     fun checkedAt(modelId: String): String? = TABLES[modelId]?.checkedAt
+
+    /** Resumen legible de la tabla, para listados (el agente no debe usar la tarifa base). */
+    fun summary(modelId: String): String? = TABLES[modelId]?.let { t ->
+        "Tarifa por segundo de vídeo según el nivel de ${t.tierField}: " +
+            t.tiers.values.joinToString(", ") { "${it.label} ${"%.6f".format(java.util.Locale.ROOT, it.usdPerSecond)} $/s" } +
+            "; ×2 con más de 30 fps y ×4 con más de 60. Fuente: ${t.source}"
+    }
 }

@@ -121,7 +121,9 @@ internal fun OrderCard(
     val dirty = prompt != plan.prompt
     val cost = remember(plan.estimate, currencyState) { plan.estimate?.amountUsd?.let(currency::formatCost) }
     val shown = presentOrder(order, cost, p.busy, assistantBusy, dirty)
-    LaunchedEffect(order.id, shown.rendered) { onRendered(shown.rendered) }
+    // Lo que de verdad se pinta: con resultados, miniaturas en lugar del botón.
+    val rendered = if (order.status == OrderStatus.COMPLETED && outputs.isNotEmpty()) "${shown.status} · ${outputs.size} resultado(s) visibles como miniatura" else shown.rendered
+    LaunchedEffect(order.id, rendered) { onRendered(rendered) }
     var editParam by remember { mutableStateOf<Pair<String, String>?>(null) }
     editParam?.let { (k, v) -> ParamEditDialogCompact(k, v, onSave = { nv -> editParam = null; onEdit(PlanEdit(params = mapOf(k to nv))) }, onDismiss = { editParam = null }) }
 
