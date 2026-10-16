@@ -202,7 +202,8 @@ fun AssistantScreen(
                                 showDiscard = false,
                                 onDirtyChanged = {dirtyPlans[p.plan.id]=it},
                                 onOpenCanvas = { scope.launch { vm.canvasState(p.plan.id)?.let(onOpenInCanvas) } },
-                                onOpenOutput = { p.jobId?.let(onNavigateToOutput) }) })
+                                onOpenOutput = { p.jobId?.let(onNavigateToOutput) },
+                                onDiagnoseFailure = { vm.diagnoseFailure(p.plan.id) }) })
                         }
                     }
                 }
@@ -535,6 +536,7 @@ internal fun PlanCardView(
     primaryAction:Boolean=true,
     showDiscard:Boolean=true,
     onDirtyChanged:(Boolean)->Unit={},
+    onDiagnoseFailure:()->Unit={},
 ) {
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency=app.currencyManager
@@ -595,6 +597,7 @@ internal fun PlanCardView(
                 }
                 if(p.jobStatus=="COMPLETED") FilledTonalButton(onClick=onOpenOutput) {Text("Ver resultado")}
                 if(p.jobStatus in setOf("FAILED","CANCELLED")) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    if(p.jobStatus=="FAILED") TextButton(onClick=onDiagnoseFailure,enabled=!assistantBusy) {Text("Analizar fallo",color=TextSecondary)}
                     TextButton(onClick=onDiscard) {Text("Quitar tarjeta",color=TextSecondary)}
                     TextButton(onClick=onOpenOutput) {Text("Ver detalle",color=TextSecondary)}
                 }

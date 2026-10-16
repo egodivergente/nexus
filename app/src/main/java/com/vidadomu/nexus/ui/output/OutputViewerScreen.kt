@@ -141,8 +141,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
                 }
                 if(details) {
                     Text(job.prompt.ifBlank {"Sin instrucción textual"},style=MaterialTheme.typography.bodyLarge)
-                    ViewerDetail("Modelo",app.modelCatalogRepository.getModelById(job.modelId)?.displayName ?: job.modelId)
-                    ViewerDetail("Proveedor",job.providerId)
+                    output?.let { OutputMetadataDetails(job, it, trustedLocal) }
                     val cost=remember(job,currencyState) {com.vidadomu.nexus.ui.components.confirmedJobCost(job,currencyManager)}
                     ViewerDetail("Coste",cost)
                     job.actualCostUsd?.let {ViewerDetail("Importe original",currencyManager.formatUsdDetails(it))}

@@ -10,6 +10,7 @@ import com.vidadomu.nexus.agent.core.cost.CostConfidence
 import com.vidadomu.nexus.agent.core.cost.CostEstimate
 import com.vidadomu.nexus.agent.core.cost.CostEstimator
 import com.vidadomu.nexus.agent.core.llm.ContentBlock
+import com.vidadomu.nexus.agent.core.log.Redactor
 import com.vidadomu.nexus.agent.core.registry.MediaSpec
 import com.vidadomu.nexus.agent.core.registry.ModelRef
 import com.vidadomu.nexus.agent.core.registry.ModelRegistry
@@ -267,7 +268,9 @@ class NexusHistorySource(private val app: NexusApplication) : GenerationHistoryS
     override suspend fun recent(limit: Int): List<HistoryEntry> = app.generationRepository.allJobs.value
         .sortedByDescending { it.startedAt }.take(limit).map { j ->
             HistoryEntry(j.id, j.providerId, j.modelId, j.modality.name, j.prompt.take(400), j.status.name, j.startedAt,
-                j.actualCostUsd ?: j.estimatedCostUsd, j.outputs.map { it.localUri ?: it.url })
+                j.actualCostUsd ?: j.estimatedCostUsd, j.outputs.map { it.localUri ?: it.url },
+                j.error?.let { Redactor.redact(it).take(500) },
+                j.technicalDetails?.let { Redactor.redact(it).take(1200) })
         }
 }
 

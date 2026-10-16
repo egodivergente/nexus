@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.vidadomu.nexus.core.model.*
 import java.io.File
+import com.vidadomu.nexus.ui.output.OutputMetadataDetails
 import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
 import com.vidadomu.nexus.ui.theme.NexusTokens
 
@@ -35,6 +36,7 @@ internal fun LibraryActions(job:GenerationJob,output:GenerationOutput,localUri:S
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space24)) {
             Text("Opciones del archivo",style=MaterialTheme.typography.titleMedium)
+            OutputMetadataDetails(job, output, localUri)
             ListItem(headlineContent={Text("Abrir")},leadingContent={Icon(Icons.Default.OpenInFull,null)},
                 modifier=Modifier.actionClick {onDismiss();onOpen()})
             ListItem(headlineContent={Text(if(favorite) "Quitar de favoritos" else "Marcar favorito")},leadingContent={Icon(Icons.Default.Star,null)},
