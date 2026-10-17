@@ -61,7 +61,7 @@ class RedactingLoggingInterceptor : Interceptor {
 object NetworkErrorParser {
     fun parse(e: Throwable): ProviderError {
         return when (e) {
-            is SocketTimeoutException -> ProviderError(
+            is SocketTimeoutException, is java.io.InterruptedIOException -> ProviderError(
                 humanReadableMessage = "La conexión ha tardado demasiado. La operación podría seguir procesándose; revisa el historial antes de repetirla.",
                 technicalDetails = e.javaClass.simpleName,
                 errorCode = "TIMEOUT"
@@ -113,9 +113,11 @@ object OkHttpClientFactory {
             .addInterceptor(RedactingLoggingInterceptor())
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            // Las referencias (imágenes de 5 MB+) se suben por esta misma conexión: con 60/120 s la subida por datos móviles
+            // se cortaba a media transferencia y se veía como «conexión interrumpida».
+            .writeTimeout(5, TimeUnit.MINUTES)
             .retryOnConnectionFailure(false)
-            .callTimeout(120, TimeUnit.SECONDS)
+            .callTimeout(10, TimeUnit.MINUTES)
             .build()
     }
 }

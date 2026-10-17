@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.25-agent] - 2026-10-17
+
+### Corregido
+- Encargos con referencias grandes (5 MB+) en Crun y Atlas fallaban con «Se ha interrumpido la conexión»: la conexión compartida cortaba la subida a los 60 s de escritura / 120 s totales. Ahora 5 / 10 min, y el corte por tiempo se explica como tiempo agotado en vez de conexión interrumpida.
+
 ## [1.9.24-agent] - 2026-10-17 (rama `feat/byteplus-custom-providers-20261017`)
 
 ### Añadido
