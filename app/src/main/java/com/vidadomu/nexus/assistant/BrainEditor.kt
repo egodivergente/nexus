@@ -21,7 +21,12 @@ import com.vidadomu.nexus.agent.core.config.LimitOverrides
 import com.vidadomu.nexus.agent.core.llm.BrainAuth
 import com.vidadomu.nexus.agent.core.llm.BrainAuthMode
 import com.vidadomu.nexus.agent.core.llm.BrainCapabilities
+import androidx.compose.ui.platform.LocalUriHandler
+import com.vidadomu.nexus.agent.core.llm.BrainDiagnosis
 import com.vidadomu.nexus.agent.core.llm.BrainDiscovery
+import com.vidadomu.nexus.agent.core.llm.BrainProblem
+import com.vidadomu.nexus.agent.core.llm.BrainProblemKind
+import com.vidadomu.nexus.agent.core.llm.ModelState
 import com.vidadomu.nexus.agent.core.llm.BrainPresets
 import com.vidadomu.nexus.agent.core.llm.BrainProfile
 import com.vidadomu.nexus.agent.core.llm.BrainProtocol
@@ -110,6 +115,9 @@ internal fun BrainEditorDialog(initial: BrainProfile?, store: BrainStore, onClos
     var lHttp by remember { mutableStateOf(seed.limits.httpTimeoutSeconds?.toString().orEmpty()) }
     var message by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // texto, esError
     var busy by remember { mutableStateOf(false) }
+    var problem by remember { mutableStateOf<BrainProblem?>(null) }
+    var states by remember { mutableStateOf<Map<String, ModelState>>(emptyMap()) }
+    val uriHandler = LocalUriHandler.current
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val maskedKey = remember(initial?.id) { initial?.let { store.maskedKey(it.id) }.orEmpty() }
@@ -130,6 +138,11 @@ internal fun BrainEditorDialog(initial: BrainProfile?, store: BrainStore, onClos
         parsed.firstNotNullOfOrNull { it.second }?.let { return bad(it) }
         val tu = dec(lTurnUsd); val du = dec(lDailyUsd)
         if ((lTurnUsd.isNotBlank() && tu == null) || (lDailyUsd.isNotBlank() && du == null)) return bad("Un importe de gasto no es un número.")
+        val wanted = modelId.trim()
+        if (models.isNotEmpty() && wanted.isNotEmpty() && wanted !in models && !wanted.startsWith("ep-")) {
+            val near = BrainDiagnosis.closest(wanted, models)
+            if (near != null) return bad("«$wanted» no figura entre los modelos del proveedor. ¿Quisiste decir «$near»?")
+        }
         val id = initial?.id ?: store.uniqueId(BrainProfile.slug(name))
         val p = BrainProfile(
             id = id, name = name.trim(), protocol = protocol, baseUrl = baseUrl.trim().trimEnd('/'), endpointPath = endpointPath.trim(),
@@ -143,6 +156,22 @@ internal fun BrainEditorDialog(initial: BrainProfile?, store: BrainStore, onClos
     }
 
     fun keyForCalls(id: String) = apiKey.trim().ifBlank { store.apiKey(id) }
+
+    fun runTest() {
+        val (p, bad) = assemble()
+        if (p == null || bad != null) { message = (bad ?: "Revisa los datos.") to true; return }
+        busy = true; message = "Probando…" to false; problem = null
+        scope.launch {
+            try {
+                val r = BrainDiscovery.test(p, { keyForCalls(p.id) })
+                if (r.models.isNotEmpty()) models = r.models
+                message = r.message to !r.ok
+                problem = r.problem
+                if (r.ok) states = states + (p.modelId to ModelState.ACTIVE)
+                else if (r.problem?.kind == BrainProblemKind.NOT_ACTIVATED) states = states + (p.modelId to ModelState.NOT_ACTIVATED)
+            } finally { busy = false }
+        }
+    }
 
     FullscreenDialog({ if (!busy) onClose(null) }) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -197,8 +226,30 @@ internal fun BrainEditorDialog(initial: BrainProfile?, store: BrainStore, onClos
                     EditorSection("Modelo") {
                         StudioTextField(modelId, { modelId = it.trim() }, shape = NexusTokens.field, singleLine = true, modifier = Modifier.fillMaxWidth(),
                             label = { Text("ID del modelo") }, supportingText = { Text(if (models.isEmpty()) "Escríbelo o pulsa «Descubrir»." else "${models.size} modelos conocidos") })
-                        val suggestions = models.filter { modelId.isBlank() || it.contains(modelId, true) }.filter { it != modelId }.take(8)
-                        if (suggestions.isNotEmpty()) ChipChoice(suggestions.map { it to it }, "") { modelId = it }
+                        val bytePlus = BrainDiagnosis.isBytePlus(seed.copy(baseUrl = baseUrl))
+                        val pool = if (bytePlus) models.filter(BrainDiagnosis::isTextModel) else models
+                        val suggestions = pool.filter { modelId.isBlank() || it.contains(modelId, true) }.filter { it != modelId }
+                            .sortedBy { if (states[it] == ModelState.ACTIVE) 0 else 1 }.take(8)
+                        fun mark(id: String) = when (states[id]) { ModelState.ACTIVE -> "✓ $id"; ModelState.NOT_ACTIVATED -> "⚠ $id (sin activar)"; ModelState.NOT_FOUND -> "✕ $id"; else -> id }
+                        if (suggestions.isNotEmpty()) ChipChoice(suggestions.map { it to mark(it) }, "") { modelId = it; problem = null }
+                        if (modelId.isNotBlank() && states[modelId] != null) Text(when (states[modelId]) {
+                            ModelState.ACTIVE -> "Activado en tu cuenta."; ModelState.NOT_ACTIVATED -> "Sin activar en tu cuenta: no responderá hasta activarlo."
+                            ModelState.NOT_FOUND -> "No existe para esta clave o región."; else -> "" }, style = MaterialTheme.typography.bodySmall,
+                            color = if (states[modelId] == ModelState.ACTIVE) TextSecondary else MaterialTheme.colorScheme.error)
+                        if (models.isNotEmpty() && protocol != BrainProtocol.CUSTOM_REST) TextButton(enabled = !busy, onClick = {
+                            val (p, bad) = assemble()
+                            if (p == null) { message = (bad ?: "Revisa los datos.") to true; return@TextButton }
+                            val ids = (if (bytePlus) models.filter(BrainDiagnosis::isTextModel) else models).take(40)
+                            busy = true; problem = null
+                            scope.launch {
+                                try {
+                                    val found = BrainDiscovery.probeModels(p, { keyForCalls(p.id) }, ids) { d, t -> message = "Comprobando activación… $d/$t" to false }
+                                    states = states + found
+                                    val open = found.count { it.value == ModelState.ACTIVE }
+                                    message = (if (open == 0) "Ningún modelo de texto está activado en esta cuenta todavía." else "$open de ${ids.size} modelos activados; los marcados con ✓ responden.") to (open == 0)
+                                } finally { busy = false }
+                            }
+                        }) { Text("Comprobar cuáles están activados") }
                         if (protocol != BrainProtocol.CUSTOM_REST) TextButton(enabled = !busy && baseUrl.isNotBlank(), onClick = {
                             val (p, problem) = assemble()
                             if (p == null) { message = (problem ?: "Revisa los datos.") to true; return@TextButton }
@@ -256,22 +307,25 @@ internal fun BrainEditorDialog(initial: BrainProfile?, store: BrainStore, onClos
                             StudioTextField(lDailyUsd, { lDailyUsd = it }, shape = NexusTokens.field, singleLine = true, modifier = Modifier.weight(1f), label = { Text("Gasto/día USD") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                         }
                     }
-                    message?.let { (text, isError) -> InlineNotice(text, isError = isError) }
+                    val prob = problem
+                    if (prob != null) Surface(shape = NexusTokens.field, color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)) {
+                        Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                            Text(prob.title, style = MaterialTheme.typography.titleSmall)
+                            Text(prob.detail, style = MaterialTheme.typography.bodySmall)
+                            prob.steps.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodySmall, color = TextSecondary) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                                prob.actionUrl?.let { url -> Button(onClick = { runCatching { uriHandler.openUri(url) } }) { Text(prob.actionLabel ?: "Resolver problema") } }
+                                OutlinedButton(enabled = !busy, onClick = { runTest() }) { Text("Volver a probar") }
+                            }
+                            if (prob.kind == BrainProblemKind.NOT_ACTIVATED) BrainDiagnosis.modelPageUrl(seed.copy(baseUrl = baseUrl, modelId = modelId))?.let { url ->
+                                TextButton(onClick = { runCatching { uriHandler.openUri(url) } }, contentPadding = PaddingValues(0.dp)) { Text("Ver la ficha del modelo") }
+                            }
+                        }
+                    } else message?.let { (text, isError) -> InlineNotice(text, isError = isError) }
                     Spacer(Modifier.height(NexusTokens.space8))
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    OutlinedButton(enabled = !busy, modifier = Modifier.weight(1f), onClick = {
-                        val (p, problem) = assemble()
-                        if (p == null || problem != null) { message = (problem ?: "Revisa los datos.") to true; return@OutlinedButton }
-                        busy = true; message = "Probando…" to false
-                        scope.launch {
-                            try {
-                                val r = BrainDiscovery.test(p, { keyForCalls(p.id) })
-                                if (r.models.isNotEmpty()) models = r.models
-                                message = r.message to !r.ok
-                            } finally { busy = false }
-                        }
-                    }) { Text(if (busy) "Probando…" else "Probar conexión") }
+                    OutlinedButton(enabled = !busy, modifier = Modifier.weight(1f), onClick = { runTest() }) { Text(if (busy) "Probando…" else "Probar conexión") }
                     Button(enabled = !busy, modifier = Modifier.weight(1f), onClick = {
                         val (p, problem) = assemble()
                         if (p == null || problem != null) { message = (problem ?: "Revisa los datos.") to true; return@Button }

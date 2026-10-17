@@ -76,6 +76,8 @@ class LlmException(
     val kind: Kind,
     message: String,
     val httpStatus: Int? = null,
+    /** Código de error del proveedor (p. ej. `ModelNotOpen`, `InvalidEndpointOrModel.NotFound`) cuando lo informa. */
+    val code: String? = null,
 ) : Exception(message) {
     enum class Kind { AUTH, BUDGET, THROTTLED, BAD_REQUEST, MODEL_NOT_ALLOWED, UPSTREAM, NETWORK, PROTOCOL }
 }

@@ -2,6 +2,13 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.24-agent] - 2026-10-17 (rama `feat/byteplus-custom-providers-20261017`)
+
+### Añadido
+- Detector de modelos sin activar (`ModelNotOpen`): «Probar conexión» muestra un diagnóstico con pasos y el botón «Activar modelo» (enlace directo a la consola de ModelArk de la región), «Volver a probar» y la ficha del modelo.
+- «Comprobar cuáles están activados»: petición mínima real por modelo; los chips marcan ✓ activado, ⚠ sin activar o ✕ inexistente. Los modelos de imagen/vídeo/voz se ocultan en el selector de cerebro de BytePlus.
+- Guardar no admite un ID de modelo que no figure en la lista del proveedor si hay uno parecido (propone la corrección).
+
 ## [1.9.23-agent] - 2026-10-17 (rama `feat/byteplus-custom-providers-20261017`, sobre la de Antigravity `b1bc7b0`)
 
 - **BytePlus ModelArk como cerebro** (Android vc57). Preconfigurado con `https://ark.ap-southeast.bytepluses.com/api/v3`,

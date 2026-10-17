@@ -5,6 +5,10 @@ import com.vidadomu.nexus.agent.core.net.JsonTemplate
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -108,6 +112,8 @@ data class BrainTestResult(
     val models: List<String> = emptyList(),
     /** null = no se pudo comprobar; false = el modelo elegido no figura en la lista del proveedor. */
     val modelListed: Boolean? = null,
+    /** Diagnóstico estructurado cuando falla (qué pasa, pasos y enlace de resolución). */
+    val problem: BrainProblem? = null,
 )
 
 /** Descubrimiento de modelos (`/models`) y prueba de conexión real contra un perfil. */
@@ -156,7 +162,7 @@ object BrainDiscovery {
             } catch (e: LlmException) {
                 // Sin /models (404/405/formato distinto) no es un error: se sigue con la petición real.
                 if (e.kind == LlmException.Kind.AUTH || e.kind == LlmException.Kind.NETWORK)
-                    return BrainTestResult(false, e.message.orEmpty())
+                    return BrainTestResult(false, e.message.orEmpty(), problem = BrainDiagnosis.of(profile, e))
             }
         }
         if (profile.modelId.isBlank())
@@ -174,7 +180,41 @@ object BrainDiscovery {
             }
             BrainTestResult(true, "Conexión correcta: «${profile.modelId}» responde.$note", models, listed)
         } catch (e: LlmException) {
-            BrainTestResult(false, e.message.orEmpty(), models, listed)
+            BrainTestResult(false, e.message.orEmpty(), models, listed, BrainDiagnosis.of(profile, e))
         }
+    }
+
+    /**
+     * Estado de activación de cada modelo de [ids] con una petición mínima (8 tokens) al modelo. Un modelo sin activar
+     * se rechaza sin coste; uno activo gasta una fracción de céntimo. De 4 en 4, avisando del progreso.
+     */
+    suspend fun probeModels(profile: BrainProfile, apiKey: () -> String, ids: List<String>, client: OkHttpClient? = null,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): Map<String, ModelState> = coroutineScope {
+        if (profile.protocol == BrainProtocol.CUSTOM_REST) return@coroutineScope emptyMap()
+        val http = client ?: BrainFactory.clientFor(profile, streaming = false).newBuilder().callTimeout(30, TimeUnit.SECONDS).build()
+        val gate = kotlinx.coroutines.sync.Semaphore(4)
+        val done = java.util.concurrent.atomic.AtomicInteger()
+        val results = ids.map { id ->
+            async {
+                gate.withPermit {
+                    val state = try {
+                        val p = BrainFactory.create(profile.copy(modelId = id, capabilities = profile.capabilities.copy(streaming = false), reasoningEffort = null, thinking = null), apiKey, http)
+                        p.complete(LlmRequest(id, emptyList(), listOf(LlmMessage(Role.USER, listOf(ContentBlock.Text("OK")))), emptyList(), 8))
+                        ModelState.ACTIVE
+                    } catch (e: LlmException) {
+                        when {
+                            e.code == "ModelNotOpen" -> ModelState.NOT_ACTIVATED
+                            e.code?.startsWith("InvalidEndpointOrModel") == true -> ModelState.NOT_FOUND
+                            // Un modelo activo puede rechazar solo la petición mínima (p. ej. 400 por parámetros): sí existe y está abierto.
+                            e.kind == LlmException.Kind.BAD_REQUEST -> ModelState.ACTIVE
+                            else -> ModelState.UNKNOWN
+                        }
+                    }
+                    onProgress(done.incrementAndGet(), ids.size)
+                    id to state
+                }
+            }
+        }.awaitAll().toMap()
+        results
     }
 }

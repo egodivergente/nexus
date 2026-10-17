@@ -251,6 +251,48 @@ class BrainProvidersTest {
             assertFalse(r.ok)
             assertTrue("activated the model" in r.message, r.message)
             assertEquals(1, r.models.size)
+            assertEquals(BrainProblemKind.NOT_ACTIVATED, r.problem?.kind)
+        }
+    }
+
+    @Test fun `el diagnostico de BytePlus da el enlace directo de activacion de su region y el nombre base del modelo`() {
+        val p = BrainPresets.byteplus()
+        val err = LlmException(LlmException.Kind.MODEL_NOT_ALLOWED, "x", 404, "ModelNotOpen")
+        val d = BrainDiagnosis.of(p, err)
+        assertEquals(BrainProblemKind.NOT_ACTIVATED, d.kind)
+        assertEquals("https://console.byteplus.com/ark/region:ap-southeast-1/openManagement", d.actionUrl)
+        assertEquals("Activar modelo", d.actionLabel)
+        assertEquals("dola-seed-2-1-turbo", BrainDiagnosis.foundationName("dola-seed-2-1-turbo-260628"))
+        assertTrue(d.steps.any { "ActivateModels" in it && "dola-seed-2-1-turbo\"" in it }, d.steps.toString())
+        assertEquals("https://console.byteplus.com/ark/region:ap-southeast-1/model/detail?Id=dola-seed-2-1-turbo", BrainDiagnosis.modelPageUrl(p))
+    }
+
+    @Test fun `un ID mal escrito se corrige con el mas parecido de la lista y nunca se inventa`() {
+        val known = listOf("dola-seed-2-1-turbo-260628", "seed-1-6-250915", "deepseek-v3-2-251201")
+        assertEquals("dola-seed-2-1-turbo-260628", BrainDiagnosis.closest("dola-seed-2-1-turbo-260682", known))
+        assertNull(BrainDiagnosis.closest("modelo-que-no-existe-para-nada", known))
+        assertFalse(BrainDiagnosis.isTextModel("seedream-4-0-250828"))
+        assertTrue(BrainDiagnosis.isTextModel("dola-seed-2-1-turbo-260628"))
+    }
+
+    @Test fun `comprobar la activacion marca cada modelo segun lo que responde de verdad`() = runTest {
+        MockWebServer().use { server ->
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                    val model = body(request)["model"]?.jsonPrimitive?.content.orEmpty()
+                    return when (model) {
+                        "ok-model" -> MockResponse().setBody("""{"id":"r","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"OK"}]}],"usage":{"input_tokens":1,"output_tokens":1}}""")
+                        "closed-model" -> MockResponse().setResponseCode(404).setBody("""{"error":{"code":"ModelNotOpen","message":"not activated"}}""")
+                        "ghost-model" -> MockResponse().setResponseCode(404).setBody("""{"error":{"code":"InvalidEndpointOrModel.NotFound","message":"missing"}}""")
+                        else -> MockResponse().setResponseCode(500).setBody("""{"error":{"code":"Boom","message":"x"}}""")
+                    }
+                }
+            }
+            val states = BrainDiscovery.probeModels(profile(server), { "k" }, listOf("ok-model", "closed-model", "ghost-model", "odd-model"))
+            assertEquals(ModelState.ACTIVE, states["ok-model"])
+            assertEquals(ModelState.NOT_ACTIVATED, states["closed-model"])
+            assertEquals(ModelState.NOT_FOUND, states["ghost-model"])
+            assertEquals(ModelState.UNKNOWN, states["odd-model"])
         }
     }
 

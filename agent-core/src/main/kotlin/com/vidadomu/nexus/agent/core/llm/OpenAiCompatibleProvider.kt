@@ -240,6 +240,7 @@ internal object LlmHttpErrors {
             val e = Json.parseToJsonElement(body).jsonObject["error"]
             (e as? JsonObject)?.get("message")?.jsonPrimitive?.contentOrNull ?: (e as? JsonPrimitive)?.contentOrNull
         }.getOrNull()?.take(200)
+        val errCode = runCatching { ((Json.parseToJsonElement(body).jsonObject["error"] as? JsonObject)?.get("code") as? JsonPrimitive)?.contentOrNull }.getOrNull()?.take(80)
         val kind = when (code) {
             401, 403 -> LlmException.Kind.AUTH
             402 -> LlmException.Kind.BUDGET
@@ -252,9 +253,12 @@ internal object LlmHttpErrors {
             LlmException.Kind.AUTH -> "La clave de API no es válida o no tiene permiso${detail?.let { ": $it" } ?: "."}"
             LlmException.Kind.BUDGET -> "La cuenta de $who no tiene saldo o crédito${detail?.let { ": $it" } ?: "."}"
             LlmException.Kind.THROTTLED -> "Límite de peticiones de $who; reintenta en unos segundos."
-            LlmException.Kind.MODEL_NOT_ALLOWED -> "El modelo no existe o no está disponible en $who${detail?.let { ": $it" } ?: "."}"
+            // «Sin activar» no es «no existe»: la clave es válida y falta activar el modelo en la consola del proveedor.
+            LlmException.Kind.MODEL_NOT_ALLOWED -> if (errCode == "ModelNotOpen")
+                "El modelo no está activado en tu cuenta de $who${detail?.let { ": $it" } ?: "."} Ajustes → Cerebros → $who → Probar conexión → Resolver problema."
+                else "El modelo no existe o no está disponible en $who${detail?.let { ": $it" } ?: "."}"
             else -> detail ?: "Error de $who (HTTP $code)."
         }
-        return LlmException(kind, msg, code)
+        return LlmException(kind, msg, code, errCode)
     }
 }

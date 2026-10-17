@@ -77,7 +77,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainFactory.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainFactory.kt",
-    "sha256": "5b8b880e6e121ea8a023aef3782e7bd0e2922f2c2440381017df388e35cc338d"
+    "sha256": "c469f9bd6607e59732059eaaa84938cb08d320a72d2986a1887aff76e5af688c"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProfile.kt",
@@ -102,7 +102,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt",
-    "sha256": "7833fede8750ea087a8282f956e4f3cb52e2df2a21e7cab6946a1bcd86a3b35e"
+    "sha256": "28d641bdaa6e58c88f02cb677fb069c174a0e13d89df567e7ec6d89711489e7e"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt",
@@ -117,7 +117,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OpenAiCompatibleProvider.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OpenAiCompatibleProvider.kt",
-    "sha256": "1fe0f3485f4d3bf72b7eebf0296ce534bfd955bb655abdc1436ee40a5031e612"
+    "sha256": "3836e83fd8a2ee1c9e4bce365e4b96627204a7924d9053945ddf0868d3d339a5"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/PromptAdapter.kt",
@@ -457,7 +457,7 @@
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProvidersTest.kt",
     "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProvidersTest.kt",
-    "sha256": "e29094f703020e269afa546414d7e328c4d27ce5591dd1eacf01759194e75166"
+    "sha256": "34304acd3e1799e9416ee12a95289acf458b0b98f79830479e75a49169b0a783"
   },
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BytePlusLiveTest.kt",
@@ -828,5 +828,10 @@
     "source": "agent-skills/skills/models/wan/SKILL.md",
     "target": "agent/agent-skills/skills/models/wan/SKILL.md",
     "sha256": "48ae25004e2f5f8a605db1602ae8273cb00db244cb09a1cabeece6fd0a9da227"
+  },
+  {
+    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainDiagnosis.kt",
+    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainDiagnosis.kt",
+    "sha256": "13dff0f56e463e983f9bf8e026762d1e9bf713fa849f429d0ccdab4f9ed530b1"
   }
 ]
