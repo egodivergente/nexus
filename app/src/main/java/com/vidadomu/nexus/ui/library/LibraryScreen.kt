@@ -129,7 +129,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     localTarget?.let {asset -> LocalAssetSheet(asset,{localTarget=null},{message -> scope.launch {snackbar.showSnackbar(message)}},
         onUseInCanvas,onSendToAgent) }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
-    val groups=remember(completed) {completed.groupBy {SimpleDateFormat("d MMMM yyyy",Locale("es","ES")).format(Date(it.startedAt))}}
+    val timeline=remember(completed,localAssets) {
+        val day=SimpleDateFormat("d MMMM yyyy",Locale("es","ES"))
+        (completed.flatMap {job -> job.outputs.indices.map {LibraryEntry.Out(job,it)}}+localAssets.map {LibraryEntry.Local(it)})
+            .sortedByDescending {it.time}.groupBy {day.format(Date(it.time))}
+    }
     // Solo cuenta y actúa sobre lo marcado que sigue visible con los filtros actuales.
     val visibleTokens=remember(completed,localAssets) {
         completed.flatMap {job -> job.outputs.map {OutputFiles.token(it)}}.toSet()+localAssets.map {"asset:"+it.id}.toSet()
@@ -291,27 +295,27 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         snackbar.showSnackbar(if(stopped) "Dejas de seguirlo aquí. No se ha cancelado en el proveedor: puede terminar y cobrarse."
                             else "No se pudo dejar de seguir este trabajo")
                     }})}
-                listOf(LibraryOriginFilter.IMPORTED,LibraryOriginFilter.EDITED,LibraryOriginFilter.SHARED,LibraryOriginFilter.GENERATED).forEach {origin ->
-                    val assets=localAssetGroups[origin].orEmpty()
-                    if(assets.isNotEmpty()) {
-                        items(assets,key={"asset:"+it.id}) {asset ->
-                            val token="asset:"+asset.id
-                            LocalAssetTile(asset,imageLoader,showDetails,mark=if(selecting) token in marked else null,
-                                onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
-                        }
-                    }
-                }
-                groups.forEach {(day,entries) ->
+                // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
+                timeline.forEach {(day,entries) ->
                     item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
-                    entries.forEach {job ->
-                        items(job.outputs.size,key={index->"${job.id}:${job.outputs[index].id}:$index"}) {index ->
-                            val token=OutputFiles.token(job.outputs[index])
-                            LibraryTile(job,job.outputs[index],conflicts,imageLoader,token in favorites,showDetails,
-                                mark=if(selecting) token in marked else null,
-                                onActions={toggleMark(token)}) {
-                                if(selecting) toggleMark(token)
-                                else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(job.outputs[index])) else onNavigateToOutput(job.id)
+                    items(entries,key={it.key}) {entry ->
+                        when(entry) {
+                            is LibraryEntry.Local -> {
+                                val asset=entry.asset
+                                val token="asset:"+asset.id
+                                LocalAssetTile(asset,imageLoader,showDetails,mark=if(selecting) token in marked else null,
+                                    onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
+                            }
+                            is LibraryEntry.Out -> {
+                                val job=entry.job;val output=job.outputs[entry.index]
+                                val token=OutputFiles.token(output)
+                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails,
+                                    mark=if(selecting) token in marked else null,
+                                    onActions={toggleMark(token)}) {
+                                    if(selecting) toggleMark(token)
+                                    else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(output)) else onNavigateToOutput(job.id)
+                                }
                             }
                         }
                     }

@@ -1,7 +1,7 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado de esta rama: Android 1.9.27-agent-preview / vc61 en fix/tls-red-interceptada-20261017 (sobre vc60). No instalada todavía. Última versión comprobada en el S25: 1.9.23-agent-preview / vc57 el 17-10; desconectado de ADB al preparar esta actualización. Pixel y Windows no modificados. El diagnóstico de interferencia wifi es una hipótesis no reproducida.
+Estado de esta rama: Android 1.9.28-agent-preview / vc62, fix/tls-red-interceptada-20261017. Integra el cambio de Biblioteca b3eb81f (vc61) y mejoras de mensajes/reintento TLS. S25 comprobado el 17-10: 1.9.27/vc61 instalada a las 17:11, certificado 8b75db0f…cd7127; esta actualización aún no instalada. No se ha demostrado la causa del fallo de certificado.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase

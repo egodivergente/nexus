@@ -2,13 +2,18 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
-## [1.9.27-agent] - 2026-10-17
+## [1.9.28-agent] - 2026-10-17
 
 ### Corregido
 - Lienzo: los fallos TLS de las opciones del modelo muestran causas posibles y pasos de comprobación. La wifi amzn-internet coincidía con la captura, pero no se reprodujo el error ni se demostró que la red fuera la causa. No se desactiva ninguna validación de certificados.
 - La descarga del esquema del modelo se reintenta una vez tras 1,5 s y, si falló por red, de nuevo automáticamente al cambiar de red (wifi ↔ datos).
 - `NetworkErrorParser` distingue los fallos de certificado (`TLS_UNTRUSTED`) de «Se ha interrumpido la conexión».
 - CI genera también AgentPreview para firmarlo localmente con la clave existente; la clave no se sube a GitHub. Pruebas específicas del reintento GET y sus cancelaciones; no se reenvían generaciones de pago.
+
+## [1.9.27-agent] - 2026-10-17
+
+### Corregido
+- Biblioteca: con «Todo» los archivos importados iban todos primero y lo recién generado por Nexus quedaba enterrado debajo. Ahora generado e importado forman una sola línea de tiempo por fecha, lo último arriba.
 
 ## [1.9.26-agent] - 2026-10-17
 
