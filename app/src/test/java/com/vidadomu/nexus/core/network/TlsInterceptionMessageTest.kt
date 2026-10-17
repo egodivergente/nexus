@@ -18,7 +18,7 @@ class TlsInterceptionMessageTest {
     private fun androidLikeFailure(): SSLHandshakeException =
         SSLHandshakeException(raw).apply { initCause(CertificateException(CertPathValidatorException("Trust anchor for certification path not found."))) }
 
-    @Test fun `el fallo de certificado se clasifica como red que intercepta, no como conexion interrumpida`() {
+    @Test fun `el fallo de certificado se clasifica como TLS sin atribuirlo a una red`() {
         val e = NetworkErrorParser.parse(androidLikeFailure())
         assertEquals("TLS_UNTRUSTED", e.errorCode)
         assertEquals(NetworkErrorParser.TLS_MESSAGE, e.humanReadableMessage)
@@ -39,6 +39,9 @@ class TlsInterceptionMessageTest {
         val shown = noticeMessage(raw, "No se han podido cargar las opciones del modelo.")
         assertEquals(NetworkErrorParser.TLS_MESSAGE, shown)
         assertTrue(shown.contains("datos móviles"))
+        assertTrue(shown.contains("certificado del servidor"))
+        assertFalse(shown.contains("La red actual no permite"))
+        assertTrue(shown.contains("revisa el historial antes de repetir"))
     }
 
     @Test fun `el mensaje ya traducido sobrevive a noticeMessage`() {

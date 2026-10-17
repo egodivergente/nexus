@@ -29,10 +29,10 @@ jobs:
       - name: Set up Gradle (wrapper)
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build debug APK
+      - name: Build debug and AgentPreview APKs
         run: |
           set -o pipefail
-          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee -a gradle.log
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleAgentPreview 2>&1 | tee -a gradle.log
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
@@ -41,10 +41,27 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      - name: Upload AgentPreview APK for local signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AgentPreview-for-local-signing
+          path: app/build/outputs/apk/agentPreview/*.apk
+          if-no-files-found: error
+
       - name: Run unit tests
         run: |
           set -o pipefail
           ./gradlew --no-daemon test 2>&1 | tee -a gradle.log
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-unit-test-reports
+          path: |
+            app/build/test-results/**/TEST-*.xml
+            agent-core/build/test-results/**/TEST-*.xml
+          if-no-files-found: warn
 
       - name: Show Gradle errors
         if: failure()

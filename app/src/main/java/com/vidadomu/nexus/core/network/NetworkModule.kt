@@ -59,12 +59,13 @@ class RedactingLoggingInterceptor : Interceptor {
 }
 
 object NetworkErrorParser {
-    /** Texto en minúsculas que delata que la red (no el servidor) ha impedido verificar el certificado. */
+    /** Indicios de un fallo TLS; no permiten atribuir su causa a la red o al servidor. */
     val TLS_HINTS = listOf("trust anchor", "certpath", "certification path", "sslhandshake",
         "certificate", "certificado", "conexión segura")
-    const val TLS_MESSAGE = "La red actual no permite verificar la conexión segura con el proveedor. " +
-        "Suele pasar en wifis de invitados que piden aceptar una página de acceso, o con una VPN o proxy. " +
-        "Abre el navegador para aceptar esa página o cambia a datos móviles, y pulsa Reintentar."
+    const val TLS_MESSAGE = "No se puede verificar la conexión segura con el proveedor. " +
+        "Puede deberse al certificado del servidor, a una VPN o proxy, o a una wifi con página de acceso. " +
+        "Comprueba la fecha del móvil y el acceso a la wifi, o prueba con datos móviles. " +
+        "Si estabas generando, revisa el historial antes de repetir la solicitud."
 
     /** True si el fallo (o alguna de sus causas) es de verificación TLS/certificado. */
     fun isTlsTrustFailure(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(8).any {
@@ -75,7 +76,7 @@ object NetworkErrorParser {
     fun parse(e: Throwable): ProviderError {
         if (e !is ProviderError && isTlsTrustFailure(e)) return ProviderError(
             humanReadableMessage = TLS_MESSAGE,
-            technicalDetails = e.javaClass.simpleName + ": " + (e.message ?: ""),
+            technicalDetails = SecureStorage.sanitizeForLogging(e.javaClass.simpleName + ": " + (e.message ?: "")),
             errorCode = "TLS_UNTRUSTED"
         )
         return when (e) {

@@ -54,12 +54,12 @@ object NativeModelSchema {
      * wifi de invitados) suelen durar segundos. Si el fallo es de certificado, se devuelve el mensaje
      * explicativo de [com.vidadomu.nexus.core.network.NetworkErrorParser] en lugar de la traza de Java.
      */
-    private suspend fun fetchWithRetry(url: String, attempts: Int = 2, pauseMs: Long = 1500): String {
+    internal suspend fun fetchWithRetry(url: String, httpClient: OkHttpClient = client, pauseMs: Long = 1500): String {
         var last: java.io.IOException? = null
-        repeat(attempts) { index ->
+        repeat(2) { index ->
             if (index > 0) kotlinx.coroutines.delay(pauseMs)
             try {
-                return client.newCall(Request.Builder().url(url).build()).awaitResponse().use {
+                return httpClient.newCall(Request.Builder().url(url).build()).awaitResponse().use {
                     check(it.isSuccessful) { "No se pudo cargar la configuración (HTTP " + it.code + ")." }
                     requireNotNull(it.body).string()
                 }

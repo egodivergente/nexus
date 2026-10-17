@@ -1,7 +1,7 @@
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
-Estado actual: Android 1.9.27-agent-preview / vc61 en rama fix/tls-red-interceptada-20261017 (sobre vc60) (BytePlus, cerebros y generadores propios, límites del usuario) en el Pixel; el S25 sigue en 1.9.18/vc52 (no estaba alcanzable). Rama eat/byteplus-custom-providers-20261017 (sobre la de Antigravity eat/agy-provider-s25-20261016), sin fusionar en main; Windows 1.9.5-agent-desktop.
+Estado de esta rama: Android 1.9.27-agent-preview / vc61 en fix/tls-red-interceptada-20261017 (sobre vc60). No instalada todavía. Última versión comprobada en el S25: 1.9.23-agent-preview / vc57 el 17-10; desconectado de ADB al preparar esta actualización. Pixel y Windows no modificados. El diagnóstico de interferencia wifi es una hipótesis no reproducida.
 
 El 13 de octubre de 2026 se consolidaron Android de opciones visuales,
 Windows de biblioteca/PDF y el botón Termux Nexus–AKI. Véase
