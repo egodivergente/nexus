@@ -173,7 +173,7 @@ class ConfigurableMediaProvider(
                     // Espera máxima de ESTE proveedor (la elige el usuario). No cancela nada: «Recuperar» vuelve a consultar.
                     job.copy(status = GenerationStatus.FAILED, parameters = job.parameters + ("__tracking_paused" to "true"),
                         error = "Superó la espera máxima configurada ($limit min). El proveedor puede seguir trabajando; usa Recuperar para consultar sin generar otra vez.")
-                else job.copy(status = GenerationStatus.GENERATING, progress = outcome.progress ?: job.progress, technicalDetails = "$displayName: en curso.")
+                else job.copy(status = GenerationStatus.GENERATING, progress = outcome.progress, technicalDetails = "$displayName: en curso.")
             }
         })
     }

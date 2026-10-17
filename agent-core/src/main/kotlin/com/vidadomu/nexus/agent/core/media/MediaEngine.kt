@@ -116,5 +116,5 @@ object MediaEngine {
 
     /** Progreso 0..1; admite 0–1 y 0–100. */
     private fun progress(m: MediaModelConfig, body: JsonElement): Float? =
-        m.progressPath.takeIf { it.isNotBlank() }?.let { JsonPaths.number(body, it) }?.let { v -> (if (v > 1.0) v / 100.0 else v).coerceIn(0.0, 1.0).toFloat() }
+        m.progressPath.takeIf { it.isNotBlank() }?.let { JsonPaths.number(body, it) }?.let { normalizedProviderProgress(it) }
 }

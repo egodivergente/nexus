@@ -73,7 +73,7 @@ class GenerationActivityTest {
         val state = generationActivityState(order(progress = 0.666f), animationsAllowed = true)
         assertEquals(0.666f, requireNotNull(state.progress), 0f)
         assertEquals(ProgressSource.MEASURED, state.source)
-        assertEquals("67 % medido por el proveedor", state.progressText)
+        assertEquals("67 % informado por el proveedor", state.progressText)
     }
 
     @Test fun submittingAndProcessingAreTheOnlyActivePhases() {
@@ -132,5 +132,12 @@ class GenerationActivityTest {
         assertEquals(0f, sweepIntensity(Float.NaN), 0f)
         assertEquals(0f, sweepIntensity(Float.POSITIVE_INFINITY), 0f)
         listOf(-2f, -0.3f, 0.1f, 0.9f, 3.7f).forEach { assertTrue(sweepIntensity(it) in 0f..1f) }
+    }
+    @Test fun mockProgressIsExplicitlySimulatedNotReportedAsReal() {
+        val state = generationActivityState(order(progress = 0.5f, modelRef = "mock_provider:mock/cinema-video"), true)
+        assertNull(state.progress)
+        assertEquals(ProgressSource.SIMULATED, state.source)
+        assertFalse(state.progressText.contains("%"))
+        assertTrue(state.progressText.contains("simulada"))
     }
 }

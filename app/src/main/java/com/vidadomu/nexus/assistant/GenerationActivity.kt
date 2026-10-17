@@ -48,7 +48,7 @@ import kotlin.math.roundToInt
 internal enum class RenderPhase { NONE, SUBMITTING, PROCESSING }
 
 /** Por qué hay (o no hay) un porcentaje que mostrar. Nunca se rellena con una estimación. */
-internal enum class ProgressSource { MEASURED, NOT_STARTED, PROVIDER_MILESTONES, NOT_REPORTED, INVALID_VALUE }
+internal enum class ProgressSource { MEASURED, NOT_STARTED, PROVIDER_MILESTONES, SIMULATED, NOT_REPORTED, INVALID_VALUE }
 
 /** Aviso fijo: lo que se mueve es una animación, no un adelanto del resultado. */
 internal const val ACTIVITY_DISCLAIMER = "Animación de actividad, no vista previa."
@@ -68,7 +68,7 @@ internal fun measuredOrderProgress(order: Order): Float? {
     if (order.status != OrderStatus.PROCESSING) return null
     val raw = order.progress ?: return null
     if (!raw.isFinite() || raw < 0f || raw > 1f) return null
-    if (reportsMilestonesNotPercentage(orderProviderId(order))) return null
+    if (reportsMilestonesNotPercentage(orderProviderId(order)) || orderProviderId(order) == "mock_provider") return null
     return raw
 }
 
@@ -79,6 +79,7 @@ internal fun progressSource(order: Order): ProgressSource {
     return when {
         !raw.isFinite() || raw < 0f || raw > 1f -> ProgressSource.INVALID_VALUE
         reportsMilestonesNotPercentage(orderProviderId(order)) -> ProgressSource.PROVIDER_MILESTONES
+        orderProviderId(order) == "mock_provider" -> ProgressSource.SIMULATED
         else -> ProgressSource.MEASURED
     }
 }
@@ -125,9 +126,10 @@ internal fun generationActivityState(order: Order, animationsAllowed: Boolean): 
     val progress = measuredOrderProgress(order)
     val source = progressSource(order)
     val progressText = when (source) {
-        ProgressSource.MEASURED -> "${((progress ?: 0f) * 100).roundToInt()} % medido por el proveedor"
+        ProgressSource.MEASURED -> "${((progress ?: 0f) * 100).roundToInt()} % informado por el proveedor"
         ProgressSource.NOT_STARTED -> "Sin porcentaje: el encargo todavía se está enviando."
         ProgressSource.PROVIDER_MILESTONES -> "Este proveedor informa por hitos, no con un porcentaje medido."
+        ProgressSource.SIMULATED -> "Proveedor de prueba: actividad simulada, sin porcentaje real."
         ProgressSource.NOT_REPORTED -> "Sin porcentaje: este proveedor no informa del avance."
         ProgressSource.INVALID_VALUE -> "Sin porcentaje: el proveedor envió un avance no válido y se ignora."
     }

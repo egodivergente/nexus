@@ -35,3 +35,16 @@ Estado inicial: pendiente de CI. No instalado ni probado en el S25. Ninguna gene
 Separar estado de proyecto de la sesión de proveedor; contrato de traspaso entre cerebros,
 capacidades comprobadas, presupuesto y permisos separados de perfiles creativos. Empezar con
 cambio manual verificable, sin fallback silencioso ni volver a enviar acciones ya ejecutadas.
+
+## Regresión cerrada al revisar el límite con proveedores
+
+Los adaptadores Atlas y configurable recortaban datos fuera de rango a 0/100 antes de
+que la vista pudiera rechazarlos. Se rechazan no finitos, negativos y valores superiores
+a 100 en el origen. Se conserva soporte para formatos 0..1 y 0..100, sin fingir que se
+conoce la unidad de un campo genérico progress; percentage/percent de Atlas sí se leen
+como porcentajes explícitos. Si una respuesta posterior no comunica avance válido,
+no se arrastra como actual un porcentaje anterior. Mock se etiqueta como simulación
+y no se muestra su 50% fijo como real. La etiqueta dice informado, no medido.
+
+Regresiones añadidas: ProviderProgressTest (5), AtlasReportedProgressTest (4),
+GenerationActivityTest (ahora 13). Pendientes de ejecución de CI del nuevo commit.
