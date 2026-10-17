@@ -2,6 +2,19 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.35-agent] - 2026-10-18
+
+### Cambiado (revisión visual a partir del vídeo)
+- Jerarquía de color: barras superior e inferior con un tono propio por tema, distinto del fondo y de las tarjetas; el tema Claro pasa de beige a gris azulado frío. La banda de entrada del chat usa el mismo tono que las barras.
+- Barras más finas: superior de 56 a 40 dp e inferior de unos 64 a 46 dp; el contenido gana espacio.
+- Filtros (Vídeo, Imagen, Biblioteca, Historial…): seleccionado con relleno de acento sólido, sin seleccionar con borde propio; mucho más visibles.
+- Chat: «Traer N encargos» sustituido por «Encargos ↓», sin contador, que solo aparece si ninguna tarjeta está a la vista y desplaza hasta la última sin reordenar. Tres o más resultados terminados seguidos se agrupan en una tarjeta de miniaturas («Ver tarjetas» las separa; «Agrupar» las junta).
+- Chat: una imagen adjunta que ya no existe muestra un hueco con icono y nombre en vez de un cuadro vacío.
+- Ajustes ordenado en secciones con cabecera e icono (Personalización, Agente, Proveedores de generación, Generadores propios, Sistema), con tarjetas y filetes.
+- Tamaño de letra de toda la app ajustable (80–140 %) en Ajustes → Personalización.
+- Biblioteca: título y contador en una línea; zoom con dos dedos (2–6 columnas, recordado) como Google Fotos.
+- Lienzo: los ajustes propios del modelo (hasta 6) a la vista, en vez de solo dentro de una hoja.
+
 ## [1.9.34-agent] - 2026-10-17
 
 ### Añadido
