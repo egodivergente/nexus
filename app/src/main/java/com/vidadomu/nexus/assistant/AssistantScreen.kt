@@ -239,6 +239,9 @@ fun AssistantScreen(
                 }
                 if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(NexusTokens.space8)); Text("Pensando…", color = TextMuted) } }
             }
+            val cardItems = visibleItems.filterIsInstance<ChatItem.PlanCard>()
+            val trailingCards = visibleItems.takeLastWhile { it is ChatItem.PlanCard }.size
+            if (cardItems.size > trailingCards && !ui.thinking) TextButton(onClick = { vm.bringCardsToFront(); following = true }) { Text("Traer los ${cardItems.size} encargos aquí ↓") }
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },

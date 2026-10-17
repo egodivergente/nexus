@@ -647,6 +647,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** Reúne al final del chat todas las tarjetas de encargo (mismo orden relativo) para tenerlas a mano. */
+    fun bringCardsToFront() {
+        _ui.update { s ->
+            val cards = s.items.filterIsInstance<ChatItem.PlanCard>().filter { s.plans[it.planId]?.state != PlanState.DISCARDED }
+            s.copy(items = s.items.filterNot { it in cards } + cards, scrollRequest = s.scrollRequest + 1)
+        }
+    }
+
     fun discardPlan(planId: String) {
         val p = _ui.value.plans[planId] ?: return
         val order = orderOf(planId)

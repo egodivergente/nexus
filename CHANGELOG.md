@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.26-agent] - 2026-10-17
+
+### Añadido
+- Botón «Traer los N encargos aquí ↓» en el chat: reúne al final todas las tarjetas de encargo (sin las descartadas) para no tener que buscarlas hacia arriba.
+
 ## [1.9.25-agent] - 2026-10-17
 
 ### Corregido
