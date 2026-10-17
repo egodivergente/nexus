@@ -3,6 +3,7 @@
 package com.vidadomu.nexus.assistant
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -110,6 +111,7 @@ internal fun OrderCard(
     onOpenOutput: () -> Unit,
     onRendered: (String) -> Unit,
     onOpenHistory: () -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency = app.currencyManager
@@ -129,11 +131,13 @@ internal fun OrderCard(
 
     var menu by remember { mutableStateOf(false) }
     val running = order.status in setOf(OrderStatus.SUBMITTING, OrderStatus.PROCESSING)
-    Card(Modifier.fillMaxWidth().animateContentSize().semantics { contentDescription = "Encargo ${plan.modelName}"; stateDescription = shown.status }, shape = NexusTokens.card) {
+    Card(modifier.fillMaxWidth().animateContentSize().semantics { contentDescription = "Encargo ${plan.modelName}"; stateDescription = shown.status }, shape = NexusTokens.card) {
         Column(Modifier.padding(start = NexusTokens.space12, end = NexusTokens.space4, top = NexusTokens.space8, bottom = NexusTokens.space8),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Cabecera en una línea: qué, quién factura, cuánto, estado y controles secundarios plegados.
             Row(verticalAlignment = Alignment.CenterVertically) {
+                ProviderMark(plan.ref.providerId)
+                Spacer(Modifier.width(NexusTokens.space8))
                 Column(Modifier.weight(1f)) {
                     Text(plan.modelName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(listOfNotNull(billingLabel(plan.ref.providerId), cost ?: "coste por confirmar".takeIf { order.status == OrderStatus.AWAITING_CONFIRMATION },
@@ -191,12 +195,29 @@ internal fun OrderCard(
     }
 }
 
+/** Marca del proveedor: su logo oficial si existe como recurso `provider_<id>` (res/drawable), y si no una inicial con color estable. */
+@Composable
+internal fun ProviderMark(providerId: String, size: androidx.compose.ui.unit.Dp = 28.dp) {
+    val context = LocalContext.current
+    val res = remember(providerId) { context.resources.getIdentifier("provider_" + providerId.lowercase().replace(Regex("[^a-z0-9_]"), "_"), "drawable", context.packageName) }
+    if (res != 0) {
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(res), billingLabel(providerId), Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape))
+    } else {
+        val label = billingLabel(providerId).trim().ifEmpty { providerId }
+        val hue = (providerId.hashCode() and 0x7fffffff) % 360
+        val bg = androidx.compose.ui.graphics.Color.hsv(hue.toFloat(), 0.45f, 0.82f)
+        Box(Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape).then(Modifier.background(bg)), contentAlignment = Alignment.Center) {
+            Text(label.first().uppercase(), style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White)
+        }
+    }
+}
+
 /** Miniatura 16:9 del resultado (fotograma para vídeo) con indicador de reproducción. */
 @Composable
 private fun ResultThumb(uri: String, modality: String, onOpen: () -> Unit) {
     val context = LocalContext.current
     val video = modality == "VIDEO"
-    Box(Modifier.width(240.dp).aspectRatio(16f / 9f).clip(NexusTokens.field).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
+    Box(Modifier.width(if (video) 200.dp else 148.dp).aspectRatio(if (video) 16f / 9f else 1f).clip(NexusTokens.field).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
         AsyncImage(
             model = coil.request.ImageRequest.Builder(context).data(uri).crossfade(160)
                 .apply { if (video) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }.build(),

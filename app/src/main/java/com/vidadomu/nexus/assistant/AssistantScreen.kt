@@ -180,7 +180,8 @@ fun AssistantScreen(
             if(LocalDensity.current.fontScale<1.3f && projectContext.isNotBlank()) Text(projectContext,
                 style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,
                 overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-        }},actions={IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
+        }},actions={BrainPicker(ui,vm)
+            IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
@@ -202,7 +203,7 @@ fun AssistantScreen(
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
                             val p = ui.plans.getValue(item.planId)
-                            OrderCard(order, p, vm.outputs(p.jobId ?: order.jobId), assistantBusy = ui.thinking,
+                            OrderCard(order, p, vm.outputs(p.jobId ?: order.jobId), assistantBusy = ui.thinking, modifier = Modifier.animateItem(),
                                 onGenerate = { vm.generate(p.plan.id, p.plan.fingerprint()) },
                                 onApplyFix = { vm.applyFix(order.id) },
                                 onAskAgent = { vm.askAgentToFix(order.id) },
@@ -244,8 +245,72 @@ fun AssistantScreen(
             if (cardItems.size > trailingCards && !ui.thinking) TextButton(onClick = { vm.bringCardsToFront(); following = true }) { Text("Traer los ${cardItems.size} encargos aquí ↓") }
             if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
+            ReasoningPicker(ui, vm)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
                 onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) })
+        }
+    }
+}
+
+/** Cerebro activo en la barra del Agente: un toque lista Bedrock, Claude, Antigravity, BytePlus/Dola y los propios, y cambia sin abrir Ajustes. */
+@Composable
+private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
+    var open by remember { mutableStateOf(false) }
+    var tick by remember { mutableStateOf(0) }
+    val store = vm.runtime.settings.brains
+    val brains = remember(tick, open) { store.all() }
+    val builtins = listOf(
+        AssistantSettings.BACKEND_DIRECT to "Bedrock", AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
+        AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI", AssistantSettings.BACKEND_PROXY to "Proxy",
+        AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity",
+    )
+    val current = ui.settings.backend
+    val label = builtins.firstOrNull { it.first == current }?.second
+        ?: brains.firstOrNull { BrainStore.backendFor(it.id) == current }?.name ?: "Cerebro"
+    val context = LocalContext.current
+    Box {
+        AssistChip(onClick = { open = true }, enabled = !ui.thinking,
+            label = { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 92.dp)) },
+            trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(16.dp)) },
+            modifier = Modifier.semantics { contentDescription = "Cerebro del agente: $label. Cambiar" })
+        DropdownMenu(open, { open = false }) {
+            (builtins.map { it.first to it.second } + brains.map { BrainStore.backendFor(it.id) to it.name }).forEach { (backend, name) ->
+                DropdownMenuItem(text = { Text(name) },
+                    trailingIcon = { if (backend == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = {
+                        open = false
+                        vm.switchBrain(backend)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
+                        tick++
+                    })
+            }
+        }
+    }
+}
+
+/** Modo de razonamiento junto al cuadro de texto, solo si el cerebro activo lo admite: Auto · Rápido · Mínimo · Bajo · Medio · Alto. */
+@Composable
+private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
+    val brain = ui.settings.brain
+    if (brain == null || !brain.capabilities.reasoning || brain.protocol == BrainProtocol.CUSTOM_REST) return
+    var open by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val modes = listOf<Triple<String, String?, String?>>(
+        Triple("Auto", null, null), Triple("Rápido", null, "disabled"), Triple("Mínimo", "minimal", null),
+        Triple("Bajo", "low", null), Triple("Medio", "medium", null), Triple("Alto", "high", null))
+    val current = modes.firstOrNull { it.second == brain.reasoningEffort && it.third == brain.thinking }?.first ?: "Auto"
+    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16), horizontalArrangement = Arrangement.End) {
+        Box {
+            TextButton(onClick = { open = true }, enabled = !ui.thinking, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp).semantics { contentDescription = "Modo de razonamiento: $current. Cambiar" }) {
+                Text("Razonar · $current ▾", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            }
+            DropdownMenu(open, { open = false }) {
+                modes.forEach { (name, effort, thinking) ->
+                    DropdownMenuItem(text = { Text(name) },
+                        trailingIcon = { if (name == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = { open = false; vm.setReasoning(effort, thinking)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
+                }
+            }
         }
     }
 }
