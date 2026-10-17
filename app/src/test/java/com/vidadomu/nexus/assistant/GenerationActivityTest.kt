@@ -20,9 +20,9 @@ class GenerationActivityTest {
     )
 
     @Test fun onlyFiniteProgressInsideZeroToOneIsMeasured() {
-        assertEquals(0.42f, measuredOrderProgress(order(progress = 0.42f)))
-        assertEquals(0f, measuredOrderProgress(order(progress = 0f)))
-        assertEquals(1f, measuredOrderProgress(order(progress = 1f)))
+        assertEquals(0.42f, requireNotNull(measuredOrderProgress(order(progress = 0.42f))), 0f)
+        assertEquals(0f, requireNotNull(measuredOrderProgress(order(progress = 0f))), 0f)
+        assertEquals(1f, requireNotNull(measuredOrderProgress(order(progress = 1f))), 0f)
         assertNull("sin dato del proveedor no hay avance", measuredOrderProgress(order(progress = null)))
     }
 
@@ -71,7 +71,7 @@ class GenerationActivityTest {
 
     @Test fun measuredProgressIsShownAsTheProvidersOwnPercentage() {
         val state = generationActivityState(order(progress = 0.666f), animationsAllowed = true)
-        assertEquals(0.666f, state.progress)
+        assertEquals(0.666f, requireNotNull(state.progress), 0f)
         assertEquals(ProgressSource.MEASURED, state.source)
         assertEquals("67 % medido por el proveedor", state.progressText)
     }
@@ -109,7 +109,7 @@ class GenerationActivityTest {
     @Test fun animationsOffKeepsEveryTextAndTheMeasuredProgress() {
         val state = generationActivityState(order(progress = 0.3f), animationsAllowed = false)
         assertFalse(state.animated)
-        assertEquals(0.3f, state.progress)
+        assertEquals(0.3f, requireNotNull(state.progress), 0f)
         assertEquals("Generación en curso", state.title)
         assertTrue(state.contentDescription.contains("30 %"))
     }
@@ -124,13 +124,13 @@ class GenerationActivityTest {
     }
 
     @Test fun sweepStaysInsideZeroToOneAndNeverBreaksOnBadInput() {
-        assertEquals(0f, sweepIntensity(0f))
-        assertEquals(1f, sweepIntensity(0.5f))
-        assertEquals(0f, sweepIntensity(1f))
-        assertEquals("el pulso es cíclico", sweepIntensity(0.25f), sweepIntensity(1.25f))
-        assertEquals("también con fase negativa", sweepIntensity(0.75f), sweepIntensity(-0.25f))
-        assertEquals(0f, sweepIntensity(Float.NaN))
-        assertEquals(0f, sweepIntensity(Float.POSITIVE_INFINITY))
+        assertEquals(0f, sweepIntensity(0f), 0f)
+        assertEquals(1f, sweepIntensity(0.5f), 0f)
+        assertEquals(0f, sweepIntensity(1f), 0f)
+        assertEquals("el pulso es cíclico", sweepIntensity(0.25f), sweepIntensity(1.25f), 0f)
+        assertEquals("también con fase negativa", sweepIntensity(0.75f), sweepIntensity(-0.25f), 0f)
+        assertEquals(0f, sweepIntensity(Float.NaN), 0f)
+        assertEquals(0f, sweepIntensity(Float.POSITIVE_INFINITY), 0f)
         listOf(-2f, -0.3f, 0.1f, 0.9f, 3.7f).forEach { assertTrue(sweepIntensity(it) in 0f..1f) }
     }
 }
