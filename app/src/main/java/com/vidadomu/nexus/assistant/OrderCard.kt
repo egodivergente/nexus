@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import kotlin.math.roundToInt
 import com.vidadomu.nexus.agent.core.orders.FailureKind
 import com.vidadomu.nexus.agent.core.orders.Order
 import com.vidadomu.nexus.agent.core.orders.OrderBook
@@ -64,7 +65,7 @@ internal fun presentOrder(order: Order, costLabel: String?, busy: Boolean, assis
             if (costLabel != null) "Generar · $costLabel" else "Generar", !busy && !assistantBusy && !dirty,
             detail = when { dirty -> "Aplica o deshaz tu cambio antes de generar."; assistantBusy -> "Espera a que el asistente termine."; else -> null })
         OrderStatus.SUBMITTING -> CardPresentation("Enviando…", CardAction.SENDING, "Enviando…", false)
-        OrderStatus.PROCESSING -> CardPresentation("Procesando" + (measuredOrderProgress(order)?.let { " · ${(it * 100).toInt()} %" } ?: ""), CardAction.NONE, null, false)
+        OrderStatus.PROCESSING -> CardPresentation("Procesando" + (measuredOrderProgress(order)?.let { " · ${(it * 100).roundToInt()} %" } ?: ""), CardAction.NONE, null, false)
         OrderStatus.COMPLETED -> CardPresentation("Completado", CardAction.VIEW_RESULT, "Ver resultado", true)
         OrderStatus.FAILED -> {
             val message = failure?.message ?: "El proveedor devolvió un error sin detalle."

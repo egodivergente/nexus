@@ -57,6 +57,7 @@ class AssistantPresentationUiTest {
         guard()
         val prefs = context.getSharedPreferences("test_presentation_isolated", Context.MODE_PRIVATE)
         val store = AssistantPresentationStore(prefs)
+        compose.setContent { NexusTheme { Text("Observación de preferencias") } }
         prefs.edit().clear().commit()
         try {
             var calls = 0
