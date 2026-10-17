@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.27-agent] - 2026-10-17
+
+### Corregido
+- Biblioteca: con «Todo» los archivos importados iban todos primero y lo recién generado por Nexus quedaba enterrado debajo. Ahora generado e importado forman una sola línea de tiempo por fecha, lo último arriba.
+
 ## [1.9.26-agent] - 2026-10-17
 
 ### Añadido
