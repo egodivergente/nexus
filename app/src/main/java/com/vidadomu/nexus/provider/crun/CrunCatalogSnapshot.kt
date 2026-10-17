@@ -116,6 +116,7 @@ object CrunCatalogSnapshot {
             contractEndpoint = "/api/v1/client/job/CreateTask",
             contractPromptField = if("text" in props && "prompt" !in props) "text" else "prompt",
             promptRequired = "prompt" in required || "text" in required,
+            promptMaxLength = ((props["prompt"] ?: props["text"]) as? JsonObject)?.get("maxLength")?.jsonPrimitive?.intOrNull,
             contractMedia = media.map { (key,value) ->
                 val isArray=value.jsonObject["type"]?.jsonPrimitive?.contentOrNull=="array"
                 ContractMediaField(key,label(key),when { isVideoKey(key)->"video/*"; "audio" in key->"audio/*";else->"image/*" },

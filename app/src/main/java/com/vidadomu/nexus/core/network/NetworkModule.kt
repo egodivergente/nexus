@@ -97,8 +97,10 @@ object NetworkErrorParser {
             else -> "El servidor ha devuelto un error HTTP $statusCode."
         }
         val sanitizedBody = responseBody?.let { SecureStorage.sanitizeForLogging(it) } ?: "No response body"
+        // 400/422: el proveedor explica qué campo no cumple; se muestra para poder corregirlo en vez de un «HTTP 422» mudo.
+        val detail = if (statusCode == 400 || statusCode == 422) sanitizedBody.take(300).takeIf { responseBody != null } else null
         return ProviderError(
-            humanReadableMessage = humanMsg,
+            humanReadableMessage = if (detail != null) "$humanMsg Detalle: $detail" else humanMsg,
             technicalDetails = "HTTP $statusCode - $sanitizedBody",
             httpStatusCode = statusCode,
             errorCode = "HTTP_$statusCode"

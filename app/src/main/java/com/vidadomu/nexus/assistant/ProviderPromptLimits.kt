@@ -8,6 +8,7 @@ import com.vidadomu.nexus.provider.atlas.NativeModelSchema
 internal object ProviderPromptLimits {
     fun forModel(model: NexusModel): TextLimit? {
         if(model.providerId == "atlas_cloud") return NativeModelSchema.promptLimit(model.id)
+        if(model.providerId == "crun") return model.promptMaxLength?.let {TextLimit("utf16_code_units",minimum=if(model.promptRequired) 1 else 0,maximum=it,source="Contrato OpenAPI de Crun")}
         if(model.providerId == "google_flow") return TextLimit("utf16_code_units",maximum=4000,source="Private Flow bridge")
         if(model.providerId != "runway") return null
         val known = when(model.contractEndpoint) {

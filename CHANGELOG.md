@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.28-agent] - 2026-10-17
+
+### Corregido
+- Crun (Qwen Image Edit y similares): el prompt se comprueba contra el máximo del contrato del modelo (800 caracteres) antes de enviar; antes se mandaban prompts de 858 y 946 caracteres y Crun respondía 422.
+- Los errores 400/422 del proveedor muestran su detalle en vez de «HTTP 422» a secas.
+
 ## [1.9.27-agent] - 2026-10-17
 
 ### Corregido
