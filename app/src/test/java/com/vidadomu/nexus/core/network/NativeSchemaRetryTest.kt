@@ -91,7 +91,10 @@ class NativeSchemaRetryTest {
         }.build()
         try {
             val error = runCatching { NativeModelSchema.fetchWithRetry(url, client, 0) }.exceptionOrNull()
-            assertSame(failure, error)
+            // Coroutine stack-trace recovery may copy IOException; identity is not part of the contract.
+            assertNotNull(error)
+            assertEquals(IOException::class.java, error!!.javaClass)
+            assertEquals(failure.message, error.message)
             assertEquals(2, calls.get())
         } finally { client.dispatcher.executorService.shutdown(); client.connectionPool.evictAll() }
     }
