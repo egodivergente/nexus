@@ -894,152 +894,203 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     val isCustom = backend.startsWith(BrainStore.PREFIX)
     val maskedKey = remember(backend) { vm.maskedApiKey(backend) }
     var error by remember { mutableStateOf<String?>(null) }
+    fun save() {
+        val t = temperature.replace(',', '.').trim()
+        val temp = if (t.isEmpty()) null else t.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+        if (t.isNotEmpty() && temp == null) { error = "Temperatura no válida (número ≥ 0; el máximo lo decide el modelo)."; return }
+        val newToken = when { clearToken -> ""; token.isNotBlank() -> token; else -> null }
+        val newSecret = when { clearSecret -> ""; secret.isNotBlank() -> secret; else -> null }
+        val newApiKey = when { clearApiKey -> ""; apiKey.isNotBlank() -> apiKey; else -> null }
+        val inRate = inputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de entrada no válida."; return } }
+        val outRate = outputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de salida no válida."; return } }
+        if (!isCustom && modelId.isBlank()) { error = "Escribe el id del modelo."; return }
+        error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
+            maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
+            llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate,
+            antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }), newToken, newSecret, newApiKey)
+        if (error == null) onDismiss()
+    }
     ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         NexusSheetSystemBars()
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
-                AgentStatus(ui,{})
-                AgentBudgetSettings()
-                AgentLimitsSettings()
-                MediaEditingSettings()
-                AgentInternetSettings()
-                Text("Proveedor del LLM", style = MaterialTheme.typography.titleSmall)
-                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    listOf(
-                        AssistantSettings.BACKEND_DIRECT to "Bedrock",
-                        AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
-                        AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI",
-                        AssistantSettings.BACKEND_PROXY to "Proxy",
-                        AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity (AGY)",
-                    ).forEach { (value, label) ->
-                        FilterChip(selected = backend == value, onClick = {
-                            if (backend != value) { backend = value; apiKey = ""; clearApiKey = false
-                                // Se recupera el modelo guardado para el nuevo proveedor o un valor por defecto válido.
-                                modelId = vm.savedModelFor(value)
-                            }
-                        }, label = { Text(label) })
-                    }
-                    brains.forEach { b ->
-                        FilterChip(selected = backend == BrainStore.backendFor(b.id), onClick = {
-                            backend = BrainStore.backendFor(b.id); apiKey = ""; clearApiKey = false; modelId = b.modelId
-                        }, label = { Text(b.name) })
-                    }
-                    AssistChip(onClick = { addingBrain = true }, label = { Text("+ Añadir") })
-                }
-                if (isCustom) {
-                    val brain = brains.firstOrNull { BrainStore.backendFor(it.id) == backend }
-                    if (brain == null) Text("Este proveedor ya no existe. Elige otro y guarda.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    else {
-                        val hasKey = brainStore.hasKey(brain.id)
-                        Text(listOf(brain.modelId.ifBlank { "sin modelo" }, when (brain.protocol) { BrainProtocol.OPENAI_RESPONSES -> "Responses API"; BrainProtocol.CUSTOM_REST -> "REST"; else -> "Chat Completions" },
-                            if (hasKey || brain.auth.mode == BrainAuthMode.NONE) "clave lista" else "falta la clave").joinToString(" · "),
-                            style = MaterialTheme.typography.bodyMedium, color = if (hasKey || brain.auth.mode == BrainAuthMode.NONE) TextSecondary else MaterialTheme.colorScheme.error)
-                        if (!brain.capabilities.tools) Text("Sin herramientas: solo conversa, no prepara encargos.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                        TextButton(onClick = { editingBrain = brain }, contentPadding = PaddingValues(0.dp)) { Text("Editar proveedor, clave y límites") }
-                    }
-                } else if (backend == AssistantSettings.BACKEND_ANTHROPIC || backend == AssistantSettings.BACKEND_OPENAI) {
-                    Text(if (backend == AssistantSettings.BACKEND_ANTHROPIC) "Claude con tu clave de la API de Anthropic (se guarda cifrada en el teléfono)."
-                        else "Cualquier API compatible con OpenAI: elige un acceso rápido o escribe la URL. La clave se guarda cifrada y es distinta para cada proveedor.",
-                        style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    if (backend == AssistantSettings.BACKEND_OPENAI) {
-                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            AssistantSettings.OPENAI_PRESETS.forEach { (name, url) -> FilterChip(selected = baseUrl.trimEnd('/') == url, onClick = { baseUrl = url }, label = { Text(name) }) }
-                        }
-                        StudioTextField(baseUrl, { baseUrl = it.trim() }, shape=NexusTokens.field, label = { Text("URL de la API (https://…/v1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    }
-                    StudioCredentialField(apiKey, { apiKey = it; clearApiKey = false }, shape=NexusTokens.field,
-                        label = { Text(if (maskedKey.isNotBlank()) "Clave de API ($maskedKey)" else "Clave de API") }, singleLine = true)
-                    if (maskedKey.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(clearApiKey, { clearApiKey = it }); Text("Borrar la clave guardada", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (backend == AssistantSettings.BACKEND_OPENAI) {
-                        Text("Tarifa para el límite de consumo (opcional, USD por millón de tokens). Sin ella solo se limita el número de llamadas por mensaje.",
-                            style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                        Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                            StudioTextField(inputRate, { inputRate = it }, shape=NexusTokens.field, label = { Text("Entrada") }, singleLine = true, modifier = Modifier.weight(1f),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                            StudioTextField(outputRate, { outputRate = it }, shape=NexusTokens.field, label = { Text("Salida") }, singleLine = true, modifier = Modifier.weight(1f),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                        }
-                    }
-                } else if (backend == AssistantSettings.BACKEND_ANTIGRAVITY) {
-                    Text("Conecta con el puente local de Antigravity CLI (AGY) en el dispositivo o por túnel (127.0.0.1:8788).",
-                        style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    StudioTextField(agyEndpoint, { agyEndpoint = it.trim() }, shape=NexusTokens.field,
-                        label = { Text("Endpoint del puente AGY (http://127.0.0.1:8788)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                } else if (backend != AssistantSettings.BACKEND_PROXY) {
-                    Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    StudioCredentialField(accessKey, { accessKey = it.trim() }, shape=NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
-                    StudioCredentialField(secret, { secret = it; clearSecret = false }, shape=NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
-                        singleLine = true)
-                    if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
-                    }
-                    StudioTextField(region, { region = it }, shape=NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true)
-                } else {
-                    Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                    StudioTextField(endpoint, { endpoint = it }, shape=NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true)
-                    StudioCredentialField(token, { token = it; clearToken = false }, shape=NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
-                        singleLine = true)
-                    if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                if (!isCustom) StudioTextField(modelId, { modelId = it.trim() }, shape=NexusTokens.field, singleLine = true,
-                    label = { Text(when (backend) {
-                        AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"
-                        AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"
-                        AssistantSettings.BACKEND_ANTIGRAVITY -> "Modelo de Antigravity (AGY)"
-                        else -> "Model ID / inference profile"
-                    }) })
-                val modelChips = when (backend) {
-                    AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS
-                    AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
-                    AssistantSettings.BACKEND_OPENAI -> emptyList()
-                    else -> AssistantSettings.KNOWN_MODELS
-                }
-                if (!isCustom && modelChips.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    modelChips.forEach { (id,name) -> FilterChip(selected=modelId==id,onClick={modelId=id},label={Text(name)}) }
-                }
-                if(!isCustom && modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                    StudioTextField(temperature, { temperature = it }, shape=NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    StudioTextField(maxTokens, { maxTokens = it.filter(Char::isDigit) }, shape=NexusTokens.field, label = { Text("Máx. tokens") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                }
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.96f)) {
+            // Cabecera fija: título, estado y una línea de resumen.
+            Column(Modifier.padding(horizontal = NexusTokens.screenMargin)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(sendImages, { sendImages = it }); Spacer(Modifier.width(NexusTokens.space8)); Text("Enviar miniatura de las imágenes adjuntas al LLM", style = MaterialTheme.typography.bodySmall)
+                    Text("Ajustes del asistente", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                    Surface(shape = NexusTokens.filter, color = if (ui.thinking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) {
+                        Text(if (ui.thinking) "Trabajando" else "Listo", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium,
+                            color = if (ui.thinking) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                    }
                 }
-                StudioTextField(excluded, { excluded = it.take(200) }, shape=NexusTokens.field, label = { Text("No recomendar estas familias") }, singleLine = true,
-                    supportingText = { Text("Separadas por comas, p. ej. «veo, runway». Si pides uno por su nombre, se respeta.") })
-                HorizontalDivider()
-                Text("Skills: ${ui.skillsCount}" + if (ui.skillErrors.isNotEmpty()) " · ${ui.skillErrors.size} con errores" else "", style = MaterialTheme.typography.bodyMedium)
-                if(ui.skillErrors.isNotEmpty()) InlineNotice("Algunas skills no se pudieron cargar.",technicalDetails=ui.skillErrors.joinToString("\n"))
-                Text("Se cargan de la app y, sin recompilar, de Documents/ALEXIA/Nexus/Skills (las de igual id sustituyen a las de la app).", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    FilledTonalButton(onClick = vm::reloadSkills) { Text("Recargar skills") }
-                    FilledTonalButton(onClick = { vm.reindexHistory() }) { Text("Indexar historial") }
-                }
-                error?.let {InlineNotice(noticeMessage(it,"Revisa los ajustes antes de guardar."),technicalDetails=it)}
-            TextButton(onClick = {
-                val t = temperature.replace(',', '.').trim()
-                val temp = if (t.isEmpty()) null else t.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
-                if (t.isNotEmpty() && temp == null) { error = "Temperatura no válida (número ≥ 0; el máximo lo decide el modelo)."; return@TextButton }
-                val newToken = when { clearToken -> ""; token.isNotBlank() -> token; else -> null }
-                val newSecret = when { clearSecret -> ""; secret.isNotBlank() -> secret; else -> null }
-                val newApiKey = when { clearApiKey -> ""; apiKey.isNotBlank() -> apiKey; else -> null }
-                val inRate = inputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de entrada no válida."; return@TextButton } }
-                val outRate = outputRate.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "Tarifa de salida no válida."; return@TextButton } }
-                if (!isCustom && modelId.isBlank()) { error = "Escribe el id del modelo."; return@TextButton }
-                error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
-                    maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
-                    llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate,
-                    antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }), newToken, newSecret, newApiKey)
-                if (error == null) onDismiss()
-            }) { Text("Guardar") }
-                TextButton(onClick=onDismiss) {Text("Cerrar",color=TextSecondary)}
+                Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills" + (if (ui.skillErrors.isNotEmpty()) " · ${ui.skillErrors.size} con errores" else "") +
+                    (ui.lastLatencyMs?.let { " · último turno ${"%.1f".format(it / 1000.0)} s" } ?: ""),
+                    style = MaterialTheme.typography.labelMedium, color = TextSecondary)
             }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8),
+                verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                // 1 · Cerebro
+                AgentSection("Cerebro", Icons.Default.AutoAwesome) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        listOf(
+                            AssistantSettings.BACKEND_DIRECT to "Bedrock",
+                            AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
+                            AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI",
+                            AssistantSettings.BACKEND_PROXY to "Proxy",
+                            AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity",
+                        ).forEach { (value, label) ->
+                            StudioFilterChip(backend == value, {
+                                if (backend != value) { backend = value; apiKey = ""; clearApiKey = false
+                                    // Se recupera el modelo guardado para el nuevo proveedor o un valor por defecto válido.
+                                    modelId = vm.savedModelFor(value)
+                                }
+                            }, label = { Text(label) })
+                        }
+                        brains.forEach { b ->
+                            StudioFilterChip(backend == BrainStore.backendFor(b.id), {
+                                backend = BrainStore.backendFor(b.id); apiKey = ""; clearApiKey = false; modelId = b.modelId
+                            }, label = { Text(b.name) })
+                        }
+                        AssistChip(onClick = { addingBrain = true }, label = { Text("+ Añadir") })
+                    }
+                    if (isCustom) {
+                        val brain = brains.firstOrNull { BrainStore.backendFor(it.id) == backend }
+                        if (brain == null) Text("Este proveedor ya no existe. Elige otro y guarda.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        else {
+                            val hasKey = brainStore.hasKey(brain.id)
+                            val ready = hasKey || brain.auth.mode == BrainAuthMode.NONE
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(brain.modelId.ifBlank { "sin modelo" }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    Text(when (brain.protocol) { BrainProtocol.OPENAI_RESPONSES -> "Responses API"; BrainProtocol.CUSTOM_REST -> "REST"; else -> "Chat Completions" },
+                                        style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                                }
+                                Surface(shape = NexusTokens.filter, color = if (ready) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer) {
+                                    Text(if (ready) "Clave lista" else "Falta la clave", Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium,
+                                        color = if (ready) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer)
+                                }
+                            }
+                            if (!brain.capabilities.tools) Text("Sin herramientas: solo conversa, no prepara encargos.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                            OutlinedButton(onClick = { editingBrain = brain }, shape = NexusTokens.field) { Text("Editar proveedor, clave y límites") }
+                        }
+                    } else if (backend == AssistantSettings.BACKEND_ANTHROPIC || backend == AssistantSettings.BACKEND_OPENAI) {
+                        Text(if (backend == AssistantSettings.BACKEND_ANTHROPIC) "Claude con tu clave de la API de Anthropic (se guarda cifrada en el teléfono)."
+                            else "Cualquier API compatible con OpenAI: elige un acceso rápido o escribe la URL. La clave se guarda cifrada y es distinta para cada proveedor.",
+                            style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        if (backend == AssistantSettings.BACKEND_OPENAI) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                                AssistantSettings.OPENAI_PRESETS.forEach { (name, url) -> StudioFilterChip(baseUrl.trimEnd('/') == url, { baseUrl = url }, label = { Text(name) }) }
+                            }
+                            StudioTextField(baseUrl, { baseUrl = it.trim() }, shape = NexusTokens.field, label = { Text("URL de la API (https://…/v1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        }
+                        StudioCredentialField(apiKey, { apiKey = it; clearApiKey = false }, shape = NexusTokens.field,
+                            label = { Text(if (maskedKey.isNotBlank()) "Clave de API ($maskedKey)" else "Clave de API") }, singleLine = true)
+                        if (maskedKey.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(clearApiKey, { clearApiKey = it }); Text("Borrar la clave guardada", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (backend == AssistantSettings.BACKEND_OPENAI) {
+                            Text("Tarifa para el límite de consumo (opcional, USD por millón de tokens). Sin ella solo se limita el número de llamadas por mensaje.",
+                                style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                            Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                                StudioTextField(inputRate, { inputRate = it }, shape = NexusTokens.field, label = { Text("Entrada") }, singleLine = true, modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                                StudioTextField(outputRate, { outputRate = it }, shape = NexusTokens.field, label = { Text("Salida") }, singleLine = true, modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                            }
+                        }
+                    } else if (backend == AssistantSettings.BACKEND_ANTIGRAVITY) {
+                        Text("Conecta con el puente local de Antigravity CLI (AGY) en el dispositivo o por túnel (127.0.0.1:8788).",
+                            style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        StudioTextField(agyEndpoint, { agyEndpoint = it.trim() }, shape = NexusTokens.field,
+                            label = { Text("Endpoint del puente AGY (http://127.0.0.1:8788)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    } else if (backend != AssistantSettings.BACKEND_PROXY) {
+                        Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        StudioCredentialField(accessKey, { accessKey = it.trim() }, shape = NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
+                        StudioCredentialField(secret, { secret = it; clearSecret = false }, shape = NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
+                            singleLine = true)
+                        if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
+                        }
+                        StudioTextField(region, { region = it }, shape = NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    } else {
+                        Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        StudioTextField(endpoint, { endpoint = it }, shape = NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        StudioCredentialField(token, { token = it; clearToken = false }, shape = NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
+                            singleLine = true)
+                        if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    if (!isCustom) StudioTextField(modelId, { modelId = it.trim() }, shape = NexusTokens.field, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(when (backend) {
+                            AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"
+                            AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"
+                            AssistantSettings.BACKEND_ANTIGRAVITY -> "Modelo de Antigravity (AGY)"
+                            else -> "Model ID / inference profile"
+                        }) })
+                    val modelChips = when (backend) {
+                        AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS
+                        AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
+                        AssistantSettings.BACKEND_OPENAI -> emptyList()
+                        else -> AssistantSettings.KNOWN_MODELS
+                    }
+                    if (!isCustom && modelChips.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        modelChips.forEach { (id, name) -> StudioFilterChip(modelId == id, { modelId = id }, label = { Text(name) }) }
+                    }
+                    if (!isCustom && modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+                // 2 · Respuesta
+                AgentSection("Respuesta", Icons.Default.Tune) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        StudioTextField(temperature, { temperature = it }, shape = NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                        StudioTextField(maxTokens, { maxTokens = it.filter(Char::isDigit) }, shape = NexusTokens.field, label = { Text("Máx. tokens") }, singleLine = true, modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                        Text("Enviar miniatura de las imágenes adjuntas al LLM", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        Switch(sendImages, { sendImages = it })
+                    }
+                    StudioTextField(excluded, { excluded = it.take(200) }, shape = NexusTokens.field, label = { Text("No recomendar estas familias") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        supportingText = { Text("Separadas por comas, p. ej. «veo, runway». Si pides uno por su nombre, se respeta.") })
+                }
+                // 3 · Consumo y límites
+                AgentSection("Consumo y límites", Icons.Default.Speed) {
+                    AgentBudgetSettings()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    AgentLimitsSettings()
+                }
+                // 4 · Herramientas
+                AgentSection("Herramientas", Icons.Default.Build) {
+                    MediaEditingSettings()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    AgentInternetSettings()
+                }
+                // 5 · Skills
+                AgentSection("Skills", Icons.Default.Extension) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${ui.skillsCount} cargadas", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                        if (ui.skillErrors.isNotEmpty()) Text("${ui.skillErrors.size} con errores", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                    }
+                    if (ui.skillErrors.isNotEmpty()) InlineNotice("Algunas skills no se pudieron cargar.", technicalDetails = ui.skillErrors.joinToString("\n"))
+                    Text("Se cargan de la app y, sin recompilar, de Documents/ALEXIA/Nexus/Skills (las de igual id sustituyen a las de la app).", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        FilledTonalButton(onClick = vm::reloadSkills) { Text("Recargar skills") }
+                        FilledTonalButton(onClick = { vm.reindexHistory() }) { Text("Indexar historial") }
+                    }
+                }
+                error?.let { InlineNotice(noticeMessage(it, "Revisa los ajustes antes de guardar."), technicalDetails = it) }
+            }
+            // Botonera fija: siempre a la vista, sin tener que llegar al final de la lista.
+            Surface(color = com.vidadomu.nexus.ui.theme.LocalChromeColor.current) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)) { Text("Cerrar") }
+                        Button(onClick = { save() }, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)) { Text("Guardar") }
+                    }
+                }
+            }
+        }
     }
     if (addingBrain || editingBrain != null) BrainEditorDialog(editingBrain, brainStore) { saved ->
         addingBrain = false; editingBrain = null; brainTick++

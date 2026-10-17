@@ -24,7 +24,7 @@ internal fun AgentInternetSettings() {
     var token by remember {mutableStateOf("")}
     var busy by remember {mutableStateOf(false)}
     var message by remember {mutableStateOf<String?>(null)}
-    TextButton(onClick={expanded=!expanded}) {Text("Internet y herramientas MCP · ${servers.size}")}
+    FoldHeader("Internet y herramientas MCP","${servers.size} servidor(es)",expanded) {expanded=!expanded}
     if(expanded) Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Búsqueda, lectura web y herramientas MCP de consulta disponibles desde el chat. Puedes pedir al agente que conecte un servidor MCP o añadirlo aquí.",style=MaterialTheme.typography.bodySmall)
         servers.forEach {(name,url) -> Row(Modifier.fillMaxWidth()) {

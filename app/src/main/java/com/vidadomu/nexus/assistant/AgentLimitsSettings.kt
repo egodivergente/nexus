@@ -36,11 +36,7 @@ internal fun AgentLimitsSettings() {
     var uiChars by remember { mutableStateOf(current.maxUiContextChars.toString()) }
     var tracking by remember { mutableStateOf(current.jobTrackingMinutes.toString()) }
     var message by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
-    TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
-        Text("Límites del agente", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.width(NexusTokens.space8))
-        Text(if (expanded) "−" else "+", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-    }
+    FoldHeader("Límites del agente", "${rounds} pasos · ${timeout} s", expanded) { expanded = !expanded }
     if (expanded) Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Son tuyos: el agente los recibe como límite vigente y mandan sobre cualquier cifra de sus instrucciones. 0 = sin límite. Cada proveedor puede tener los suyos.",
             style = MaterialTheme.typography.bodySmall, color = TextSecondary)

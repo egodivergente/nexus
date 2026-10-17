@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.36-agent] - 2026-10-18
+
+### Cambiado
+- Ajustes del asistente rediseñado: cabecera fija con estado y resumen, secciones con icono (Cerebro, Respuesta, Consumo y límites, Herramientas, Skills) en tarjetas, filtros de proveedor y modelo bien visibles, estado de la clave como etiqueta, filas plegables con resumen y flecha, y botonera Cerrar/Guardar fija abajo.
+
 ## [1.9.35-agent] - 2026-10-18
 
 ### Cambiado (revisión visual a partir del vídeo)
