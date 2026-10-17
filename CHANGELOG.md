@@ -2,6 +2,13 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.27-agent] - 2026-10-17
+
+### Corregido
+- Lienzo: «No se han podido cargar las opciones del modelo» con `Trust anchor for certification path not found` ya no muestra solo la traza de Java. Ahora explica que la red actual (wifi de invitados con página de acceso, VPN o proxy) impide verificar el certificado y cómo resolverlo. Caso real: S25 en la wifi `amzn-internet` (16:28–16:34), con la detección de portal cautivo desactivada en el móvil; servidores y certificados de Atlas/Crun/BytePlus verificados como correctos.
+- La descarga del esquema del modelo se reintenta una vez tras 1,5 s y, si falló por red, de nuevo automáticamente al cambiar de red (wifi ↔ datos).
+- `NetworkErrorParser` distingue los fallos de certificado (`TLS_UNTRUSTED`) de «Se ha interrumpido la conexión».
+
 ## [1.9.26-agent] - 2026-10-17
 
 ### Añadido

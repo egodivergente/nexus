@@ -59,7 +59,25 @@ class RedactingLoggingInterceptor : Interceptor {
 }
 
 object NetworkErrorParser {
+    /** Texto en minúsculas que delata que la red (no el servidor) ha impedido verificar el certificado. */
+    val TLS_HINTS = listOf("trust anchor", "certpath", "certification path", "sslhandshake",
+        "certificate", "certificado", "conexión segura")
+    const val TLS_MESSAGE = "La red actual no permite verificar la conexión segura con el proveedor. " +
+        "Suele pasar en wifis de invitados que piden aceptar una página de acceso, o con una VPN o proxy. " +
+        "Abre el navegador para aceptar esa página o cambia a datos móviles, y pulsa Reintentar."
+
+    /** True si el fallo (o alguna de sus causas) es de verificación TLS/certificado. */
+    fun isTlsTrustFailure(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(8).any {
+        it is javax.net.ssl.SSLHandshakeException || it is javax.net.ssl.SSLPeerUnverifiedException ||
+            it is java.security.cert.CertificateException || it is java.security.cert.CertPathValidatorException
+    }
+
     fun parse(e: Throwable): ProviderError {
+        if (e !is ProviderError && isTlsTrustFailure(e)) return ProviderError(
+            humanReadableMessage = TLS_MESSAGE,
+            technicalDetails = e.javaClass.simpleName + ": " + (e.message ?: ""),
+            errorCode = "TLS_UNTRUSTED"
+        )
         return when (e) {
             is SocketTimeoutException, is java.io.InterruptedIOException -> ProviderError(
                 humanReadableMessage = "La conexión ha tardado demasiado. La operación podría seguir procesándose; revisa el historial antes de repetirla.",

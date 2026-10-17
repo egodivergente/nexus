@@ -25,6 +25,8 @@ internal fun noticeMessage(raw: String?, fallback: String = "No se ha podido com
             "Se ha alcanzado el límite diario del agente. Revisa el consumo en Ajustes del agente."
         listOf("limite de consumo", "límite de consumo").any(text::contains) ->
             "Este mensaje ha alcanzado su límite de consumo. El trabajo se conserva; revisa los límites del agente."
+        com.vidadomu.nexus.core.network.NetworkErrorParser.TLS_HINTS.any(text::contains) ->
+            com.vidadomu.nexus.core.network.NetworkErrorParser.TLS_MESSAGE
         listOf("unable to resolve host", "unknownhost", "network", "connection", "sin conexión").any(text::contains) ->
             "No hay conexión. Comprueba la red y vuelve a intentarlo."
         listOf("timeout", "timed out", "tiempo de espera").any(text::contains) ->

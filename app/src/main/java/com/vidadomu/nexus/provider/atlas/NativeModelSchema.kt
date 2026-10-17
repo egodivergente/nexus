@@ -45,11 +45,30 @@ object NativeModelSchema {
         val url = requireNotNull(model.schemaUrl) { "Este modelo no publica un esquema de configuración." }
         val parsed = java.net.URI(url)
         require(parsed.scheme == "https" && parsed.host == "static.atlascloud.ai") { "El esquema no procede del dominio oficial de Atlas." }
-        val payload = client.newCall(Request.Builder().url(url).build()).awaitResponse().use {
-            check(it.isSuccessful) { "No se pudo cargar la configuración (HTTP " + it.code + ")." }
-            requireNotNull(it.body).string()
-        }
+        val payload = fetchWithRetry(url)
         decode(model, payload).also { cached[model.id+":"+model.schemaUrl] = it }
+    }
+
+    /**
+     * Un reintento tras una pausa corta: los fallos de red al cambiar de wifi a datos (o al entrar en una
+     * wifi de invitados) suelen durar segundos. Si el fallo es de certificado, se devuelve el mensaje
+     * explicativo de [com.vidadomu.nexus.core.network.NetworkErrorParser] en lugar de la traza de Java.
+     */
+    private suspend fun fetchWithRetry(url: String, attempts: Int = 2, pauseMs: Long = 1500): String {
+        var last: java.io.IOException? = null
+        repeat(attempts) { index ->
+            if (index > 0) kotlinx.coroutines.delay(pauseMs)
+            try {
+                return client.newCall(Request.Builder().url(url).build()).awaitResponse().use {
+                    check(it.isSuccessful) { "No se pudo cargar la configuración (HTTP " + it.code + ")." }
+                    requireNotNull(it.body).string()
+                }
+            } catch (e: java.io.IOException) { last = e }
+        }
+        val failure = requireNotNull(last)
+        if (com.vidadomu.nexus.core.network.NetworkErrorParser.isTlsTrustFailure(failure))
+            throw com.vidadomu.nexus.core.network.NetworkErrorParser.parse(failure)
+        throw failure
     }
 
     fun decode(model: NexusModel, payload: String): NativeConfiguration {

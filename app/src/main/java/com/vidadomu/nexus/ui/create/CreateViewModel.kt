@@ -90,6 +90,15 @@ data class CreateUiState(
         get() = attachedMedia.firstOrNull()?.mimeType
 }
 
+/** Solo los fallos de red/certificado merecen reintento automático; un esquema incompatible no cambia con la red. */
+internal fun shouldRetryAfterNetworkChange(message: String?): Boolean {
+    val text = message?.lowercase() ?: return false
+    if ("requiere entradas" in text || "esquema no" in text || "dominio oficial" in text) return false
+    return com.vidadomu.nexus.core.network.NetworkErrorParser.TLS_HINTS.any(text::contains) ||
+        listOf("unable to resolve", "failed to connect", "connection", "conexión", "timeout", "timed out",
+            "tiempo", "reset", "interrumpido", "unreachable").any(text::contains)
+}
+
 class CreateViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as NexusApplication
@@ -144,7 +153,20 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val _uiState = MutableStateFlow(CreateUiState(selectedModality=restoredDraft?.modality ?: Modality.IMAGE))
     val uiState: StateFlow<CreateUiState> = _uiState.asStateFlow()
 
+    /** Si las opciones del modelo fallaron por la red, se reintenta solo al cambiar de red (wifi ↔ datos). */
+    private val networkRecovery = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            viewModelScope.launch(Dispatchers.Main) {
+                kotlinx.coroutines.delay(1500)
+                val s = _uiState.value
+                if (!s.schemaReady && !s.isLoadingSchema && shouldRetryAfterNetworkChange(s.schemaMessage)) retryConfiguration()
+            }
+        }
+    }
+    private val connectivity = application.getSystemService(android.net.ConnectivityManager::class.java)
+
     init {
+        runCatching { connectivity?.registerDefaultNetworkCallback(networkRecovery) }
         observeDraft()
         viewModelScope.launch {
             modelCatalogRepo.models.collect { models ->
@@ -321,6 +343,11 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             )
         }
         loadNativeConfiguration(model)
+    }
+
+    override fun onCleared() {
+        runCatching { connectivity?.unregisterNetworkCallback(networkRecovery) }
+        super.onCleared()
     }
 
     fun retryConfiguration() {
