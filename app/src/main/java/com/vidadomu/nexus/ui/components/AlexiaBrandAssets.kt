@@ -8,6 +8,28 @@ internal object AlexiaBrandAssets {
     fun resolve(text: String): BrandAsset.Resource? {
         val id = when {
             "nano-banana" in text || "nanobanana" in text -> R.drawable.alexia_nanobanana
+            // Marcas concretas antes que su casa matriz (Seedream/Seedance antes que ByteDance, Veo/Gemini/Imagen/Flow antes que Google).
+            "antigravity" in text -> R.drawable.alexia_antigravity
+            "dola" in text -> R.drawable.alexia_dola
+            "seedream" in text -> R.drawable.alexia_seedream
+            "seedance" in text -> R.drawable.alexia_seedance
+            "byteplus" in text -> R.drawable.alexia_bytedance
+            "veo" in text -> R.drawable.alexia_veo
+            "gemini" in text -> R.drawable.alexia_gemini
+            "imagen" in text -> R.drawable.alexia_imagen
+            "google flow" in text || "google_flow" in text || Regex("\\bflow\\b").containsMatchIn(text) -> R.drawable.alexia_flow
+            "hi3d" in text -> R.drawable.alexia_hi3d
+            "hidream" in text -> R.drawable.alexia_hidream
+            "kwaipilot" in text -> R.drawable.alexia_kwaipilot
+            "ltx" in text -> R.drawable.alexia_ltx
+            "recraft" in text -> R.drawable.alexia_recraft
+            Regex("\\bsync\\b").containsMatchIn(text) -> R.drawable.alexia_sync
+            Regex("\\bdots\\b").containsMatchIn(text) -> R.drawable.alexia_dots
+            "cohere" in text -> R.drawable.alexia_cohere
+            "tencent" in text -> R.drawable.alexia_tencent
+            Regex("\\budio\\b").containsMatchIn(text) -> R.drawable.alexia_udio
+            "veed" in text -> R.drawable.alexia_veed
+            "youchuan" in text -> R.drawable.alexia_youchuan
             "hailuo" in text -> R.drawable.alexia_hailuo
             "sora" in text -> R.drawable.alexia_sora
             "grok" in text -> R.drawable.alexia_grok

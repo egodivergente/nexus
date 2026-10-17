@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.34-agent] - 2026-10-17
+
+### Añadido
+- 20 logos más (Logos_Oficiales_Branding_Completo): Antigravity, Dola, Cohere, Dots, Flow, Gemini, Hi3D, HiDream, Imagen, Kwaipilot, LTX, Recraft, Seedance, Seedream, Sync, Tencent, Udio, Veed, Veo y Youchuan. La marca concreta gana a su casa matriz (Seedream/Seedance antes que ByteDance, Veo/Gemini/Imagen/Flow antes que Google). BytePlus usa el logo de ByteDance porque el archivo recibido traía la cuadrícula de transparencia pintada.
+
 ## [1.9.33-agent] - 2026-10-17
 
 ### Añadido
