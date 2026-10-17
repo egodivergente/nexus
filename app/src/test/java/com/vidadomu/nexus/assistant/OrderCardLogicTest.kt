@@ -31,6 +31,15 @@ class OrderCardLogicTest {
     )
     private fun fail(kind: FailureKind, message: String, fix: SuggestedFix? = null) = OrderFailure(kind, message, 0, "p1", 1, fix, "Atlas exige resolution.")
 
+    @Test fun headerNeverInventsProgressOrShowsFlowMilestones() {
+        val processing = order(OrderStatus.PROCESSING)
+        for (value in listOf(null, Float.NaN, Float.POSITIVE_INFINITY, -0.1f, 1.1f)) {
+            assertEquals("Procesando", presentOrder(processing.copy(progress = value), null, false, false, false).status)
+        }
+        assertEquals("Procesando", presentOrder(processing.copy(modelRef = "google_flow:veo", progress = .5f), null, false, false, false).status)
+        assertEquals("Procesando · 50 %", presentOrder(processing.copy(progress = .5f), null, false, false, false).status)
+    }
+
     @Test fun everyStateShowsAtMostOneActionAndHonestLabels() {
         val awaiting = presentOrder(order(OrderStatus.AWAITING_CONFIRMATION), "1,00 €", busy = false, assistantBusy = false, dirty = false)
         assertEquals(CardAction.GENERATE, awaiting.action)

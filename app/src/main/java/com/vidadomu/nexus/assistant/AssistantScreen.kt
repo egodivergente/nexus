@@ -87,6 +87,7 @@ fun AssistantScreen(
     vm: AssistantViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val draftPrefs = LocalContext.current.getSharedPreferences("assistant_draft_v1", android.content.Context.MODE_PRIVATE)
@@ -206,7 +207,7 @@ fun AssistantScreen(
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
                             val p = ui.plans.getValue(item.planId)
-                            OrderCard(order, p, vm.outputs(p.jobId ?: order.jobId), assistantBusy = ui.thinking, modifier = Modifier.animateItem(),
+                            OrderCard(order, p, vm.outputs(p.jobId ?: order.jobId), assistantBusy = ui.thinking, modifier = Modifier.animateItem(), presentation = presentation,
                                 onGenerate = { vm.generate(p.plan.id, p.plan.fingerprint()) },
                                 onApplyFix = { vm.applyFix(order.id) },
                                 onAskAgent = { vm.askAgentToFix(order.id) },
@@ -503,12 +504,7 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
 internal fun AssistantMediaPreview(media: Attachment) {
     val context=LocalContext.current
     when {
-        media.mimeType.startsWith("image/") -> AsyncImage(
-            model=media.uri,
-            contentDescription=media.name ?: "Imagen del asistente",
-            contentScale=ContentScale.Fit,
-            modifier=Modifier.widthIn(max=280.dp).heightIn(max=260.dp).clip(NexusTokens.card),
-        )
+        media.mimeType.startsWith("image/") -> AssistantImagePreview(media)
         media.mimeType.startsWith("video/") -> {
             val player=remember(media.uri) {
                 ExoPlayer.Builder(context).build().apply {
@@ -855,6 +851,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
         NexusSheetSystemBars()
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 Text("Ajustes del asistente",style=MaterialTheme.typography.titleLarge)
+                AssistantPresentationSettings()
                 AgentStatus(ui,{})
                 AgentBudgetSettings()
                 AgentLimitsSettings()
