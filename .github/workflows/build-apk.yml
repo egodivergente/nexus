@@ -67,6 +67,9 @@ jobs:
           target: google_apis
           profile: pixel_6
           ram-size: 2048M
+          # API35 defaults to a 6G userdata partition; runner had 3.8G left after build.
+          # These six offline fixtures need only the app, tests and nine small PNGs.
+          disk-size: 2048M
           disable-animations: true
           script: |
             ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process :app:connectedOfflineQaAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.vidadomu.nexus.assistant.AssistantPresentationUiTest
