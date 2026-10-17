@@ -2,6 +2,14 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.31-agent] - 2026-10-17
+
+### Cambiado
+- Agente: el cerebro pasa a ser un texto discreto bajo el título (sin recuadro que apretaba la barra).
+- Una sola fila sobre el cuadro de texto: atajos (Traer encargos, Último) a la izquierda y Razonar a la derecha.
+- El cuadro de texto va sobre una banda de otro tono con filetes arriba y abajo y borde más marcado.
+- Tarjeta de encargo terminada: miniatura a la izquierda y datos a la derecha, sin el hueco vacío; el resto de resultados en una tira pequeña.
+
 ## [1.9.30-agent] - 2026-10-17
 
 ### Añadido

@@ -80,9 +80,13 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
     onReply: (String) -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
-    Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
-        border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f)),
-        modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4)) {
+    // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
+    Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,modifier=Modifier.fillMaxWidth()) {
+      Column {
+        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+        Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
+        border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=0.55f)),
+        modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
@@ -146,6 +150,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }
         }
+        }
+        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+      }
     }
 }
 

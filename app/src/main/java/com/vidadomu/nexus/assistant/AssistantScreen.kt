@@ -177,10 +177,13 @@ fun AssistantScreen(
                 ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},
                 ui.projectAssets.size.takeIf {it>0}?.let {"$it referencias"}
             ).joinToString(" · ")
-            if(LocalDensity.current.fontScale<1.3f && projectContext.isNotBlank()) Text(projectContext,
-                style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,
-                overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-        }},actions={BrainPicker(ui,vm)
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                BrainPicker(ui,vm)
+                if(LocalDensity.current.fontScale<1.3f && projectContext.isNotBlank()) Text("· $projectContext",
+                    style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,
+                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
+            }
+        }},actions={
             IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
@@ -242,10 +245,16 @@ fun AssistantScreen(
             }
             val cardItems = visibleItems.filterIsInstance<ChatItem.PlanCard>()
             val trailingCards = visibleItems.takeLastWhile { it is ChatItem.PlanCard }.size
-            if (cardItems.size > trailingCards && !ui.thinking) TextButton(onClick = { vm.bringCardsToFront(); following = true }) { Text("Traer los ${cardItems.size} encargos aquí ↓") }
-            if (!following) TextButton(onClick = { following = true; scope.launch { followLast() } }) { Text("Ir al último mensaje ↓") }
+            val showBring = cardItems.size > trailingCards && !ui.thinking
+            val showReasoning = reasoningAvailable(ui)
+            // Una sola fila fina sobre el cuadro de texto: atajos a la izquierda, modo de razonamiento a la derecha.
+            if (showBring || !following || showReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (showBring) QuickLink("Traer ${cardItems.size} encargos ↓") { vm.bringCardsToFront(); following = true }
+                if (!following) QuickLink("Último ↓") { following = true; scope.launch { followLast() } }
+                Spacer(Modifier.weight(1f))
+                ReasoningPicker(ui, vm)
+            }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
-            ReasoningPicker(ui, vm)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
                 onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) })
         }
@@ -269,10 +278,11 @@ private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
         ?: brains.firstOrNull { BrainStore.backendFor(it.id) == current }?.name ?: "Cerebro"
     val context = LocalContext.current
     Box {
-        AssistChip(onClick = { open = true }, enabled = !ui.thinking,
-            label = { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 92.dp)) },
-            trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(16.dp)) },
-            modifier = Modifier.semantics { contentDescription = "Cerebro del agente: $label. Cambiar" })
+        // Texto discreto bajo el título (sin recuadro): el nombre corto del cerebro y una flecha.
+        val short = if (label.length > 12) label.substringBefore(' ') else label
+        Text("$short ▾", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1,
+            modifier = Modifier.clickable(enabled = !ui.thinking) { open = true }.padding(vertical = 4.dp)
+                .semantics { contentDescription = "Cerebro del agente: $label. Cambiar" })
         DropdownMenu(open, { open = false }) {
             (builtins.map { it.first to it.second } + brains.map { BrainStore.backendFor(it.id) to it.name }).forEach { (backend, name) ->
                 DropdownMenuItem(text = { Text(name) },
@@ -298,20 +308,28 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
         Triple("Auto", null, null), Triple("Rápido", null, "disabled"), Triple("Mínimo", "minimal", null),
         Triple("Bajo", "low", null), Triple("Medio", "medium", null), Triple("Alto", "high", null))
     val current = modes.firstOrNull { it.second == brain.reasoningEffort && it.third == brain.thinking }?.first ?: "Auto"
-    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16), horizontalArrangement = Arrangement.End) {
-        Box {
-            TextButton(onClick = { open = true }, enabled = !ui.thinking, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                modifier = Modifier.height(28.dp).semantics { contentDescription = "Modo de razonamiento: $current. Cambiar" }) {
-                Text("Razonar · $current ▾", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            }
-            DropdownMenu(open, { open = false }) {
-                modes.forEach { (name, effort, thinking) ->
-                    DropdownMenuItem(text = { Text(name) },
-                        trailingIcon = { if (name == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = { open = false; vm.setReasoning(effort, thinking)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
-                }
+    Box {
+        TextButton(onClick = { open = true }, enabled = !ui.thinking, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            modifier = Modifier.height(28.dp).semantics { contentDescription = "Modo de razonamiento: $current. Cambiar" }) {
+            Text("Razonar · $current ▾", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+        }
+        DropdownMenu(open, { open = false }) {
+            modes.forEach { (name, effort, thinking) ->
+                DropdownMenuItem(text = { Text(name) },
+                    trailingIcon = { if (name == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = { open = false; vm.setReasoning(effort, thinking)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
             }
         }
+    }
+}
+
+private fun reasoningAvailable(ui: AssistantUiState): Boolean =
+    ui.settings.brain?.let { it.capabilities.reasoning && it.protocol != BrainProtocol.CUSTOM_REST } == true
+
+@Composable
+private fun QuickLink(text: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) {
+        Text(text, style = MaterialTheme.typography.labelMedium)
     }
 }
 

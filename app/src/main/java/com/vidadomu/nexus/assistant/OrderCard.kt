@@ -135,19 +135,19 @@ internal fun OrderCard(
         Column(Modifier.padding(start = NexusTokens.space12, end = NexusTokens.space4, top = NexusTokens.space8, bottom = NexusTokens.space8),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Cabecera en una línea: qué, quién factura, cuánto, estado y controles secundarios plegados.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ProviderMark(plan.ref.providerId)
-                Spacer(Modifier.width(NexusTokens.space8))
-                Column(Modifier.weight(1f)) {
-                    Text(plan.modelName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(billingLabel(plan.ref.providerId), cost ?: "coste por confirmar".takeIf { order.status == OrderStatus.AWAITING_CONFIRMATION },
-                        "intento ${order.attempt}".takeIf { order.attempt > 1 }).joinToString(" · "),
-                        style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                StatusPill(shown.status, shown.error)
+            val compact = order.status == OrderStatus.COMPLETED && outputs.isNotEmpty()
+            val titleTexts: @Composable () -> Unit = {
+                Text(plan.modelName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOfNotNull(billingLabel(plan.ref.providerId), cost ?: "coste por confirmar".takeIf { order.status == OrderStatus.AWAITING_CONFIRMATION },
+                    "intento ${order.attempt}".takeIf { order.attempt > 1 }).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            val expandButton: @Composable () -> Unit = {
                 IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(40.dp)) {
                     Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (expanded) "Ocultar detalles" else "Detalles", tint = TextSecondary)
                 }
+            }
+            val menuBox: @Composable () -> Unit = {
                 Box {
                     IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.MoreVert, "Más opciones", tint = TextSecondary) }
                     DropdownMenu(menu, { menu = false }) {
@@ -157,22 +157,48 @@ internal fun OrderCard(
                     }
                 }
             }
+            if (compact) {
+                // Terminado: miniatura a la izquierda y los datos a su derecha, sin el hueco vacío de antes.
+                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
+                    ResultThumb(outputs.first(), plan.modality, onOpenOutput, small = true)
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ProviderMark(plan.ref.providerId)
+                            Spacer(Modifier.width(NexusTokens.space8))
+                            Column(Modifier.weight(1f)) { titleTexts() }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusPill(shown.status, shown.error)
+                            Spacer(Modifier.weight(1f))
+                            expandButton()
+                            menuBox()
+                        }
+                    }
+                }
+            } else Row(verticalAlignment = Alignment.CenterVertically) {
+                ProviderMark(plan.ref.providerId)
+                Spacer(Modifier.width(NexusTokens.space8))
+                Column(Modifier.weight(1f)) { titleTexts() }
+                StatusPill(shown.status, shown.error)
+                expandButton()
+                menuBox()
+            }
             Column(Modifier.padding(end = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (running) {
                     val progress = order.progress
                     if (progress != null) LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
                     else LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
-                shown.headline?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = if (shown.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                shown.headline?.takeIf { !compact || expanded }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = if (shown.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                     maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis) }
-                shown.detail?.takeIf { it.isNotBlank() }?.let {
+                shown.detail?.takeIf { it.isNotBlank() && (!compact || expanded) }?.let {
                     androidx.compose.foundation.text.selection.SelectionContainer {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 // El resultado es el contenido: miniatura que abre el visor, sin botón aparte.
-                if (outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    items(outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput) }
+                if (outputs.isNotEmpty() && (!compact || outputs.size > 1)) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                    items(if (compact) outputs.drop(1) else outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput, small = compact) }
                 }
                 if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
                     val click = when (shown.action) {
@@ -214,10 +240,10 @@ internal fun ProviderMark(providerId: String, size: androidx.compose.ui.unit.Dp 
 
 /** Miniatura 16:9 del resultado (fotograma para vídeo) con indicador de reproducción. */
 @Composable
-private fun ResultThumb(uri: String, modality: String, onOpen: () -> Unit) {
+private fun ResultThumb(uri: String, modality: String, onOpen: () -> Unit, small: Boolean = false) {
     val context = LocalContext.current
     val video = modality == "VIDEO"
-    Box(Modifier.width(if (video) 200.dp else 148.dp).aspectRatio(if (video) 16f / 9f else 1f).clip(NexusTokens.field).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
+    Box(Modifier.width(if (video) (if (small) 132.dp else 200.dp) else (if (small) 96.dp else 148.dp)).aspectRatio(if (video) 16f / 9f else 1f).clip(NexusTokens.field).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
         AsyncImage(
             model = coil.request.ImageRequest.Builder(context).data(uri).crossfade(160)
                 .apply { if (video) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }.build(),
