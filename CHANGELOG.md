@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.29-agent] - 2026-10-17
+
+### Cambiado
+- El agente sabe que no puede traer tarjetas al frente y, si se lo piden, señala el botón «Traer los N encargos aquí ↓» en vez de decir que no hay forma.
+
 ## [1.9.28-agent] - 2026-10-17
 
 ### Corregido

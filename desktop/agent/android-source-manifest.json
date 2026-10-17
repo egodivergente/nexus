@@ -22,7 +22,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
-    "sha256": "5689a8a2c1d5d9bdf6d9fe7452ccfda889ef28a8f9bceef11bc60ba40db12503"
+    "sha256": "100fe3447b0a3631f5619157c70ddc76903e9c7b08b8a2b83ca817d585a3fdd1"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt",
