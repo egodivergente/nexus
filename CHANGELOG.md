@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.32-agent] - 2026-10-17
+
+### Cambiado
+- Tarjetas de encargo: logo oficial del modelo (biblioteca de marcas de ALEXIA ya incluida en la app) en lugar de un círculo con inicial; monograma neutro si no hay logo conocido.
+
 ## [1.9.31-agent] - 2026-10-17
 
 ### Cambiado

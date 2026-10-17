@@ -163,7 +163,7 @@ internal fun OrderCard(
                     ResultThumb(outputs.first(), plan.modality, onOpenOutput, small = true)
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            ProviderMark(plan.ref.providerId)
+                            ProviderMark(plan.ref.providerId, plan.ref.modelId, plan.modelName)
                             Spacer(Modifier.width(NexusTokens.space8))
                             Column(Modifier.weight(1f)) { titleTexts() }
                         }
@@ -176,7 +176,7 @@ internal fun OrderCard(
                     }
                 }
             } else Row(verticalAlignment = Alignment.CenterVertically) {
-                ProviderMark(plan.ref.providerId)
+                ProviderMark(plan.ref.providerId, plan.ref.modelId, plan.modelName)
                 Spacer(Modifier.width(NexusTokens.space8))
                 Column(Modifier.weight(1f)) { titleTexts() }
                 StatusPill(shown.status, shown.error)
@@ -221,21 +221,10 @@ internal fun OrderCard(
     }
 }
 
-/** Marca del proveedor: su logo oficial si existe como recurso `provider_<id>` (res/drawable), y si no una inicial con color estable. */
+/** Logo oficial del modelo (biblioteca de marcas de la app); si no hay uno conocido, monograma neutro con el proveedor. */
 @Composable
-internal fun ProviderMark(providerId: String, size: androidx.compose.ui.unit.Dp = 28.dp) {
-    val context = LocalContext.current
-    val res = remember(providerId) { context.resources.getIdentifier("provider_" + providerId.lowercase().replace(Regex("[^a-z0-9_]"), "_"), "drawable", context.packageName) }
-    if (res != 0) {
-        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(res), billingLabel(providerId), Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape))
-    } else {
-        val label = billingLabel(providerId).trim().ifEmpty { providerId }
-        val hue = (providerId.hashCode() and 0x7fffffff) % 360
-        val bg = androidx.compose.ui.graphics.Color.hsv(hue.toFloat(), 0.45f, 0.82f)
-        Box(Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape).then(Modifier.background(bg)), contentAlignment = Alignment.Center) {
-            Text(label.first().uppercase(), style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White)
-        }
-    }
+internal fun ProviderMark(providerId: String, modelId: String, modelName: String) {
+    com.vidadomu.nexus.ui.components.BrandLogo(organization = providerId.replace('_', ' '), family = modelName, modelId = modelId, size = 28.dp, containerSize = 32.dp)
 }
 
 /** Miniatura 16:9 del resultado (fotograma para vídeo) con indicador de reproducción. */
