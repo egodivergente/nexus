@@ -46,8 +46,20 @@ internal object AlexiaBrandAssets {
             "doubao" in text -> R.drawable.alexia_doubao
             "ernie" in text -> R.drawable.alexia_ernie
             "longcat" in text -> R.drawable.alexia_longcat
+            // Proveedores y marcas añadidas después (Logos_Oficiales_Branding): solo cuando el modelo no tiene logo propio.
+            "crun" in text -> R.drawable.alexia_crun
+            "bedrock" in text || "amazon" in text -> R.drawable.alexia_bedrock
+            "agnes" in text -> R.drawable.alexia_agnes
+            "mistral" in text -> R.drawable.alexia_mistral
+            "perplexity" in text || "sonar" in text -> R.drawable.alexia_perplexity
+            "pruna" in text -> R.drawable.alexia_pruna
+            "meshy" in text -> R.drawable.alexia_meshy
+            Regex("\\bmeta\\b").containsMatchIn(text) || "llama" in text -> R.drawable.alexia_meta
+            "atlascloud" in text || "atlas cloud" in text || "atlas_cloud" in text -> R.drawable.alexia_atlascloud
             else -> return null
         }
-        return BrandAsset.Resource(id, isBitmap = true, backgroundColor = Color(0xFF141B29))
+        // Logos oscuros o azules: fondo claro para que se lean.
+        val light = id in setOf(R.drawable.alexia_pruna, R.drawable.alexia_meta, R.drawable.alexia_perplexity, R.drawable.alexia_crun)
+        return BrandAsset.Resource(id, isBitmap = true, backgroundColor = if (light) Color(0xFFF1EFE9) else Color(0xFF141B29))
     }
 }

@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.33-agent] - 2026-10-17
+
+### Añadido
+- Logos nuevos (Logos_Oficiales_Branding): Crun, Amazon Bedrock, Agnes, Mistral, Perplexity, Pruna, Meshy, Meta y Atlas Cloud, recortados al símbolo y centrados en 256 px con fondo transparente. Se usan cuando el modelo no tiene logo propio; los oscuros llevan fondo claro.
+
 ## [1.9.32-agent] - 2026-10-17
 
 ### Cambiado
