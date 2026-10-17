@@ -306,3 +306,37 @@ private fun ParamEditDialogCompact(key: String, value: String, onSave: (String) 
         confirmButton = { TextButton(onClick = { onSave(v.trim()) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
 }
+
+
+internal data class GroupEntry(val jobId: String?, val model: String, val uri: String, val modality: String)
+
+/** Varios resultados terminados seguidos, agrupados en una sola tarjeta de miniaturas; un toque en una miniatura abre ese resultado. */
+@Composable
+internal fun GeneratedGroupCard(items: List<GroupEntry>, onOpen: (String) -> Unit, onExpand: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val models = items.map { it.model }.distinct()
+    Card(modifier.fillMaxWidth().animateContentSize(), shape = NexusTokens.card) {
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${items.size} resultados", style = MaterialTheme.typography.titleSmall)
+                    Text(models.take(3).joinToString(" · ") + if (models.size > 3) " +${models.size - 3}" else "",
+                        style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                TextButton(onClick = onExpand, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Ver tarjetas") }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items.take(15).forEach { e ->
+                    Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail).clickable { e.jobId?.let(onOpen) }, contentAlignment = Alignment.Center) {
+                        AsyncImage(model = coil.request.ImageRequest.Builder(context).data(e.uri).crossfade(120)
+                            .apply { if (e.modality == "VIDEO") decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }.build(),
+                            contentDescription = "Abrir resultado de ${e.model}", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
+                }
+                if (items.size > 15) Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail).clickable(onClick = onExpand), contentAlignment = Alignment.Center) {
+                    Text("+${items.size - 15}", style = MaterialTheme.typography.titleSmall, color = TextSecondary)
+                }
+            }
+        }
+    }
+}

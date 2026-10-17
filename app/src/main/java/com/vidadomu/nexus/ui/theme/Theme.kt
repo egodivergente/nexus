@@ -13,7 +13,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.text.font.*
 import androidx.core.view.WindowCompat
@@ -41,18 +43,23 @@ fun NexusTheme(content: @Composable () -> Unit) {
     val view=LocalView.current
     SideEffect {
         (view.context as? Activity)?.window?.let { window ->
-            window.statusBarColor=scheme.background.toArgb()
-            window.navigationBarColor=scheme.background.toArgb()
+            window.statusBarColor=chromeFor(theme).toArgb()
+            window.navigationBarColor=chromeFor(theme).toArgb()
             WindowCompat.getInsetsController(window,view).apply {
                 isAppearanceLightStatusBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
                 isAppearanceLightNavigationBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
             }
         }
     }
-    MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
-        Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
-            // Static background avoids motion distraction and continuous rendering.
-            content()
+    val fontScale by preferences.fontScaleState()
+    val base = LocalDensity.current
+    val density = remember(base, fontScale) { Density(base.density, base.fontScale * fontScale) }
+    CompositionLocalProvider(LocalChromeColor provides chromeFor(theme), LocalDensity provides density) {
+        MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
+            Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
+                // Static background avoids motion distraction and continuous rendering.
+                content()
+            }
         }
     }
 }

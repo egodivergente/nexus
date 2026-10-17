@@ -1,5 +1,10 @@
 package com.vidadomu.nexus.ui.library
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.components.StudioFilterChip
@@ -102,6 +107,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
     var originMenu by remember {mutableStateOf(false)}
+    // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
+    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",3).coerceIn(2,6))}
     // Editado/Compartido solo se ofrecen si hay algo de ese origen; Nexus e Importado, siempre.
     val origins=remember(index) {
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
@@ -225,10 +232,10 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
             marked=emptySet()
         }) else TopAppBar(title={
-        Column(verticalArrangement=Arrangement.Center) {
+        Row(verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             val count=completed.sumOf {it.outputs.size}+localAssets.size
-            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.padding(bottom=2.dp))
         }
     },actions={
         IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
@@ -279,7 +286,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
                 val filtered=query.isNotBlank() || filter!=null || originFilter!=LibraryOriginFilter.ALL || favoriteOnly || showHidden
                 Text(if(filtered) "No hay resultados con estos filtros." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
-            } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
+            } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()},
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
                 // Trabajos en curso: una línea por trabajo (modelo, estado y tiempo), no una tarjeta.
@@ -304,13 +311,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                             is LibraryEntry.Local -> {
                                 val asset=entry.asset
                                 val token="asset:"+asset.id
-                                LocalAssetTile(asset,imageLoader,showDetails,mark=if(selecting) token in marked else null,
+                                LocalAssetTile(asset,imageLoader,showDetails && columns<=4,mark=if(selecting) token in marked else null,
                                     onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
                             }
                             is LibraryEntry.Out -> {
                                 val job=entry.job;val output=job.outputs[entry.index]
                                 val token=OutputFiles.token(output)
-                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails,
+                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<=4,
                                     mark=if(selecting) token in marked else null,
                                     onActions={toggleMark(token)}) {
                                     if(selecting) toggleMark(token)
@@ -386,5 +393,25 @@ private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit,onRefresh:()->Unit,o
             IconButton(onClick=onRefresh,Modifier.size(40.dp)) {Icon(Icons.Default.Refresh,"Consultar estado en el proveedor",Modifier.size(20.dp),tint=AccentAmber)}
             IconButton(onClick=onStopTracking,Modifier.size(40.dp)) {Icon(Icons.Default.Close,"Dejar de seguir este trabajo",Modifier.size(20.dp),tint=TextSecondary)}
         }
+    }
+}
+
+/**
+ * Pellizco con dos dedos sobre la cuadrícula: abrir los dedos = miniaturas más grandes (menos columnas); juntarlos = más pequeñas.
+ * Solo consume el gesto cuando hay dos dedos, así el desplazamiento con uno sigue siendo normal.
+ */
+private fun Modifier.pinchColumns(current:Int,onChange:(Int)->Unit):Modifier = this.pointerInput(current) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed=false)
+        var scale=1f
+        do {
+            val event=awaitPointerEvent(PointerEventPass.Initial)
+            if(event.changes.size>=2) {
+                scale*=event.calculateZoom()
+                event.changes.forEach {it.consume()}
+                val next=when {scale>1.3f -> (current-1).coerceAtLeast(2); scale<.77f -> (current+1).coerceAtMost(6); else -> current}
+                if(next!=current) {onChange(next);scale=1f;return@awaitEachGesture}
+            }
+        } while(event.changes.any {it.pressed})
     }
 }

@@ -81,7 +81,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     onReply: (String) -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
-    Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,modifier=Modifier.fillMaxWidth()) {
+    Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
       Column {
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
         Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,

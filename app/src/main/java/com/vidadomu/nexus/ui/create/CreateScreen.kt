@@ -304,6 +304,24 @@ fun CreateScreen(
                     StudioToolChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true}
                 }
             }
+            // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
+            if(state.schemaReady) {
+                val inline=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty().filter {!it.isAdvanced}
+                if(inline.isNotEmpty()) item(key="inline-params") {
+                    Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
+                        border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
+                        Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                Text("Ajustes del modelo",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.primary)
+                                TextButton(onClick={showParameters=true}) {Text(if(inline.size>6) "Ver todos (${inline.size})" else "Ampliar",color=TextSecondary)}
+                            }
+                            inline.take(6).forEach { param ->
+                                key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
+                            }
+                        }
+                    }
+                }
+            }
             if(state.isLoadingSchema) item {
                 Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())

@@ -53,6 +53,20 @@ object StudioPalette {
     val Glass = Color(0xE60A0D12)
 }
 
+/** Barras superior e inferior: un tono propio, claramente distinto del fondo del contenido y de las tarjetas. */
+internal fun chromeFor(theme: NexusAppearance): Color = Color(when (theme) {
+    NexusAppearance.AURORA -> 0xFF182030
+    NexusAppearance.OLED -> 0xFF121821
+    NexusAppearance.QUARTZ -> 0xFF2A231D
+    NexusAppearance.OCEAN -> 0xFF17304A
+    NexusAppearance.FOREST -> 0xFF1E3A2A
+    NexusAppearance.SAND -> 0xFFEAD9BC
+    NexusAppearance.ROSE -> 0xFFEBCFCB
+    NexusAppearance.LIGHT -> 0xFFDCE3F0
+})
+
+val LocalChromeColor = androidx.compose.runtime.staticCompositionLocalOf { Color(0xFF182030) }
+
 internal fun palette(theme: NexusAppearance): ColorScheme {
     if (theme == NexusAppearance.SAND || theme == NexusAppearance.ROSE) {
         val rose = theme == NexusAppearance.ROSE
@@ -74,9 +88,9 @@ internal fun palette(theme: NexusAppearance): ColorScheme {
     val light = theme == NexusAppearance.LIGHT
     val quartz = theme == NexusAppearance.QUARTZ
     val accent = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Accent else Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF4EBAE8)
-    val bg = if(theme == NexusAppearance.AURORA) StudioPalette.Background else Color(if(theme == NexusAppearance.OCEAN) 0xFF0A1420 else if(theme == NexusAppearance.FOREST) 0xFF0D1712 else if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF7F5EF else if (quartz) 0xFF14110F else 0xFF0A0D12)
+    val bg = if(theme == NexusAppearance.AURORA) StudioPalette.Background else Color(if(theme == NexusAppearance.OCEAN) 0xFF0A1420 else if(theme == NexusAppearance.FOREST) 0xFF0D1712 else if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF1F3F8 else if (quartz) 0xFF14110F else 0xFF0A0D12)
     val surface = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Surface else Color(if(theme == NexusAppearance.OCEAN) 0xFF122437 else if(theme == NexusAppearance.FOREST) 0xFF182A20 else if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF131922)
-    val variant = if(!light && !quartz) StudioPalette.Interactive else Color(if (light) 0xFFEAE9E5 else if (quartz) 0xFF302820 else 0xFF1C2533)
+    val variant = if(!light && !quartz) StudioPalette.Interactive else Color(if (light) 0xFFE4E8F1 else if (quartz) 0xFF302820 else 0xFF1C2533)
     val ink = Color(if (light) 0xFF191C23 else if (quartz) 0xFFF6EDE0 else 0xFFF0F3F8)
     val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)
     val base = if (light) lightColorScheme() else darkColorScheme()

@@ -43,13 +43,8 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
  * Compose uses the native render effect on Android 12+ and a tonal fallback below it. */
 @Composable
 fun StudioChrome(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    Box(modifier.clip(RectangleShape).background(scheme.background.copy(alpha = .90f))) {
-        Box(Modifier.matchParentSize()
-            .blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-            .background(Brush.horizontalGradient(listOf(
-                scheme.primary.copy(alpha = .065f), scheme.surface.copy(alpha = .24f),
-                scheme.secondary.copy(alpha = .035f)))))
+    // Barras con tono propio (jerarquía: barras > fondo > tarjetas), sin mezclarse con el contenido.
+    Box(modifier.clip(RectangleShape).background(com.vidadomu.nexus.ui.theme.LocalChromeColor.current)) {
         content()
     }
 }
@@ -146,8 +141,13 @@ fun StudioFilterChip(selected: Boolean, onClick: () -> Unit, label: @Composable 
     shape: Shape = NexusTokens.filter) {
     val haptic=LocalHapticFeedback.current
     FilterChip(selected=selected, onClick={haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);onClick()},
-        label=label, modifier=modifier, leadingIcon=leadingIcon, shape=shape, border=null,
+        label=label, modifier=modifier, leadingIcon=leadingIcon, shape=shape,
+        // Filtros bien visibles: seleccionado = relleno de acento sólido; sin seleccionar = tarjeta con borde propio.
+        border=FilterChipDefaults.filterChipBorder(enabled=true, selected=selected,
+            borderColor=MaterialTheme.colorScheme.outline.copy(alpha=.55f), selectedBorderColor=Color.Transparent),
         colors=FilterChipDefaults.filterChipColors(containerColor=MaterialTheme.colorScheme.surface,
-            selectedContainerColor=MaterialTheme.colorScheme.primaryContainer,
-            selectedLabelColor=MaterialTheme.colorScheme.primary))
+            labelColor=MaterialTheme.colorScheme.onSurface,
+            selectedContainerColor=MaterialTheme.colorScheme.primary,
+            selectedLabelColor=MaterialTheme.colorScheme.onPrimary,
+            selectedLeadingIconColor=MaterialTheme.colorScheme.onPrimary))
 }

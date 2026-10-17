@@ -21,6 +21,9 @@ class AppearancePreferences(context: Context) {
     private val prefs = context.getSharedPreferences("nexus_appearance_user_v1", Context.MODE_PRIVATE)
     fun theme() = NexusAppearance.entries.firstOrNull { it.name == prefs.getString("theme", null) } ?: NexusAppearance.AURORA
     fun setTheme(theme: NexusAppearance) { prefs.edit().putString("theme", theme.name).apply() }
+    /** Tamaño de letra de toda la app (0,8–1,4), encima del ajuste del sistema. */
+    fun fontScale() = prefs.getFloat("font_scale", 1f).coerceIn(.8f, 1.4f)
+    fun setFontScale(scale: Float) { prefs.edit().putFloat("font_scale", scale.coerceIn(.8f, 1.4f)).apply() }
     fun order(filter: String): List<String> = runCatching {
         val json = JSONArray(prefs.getString("order_$filter", "[]"))
         List(json.length()) { json.getString(it) }.distinct()
@@ -44,6 +47,16 @@ fun AppearancePreferences.themeState(): State<NexusAppearance> {
     val state = remember(this) { mutableStateOf(theme()) }
     DisposableEffect(this) {
         val unregister = observe { state.value = theme() }
+        onDispose(unregister)
+    }
+    return state
+}
+
+@Composable
+fun AppearancePreferences.fontScaleState(): State<Float> {
+    val state = remember(this) { mutableStateOf(fontScale()) }
+    DisposableEffect(this) {
+        val unregister = observe { state.value = fontScale() }
         onDispose(unregister)
     }
     return state

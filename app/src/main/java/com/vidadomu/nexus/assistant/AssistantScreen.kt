@@ -2,6 +2,7 @@
 
 package com.vidadomu.nexus.assistant
 
+import androidx.compose.foundation.background
 import com.vidadomu.nexus.ui.components.*
 import androidx.compose.animation.animateContentSize
 import com.vidadomu.nexus.ui.components.NexusTopAppBar
@@ -104,6 +105,23 @@ fun AssistantScreen(
     var automaticScroll by remember { mutableStateOf(false) }
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
+    // Varios resultados terminados seguidos (3 o más) se agrupan en una tarjeta de miniaturas; «Ver tarjetas» las separa.
+    var expandedGroups by remember {mutableStateOf(setOf<String>())}
+    val rows=remember(visibleItems,ui.orders,ui.plans,expandedGroups) {
+        fun done(i:ChatItem):Boolean {
+            if(i !is ChatItem.PlanCard) return false
+            val order=i.orderId?.let {ui.orders[it]} ?: return false
+            return order.status==com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED && vm.outputs(ui.plans[i.planId]?.jobId ?: order.jobId).isNotEmpty()
+        }
+        val out=mutableListOf<Any>();var run=mutableListOf<ChatItem.PlanCard>()
+        fun flush() {
+            if(run.size>=3 && run.first().id !in expandedGroups) out.add(CardGroup(run.toList()))
+            else {if(run.size>=3) out.add(GroupHeader(run.first().id,run.size));out.addAll(run)}
+            run=mutableListOf()
+        }
+        for(i in visibleItems) if(done(i)) run.add(i as ChatItem.PlanCard) else {flush();out.add(i)}
+        flush();out
+    }
     val latestVisible by rememberUpdatedState(visibleItems)
     val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
@@ -192,7 +210,22 @@ fun AssistantScreen(
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
-                items(visibleItems, key = { it.id }) { item ->
+                items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
+                    if (row is CardGroup) {
+                        GeneratedGroupCard(row.cards.mapNotNull { c ->
+                            val order = c.orderId?.let { ui.orders[it] } ?: return@mapNotNull null
+                            val plan = ui.plans[c.planId]
+                            val jobId = plan?.jobId ?: order.jobId
+                            val uri = vm.outputs(jobId).firstOrNull() ?: return@mapNotNull null
+                            GroupEntry(jobId, plan?.plan?.modelName ?: "Resultado", uri, plan?.plan?.modality ?: "IMAGE")
+                        }, onOpen = onNavigateToOutput, onExpand = { expandedGroups = expandedGroups + row.cards.first().id }, modifier = Modifier.animateItem())
+                        return@items
+                    }
+                    if (row is GroupHeader) {
+                        TextButton(onClick = { expandedGroups = expandedGroups - row.firstId }) { Text("Agrupar los ${row.count} resultados") }
+                        return@items
+                    }
+                    val item = row as ChatItem
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item, onOpenHistory)
@@ -243,13 +276,17 @@ fun AssistantScreen(
                 }
                 if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(NexusTokens.space8)); Text("Pensando…", color = TextMuted) } }
             }
-            val cardItems = visibleItems.filterIsInstance<ChatItem.PlanCard>()
-            val trailingCards = visibleItems.takeLastWhile { it is ChatItem.PlanCard }.size
-            val showBring = cardItems.size > trailingCards && !ui.thinking
+            // «Encargos» solo aparece cuando NINGUNA tarjeta está a la vista; sin contador y sin reordenar nada: lleva a la última.
+            val cardKeys = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id }.toSet() }
+            val cardsOffscreen by remember(cardKeys) { derivedStateOf {
+                cardKeys.isNotEmpty() && listState.layoutInfo.visibleItemsInfo.none { it.key in cardKeys } } }
             val showReasoning = reasoningAvailable(ui)
             // Una sola fila fina sobre el cuadro de texto: atajos a la izquierda, modo de razonamiento a la derecha.
-            if (showBring || !following || showReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (showBring) QuickLink("Traer ${cardItems.size} encargos ↓") { vm.bringCardsToFront(); following = true }
+            if (cardsOffscreen || !following || showReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (cardsOffscreen) QuickLink("Encargos ↓") {
+                    following = false
+                    scope.launch { listState.animateScrollToItem(visibleItems.indexOfLast { it is ChatItem.PlanCard }.coerceAtLeast(0)) }
+                }
                 if (!following) QuickLink("Último ↓") { following = true; scope.launch { followLast() } }
                 Spacer(Modifier.weight(1f))
                 ReasoningPicker(ui, vm)
@@ -809,8 +846,14 @@ private fun ParamEditDialog(key: String, value: String, onSave: (String) -> Unit
 
 @Composable
 private fun AttachmentThumb(a: Attachment, onRemove: (() -> Unit)? = null) {
-    Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail)) {
-        if (a.mimeType.startsWith("image/")) AsyncImage(model = a.uri, contentDescription = a.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    var failed by remember(a.uri) { mutableStateOf(false) }
+    // Si el archivo ya no está (borrado de la biblioteca o permiso perdido) se muestra un hueco visible, no un cuadro vacío.
+    Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail).then(Modifier.background(MaterialTheme.colorScheme.surfaceVariant))) {
+        if (a.mimeType.startsWith("image/") && failed) Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(Icons.Default.BrokenImage, "Imagen no disponible", tint = TextSecondary, modifier = Modifier.size(22.dp))
+            Text(a.name ?: "Imagen", style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        else if (a.mimeType.startsWith("image/")) AsyncImage(model = a.uri, contentDescription = a.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), onError = { failed = true })
         else Surface(color = SurfaceVariantDark, modifier = Modifier.fillMaxSize()) { Box(contentAlignment = Alignment.Center) { Icon(if(a.mimeType.startsWith("video/")) Icons.Default.Movie else Icons.Default.Description, a.name) } }
         if (onRemove != null) IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
             Icon(Icons.Default.Close, "Quitar", tint = MediaForeground)
@@ -1004,3 +1047,6 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
         if (saved != null) brainStore.get(saved)?.let { backend = BrainStore.backendFor(it.id); modelId = it.modelId; apiKey = ""; clearApiKey = false }
     }
 }
+
+private data class CardGroup(val cards: List<ChatItem.PlanCard>) { val key get() = "group:" + cards.first().id }
+private data class GroupHeader(val firstId: String, val count: Int)
