@@ -73,3 +73,18 @@ El visor ahora usa decorFitsSystemWindows=false y mantiene safeDrawingPadding
 como único responsable de los insets. Se comprueba texto del pie, botón completo
 dentro del diálogo y apertura/Ajustar/cierre mediante toques, no solo acciones
 semánticas. Arreglo pendiente de nuevo CI y captura, no instalado en S25.
+
+### Resultado medido, hipótesis anterior insuficiente
+
+Run39095259205 registra ventana visible1079x2146 en y128, pero DialogLayout
+y Compose miden1079x2399. Ajustar está en y2284..2389 dentro de esa ventana,
+fuera del frame visible. Los insets de la ventana flotante son cero; por eso
+decorFits=false por sí solo NO resolvió.
+Se conserva el camino de medida de plataforma (usePlatformDefaultWidth=true)
+y se configura su propia ventana MATCH_PARENT. Así se evita la rama de Compose1.7
+que ignora el MeasureSpec real y remide con screenHeightDp. Assertions intactas.
+El diagnóstico también capturó un ANR del launcher Quickstep del emulador;
+CI cierra solo com.android.launcher3 tras calentamiento, no Nexus, y conserva
+logcat completo. No se deshabilitan errores ni aumentan timeouts. Pendiente CI.
+Corrección de texto anterior: performClick ya inyectaba toques en Compose1.7;
+la nueva cobertura la aportan visibilidad, bounds y píxeles, no cambiar su nombre.

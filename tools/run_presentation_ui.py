@@ -62,6 +62,10 @@ def main():
     for package in [PACKAGE, PACKAGE + ".test"]:
         compiled = adb("shell", "cmd", "package", "compile", "-m", "speed", "-f", package)
         if "Success" not in compiled.stdout: raise RuntimeError("Ahead-of-time compilation failed: " + package)
+    # The AOSP launcher can ANR during cold emulator boot. Close only that unrelated
+    # process after warm-up so its error dialog cannot intercept QA touches. Nexus
+    # packages, ANR timeouts and error reporting are untouched; logcat is preserved.
+    adb("shell", "am", "force-stop", "com.android.launcher3")
     registered = adb("shell", "pm", "list", "instrumentation").stdout
     if RUNNER not in registered or "target=" + PACKAGE not in registered: raise ValueError("QA runner not registered")
     result = adb("shell", "am", "instrument", "-w", "-r", "-e", "class", SUITE, RUNNER, check=False)

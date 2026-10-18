@@ -18,6 +18,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -46,10 +48,17 @@ private fun AssistantImageForeground(media: Attachment, onClose: () -> Unit) {
     var scale by remember(media.uri) { mutableFloatStateOf(1f) }
     var offset by remember(media.uri) { mutableStateOf(Offset.Zero) }
     var imageState by remember(media.uri) { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
-    // Compose 1.7 measures a full-width dialog using screenHeightDp. With target 35 that
-    // includes system bars: fitting decor as well clips the footer. Let safeDrawingPadding
-    // below own the insets, so both the close button and Adjust stay inside the window.
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    // Keep DialogLayout on its platform-measured path. Compose 1.7's custom-width path
+    // remeasures to screenHeightDp (2399px), even when the actual API35 window is 2146px.
+    // Setting the owned window to MATCH_PARENT gives full width without that remeasurement.
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = true, decorFitsSystemWindows = false)) {
+        val view = LocalView.current
+        SideEffect {
+            (view.parent as? DialogWindowProvider)?.window?.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        }
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
