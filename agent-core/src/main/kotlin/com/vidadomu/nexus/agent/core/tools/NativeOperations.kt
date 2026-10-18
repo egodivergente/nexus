@@ -130,6 +130,14 @@ object NativeOperationTools {
                 string("label", "Nombre corto que verá el usuario en Deshacer, p. ej. «Quitar silencios».")
                 string("project_id", "Proyecto; vacío = el abierto.")
             }),
+        NativeTool(operations, "corte_import_media", ToolCategory.ORGANIZE,
+            "Importa en el proyecto ABIERTO de Corte archivos de la biblioteca de Nexus (vídeo, imagen o audio, p. ej. algo generado) y, por defecto, los coloca en la línea de tiempo a continuación del último clip (o en at_us). Copia los archivos: los originales de Nexus no se tocan. Un «Deshacer» quita la colocación. Después usa corte_read_project para ver los ids de los clips nuevos y seguir editando con corte_apply_ops.",
+            schema {
+                stringArray("asset_ids", "Ids de la biblioteca de Nexus (list_library_assets o search_assets); máximo 10 por llamada.", required = true)
+                boolean("place", "Colocarlos en la línea de tiempo; por defecto true. Con false solo entran en Medios.")
+                integer("at_us", "Posición en microsegundos donde empezar a colocarlos; vacío = al final.")
+                string("project_id", "Proyecto; vacío = el abierto.")
+            }),
         NativeTool(operations, "corte_undo", ToolCategory.ORGANIZE,
             "Deshace en Corte la última edición (la del agente si fue la última).",
             schema { string("project_id", "Proyecto; vacío = el abierto.") }),

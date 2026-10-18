@@ -22,7 +22,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
-    "sha256": "b9b68fe0d0df50f4a8a4a752c696dfcbadbc6f72b6ef7dd3d9957bbe1ac5f0a8"
+    "sha256": "9288035dce53280ad03b4f5787556bf1e047295a6de0f62591adb83a79eb3565"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt",
@@ -227,7 +227,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
-    "sha256": "2bcbab6fb54fc882f08cfbca6fad653aa2c5cfd9b259d88e8fc9e478d32c052b"
+    "sha256": "e21d66a9d808c07c1bf057eff41238ffda5af756cffa21dfd8db56e6975c47a7"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NexusToolkit.kt",
