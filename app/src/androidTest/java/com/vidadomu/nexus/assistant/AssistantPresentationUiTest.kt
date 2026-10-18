@@ -7,6 +7,10 @@ import androidx.compose.runtime.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -28,11 +32,43 @@ class AssistantPresentationUiTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun guard() { check(BuildConfig.OFFLINE_QA) }
-    private fun screenshot(name: String) {
-        val image = checkNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+    private fun fixture(content: @Composable () -> Unit) {
+        compose.setContent {
+            NexusTheme {
+                // Like the real Scaffold/LazyColumn: safe insets and no forced minimum card height.
+                Box(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
+                    Column(Modifier.fillMaxWidth().testTag("presentation-fixture")) { content() }
+                }
+            }
+        }
+    }
+    private fun awaitImagePixels(node: SemanticsNodeInteraction, red: Float, green: Float, blue: Float) {
+        // AsyncImage semantics exist before Coil has decoded/drawn the file. Check actual pixels.
+        compose.waitUntil(15_000) {
+            val pixels = node.captureToImage().toPixelMap()
+            val center = pixels[pixels.width / 2, pixels.height / 2]
+            kotlin.math.abs(center.red - red) < .04f && kotlin.math.abs(center.green - green) < .04f &&
+                kotlin.math.abs(center.blue - blue) < .04f
+        }
+    }
+    private fun awaitLogoPixels() {
+        compose.waitUntil(15_000) {
+            val pixels = compose.onNodeWithContentDescription("atlas cloud").captureToImage().toPixelMap()
+            var whitePixels = 0
+            for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
+                val pixel = pixels[x, y]
+                if (pixel.red > .8f && pixel.green > .8f && pixel.blue > .8f) whitePixels++
+            }
+            whitePixels > 20
+        }
+    }
+    private fun screenshot(name: String, dialog: Boolean = false) {
+        compose.waitForIdle()
+        // captureToImage synchronizes drawing and PixelCopy; uiAutomation can return the previous frame.
+        val node = if (dialog) compose.onNode(isDialog()) else compose.onNodeWithTag("presentation-fixture")
+        val image = node.captureToImage().asAndroidBitmap()
         val dir = File(context.getExternalFilesDir(null), "studio-ux").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        image.recycle()
     }
     @Test fun settingsPersistImmediatelyAndResetOnlyPresentation() {
         guard()
@@ -40,7 +76,7 @@ class AssistantPresentationUiTest {
         val previous = store.load()
         try {
             store.reset()
-            compose.setContent { NexusTheme { AssistantPresentationSettings() } }
+            fixture { AssistantPresentationSettings() }
             compose.onNodeWithText("Compactas").performClick().assertIsSelected()
             compose.onNodeWithContentDescription("Animación al generar").performClick().assertIsOff()
             compose.runOnIdle {
@@ -57,7 +93,7 @@ class AssistantPresentationUiTest {
         guard()
         val prefs = context.getSharedPreferences("test_presentation_isolated", Context.MODE_PRIVATE)
         val store = AssistantPresentationStore(prefs)
-        compose.setContent { NexusTheme { Text("Observación de preferencias") } }
+        fixture { Text("Observación de preferencias") }
         prefs.edit().clear().commit()
         try {
             var calls = 0
@@ -79,10 +115,12 @@ class AssistantPresentationUiTest {
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
         try {
             val media = Attachment("fixture", Uri.fromFile(file).toString(), "image/png", "Plano de prueba")
-            compose.setContent { NexusTheme { Column { Text("Chat conservado"); AssistantMediaPreview(media) } } }
+            fixture { Text("Chat conservado"); AssistantMediaPreview(media) }
             compose.onNodeWithText("Ampliar imagen").performClick()
             compose.onNodeWithContentDescription("Cerrar imagen ampliada").assertIsDisplayed()
-            screenshot("foreground-image")
+            compose.onNodeWithText("Ajustar").assertIsDisplayed()
+            awaitImagePixels(compose.onNodeWithContentDescription("Plano de prueba"), 96 / 255f, 132 / 255f, 164 / 255f)
+            screenshot("foreground-image", dialog = true)
             compose.onNodeWithText("Ajustar").performClick()
             compose.onNodeWithContentDescription("Cerrar imagen ampliada").performClick()
             compose.onNodeWithText("Chat conservado").assertIsDisplayed()
@@ -103,10 +141,10 @@ class AssistantPresentationUiTest {
         var size by mutableStateOf(AssistantCardSize.COMPACT)
         var opens = 0
         try {
-            compose.setContent { NexusTheme {
+            fixture {
                 OrderCard(order, PlanUi(plan, false, PlanState.SUBMITTED), listOf(Uri.fromFile(image).toString()), false,
                     {}, {}, {}, {}, {}, {}, { opens++ }, {}, presentation = AssistantPresentation(size, false))
-            } }
+            }
             var previousWidth = 0f
             for (value in AssistantCardSize.entries) {
                 compose.runOnIdle { size = value }
@@ -116,6 +154,10 @@ class AssistantPresentationUiTest {
                 val width = thumbnail.fetchSemanticsNode().boundsInRoot.width
                 assertTrue("Each size grows the result", width > previousWidth)
                 previousWidth = width
+                awaitImagePixels(thumbnail, 0f, 0f, 1f)
+                awaitLogoPixels()
+                val cardHeight = compose.onNodeWithContentDescription("Encargo Flux 2 Max").fetchSemanticsNode().boundsInRoot.height
+                assertTrue("Card must wrap its content, not fill the screen", cardHeight < context.resources.displayMetrics.heightPixels * .7f)
                 screenshot("result-${value.name.lowercase()}")
             }
             compose.runOnIdle { assertEquals(3, opens) }
@@ -124,11 +166,11 @@ class AssistantPresentationUiTest {
     @Test fun unknownProgressHasNoPercentageAndStopsAtCompletion() {
         guard()
         var status by mutableStateOf(OrderStatus.PROCESSING)
-        compose.setContent { NexusTheme {
+        fixture {
             GenerationActivity(Order(id = "o-unknown", planId = "p-unknown", status = status,
                 modelName = "Veo", modelRef = "google_flow:veo", modality = "VIDEO", progress = .5f,
                 createdAt = 1, updatedAt = 2), animated = false, compact = false)
-        } }
+        }
         compose.onNodeWithText("Generación en curso").assertIsDisplayed()
         compose.onNodeWithText("50", substring = true).assertDoesNotExist()
         screenshot("generation-indeterminate")
@@ -142,16 +184,17 @@ class AssistantPresentationUiTest {
         val order = Order(id = "o-test", planId = plan.id, status = OrderStatus.PROCESSING, modelName = plan.modelName,
             modelRef = ref.toString(), modality = "IMAGE", progress = .42f, createdAt = 1, updatedAt = 2)
         var size by mutableStateOf(AssistantCardSize.BALANCED)
-        compose.setContent { NexusTheme {
+        fixture {
             OrderCard(order, PlanUi(plan, false, PlanState.SUBMITTED), emptyList(), false, {}, {}, {}, {}, {}, {}, {}, {},
                 presentation = AssistantPresentation(size, false))
-        } }
+        }
         for (value in AssistantCardSize.entries) {
             compose.runOnIdle { size = value }
             compose.onNodeWithText("Flux 2 Max").assertIsDisplayed()
             compose.onNodeWithContentDescription("atlas cloud").assertIsDisplayed()
             compose.onNodeWithContentDescription("Detalles").assertIsDisplayed().assertHasClickAction()
             compose.onNodeWithText("Procesando · 42 %").assertIsDisplayed()
+            awaitLogoPixels()
             screenshot("generation-${value.name.lowercase()}")
         }
     }

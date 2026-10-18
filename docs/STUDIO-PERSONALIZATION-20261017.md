@@ -48,3 +48,17 @@ y no se muestra su 50% fijo como real. La etiqueta dice informado, no medido.
 
 Regresiones añadidas: ProviderProgressTest (5), AtlasReportedProgressTest (4),
 GenerationActivityTest (ahora 13). Pendientes de ejecución de CI del nuevo commit.
+
+## Capturas verificables, no solo nodos semánticos (18-10)
+
+CI 39086968697 pasó compilación, JVM y seis tests UI. La revisión manual rechazó
+los PNG: el fixture heredaba tamaño mínimo de pantalla completa del tema, no
+aplicaba insets, y UiAutomation podía capturar un frame anterior a la carga Coil.
+Se corrige SOLO el fixture: contenedor como el contenido real, captura sincronizada
+con PixelCopy/Compose y comprobación del color real de las imágenes y el logo.
+No se cambia código de producción ni se acepta el CI verde como prueba visual.
+La revisión/firma sigue pendiente de estas nuevas capturas y de su CI.
+
+El filtro Mock sin porcentaje se aplica a las tarjetas actuales del agente.
+Los paneles heredados de Historial/visor, Biblioteca y Comparación quedan fuera
+del rediseño, así como Nexus Desktop.
