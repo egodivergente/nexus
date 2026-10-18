@@ -70,6 +70,33 @@ class AssistantPresentationUiTest {
         val dir = File(context.getExternalFilesDir(null), "studio-ux").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+    private fun recordViewerGeometry() {
+        val dir = File(context.getExternalFilesDir(null), "studio-ux").apply { mkdirs() }
+        val report = StringBuilder()
+        val nodes = listOf("Cerrar imagen ampliada", "Plano de prueba")
+        for (name in nodes) {
+            val n = compose.onNodeWithContentDescription(name).fetchSemanticsNode()
+            report.appendLine("$name: position=${n.positionInWindow} size=${n.size} clipped=${n.boundsInWindow}")
+        }
+        val adjust = compose.onNodeWithText("Ajustar").fetchSemanticsNode()
+        report.appendLine("Ajustar: position=${adjust.positionInWindow} size=${adjust.size} clipped=${adjust.boundsInWindow}")
+        report.appendLine(compose.onNode(isDialog(), useUnmergedTree = true).printToString())
+        compose.runOnIdle {
+            report.appendLine("screenHeightDp=${context.resources.configuration.screenHeightDp} metrics=${context.resources.displayMetrics}")
+            fun describe(view: android.view.View, depth: Int) {
+                val location = IntArray(2); view.getLocationOnScreen(location)
+                val visible = android.graphics.Rect(); view.getGlobalVisibleRect(visible)
+                report.appendLine("${" ".repeat(depth)}${view.javaClass.name}: measured=${view.measuredWidth}x${view.measuredHeight} actual=${view.width}x${view.height} xy=${location.toList()} visible=$visible padding=${view.paddingTop}/${view.paddingBottom} insets=${view.rootWindowInsets}")
+                if (view is android.view.ViewGroup) for (i in 0 until view.childCount) describe(view.getChildAt(i), depth + 1)
+            }
+            // Diagnostic runs only in the isolated API35 QA emulator, never on the user's phone.
+            if (android.os.Build.VERSION.SDK_INT >= 29) android.view.inspector.WindowInspector.getGlobalWindowViews().forEach { describe(it, 0) }
+        }
+        File(dir, "viewer-geometry.txt").writeText(report.toString())
+        val frame = checkNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        try { File(dir, "diagnostic-viewer.png").outputStream().use { frame.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        finally { frame.recycle() }
+    }
     @Test fun settingsPersistImmediatelyAndResetOnlyPresentation() {
         guard()
         val store = AssistantPresentationStore(context)
@@ -118,6 +145,7 @@ class AssistantPresentationUiTest {
             fixture { Text("Chat conservado"); AssistantMediaPreview(media) }
             compose.onNodeWithText("Ampliar imagen").performTouchInput { click() }
             compose.onNodeWithContentDescription("Cerrar imagen ampliada").assertIsDisplayed()
+            recordViewerGeometry()
             compose.onNodeWithText("Ajustar").assertIsDisplayed()
             compose.onNodeWithText("Pellizca o toca dos veces para ampliar").assertIsDisplayed()
             val dialogBounds = compose.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
