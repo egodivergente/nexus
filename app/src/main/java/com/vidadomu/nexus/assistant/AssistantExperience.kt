@@ -84,9 +84,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
       Column {
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-        Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
+        Surface(color=MaterialTheme.colorScheme.surface,shape=if(text.text.contains('\n') || text.text.length>40) NexusTokens.card else NexusTokens.pill,
         border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=0.55f)),
-        modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
+        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
@@ -121,7 +121,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
-                        Box(Modifier.padding(vertical = 13.dp), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             inner()
                         }

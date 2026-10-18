@@ -38,7 +38,7 @@ fun NexusBottomBar(navController: NavController) {
                 verticalAlignment=Alignment.CenterVertically) {
                 Screen.bottomNavItems.forEach { screen ->
                     val selected=currentRoute==screen.route
-                    val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
+                    val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
                     Column(Modifier.weight(1f).heightIn(min=42.dp)
                         .semantics { contentDescription=screen.title }
                         .selectable(selected=selected,role=Role.Tab,onClick={
@@ -59,7 +59,7 @@ fun NexusBottomBar(navController: NavController) {
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(0.dp)) {
-                        Box(Modifier.width(52.dp).height(24.dp).clip(NexusTokens.filter)
+                        Box(Modifier.width(52.dp).height(24.dp).clip(NexusTokens.pill)
                             .background(tone),
                             contentAlignment=Alignment.Center) {
                             Icon(screen.icon,contentDescription=null,

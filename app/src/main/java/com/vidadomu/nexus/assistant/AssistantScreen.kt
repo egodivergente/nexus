@@ -5,6 +5,11 @@ package com.vidadomu.nexus.assistant
 import androidx.compose.foundation.background
 import com.vidadomu.nexus.ui.components.*
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import com.vidadomu.nexus.ui.components.NexusTopAppBar
 import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.noticeMessage
@@ -96,6 +101,7 @@ fun AssistantScreen(
     var input by rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString("text", "").orEmpty())) }
     var showSettings by remember { mutableStateOf(false) }
     var showProject by remember {mutableStateOf(false)}
+    var ordersPanel by remember {mutableStateOf(false)}
     val dirtyPlans=remember {mutableStateMapOf<String,Boolean>()}
     val included=ui.plans.values.count {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION)}
     val primaryPlanId=ui.items.filterIsInstance<ChatItem.PlanCard>().lastOrNull {ui.plans[it.planId]?.let {p->p.executable && p.state !in setOf(PlanState.SUBMITTED,PlanState.DISCARDED,PlanState.UNCERTAIN)}==true}?.planId
@@ -189,19 +195,10 @@ fun AssistantScreen(
             contentDescription="Abrir proyecto"
             stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
         },verticalArrangement=Arrangement.Center) {
+            // Una sola línea: el proyecto. Cerebro y razonamiento van junto al cuadro de texto; escena y referencias, en la hoja del proyecto.
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
                 Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
-            }
-            val projectContext=listOfNotNull(
-                ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},
-                ui.projectAssets.size.takeIf {it>0}?.let {"$it referencias"}
-            ).joinToString(" · ")
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                BrainPicker(ui,vm)
-                if(LocalDensity.current.fontScale<1.3f && projectContext.isNotBlank()) Text("· $projectContext",
-                    style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,
-                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
             }
         }},actions={
             IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
@@ -209,8 +206,9 @@ fun AssistantScreen(
         Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState,
-                contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState,
+                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is CardGroup) {
@@ -278,18 +276,31 @@ fun AssistantScreen(
                 }
                 if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(NexusTokens.space8)); Text("Pensando…", color = TextMuted) } }
             }
-            // «Encargos» solo aparece cuando NINGUNA tarjeta está a la vista; sin contador y sin reordenar nada: lleva a la última.
-            val cardKeys = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id }.toSet() }
-            val cardsOffscreen by remember(cardKeys) { derivedStateOf {
-                cardKeys.isNotEmpty() && listState.layoutInfo.visibleItemsInfo.none { it.key in cardKeys } } }
-            val showReasoning = reasoningAvailable(ui)
-            // Una sola fila fina sobre el cuadro de texto: atajos a la izquierda, modo de razonamiento a la derecha.
-            if (cardsOffscreen || !following || showReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (cardsOffscreen) QuickLink("Encargos ↓") {
-                    following = false
-                    scope.launch { listState.animateScrollToItem(visibleItems.indexOfLast { it is ChatItem.PlanCard }.coerceAtLeast(0)) }
+            // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
+            val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
+            Column(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                AnimatedVisibility(cardIds.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+                    SmallFloatingActionButton(onClick = { ordersPanel = true }, shape = NexusTokens.pill,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = TextPrimary) {
+                        Icon(Icons.Default.Inventory2, "Ver encargos")
+                    }
                 }
-                if (!following) QuickLink("Último ↓") { following = true; scope.launch { followLast() } }
+                AnimatedVisibility(!following, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                    SmallFloatingActionButton(onClick = { following = true; scope.launch { followLast() } }, shape = NexusTokens.pill,
+                        containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
+                        Icon(Icons.Default.KeyboardArrowDown, "Bajar al final")
+                    }
+                }
+            }
+            }
+            if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
+                ordersPanel = false; following = false
+                scope.launch { listState.animateScrollToItem(visibleItems.indexOfFirst { it is ChatItem.PlanCard && it.id == id }.coerceAtLeast(0)) }
+            }
+            // Fila fina sobre el cuadro de texto: cerebro a la izquierda, modo de razonamiento a la derecha.
+            Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+                BrainPicker(ui, vm)
                 Spacer(Modifier.weight(1f))
                 ReasoningPicker(ui, vm)
             }
@@ -365,6 +376,45 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
 private fun reasoningAvailable(ui: AssistantUiState): Boolean =
     ui.settings.brain?.let { it.capabilities.reasoning && it.protocol != BrainProtocol.CUSTOM_REST } == true
 
+/** Los IDs internos (ord_…) no se enseñan en el chat; la tarjeta y su «Detalles» ya identifican el encargo. Copiar conserva el texto original. */
+internal fun hideOrderIds(text: String): String =
+    text.replace(Regex("""[ \t]*\(?`?ord_[0-9a-f]{6,}`?\)?"""), "").replace(Regex(" {2,}"), " ")
+
+/** Panel propio de encargos: estado con icono, modelo y coste; tocar uno lleva a su tarjeta en el chat. Sin IDs. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OrdersSheet(cards: List<ChatItem.PlanCard>, ui: AssistantUiState, onClose: () -> Unit, onPick: (String) -> Unit) {
+    val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val currencyState by app.currencyManager.state.collectAsState()
+    ModalBottomSheet(onDismissRequest = onClose, shape = NexusTokens.sheet, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Text("Encargos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space8))
+        LazyColumn(contentPadding = PaddingValues(bottom = NexusTokens.space24)) {
+            items(cards.asReversed(), key = { it.id }) { card ->
+                val plan = ui.plans[card.planId]?.plan
+                val status = card.orderId?.let { ui.orders[it] }?.status
+                val (icon, tint, label) = when (status) {
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED -> Triple(Icons.Default.CheckCircle, MaterialTheme.colorScheme.primary, "Listo")
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED, com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN -> Triple(Icons.Default.Warning, MaterialTheme.colorScheme.error, "Error")
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.SUBMITTING, com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING -> Triple(Icons.Default.Autorenew, TextSecondary, "En curso")
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED -> Triple(Icons.Default.Close, TextSecondary, "Descartado")
+                    else -> Triple(Icons.Default.Schedule, TextSecondary, "Pendiente")
+                }
+                val cost = remember(plan?.estimate, currencyState) { plan?.estimate?.amountUsd?.let(app.currencyManager::formatCost) }
+                Row(Modifier.fillMaxWidth().clickable { onPick(card.id) }.heightIn(min = NexusTokens.minimumTouch)
+                    .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space8),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                    Icon(icon, label, tint = tint, modifier = Modifier.size(20.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(plan?.modelName ?: "Encargo", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    }
+                    cost?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = TextSecondary) }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun QuickLink(text: String, onClick: () -> Unit) {
     TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) {
@@ -388,7 +438,7 @@ private fun EmptyHint() {
             contentScale = ContentScale.Fit
         )
         Surface(
-            shape = RoundedCornerShape(999.dp),
+            shape = NexusTokens.pill,
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
         ) {
@@ -491,8 +541,14 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
 private fun UserBubble(item:ChatItem.User) {
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
-        Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.widthIn(max=300.dp).padding(top=NexusTokens.space4,start=NexusTokens.space32)) {
-            Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=6.dp),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
+        // Tu mensaje: completo (nunca truncado), ancho casi total para ganar altura, con el acento en degradado y seleccionable.
+        val accent=MaterialTheme.colorScheme.primary
+        val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.30f),accent.copy(alpha=.16f)))}
+        Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)
+            .background(brush,NexusTokens.card)) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
+            }
         }
     }
 }
@@ -506,12 +562,12 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         if(item.text.isNotBlank()) {
             // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
-            // Fondo propio, como el de tus mensajes pero más suave, para separar quién habla.
-            Surface(color=MaterialTheme.colorScheme.surfaceContainer,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
+            // Casi sin fondo: tus mensajes llevan el acento y las respuestas quedan limpias, a todo el ancho.
+            Surface(color=MaterialTheme.colorScheme.surfaceContainer.copy(alpha=.35f),shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
                 .pointerInput(Unit) {detectTapGestures(onLongPress={actionsExpanded=true})}
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-                ChatMarkdownView(item.text)
+                ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) })
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false

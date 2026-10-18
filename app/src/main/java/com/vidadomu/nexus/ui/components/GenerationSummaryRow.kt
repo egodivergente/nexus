@@ -41,12 +41,13 @@ internal fun generationStatusLabel(job:GenerationJob):String =
     }
 
 /** Only formats existing values. It does not resolve, refresh or compute charges.
- * Una sola unidad de coste en la fila (€/$ segun preferencia): si el proveedor solo
- * informo creditos (sin equivalencia en moneda), el detalle en creditos se ve en el
- * dialogo de diagnostico, no mezclado aqui con el importe en euros. */
+ * Una sola unidad de coste en la fila: la moneda si existe; solo si el proveedor
+ * informó únicamente créditos, se muestran los créditos (nunca ambos). */
 internal fun confirmedJobCost(job:GenerationJob,currency:CurrencyManager):String {
     val cost=job.actualCostUsd?.takeIf {it.isFinite() && it>=0}
-    return if(job.providerId=="mock_provider") "Sin cargo" else cost?.let(currency::formatCost) ?: "Por confirmar"
+    val credits=job.parameters["__actual_credits"]?.toDoubleOrNull()?.takeIf {it.isFinite() && it>=0}
+    return if(job.providerId=="mock_provider") "Sin cargo" else cost?.let(currency::formatCost)
+        ?: credits?.let(currency::formatCredits) ?: "Por confirmar"
 }
 
 @Composable

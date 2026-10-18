@@ -2,6 +2,16 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.45-agent] - 2026-10-18 · «Horizonte»
+
+- Chat más panorámico: cabecera de una sola línea (cerebro y razonamiento pasan junto al cuadro de texto), márgenes laterales de 8 dp y campo de entrada en pastilla más bajo.
+- Tus mensajes van completos, seleccionables, casi a todo el ancho y con el acento en degradado; las respuestas quedan casi sin fondo.
+- Los enlaces «Encargos ↓ / Último ↓» se sustituyen por un botón redondo de bajar (solo si no estás al final) y un panel de encargos con estado, modelo y coste.
+- Los IDs internos (ord_…) ya no aparecen en el texto del chat.
+- Resultados agrupados en carrusel con miniaturas grandes y el modelo debajo.
+- Barra inferior con pastilla activa más clara; tokens de radio y curva únicos.
+- Historial vuelve a mostrar créditos cuando el proveedor no da importe en moneda.
+
 ## [1.9.44-agent] - 2026-10-18 · «Horizonte»
 
 - Ajustes del asistente (aportado por el agente de Termux, punto 5): los filtros de proveedor del Cerebro van en una sola fila deslizable en lugar de varias líneas.
