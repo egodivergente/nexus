@@ -158,7 +158,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                     Switch(isMockMode,{checked->isMockMode=checked;settingsRepo.setMockMode(checked);app.modelCatalogRepository.refreshModels()},modifier=Modifier.semantics {contentDescription="Proveedor simulado"})
                 }
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-                SettingRow("Diagnóstico del sistema","Aplicación y dispositivo",{showDiagnostics=true})
+                SettingRow("Diagnóstico del sistema","Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»",{showDiagnostics=true})
             }}
         }
     }
@@ -215,7 +215,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Text("Diagnóstico del sistema",style=MaterialTheme.typography.titleLarge)
-            Text("Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",style=MaterialTheme.typography.bodyMedium)
+            Text("Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}» · ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",style=MaterialTheme.typography.bodyMedium)
             Text("Dispositivo: ${Build.MANUFACTURER} ${Build.MODEL}",style=MaterialTheme.typography.bodyMedium)
             Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",style=MaterialTheme.typography.bodyMedium)
             Text(if(app.secureStorage.credentialStorageAvailable) "Almacenamiento cifrado disponible" else "Almacenamiento cifrado no disponible",style=MaterialTheme.typography.bodyMedium)

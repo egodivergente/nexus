@@ -7,6 +7,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Nombre de versión: cada 10 versionCode cambia el nombre (vc 70–79 = Horizonte, 80–89 = Índigo…) para orientarse de un vistazo.
+val versionCodenames = listOf("Aurora", "Boreal", "Cénit", "Dorado", "Eclipse", "Fénix", "Glaciar", "Horizonte", "Índigo", "Júpiter",
+    "Kairos", "Lumen", "Mistral", "Nébula", "Ónix", "Polaris", "Quásar", "Ródano", "Sirio", "Tundra")
+fun versionCodename(code: Int) = versionCodenames[(code / 10) % versionCodenames.size]
+
 android {
     namespace = "com.vidadomu.nexus"
     compileSdk = 35
@@ -18,11 +23,12 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 70
-        versionName = "1.9.36-agent"
+        versionCode = 71
+        versionName = "1.9.37-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
+        buildConfigField("String", "CODENAME", "\"${versionCodename(versionCode!!)}\"")
         // Claves de Bedrock opcionales desde un fichero local FUERA del repo: -PnexusBedrockFile=<ruta a .properties>
         // (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, BEDROCK_MODEL_ID). Sin él quedan vacías.
         val bedrock = Properties().apply {

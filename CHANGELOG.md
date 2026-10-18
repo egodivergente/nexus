@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.37-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido
+- Versiones con nombre: cada 10 `versionCode` cambia el nombre (vc 70–79 = Horizonte, 80–89 = Índigo, 90–99 = Júpiter…; lista de 20 en `app/build.gradle.kts`). Se ve en la pantalla vacía del Agente, en el arranque y en Ajustes → Diagnóstico. Los APK llevan el nombre en el fichero.
+
 ## [1.9.36-agent] - 2026-10-18
 
 ### Cambiado

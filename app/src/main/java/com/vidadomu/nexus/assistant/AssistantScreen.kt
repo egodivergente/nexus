@@ -391,7 +391,7 @@ private fun EmptyHint() {
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
         ) {
             Text(
-                text = "v${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · build ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",
+                text = "v${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · ${com.vidadomu.nexus.BuildConfig.CODENAME} · build ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
