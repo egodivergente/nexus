@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -926,7 +927,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 // 1 · Cerebro
                 AgentSection("Cerebro", Icons.Default.AutoAwesome) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                         listOf(
                             AssistantSettings.BACKEND_DIRECT to "Bedrock",
                             AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
