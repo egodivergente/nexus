@@ -138,7 +138,7 @@ class NativeOperations:
                 cached = cache.get(identifier)
                 if cached:
                     return result, resolve_media(self.data, cached)
-                extension = mimetypes.guess_extension(result.get('mimeType', '')) or Path(urllib.parse.urlsplit(result['uri']).path).suffix or ('.mp4' if result.get('type') == 'VIDEO' else '.wav')
+                extension = mimetypes.guess_extension(result.get('mimeType') or '') or Path(urllib.parse.urlsplit(result['uri']).path).suffix or ({'VIDEO':'.mp4','IMAGE':'.png'}.get(result.get('type'),'.wav'))
                 if not re.fullmatch(r'\.('+EXTENSIONS+')', extension):
                     raise ValueError('Formato remoto no admitido para edición local.')
                 target = self.new_path(extension)

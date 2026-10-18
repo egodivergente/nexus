@@ -10,7 +10,7 @@ import zipfile
 parser=argparse.ArgumentParser();parser.add_argument('--install',action='store_true');args=parser.parse_args()
 root=Path(__file__).resolve().parents[2];desktop=root/'desktop';out=root/'entregas';out.mkdir(exist_ok=True)
 subprocess.run(['python','-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
-version='2026.10.18-corte-preview.1'
+version='2026.10.18-corte-preview.2'
 files={}
 def include(path,relative):
     if path.is_file():files[str(relative).replace('\\','/')]=path
@@ -23,7 +23,7 @@ for folder in ['ui','agent/runtime','agent/assets']:
 # Package current authoritative skills, rather than an older duplicated tree.
 for p in (root/'agent-skills').rglob('*'):
     include(p,Path('desktop/agent/agent-skills')/p.relative_to(root/'agent-skills'))
-for name in ['test-corte-ui.py','test-corte-windows.py','test-windows-library.py','test-windows-agent-providers.py','agent-qa-schema.json']:
+for name in ['test-corte-ui.py','test-corte-windows.py','test-windows-library.py','test-windows-agent-providers.py','test-custom-media.py','agent-qa-schema.json']:
     include(desktop/'tools'/name,Path('desktop/tools')/name)
 for p in (root/'tools/flow-bridge').glob('*.py'):include(p,Path('tools/flow-bridge')/p.name)
 for p in (root/'docs/windows-corte').glob('*'):

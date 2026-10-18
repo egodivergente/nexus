@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 import uuid
+from jvm_protocol import decode_line
 
 
 class AgentHost:
@@ -117,7 +118,7 @@ class AgentHost:
             raise RuntimeError('Falta Java 17 o el motor del asistente.')
         self.lines = queue.Queue()
         self.process = subprocess.Popen(
-            [java, '-Xms32m', '-Xmx256m', '-Dfile.encoding=UTF-8', '-cp',
+            [java, '-Xms32m', '-Xmx256m', '-XX:+UseSerialGC', '-XX:ActiveProcessorCount=2', '-Xlog:all=warning:stderr', '-Dfile.encoding=UTF-8', '-cp',
              str(self.root / 'runtime' / '*'), 'DesktopAgentKt', str(self.root), str(self.data)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding='utf-8', bufsize=1,
@@ -170,7 +171,13 @@ class AgentHost:
                 raise TimeoutError('El asistente ha agotado el tiempo de espera. Comprueba el historial antes de repetir.')
             if line is None:
                 raise RuntimeError('El motor del asistente se ha cerrado.')
-            response = json.loads(line)
+            try:
+                response = decode_line(line)
+            except ValueError:
+                self.close()
+                raise
+            if response is None:
+                continue
             if 'callback' not in response:
                 if not response.get('ok'):
                     raise RuntimeError(response.get('error', 'Error del asistente'))

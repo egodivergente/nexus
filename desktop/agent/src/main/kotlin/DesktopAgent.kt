@@ -309,20 +309,24 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             }
             "sync" -> deps.lifecycle.sync(args.text("id"))
             "importHistory" -> {
-                val history = json.decodeFromJsonElement<List<HistoryEntry>>(callback("history", JsonPrimitive(10000)))
+                val rawHistory = callback("history", JsonPrimitive(10000)).jsonArray
+                val history = json.decodeFromJsonElement<List<HistoryEntry>>(rawHistory)
+                val byJob = rawHistory.associateBy { it.jsonObject.text("jobId") }
                 for (job in history.filter { it.status == "COMPLETED" && it.outputs.isNotEmpty() }) {
-                    if (assets.generation(job.jobId) != null) continue
+                    val existing = assets.generation(job.jobId)
+                    if (existing?.status == "COMPLETED" && existing.outputAssetIds.mapNotNull { assets.asset(it)?.uri }.toSet() == job.outputs.toSet()) continue
                     val type = runCatching { AssetType.valueOf(job.modality) }.getOrDefault(AssetType.OTHER)
-                    val record = GenerationRecord(id = AssetIndex.newId("gen"), nexusJobId = job.jobId,
+                    val projectId = byJob[job.jobId]?.jsonObject?.text("projectId")?.takeIf { assets.findProject(it) != null }
+                    val record = existing ?: GenerationRecord(id = AssetIndex.newId("gen"), nexusJobId = job.jobId,
                         providerId = job.providerId, modelId = job.modelId, modality = job.modality,
-                        prompt = job.prompt, status = job.status, createdAt = job.createdAt)
+                        prompt = job.prompt, status = job.status, createdAt = job.createdAt, projectId = projectId)
                     val outputIds = job.outputs.mapIndexed { index, uri ->
                         assets.assetByUri(uri)?.id ?: assets.addAsset(Asset(id = "", uri = uri,
                             type = type, role = AssetRole.OUTPUT, source = AssetSource.GENERATED,
                             displayName = "${job.modelId.substringAfterLast('/')} ${index + 1}",
-                            generationId = record.id, createdAt = job.createdAt)).id
+                            generationId = record.id, projectId = record.projectId, shotId = record.shotId, createdAt = job.createdAt)).id
                     }
-                    assets.upsertGeneration(record.copy(outputAssetIds = outputIds))
+                    assets.upsertGeneration(record.copy(status = "COMPLETED", outputAssetIds = outputIds, completedAt = record.completedAt ?: System.currentTimeMillis()))
                 }
             }
             "reload" -> { skills = loadSkills(); deps = deps(); orchestrator = makeOrchestrator() }

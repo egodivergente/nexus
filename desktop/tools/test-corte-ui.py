@@ -28,15 +28,25 @@ try:
   page=browser.new_page(viewport={'width':1600,'height':1000});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   page.goto(url)
   page.wait_for_function('()=>typeof Corte!=="undefined"&&Boolean(initial)&&Boolean(window.NexusAgentParity)',timeout=45000)
+  page.evaluate("()=>{window.qaRpcErrors=[];const before=rpc;rpc=async(op,args={})=>{try{return await before(op,args);}catch(e){qaRpcErrors.push({op,method:args.method,subop:args.op,error:e.message});throw e;}};}")
   page.evaluate("async()=>{await ensureAssistantReady();await agentCall('createProject',{name:'Montaje Windows · prueba local'});navigate('editor');}")
-  page.wait_for_function('()=>Boolean(Corte.snapshot)&&!Agent.busy',timeout=45000)
+  try:
+   page.wait_for_function('()=>Boolean(Corte.snapshot)&&!Agent.busy',timeout=45000)
+  except Exception:
+   print(json.dumps({'errors':errors,'state':page.evaluate('({view,rpcErrors:qaRpcErrors,corte:{...Corte,selected:[...Corte.selected]},agentError:Agent.error,agentBusy:Agent.busy,content:document.body.innerText.slice(-4000)})')},ensure_ascii=False,default=str))
+   page.screenshot(path=str(out/'failure.png'),full_page=True)
+   raise
   page.evaluate("async()=>{await agentCall('importReferences',{projectId:Corte.projectId,files:[{uri:'/media/"+video.name+"',mime:'video/mp4',name:'Plano de prueba'}]});renderCorteAssets();}")
   page.locator('[data-corte-place]').first.click()
   page.wait_for_selector('.corte-clip')
   page.locator('.corte-clip').first.click()
   page.wait_for_function('()=>Corte.selected.size>0&&!Corte.busy')
   page.locator('[data-corte=duplicate]').click()
-  page.wait_for_function('()=>corteClips().filter(c=>c.kind==="VIDEO").length===2&&!Corte.busy')
+  try:
+   page.wait_for_function('()=>corteClips().filter(c=>c.kind==="VIDEO").length===2&&!Corte.busy')
+  except Exception:
+   print(json.dumps(page.evaluate('({errors:qaRpcErrors,clips:corteClips(),selected:[...Corte.selected],busy:Corte.busy,error:Corte.error,toast:document.querySelector("#toast").textContent})'),ensure_ascii=False))
+   raise
   page.locator('[data-corte=preview]').click()
   page.wait_for_function('()=>Corte.jobs.some(j=>j.kind==="preview"&&["COMPLETED","FAILED"].includes(j.state))',timeout=180000)
   jobs=page.evaluate('Corte.jobs');assert jobs[0]['state']=='COMPLETED',jobs

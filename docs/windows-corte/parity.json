@@ -65,7 +65,7 @@
       "dependencies": "Credenciales y endpoint del usuario",
       "windowsAdaptation": "BrainFactory/SDK original con adaptador Windows",
       "acceptance": "Guardar perfil, inferencia y herramientas según capacidades",
-      "result": "PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA",
+      "result": "PASS real: Chat, Responses con herramienta y continuidad, conexión y streaming; dola-seed-2-1-turbo-260628. Clave DPAPI. Visión/documentos y herramientas del PC con BytePlus pendientes",
       "classification": "PARCIAL"
     },
     {
@@ -193,55 +193,55 @@
       "id": "MEDIA-01",
       "android": "Catálogo, esquemas y validación",
       "reference": "app/.../provider; agent-core/media",
-      "desktop": "Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host",
+      "desktop": "Proveedores existentes conservados; generadores configurables conectados al catálogo y agente",
       "dependencies": "API externa y credenciales",
-      "windowsAdaptation": "MediaEngine y adaptador Windows pendientes para proveedores multimedia propios",
+      "windowsAdaptation": "MediaEngine compartido + host HTTP Windows, DPAPI, subidas y recibos persistentes",
       "acceptance": "Crear y recuperar con servidor local; sin envío de pago",
-      "result": "PENDIENTE en generadores personalizados; resto exige reconciliación",
+      "result": "PASS local: manual y agente con confirmación, biblioteca y Corte; SYNC/ASYNC y recuperación sin reenvío. APIs externas y cancelación remota no probadas/no configurada",
       "classification": "PARCIAL"
     },
     {
       "id": "MEDIA-02",
       "android": "Atlas/Runway/Crun/Flow existentes",
       "reference": "app/.../provider; agent-core/media",
-      "desktop": "Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host",
+      "desktop": "Proveedores existentes conservados; generadores configurables conectados al catálogo y agente",
       "dependencies": "API externa y credenciales",
-      "windowsAdaptation": "MediaEngine y adaptador Windows pendientes para proveedores multimedia propios",
+      "windowsAdaptation": "MediaEngine compartido + host HTTP Windows, DPAPI, subidas y recibos persistentes",
       "acceptance": "Crear y recuperar con servidor local; sin envío de pago",
-      "result": "PENDIENTE en generadores personalizados; resto exige reconciliación",
+      "result": "PASS local: manual y agente con confirmación, biblioteca y Corte; SYNC/ASYNC y recuperación sin reenvío. APIs externas y cancelación remota no probadas/no configurada",
       "classification": "PARCIAL"
     },
     {
       "id": "MEDIA-03",
       "android": "Generadores multimedia personalizados",
       "reference": "app/.../provider; agent-core/media",
-      "desktop": "Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host",
+      "desktop": "Proveedores existentes conservados; generadores configurables conectados al catálogo y agente",
       "dependencies": "API externa y credenciales",
-      "windowsAdaptation": "MediaEngine y adaptador Windows pendientes para proveedores multimedia propios",
+      "windowsAdaptation": "MediaEngine compartido + host HTTP Windows, DPAPI, subidas y recibos persistentes",
       "acceptance": "Crear y recuperar con servidor local; sin envío de pago",
-      "result": "PENDIENTE en generadores personalizados; resto exige reconciliación",
+      "result": "PASS local: manual y agente con confirmación, biblioteca y Corte; SYNC/ASYNC y recuperación sin reenvío. APIs externas y cancelación remota no probadas/no configurada",
       "classification": "PARCIAL"
     },
     {
       "id": "MEDIA-04",
       "android": "Subidas grandes, timeout y errores del proveedor",
       "reference": "app/.../provider; agent-core/media",
-      "desktop": "Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host",
+      "desktop": "Proveedores existentes conservados; generadores configurables conectados al catálogo y agente",
       "dependencies": "API externa y credenciales",
-      "windowsAdaptation": "MediaEngine y adaptador Windows pendientes para proveedores multimedia propios",
+      "windowsAdaptation": "MediaEngine compartido + host HTTP Windows, DPAPI, subidas y recibos persistentes",
       "acceptance": "Crear y recuperar con servidor local; sin envío de pago",
-      "result": "PENDIENTE en generadores personalizados; resto exige reconciliación",
+      "result": "PASS local: manual y agente con confirmación, biblioteca y Corte; SYNC/ASYNC y recuperación sin reenvío. APIs externas y cancelación remota no probadas/no configurada",
       "classification": "PARCIAL"
     },
     {
       "id": "MEDIA-05",
       "android": "Estimaciones, autorización, lotes y recuperación incierta",
       "reference": "app/.../provider; agent-core/media",
-      "desktop": "Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host",
+      "desktop": "Proveedores existentes conservados; generadores configurables conectados al catálogo y agente",
       "dependencies": "API externa y credenciales",
-      "windowsAdaptation": "MediaEngine y adaptador Windows pendientes para proveedores multimedia propios",
+      "windowsAdaptation": "MediaEngine compartido + host HTTP Windows, DPAPI, subidas y recibos persistentes",
       "acceptance": "Crear y recuperar con servidor local; sin envío de pago",
-      "result": "PENDIENTE en generadores personalizados; resto exige reconciliación",
+      "result": "PASS local: manual y agente con confirmación, biblioteca y Corte; SYNC/ASYNC y recuperación sin reenvío. APIs externas y cancelación remota no probadas/no configurada",
       "classification": "PARCIAL"
     },
     {
@@ -681,7 +681,7 @@
       "dependencies": "AssetIndex y proveedor",
       "windowsAdaptation": "Links explícitos y proyecto del turno fijado",
       "acceptance": "Importación de activos locales y cambio de proyecto",
-      "result": "PASS colocación local y conservación; cadena de generación externa no probada",
+      "result": "PASS generación con proveedor simulado, confirmación, biblioteca del proyecto y colocación Corte. Generación externa de pago NO PROBADA",
       "classification": "PARCIAL"
     },
     {

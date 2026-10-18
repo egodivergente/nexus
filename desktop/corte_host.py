@@ -7,6 +7,7 @@ import atexit
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import mimetypes
 import os
 from pathlib import Path
 import queue
@@ -15,6 +16,7 @@ import subprocess
 import threading
 import time
 import uuid
+from jvm_protocol import decode_line
 
 from native_operations import atomic_json, FLAGS
 
@@ -61,7 +63,7 @@ class CorteHost:
                 if not java:
                     raise ValueError('Falta Java 17 para el motor Corte.')
                 self.queue = queue.Queue()
-                self.process = subprocess.Popen([str(java), '-Xmx512m', '-Dfile.encoding=UTF-8', '-cp',
+                self.process = subprocess.Popen([str(java), '-Xmx512m', '-XX:+UseSerialGC', '-XX:ActiveProcessorCount=2', '-Xlog:all=warning:stderr', '-Dfile.encoding=UTF-8', '-cp',
                     str(self.root/'agent/runtime/*'), 'CorteDesktopMain', str(self.projects)],
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                     text=True, encoding='utf-8', creationflags=FLAGS)
@@ -73,21 +75,31 @@ class CorteHost:
                 threading.Thread(target=read, daemon=True).start()
             self.process.stdin.write(json.dumps({'op': op, 'args': args})+'\n')
             self.process.stdin.flush()
-            try:
-                line = self.queue.get(timeout=45)
-            except queue.Empty:
+            deadline=time.monotonic()+45
+            for _ in range(16):
+                try:
+                    line = self.queue.get(timeout=max(.1,deadline-time.monotonic()))
+                except queue.Empty:
+                    self.close()
+                    raise ValueError('Resultado incierto. Consulta el proyecto o recupera el mismo request_id antes de editar.')
+                if line is None:
+                    raise ValueError('Motor Corte cerrado. Recupera el mismo request_id antes de repetir.')
+                try:
+                    result=decode_line(line)
+                except ValueError:
+                    self.close()
+                    raise
+                if result is not None:break
+            else:
                 self.close()
-                raise ValueError('Resultado incierto. Consulta el proyecto o recupera el mismo request_id antes de editar.')
-            if line is None:
-                raise ValueError('Motor Corte cerrado. Recupera el mismo request_id antes de repetir.')
-            result = json.loads(line)
+                raise ValueError('Demasiados diagnósticos JVM. Consulta el mismo request_id antes de repetir.')
             if not result.get('ok'):
                 raise ValueError(result.get('error', 'Edición rechazada'))
             return result
 
     def metadata(self, asset, path, media_id=None):
-        mime = asset.get('mimeType') or ''
-        image = mime.startswith('image/')
+        mime = asset.get('mimeType') or mimetypes.guess_type(path.name)[0] or ''
+        image = mime.startswith('image/') or asset.get('type') == 'IMAGE'
         if image:
             from PIL import Image
             with Image.open(path) as im:

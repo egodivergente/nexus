@@ -2,7 +2,7 @@
 
 **Estado del encargo: PARCIAL. Esta entrega no acredita la paridad completa solicitada.**
 
-Versión de aplicación: `2026.10.18-corte-preview.1`. Referencia Nexus Android:
+Versión de aplicación: `2026.10.18-corte-preview.2`. Referencia Nexus Android:
 `8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6` (1.9.39/vc73). Corte compartido:
 `5869228ae887a439fc522c2cbf76c13e29a143b2`. Se volvió a consultar GitHub y se observó
 `ffc4d0ffb1311ac8eed1b3ec806089d6a6562d41`, que cambia únicamente la lista de métodos
@@ -17,6 +17,11 @@ del ContentProvider Android. No cambia los módulos compartidos usados aquí.
   Chat/Responses/REST pasan por el host y runtime. Los perfiles pueden guardar varias
   configuraciones y claves independientes mediante DPAPI CurrentUser. El descubrimiento
   y la prueba de inferencia se solicitan expresamente; no se prueban modelos al arrancar.
+- Los generadores multimedia personalizados se configuran en Ajustes. `WindowsMediaCodec`
+  utiliza `MediaProviderConfig` y `MediaEngine` del núcleo compartido; el host Windows gestiona
+  autenticación, subida DATA_URI/multipart, envío SYNC/ASYNC y seguimiento. Sus claves van en
+  `custom-media-credentials.dpapi`, separado de los perfiles JSON. Los resultados incrustados
+  se materializan con identificadores locales compatibles con biblioteca y Corte.
 - La ventana incorpora medios del proyecto, visor, timeline e inspector con el chat
   acoplado y paneles plegables. El proyecto activo usa el identificador del proyecto Nexus.
   Hay selección, arrastre, zoom, atajos, menú contextual y tamaños de panel guardados.
@@ -50,10 +55,12 @@ caché. Falta implantar un presupuesto global y política de expulsión para esa
 
 ## Comprobación ejecutada
 
-En AXELPC, JDK 17, Gradle 9.1.0, Kotlin 2.3.20, máximo dos workers y sin compilaciones
-paralelas entre módulos:
+En AXELPC, JDK 17, Gradle 9.1.0, Kotlin 2.3.20, un trabajador y sin compilaciones
+paralelas entre módulos (JVM con SerialGC y dos procesadores lógicos visibles):
 
-- 226 pruebas del núcleo Nexus, 15 del runtime y 77 del timeline más 7 de almacenamiento.
+- Suites JVM: 226 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
+  almacenamiento. Base sin red: 321 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
+  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 325.
 - Aceptación Windows con archivos reales y perfil aislado: importar, duplicar, dividir,
   colores, foco/selección, undo/redo, reapertura, lote inválido, doble envío tras reinicio,
   revisión obsoleta, edición manual posterior, exportación de 8 s con audio, cancelación,
@@ -65,6 +72,15 @@ paralelas entre módulos:
   inferencia. Los resultados del servidor local se identifican como prueba de integración;
   no son inferencia con las cuentas externas del usuario.
 - Pruebas de PDF con imagen, lectura, métricas, análisis de audio y conservación del original.
+- Ocho pruebas de generadores configurables: credencial DPAPI, servidor HTTP local,
+  plantilla Kotlin tipada, subida, SYNC/ASYNC, snapshot de configuración, recibos tras reinicio,
+  tarifa vinculada a configuración, referencia local sin base64 de ida y vuelta por el navegador,
+  incertidumbre sin reenvío y distinción entre preparación interrumpida y envío sin confirmar.
+  Edge prueba configuración → creación manual → inferencia local → tarjeta preparada sin envío
+  automático → confirmación → biblioteca del proyecto → colocación en Corte. La reindexación
+  importa también las salidas de generaciones ya registradas y conserva su proyecto.
+  La indexación se realiza automáticamente cuando el turno queda libre; no requiere una orden
+  manual ni interrumpe el callback de confirmación. También se prueba el polling UI asíncrono.
 - Pruebas previas de edición local/MCP e integridad del host.
 - UI real de Edge con un perfil de prueba: importación de activo, colocación, edición real,
   reproducción del preview, chat plegable, ajustes y navegación conservando el montaje.
@@ -95,14 +111,19 @@ Pendientes concretos:
 
 1. Reconciliar exhaustivamente todos los comportamientos y correcciones de Android;
    validar cada fila en la instalación activada con el perfil real.
-2. Conectar generadores multimedia personalizados al catálogo, cotización, subida,
-   envío/seguimiento/cancelación y biblioteca Windows mediante el `MediaEngine` compartido.
+2. Verificar generadores personalizados con cada API externa real y ampliar sus protocolos
+   cuando sea necesario. La configuración genérica actual no define cancelación remota: se rechaza
+   expresamente. Las tarifas son declaradas por el usuario; solo se interpretan unidades generation
+   y second. Protocolos con firmas, WebSocket o subidas en varias etapas requieren otro adaptador.
 3. Completar paridad de encargos/tarjetas, cancelación de turno, agrupación de resultados,
    visores, referencias, personalización y accesibilidad, con pruebas de cada flujo.
 4. Implementar paquete portable completo con reimportación y migración de proyectos Corte
    anteriores; completar referencias externas sin copia y conservación de procedencia.
-5. Verificar inferencia, visión, documentos, herramientas y razonamiento con cada cuenta
-   externa configurada. Listado, activación de modelo e inferencia son resultados distintos.
+5. BytePlus pasó inferencia mínima, Chat Completions, Responses con herramienta y continuidad,
+   y streaming con dola-seed-2-1-turbo-260628. La herramienta de la prueba API devuelve un
+   estado simulado; falta ejecutar herramientas del PC con BytePlus, visión, documentos,
+   razonamiento y las demás cuentas externas. La clave copiada del S25 permanece en DPAPI.
+   Listado, activación de modelo e inferencia son resultados distintos.
 6. Certificar multipista, transiciones con handles, VFR, velocidades, keyframes y mezclas
    extensas. La ganancia de audio Windows se evalúa por fotograma; falta equivalencia a nivel
    de muestra y cambio de velocidad con conservación del tono. LUT se rechaza; HDR pendiente.
@@ -122,6 +143,7 @@ el S25. Cada proveedor conserva sus requisitos de conexión y autenticación.
 
 ```powershell
 powershell -NoProfile -File desktop/tools/build-windows-corte.ps1
+python -X utf8 desktop/tools/test-custom-media.py
 python -X utf8 desktop/tools/test-corte-windows.py
 python -X utf8 desktop/tools/test-windows-agent-providers.py
 python -X utf8 desktop/tools/test-windows-library.py
@@ -137,3 +159,23 @@ Los scripts de prueba usan datos aislados y medios sintéticos. El instalador an
 ## Cambio concurrente posterior
 
 Durante esta tarea, otro proceso incorporó `8c40c827f98b31f6efda31ab6bee9099691bb604` al checkout original: filtros de duplicados, origen completo, búsqueda visible y cabeceras de Biblioteca Android. También dejó modificaciones locales en `app/build.gradle.kts` y `LibraryScreen.kt`. Se preservan; sus novedades de UX no están todavía portadas y verificadas en Windows. La entrega se aisló desde `8ceb3aa` en `windows-corte-delivery` para no publicar cambios ajenos.
+
+## Proveedores configurables
+
+Ajustes → Generadores personalizados → Añadir proveedor. El JSON tiene el mismo formato que
+Android (`MediaProviderConfig`); la clave se introduce en el campo protegido. `healthPath` permite
+«Guardar y probar conexión» mediante GET, sin generar. Las referencias locales se suben o incrustan
+en el host: los archivos grandes no recorren la interfaz codificados en base64.
+
+Las cotizaciones caducan a los cinco minutos y quedan vinculadas a la configuración usada.
+Una unidad de precio desconocida impide el envío; no se convierte implícitamente en segundos.
+Cada creación se registra antes de contactar con la API. Un cierre durante la preparación se
+identifica como no enviado; un cierre o corte después de iniciar la creación queda sin confirmar,
+sin reenvío automático. El seguimiento usa el snapshot del protocolo original. Eliminar un
+proveedor con trabajos pendientes o cambiar su destino exige conservar el identificador anterior.
+No se afirma que el servidor remoto haya cancelado una tarea por detener su seguimiento local.
+
+Durante QA se observó falta real de memoria nativa JVM y recursos del navegador. Se cerró solo
+el daemon Gradle 9.1.0 después de verificarlo IDLE y se repitieron las pruebas secuencialmente.
+El canal JVM separa diagnósticos de las respuestas JSON y el listener local admite la carga
+concurrente de módulos de interfaz y RPC. Los registros de diagnóstico quedan fuera del paquete.

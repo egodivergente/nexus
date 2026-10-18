@@ -9,7 +9,13 @@ if (-not $gradle) { throw 'Falta Gradle 9.1.0. Instala la distribución antes de
 if ($LASTEXITCODE) { throw 'Las fuentes Corte no coinciden con su referencia.' }
 $tasks = @('runtime')
 if (-not $SkipTests) { $tasks = @('test', ':corte-timeline:test', ':corte-storage:test', 'runtime') }
-& $gradle.FullName -p "$root\desktop\agent" @tasks --max-workers=2 --no-parallel --console=plain
+$previousJavaOpts = $env:JAVA_OPTS
+try {
+    $env:JAVA_OPTS = "$previousJavaOpts -XX:+UseSerialGC -XX:ActiveProcessorCount=2"
+    & $gradle.FullName -p "$root\desktop\agent" @tasks --max-workers=1 --no-parallel --no-daemon --console=plain
+} finally {
+    $env:JAVA_OPTS = $previousJavaOpts
+}
 if ($LASTEXITCODE) { throw 'Falló la compilación JVM.' }
 $runtime = "$root\desktop\agent\runtime"
 New-Item -ItemType Directory -Path $runtime -Force | Out-Null

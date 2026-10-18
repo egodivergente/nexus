@@ -367,6 +367,15 @@ def save_remote(url):
 
 
 def dispatch(keys, operation, args):
+    if operation == 'customMedia':
+        if OFFLINE_QA and args.get('op') in {'submit', 'status', 'upload', 'test'}:
+            raise ValueError('Operaciones de red desactivadas en el perfil de prueba.')
+        host = agent_host()
+        with _agent_lock:
+            if not hasattr(host, 'custom_media'):
+                from custom_media import CustomMedia
+                host.custom_media = CustomMedia(DATA, host.corte.exchange, windows_keys, write_secret)
+        return host.custom_media.command(args['op'], args.get('args', {}))
     if operation == 'readCredential':
         if args.get('provider') in ALLOWED_PROVIDERS:
             return {'value': keys.get(args['provider'], '')}
@@ -482,7 +491,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '2026.10.18-corte-preview.1', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'version': '2026.10.18-corte-preview.2', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -599,6 +608,14 @@ def dispatch(keys, operation, args):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def handle(self):
+        try:
+            super().handle()
+        except ConnectionError:
+            # Closing a tab or cancelling playback can close an in-flight response.
+            # The dispatched operation is not retried.
+            pass
+
     server_version = 'NexusLocal/1.0'
 
     def log_message(self, *args):
@@ -814,6 +831,8 @@ def main():
 
 
 class LoopbackHTTPServer(ThreadingHTTPServer):
+    # Static UI modules and concurrent agent/editor RPCs share this loopback listener.
+    request_queue_size = 64
     def server_bind(self):
         # The address is explicitly loopback; startup does not need reverse DNS.
         socketserver.TCPServer.server_bind(self)
@@ -831,7 +850,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.18-corte-preview.1'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.18-corte-preview.2'}),
         encoding='utf-8',
     )
     if options.headless:

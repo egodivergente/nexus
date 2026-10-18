@@ -50,6 +50,7 @@ class CorteDesktop(private val root: File) {
         put("transaction_id", transaction)
     }
     @Synchronized fun command(op: String, a: JsonObject): JsonObject {
+        if (op == "media_codec") return WindowsMediaCodec.command(a)
         if(op=="media_analysis") {
             val cache=File(a.s("waveform_path"))
             val w=if(cache.exists()) Waveform.readFrom(cache) else {

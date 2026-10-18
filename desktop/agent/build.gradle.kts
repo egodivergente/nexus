@@ -15,6 +15,13 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 tasks.test { useJUnitPlatform() }
+allprojects {
+    tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+        maxParallelForks = 1
+        maxHeapSize = "256m"
+        jvmArgs("-XX:+UseSerialGC", "-XX:ActiveProcessorCount=2")
+    }
+}
 application { mainClass.set("DesktopAgentKt") }
 tasks.register<Copy>("runtime") {
     dependsOn(tasks.jar, ":core:jar")
