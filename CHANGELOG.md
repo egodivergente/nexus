@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.42-agent] - 2026-10-18 · «Horizonte»
+
+- Modelos (aportado por el agente de Termux): plural correcto en los contadores, descripción a 2 líneas, la píldora de coste solo aparece si hay precio y las tarjetas de la cuadrícula tienen altura uniforme.
+
 ## [1.9.41-agent] - 2026-10-18 · «Horizonte»
 
 - Historial (aportado por el agente de Termux): los fallos muestran su motivo en una línea con botón «Reintentar», el coste se ve en una sola unidad, cada día suma su gasto y el prompt ocupa hasta 2 líneas.
