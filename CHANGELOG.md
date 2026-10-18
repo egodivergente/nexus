@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.43-agent] - 2026-10-18 · «Horizonte»
+
+- Biblioteca: se pueden importar archivos de hasta 4 GB (antes el límite era 512 MB y el fallo era silencioso); si un archivo falla, el aviso dice el motivo.
+- Nunca se muestra «UNKNOWN» al usuario (aportado por el agente de Termux, punto 4).
+
 ## [1.9.42-agent] - 2026-10-18 · «Horizonte»
 
 - Modelos (aportado por el agente de Termux): plural correcto en los contadores, descripción a 2 líneas, la píldora de coste solo aparece si hay precio y las tarjetas de la cuadrícula tienen altura uniforme.
