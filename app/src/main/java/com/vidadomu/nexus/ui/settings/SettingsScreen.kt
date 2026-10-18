@@ -450,5 +450,14 @@ private fun FontScaleRow(appearance:AppearancePreferences) {
         }
         Slider(draft,{draft=it},valueRange=.8f..1.4f,steps=11,onValueChangeFinished={appearance.setFontScale(draft)})
         Text("Así se verá el texto de Nexus.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+        // Más espacio para el chat: la barra de pestañas se esconde al bajar y vuelve al subir.
+        var autoHide by remember {mutableStateOf(appearance.autoHideBars())}
+        Row(Modifier.fillMaxWidth().padding(top=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ocultar la barra al bajar por el chat",style=MaterialTheme.typography.bodyLarge)
+                Text("Vuelve en cuanto subes un poco.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            }
+            Switch(autoHide,{autoHide=it;appearance.setAutoHideBars(it)})
+        }
     }
 }

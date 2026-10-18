@@ -78,7 +78,7 @@ internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldVal
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
-    onReply: (String) -> Unit = {}) {
+    onReply: (String) -> Unit = {}, onCamera: (() -> Unit)? = null) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
@@ -111,7 +111,11 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                 }
             }
             Row(verticalAlignment = Alignment.Bottom) {
-                IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                IconButton(onClick = onAttach, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                // La cámara solo con el campo vacío: al escribir, el texto recupera el ancho.
+                if (onCamera != null && text.text.isEmpty()) IconButton(onClick = onCamera, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Default.PhotoCamera, "Hacer una foto")
+                }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
                 val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)

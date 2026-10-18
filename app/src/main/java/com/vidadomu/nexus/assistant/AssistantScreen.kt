@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import com.vidadomu.nexus.ui.components.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -108,6 +109,19 @@ fun AssistantScreen(
     val activeProject=ui.projects.firstOrNull {it.id==ui.activeProjectId}
     val listState = rememberLazyListState()
     val picker = rememberProjectMediaPicker { uris -> vm.attach(uris) }
+    // Cámara: la foto va a la caché (FileProvider) y se adjunta como cualquier referencia.
+    val context = LocalContext.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val camera = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.TakePicture()) { ok ->
+        cameraUri?.takeIf { ok }?.let { vm.attach(listOf(it)) }
+    }
+    val takePhoto: () -> Unit = {
+        runCatching {
+            val file = java.io.File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+            FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file).also { cameraUri = it; camera.launch(it) }
+        }.onFailure { Toast.makeText(context, "No se pudo abrir la cámara", Toast.LENGTH_SHORT).show() }
+    }
 
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
@@ -206,8 +220,18 @@ fun AssistantScreen(
         Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
+            // Al bajar por el chat se esconde la barra inferior para ganar espacio; al subir vuelve (Ajustes → Apariencia).
+            val appearance = com.vidadomu.nexus.ui.theme.rememberAppearancePreferences()
+            val autoHide = remember(appearance) { appearance.autoHideBars() }
+            DisposableEffect(Unit) { onDispose { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = true } }
+            val hideOnScroll = remember(autoHide) { object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (autoHide && kotlin.math.abs(available.y) > 6f) com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = available.y > 0
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+            } }
             Box(Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(Modifier.fillMaxSize(), state = listState,
+            LazyColumn(Modifier.fillMaxSize().nestedScroll(hideOnScroll), state = listState,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
@@ -227,8 +251,8 @@ fun AssistantScreen(
                     }
                     val item = row as ChatItem
                     when (item) {
-                        is ChatItem.User -> UserBubble(item)
-                        is ChatItem.Assistant -> AssistantBubble(item, onOpenHistory)
+                        is ChatItem.User -> Box(Modifier.animateItem()) { UserBubble(item) }
+                        is ChatItem.Assistant -> Box(Modifier.animateItem()) { AssistantBubble(item, onOpenHistory) }
                         is ChatItem.Notice -> NoticeRow(item, onOpenHistory)
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
@@ -306,7 +330,7 @@ fun AssistantScreen(
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
-                onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) })
+                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto)
         }
     }
 }

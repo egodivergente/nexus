@@ -65,7 +65,22 @@ class CustomMediaStore(private val app: NexusApplication, private val client: Ok
 
     /** Un proveedor ejecutable por cada configuración válida. */
     fun providers(): List<ConfigurableMediaProvider> = all().filter { it.problems().isEmpty() }.map { c ->
-        ConfigurableMediaProvider(c, client, { apiKey(c.id) }, File(app.filesDir, "custom_outputs"))
+        ConfigurableMediaProvider(c, client, { keyFor(c.id) }, File(app.filesDir, "custom_outputs"))
+    }
+
+    /** BytePlus (medios) usa la clave del cerebro BytePlus si no tiene una propia: es la misma cuenta y el mismo saldo. */
+    private fun keyFor(id: String): String = apiKey(id).ifBlank {
+        if (id == BytePlusMediaPreset.ID) runCatching { secure.getProviderApiKey(com.vidadomu.nexus.assistant.BrainStore.keyId(com.vidadomu.nexus.agent.core.llm.BrainPresets.BYTEPLUS_ID)) }.getOrDefault("") else ""
+    }
+
+    /** Instala BytePlus (Seedance y Seedream) una sola vez; si el usuario lo borra, no vuelve a aparecer. */
+    fun ensureBytePlus() {
+        if (prefs.getBoolean(SEEDED, false)) return
+        if (get(BytePlusMediaPreset.ID) == null) runCatching {
+            val next = all() + BytePlusMediaPreset.config()
+            prefs.edit().putString(KEY, json.encodeToString(serializer, next)).commit()
+        }
+        prefs.edit().putBoolean(SEEDED, true).apply()
     }
 
     /** Comprueba la conexión de una configuración aún sin guardar, con la clave que se está escribiendo. */
@@ -80,6 +95,7 @@ class CustomMediaStore(private val app: NexusApplication, private val client: Ok
 
     companion object {
         private const val KEY = "configs"
+        private const val SEEDED = "byteplus_media_seeded"
         fun keyId(id: String) = "nexus_media_key_$id"
     }
 }

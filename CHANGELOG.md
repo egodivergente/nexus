@@ -2,6 +2,13 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.46-agent] - 2026-10-18 · «Índigo»
+
+- Nuevo proveedor de medios BytePlus (ModelArk) con Seedance 2.0 y 2.0 Fast (texto o imagen a vídeo) y Seedream 5.0 Pro (imagen y edición). Usa la misma clave y el mismo saldo que el cerebro BytePlus; los IDs de modelo se pueden cambiar en Ajustes → Proveedores.
+- La barra de pestañas se esconde al bajar por el chat y vuelve al subir (se puede desactivar en Apariencia).
+- Botón de cámara en el cuadro de texto (solo con el campo vacío).
+- Negritas más ligeras en las respuestas, mensajes que entran con animación y vibración suave al enviar.
+
 ## [1.9.45-agent] - 2026-10-18 · «Horizonte»
 
 - Chat más panorámico: cabecera de una sola línea (cerebro y razonamiento pasan junto al cuadro de texto), márgenes laterales de 8 dp y campo de entrada en pastilla más bajo.

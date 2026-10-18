@@ -31,6 +31,9 @@ fun NexusBottomBar(navController: NavController) {
     val currentRoute=entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
     val haptic = LocalHapticFeedback.current
+    // En el chat se esconde al bajar (si está activado en Ajustes) y vuelve al subir; en el resto de pestañas siempre se ve.
+    val visible = ChromeVisibility.bottomBar.value || currentRoute != Screen.Assistant.route
+    androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
     StudioChrome(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
             HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
@@ -76,5 +79,6 @@ fun NexusBottomBar(navController: NavController) {
                 }
             }
         }
+    }
     }
 }

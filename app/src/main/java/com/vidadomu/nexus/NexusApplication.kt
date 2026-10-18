@@ -92,6 +92,7 @@ class NexusApplication : Application() {
         )
         // Los proveedores API del usuario se registran ANTES de crear el catálogo para que entren en la primera carga.
         customMediaStore = com.vidadomu.nexus.provider.custom.CustomMediaStore(this, okHttpClient)
+        customMediaStore.ensureBytePlus()
         providerRegistry.setCustomProviders(customMediaStore.providers())
         val catalogCache = com.vidadomu.nexus.data.repository.ModelCatalogCache(this)
         modelCatalogRepository = ModelCatalogRepository(providerRegistry, currencyManager, catalogCache, getSharedPreferences("catalog_customization_v1", 0))

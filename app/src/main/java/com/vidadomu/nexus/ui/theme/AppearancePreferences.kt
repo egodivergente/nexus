@@ -24,6 +24,9 @@ class AppearancePreferences(context: Context) {
     /** Tamaño de letra de toda la app (0,8–1,4), encima del ajuste del sistema. */
     fun fontScale() = prefs.getFloat("font_scale", 1f).coerceIn(.8f, 1.4f)
     fun setFontScale(scale: Float) { prefs.edit().putFloat("font_scale", scale.coerceIn(.8f, 1.4f)).apply() }
+    /** Ocultar la barra de navegación al bajar por el chat y mostrarla al subir. */
+    fun autoHideBars() = prefs.getBoolean("auto_hide_bars", true)
+    fun setAutoHideBars(on: Boolean) { prefs.edit().putBoolean("auto_hide_bars", on).apply() }
     fun order(filter: String): List<String> = runCatching {
         val json = JSONArray(prefs.getString("order_$filter", "[]"))
         List(json.length()) { json.getString(it) }.distinct()
@@ -60,6 +63,11 @@ fun AppearancePreferences.fontScaleState(): State<Float> {
         onDispose(unregister)
     }
     return state
+}
+
+/** Si la barra inferior está visible. La pantalla del chat la oculta al bajar; el resto la deja siempre a la vista. */
+object ChromeVisibility {
+    val bottomBar = mutableStateOf(true)
 }
 
 /** Replace visible slots only; hidden providers keep their saved positions. */

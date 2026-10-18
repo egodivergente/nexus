@@ -70,7 +70,8 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
                 sp.bold -> st.ink
                 else -> Color.Unspecified
             },
-            fontWeight = if (sp.bold) FontWeight.SemiBold else null,
+            // Negrita moderada: el modelo marca mucho en negrita y en un párrafo pesaba demasiado; el color ya la destaca.
+            fontWeight = if (sp.bold) FontWeight.Medium else null,
             fontStyle = if (sp.italic) FontStyle.Italic else null,
             fontFamily = if (sp.code) FontFamily.Monospace else null,
             fontSize = if (sp.code) st.body.fontSize else androidx.compose.ui.unit.TextUnit.Unspecified,
