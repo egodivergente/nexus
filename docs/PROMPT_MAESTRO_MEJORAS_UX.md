@@ -26,9 +26,8 @@ Eres el ingeniero responsable de **Nexus Agent** (app Android Kotlin/Compose, va
 ## CÓMO ENTREGAR CADA VERSIÓN
 1. Sube `versionCode` y `versionName` en `app/build.gradle.kts` (patrones `versionCode = N` y `versionName = "x.y.z-agent"`). **Cada 10 versionCode cambia el nombre de versión** (vc 70–79 = Horizonte, 80–89 = Índigo, 90–99 = Júpiter…; lista en el propio gradle). Anótalo en `CHANGELOG.md` (arriba, con el nombre) y en `CONTINUAR.md`.
 2. Compila y pasa tests existentes: `.\gradlew.bat :app:testAgentPreviewUnitTest :app:assembleAgentPreview`.
-3. Firma con el `debug.keystore` del ASUS (alias `androiddebugkey`, contraseña `android`) con `apksigner` del SDK. Nombre del APK: `Nexus-Agent-<versión>-<Nombre>-preview.apk`. Si no encuentras ese keystore, **pregunta**.
-4. Instala con `adb install -r` en el Pixel 8 Pro (`adb-38271FDJG00264-MUUaiB._adb-tls-connect._tcp`) y en el S25 (`adb connect 100.119.88.105:5555`, por Tailscale) **solo si** `dumpsys activity services com.vidadomu.nexus.agent` no muestra servicios en marcha. Si un móvil no responde, dilo y sigue.
-5. Copia el APK a `G:\Mi unidad\Nexus_Android_APK\`, haz commit y push, y responde con: versión y nombre, qué cambió, SHA del commit y lo que no pudiste comprobar.
+3. **Entrega con un solo comando**, desde la raíz del worktree: `.\tools\release\entregar-apk.ps1`. El script lee la versión del APK, calcula el nombre de tanda, **firma** con el keystore fijo `C:\Users\User\Documents\nexus-audit\signing\debug.keystore` (fuera de Git; alias `androiddebugkey`, contraseña `android`), **instala** en el Pixel 8 Pro y en el S25 (por Tailscale) solo si no hay trabajo en marcha, y **copia** el APK a `G:\Mi unidad\Nexus_Android_APK\` con el nombre `Nexus-Agent-<versión>-<Nombre>-preview.apk`. Un móvil que no responde se salta solo. No firmes ni instales a mano. Si el script dice que falta el keystore, **pregunta**.
+4. Haz commit y push, y responde con: versión y nombre, qué cambió, SHA del commit y lo que no pudiste comprobar.
 
 ## PLAN
 
