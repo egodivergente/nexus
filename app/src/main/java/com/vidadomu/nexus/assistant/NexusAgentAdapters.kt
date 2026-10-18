@@ -305,7 +305,7 @@ class AssetSkillSource(private val assets: AssetManager, private val root: Strin
 
 /** Copia privada de los adjuntos del asistente (los URIs del selector caducan). */
 object AgentMediaStore {
-    private const val MAX_BYTES = 512L * 1024 * 1024
+    private const val MAX_BYTES = 4L * 1024 * 1024 * 1024
 
     suspend fun persist(context: Context, uri: Uri, mime: String?, projectId: String? = null): Attachment = withContext(Dispatchers.IO) {
         val runtime = AssistantRuntime.get(context.applicationContext as com.vidadomu.nexus.NexusApplication)
@@ -335,7 +335,7 @@ object AgentMediaStore {
                     val buf = ByteArray(65536); var total = 0L
                     while (true) {
                         val n = input.read(buf); if (n < 0) break
-                        total += n; require(total <= byteLimit) { if(documentFormat!=null) "Bedrock admite documentos de hasta 4,5 MB; divide el archivo en capítulos." else "El archivo supera 512 MB." }
+                        total += n; require(total <= byteLimit) { if(documentFormat!=null) "Bedrock admite documentos de hasta 4,5 MB; divide el archivo en capítulos." else "El archivo supera 4 GB." }
                         out.write(buf, 0, n)
                     }
                 }

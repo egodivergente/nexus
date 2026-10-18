@@ -91,12 +91,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
     val importPicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) {uris ->
         if(uris.isNotEmpty()) { importing=true; scope.launch {
-            var imported=0
+            var imported=0;var lastError:String?=null
             try { for(uri in uris) {
                 try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,context.contentResolver.getType(uri),runtime.settings.activeProjectId()); imported++ }
                 catch(e:kotlinx.coroutines.CancellationException) {throw e}
-                catch(_:Exception) { }
-            }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos") }
+                catch(e:Exception) {lastError=e.message}
+            }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos"+(lastError?.takeIf {imported<uris.size}?.let {". $it"} ?: "")) }
             finally {importing=false}
         } }
     }
