@@ -85,6 +85,7 @@ class NexusNativeOperations(
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
                 "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
                 "atlas_get_balance" -> atlasBalance()
+                "corte_status", "corte_list_projects", "corte_read_project", "corte_find_silences", "corte_apply_ops", "corte_undo" -> CorteBridge(app).run(operation, input)
                 else -> throw ToolInputException("Operación desconocida.")
             }
         }

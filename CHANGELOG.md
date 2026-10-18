@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.39-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido
+- Integración con Corte (editor de vídeo): herramientas `corte_status`, `corte_list_projects`, `corte_read_project`, `corte_find_silences`, `corte_apply_ops` y `corte_undo`. El agente lee la línea de tiempo real y edita a través del motor de Corte (validado, en un solo «Deshacer»). Requiere Corte con el puente del agente (rama `feat/puente-agente-nexus-20261018` del repo de Corte) y la misma firma; permiso de firma concedido.
+
 ## [1.9.38-agent] - 2026-10-18 · «Horizonte»
 
 ### Añadido (fusión de `aki/personalizacion-estudio-20261017`)
