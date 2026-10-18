@@ -4,6 +4,7 @@ import android.util.LruCache
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -92,6 +93,15 @@ internal fun TileDetailsCaption(quality: String?, bytes: Long?, epochMillis: Lon
         .padding(start = 6.dp, end = 6.dp, top = 14.dp, bottom = 4.dp)) {
         if (first.isNotEmpty()) Text(first, style = style, color = MediaForeground, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (second != null) Text(second, style = style, color = MediaForeground.copy(alpha = .8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Insignia discreta para una miniatura que apunta exactamente al mismo archivo que otra en la lista. */
+@Composable
+internal fun TileDuplicateBadge(modifier: Modifier = Modifier) {
+    Surface(color = MaterialTheme.colorScheme.scrim.copy(alpha = .78f), contentColor = MediaForeground,
+        shape = NexusTokens.thumbnail, modifier = modifier.padding(NexusTokens.space4)) {
+        Icon(Icons.Default.ContentCopy, "Duplicado exacto de otro archivo", Modifier.padding(NexusTokens.space4).size(NexusTokens.space16))
     }
 }
 

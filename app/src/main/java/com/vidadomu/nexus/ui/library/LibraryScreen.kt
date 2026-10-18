@@ -58,7 +58,7 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
     "%d:%02d".format(Locale.ROOT,it/60,it%60)
 }
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
@@ -140,6 +140,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         val day=SimpleDateFormat("d MMMM yyyy",Locale("es","ES"))
         (completed.flatMap {job -> job.outputs.indices.map {LibraryEntry.Out(job,it)}}+localAssets.map {LibraryEntry.Local(it)})
             .sortedByDescending {it.time}.groupBy {day.format(Date(it.time))}
+    }
+    // Mismo archivo exacto apareciendo más de una vez en la lista visible (p. ej. importado y luego generado otra vez).
+    val duplicateUris=remember(completed,localAssets,conflicts) {
+        (completed.flatMap {job -> job.outputs.map {OutputFiles.trustedLocalUri(it,conflicts) ?: it.url}}+localAssets.map {it.uri})
+            .groupingBy {it}.eachCount().filterValues {it>1}.keys
     }
     // Solo cuenta y actúa sobre lo marcado que sigue visible con los filtros actuales.
     val visibleTokens=remember(completed,localAssets) {
@@ -238,11 +243,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.padding(bottom=2.dp))
         }
     },actions={
+        IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,if(searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",tint=if(searchVisible) MaterialTheme.colorScheme.primary else TextSecondary)}
         IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
         Box {
         IconButton(onClick={moreVisible=true}) {Icon(Icons.Default.MoreVert,"Más opciones de biblioteca",tint=TextSecondary)}
         DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
-        DropdownMenuItem(text={Text("Buscar")},leadingIcon={Icon(Icons.Default.Search,null)},modifier=Modifier.semantics {contentDescription="Buscar en Biblioteca"},onClick={moreVisible=false;searchVisible=!searchVisible})
         DropdownMenuItem(text={Text(if(showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas")},leadingIcon={Icon(Icons.Default.Info,null)},onClick={
             moreVisible=false;showDetails=!showDetails;prefs.edit().putBoolean("tile_details",showDetails).apply()})
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
@@ -270,7 +275,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 item {Box {
                     StudioFilterChip(originFilter!=LibraryOriginFilter.ALL,{originMenu=true},
                         label={Row(verticalAlignment=Alignment.CenterVertically) {
-                            Text(if(originFilter==LibraryOriginFilter.ALL) "Origen" else originFilter.shortLabel())
+                            Text(if(originFilter==LibraryOriginFilter.ALL) "Origen" else originFilter.label)
                             Icon(Icons.Default.ArrowDropDown,null,Modifier.size(NexusTokens.space16))
                         }},modifier=Modifier.semantics {contentDescription="Filtrar por origen: ${originFilter.label}"})
                     DropdownMenu(expanded=originMenu,onDismissRequest={originMenu=false}) {
@@ -304,21 +309,22 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     }})}
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
                 timeline.forEach {(day,entries) ->
-                    item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                        modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
+                    // Cabecera fija al desplazarse: se queda arriba mientras dura ese día en pantalla.
+                    stickyHeader(key="header:$day") {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                        modifier=Modifier.fillMaxWidth().background(ScreenBackground).padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     items(entries,key={it.key}) {entry ->
                         when(entry) {
                             is LibraryEntry.Local -> {
                                 val asset=entry.asset
                                 val token="asset:"+asset.id
-                                LocalAssetTile(asset,imageLoader,showDetails && columns<=4,mark=if(selecting) token in marked else null,
+                                LocalAssetTile(asset,imageLoader,showDetails && columns<3,mark=if(selecting) token in marked else null,duplicate=asset.uri in duplicateUris,
                                     onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
                             }
                             is LibraryEntry.Out -> {
                                 val job=entry.job;val output=job.outputs[entry.index]
                                 val token=OutputFiles.token(output)
-                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<=4,
-                                    mark=if(selecting) token in marked else null,
+                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<3,
+                                    mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris,
                                     onActions={toggleMark(token)}) {
                                     if(selecting) toggleMark(token)
                                     else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(output)) else onNavigateToOutput(job.id)
@@ -334,7 +340,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,onActions:()->Unit,onOpen:()->Unit) {
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,duplicate:Boolean=false,onActions:()->Unit,onOpen:()->Unit) {
     val context=LocalContext.current
     val haptic=LocalHapticFeedback.current
     val interaction=remember {MutableInteractionSource()}
@@ -357,7 +363,10 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
         // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
         if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
         else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
-        if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration,Modifier.align(Alignment.TopEnd))
+        Column(modifier=Modifier.align(Alignment.TopEnd),horizontalAlignment=Alignment.End) {
+            if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration)
+            if(duplicate) TileDuplicateBadge()
+        }
         if(showDetails) {
             val known=output.width?.takeIf {it>0}!=null && output.height?.takeIf {it>0}!=null
             val mime=output.mimeType.ifBlank {when(output.type) {Modality.IMAGE->"image/*";Modality.VIDEO->"video/*";Modality.AUDIO->"audio/*";else->"application/octet-stream"}}
