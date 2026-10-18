@@ -1,0 +1,79 @@
+# Paridad Nexus Windows + Corte
+
+Estado: **PARCIAL. No constituye la fusión completa solicitada.** Fuentes fijadas en source-reference.json y desktop/corte/source-lock.json. Las pruebas locales no equivalen a inferencia con cuentas externas ni a activación en el perfil real.
+
+| ID | Función Android | Estado Desktop | Clasificación | Resultado |
+|---|---|---|---|---|
+| CORE-01 | Núcleo vigente del agente | Compila directamente agent-core; se excluye la copia desktop/agent/core/src | PARCIAL | PASS: JVM; instalación en prueba aislada pendiente |
+| LLM-01 | Bedrock directo y proxy | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-02 | Anthropic | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-03 | Compatible OpenAI | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-04 | Responses API | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-05 | BytePlus ModelArk | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-06 | Antigravity | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-07 | Perfiles REST personalizados | Selección runtime conectada a host y DPAPI | PARCIAL | PASS local para perfil Chat + herramienta; protocolos en pruebas JVM. Inferencia real externa NO PROBADA |
+| LLM-08 | Razonamiento, thinking, streaming, límites globales y propios | Perfiles y límites conectados; streaming al chat sin repintar cada token | PARCIAL | PASS JVM; combinaciones reales NO PROBADAS |
+| LLM-09 | Diagnóstico de clave/listado/modelo activado/inferencia | Listar modelos y probar inferencia bajo acción explícita | PARCIAL | NO PROBADO con cada cuenta externa |
+| LLM-10 | Presupuesto y consumo | Envoltorio de presupuesto conservando streaming; perfiles admiten tarifas y límites propios | PARCIAL | PASS JVM; gasto por proveedor no certificado |
+| AGENT-01 | Orquestación y herramientas | Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente | PARCIAL | PARCIAL; cancelación de turno y paridad completa de encargos pendientes |
+| AGENT-02 | Skills y guías actuales | Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente | PARCIAL | PARCIAL; cancelación de turno y paridad completa de encargos pendientes |
+| AGENT-03 | Proyectos, instrucciones y memoria | Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente | PARCIAL | PARCIAL; cancelación de turno y paridad completa de encargos pendientes |
+| AGENT-04 | Continuidad y recuperación de conversaciones | Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente | PARCIAL | PARCIAL; cancelación de turno y paridad completa de encargos pendientes |
+| AGENT-05 | Encargos persistentes y tarjetas únicas | Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente | PARCIAL | PARCIAL; cancelación de turno y paridad completa de encargos pendientes |
+| AGENT-06 | Cancelación de un turno LLM en ejecución | Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente | PARCIAL | PARCIAL; cancelación de turno y paridad completa de encargos pendientes |
+| MEDIA-01 | Catálogo, esquemas y validación | Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host | PARCIAL | PENDIENTE en generadores personalizados; resto exige reconciliación |
+| MEDIA-02 | Atlas/Runway/Crun/Flow existentes | Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host | PARCIAL | PENDIENTE en generadores personalizados; resto exige reconciliación |
+| MEDIA-03 | Generadores multimedia personalizados | Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host | PARCIAL | PENDIENTE en generadores personalizados; resto exige reconciliación |
+| MEDIA-04 | Subidas grandes, timeout y errores del proveedor | Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host | PARCIAL | PENDIENTE en generadores personalizados; resto exige reconciliación |
+| MEDIA-05 | Estimaciones, autorización, lotes y recuperación incierta | Proveedores anteriores conservados. Generadores personalizados todavía sin conectar al catálogo y host | PARCIAL | PENDIENTE en generadores personalizados; resto exige reconciliación |
+| LIB-01 | Listado paginado de biblioteca | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| LIB-02 | Abrir imagen/vídeo/documento en contexto y chat | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| LIB-03 | PDF con imágenes y documentos descargables | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| LIB-04 | Lectura de texto y PDF | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| LIB-05 | Medición real de imagen | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| LIB-06 | Análisis de audio por cola local | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| LIB-07 | Archivar fallidos y borrado lógico | Adaptador native_library conectado al runtime | PARCIAL | PASS de adaptadores locales; visualización conversacional completa pendiente |
+| WIN-01 | Búsqueda web y lectura | Capacidades Windows conservadas | PARCIAL | PASS en pruebas locales; servicios externos individuales NO PROBADOS |
+| WIN-02 | MCP HTTP/SSE y paginación | Capacidades Windows conservadas | PARCIAL | PASS en pruebas locales; servicios externos individuales NO PROBADOS |
+| WIN-03 | Edición local y Whisper | Capacidades Windows conservadas | PARCIAL | PASS en pruebas locales; servicios externos individuales NO PROBADOS |
+| WIN-04 | Credenciales DPAPI CurrentUser | Capacidades Windows conservadas | PARCIAL | PASS en pruebas locales; servicios externos individuales NO PROBADOS |
+| PROJECT-01 | Identidad compartida Nexus/montaje | Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales | PARCIAL | PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE |
+| PROJECT-02 | Relación asset_id/media_id/clip_id/track_id/job_id/conversation_id | Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales | PARCIAL | PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE |
+| PROJECT-03 | Guardado atómico y backup recuperable | Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales | PARCIAL | PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE |
+| PROJECT-04 | Historial persistente; abrir y cerrar | Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales | PARCIAL | PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE |
+| PROJECT-05 | Medios ausentes y revinculación | Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales | PARCIAL | PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE |
+| PROJECT-06 | Paquete portable completo y reimportación | Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales | PARCIAL | PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE |
+| EDIT-01 | Operaciones reales Kotlin | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| EDIT-02 | Lotes atómicos y un paso de deshacer | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| EDIT-03 | Revisión obsoleta y duplicados tras reconexión | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| EDIT-04 | Deshacer transacción del agente frente a edición manual posterior | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| EDIT-05 | Foco y selección derivados de ChangeSet | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| EDIT-06 | Microsegundos, ripple, vínculos y pistas bloqueadas | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| EDIT-07 | Miniaturas, formas de onda y silencios | Motor Cortex JVM en el mismo host Windows | PARCIAL | PASS dominio e integración; caché y silencios Windows requieren más validación |
+| RENDER-01 | Visor y exportación con el mismo compositor | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| RENDER-02 | Vídeo multipista y mezcla de audio | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| RENDER-03 | Color, título, fades y transición | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| RENDER-04 | Keyframes y velocidades racionales | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| RENDER-05 | LUT y HDR | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| RENDER-06 | Cola, cancelación y reinicio de exportaciones | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| RENDER-07 | Reproducción interactiva de grandes montajes | Compositor Windows usa evaluadores Kotlin. Visor se prepara como vídeo local | PARCIAL | PASS composición pequeña y cancelación. LUT/HDR PENDIENTES; audio evaluado por fotograma, no certificado a nivel de muestra |
+| UX-01 | Una ventana con medios, montaje y agente | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-02 | Paneles plegables, redimensionables y distribución recordada | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-03 | Selección, arrastre, zoom y atajos | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-04 | Chat completo sin montaje | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-05 | Cerebro rápido y ajustes accesibles | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-06 | Tarjetas compactas/equilibradas/amplias y atribución | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-07 | Visores, tipografía, movimiento reducido y accesibilidad | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| UX-08 | Lienzo, referencias y agrupación de resultados | UI existente conservada; Montaje y selector de cerebro añadidos | PARCIAL | PASS montaje básico; persistencia de tamaños, menús contextuales y paridad visual total PENDIENTES |
+| GEN-01 | Resultado disponible en proyecto sin reimportación manual | Biblioteca del proyecto conectada a import_media; colocación explícita | PARCIAL | PASS colocación local y conservación; cadena de generación externa no probada |
+| GEN-02 | Colocar al cabezal o después de un clip | Biblioteca del proyecto conectada a import_media; colocación explícita | PARCIAL | PASS colocación local y conservación; cadena de generación externa no probada |
+| GEN-03 | Varios resultados en orden y pista/modo | Biblioteca del proyecto conectada a import_media; colocación explícita | PARCIAL | PASS colocación local y conservación; cadena de generación externa no probada |
+| GEN-04 | Resultado tardío no modifica otro proyecto | Biblioteca del proyecto conectada a import_media; colocación explícita | PARCIAL | PASS colocación local y conservación; cadena de generación externa no probada |
+| GEN-05 | Deshacer colocación conserva original y no repite generación | Biblioteca del proyecto conectada a import_media; colocación explícita | PARCIAL | PASS colocación local y conservación; cadena de generación externa no probada |
+| ANDROID-01 | SAF y content URI | Equivalente funcional Windows necesario; API Android no es portable | ESPECÍFICO DE ANDROID | API específica excluida individualmente; equivalentes parcialmente verificados |
+| ANDROID-02 | ContentProvider por firma | Equivalente funcional Windows necesario; API Android no es portable | ESPECÍFICO DE ANDROID | API específica excluida individualmente; equivalentes parcialmente verificados |
+| ANDROID-03 | Media3/ContentResolver/ParcelFileDescriptor | Equivalente funcional Windows necesario; API Android no es portable | ESPECÍFICO DE ANDROID | API específica excluida individualmente; equivalentes parcialmente verificados |
+| ANDROID-04 | Servicios y notificaciones | Equivalente funcional Windows necesario; API Android no es portable | ESPECÍFICO DE ANDROID | API específica excluida individualmente; equivalentes parcialmente verificados |
+| RELEASE-01 | Instalación y trazabilidad | Paquete sin datos privados; activación aplazada por encargos reales processing | PARCIAL | PENDIENTE activación y validación con perfil real |
+
+El JSON paralelo contiene referencias, dependencias, adaptación y aceptación de cada fila. No se marca EXISTENTE VERIFICADO por mera presencia de clases o controles.

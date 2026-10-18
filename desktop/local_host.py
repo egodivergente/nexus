@@ -44,6 +44,7 @@ MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif'
         '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
         '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
         '.pdf': 'application/pdf', '.txt': 'text/plain', '.md': 'text/markdown',
+        '.json':'text/plain', '.py':'text/plain', '.js':'text/plain', '.sh':'text/plain', '.ps1':'text/plain',
         '.csv': 'text/csv', '.html': 'text/html', '.srt': 'text/plain', '.zip': 'application/zip'}
 
 
@@ -105,6 +106,8 @@ def agent_host():
             _agent = AgentHost(ROOT, DATA, windows_keys, write_secret)
             from native_operations import NativeOperations
             _agent.native = NativeOperations(DATA, _agent, read_state, write_state, provider_request, windows_keys)
+            from corte_host import CorteHost
+            _agent.corte = CorteHost(ROOT, DATA, _agent.native)
     return _agent
 
 
@@ -448,6 +451,8 @@ def dispatch(keys, operation, args):
                 _, source = native.asset(asset['id'], assets)
                 archive.write(source, 'media/'+asset['id']+source.suffix)
         return {'url': '/media/'+identifier, 'name': project['name']+'.zip', 'assets': len(assets)}
+    if operation == 'corte':
+        return agent_host().corte.run(args)
     if operation == 'nativeOperation':
         if OFFLINE_QA and args.get('operation') in {'web_search', 'read_web_page', 'connect_mcp_server', 'call_mcp_tool', 'atlas_get_balance', 'diagnose_flow', 'repair_flow', 'recover_generation'}:
             raise ValueError('Laboratorio: operación de red bloqueada.')
@@ -477,8 +482,8 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '1.9.5-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
-                'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
+                'version': '2026.10.18-corte-preview.1', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
             return {'status': 'unavailable', 'checked_at': 0}
@@ -826,7 +831,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.5-agent-desktop'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.18-corte-preview.1'}),
         encoding='utf-8',
     )
     if options.headless:

@@ -50,7 +50,7 @@ class AgentHost:
     def save_settings(self, args):
         settings = self.settings()
         fields = {'backend', 'region', 'modelId', 'mode', 'maxTokens', 'sendImages',
-                  'excludedFamilies', 'endpoint', 'temperature', 'projectId', 'perTurnUsd', 'dailyUsd', 'perTurnCalls'}
+                  'excludedFamilies', 'endpoint', 'temperature', 'projectId', 'perTurnUsd', 'dailyUsd', 'perTurnCalls', 'brainProfile', 'limits'}
         settings.update({k: v for k, v in args.items() if k in fields})
         import re
         from urllib.parse import urlsplit
@@ -63,26 +63,32 @@ class AgentHost:
             raise ValueError('URL del proxy no valida.')
         if not re.fullmatch(r'[a-z]{2}(-[a-z]+)+-\d', str(settings['region'])):
             raise ValueError('Region de AWS no valida.')
-        if settings['backend'] not in {'direct', 'proxy'} or settings['mode'] not in {'ASSISTANT', 'COPILOT', 'AGENT'}:
+        if settings['backend'] not in {'direct', 'proxy', 'profile', 'anthropic', 'openai', 'antigravity'} or settings['mode'] not in {'ASSISTANT', 'COPILOT', 'AGENT'}:
             raise ValueError('Modo no valido.')
         settings['endpoint'] = endpoint
-        settings['maxTokens'] = max(256, min(32000, int(settings['maxTokens'])))
+        settings['maxTokens'] = max(1, int(settings['maxTokens']))
         for field in ('perTurnUsd', 'dailyUsd'):
             if field in settings:
                 import math
                 value = float(settings[field])
-                if not math.isfinite(value) or value <= 0:
-                    raise ValueError('El límite de consumo debe ser mayor que cero.')
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError('El límite de consumo no puede ser negativo.')
                 settings[field] = value
         if 'perTurnCalls' in settings:
-            settings['perTurnCalls'] = max(1, min(64, int(settings['perTurnCalls'])))
+            settings['perTurnCalls'] = max(0, int(settings['perTurnCalls']))
         secret = self.read_secret(self.data / 'credentials.dpapi')
-        for key in ('accessKey', 'secretKey', 'sessionToken', 'token'):
+        profile = settings.get('brainProfile') or {}
+        if args.get('brainProfile'):
+            profiles = dict(settings.get('brainProfiles') or {})
+            profiles[profile['id']] = profile
+            settings['brainProfiles'] = profiles
+        for key in ('accessKey', 'secretKey', 'sessionToken', 'token', 'apiKey', 'brainKey'):
             if key in args:
+                stored_key = ('brain:'+profile['id']) if key == 'brainKey' and profile.get('id') else ('api:'+settings['backend']) if key == 'apiKey' else key
                 if str(args[key]).strip():
-                    secret[key] = str(args[key]).strip()
+                    secret[stored_key] = str(args[key]).strip()
                 elif args.get('clearCredentials'):
-                    secret.pop(key, None)
+                    secret.pop(stored_key, None)
         self.write_secret(self.data / 'credentials.dpapi', secret)
         temporary = self.data / 'settings.json.tmp'
         temporary.write_text(json.dumps(settings, ensure_ascii=False), encoding='utf-8')
@@ -92,6 +98,14 @@ class AgentHost:
     def public_settings(self):
         secret = self.read_secret(self.data / 'credentials.dpapi')
         return {**self.settings(), 'configured': [key for key, value in secret.items() if value]}
+
+    def runtime_secrets(self):
+        secret = dict(self.read_secret(self.data / 'credentials.dpapi'))
+        settings = self.settings()
+        profile = settings.get('brainProfile') or {}
+        secret['apiKey'] = secret.get('api:'+settings['backend'], secret.get('apiKey', ''))
+        secret['brainKey'] = secret.get('brain:'+str(profile.get('id', '')), secret.get('brainKey', ''))
+        return secret
 
     def start(self):
         if self.process and self.process.poll() is None:
@@ -117,7 +131,7 @@ class AgentHost:
             lines.put(None)
         threading.Thread(target=read_lines, daemon=True).start()
         self.exchange('init', {'settings': self.settings(),
-                              'secrets': self.read_secret(self.data / 'credentials.dpapi')})
+                              'secrets': self.runtime_secrets()})
 
     def events(self, owner):
         with self.pending_lock:
@@ -141,10 +155,16 @@ class AgentHost:
     def exchange(self, op, args):
         self.process.stdin.write(json.dumps({'op': op, 'args': args}) + '\n')
         self.process.stdin.flush()
-        deadline = time.monotonic() + (600 if op in {'send', 'rewritePrompt'} else 170)
+        seconds = 600 if op == 'rewritePrompt' else 170
+        if op == 'send':
+            settings = self.settings()
+            limits = settings.get('limits') or {}
+            override = (settings.get('brainProfile') or {}).get('limits') or {} if settings.get('backend') == 'profile' else {}
+            seconds = override.get('turnTimeoutSeconds', limits.get('turnTimeoutSeconds', 600))
+        deadline = time.monotonic() + seconds + 30 if seconds else None
         while True:
             try:
-                line = self.lines.get(timeout=max(0.1, deadline - time.monotonic()))
+                line = self.lines.get(timeout=max(0.1, deadline - time.monotonic()) if deadline else None)
             except queue.Empty:
                 self.close()
                 raise TimeoutError('El asistente ha agotado el tiempo de espera. Comprueba el historial antes de repetir.')
@@ -171,7 +191,7 @@ class AgentHost:
                 self.process.stdin.write(json.dumps(reply) + '\n')
                 self.process.stdin.flush()
                 continue
-            if name not in {'models', 'schema', 'quote', 'submit', 'status', 'cancel', 'history', 'thumbnail'}:
+            if name not in {'models', 'schema', 'quote', 'submit', 'status', 'cancel', 'history', 'thumbnail', 'progress', 'stream', 'uiEvent'}:
                 raise RuntimeError('Operacion del motor no admitida.')
             if name == 'submit' and op != 'confirm':
                 submission = response.get('args') or {}
@@ -215,7 +235,7 @@ class AgentHost:
             op = args.get('op', 'snapshot')
             body = dict(args.get('args') or {})
             allowed = {'snapshot', 'send', 'new', 'mode', 'project', 'createProject', 'memory',
-                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference', 'rewritePrompt', 'importAssets', 'deleteLibrary', 'restoreHistory', 'projectNote'}
+                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference', 'rewritePrompt', 'importAssets', 'deleteLibrary', 'restoreHistory', 'projectNote', 'validateBrain', 'discoverBrain', 'testBrain', 'validateLimits'}
             if op not in allowed:
                 raise ValueError('Operacion no admitida.')
             if op == 'importReferences':
@@ -232,12 +252,28 @@ class AgentHost:
                     if not path.is_file():
                         raise ValueError('El archivo importado ya no está disponible.')
             if op == 'settings':
+                if body.get('limits') is not None:
+                    check = self.exchange('validateLimits', {'limits': body['limits']})
+                    if check.get('problems'):
+                        raise ValueError('; '.join(check['problems']))
+                if body.get('brainProfile') is not None:
+                    check = self.exchange('validateBrain', {'profile': body['brainProfile']})
+                    if check.get('problems'):
+                        raise ValueError('; '.join(check['problems']))
                 body = {'settings': self.save_settings(body),
-                        'secrets': self.read_secret(self.data / 'credentials.dpapi')}
+                        'secrets': self.runtime_secrets()}
             elif op in {'mode', 'project'}:
                 self.save_settings({'mode': body['mode']} if op == 'mode' else {'projectId': body.get('id', '')})
             if op == 'send':
                 body['runtimeSettings'] = self.settings()
+                project_id = body['runtimeSettings'].get('projectId')
+                if getattr(self, 'corte', None) and project_id:
+                    self.corte.run({'method':'create_project', 'project_id':project_id, 'name':project_id})
+                    current=self.corte.run({'method':'read_project', 'project_id':project_id})
+                    self.corte.agent_context={**current, 'agent_transaction_id':None}
+                    body['text']=str(body.get('text',''))+'\n\nEstado explícito del montaje Corte (datos): '+json.dumps({k:current[k] for k in ('project_id','revision','playhead_us','selection')})
+                elif getattr(self, 'corte', None):
+                    self.corte.agent_context=None
             result = self.exchange(op, body)
             if op == 'createProject':
                 self.save_settings({'projectId': result.get('projectId', '')})

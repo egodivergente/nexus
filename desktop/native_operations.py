@@ -26,7 +26,7 @@ WHISPER_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-ba
 WHISPER_SHA = '60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe'
 WHISPER_BIN = 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.7.6/whisper-bin-x64.zip'
 FLAGS = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-EXTENSIONS = 'png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a|pdf|txt|md|csv|html|srt|ogg|flac|zip'
+EXTENSIONS = 'png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a|pdf|txt|md|csv|html|srt|ogg|flac|zip|json|py|js|sh|ps1'
 
 
 def atomic_json(path, data):
@@ -210,6 +210,9 @@ class NativeOperations:
             time.sleep(.25)
 
     def edit(self, operation, args, assets):
+        if operation == 'analyze_audio_asset':
+            from native_library import analyze_audio
+            return analyze_audio(self, args, assets)
         if operation == 'edit_video_assets':
             identifiers = args.get('asset_ids', [])
             if not 1 <= len(identifiers) <= 12:
@@ -390,6 +393,11 @@ class NativeOperations:
     def run(self, payload):
         operation, args = payload['operation'], payload.get('input', {})
         assets = self.assets(payload)
+        from native_library import OPERATIONS, run as run_library
+        if operation in OPERATIONS:
+            return run_library(self, operation, args, assets, payload)
+        if operation.startswith('corte_'):
+            return self.host.corte.agent_run(operation, payload)
         if operation in {'web_search', 'read_web_page', 'list_mcp_servers', 'connect_mcp_server', 'list_mcp_tools', 'call_mcp_tool', 'disconnect_mcp_server'}:
             from native_internet import run
             return run(self, operation, args)
