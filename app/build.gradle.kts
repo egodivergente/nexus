@@ -1,10 +1,79 @@
 import java.util.Properties
+import java.io.FileInputStream
+import java.security.KeyStore
+import java.security.MessageDigest
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+// One machine-local configuration shared by every LLM/IDE using this Gradle user home.
+// The file and keystores stay outside the repository. CI writes the same format from
+// encrypted GitHub Actions secrets before invoking Gradle.
+val nexusSigningPropertiesFile = (project.findProperty("nexusSigningFile") as String?)
+    ?.let(::file)
+    ?: file("${System.getProperty("user.home")}/.gradle/nexus-signing.properties")
+val nexusSigningProperties = Properties().apply {
+    if (nexusSigningPropertiesFile.isFile) {
+        nexusSigningPropertiesFile.inputStream().use(::load)
+    }
+}
+
+fun nexusSigningProperty(identity: String, name: String): String? =
+    nexusSigningProperties.getProperty("nexus.$identity.$name")?.trim()?.takeIf(String::isNotEmpty)
+
+fun nexusSigningStore(identity: String): File? = nexusSigningProperty(identity, "storeFile")
+    ?.replace("${'$'}{user.home}", System.getProperty("user.home"))
+    ?.let(::file)
+
+val nexusExpectedSigningFingerprints = mapOf(
+    "main" to "287a0c42d49c672ef61fc789af44584f5cab9a54f0e1ae4aa1332af4a4bab0f9",
+    "agent" to "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127"
+)
+
+val verifyNexusSigning = tasks.register("verifyNexusSigning") {
+    group = "verification"
+    description = "Checks that Nexus APK variants use the established signing identities."
+    doLast {
+        check(nexusSigningPropertiesFile.isFile) {
+            "Nexus signing config is missing at ${nexusSigningPropertiesFile.absolutePath}. See docs/ANDROID-SIGNING.md."
+        }
+        nexusExpectedSigningFingerprints.forEach { (identity, expectedFingerprint) ->
+            val store = nexusSigningStore(identity)
+            check(store != null && store.isFile) {
+                "Nexus '$identity' keystore is missing. See docs/ANDROID-SIGNING.md."
+            }
+            val storePassword = nexusSigningProperty(identity, "storePassword")
+                ?: error("Nexus '$identity' keystore password is missing from the local signing config.")
+            val keyAlias = nexusSigningProperty(identity, "keyAlias")
+                ?: error("Nexus '$identity' key alias is missing from the local signing config.")
+            val keyPassword = nexusSigningProperty(identity, "keyPassword")
+                ?: error("Nexus '$identity' key password is missing from the local signing config.")
+
+            val keyStore = sequenceOf("PKCS12", "JKS").firstNotNullOfOrNull { type ->
+                runCatching {
+                    KeyStore.getInstance(type).apply {
+                        FileInputStream(store).use { load(it, storePassword.toCharArray()) }
+                    }
+                }.getOrNull()
+            } ?: error("Nexus '$identity' keystore could not be opened; check its local configuration.")
+            val certificate = keyStore.getCertificate(keyAlias)
+                ?: error("Nexus '$identity' keystore does not contain the configured alias.")
+            check(keyStore.getKey(keyAlias, keyPassword.toCharArray()) != null) {
+                "Nexus '$identity' key password is incorrect."
+            }
+            val actualFingerprint = MessageDigest.getInstance("SHA-256")
+                .digest(certificate.encoded)
+                .joinToString("") { "%02x".format(it) }
+            check(actualFingerprint.equals(expectedFingerprint, ignoreCase = true)) {
+                "Nexus '$identity' signing certificate does not match the established app identity."
+            }
+        }
+        logger.lifecycle("Nexus signing identities verified (main + agent).")
+    }
 }
 
 android {
@@ -38,6 +107,20 @@ android {
         }
     }
 
+    signingConfigs {
+        create("nexusMain") {
+            storeFile = nexusSigningStore("main")
+            storePassword = nexusSigningProperty("main", "storePassword")
+            keyAlias = nexusSigningProperty("main", "keyAlias")
+            keyPassword = nexusSigningProperty("main", "keyPassword")
+        }
+        create("nexusAgent") {
+            storeFile = nexusSigningStore("agent")
+            storePassword = nexusSigningProperty("agent", "storePassword")
+            keyAlias = nexusSigningProperty("agent", "keyAlias")
+            keyPassword = nexusSigningProperty("agent", "keyPassword")
+        }
+    }
     buildTypes {
         create("offlineQa") {
             initWith(getByName("debug"))
@@ -46,6 +129,7 @@ android {
             isDebuggable = true
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "OFFLINE_QA", "true")
+            signingConfig = signingConfigs.getByName("nexusMain")
         }
         // Instalación de prueba JUNTO a la Nexus actual (otro paquete, otros datos): no la sustituye ni
         // necesita su firma. No comparte claves ni historial con com.vidadomu.nexus.
@@ -55,9 +139,11 @@ android {
             versionNameSuffix = "-preview"
             isDebuggable = true
             matchingFallbacks += listOf("debug")
+            signingConfig = signingConfigs.getByName("nexusAgent")
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("nexusMain")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -65,6 +151,7 @@ android {
         }
         debug {
             // Keep stable package ID
+            signingConfig = signingConfigs.getByName("nexusMain")
         }
     }
     compileOptions {
@@ -95,6 +182,13 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.all { it.maxHeapSize = "64m" }
+    }
+}
+
+// Never let the Android plugin silently fall back to a host-generated debug key.
+tasks.configureEach {
+    if (name.matches(Regex("^(assemble|bundle|package|install)(Debug|Release|OfflineQa|AgentPreview)(?:[A-Z].*)?$"))) {
+        dependsOn(verifyNexusSigning)
     }
 }
 
