@@ -24,6 +24,8 @@ nexus.agent.keyPassword=<existing key password>
 
 Keep that file and both keystores private to the account that runs Gradle. If an LLM runs Gradle under a different Windows/Linux user, give that user the same existing keystores and local config; do not generate a replacement key. A different local config path can be selected with `-PnexusSigningFile=<path>`.
 
+The Windows user profile also has a separate shared signing identity for future Android projects. Its Gradle init script assigns it automatically to new Android app projects with no existing release signer. This NEXUS project opts out with `codexSigningManagedByProject=true` because its installed stable and agent package IDs already have separate established certificates. Reuse the shared profile for new projects; preserve any installed app's existing certificate.
+
 GitHub Actions reads the same identities from encrypted repository secrets: `NEXUS_MAIN_KEYSTORE_B64`, `NEXUS_AGENT_KEYSTORE_B64`, `NEXUS_MAIN_STORE_PASSWORD`, `NEXUS_MAIN_KEY_PASSWORD`, `NEXUS_AGENT_STORE_PASSWORD`, and `NEXUS_AGENT_KEY_PASSWORD`. The workflow builds both the stable and agent-preview APKs and runs the same certificate checks before packaging.
 
 Run `./gradlew :app:verifyNexusSigning` to check the local setup without building an APK. Never install an APK merely because it compiled; the signing check proves identity continuity, not that the build is newer than a device's installed app.
