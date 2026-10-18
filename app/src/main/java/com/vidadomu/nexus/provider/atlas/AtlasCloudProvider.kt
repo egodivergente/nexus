@@ -59,6 +59,14 @@ internal object AtlasUploadResponseParser {
     }
 }
 
+internal fun atlasReportedProgress(data: JsonObject): Float? {
+    for (key in listOf("progress", "percentage", "percent")) {
+        val raw = (data[key] as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull() ?: continue
+        return com.vidadomu.nexus.agent.core.media.normalizedProviderProgress(raw, percentage = key != "progress")
+    }
+    return null
+}
+
 class AtlasCloudProvider(
     private val okHttpClient: OkHttpClient,
     private val secureStorage: SecureStorage,
@@ -202,12 +210,7 @@ class AtlasCloudProvider(
                 val rawPredictionId = (dataObj["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
                 val statusStr = (dataObj["status"] as? JsonPrimitive)?.contentOrNull?.lowercase() ?: "processing"
-                val serverProgress = listOf("progress", "percentage", "percent")
-                    .firstNotNullOfOrNull { key ->
-                        (dataObj[key] as? JsonPrimitive)?.contentOrNull?.toFloatOrNull()
-                    }
-                    ?.let { raw -> if (raw > 1f) raw / 100f else raw }
-                    ?.coerceIn(0f, 1f)
+                val serverProgress = atlasReportedProgress(dataObj)
                 val initialOutputs = mutableListOf<GenerationOutput>()
                 val outputsArray = dataObj["outputs"] as? JsonArray
                 if (outputsArray != null) {
@@ -315,12 +318,7 @@ class AtlasCloudProvider(
                 val jsonElement = json.parseToJsonElement(respBody).jsonObject
                 val dataObj = (jsonElement["data"] as? JsonObject) ?: jsonElement
                 val statusStr = (dataObj["status"] as? JsonPrimitive)?.contentOrNull?.lowercase() ?: "processing"
-                val serverProgress = listOf("progress", "percentage", "percent")
-                    .firstNotNullOfOrNull { key ->
-                        (dataObj[key] as? JsonPrimitive)?.contentOrNull?.toFloatOrNull()
-                    }
-                    ?.let { raw -> if (raw > 1f) raw / 100f else raw }
-                    ?.coerceIn(0f, 1f)
+                val serverProgress = atlasReportedProgress(dataObj)
 
                 val outputs = mutableListOf<GenerationOutput>()
                 val outputsArray = dataObj["outputs"] as? JsonArray
@@ -364,7 +362,7 @@ class AtlasCloudProvider(
                     progress = when (newStatus) {
                         GenerationStatus.COMPLETED -> 1f
                         GenerationStatus.FAILED, GenerationStatus.CANCELLED -> job.progress
-                        else -> serverProgress ?: job.progress
+                        else -> serverProgress
                     },
                     completedAt = if (newStatus == GenerationStatus.COMPLETED || newStatus == GenerationStatus.FAILED) System.currentTimeMillis() else null,
                     error = errorMessage,

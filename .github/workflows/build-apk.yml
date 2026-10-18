@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55
 
     steps:
       - name: Check out project
@@ -32,7 +32,7 @@ jobs:
       - name: Build debug APK
         run: |
           set -o pipefail
-          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee -a gradle.log
+          ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process :app:assembleDebug :app:assembleAgentPreview 2>&1 | tee -a gradle.log
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
@@ -41,10 +41,54 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      - name: Upload Agent APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-agent-preview-apk
+          path: app/build/outputs/apk/agentPreview/*.apk
+          if-no-files-found: error
+
       - name: Run unit tests
         run: |
           set -o pipefail
-          ./gradlew --no-daemon test 2>&1 | tee -a gradle.log
+          ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process test :app:assembleOfflineQa :app:assembleOfflineQaAndroidTest 2>&1 | tee -a gradle.log
+
+      - name: Enable KVM for isolated UI tests
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run presentation UI tests (offline fixtures)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 2048M
+          # API35 defaults to a 6G userdata partition; runner had 3.8G left after build.
+          # These six offline fixtures need only the app, tests and nine small PNGs.
+          disk-size: 2048M
+          disable-animations: true
+          script: |
+            ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process :app:connectedOfflineQaAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.vidadomu.nexus.assistant.AssistantPresentationUiTest
+            mkdir -p ui-evidence
+            adb pull /sdcard/Android/data/com.vidadomu.nexus.qa/files/studio-ux ui-evidence/
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-test-evidence
+          path: |
+            agent-core/build/test-results/
+            app/build/test-results/
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+            ui-evidence/
+            gradle.log
+          if-no-files-found: warn
 
       - name: Show Gradle errors
         if: failure()

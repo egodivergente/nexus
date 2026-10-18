@@ -100,7 +100,7 @@ class UiAuditScreenshotsTest {
                             "modelo-opciones" -> ModelOptionsScreen(CatalogModelGroup("ui-audit", "GPT Image", listOf(model)), emptySet(), {}, {})
                             "biblioteca" -> LibraryScreen({})
                             "visor" -> OutputViewerScreen(id, {}, {})
-                            "asistente", "proyecto" -> AssistantScreen({}, {}, {}, assistant)
+                            "asistente", "proyecto" -> AssistantScreen(onOpenInCanvas = {}, onNavigateToOutput = {}, onOpenSettings = {}, vm = assistant)
                             "ajustes" -> SettingsScreen({})
                             "flow" -> FlowCreateScreen({}, {})
                             "comparacion" -> ComparisonScreen(comparison, {}, {})

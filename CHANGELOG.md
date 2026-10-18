@@ -2,6 +2,13 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.38-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido (fusión de `aki/personalizacion-estudio-20261017`)
+- Tarjetas de encargo Compactas / Equilibradas / Amplias a elección del usuario, con logos conservados; sección «Tu espacio de creación» en Ajustes del asistente.
+- Actividad animada durante la generación (activable; se apaga con las animaciones del sistema o fuera de primer plano) y porcentaje solo si el proveedor lo informa de verdad (Atlas y proveedores propios rechazan valores fuera de rango; Flow y el simulado no muestran porcentaje falso).
+- Visor de imagen dentro de Nexus para las que el agente trae al chat (pellizco, doble toque, Ajustar).
+
 ## [1.9.37-agent] - 2026-10-18 · «Horizonte»
 
 ### Añadido
