@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.44-agent] - 2026-10-18 · «Horizonte»
+
+- Ajustes del asistente (aportado por el agente de Termux, punto 5): los filtros de proveedor del Cerebro van en una sola fila deslizable en lugar de varias líneas.
+
 ## [1.9.43-agent] - 2026-10-18 · «Horizonte»
 
 - Biblioteca: se pueden importar archivos de hasta 4 GB (antes el límite era 512 MB y el fallo era silencioso); si un archivo falla, el aviso dice el motivo.
