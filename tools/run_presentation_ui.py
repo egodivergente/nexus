@@ -57,6 +57,11 @@ def main():
     if len(app) != 1 or len(test) != 1: raise ValueError("Expected exact QA APK pair: " + repr(apks))
     adb("install", "-r", "-t", str(app[0]))
     adb("install", "-r", "-t", str(test[0]))
+    # Cold bytecode verification under emulator load can consume Android's startup deadline.
+    # Compile the same APKs ahead of launch, without relaxing ANR or test timeouts.
+    for package in [PACKAGE, PACKAGE + ".test"]:
+        compiled = adb("shell", "cmd", "package", "compile", "-m", "speed", "-f", package)
+        if "Success" not in compiled.stdout: raise RuntimeError("Ahead-of-time compilation failed: " + package)
     registered = adb("shell", "pm", "list", "instrumentation").stdout
     if RUNNER not in registered or "target=" + PACKAGE not in registered: raise ValueError("QA runner not registered")
     result = adb("shell", "am", "instrument", "-w", "-r", "-e", "class", SUITE, RUNNER, check=False)

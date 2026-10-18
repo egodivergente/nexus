@@ -108,9 +108,9 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          target: google_apis
+          target: default
           profile: pixel_6
-          ram-size: 2048M
+          ram-size: 4096M
           disable-animations: true
           script: python3 tools/run_presentation_ui.py
       - name: Upload UI test evidence
