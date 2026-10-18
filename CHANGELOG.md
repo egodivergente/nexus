@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.40-agent] - 2026-10-18 · «Horizonte»
+
+- Biblioteca (aportado por el agente de Termux): insignia de duplicados exactos, filtro de origen con nombre completo, botón de búsqueda visible y detalles de miniatura ocultos con menos de 3 columnas. La cabecera de día sigue sin ser fija (la cuadrícula no lo admite).
+
 ## [1.9.39-agent] - 2026-10-18 · «Horizonte»
 
 ### Añadido

@@ -309,9 +309,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     }})}
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
                 timeline.forEach {(day,entries) ->
-                    // Cabecera fija al desplazarse: se queda arriba mientras dura ese día en pantalla.
-                    stickyHeader(key="header:$day") {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                        modifier=Modifier.fillMaxWidth().background(ScreenBackground).padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
+                    item(key="header:$day",span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                        modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     items(entries,key={it.key}) {entry ->
                         when(entry) {
                             is LibraryEntry.Local -> {
