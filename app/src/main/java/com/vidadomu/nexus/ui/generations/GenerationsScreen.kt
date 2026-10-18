@@ -120,9 +120,16 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
             } else LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=NexusTokens.space24)) {
                 val dayFormat=SimpleDateFormat("EEEE d MMMM",Locale("es","ES"))
                 filteredJobs.groupBy {dayFormat.format(Date(it.startedAt))}.forEach { (day,dayJobs) ->
-                    item(key="day-$day") {Text(day.replaceFirstChar {it.titlecase()},
-                        Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),
-                        style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+                    // Total de gasto del día: solo trabajos completados con coste real conocido en €.
+                    val dayTotalUsd=dayJobs.filter {it.status==GenerationStatus.COMPLETED}
+                        .mapNotNull {it.actualCostUsd?.takeIf {c->c.isFinite() && c>=0}}.sum()
+                    item(key="day-$day") {Row(Modifier.fillMaxWidth()
+                        .padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),
+                        horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+                        Text(day.replaceFirstChar {it.titlecase()},style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        if(dayTotalUsd>0) Text("Total: ${currencyManager.formatCost(dayTotalUsd)}",
+                            style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                    }}
                     val rows=if(statusFilter=="COMPARISONS") dayJobs.map {HistoryRow.Job(it)} else groupFailedRuns(dayJobs,expandedRuns)
                     items(rows,key={it.key}) {row ->
                       if(row is HistoryRow.Header) {
@@ -153,6 +160,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                             if(expanded) TextButton(onClick={comparisonId=id},modifier=Modifier.padding(horizontal=NexusTokens.screenMargin)) {Text("Ver comparativa",color=TextSecondary)}
                         } else GenerationSummaryRow(job,currencyManager,
                             onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
+                            onRetry={onPrepareAgain(job)},
                             menu={ close ->
                                 if(job.parameters["__tracking_paused"]=="true") DropdownMenuItem(text={Text("Recuperar seguimiento")},onClick={close();scope.launch {
                                     val recovered=app.generationRepository.pollJob(job.id,refreshFailed=true)
