@@ -116,13 +116,19 @@ class AssistantPresentationUiTest {
         try {
             val media = Attachment("fixture", Uri.fromFile(file).toString(), "image/png", "Plano de prueba")
             fixture { Text("Chat conservado"); AssistantMediaPreview(media) }
-            compose.onNodeWithText("Ampliar imagen").performClick()
+            compose.onNodeWithText("Ampliar imagen").performTouchInput { click() }
             compose.onNodeWithContentDescription("Cerrar imagen ampliada").assertIsDisplayed()
             compose.onNodeWithText("Ajustar").assertIsDisplayed()
+            compose.onNodeWithText("Pellizca o toca dos veces para ampliar").assertIsDisplayed()
+            val dialogBounds = compose.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
+            val adjust = compose.onNodeWithText("Ajustar").fetchSemanticsNode()
+            // Use un-clipped coordinates: boundsInWindow alone could hide a cropped footer.
+            val adjustTop = adjust.positionInWindow.y
+            assertTrue("Adjust must be fully inside the dialog", adjustTop >= dialogBounds.top && adjustTop + adjust.size.height <= dialogBounds.bottom)
             awaitImagePixels(compose.onNodeWithContentDescription("Plano de prueba"), 96 / 255f, 132 / 255f, 164 / 255f)
             screenshot("foreground-image", dialog = true)
-            compose.onNodeWithText("Ajustar").performClick()
-            compose.onNodeWithContentDescription("Cerrar imagen ampliada").performClick()
+            compose.onNodeWithText("Ajustar").performTouchInput { click() }
+            compose.onNodeWithContentDescription("Cerrar imagen ampliada").performTouchInput { click() }
             compose.onNodeWithText("Chat conservado").assertIsDisplayed()
             compose.onNodeWithText("Ampliar imagen").assertIsDisplayed()
         } finally { file.delete() }

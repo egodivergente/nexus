@@ -46,7 +46,10 @@ private fun AssistantImageForeground(media: Attachment, onClose: () -> Unit) {
     var scale by remember(media.uri) { mutableFloatStateOf(1f) }
     var offset by remember(media.uri) { mutableStateOf(Offset.Zero) }
     var imageState by remember(media.uri) { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // Compose 1.7 measures a full-width dialog using screenHeightDp. With target 35 that
+    // includes system bars: fitting decor as well clips the footer. Let safeDrawingPadding
+    // below own the insets, so both the close button and Adjust stay inside the window.
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {

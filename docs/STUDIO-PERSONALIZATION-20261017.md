@@ -62,3 +62,14 @@ La revisión/firma sigue pendiente de estas nuevas capturas y de su CI.
 El filtro Mock sin porcentaje se aplica a las tarjetas actuales del agente.
 Los paneles heredados de Historial/visor, Biblioteca y Comparación quedan fuera
 del rediseño, así como Nexus Desktop.
+
+## Visor en Android 15: pie recortado
+
+CI 39090853625: cinco pruebas UI pasan; el nuevo assertIsDisplayed de Ajustar
+falla. Las capturas de tarjetas/actividad ya están completas. Se mantiene la
+aserción: la acción existía semánticamente pero su pie no era visible.
+Compose 1.7 mide Dialog con screenHeightDp; con target35 incluye las barras.
+El visor ahora usa decorFitsSystemWindows=false y mantiene safeDrawingPadding
+como único responsable de los insets. Se comprueba texto del pie, botón completo
+dentro del diálogo y apertura/Ajustar/cierre mediante toques, no solo acciones
+semánticas. Arreglo pendiente de nuevo CI y captura, no instalado en S25.
