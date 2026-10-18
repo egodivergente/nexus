@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.47-agent] - 2026-10-18 · «Índigo»
+
+- Corrige el cierre al abrir la app en la 1.9.46: una expresión de las plantillas de proveedores no era válida en Android y fallaba al cargar el proveedor BytePlus.
+
 ## [1.9.46-agent] - 2026-10-18 · «Índigo»
 
 - Nuevo proveedor de medios BytePlus (ModelArk) con Seedance 2.0 y 2.0 Fast (texto o imagen a vídeo) y Seedream 5.0 Pro (imagen y edición). Usa la misma clave y el mismo saldo que el cerebro BytePlus; los IDs de modelo se pueden cambiar en Ajustes → Proveedores.

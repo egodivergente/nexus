@@ -167,7 +167,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt",
-    "sha256": "1ea1900f6ccc3229b6a2089038be2a21501e2b5be1810dabe29a53031239b929"
+    "sha256": "20e00f98aebe0d0ab7ad0b7a3454776be4905d157fcd2fceeb24153ed8af20e1"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/orders/OrderBook.kt",
