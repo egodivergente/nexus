@@ -53,28 +53,14 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process test :app:assembleOfflineQa :app:assembleOfflineQaAndroidTest 2>&1 | tee -a gradle.log
 
-      - name: Enable KVM for isolated UI tests
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Run presentation UI tests (offline fixtures)
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+      - name: Upload prebuilt QA APKs
+        uses: actions/upload-artifact@v4
         with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          profile: pixel_6
-          ram-size: 2048M
-          # API35 defaults to a 6G userdata partition; runner had 3.8G left after build.
-          # These six offline fixtures need only the app, tests and nine small PNGs.
-          disk-size: 2048M
-          disable-animations: true
-          script: |
-            ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process :app:connectedOfflineQaAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.vidadomu.nexus.assistant.AssistantPresentationUiTest
-            mkdir -p ui-evidence
-            adb pull /sdcard/Android/data/com.vidadomu.nexus.qa/files/studio-ux ui-evidence/
+          name: NEXUS-offline-qa-apks
+          path: |
+            app/build/outputs/apk/offlineQa/*.apk
+            app/build/outputs/apk/androidTest/offlineQa/*.apk
+          if-no-files-found: error
 
       - name: Upload test evidence
         if: always()
@@ -96,3 +82,43 @@ jobs:
           test -f gradle.log || exit 0
           msg=$(grep -E "^e: |error:|What went wrong|Could not|FAILED|^> |Exception" gradle.log | head -40 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
           echo "::error title=Gradle::$msg"
+
+  presentation-ui:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v5
+      - name: Download prebuilt QA APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: NEXUS-offline-qa-apks
+          path: qa-apks
+      - name: Verify instrumentation evidence parser
+        run: python3 tools/test_run_presentation_ui.py
+      - name: Enable KVM for isolated UI tests
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          df -h
+      - name: Run presentation UI tests (offline fixtures)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 2048M
+          disable-animations: true
+          script: python3 tools/run_presentation_ui.py
+      - name: Upload UI test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-ui-evidence
+          path: |
+            app/build/outputs/androidTest-results/
+            ui-evidence/
+          if-no-files-found: error
