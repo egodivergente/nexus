@@ -34,8 +34,10 @@ internal class FlowBridgeClient(
     suspend fun status(): Result<FlowBridgeStatus> = guarded {
         // Comprobar el estado vuelve a elegir puente: si AXELPC se encendió o se apagó, se nota aquí.
         pinned = null
+        val chosen = base()
+        val where = if (tagFor(chosen) == HOSTS.first().first) "AXELPC" else "ASUS (respaldo; AXELPC no está listo)"
         requestJson(
-            request = authorizedRequest("${base()}/status").get().build(),
+            request = authorizedRequest("$chosen/status").get().build(),
             decode = { raw ->
                 val payload = json.decodeFromString<StatusPayload>(raw)
                 FlowBridgeStatus(
@@ -48,7 +50,7 @@ internal class FlowBridgeClient(
                         .toSet()
                         .ifEmpty { EXPECTED_OUTPUTS },
                     checkedAt = System.currentTimeMillis(),
-                    detail = statusDetail(payload.reason)
+                    detail = listOfNotNull("Puente: $where.", statusDetail(payload.reason)).joinToString(" ")
                 )
             }
         )
@@ -351,7 +353,8 @@ internal class FlowBridgeClient(
         val primary = HOSTS.first().second
         val ready = withContext(Dispatchers.IO) {
             runCatching {
-                val probe = client.newBuilder().callTimeout(4, java.util.concurrent.TimeUnit.SECONDS).build()
+                // AXELPC tarda 1-3 s en comprobar Flow (abre la página por CDP); con poco margen se caía al ASUS sin motivo.
+                val probe = client.newBuilder().callTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build()
                 probe.newCall(authorizedRequest("$primary/status").get().build()).execute().use { response ->
                     response.isSuccessful && json.decodeFromString<StatusPayload>(response.body?.string().orEmpty()).generationReady
                 }

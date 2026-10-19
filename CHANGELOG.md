@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.51-agent] - 2026-10-19 · «Índigo»
+
+- Flow: Nexus espera hasta 15 s a que AXELPC confirme que está listo (antes 4 s y a veces se iba al ASUS sin sesión). El diagnóstico dice qué puente usa.
+
 ## [1.9.50-agent] - 2026-10-19 · «Índigo»
 
 - El agente de Nexus habla con el agente de Google Flow (flow_agent_send / flow_agent_read): le encarga generaciones en cantidad, colecciones o descargas, lee su respuesta, negocia si pregunta y trae las imágenes y vídeos a la Biblioteca.
