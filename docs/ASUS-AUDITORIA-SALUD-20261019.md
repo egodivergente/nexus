@@ -48,6 +48,18 @@
   En esa ejecución `swapon` no se encontraba porque `/usr/sbin` no estaba en el PATH;
   el script ya lo corrige.
 
+### Cambio aplicado: Home Assistant en reposo (19-10-2026, ejecutado por el usuario)
+
+- La política de reinicio anterior era `unless-stopped`; ahora es `--restart=no`. Se ejecutó
+  `docker stop axel-homeassistant` y el estado quedó en `Exited (137)`: no se cerró en los
+  10 s de margen y Docker lo terminó a la fuerza. La próxima vez conviene usar `docker stop -t 60`.
+- Resultado: memoria disponible de **724 → 1780 MB** y swap usado de 1115 → 734 MB.
+- No se borró nada: configuración, integración «Conga» y automatización intactas.
+- Para despertarlo: `sudo docker start axel-homeassistant`. Para volver a dejarlo siempre
+  encendido: `sudo docker update --restart=unless-stopped axel-homeassistant`.
+- Mientras está parado, la app oficial de la Conga sigue funcionando; solo dejan de funcionar
+  la voz y la automatización que dependen de Home Assistant.
+
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
 navegador mientras está inactivo (ver «Chromium en reposo»), y decidir
