@@ -27,10 +27,13 @@
   en disco; 5,9 GB en total) y `Committed_AS` de 7,8 GB frente a un `CommitLimit` de 8,0 GB,
   casi en el límite. `swappiness=60`. En el momento de la medida no había presión de memoria;
   la presión de E/S era moderada (avg300 del 7 %).
-- **Un `python3` de root ocupa 963 MB** y lleva 18 días en marcha (PID 1680): es el mayor
-  consumidor de RAM y **no se sabe qué es**. Además: un `node` de `vidal` (88 MB, 18 días;
-  probablemente Desktop Commander, cuya conexión no responde) y un `python3` de otro
-  usuario, `axel-br…` (52 MB, 11 días).
+- **Procesos de larga duración identificados** (`ps` y `systemctl status` del 19-10):
+  - PID 1680, 963 MB: **Home Assistant** (`python3 -m homeassistant --config /config`)
+    en un contenedor Docker. Es el mayor consumidor de RAM.
+  - PID 2150, 64–88 MB: **Desktop Commander** remoto (`axel-commander-0.2.51`), en marcha
+    pero sin una conexión que responda.
+  - PID 1481590, 41–52 MB: **`axel-bridge.service`** («AXEL authenticated durable
+    agent», `/opt/axel-agent/server.py`), activo desde el 08-10.
 - No había procesos de Gradle ni de Kotlin activos.
 - Falta la segunda mitad del informe (servicios, puertos, discos, temperatura y batería).
   En esa ejecución `swapon` no se encontraba porque `/usr/sbin` no estaba en el PATH;
@@ -38,8 +41,8 @@
 
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
-navegador mientras está inactivo (ver «Chromium en reposo»), e identificar o retirar el
-`python3` de 963 MB.
+navegador mientras está inactivo (ver «Chromium en reposo»), y decidir
+si Home Assistant se queda en esta máquina o se ajusta.
 
 ## Hardware conocido
 
@@ -59,6 +62,8 @@ navegador mientras está inactivo (ver «Chromium en reposo»), e identificar o 
 | 1 | **Compilación Gradle** de Android y del motor de escritorio (JDK 17 en `~/aki/toolchain/jdk17`, SDK 35, copias en `~/builds`) | Varios `BUILD SUCCESSFUL` de 7 a 24 min; trabajos cancelados por falta de RAM (`20261006T043115Z`, `…043740Z`); empaquetado abortado por swap y espera de E/S (09-10); SSH casi inaccesible con unos 150 MiB libres | **No.** Es su peor tarea: con 3,7 GB Gradle + Kotlin necesitan casi toda la RAM y acaban en swap. Ya existen alternativas mejores: AXELPC (prioridad 1 en `AGENTS.md`) y **GitHub Actions** (`.github/workflows/build-apk.yml` ya compila la APK en cada push). |
 | 2 | **Clave de firma** de las APK instaladas (`~/.android/debug.keystore`, certificado `8b75db0f…cd7127`) | `docs/HISTORIAL-NAVEGACION-199-20261016.md`; AXELPC tuvo que volver a firmar con la clave del ASUS | **No debería depender solo de él.** Si ese disco falla, el S25 y el Pixel no podrán actualizarse sin borrar datos. Algunos documentos dicen que hay una copia en Windows, pero esto no se ha verificado. Hay que guardar una copia cifrada y comprobada en AXELPC y otra sin conexión, nunca en Git. |
 | 3 | **Sesión persistente de Google Flow**: Chromium en Xvfb, portal de recuperación noVNC (`nexus-flow-recovery.service`, `100.112.57.2:8899`), puente que usa la app Android (`bridge_status=connected`, `generation_ready=true` el 09-10) | `tools/flow-linux-probe/README.md`, `docs/ANDROID-STALLED-JOBS-20261009.md` | **Sí: es la función que mejor le encaja.** Pide pocos recursos si es lo único que hace (pico medido de 500 MiB a 1 GiB), necesita una máquina siempre encendida y ya está desplegada. |
+| 3b | **Home Assistant** en Docker (963 MB) | `ps` del 19-10 | Encaja como servicio siempre encendido, pero compite con Flow por la RAM. Conviene ajustar el *recorder* y las integraciones, o moverlo a un equipo dedicado (por ejemplo, una Raspberry Pi o un HA Green). Lo decide el usuario. |
+| 3c | `axel-bridge` y Desktop Commander remoto (~100 MB entre los dos) | `ps` y `systemctl` del 19-10 | Ligeros. Mantenerlos; Desktop Commander necesita reiniciarse porque su conexión no responde. |
 | 4 | Ejecutar pruebas JVM y Python del puente | Pruebas de recuperación y autenticación en el ASUS | Solo las del propio puente de Flow, que son ligeras. Las de la app y de `agent-core`, en AXELPC, el Pixel o Actions. |
 | 5 | Restos de pruebas: perfil de sondeo de Playwright, credencial cifrada con caducidad de 24 h (06-10), copias en `~/builds`, cachés de Gradle | `flow-linux-probe/README.md`, `build-agent-asus.py` | **No.** La credencial ya habrá caducado y el inicio de sesión desatendido falló (Google lo rechazó). Lo demás ocupa disco y, si quedan *daemons* activos, también RAM. |
 
