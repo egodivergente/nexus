@@ -60,6 +60,48 @@
 - Mientras está parado, la app oficial de la Conga sigue funcionando; solo dejan de funcionar
   la voz y la automatización que dependen de Home Assistant.
 
+### Medidas directas por Desktop Commander (19-10-2026, 22:34)
+
+Desktop Commander volvió a conectar tras `systemctl --user restart desktop-commander-remote`,
+ejecutado por el usuario.
+
+- **Disco**: Seagate ST500LT012, un **HDD de 5400 rpm** (`ROTA=1`) de 500 GB. Usados 34 GB (8 %).
+  Hay también un pendrive USB de 3,8 GB conectado (`sdb`). Esto explica las esperas de E/S
+  cuando entraba en swap.
+- **Swap**: zram de 1,9 GB con prioridad 100 y partición `sda3` de 4 GB con prioridad -2.
+  El orden ya es el correcto.
+- **Temperaturas**: CPU 44 °C y PCH 40 °C. Sin problemas.
+- **Batería**: **0 %, «Not charging»**, con el cargador conectado. Salud del 79 %
+  (26,1 de 33,2 Wh) y 266 ciclos. No sirve como reserva ante un corte de luz; si está hinchada,
+  hay que retirarla físicamente.
+- **Sin escritorio gráfico**: solo `getty@tty1`. No hay nada que quitar en este punto.
+- **Servicios AXEL activos** (sistema): `axel-adb`, `axel-awake`, `axel-bridge`, `axel-devices`,
+  `axel-home`, `axel-lamp-link`, `axel-lamp-panel` y `axel-taildrop`. Del usuario:
+  `axel-tv-bridge`, `nexus-flow-recovery` y `desktop-commander-remote`. Además, un túnel SSH
+  al Pixel (`~/aki/bin/pixel-ssh-tunnel.py`). Cada uno ocupa menos de 90 MB; ninguno ha fallado.
+- **Chromium de Flow**: lo lanza `nexus-flow-recovery` (`login.py --persistent`, desde las 18:48).
+  La pestaña estaba en **`https://flow.google.com/about`, la portada pública: la sesión de
+  Google estaba cerrada**, y la portada, con sus vídeos y animaciones, era lo que consumía la CPU.
+
+### Cambio aplicado: pestaña de Flow en blanco (22:35, por el agente)
+
+Se llevó esa pestaña a `about:blank` con Playwright por CDP (`page.goto`), sin cerrar el
+navegador. La sesión ya estaba cerrada, así que no se perdió nada.
+
+| | Antes | Después (~1 min) |
+|---|---|---|
+| CPU inactiva | ~58 % (renderer al 67 %, GPU al 17 %) | **98,5 %** |
+| `cpu some` avg10 | ~84 % | **7,7 %** (bajando) |
+| RAM de Chromium | ~1,5 GB | **529 MB** |
+| RAM disponible | 1780 MB (tras parar Home Assistant) | **2339 MB** |
+
+Mejora frente al inicio de la auditoría: memoria disponible de **724 → 2339 MB**, y la CPU pasa
+de saturada a estar casi en reposo.
+
+Pendiente: para usar Flow hay que volver a iniciar sesión con el portal de recuperación. Cuando
+haya un proyecto abierto, el consumo volverá a subir; de ahí el plan de «Chromium en reposo»
+(congelar la pestaña o dejarla ligera entre usos).
+
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
 navegador mientras está inactivo (ver «Chromium en reposo»), y decidir
@@ -74,7 +116,8 @@ si Home Assistant se queda en esta máquina o se ajusta.
 | RAM | 3,8 GB, zram de 2 GB + swap hasta 5,9 GB | `audit.sh` 19-10 |
 | SO | Debian 13, kernel 6.12, Python 3.13, Chromium 154 | `audit.sh`, `flow-linux-probe/README.md` |
 | Acceso | SSH `vidal@100.112.57.2` por Tailscale | `AGENTS.md`, `build-agent-asus.py` |
-| Disco (SSD/HDD), batería, temperatura | **pendiente** (segunda mitad del informe) | `audit.sh` |
+| Disco | HDD Seagate de 5400 rpm, 500 GB (8 % usado) | DC 19-10 |
+| Batería | 0 %, no carga, salud del 79 %, 266 ciclos | DC 19-10 |
 
 ## Funciones que tiene hoy en el ecosistema
 
@@ -161,7 +204,7 @@ Ordenadas por impacto esperado en una máquina de 3,7 GB:
 6. **Actualizaciones**: activar `unattended-upgrades` solo para seguridad, pero **retener
    Chromium** (`apt-mark hold`) y actualizarlo a mano junto a `gflow-cli`, porque una actualización
    sin control puede romper el puente.
-7. **Hardware**: si `audit.sh` confirma que el disco es un HDD, cambiarlo por un SSD SATA barato es la
+7. **Hardware**: el disco **es un HDD de 5400 rpm**, así que cambiarlo por un SSD SATA barato es la
    mejora más notable. Ampliar la RAM a 8 GB, si tiene ranura libre, es la segunda.
 
 Ninguna de estas acciones se ha ejecutado. Todas requieren acceso al ASUS y, en las que borran
