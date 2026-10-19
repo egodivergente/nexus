@@ -327,3 +327,17 @@ cualquier otro motivo); no se insistirá mientras Google muestre el aviso de int
   «Inicio», «Fin» e «Intercambiar».
 - Aprendido: el chip «Agente» del compositor es un interruptor; una sonda lo desactivó por error en el
   proyecto del gato y se restauró al momento. Las sondas guardan ahora su estado inicial y lo restauran.
+
+### Prueba del Pixel 8 Pro como navegador de Flow (2026-10-20, 01:10, solo lectura)
+
+- El Pixel (Android 17, cargando, al 100 %) está conectado al ASUS por ADB inalámbrico (`axel-adb`). Con
+  `adb forward tcp:9333 localabstract:chrome_devtools_remote`, el ASUS controla por CDP el Chrome del
+  teléfono (Chrome 155) **con la pantalla apagada**: abre pestañas, carga Flow y lee el DOM.
+- En el Pixel, Flow ya tenía la sesión iniciada, pero **con otra cuenta de Google** («Vidala Dominga»): el
+  proyecto del ASUS da 404, no aparece la insignia ULTRA y no existe el chip «Agente». La interfaz está en
+  inglés, con los mismos componentes (`Settings trigger`, `Start generation`, `What do you want to create?`).
+- Para usarlo como puente haría falta: iniciar sesión en ese Chrome con la cuenta Ultra; que el puente acepte
+  otro endpoint CDP (el del `adb forward`); selectores en inglés y en español; y que el ADB inalámbrico
+  sobreviva a los reinicios del teléfono. La ventaja esperada, no comprobada, es una sesión de Google más
+  estable, porque va ligada a la cuenta del propio Android.
+- Al terminar se cerró la pestaña de Flow del Pixel y se quitó el `adb forward`.
