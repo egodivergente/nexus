@@ -377,7 +377,11 @@ class NativeOperations:
                 text = extract_pdf(path)
                 if text is not None:
                     format_name, payload = 'txt', text.encode('utf-8')
-            return {'format': format_name, 'name': re.sub(r'[^\w -]', ' ', args.get('name', 'Documento'))[:100], 'bytes': base64.b64encode(payload).decode()}
+            result={'format': format_name, 'name': re.sub(r'[^\w -]', ' ', args.get('name', 'Documento'))[:100], 'bytes': base64.b64encode(payload).decode()}
+            if format_name=='pdf' and args.get('render_pdf'):
+                from document_reader import render_pdf
+                result.update(render_pdf(path))
+            return result
         if operation == 'video':
             info = self.inspect(path)
             frames = []

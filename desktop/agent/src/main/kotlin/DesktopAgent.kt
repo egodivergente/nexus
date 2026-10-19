@@ -157,8 +157,15 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             val response = callback("thumbnail", encoded(attachment)).jsonObject
             ContentBlock.Image(response.text("format"), Base64.getDecoder().decode(response.text("bytes")))
         }, documents = AttachmentDocumentLoader { attachment ->
-            val response = callback("document", encoded(attachment)).jsonObject
-            ContentBlock.Document(response.text("format"), response.text("name"), Base64.getDecoder().decode(response.text("bytes")))
+            val profile=settings["brainProfile"]?.jsonObject
+            val responses=settings.text("backend")=="profile" && profile?.text("protocol")=="OPENAI_RESPONSES"
+            val vision=profile?.get("capabilities")?.jsonObject?.get("vision")?.jsonPrimitive?.booleanOrNull==true
+            val response = callback("document", JsonObject(encoded(attachment).jsonObject + ("render_pdf" to JsonPrimitive(responses && vision)))).jsonObject
+            val pages=response["pages"]?.jsonArray.orEmpty().map { page ->
+                val p=page.jsonObject;ContentBlock.Image(p.text("format"),Base64.getDecoder().decode(p.text("bytes")))
+            }
+            require(!responses || response.text("format")!="pdf" || pages.isNotEmpty()) { "Este PDF requiere un cerebro Responses con visión y renderizado local de páginas." }
+            ContentBlock.Document(response.text("format"), response.text("name"), Base64.getDecoder().decode(response.text("bytes")),pages,response.text("coverage").ifBlank { null })
         }, videos = AttachmentVideoLoader { attachment ->
             val response = callback("video", encoded(attachment)).jsonObject
             response["frames"]!!.jsonArray.flatMap { element ->

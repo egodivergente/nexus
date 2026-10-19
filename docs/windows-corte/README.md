@@ -2,7 +2,7 @@
 
 **Estado del encargo: PARCIAL. Esta entrega no acredita la paridad completa solicitada.**
 
-Versión de aplicación: `2026.10.19-corte-preview.3`. Referencia Nexus Android:
+Versión de aplicación: `2026.10.19-corte-preview.4`. Referencia Nexus Android:
 `8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6` (1.9.39/vc73). Corte compartido:
 `5869228ae887a439fc522c2cbf76c13e29a143b2`. Se volvió a consultar GitHub y se observó
 `ffc4d0ffb1311ac8eed1b3ec806089d6a6562d41`, que cambia únicamente la lista de métodos
@@ -58,9 +58,9 @@ caché. Falta implantar un presupuesto global y política de expulsión para esa
 En AXELPC, JDK 17, Gradle 9.1.0, Kotlin 2.3.20, un trabajador y sin compilaciones
 paralelas entre módulos (JVM con SerialGC y dos procesadores lógicos visibles):
 
-- Suites JVM: 227 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
-  almacenamiento. Base sin red: 322 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
-  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 326; las cuatro llamadas reales corresponden a la validación anterior.
+- Suites JVM: 228 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
+  almacenamiento. Base sin red: 323 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
+  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 327; las cuatro llamadas reales corresponden a la validación anterior.
 - Aceptación Windows con archivos reales y perfil aislado: importar, duplicar, dividir,
   colores, foco/selección, undo/redo, reapertura, lote inválido, doble envío tras reinicio,
   revisión obsoleta, edición manual posterior, exportación de 8 s con audio, cancelación,
@@ -232,3 +232,23 @@ herramientas del PC, ni visión/documentos/razonamiento específico.
 
 La evidencia con auditoría de llamadas está en `outputs/windows-corte/byteplus-pc-live.json`
 (fuera de Git). No se repitió la inferencia real después del resultado satisfactorio.
+
+## PDF visual para Responses — preview 4
+
+El host detecta si un PDF requiere visión (imagen incrustada, gráfico vectorial, escaneo o página sin texto).
+En perfiles Responses con visión, PDFium prepara imágenes JPEG de sus primeras ocho páginas,
+con lado máximo de 1280 píxeles, en un proceso local limitado a 30 segundos. Se adjuntan al
+modelo en orden, con cobertura explícita; más de ocho páginas se identifica como LECTURA
+PARCIAL. El original se conserva. La extracción de texto sigue siendo la ruta de los PDF
+completamente textuales. Los demás proveedores conservan su ruta previa.
+
+La dependencia `pypdfium2>=5,<6` forma parte de `requirements-media.txt` / `setup-media.ps1`.
+Si falta o un PDF no puede prepararse, se comunica el fallo. Un perfil Responses sin visión
+no recibe un mensaje que aparente haber leído un escaneo. No se soporta aquí elegir un
+intervalo posterior al de las primeras ocho páginas ni se certifica todo tipo de PDF.
+
+`test-byteplus-documents.py` prueba transporte real JVM/host con servidor local, PDF textual,
+PDF visual, imagen, límites de páginas y conservación. La prueba `--live` usa BytePlus,
+razonamiento enabled/low, fixtures sintéticos y un relé local que solo registra metadatos
+seleccionados. No registra claves, imágenes codificadas ni contenido de razonamiento.
+La aceptación externa de esta corrección se registrará por separado.
