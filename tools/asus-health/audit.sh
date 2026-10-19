@@ -6,6 +6,8 @@
 set -u
 LC_ALL=C
 export LC_ALL
+# swapon, smartctl, etc. viven en sbin y no están en el PATH de un usuario normal.
+PATH="$PATH:/usr/sbin:/sbin"
 
 section() { printf '\n===== %s =====\n' "$1"; }
 run() { command -v "${1%% *}" >/dev/null 2>&1 && eval "$1" 2>&1 || echo "(no disponible: ${1%% *})"; }
@@ -29,12 +31,14 @@ cat /proc/sys/vm/swappiness
 run "cat /proc/pressure/memory"
 run "cat /proc/pressure/io"
 grep -E 'MemAvailable|Committed_AS|CommitLimit' /proc/meminfo
-echo "-- OOM recientes (7 días):"
+echo "-- OOM recientes (7 dias):"
 run "journalctl --user -q --since '-7d' | grep -ci 'oom\\|out of memory'"
 run "journalctl -k -q --since '-7d' 2>/dev/null | grep -i 'out of memory\\|oom-kill' | tail -5"
 
 section "Procesos por RSS (top 15)"
 ps -eo pid,user,rss,pcpu,etime,comm --sort=-rss | head -16
+echo "-- Linea de comandos de los 5 mayores:"
+ps -eo pid,user,args --sort=-rss | head -6 | cut -c1-220
 
 section "Procesos por CPU (top 10)"
 ps -eo pid,user,pcpu,rss,etime,comm --sort=-pcpu | head -11

@@ -2,24 +2,55 @@
 
 ## Qué se pudo comprobar
 
-- **Acceso en vivo: NO.** Desktop Commander mostraba `ASUSVIDAL` como *Online*, pero
+- **Acceso directo desde la sesión: NO.** Desktop Commander mostraba `ASUSVIDAL` como *Online*, pero
   rechazó los comandos («no live connection»). Desde esta sesión en la nube no hay
   Tailscale y `100.112.57.2:22` no responde. Por eso no hay medidas actuales de RAM,
-  disco, temperatura ni servicios.
+  disco, temperatura ni servicios tomadas por el agente; el usuario ejecutó después
+  `audit.sh` (ver «Medidas en vivo»).
 - **Sí se revisó** todo lo que el repositorio documenta sobre el ASUS (README de
   `tools/flow-linux-probe`, `tools/flow-bridge`, notas de compilación en `docs/`,
   `CONTINUAR.md`, `AGENTS.md`). Lo que sigue se basa en esas evidencias, que tienen fecha.
 - **Para completar la auditoría**: ejecutar `tools/asus-health/audit.sh`, que es
   solo de lectura (ver más abajo), y analizar su salida.
 
+## Medidas en vivo (19-10-2026, 22:10, `audit.sh` ejecutado por el usuario, salida parcial)
+
+- **Equipo**: ASUS X540LA (BIOS X540LA.203), Intel Core i3-4005U (Haswell, 2 núcleos
+  y 4 hilos, 1,7 GHz sin turbo), 3,8 GB de RAM, Debian 13 y kernel 6.12. Llevaba 18 días encendido.
+- **CPU saturada**: carga de 3,3 a 6,4 en 4 hilos y *pressure* `cpu some` del ~84 % sostenido
+  (avg10, avg60 y avg300). Siempre hay procesos esperando CPU.
+- **El causante es el Chromium de Flow**: su renderer promedia el 87 % de un hilo y el proceso
+  GPU el 12,5 % desde que arrancó (3 h 21 min). Funciona en Xvfb (1280×800×24) con
+  `--enable-gpu-rasterization` y no hay GPU real, así que todo el dibujado se hace por
+  software en la CPU. RAM de Chromium + Xvfb: ~1,5 GB.
+- **Memoria justa**: 724 MB disponibles, 1,1 GB en swap (zram de 2 GB con zstd, más swap
+  en disco; 5,9 GB en total) y `Committed_AS` de 7,8 GB frente a un `CommitLimit` de 8,0 GB,
+  casi en el límite. `swappiness=60`. En el momento de la medida no había presión de memoria;
+  la presión de E/S era moderada (avg300 del 7 %).
+- **Un `python3` de root ocupa 963 MB** y lleva 18 días en marcha (PID 1680): es el mayor
+  consumidor de RAM y **no se sabe qué es**. Además: un `node` de `vidal` (88 MB, 18 días;
+  probablemente Desktop Commander, cuya conexión no responde) y un `python3` de otro
+  usuario, `axel-br…` (52 MB, 11 días).
+- No había procesos de Gradle ni de Kotlin activos.
+- Falta la segunda mitad del informe (servicios, puertos, discos, temperatura y batería).
+  En esa ejecución `swapon` no se encontraba porque `/usr/sbin` no estaba en el PATH;
+  el script ya lo corrige.
+
+**Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
+solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
+navegador mientras está inactivo (ver «Chromium en reposo»), e identificar o retirar el
+`python3` de 963 MB.
+
 ## Hardware conocido
 
 | Dato | Valor | Fuente |
 |---|---|---|
-| RAM | ~3,7 GB | `AGENTS.md` |
-| SO | Debian, Python 3.13, Chromium 154 | `flow-linux-probe/README.md` |
+| Modelo | ASUS X540LA | `audit.sh` 19-10 |
+| CPU | i3-4005U, 2 núcleos y 4 hilos, 1,7 GHz | `audit.sh` 19-10 |
+| RAM | 3,8 GB, zram de 2 GB + swap hasta 5,9 GB | `audit.sh` 19-10 |
+| SO | Debian 13, kernel 6.12, Python 3.13, Chromium 154 | `audit.sh`, `flow-linux-probe/README.md` |
 | Acceso | SSH `vidal@100.112.57.2` por Tailscale | `AGENTS.md`, `build-agent-asus.py` |
-| CPU, disco (SSD/HDD), batería, temperatura | **desconocido** | lo obtiene `audit.sh` |
+| Disco (SSD/HDD), batería, temperatura | **pendiente** (segunda mitad del informe) | `audit.sh` |
 
 ## Funciones que tiene hoy en el ecosistema
 
@@ -64,6 +95,23 @@ Tu idea es buena, siempre que se cumplan estas reglas:
 5. **Nada más en la máquina**: ni compilaciones ni pruebas pesadas de Gradle. `AGENTS.md`
    ya lo deja como último recurso; pasaría a «nunca, salvo petición expresa».
 
+### Chromium en reposo
+
+La medida del 19-10 muestra que la pestaña de Flow, aunque nadie la mire, gasta casi un hilo
+entero: dentro de Xvfb la página siempre cuenta como visible y Chromium nunca la frena.
+Opciones, de menos a más trabajo:
+
+1. Dejar la pestaña en una página ligera (la lista de proyectos o `about:blank` en otra
+   pestaña) en vez de un proyecto con vídeos o animaciones. Las cookies de sesión no se pierden
+   mientras el navegador siga abierto.
+2. Congelar la página por CDP cuando no se usa (`Page.setWebLifecycleState frozen`) y
+   descongelarla al recibir un trabajo o al hacer el *keep-alive*.
+3. Probar `--disable-gpu` en lugar de `--enable-gpu-rasterization` (sin GPU, el dibujado
+   por software de Skia suele costar menos que emular GL), con una pantalla de Xvfb más pequeña
+   y menos profundidad de color.
+
+Cada cambio se mide antes y después con `cpu some` y el %CPU del renderer, sin generar nada de pago.
+
 Esto **no está implementado ni probado**: es el plan. El paso 1 requiere cambiar
 `health.py` y el puente para que se conecten por CDP. Hay que hacerlo con pruebas y validarlo sin
 generaciones de pago.
@@ -77,9 +125,8 @@ Ordenadas por impacto esperado en una máquina de 3,7 GB:
 2. **Matar los *daemons* de Gradle o Kotlin** que queden (`gradle --stop`) y borrar
    `~/builds/*` y `~/.gradle/caches`. Si deja de compilar allí, también el SDK de Android, pero
    **antes** hay que sacar la copia del `debug.keystore`.
-3. **zram** (`zram-tools`, zstd, 50 % de la RAM) con `vm.swappiness` alto (100–180). En
-   un equipo con poca RAM, el swap comprimido en memoria evita las esperas de E/S que
-   se vieron, sobre todo si el disco es mecánico.
+3. **zram**: ya existe (2 GB, zstd). Falta darle prioridad sobre el swap en disco y subir
+   `vm.swappiness` a 100–150, para que se use antes el swap comprimido que el disco.
 4. **Limitar el journal** (`SystemMaxUse=200M`) y la caché de disco de Chromium
    (`--disk-cache-size`).
 5. **Batería** (si es un portátil que siempre está enchufado): fijar el umbral de carga en 60–80 % si
