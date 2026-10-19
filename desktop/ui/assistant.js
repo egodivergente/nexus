@@ -189,7 +189,7 @@ async function agentCallback(op,args){
    const plan={model,prompt:args.prompt,values,media};
    const key=args.id,approved=Agent.approved;
    if(model.providerId==='google_flow'){
-    const count=Number(values.count||1);if(!Number.isInteger(count)||count<1||count>20)throw Error('Puedes pedir hasta 20 resultados por encargo.');
+    const count=Number(values.count||1);if(!Number.isInteger(count)||count<1||count>FLOW_DIRECT_MAX_RESULTS)throw Error(`Puedes pedir hasta ${FLOW_DIRECT_MAX_RESULTS} resultados por encargo.`);
     plan.cost={amount:null,currency:'flow_account',time:Date.now(),detail:'Tu cuenta Flow'};
    }else{
     if(!approved||approved.id!==key)throw Error('Falta la confirmacion del plan.');
@@ -211,6 +211,7 @@ async function agentCallback(op,args){
  }
 }
 function agentModelLabel(){return (Agent.settings.modelId||'Modelo conectado').replace(/^us\.|^eu\.|^global\./,'').replace(/^anthropic\./,'').replace(/claude-sonnet-4-6/,'Claude Sonnet 4.6').replace(/claude-opus-4-6/,'Claude Opus 4.6');}
+const FLOW_DIRECT_MAX_RESULTS=20;
 function planOutputCount(plan){const count=Number(plan?.effectiveParams?.count??plan?.params?.count);return Number.isInteger(count)&&count>0?count:1;}
 function planAspect(plan){return plan?.effectiveParams?.aspect||plan?.params?.aspect||plan?.effectiveParams?.aspect_ratio||plan?.params?.aspect_ratio||'Original';}
 function isImagePlan(entry){const plan=entry?.plan;return plan?.modality==='IMAGE'&&Boolean(plan.ref?.providerId&&plan.ref?.modelId);}
@@ -227,11 +228,15 @@ function generationBatches(entries){
  for(const entry of entries){
   const plan=entry.plan;if(claimed.has(plan.id)||!isImagePlan(entry))continue;
   const count=planOutputCount(plan);
-  if(count>1||plan.ref.providerId==='google_flow'){groups.push(makeGenerationBatch('native:'+plan.id,[entry]));claimed.add(plan.id);continue;}
+  if(count>1){groups.push(makeGenerationBatch('native:'+plan.id,[entry]));claimed.add(plan.id);continue;}
   const key=batchIdentity(plan);
-  // Completed orders must never absorb a new request with the same prompt.
+  // The originating turn is durable enough to keep a batch together as jobs settle,
+  // while keeping a later retry with the same prompt separate.
   const anchor=Agent.cardAnchors.get('plan:'+plan.id);
-  const siblings=entries.filter(candidate=>!claimed.has(candidate.plan.id)&&isImagePlan(candidate)&&planOutputCount(candidate.plan)===1&&batchIdentity(candidate.plan)===key&&candidate.state===entry.state&&!jobsForPlan(candidate.plan.id).length&&!jobsForPlan(plan.id).length&&Agent.cardAnchors.get('plan:'+candidate.plan.id)===anchor);
+  const siblings=entries.filter(candidate=>{
+   if(claimed.has(candidate.plan.id)||!isImagePlan(candidate)||planOutputCount(candidate.plan)!==1||batchIdentity(candidate.plan)!==key||Agent.cardAnchors.get('plan:'+candidate.plan.id)!==anchor)return false;
+   return true;
+  });
   if(siblings.length>1){
    const id='group:'+siblings.map(candidate=>candidate.plan.id).sort().join('|');
    groups.push(makeGenerationBatch(id,siblings));siblings.forEach(candidate=>claimed.add(candidate.plan.id));
@@ -260,7 +265,7 @@ function batchStatus(batch){
 function batchCanGenerate(batch){return !batch.jobs.length&&batch.entries.every(entry=>!['SUBMITTED','UNCERTAIN','DISCARDED'].includes(entry.state));}
 function legacyPlanCard(entry,disabled){const p=entry.plan;return `<article class="agent-plan" data-agent-card="plan:${escape(p.id)}"><div class="summary"><h3>${escape(p.modelName)}</h3><span>${escape(planLabels[entry.state]||entry.state)}</span></div><p class="agent-text">${escape(p.prompt)}</p>${promptOriginalHtml(p)}<div class="agent-plan-meta">${Object.entries(p.effectiveParams||{}).map(([k,v])=>`<span>${escape(E.label(k))}: ${escape(v)}</span>`).join('')}</div><p>${escape(p.estimate?.basis||'Coste pendiente')}</p>${(p.warnings||[]).map(w=>`<p class="hint">${escape(w)}</p>`).join('')}<div class="toolbar"><button class="primary" data-agent-generate="${p.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(entry.state)?'disabled':''}>Generar</button><button data-agent-canvas="${p.id}" ${disabled}>Abrir en lienzo</button><button data-agent-edit="${p.id}" ${Agent.busy||['SUBMITTED','UNCERTAIN'].includes(entry.state)?'disabled':''}>Editar</button><button data-agent-discard="${p.id}" ${disabled}>Descartar</button></div></article>`;}
 function generationBatchCard(batch,disabled){
- if(batch.providerId==='google_flow'){
+ if(batch.providerId==='google_flow'&&batch.plan.modality==='VIDEO'){
   const outputs=batchOutputs(batch),status=batchStatus(batch);
   return `<div class="agent-flow-result" data-agent-card="batch:${escape(batch.id)}" data-agent-batch-members="${escape(batch.entries.map(entry=>entry.plan.id).join('|'))}"><p class="agent-flow-status">${escape(status)}${batch.count>1?' · '+outputs.length+' / '+batch.count:''}</p><div class="agent-flow-media">${outputs.map((url,i)=>batch.plan.modality==='VIDEO'?`<div><video src="${escape(url)}" controls playsinline preload="metadata" aria-label="Resultado ${i+1}"></video><a href="${escape(url)}" download>Descargar vídeo</a></div>`:`<a href="${escape(url)}" download aria-label="Descargar resultado ${i+1}"><img src="${escape(url)}" alt="Resultado ${i+1}" loading="lazy" decoding="async"></a>`).join('')}</div></div>`;
  }
@@ -271,18 +276,26 @@ function generationBatchCard(batch,disabled){
  return `<article class="generation-batch-card" data-agent-card="batch:${escape(batch.id)}" data-agent-batch-members="${escape(batch.entries.map(entry=>entry.plan.id).join('|'))}"><div class="generation-batch-header"><span class="generation-batch-label">Generación de imágenes</span><span class="generation-batch-status">${escape(status)}</span></div><div class="generation-batch-chips"><span>${escape(batch.plan.modelName)}</span><span>${escape(providers[batch.providerId]||batch.providerId)}</span><span>${escape(batch.aspect)}</span><span>${escape(batch.cost)}</span><span>${batch.count} imágenes</span></div>${images}<div class="generation-batch-prompt ${expanded?'is-expanded':''}"><span>${escape(prompt)}</span>${canExpand?`<button class="small" data-agent-prompt-toggle="${escape(batch.id)}">${expanded?'Ver menos':'Ver más'}</button>`:''}</div>${promptOriginalHtml(batch.plan)}${batch.plan.warnings?.map(w=>`<p class="hint generation-batch-warning">${escape(w)}</p>`).join('')||''}<div class="generation-batch-actions">${primary}<button class="small" data-agent-batch-edit="${escape(batch.id)}" ${Agent.busy||!canGenerate?'disabled':''}>Editar prompt</button><button class="small" data-agent-batch-regenerate="${escape(batch.id)}" ${disabled}>Regenerar ${batch.count}</button><button class="small" data-agent-batch-canvas="${escape(batch.id)}" ${disabled}>Abrir en lienzo</button></div></article>`;
 }
 function renderGenerationPlans(snapshot,disabled){
- const current=snapshot?.plans||[],saved=[...new Map([...(state.agentConversation?.flowPlans||[]),...(state.agentConversation?.resultPlans||[])].map(e=>[e.plan.id,e])).values()].filter(entry=>!current.some(e=>e.plan.id===entry.plan.id));
+ const current=(snapshot?.plans||[]).filter(entry=>entry?.plan?.id),stored=[...(state.agentConversation?.flowPlans||[]),...(state.agentConversation?.resultPlans||[])].filter(entry=>entry?.plan?.id);
+ const saved=[...new Map(stored.map(entry=>[entry.plan.id,entry])).values()].filter(entry=>!current.some(candidate=>candidate.plan.id===entry.plan.id));
  const entries=[...saved,...current].filter(entry=>entry.state!=='DISCARDED'),{byPlanId}=generationBatches(entries),rendered=new Set();
- return entries.map(entry=>{const batch=byPlanId.get(entry.plan.id);if(!batch)return entry.plan.ref.providerId==='google_flow'?generationBatchCard(makeGenerationBatch('flow:'+entry.plan.id,[entry]),disabled):legacyPlanCard(entry,disabled);if(rendered.has(batch.id))return '';rendered.add(batch.id);return generationBatchCard(batch,disabled);}).join('');
+ return entries.map(entry=>{const batch=byPlanId.get(entry.plan.id);if(!batch)return entry.plan.ref?.providerId==='google_flow'?generationBatchCard(makeGenerationBatch('flow:'+entry.plan.id,[entry]),disabled):legacyPlanCard(entry,disabled);if(rendered.has(batch.id))return '';rendered.add(batch.id);return generationBatchCard(batch,disabled);}).join('');
 }
-function findGenerationBatch(id){return generationBatches((Agent.snapshot?.plans||[]).filter(entry=>entry.state!=='DISCARDED')).groups.find(batch=>batch.id===id);}
-function agentPendingEntries(){return (Agent.snapshot?.plans||[]).filter(e=>e.plan.ref.providerId!=='google_flow'&&!['SUBMITTED','UNCERTAIN','DISCARDED'].includes(e.state)&&!jobsForPlan(e.plan.id).length);}
+function findGenerationBatch(id){return generationBatches((Agent.snapshot?.plans||[]).filter(entry=>entry?.plan?.id&&entry.state!=='DISCARDED')).groups.find(batch=>batch.id===id);}
+function agentPendingEntries(){return (Agent.snapshot?.plans||[]).filter(entry=>entry?.plan?.ref?.providerId&&!isImagePlan(entry)&&!['SUBMITTED','UNCERTAIN','DISCARDED'].includes(entry.state)&&!jobsForPlan(entry.plan.id).length);}
 async function openBatchCanvas(batch,regenerate=false){const p=batch.plan,m=await agentModel(p.ref),supportsCount='count' in (p.params||{})||'count' in (p.effectiveParams||{}),values={...p.params,...(supportsCount?{count:String(batch.count)}:{})};state.draft={modelId:p.ref.modelId,prompt:p.prompt,values,media:agentMedia(p,m)};persist();await openModel(p.ref.modelId,false);if(regenerate)toast(`Lote de ${batch.count} listo para regenerar.`);}
 async function consolidateBatch(batch,prompt=batch.plan.prompt){
- // Editing a group must not invent unsupported count parameters or discard jobs.
+ const canUseNativeFlowBatch=batch.providerId==='google_flow'&&batch.plan.modality==='IMAGE'&&batch.entries.length>1&&batch.count<=FLOW_DIRECT_MAX_RESULTS&&batch.entries.every(entry=>planOutputCount(entry.plan)===1&&!jobsForPlan(entry.plan.id).length&&!['SUBMITTED','UNCERTAIN','DISCARDED'].includes(entry.state));
+ if(canUseNativeFlowBatch){
+  const leader=batch.entries[0].plan,params={...leader.params,count:String(batch.count)};
+  await agentCall('edit',{id:leader.id,prompt,params});
+  for(const entry of batch.entries.slice(1))await agentCall('discard',{id:entry.plan.id});
+  return findGenerationBatch('native:'+leader.id)||findGenerationBatch(batch.id)||batch;
+ }
  for(const entry of batch.entries)if(prompt!==entry.plan.prompt)await agentCall('edit',{id:entry.plan.id,prompt,params:entry.plan.params});
  return findGenerationBatch(batch.id)||batch;
 }
+async function generateGenerationBatch(batch){const merged=await consolidateBatch(batch);await generateAgentEntries(merged.entries);}
 async function generateAgentEntries(entries){
  if(Agent.generating||Agent.busy)return;
  Agent.generating=true;if(view==='assistant')renderAssistant();
@@ -433,7 +446,7 @@ document.addEventListener('click',async e=>{
   for(const action of ['apply','reject','discard'])if(b.dataset['agent'+action[0].toUpperCase()+action.slice(1)])await agentCall(action,{id:b.dataset['agent'+action[0].toUpperCase()+action.slice(1)]});
    if(b.dataset.agentBatchCanvas||b.dataset.agentBatchRegenerate){const batch=findGenerationBatch(b.dataset.agentBatchCanvas||b.dataset.agentBatchRegenerate);if(!batch)throw Error('El lote ya no está disponible.');await openBatchCanvas(batch,Boolean(b.dataset.agentBatchRegenerate));return;}
    if(b.dataset.agentBatchEdit){const batch=findGenerationBatch(b.dataset.agentBatchEdit);if(!batch)throw Error('El lote ya no está disponible.');modal(`<h2>Editar prompt</h2><form id="agent-batch-edit"><input type="hidden" name="batchId" value="${escape(batch.id)}"><label>Prompt<textarea name="prompt">${escape(batch.plan.prompt)}</textarea></label><button class="primary">Guardar</button></form>`);return;}
-   if(b.dataset.agentBatchGenerate){const batch=findGenerationBatch(b.dataset.agentBatchGenerate);if(!batch)throw Error('El lote ya no está disponible.');await generateAgentEntries(batch.entries);return;}
+   if(b.dataset.agentBatchGenerate){const batch=findGenerationBatch(b.dataset.agentBatchGenerate);if(!batch)throw Error('El lote ya no está disponible.');await generateGenerationBatch(batch);return;}
   if(b.dataset.agentCanvas){const p=Agent.snapshot.plans.find(p=>p.plan.id===b.dataset.agentCanvas).plan;
    const m=await agentModel(p.ref);state.draft={modelId:p.ref.modelId,prompt:p.prompt,originalPrompt:p.originalPrompt,values:p.params,media:agentMedia(p,m)};await openModel(p.ref.modelId,false);persist();}
   if(b.dataset.agentEdit){const p=Agent.snapshot.plans.find(p=>p.plan.id===b.dataset.agentEdit).plan,m=await agentModel(p.ref);

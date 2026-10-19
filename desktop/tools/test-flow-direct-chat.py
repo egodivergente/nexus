@@ -51,13 +51,15 @@ with tempfile.TemporaryDirectory(prefix='nexus-flow-direct-') as folder:
               }
               navigate('assistant');
             }""")
-            page.wait_for_selector('.agent-flow-result img')
-            assert page.locator('.agent-flow-result img').count()==20
+            page.wait_for_selector('.generation-batch-card img')
+            assert page.locator('.generation-batch-card img').count()==20
             page.evaluate("""()=>{state.jobs[0].outputs.push('/media/'+'b'.repeat(32)+'.png');refreshJobViews([state.jobs[0].id]);}""" )
-            assert page.locator('.agent-flow-result img').count()==21
+            assert page.locator('.generation-batch-card img').count()==21
             page.evaluate("""()=>{state.jobs[0].outputs.pop();refreshJobViews([state.jobs[0].id]);}""" )
-            assert page.locator('.agent-flow-result img').count()==20
-            assert page.locator('.generation-batch-card,.agent-plan').count()==0
+            assert page.locator('.generation-batch-card img').count()==20
+            assert page.locator('.agent-flow-result').count()==0
+            assert page.locator('.generation-batch-card').count()==20
+            assert page.locator('.agent-plan').count()==0
             assert page.locator('[data-agent-generate],[data-agent-batch-generate]').count()==0
             for width,height in [(1360,900),(480,850),(1280,600)]:
                 page.set_viewport_size({'width':width,'height':height})

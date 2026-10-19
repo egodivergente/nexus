@@ -35,9 +35,9 @@ with tempfile.TemporaryDirectory() as folder:
             }""")
             order=page.locator('.agent-messages > article').all_text_contents()
             assert 'Primera petición' in order[0]
-            assert 'Comentario anterior' in order[1]
-            assert 'Propuesta anterior' in order[2]
-            assert 'Primera respuesta' in order[3]
+            assert 'Primera respuesta' in order[1]
+            assert 'Comentario anterior' in order[2]
+            assert 'Propuesta anterior' in order[3]
             assert 'Segunda respuesta' in order[-1],order
             page.evaluate("Agent.snapshot.plans[0].state='SUBMITTED';renderAssistant()")
             assert page.locator('.agent-messages > article').all_text_contents()[-1].endswith('Segunda respuesta')
