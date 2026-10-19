@@ -159,6 +159,35 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     fun snapshot(): IndexData = data
 
+    /** One atomic insertion; callers remap imported identities and materialize files first. */
+    suspend fun importProject(bundle: IndexData): Project = edit { current ->
+        require(bundle.schemaVersion == 1 && bundle.projects.size == 1 && bundle.projectSessions.isEmpty()) { "Paquete de proyecto incompatible" }
+        val project = bundle.projects.single()
+        fun ids(d: IndexData) = d.projects.map { it.id } + d.scenes.map { it.id } + d.shots.map { it.id } +
+            d.characters.map { it.id } + d.assets.map { it.id } + d.generations.map { it.id }
+        val incoming = ids(bundle)
+        val existingIds=ids(current).toSet()
+        require(incoming.all { it.isNotBlank() } && incoming.distinct().size == incoming.size) { "Identidades repetidas en el paquete" }
+        require(incoming.none { it in existingIds }) { "El proyecto ya existe o sus identidades colisionan" }
+        require(bundle.assets.all { it.projectId == project.id } && bundle.scenes.all { it.projectId == project.id } &&
+            bundle.shots.all { it.projectId == project.id } && bundle.characters.all { it.projectId == project.id } &&
+            bundle.generations.all { it.projectId == project.id }) { "El paquete contiene otro proyecto" }
+        val sceneIds=bundle.scenes.map { it.id }.toSet()
+        val shotIds=bundle.shots.map { it.id }.toSet()
+        val characterIds=bundle.characters.map { it.id }.toSet()
+        val assetIds=bundle.assets.map { it.id }.toSet()
+        val generationIds=bundle.generations.map { it.id }.toSet()
+        fun String?.belongsTo(ids: Set<String>) = this == null || this in ids
+        require(bundle.assets.all { it.sceneId.belongsTo(sceneIds) && it.shotId.belongsTo(shotIds) &&
+            it.generationId.belongsTo(generationIds) && it.parentAssetId.belongsTo(assetIds) && it.characterIds.all { id -> id in characterIds } } &&
+            bundle.shots.all { it.sceneId.belongsTo(sceneIds) } && bundle.characters.all { it.referenceAssetIds.all { id -> id in assetIds } } &&
+            bundle.generations.all { it.parentGenerationId.belongsTo(generationIds) && it.shotId.belongsTo(shotIds) &&
+                (it.referenceAssetIds+it.outputAssetIds).all { id -> id in assetIds } }) { "Faltan relaciones del proyecto o tienen un tipo incorrecto" }
+        current.copy(projects=current.projects+bundle.projects,scenes=current.scenes+bundle.scenes,
+            shots=current.shots+bundle.shots,characters=current.characters+bundle.characters,
+            assets=current.assets+bundle.assets,generations=current.generations+bundle.generations) to project
+    }
+
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
         persist(next)

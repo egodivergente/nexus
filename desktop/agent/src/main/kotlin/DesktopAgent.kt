@@ -18,6 +18,10 @@ import kotlinx.serialization.json.*
 
 private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 private val input = System.`in`.bufferedReader()
+private val callbackReplies=java.util.concurrent.LinkedBlockingQueue<JsonObject>()
+@Volatile private var activeRequestId=""
+private val protocolOutput=Any()
+private fun emit(value: JsonObject) = synchronized(protocolOutput) { println(value) }
 private fun JsonObject.text(key: String, fallback: String = "") = this[key]?.jsonPrimitive?.contentOrNull ?: fallback
 private inline fun <reified T> encoded(value: T) = json.encodeToJsonElement(value)
 private fun obj(vararg pairs: Pair<String, JsonElement>) = JsonObject(pairs.toMap())
@@ -45,8 +49,11 @@ private fun markdownHtml(text: String) = ChatMarkdown.parse(text).joinToString("
 
 // Private stdin/stdout protocol; the Windows host services bounded callbacks.
 private fun callback(op: String, args: JsonElement = JsonObject(emptyMap())): JsonElement {
-    println(obj("callback" to JsonPrimitive(op), "args" to args))
-    val reply = json.parseToJsonElement(input.readLine() ?: error("Host disconnected")).jsonObject
+    emit(obj("callback" to JsonPrimitive(op), "args" to args, "requestId" to JsonPrimitive(activeRequestId)))
+    val reply = try { callbackReplies.take() } catch(e: InterruptedException) {
+        throw kotlinx.coroutines.CancellationException("Turno detenido").also { it.initCause(e) }
+    }
+    if(reply["cancelled"]?.jsonPrimitive?.booleanOrNull==true) throw kotlinx.coroutines.CancellationException("Turno detenido")
     if (reply["ok"]?.jsonPrimitive?.boolean != true) error(reply.text("error", "Host operation failed"))
     return reply["value"] ?: JsonNull
 }
@@ -331,6 +338,8 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             }
             "reload" -> { skills = loadSkills(); deps = deps(); orchestrator = makeOrchestrator() }
             "snapshot" -> Unit
+            "importProjectBundle" -> assets.importProject(json.decodeFromJsonElement<IndexData>(args.getValue("index")))
+            "validateProjectBundle" -> AssetIndex(null).importProject(json.decodeFromJsonElement<IndexData>(args.getValue("index")))
             "importAssets" -> args["assets"]!!.jsonArray.forEach { element ->
                 val asset = json.decodeFromJsonElement<Asset>(element)
                 if (assets.asset(asset.id) == null) assets.addAsset(asset) else assets.updateAsset(asset.id) { asset }
@@ -344,16 +353,38 @@ private class DesktopRuntime(private val root: File, private val data: File) {
     }
 }
 
-fun main(args: Array<String>) = runBlocking {
+fun main(args: Array<String>) {
     val runtime = DesktopRuntime(File(args[0]), File(args[1]).also { it.mkdirs() })
+    val worker=java.util.concurrent.atomic.AtomicReference<Thread?>()
+    val cancelled=java.util.concurrent.atomic.AtomicBoolean(false)
     while (true) {
         val line = input.readLine() ?: break
-        try {
-            val request = json.parseToJsonElement(line).jsonObject
-            val result = runtime.command(request.text("op"), request["args"]?.jsonObject ?: JsonObject(emptyMap()))
-            println(obj("ok" to JsonPrimitive(true), "value" to result))
-        } catch (e: Exception) {
-            println(obj("ok" to JsonPrimitive(false), "error" to JsonPrimitive(Redactor.redact(e.message ?: "Error del agente"))))
+        val request=runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull() ?: continue
+        if(request.text("op")=="__cancel") {
+            if(request.text("requestId")==activeRequestId && worker.get()!=null) {
+                cancelled.set(true)
+                callbackReplies.offer(obj("ok" to JsonPrimitive(false),"cancelled" to JsonPrimitive(true),"error" to JsonPrimitive("Turno detenido")))
+                worker.get()?.interrupt()
+            }
+            continue
         }
+        if("op" !in request) {
+            if(worker.get()!=null && request.text("requestId")==activeRequestId) callbackReplies.offer(request)
+            continue
+        }
+        if(worker.get()!=null) { emit(obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive("El agente está ocupado")));continue }
+        val id=request.text("requestId");activeRequestId=id;callbackReplies.clear();cancelled.set(false)
+        val thread=Thread({
+            val reply=try {
+                val result=runBlocking { runtime.command(request.text("op"),request["args"]?.jsonObject ?: JsonObject(emptyMap())) }
+                obj("ok" to JsonPrimitive(true),"value" to result)
+            } catch(e: Exception) {
+                obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive(if(cancelled.get()) "Turno detenido por el usuario. Las operaciones ya enviadas conservan su estado." else Redactor.redact(e.message ?: "Error del agente")))
+            }
+            activeRequestId="";worker.set(null)
+            emit(JsonObject(reply + ("requestId" to JsonPrimitive(id))))
+        },"nexus-command")
+        worker.set(thread);thread.start()
     }
+    worker.get()?.interrupt()
 }

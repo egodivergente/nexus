@@ -83,6 +83,21 @@ class CorteDesktop(private val root: File) {
             }))
         }
         val id = a.s("project_id"); val target = file(id)
+        if (op == "validate_document" || op == "import_document") {
+            val source=cj.decodeFromJsonElement<CorteDocument>(a.getValue("document"))
+            require(source.schema == 1) { "Esquema de montaje incompatible" }
+            val next=source.copy(project=source.project.copy(id=id),receipts=emptyMap())
+            com.vidadomu.corte.storage.ProjectCodec.decode(com.vidadomu.corte.storage.ProjectCodec.encode(next.project))
+            require(next.undo.size<=100 && next.redo.size<=100) { "Historial de montaje demasiado grande" }
+            val mediaIds=next.project.media.map { it.id }.toSet()
+            require(mediaIds.size==next.project.media.size) { "Medios repetidos en el montaje" }
+            val timelines=listOf(next.project.timeline)+(next.undo+next.redo).flatMap { listOf(it.before,it.after) }
+            require(timelines.all { timeline -> timeline.allTracks.all { track -> track.clips.all { it.kind==ClipKind.TEXT || it.mediaId in mediaIds } } }) { "El montaje referencia un medio no incluido" }
+            (next.undo+next.redo).forEach { require(TimelineValidator.violations(it.before).isEmpty() && TimelineValidator.violations(it.after).isEmpty()) { "Historial de montaje inconsistente" } }
+            if(op=="validate_document") return buildJsonObject { put("ok",true) }
+            if(target.exists()) { require(load(id)==next) { "El montaje de destino ya existe" };return result(next) }
+            save(next);return result(next)
+        }
         if (op == "create_project") {
             if (target.exists()) return result(load(id))
             val now = System.currentTimeMillis()
@@ -93,6 +108,7 @@ class CorteDesktop(private val root: File) {
             save(d); return result(d)
         }
         val d = load(id)
+        if (op == "export_document") return buildJsonObject { put("ok",true);put("document",cj.encodeToJsonElement(d)) }
         if (op == "read_project") return result(d)
         if (op == "render_samples") {
             val source=a["render_project"]?.let { cj.decodeFromJsonElement<Project>(it) } ?: d.project

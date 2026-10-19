@@ -2,7 +2,7 @@
 
 **Estado del encargo: PARCIAL. Esta entrega no acredita la paridad completa solicitada.**
 
-Versión de aplicación: `2026.10.18-corte-preview.2`. Referencia Nexus Android:
+Versión de aplicación: `2026.10.19-corte-preview.3`. Referencia Nexus Android:
 `8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6` (1.9.39/vc73). Corte compartido:
 `5869228ae887a439fc522c2cbf76c13e29a143b2`. Se volvió a consultar GitHub y se observó
 `ffc4d0ffb1311ac8eed1b3ec806089d6a6562d41`, que cambia únicamente la lista de métodos
@@ -58,9 +58,9 @@ caché. Falta implantar un presupuesto global y política de expulsión para esa
 En AXELPC, JDK 17, Gradle 9.1.0, Kotlin 2.3.20, un trabajador y sin compilaciones
 paralelas entre módulos (JVM con SerialGC y dos procesadores lógicos visibles):
 
-- Suites JVM: 226 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
-  almacenamiento. Base sin red: 321 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
-  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 325.
+- Suites JVM: 227 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
+  almacenamiento. Base sin red: 322 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
+  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 326; las cuatro llamadas reales corresponden a la validación anterior.
 - Aceptación Windows con archivos reales y perfil aislado: importar, duplicar, dividir,
   colores, foco/selección, undo/redo, reapertura, lote inválido, doble envío tras reinicio,
   revisión obsoleta, edición manual posterior, exportación de 8 s con audio, cancelación,
@@ -115,10 +115,10 @@ Pendientes concretos:
    cuando sea necesario. La configuración genérica actual no define cancelación remota: se rechaza
    expresamente. Las tarifas son declaradas por el usuario; solo se interpretan unidades generation
    y second. Protocolos con firmas, WebSocket o subidas en varias etapas requieren otro adaptador.
-3. Completar paridad de encargos/tarjetas, cancelación de turno, agrupación de resultados,
+3. Completar paridad de encargos/tarjetas, agrupación de resultados,
    visores, referencias, personalización y accesibilidad, con pruebas de cada flujo.
-4. Implementar paquete portable completo con reimportación y migración de proyectos Corte
-   anteriores; completar referencias externas sin copia y conservación de procedencia.
+4. Completar migración directa de proyectos/paquetes Android anteriores y referencias externas
+   sin copia. El portable Windows conserva procedencia y crea copias de los medios.
 5. BytePlus pasó inferencia mínima, Chat Completions, Responses con herramienta y continuidad,
    y streaming con dola-seed-2-1-turbo-260628. La herramienta de la prueba API devuelve un
    estado simulado; falta ejecutar herramientas del PC con BytePlus, visión, documentos,
@@ -143,6 +143,9 @@ el S25. Cada proveedor conserva sus requisitos de conexión y autenticación.
 
 ```powershell
 powershell -NoProfile -File desktop/tools/build-windows-corte.ps1
+python -X utf8 desktop/tools/test-project-portable.py
+python -X utf8 desktop/tools/test-agent-cancel.py
+python -X utf8 desktop/tools/test-project-controls-ui.py
 python -X utf8 desktop/tools/test-custom-media.py
 python -X utf8 desktop/tools/test-corte-windows.py
 python -X utf8 desktop/tools/test-windows-agent-providers.py
@@ -179,3 +182,29 @@ Durante QA se observó falta real de memoria nativa JVM y recursos del navegador
 el daemon Gradle 9.1.0 después de verificarlo IDLE y se repitieron las pruebas secuencialmente.
 El canal JVM separa diagnósticos de las respuestas JSON y el listener local admite la carga
 concurrente de módulos de interfaz y RPC. Los registros de diagnóstico quedan fuera del paquete.
+
+## Proyectos portables y detener el agente — preview 3
+
+Ajustes → Proyectos portables permite exportar el proyecto activo e importar un ZIP como
+copia independiente. Se incluyen activos, instrucciones/memoria del proyecto, relaciones,
+procedencia y, si existe, el montaje con revisión, selección, cabezal y deshacer/rehacer.
+No se incluyen credenciales, sesiones globales ni trabajos vivos del proveedor. El historial
+de generaciones conserva la procedencia original en el paquete; la copia recibe identidades
+nuevas y no reenvía ni se apropia de los encargos de producción.
+
+Cada archivo se verifica con SHA-256. Se rechazan rutas externas, enlaces, entradas repetidas,
+medios ausentes y relaciones incoherentes. Antes de publicar se valida el índice y el montaje.
+La importación guarda un recibo persistente: «Reanudar importación pendiente» reutiliza la
+misma operación después de una desconexión; no vuelve a crear el proyecto. Los originales
+permanecen intactos. Este formato Windows no certifica importar directamente paquetes Android.
+
+«Detener agente» interrumpe el turno LLM de esa ventana sin reiniciar el motor. Se comprueban
+dueño e identidad del turno y se descartan respuestas tardías de herramientas. Las operaciones
+que ya alcanzaron al proveedor conservan su seguimiento; detener el turno no afirma su
+cancelación remota. Si una herramienta ya se está ejecutando, se espera su terminación antes
+de permitir otra operación incompatible.
+
+La aceptación usa el JVM real y Edge, con proveedor HTTP local: roundtrip, montaje/historial,
+originales intactos, recuperación sin duplicados, corrupción/rutas/relaciones rechazadas,
+cancelación durante inferencia y espera de herramienta, respuesta tardía y continuidad del
+proceso. Son pruebas aisladas; la activación en el perfil real continúa pendiente.

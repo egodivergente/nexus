@@ -23,6 +23,9 @@ class AgentHost:
         self.lock = threading.Lock()
         self.pending_lock = threading.Lock()
         self.pending = {}
+        self.write_lock = threading.Lock()
+        self.active_exchange = None
+        self.turn_id = None
         self.lines = queue.Queue()
         self.owner = None
         self.native = None
@@ -153,9 +156,32 @@ class AgentHost:
             item['event'].set()
         return True
 
+    def write(self, message):
+        with self.write_lock:
+            self.process.stdin.write(json.dumps(message)+'\n')
+            self.process.stdin.flush()
+
+    def cancel(self, owner, turn_id):
+        with self.pending_lock:
+            active=self.active_exchange
+            if not active or active['op'] not in {'send','rewritePrompt','testBrain'} or active['owner']!=owner or not turn_id or active['turn_id']!=turn_id:
+                raise ValueError('Ese turno ya terminó o pertenece a otra ventana.')
+            active['cancelled']=True
+            self.write({'op':'__cancel','requestId':active['id']})
+            for item in self.pending.values():
+                item['reply']={'ok':False,'cancelled':True,'error':'Turno detenido'};item['event'].set()
+        return {'requested':True,'remoteJobsCancelled':False}
+
     def exchange(self, op, args):
-        self.process.stdin.write(json.dumps({'op': op, 'args': args}) + '\n')
-        self.process.stdin.flush()
+        request_id=uuid.uuid4().hex
+        with self.pending_lock:
+            self.active_exchange={'id':request_id,'op':op,'owner':self.owner,'turn_id':self.turn_id,'cancelled':False}
+        try:return self._exchange(op,args,request_id)
+        finally:
+            with self.pending_lock:self.active_exchange=None
+
+    def _exchange(self, op, args, request_id):
+        self.write({'op':op,'args':args,'requestId':request_id})
         seconds = 600 if op == 'rewritePrompt' else 170
         if op == 'send':
             settings = self.settings()
@@ -183,6 +209,9 @@ class AgentHost:
                     raise RuntimeError(response.get('error', 'Error del asistente'))
                 return response.get('value')
             name = response['callback']
+            if self.active_exchange and self.active_exchange.get('cancelled'):
+                self.write({'ok':False,'cancelled':True,'error':'Turno detenido','requestId':request_id})
+                continue
             if name in {'native', 'document', 'video', 'thumbnail'} and self.native is not None:
                 try:
                     if name == 'native':
@@ -195,8 +224,7 @@ class AgentHost:
                     reply = {'ok': True, 'value': value}
                 except Exception as error:
                     reply = {'ok': False, 'error': str(error)[:1500]}
-                self.process.stdin.write(json.dumps(reply) + '\n')
-                self.process.stdin.flush()
+                self.write({**reply,'requestId':request_id})
                 continue
             if name not in {'models', 'schema', 'quote', 'submit', 'status', 'cancel', 'history', 'thumbnail', 'progress', 'stream', 'uiEvent'}:
                 raise RuntimeError('Operacion del motor no admitida.')
@@ -209,13 +237,14 @@ class AgentHost:
                 if not count.is_integer() or not 1 <= count <= 20:
                     raise ValueError('Puedes pedir hasta 20 resultados de Flow por encargo.')
             reply = self.browser_reply(name, response['args'], deadline)
-            self.process.stdin.write(json.dumps(reply) + '\n')
-            self.process.stdin.flush()
+            self.write({**reply,'requestId':request_id})
 
     def browser_reply(self, name, args, deadline=None):
         identifier = uuid.uuid4().hex
         item = {'op': name, 'args': args, 'event': threading.Event()}
         with self.pending_lock:
+            if self.active_exchange and self.active_exchange.get('cancelled'):
+                return {'ok':False,'cancelled':True,'error':'Turno detenido'}
             self.pending[identifier] = item
         answered = item['event'].wait(timeout=max(.1, (deadline or time.monotonic()+120)-time.monotonic()))
         with self.pending_lock:
@@ -233,6 +262,7 @@ class AgentHost:
             raise RuntimeError('El asistente esta ocupado.')
         try:
             self.owner = args.get('owner')
+            self.turn_id = args.get('turn_id')
             if not isinstance(self.owner, str) or not self.owner:
                 raise ValueError('Falta la sesion de la ventana.')
             if args.get('op') in {'send', 'rewritePrompt'}:
@@ -287,4 +317,5 @@ class AgentHost:
             return {'result': result, 'settings': self.public_settings()}
         finally:
             self.owner = None
+            self.turn_id = None
             self.lock.release()

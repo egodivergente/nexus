@@ -9,7 +9,7 @@
       "desktop": "Compila directamente agent-core; se excluye la copia desktop/agent/core/src",
       "dependencies": "JDK17/Kotlin2.3.20",
       "windowsAdaptation": "Mismo sourceSet autoritativo",
-      "acceptance": "226 pruebas JVM del núcleo +15 runtime",
+      "acceptance": "227 pruebas JVM del núcleo +15 runtime",
       "result": "PASS: JVM; instalación en prueba aislada pendiente",
       "classification": "PARCIAL"
     },
@@ -131,7 +131,7 @@
       "dependencies": "Adaptadores Windows",
       "windowsAdaptation": "Reconciliar comportamiento Android y UI instalada",
       "acceptance": "Flujo real por cada capacidad",
-      "result": "PARCIAL; cancelación de turno y paridad completa de encargos pendientes",
+      "result": "PARCIAL; paridad completa de encargos pendiente; cancelación Windows validada por AGENT-06",
       "classification": "PARCIAL"
     },
     {
@@ -142,7 +142,7 @@
       "dependencies": "Adaptadores Windows",
       "windowsAdaptation": "Reconciliar comportamiento Android y UI instalada",
       "acceptance": "Flujo real por cada capacidad",
-      "result": "PARCIAL; cancelación de turno y paridad completa de encargos pendientes",
+      "result": "PARCIAL; paridad completa de encargos pendiente; cancelación Windows validada por AGENT-06",
       "classification": "PARCIAL"
     },
     {
@@ -153,7 +153,7 @@
       "dependencies": "Adaptadores Windows",
       "windowsAdaptation": "Reconciliar comportamiento Android y UI instalada",
       "acceptance": "Flujo real por cada capacidad",
-      "result": "PARCIAL; cancelación de turno y paridad completa de encargos pendientes",
+      "result": "PARCIAL; paridad completa de encargos pendiente; cancelación Windows validada por AGENT-06",
       "classification": "PARCIAL"
     },
     {
@@ -164,7 +164,7 @@
       "dependencies": "Adaptadores Windows",
       "windowsAdaptation": "Reconciliar comportamiento Android y UI instalada",
       "acceptance": "Flujo real por cada capacidad",
-      "result": "PARCIAL; cancelación de turno y paridad completa de encargos pendientes",
+      "result": "PARCIAL; paridad completa de encargos pendiente; cancelación Windows validada por AGENT-06",
       "classification": "PARCIAL"
     },
     {
@@ -175,18 +175,18 @@
       "dependencies": "Adaptadores Windows",
       "windowsAdaptation": "Reconciliar comportamiento Android y UI instalada",
       "acceptance": "Flujo real por cada capacidad",
-      "result": "PARCIAL; cancelación de turno y paridad completa de encargos pendientes",
+      "result": "PARCIAL; paridad completa de encargos pendiente; cancelación Windows validada por AGENT-06",
       "classification": "PARCIAL"
     },
     {
       "id": "AGENT-06",
       "android": "Cancelación de un turno LLM en ejecución",
       "reference": "agent-core; app/.../assistant",
-      "desktop": "Núcleo actual compilado; host y UI anteriores conservados y adaptados parcialmente",
+      "desktop": "Control Detener agente, dueño de ventana y turno; interrupción de coroutine sin reiniciar JVM",
       "dependencies": "Adaptadores Windows",
-      "windowsAdaptation": "Reconciliar comportamiento Android y UI instalada",
-      "acceptance": "Flujo real por cada capacidad",
-      "result": "PARCIAL; cancelación de turno y paridad completa de encargos pendientes",
+      "windowsAdaptation": "Canal de control concurrente, callbacks correlacionados y respuestas tardías descartadas",
+      "acceptance": "Inferencia HTTP local bloqueada, herramienta esperando ventana, siguiente turno en el mismo proceso y UI Edge",
+      "result": "PASS aislado: cancelación, dueño/turno, callback tardío y continuidad; no cancela generaciones remotas",
       "classification": "PARCIAL"
     },
     {
@@ -373,7 +373,7 @@
       "dependencies": "Datos existentes",
       "windowsAdaptation": "Envelope Windows versionado con historial, recibos y relaciones explícitas",
       "acceptance": "Acceptance Corte, reapertura y referencias",
-      "result": "PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE",
+      "result": "PASS integración en identidad/guardado/historial. portable/reimportación Windows validado por PROJECT-06; migración Android pendiente",
       "classification": "PARCIAL"
     },
     {
@@ -384,7 +384,7 @@
       "dependencies": "Datos existentes",
       "windowsAdaptation": "Envelope Windows versionado con historial, recibos y relaciones explícitas",
       "acceptance": "Acceptance Corte, reapertura y referencias",
-      "result": "PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE",
+      "result": "PASS integración en identidad/guardado/historial. portable/reimportación Windows validado por PROJECT-06; migración Android pendiente",
       "classification": "PARCIAL"
     },
     {
@@ -395,7 +395,7 @@
       "dependencies": "Datos existentes",
       "windowsAdaptation": "Envelope Windows versionado con historial, recibos y relaciones explícitas",
       "acceptance": "Acceptance Corte, reapertura y referencias",
-      "result": "PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE",
+      "result": "PASS integración en identidad/guardado/historial. portable/reimportación Windows validado por PROJECT-06; migración Android pendiente",
       "classification": "PARCIAL"
     },
     {
@@ -406,7 +406,7 @@
       "dependencies": "Datos existentes",
       "windowsAdaptation": "Envelope Windows versionado con historial, recibos y relaciones explícitas",
       "acceptance": "Acceptance Corte, reapertura y referencias",
-      "result": "PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE",
+      "result": "PASS integración en identidad/guardado/historial. portable/reimportación Windows validado por PROJECT-06; migración Android pendiente",
       "classification": "PARCIAL"
     },
     {
@@ -417,18 +417,18 @@
       "dependencies": "Datos existentes",
       "windowsAdaptation": "Envelope Windows versionado con historial, recibos y relaciones explícitas",
       "acceptance": "Acceptance Corte, reapertura y referencias",
-      "result": "PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE",
+      "result": "PASS integración en identidad/guardado/historial. portable/reimportación Windows validado por PROJECT-06; migración Android pendiente",
       "classification": "PARCIAL"
     },
     {
       "id": "PROJECT-06",
       "android": "Paquete portable completo y reimportación",
       "reference": "Corte/core-model; core-storage; Nexus AssetIndex",
-      "desktop": "Proyecto de montaje bajo el id Nexus; medios referenciados sin borrar originales",
+      "desktop": "ZIP versionado con activos, memoria, montaje e historial; importación aditiva con identidades nuevas",
       "dependencies": "Datos existentes",
-      "windowsAdaptation": "Envelope Windows versionado con historial, recibos y relaciones explícitas",
-      "acceptance": "Acceptance Corte, reapertura y referencias",
-      "result": "PASS integración en identidad/guardado/historial. Portable/reimportación PENDIENTE",
+      "windowsAdaptation": "SHA-256 por archivo, índice atómico, recibo persistente para reanudación y procedencia separada",
+      "acceptance": "Roundtrip de medios/montaje/undo, interrupción/reintento sin duplicados, rechazo de corrupción/rutas/relaciones y UI Edge",
+      "result": "PASS aislado: exportación/reimportación y recuperación Windows; migración directa de paquetes Android y activación real pendientes",
       "classification": "PARCIAL"
     },
     {

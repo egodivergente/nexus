@@ -367,6 +367,11 @@ def save_remote(url):
 
 
 def dispatch(keys, operation, args):
+    if operation == 'agentCancel':
+        return agent_host().cancel(args.get('owner'),args.get('turn_id'))
+    if operation == 'portableProject' or operation == 'exportProject' and 'assetIds' not in args:
+        from portable_project import PortableProject
+        return PortableProject(agent_host(),allow_network=not OFFLINE_QA).command(args['op'] if operation=='portableProject' else 'export',args)
     if operation == 'customMedia':
         if OFFLINE_QA and args.get('op') in {'submit', 'status', 'upload', 'test'}:
             raise ValueError('Operaciones de red desactivadas en el perfil de prueba.')
@@ -491,7 +496,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '2026.10.18-corte-preview.2', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'version': '2026.10.19-corte-preview.3', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -850,7 +855,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.18-corte-preview.2'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.19-corte-preview.3'}),
         encoding='utf-8',
     )
     if options.headless:
