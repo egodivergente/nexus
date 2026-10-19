@@ -2,6 +2,136 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.51-agent] - 2026-10-19 · «Índigo»
+
+- Flow: Nexus espera hasta 15 s a que AXELPC confirme que está listo (antes 4 s y a veces se iba al ASUS sin sesión). El diagnóstico dice qué puente usa.
+
+## [1.9.50-agent] - 2026-10-19 · «Índigo»
+
+- El agente de Nexus habla con el agente de Google Flow (flow_agent_send / flow_agent_read): le encarga generaciones en cantidad, colecciones o descargas, lee su respuesta, negocia si pregunta y trae las imágenes y vídeos a la Biblioteca.
+- El puente de Flow se adapta al nuevo cuadro de Flow (el antiguo campo era el título del proyecto).
+
+## [1.9.49-agent] - 2026-10-19 · «Índigo»
+
+- Google Flow en lotes: un encargo pide hasta 40 resultados y el puente pulsa Generar las veces necesarias (según el «xN» de Flow, por defecto 4) y los recoge juntos, en vez de uno detrás de otro.
+- El puente de Flow corre ahora en AXELPC como principal; si AXELPC está apagado o sin Flow listo, Nexus usa el ASUS de respaldo. Cada trabajo se sigue y descarga en el puente donde se envió.
+
+## [1.9.48-agent] - 2026-10-19 · «Índigo»
+
+- El agente puede crear proyectos nuevos en Corte (corte_create_project): crea uno vacío, abre Corte en él y deja listo importar clips. Requiere Corte con el puente protocolo 3.
+
+## [1.9.47-agent] - 2026-10-18 · «Índigo»
+
+- Corrige el cierre al abrir la app en la 1.9.46: una expresión de las plantillas de proveedores no era válida en Android y fallaba al cargar el proveedor BytePlus.
+
+## [1.9.46-agent] - 2026-10-18 · «Índigo»
+
+- Nuevo proveedor de medios BytePlus (ModelArk) con Seedance 2.0 y 2.0 Fast (texto o imagen a vídeo) y Seedream 5.0 Pro (imagen y edición). Usa la misma clave y el mismo saldo que el cerebro BytePlus; los IDs de modelo se pueden cambiar en Ajustes → Proveedores.
+- La barra de pestañas se esconde al bajar por el chat y vuelve al subir (se puede desactivar en Apariencia).
+- Botón de cámara en el cuadro de texto (solo con el campo vacío).
+- Negritas más ligeras en las respuestas, mensajes que entran con animación y vibración suave al enviar.
+
+## [1.9.45-agent] - 2026-10-18 · «Horizonte»
+
+- Chat más panorámico: cabecera de una sola línea (cerebro y razonamiento pasan junto al cuadro de texto), márgenes laterales de 8 dp y campo de entrada en pastilla más bajo.
+- Tus mensajes van completos, seleccionables, casi a todo el ancho y con el acento en degradado; las respuestas quedan casi sin fondo.
+- Los enlaces «Encargos ↓ / Último ↓» se sustituyen por un botón redondo de bajar (solo si no estás al final) y un panel de encargos con estado, modelo y coste.
+- Los IDs internos (ord_…) ya no aparecen en el texto del chat.
+- Resultados agrupados en carrusel con miniaturas grandes y el modelo debajo.
+- Barra inferior con pastilla activa más clara; tokens de radio y curva únicos.
+- Historial vuelve a mostrar créditos cuando el proveedor no da importe en moneda.
+
+## [1.9.44-agent] - 2026-10-18 · «Horizonte»
+
+- Ajustes del asistente (aportado por el agente de Termux, punto 5): los filtros de proveedor del Cerebro van en una sola fila deslizable en lugar de varias líneas.
+
+## [1.9.43-agent] - 2026-10-18 · «Horizonte»
+
+- Biblioteca: se pueden importar archivos de hasta 4 GB (antes el límite era 512 MB y el fallo era silencioso); si un archivo falla, el aviso dice el motivo.
+- Nunca se muestra «UNKNOWN» al usuario (aportado por el agente de Termux, punto 4).
+
+## [1.9.42-agent] - 2026-10-18 · «Horizonte»
+
+- Modelos (aportado por el agente de Termux): plural correcto en los contadores, descripción a 2 líneas, la píldora de coste solo aparece si hay precio y las tarjetas de la cuadrícula tienen altura uniforme.
+
+## [1.9.41-agent] - 2026-10-18 · «Horizonte»
+
+- Historial (aportado por el agente de Termux): los fallos muestran su motivo en una línea con botón «Reintentar», el coste se ve en una sola unidad, cada día suma su gasto y el prompt ocupa hasta 2 líneas.
+
+## [1.9.40-agent] - 2026-10-18 · «Horizonte»
+
+- Biblioteca (aportado por el agente de Termux): insignia de duplicados exactos, filtro de origen con nombre completo, botón de búsqueda visible y detalles de miniatura ocultos con menos de 3 columnas. La cabecera de día sigue sin ser fija (la cuadrícula no lo admite).
+
+## [1.9.39-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido
+- Integración con Corte (editor de vídeo): herramientas `corte_status`, `corte_list_projects`, `corte_read_project`, `corte_find_silences`, `corte_apply_ops` y `corte_undo`. El agente lee la línea de tiempo real y edita a través del motor de Corte (validado, en un solo «Deshacer»). Requiere Corte con el puente del agente (rama `feat/puente-agente-nexus-20261018` del repo de Corte) y la misma firma; permiso de firma concedido.
+
+## [1.9.39-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido
+- Herramienta del agente `corte_import_media`: importa en el proyecto abierto de Corte archivos de la biblioteca de Nexus (vídeo, imagen, audio) y los coloca al final de la línea de tiempo (o en `at_us`). Requiere Corte con el puente protocolo 2 (rama `feat/importar-y-modo-nexus-20261018` del repo de Corte). El agente deja de decir que no se puede importar.
+
+## [1.9.38-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido (fusión de `aki/personalizacion-estudio-20261017`)
+- Tarjetas de encargo Compactas / Equilibradas / Amplias a elección del usuario, con logos conservados; sección «Tu espacio de creación» en Ajustes del asistente.
+- Actividad animada durante la generación (activable; se apaga con las animaciones del sistema o fuera de primer plano) y porcentaje solo si el proveedor lo informa de verdad (Atlas y proveedores propios rechazan valores fuera de rango; Flow y el simulado no muestran porcentaje falso).
+- Visor de imagen dentro de Nexus para las que el agente trae al chat (pellizco, doble toque, Ajustar).
+
+## [1.9.37-agent] - 2026-10-18 · «Horizonte»
+
+### Añadido
+- Versiones con nombre: cada 10 `versionCode` cambia el nombre (vc 70–79 = Horizonte, 80–89 = Índigo, 90–99 = Júpiter…; lista de 20 en `app/build.gradle.kts`). Se ve en la pantalla vacía del Agente, en el arranque y en Ajustes → Diagnóstico. Los APK llevan el nombre en el fichero.
+
+## [1.9.36-agent] - 2026-10-18
+
+### Cambiado
+- Ajustes del asistente rediseñado: cabecera fija con estado y resumen, secciones con icono (Cerebro, Respuesta, Consumo y límites, Herramientas, Skills) en tarjetas, filtros de proveedor y modelo bien visibles, estado de la clave como etiqueta, filas plegables con resumen y flecha, y botonera Cerrar/Guardar fija abajo.
+
+## [1.9.35-agent] - 2026-10-18
+
+### Cambiado (revisión visual a partir del vídeo)
+- Jerarquía de color: barras superior e inferior con un tono propio por tema, distinto del fondo y de las tarjetas; el tema Claro pasa de beige a gris azulado frío. La banda de entrada del chat usa el mismo tono que las barras.
+- Barras más finas: superior de 56 a 40 dp e inferior de unos 64 a 46 dp; el contenido gana espacio.
+- Filtros (Vídeo, Imagen, Biblioteca, Historial…): seleccionado con relleno de acento sólido, sin seleccionar con borde propio; mucho más visibles.
+- Chat: «Traer N encargos» sustituido por «Encargos ↓», sin contador, que solo aparece si ninguna tarjeta está a la vista y desplaza hasta la última sin reordenar. Tres o más resultados terminados seguidos se agrupan en una tarjeta de miniaturas («Ver tarjetas» las separa; «Agrupar» las junta).
+- Chat: una imagen adjunta que ya no existe muestra un hueco con icono y nombre en vez de un cuadro vacío.
+- Ajustes ordenado en secciones con cabecera e icono (Personalización, Agente, Proveedores de generación, Generadores propios, Sistema), con tarjetas y filetes.
+- Tamaño de letra de toda la app ajustable (80–140 %) en Ajustes → Personalización.
+- Biblioteca: título y contador en una línea; zoom con dos dedos (2–6 columnas, recordado) como Google Fotos.
+- Lienzo: los ajustes propios del modelo (hasta 6) a la vista, en vez de solo dentro de una hoja.
+
+## [1.9.34-agent] - 2026-10-17
+
+### Añadido
+- 20 logos más (Logos_Oficiales_Branding_Completo): Antigravity, Dola, Cohere, Dots, Flow, Gemini, Hi3D, HiDream, Imagen, Kwaipilot, LTX, Recraft, Seedance, Seedream, Sync, Tencent, Udio, Veed, Veo y Youchuan. La marca concreta gana a su casa matriz (Seedream/Seedance antes que ByteDance, Veo/Gemini/Imagen/Flow antes que Google). BytePlus usa el logo de ByteDance porque el archivo recibido traía la cuadrícula de transparencia pintada.
+
+## [1.9.33-agent] - 2026-10-17
+
+### Añadido
+- Logos nuevos (Logos_Oficiales_Branding): Crun, Amazon Bedrock, Agnes, Mistral, Perplexity, Pruna, Meshy, Meta y Atlas Cloud, recortados al símbolo y centrados en 256 px con fondo transparente. Se usan cuando el modelo no tiene logo propio; los oscuros llevan fondo claro.
+
+## [1.9.32-agent] - 2026-10-17
+
+### Cambiado
+- Tarjetas de encargo: logo oficial del modelo (biblioteca de marcas de ALEXIA ya incluida en la app) en lugar de un círculo con inicial; monograma neutro si no hay logo conocido.
+
+## [1.9.31-agent] - 2026-10-17
+
+### Cambiado
+- Agente: el cerebro pasa a ser un texto discreto bajo el título (sin recuadro que apretaba la barra).
+- Una sola fila sobre el cuadro de texto: atajos (Traer encargos, Último) a la izquierda y Razonar a la derecha.
+- El cuadro de texto va sobre una banda de otro tono con filetes arriba y abajo y borde más marcado.
+- Tarjeta de encargo terminada: miniatura a la izquierda y datos a la derecha, sin el hueco vacío; el resto de resultados en una tira pequeña.
+
+## [1.9.30-agent] - 2026-10-17
+
+### Añadido
+- Selector de cerebro en la barra del Agente (Bedrock, Claude, Compatible OpenAI, Proxy, Antigravity, BytePlus/Dola y los propios) sin abrir Ajustes.
+- Modo de razonamiento junto al cuadro de texto (Auto, Rápido, Mínimo, Bajo, Medio, Alto) cuando el cerebro lo admite.
+- Tarjetas de encargo: marca del proveedor (logo si existe como recurso `provider_<id>`, si no una inicial), miniaturas más pequeñas y animación al reordenarse.
+
 ## [1.9.29-agent] - 2026-10-17
 
 ### Cambiado

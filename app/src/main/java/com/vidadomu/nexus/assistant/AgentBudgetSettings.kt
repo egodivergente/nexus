@@ -25,7 +25,7 @@ internal fun AgentBudgetSettings() {
     var message by remember {mutableStateOf("")}
     val spent=remember {runCatching {runtime.llmBudget.spentToday()}.getOrNull()}
     val spendingLabel=remember(spent,currencyState) {spent?.let {app.currencyManager.formatCost(it)} ?: "registro no disponible"}
-    TextButton(onClick={expanded=!expanded}) {Text("Consumo del agente · $spendingLabel hoy",style=MaterialTheme.typography.bodyMedium.tabularMoney())}
+    FoldHeader("Consumo del agente","$spendingLabel hoy",expanded) {expanded=!expanded}
     if(expanded) Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         spent?.let {Text(app.currencyManager.formatUsdDetails(it),style=MaterialTheme.typography.labelMedium.tabularMoney())}
         Text("AWS directo: presupuesto local estimado con margen del 20%. Incluye reservas de envios sin respuesta; no es la factura global de AWS.",style=MaterialTheme.typography.bodySmall)

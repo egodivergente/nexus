@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -6,6 +6,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+// Nombre de versiÃ³n: cada 10 versionCode cambia el nombre (vc 70â€“79 = Horizonte, 80â€“89 = Ãndigoâ€¦) para orientarse de un vistazo.
+val versionCodenames = listOf("Aurora", "Boreal", "CÃ©nit", "Dorado", "Eclipse", "FÃ©nix", "Glaciar", "Horizonte", "Ãndigo", "JÃºpiter",
+    "Kairos", "Lumen", "Mistral", "NÃ©bula", "Ã“nix", "Polaris", "QuÃ¡sar", "RÃ³dano", "Sirio", "Tundra")
+fun versionCodename(code: Int) = versionCodenames[(code / 10) % versionCodenames.size]
 
 android {
     namespace = "com.vidadomu.nexus"
@@ -18,13 +23,14 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 63
-        versionName = "1.9.29-agent"
+        versionCode = 85
+        versionName = "1.9.51-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
+        buildConfigField("String", "CODENAME", "\"${versionCodename(versionCode!!)}\"")
         // Claves de Bedrock opcionales desde un fichero local FUERA del repo: -PnexusBedrockFile=<ruta a .properties>
-        // (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, BEDROCK_MODEL_ID). Sin él quedan vacías.
+        // (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, BEDROCK_MODEL_ID). Sin Ã©l quedan vacÃ­as.
         val bedrock = Properties().apply {
             (project.findProperty("nexusBedrockFile") as String?)?.let { f -> file(f).takeIf { it.isFile }?.inputStream()?.use { load(it) } }
         }
@@ -47,7 +53,7 @@ android {
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "OFFLINE_QA", "true")
         }
-        // Instalación de prueba JUNTO a la Nexus actual (otro paquete, otros datos): no la sustituye ni
+        // InstalaciÃ³n de prueba JUNTO a la Nexus actual (otro paquete, otros datos): no la sustituye ni
         // necesita su firma. No comparte claves ni historial con com.vidadomu.nexus.
         create("agentPreview") {
             initWith(getByName("debug"))
@@ -88,7 +94,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    // Skills del asistente (Markdown + YAML): se empaquetan como assets/skills/** y además se pueden
+    // Skills del asistente (Markdown + YAML): se empaquetan como assets/skills/** y ademÃ¡s se pueden
     // sustituir sin recompilar desde files/skills o Documents/ALEXIA/Nexus/Skills.
     sourceSets["main"].assets.srcDir(rootProject.file("agent-skills"))
     testBuildType = "offlineQa"
@@ -99,7 +105,7 @@ android {
 }
 
 dependencies {
-    // Núcleo del asistente (Kotlin puro, probado en JVM).
+    // NÃºcleo del asistente (Kotlin puro, probado en JVM).
     implementation(project(":agent-core"))
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
     implementation("androidx.core:core-ktx:1.13.1")

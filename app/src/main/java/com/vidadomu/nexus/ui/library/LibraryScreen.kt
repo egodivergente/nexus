@@ -1,5 +1,10 @@
 package com.vidadomu.nexus.ui.library
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.components.StudioFilterChip
@@ -53,7 +58,7 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
     "%d:%02d".format(Locale.ROOT,it/60,it%60)
 }
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
@@ -86,12 +91,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
     val importPicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) {uris ->
         if(uris.isNotEmpty()) { importing=true; scope.launch {
-            var imported=0
+            var imported=0;var lastError:String?=null
             try { for(uri in uris) {
                 try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,context.contentResolver.getType(uri),runtime.settings.activeProjectId()); imported++ }
                 catch(e:kotlinx.coroutines.CancellationException) {throw e}
-                catch(_:Exception) { }
-            }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos") }
+                catch(e:Exception) {lastError=e.message}
+            }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos"+(lastError?.takeIf {imported<uris.size}?.let {". $it"} ?: "")) }
             finally {importing=false}
         } }
     }
@@ -102,6 +107,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
     var originMenu by remember {mutableStateOf(false)}
+    // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
+    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",3).coerceIn(2,6))}
     // Editado/Compartido solo se ofrecen si hay algo de ese origen; Nexus e Importado, siempre.
     val origins=remember(index) {
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
@@ -133,6 +140,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         val day=SimpleDateFormat("d MMMM yyyy",Locale("es","ES"))
         (completed.flatMap {job -> job.outputs.indices.map {LibraryEntry.Out(job,it)}}+localAssets.map {LibraryEntry.Local(it)})
             .sortedByDescending {it.time}.groupBy {day.format(Date(it.time))}
+    }
+    // Mismo archivo exacto apareciendo más de una vez en la lista visible (p. ej. importado y luego generado otra vez).
+    val duplicateUris=remember(completed,localAssets,conflicts) {
+        (completed.flatMap {job -> job.outputs.map {OutputFiles.trustedLocalUri(it,conflicts) ?: it.url}}+localAssets.map {it.uri})
+            .groupingBy {it}.eachCount().filterValues {it>1}.keys
     }
     // Solo cuenta y actúa sobre lo marcado que sigue visible con los filtros actuales.
     val visibleTokens=remember(completed,localAssets) {
@@ -225,17 +237,17 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
             marked=emptySet()
         }) else TopAppBar(title={
-        Column(verticalArrangement=Arrangement.Center) {
+        Row(verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             val count=completed.sumOf {it.outputs.size}+localAssets.size
-            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.padding(bottom=2.dp))
         }
     },actions={
+        IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,if(searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",tint=if(searchVisible) MaterialTheme.colorScheme.primary else TextSecondary)}
         IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
         Box {
         IconButton(onClick={moreVisible=true}) {Icon(Icons.Default.MoreVert,"Más opciones de biblioteca",tint=TextSecondary)}
         DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
-        DropdownMenuItem(text={Text("Buscar")},leadingIcon={Icon(Icons.Default.Search,null)},modifier=Modifier.semantics {contentDescription="Buscar en Biblioteca"},onClick={moreVisible=false;searchVisible=!searchVisible})
         DropdownMenuItem(text={Text(if(showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas")},leadingIcon={Icon(Icons.Default.Info,null)},onClick={
             moreVisible=false;showDetails=!showDetails;prefs.edit().putBoolean("tile_details",showDetails).apply()})
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
@@ -263,7 +275,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 item {Box {
                     StudioFilterChip(originFilter!=LibraryOriginFilter.ALL,{originMenu=true},
                         label={Row(verticalAlignment=Alignment.CenterVertically) {
-                            Text(if(originFilter==LibraryOriginFilter.ALL) "Origen" else originFilter.shortLabel())
+                            Text(if(originFilter==LibraryOriginFilter.ALL) "Origen" else originFilter.label)
                             Icon(Icons.Default.ArrowDropDown,null,Modifier.size(NexusTokens.space16))
                         }},modifier=Modifier.semantics {contentDescription="Filtrar por origen: ${originFilter.label}"})
                     DropdownMenu(expanded=originMenu,onDismissRequest={originMenu=false}) {
@@ -279,7 +291,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
                 val filtered=query.isNotBlank() || filter!=null || originFilter!=LibraryOriginFilter.ALL || favoriteOnly || showHidden
                 Text(if(filtered) "No hay resultados con estos filtros." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
-            } else LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),
+            } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()},
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
                 // Trabajos en curso: una línea por trabajo (modelo, estado y tiempo), no una tarjeta.
@@ -297,21 +309,21 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     }})}
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
                 timeline.forEach {(day,entries) ->
-                    item(span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                    item(key="header:$day",span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     items(entries,key={it.key}) {entry ->
                         when(entry) {
                             is LibraryEntry.Local -> {
                                 val asset=entry.asset
                                 val token="asset:"+asset.id
-                                LocalAssetTile(asset,imageLoader,showDetails,mark=if(selecting) token in marked else null,
+                                LocalAssetTile(asset,imageLoader,showDetails && columns<3,mark=if(selecting) token in marked else null,duplicate=asset.uri in duplicateUris,
                                     onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
                             }
                             is LibraryEntry.Out -> {
                                 val job=entry.job;val output=job.outputs[entry.index]
                                 val token=OutputFiles.token(output)
-                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails,
-                                    mark=if(selecting) token in marked else null,
+                                LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<3,
+                                    mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris,
                                     onActions={toggleMark(token)}) {
                                     if(selecting) toggleMark(token)
                                     else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(output)) else onNavigateToOutput(job.id)
@@ -327,7 +339,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,onActions:()->Unit,onOpen:()->Unit) {
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,duplicate:Boolean=false,onActions:()->Unit,onOpen:()->Unit) {
     val context=LocalContext.current
     val haptic=LocalHapticFeedback.current
     val interaction=remember {MutableInteractionSource()}
@@ -350,7 +362,10 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
         // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
         if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
         else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
-        if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration,Modifier.align(Alignment.TopEnd))
+        Column(modifier=Modifier.align(Alignment.TopEnd),horizontalAlignment=Alignment.End) {
+            if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration)
+            if(duplicate) TileDuplicateBadge()
+        }
         if(showDetails) {
             val known=output.width?.takeIf {it>0}!=null && output.height?.takeIf {it>0}!=null
             val mime=output.mimeType.ifBlank {when(output.type) {Modality.IMAGE->"image/*";Modality.VIDEO->"video/*";Modality.AUDIO->"audio/*";else->"application/octet-stream"}}
@@ -386,5 +401,25 @@ private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit,onRefresh:()->Unit,o
             IconButton(onClick=onRefresh,Modifier.size(40.dp)) {Icon(Icons.Default.Refresh,"Consultar estado en el proveedor",Modifier.size(20.dp),tint=AccentAmber)}
             IconButton(onClick=onStopTracking,Modifier.size(40.dp)) {Icon(Icons.Default.Close,"Dejar de seguir este trabajo",Modifier.size(20.dp),tint=TextSecondary)}
         }
+    }
+}
+
+/**
+ * Pellizco con dos dedos sobre la cuadrícula: abrir los dedos = miniaturas más grandes (menos columnas); juntarlos = más pequeñas.
+ * Solo consume el gesto cuando hay dos dedos, así el desplazamiento con uno sigue siendo normal.
+ */
+private fun Modifier.pinchColumns(current:Int,onChange:(Int)->Unit):Modifier = this.pointerInput(current) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed=false)
+        var scale=1f
+        do {
+            val event=awaitPointerEvent(PointerEventPass.Initial)
+            if(event.changes.size>=2) {
+                scale*=event.calculateZoom()
+                event.changes.forEach {it.consume()}
+                val next=when {scale>1.3f -> (current-1).coerceAtLeast(2); scale<.77f -> (current+1).coerceAtMost(6); else -> current}
+                if(next!=current) {onChange(next);scale=1f;return@awaitEachGesture}
+            }
+        } while(event.changes.any {it.pressed})
     }
 }

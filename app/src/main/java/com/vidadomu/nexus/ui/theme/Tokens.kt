@@ -16,7 +16,7 @@ object NexusTokens {
     val tabletMargin = 20.dp
     val galleryGap = 2.dp
     val minimumTouch = 48.dp
-    val topBarHeight = 56.dp
+    val topBarHeight = 40.dp
     val thumbnail = RoundedCornerShape(8.dp)
     val field = RoundedCornerShape(16.dp)
     val card = RoundedCornerShape(16.dp)
@@ -26,6 +26,13 @@ object NexusTokens {
     const val pressDuration = 120
     const val contentDuration = 180
     val filter = RoundedCornerShape(50)
+    /** Radios únicos de la app: pequeño 8, medio 16, grande 24 y pastilla. */
+    val radiusSmall = thumbnail
+    val radiusMedium = card
+    val radiusLarge = RoundedCornerShape(24.dp)
+    val pill = RoundedCornerShape(999.dp)
+    /** Curva estándar para entradas y salidas. */
+    val easing = androidx.compose.animation.core.FastOutSlowInEasing
     val shapes = Shapes(extraSmall = thumbnail, small = thumbnail, medium = field,
         large = card, extraLarge = RoundedCornerShape(24.dp))
 }

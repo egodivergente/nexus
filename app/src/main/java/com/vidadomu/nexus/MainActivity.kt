@@ -330,7 +330,7 @@ private fun NexusStartupOnboardingOverlay(epoch: Int) {
                         )
                     ) {
                         androidx.compose.material3.Text(
-                            text = "v${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}",
+                            text = "v${BuildConfig.VERSION_NAME} · ${BuildConfig.CODENAME} · build ${BuildConfig.VERSION_CODE}",
                             style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                             color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)

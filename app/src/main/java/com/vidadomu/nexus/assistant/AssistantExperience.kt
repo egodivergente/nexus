@@ -78,11 +78,15 @@ internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldVal
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
-    onReply: (String) -> Unit = {}) {
+    onReply: (String) -> Unit = {}, onCamera: (() -> Unit)? = null) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
-    Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
-        border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f)),
-        modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4)) {
+    // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
+    Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
+      Column {
+        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+        Surface(color=MaterialTheme.colorScheme.surface,shape=if(text.text.contains('\n') || text.text.length>40) NexusTokens.card else NexusTokens.pill,
+        border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=0.55f)),
+        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
@@ -107,7 +111,11 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                 }
             }
             Row(verticalAlignment = Alignment.Bottom) {
-                IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                IconButton(onClick = onAttach, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                // La cámara solo con el campo vacío: al escribir, el texto recupera el ancho.
+                if (onCamera != null && text.text.isEmpty()) IconButton(onClick = onCamera, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Default.PhotoCamera, "Hacer una foto")
+                }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
                 val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
@@ -117,7 +125,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
-                        Box(Modifier.padding(vertical = 13.dp), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             inner()
                         }
@@ -146,6 +154,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }
         }
+        }
+        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+      }
     }
 }
 

@@ -31,15 +31,18 @@ fun NexusBottomBar(navController: NavController) {
     val currentRoute=entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
     val haptic = LocalHapticFeedback.current
+    // En el chat se esconde al bajar (si está activado en Ajustes) y vuelve al subir; en el resto de pestañas siempre se ve.
+    val visible = ChromeVisibility.bottomBar.value || currentRoute != Screen.Assistant.route
+    androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
     StudioChrome(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
             HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
-            Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=4.dp),
+            Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=1.dp),
                 verticalAlignment=Alignment.CenterVertically) {
                 Screen.bottomNavItems.forEach { screen ->
                     val selected=currentRoute==screen.route
-                    val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
-                    Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
+                    val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
+                    Column(Modifier.weight(1f).heightIn(min=42.dp)
                         .semantics { contentDescription=screen.title }
                         .selectable(selected=selected,role=Role.Tab,onClick={
                             if(currentRoute!=screen.route) {
@@ -59,12 +62,12 @@ fun NexusBottomBar(navController: NavController) {
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(0.dp)) {
-                        Box(Modifier.width(56.dp).height(32.dp).clip(NexusTokens.filter)
+                        Box(Modifier.width(52.dp).height(24.dp).clip(NexusTokens.pill)
                             .background(tone),
                             contentAlignment=Alignment.Center) {
                             Icon(screen.icon,contentDescription=null,
                                 tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier=Modifier.size(NexusTokens.space24))
+                                modifier=Modifier.size(20.dp))
                         }
                         // «Biblioteca» cabe entera en 1/5 de 360 dp; solo con letra grande del sistema se abrevia.
                         // El texto no se anuncia: la pestaña ya lleva su nombre (antes se leía «Biblioteca Biblio»).
@@ -76,5 +79,6 @@ fun NexusBottomBar(navController: NavController) {
                 }
             }
         }
+    }
     }
 }

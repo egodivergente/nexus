@@ -16,7 +16,7 @@ internal fun MediaEditingSettings() {
     var expanded by remember {mutableStateOf(false)}
     var status by remember {mutableStateOf(store.status())}
     LaunchedEffect(expanded) {while(expanded) {status=store.status();delay(1500)}}
-    TextButton(onClick={expanded=!expanded}) {Text("Edición y Whisper · ${if(store.ready()) "Local" else "Sin modelo"}")}
+    FoldHeader("Edición y Whisper",if(store.ready()) "Local" else "Sin modelo",expanded) {expanded=!expanded}
     if(expanded) Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Pide al agente recortar, unir clips, quitar o añadir audio y extraer fotogramas. Guarda archivos nuevos y conserva los originales.",style=MaterialTheme.typography.bodyMedium)
         Text("Whisper Base multilingüe transcribe en este teléfono y crea TXT y SRT. Sólo se descarga el modelo (148 MB); el audio no se sube.",style=MaterialTheme.typography.bodyMedium)

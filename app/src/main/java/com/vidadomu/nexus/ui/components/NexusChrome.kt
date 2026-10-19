@@ -163,4 +163,4 @@ internal fun StudioBalanceChip(balance:String,onClick:()->Unit) {
 /** Compact headings in chrome; the user's font scale still applies in full. */
 @Composable
 fun nexusScreenTitleStyle():TextStyle = if(LocalDensity.current.fontScale>=1.3f)
-    MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge
+    MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleMedium

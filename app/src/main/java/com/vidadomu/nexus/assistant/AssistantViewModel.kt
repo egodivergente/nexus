@@ -805,6 +805,27 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         null
     } catch (e: IllegalArgumentException) { e.message }
 
+    /** Modo de razonamiento del cerebro activo (esfuerzo / pensar): se guarda en su perfil y se aplica ya. */
+    fun setReasoning(effort: String?, thinking: String?): String? {
+        val brain = _ui.value.settings.brain ?: return "Este proveedor no tiene modo de razonamiento configurable."
+        return try {
+            runtime.settings.brains.save(brain.copy(reasoningEffort = effort, thinking = thinking), null)
+            val loaded = runtime.settings.load()
+            orchestrator = runtime.orchestrator(loaded)
+            _ui.update { it.copy(settings = loaded) }
+            null
+        } catch (e: IllegalArgumentException) { e.message } catch (e: IllegalStateException) { e.message }
+    }
+
+    /** Cambia solo el proveedor del LLM (selector de la barra): recupera su modelo guardado y conserva lo demás. */
+    fun switchBrain(backend: String): String? {
+        val current = _ui.value.settings
+        if (current.backend == backend) return null
+        val model = if (backend.startsWith(BrainStore.PREFIX)) runtime.settings.brains.get(backend.removePrefix(BrainStore.PREFIX))?.modelId.orEmpty()
+            else runtime.settings.savedModelFor(backend)
+        return saveSettings(current.copy(backend = backend, modelId = model), null)
+    }
+
     fun reloadSkills() {
         val store = runtime.reloadSkills()
         orchestrator = runtime.orchestrator(_ui.value.settings)

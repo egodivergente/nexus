@@ -86,10 +86,16 @@ async def receive_reference(request, root):
         temporary.unlink(missing_ok=True)
 
 
+# Flow (oct 2026) movió el cuadro de prompt a un div editable «¿Qué quieres crear?» (también el del agente de Flow).
+# El antiguo input «Texto editable» es ahora el TÍTULO del proyecto: no se debe escribir ahí nunca.
+COMPOSER = ('[contenteditable="true"][aria-label="¿Qué quieres crear?"], '
+            '[contenteditable="true"][aria-label="What do you want to create?"]')
+
+
 async def composer_reference_count(page):
     # Minimal ancestor containing both observed composer and Generate controls.
     # Gallery images and model logos outside the composer cannot confirm an upload.
-    return await page.locator('input[aria-label="Texto editable"]').evaluate("""input => {
+    return await page.locator(COMPOSER).first.evaluate("""input => {
         let node = input.parentElement;
         while (node && !(node.querySelector('button[aria-label="Iniciar generación"]') &&
             node.querySelector('button[aria-label="Añadir ingredientes a ventana para peticiones"]'))) node = node.parentElement;
@@ -107,7 +113,7 @@ async def attach_references(page, paths):
         raise ReferenceError('flow_references_not_empty' if baseline > 0 else 'flow_reference_controls_unavailable', 409)
     # Google documents dragging local images into the prompt box. Keep the
     # browser's native File/DataTransfer path; never invoke Google's private RPCs.
-    composer = page.locator('input[aria-label="Texto editable"]')
+    composer = page.locator(COMPOSER).first
     try:
         for index, path in enumerate(paths):
             raw = path.read_bytes()

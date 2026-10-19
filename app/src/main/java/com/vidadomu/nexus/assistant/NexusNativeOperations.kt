@@ -71,6 +71,7 @@ class NexusNativeOperations(
                 "web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools", "call_mcp_tool", "disconnect_mcp_server" -> internet.run(operation,input)
                 "get_active_generations" -> active(input)
                 "recover_generation" -> recover(input.requiredText("job_id"))
+                "flow_agent_send", "flow_agent_read" -> FlowAgentOperations(app).run(operation, input)
                 "diagnose_flow" -> flow(false)
                 "repair_flow" -> flow(true)
                 "get_nexus_settings" -> settings()
@@ -85,6 +86,8 @@ class NexusNativeOperations(
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
                 "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
                 "atlas_get_balance" -> atlasBalance()
+                "corte_status", "corte_list_projects", "corte_read_project", "corte_find_silences", "corte_apply_ops", "corte_undo", "corte_import_media", "corte_create_project" ->
+                    CorteBridge(app) { id -> AgentVideoOperations(app).source(id) }.run(operation, input)
                 else -> throw ToolInputException("Operación desconocida.")
             }
         }

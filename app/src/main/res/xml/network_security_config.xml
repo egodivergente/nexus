@@ -12,5 +12,8 @@
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">asusvidal.tail6ac6b4.ts.net</domain>
         <domain includeSubdomains="false">100.112.57.2</domain>
+        <!-- AXELPC: puente Flow principal (el ASUS queda de respaldo). -->
+        <domain includeSubdomains="false">axelpc.tail6ac6b4.ts.net</domain>
+        <domain includeSubdomains="false">100.72.111.97</domain>
     </domain-config>
 </network-security-config>

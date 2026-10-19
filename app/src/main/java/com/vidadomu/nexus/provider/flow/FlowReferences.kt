@@ -36,7 +36,9 @@ internal object FlowReferences {
             listOf(ModelCapability.TEXT_TO_IMAGE, ModelCapability.IMAGE_TO_IMAGE)
         else listOf(ModelCapability.TEXT_TO_VIDEO, ModelCapability.REFERENCE_TO_VIDEO),
         parameters = listOf(ModelParameter("count", "Resultados solicitados", ParameterType.INTEGER,
-            "1", minValue = 1f, maxValue = 20f, nativeType = "integer")),
+            "4", minValue = 1f, maxValue = FlowBridgeClient.MAX_RESULT_COUNT.toFloat(), nativeType = "integer"),
+            ModelParameter("per_run", "Resultados por envío (el «xN» puesto en Flow)", ParameterType.INTEGER,
+            "4", minValue = 1f, maxValue = 4f, nativeType = "integer")),
         description = "Texto e imágenes de referencia en el proyecto abierto en Flow. Se conservan sus ajustes; Flow valida los ingredientes.",
         inputMode = ModelInputMode.MULTI_IMAGE, imagesArrayField = "reference_ids",
         supportsImageInput = true, supportsReferenceImages = true, maxImages = MAX_IMAGES,
