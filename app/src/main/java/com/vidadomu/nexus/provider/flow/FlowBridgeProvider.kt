@@ -88,8 +88,10 @@ class FlowBridgeProvider(
                     return@withLock Result.success(job.copy(status = GenerationStatus.QUEUED, error = "Esperando al encargo anterior de Flow; su seguimiento sigue activo."))
                 queue.edit().putString("state_$previous", "released").commit()
             }
+            if (FlowRetryPolicy.waiting(job.parameters["__flow_retry_at"]?.toLongOrNull())) return@withLock Result.success(job)
             val block = job.parameters["__flow_block"]?.toIntOrNull() ?: 0
-            val requestId = "${job.id}_$block"
+            val attempt = job.parameters["__flow_attempt"]?.toIntOrNull() ?: 0
+            val requestId = FlowRetryPolicy.requestId(job.id, block, attempt)
             val recovered = queue.getString("remote_$requestId", null)
             val remote = if(recovered != null) bridge.job(recovered) else
                 run {
@@ -111,6 +113,10 @@ class FlowBridgeProvider(
                     completedAt = System.currentTimeMillis(), error = submissionError?.humanReadableMessage))
             }
             remote.map { submitted ->
+                if (submitted.state == "failed" && FlowRetryPolicy.shouldRetry(submitted.error, attempt)) {
+                    queue.edit().putString("state_${job.id}", "active").commit()
+                    return@withLock Result.success(retryLater(job, submitted.error, attempt))
+                }
                 queue.edit().putString("remote_$requestId", submitted.id).putString("state_${job.id}", if(submitted.state == "failed") "failed" else "active").commit()
                 job.copy(providerJobId = submitted.id, status = statusFor(submitted.state),
                     parameters = job.parameters + ("__tracking_started_at" to System.currentTimeMillis().toString()),
@@ -145,7 +151,10 @@ class FlowBridgeProvider(
                     }
                 }
                 }
-                "failed" -> Result.success(
+                "failed" -> if (queue != null && FlowRetryPolicy.shouldRetry(remote.error, job.parameters["__flow_attempt"]?.toIntOrNull() ?: 0)) {
+                    queue.edit().putString("state_${job.id}", "active").commit()
+                    Result.success(retryLater(job, remote.error, job.parameters["__flow_attempt"]?.toIntOrNull() ?: 0))
+                } else Result.success(
                     job.copy(
                         status = GenerationStatus.FAILED,
                         completedAt = System.currentTimeMillis(),
@@ -298,6 +307,13 @@ class FlowBridgeProvider(
         "completed" -> previous?.coerceAtLeast(0.9f) ?: 0.9f
         else -> previous
     }
+
+    /** Vuelve a la cola de Flow para un nuevo intento dentro de [FlowRetryPolicy.DELAY_MS]. */
+    private fun retryLater(job: GenerationJob, error: String?, attempt: Int): GenerationJob = job.copy(
+        providerJobId = "queue_${job.id}", status = GenerationStatus.QUEUED, completedAt = null,
+        parameters = job.parameters + mapOf("__flow_attempt" to (attempt + 1).toString(),
+            "__flow_retry_at" to (System.currentTimeMillis() + FlowRetryPolicy.DELAY_MS).toString()),
+        error = "Reintento automático ${attempt + 1} de ${FlowRetryPolicy.MAX_RETRIES}: ${flowFailureMessage(error)}")
 
     private fun flowDetails(remote: FlowBridgeJob): String = buildString {
         append("Flow bridge state: ").append(remote.state)
