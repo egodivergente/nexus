@@ -58,9 +58,9 @@ caché. Falta implantar un presupuesto global y política de expulsión para esa
 En AXELPC, JDK 17, Gradle 9.1.0, Kotlin 2.3.20, un trabajador y sin compilaciones
 paralelas entre módulos (JVM con SerialGC y dos procesadores lógicos visibles):
 
-- Suites JVM: 228 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
-  almacenamiento. Base sin red: 323 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
-  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 327; las cuatro llamadas reales corresponden a la validación anterior.
+- Suites JVM: 229 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
+  almacenamiento. Base sin red: 324 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
+  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 328; las cuatro llamadas reales corresponden a la validación anterior.
 - Aceptación Windows con archivos reales y perfil aislado: importar, duplicar, dividir,
   colores, foco/selección, undo/redo, reapertura, lote inválido, doble envío tras reinicio,
   revisión obsoleta, edición manual posterior, exportación de 8 s con audio, cancelación,
@@ -252,3 +252,11 @@ PDF visual, imagen, límites de páginas y conservación. La prueba `--live` usa
 razonamiento enabled/low, fixtures sintéticos y un relé local que solo registra metadatos
 seleccionados. No registra claves, imágenes codificadas ni contenido de razonamiento.
 La aceptación externa de esta corrección se registrará por separado.
+
+La primera aceptación externa detectó una segunda discrepancia: los perfiles sin herramientas
+las omitían en HTTP, pero el orquestador aún preparaba una segunda ronda de documento orientada
+a herramientas. BytePlus devolvió etiquetas `seed:tool_call` en vez de la respuesta esperada.
+Ese intento no se considera PASS. Se propaga ahora la capacidad `tools` al orquestador: los
+perfiles sin herramientas responden en una sola lectura y conservan el contexto para turnos
+posteriores. La lectura intermedia con herramientas conserva sus dos fases, con instrucciones
+explícitas para usar el contenido recibido y su resumen. Hay una regresión JVM de continuidad.

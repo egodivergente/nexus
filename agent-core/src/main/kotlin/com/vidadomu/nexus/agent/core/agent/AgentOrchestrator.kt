@@ -198,7 +198,11 @@ class AgentOrchestrator(
                 break
             }
             val readingDocuments = conv.messages.any { m -> m.content.any { it is ContentBlock.Document } }
-            val requestSystem = if (readingDocuments) system + "Lee los documentos y extrae un resumen de trabajo preciso, con hechos, citas de seccion y detalles necesarios para la peticion del usuario. Indica lo que no has podido leer. Esta fase solo lee: no afirma haber ejecutado acciones. El original no se reenviara en los siguientes pasos; conserva aqui la informacion necesaria." else system
+            val requestSystem = if (readingDocuments) system +
+                "El contenido de los documentos ya está adjunto en este mensaje como texto, archivo o páginas visuales. En esta fase no hay herramientas disponibles: lee directamente ese contenido; no busques de nuevo los adjuntos ni emitas llamadas a herramientas o etiquetas XML. Indica lo que no has podido leer. " +
+                if (!config.toolUse) "Responde directamente a la petición original del usuario, respetando el formato solicitado. No es un resumen intermedio." else
+                    "Extrae un resumen de trabajo preciso con hechos, citas de sección y detalles necesarios para la petición. Esta fase solo lee: no afirma haber ejecutado acciones. El original no se reenviará en los siguientes pasos; conserva aquí la información necesaria."
+                else system
             if(readingDocuments) onEvent(UiEvent.Info("Leyendo los documentos. Puedes cancelar sin perder los originales."))
             // Local PDF extraction is plain text: no binary/base64 upload or mandatory document CountTokens.
             val requestMessages=conv.messages.map { m -> m.copy(content=m.content.map { block ->
@@ -241,9 +245,10 @@ class AgentOrchestrator(
                         if(it is ContentBlock.Document) ContentBlock.Text("[Documento ${it.name}: lectura resumida en el siguiente mensaje; el original sigue en referencias.]") else it
                     })
                 }
+                if (!config.toolUse) { stop=response.stopReason.name;break }
                 onEvent(UiEvent.Info("Lectura recibida; preparando la respuesta."))
                 if(response.stopReason != StopReason.END_TURN) { stop=response.stopReason.name; break }
-                conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text("Con esa lectura, atiende ahora mi peticion original: $text")))
+                conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text("Los documentos ya se han leído en tu mensaje anterior. Atiende mi petición con esa lectura, sin volver a buscar los adjuntos salvo que falte un dato necesario. Petición original: $text")))
                 continue
             }
             val uses = msg.toolUses()

@@ -214,6 +214,19 @@ class OrchestratorTest {
         assertEquals("Continuacion",o.send(conv,"Sigue").text)
     }
 
+    @Test fun `document reading without tools answers in one call and preserves subsequent context`() = runTest {
+        val h=Harness()
+        val llm=ScriptedLlmProvider(listOf(
+            { r -> assertTrue(r.tools.isEmpty());assertTrue(r.messages.any { "Invoice 731" in it.text() });text("Invoice 731 totals 131") },
+            { r -> assertFalse(r.messages.any { m -> m.content.any { it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Document } });text("Still 131") }
+        ))
+        val o=AgentOrchestrator(llm,config.copy(toolUse=false),NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { com.vidadomu.nexus.agent.core.llm.ContentBlock.Document("txt","Invoice","Invoice 731: 7*13+3*17-11".toByteArray()) })
+        val conv=o.newConversation()
+        assertEquals("Invoice 731 totals 131",o.send(conv,"Calculate",listOf(Attachment("doc","file:///doc.pdf","application/pdf","Invoice"))).text)
+        assertEquals("Still 131",o.send(conv,"Confirm").text)
+    }
+
     @Test fun `adjunto se describe al LLM con su id`() = runTest {
         val h = Harness()
         val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.messages.last().text().contains("attachment_id=att_1")); text("visto") }))

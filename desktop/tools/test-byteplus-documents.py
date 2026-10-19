@@ -40,7 +40,7 @@ def parse_answer(text):
     return json.loads(matches[-1])
 
 
-def session(desktop,production=None):
+def session(desktop,production=None,only=None,report_path=None,with_tools=False):
     sys.path.insert(0,str(desktop))
     from agent_host import AgentHost
     from local_host import windows_keys,write_secret
@@ -78,7 +78,9 @@ def session(desktop,production=None):
             native=NativeOperations(data,host,lambda:{},lambda _:None,None,lambda:{})
             class AuditedNative:
                 def __getattr__(self,name):return getattr(native,name)
-                def run(self,payload):raise ValueError('Esta prueba solo lee adjuntos; no ejecuta herramientas.')
+                def run(self,payload):
+                    if with_tools and payload['operation'] in {'list_library_assets','read_library_text','view_library_asset'}:return native.run(payload)
+                    raise ValueError('Esta prueba solo lee adjuntos y su biblioteca aislada.')
                 def attachment(self,op,args):
                     value=native.attachment(op,args)
                     attachments.append({'operation':op,'format':value.get('format'),'pages':len(value.get('pages',[])),
@@ -93,7 +95,7 @@ def session(desktop,production=None):
             try:
                 profile=profile or {'id':'local-documents','name':'Local','protocol':'OPENAI_RESPONSES','modelId':'mock'}
                 profile.update(storeOnServer=False,baseUrl=f'http://127.0.0.1:{server.server_port}',endpointPath='',thinking='enabled',reasoningEffort='low',
-                               capabilities={**profile.get('capabilities',{}),'vision':True,'streaming':False,'tools':False},
+                               capabilities={**profile.get('capabilities',{}),'vision':True,'streaming':False,'tools':with_tools},
                                limits={'maxCallsPerTurn':3,'maxToolRounds':2,'maxTokens':2048,'turnTimeoutSeconds':150,'httpTimeoutSeconds':110})
                 host.command({'op':'settings','owner':'documents-qa','args':{'backend':'profile','mode':'ASSISTANT','brainProfile':profile,'brainKey':key}})
                 thread.start();results=[]
@@ -101,19 +103,24 @@ def session(desktop,production=None):
                     ('image','image/png','Lee el código superior y cuenta las figuras por forma y color. Responde solo JSON con code, red_circles, blue_squares, green_triangles.',{'code':files['code'],'red_circles':3,'blue_squares':2,'green_triangles':1}),
                     ('pdf','application/pdf','Lee el documento adjunto y calcula el importe conjunto de los lotes menos el descuento. Responde solo JSON con reference y total.',{'reference':files['reference'],'total':files['total']}),
                     ('scan','application/pdf','Examina las figuras del PDF adjunto. Responde solo JSON con code, red_circles, blue_squares, green_triangles.',{'code':files['code'],'red_circles':3,'blue_squares':2,'green_triangles':1})]:
+                    if only and name not in only:continue
                     current.update(name=name,expected=expected);host.command({'op':'new','owner':'documents-qa'})
                     path=files[name];original=hashlib.sha256(path.read_bytes()).hexdigest()
                     result=host.command({'op':'send','owner':'documents-qa','args':{'text':prompt,'attachments':[{'id':uuid.uuid4().hex,'uri':'/media/'+path.name,'mimeType':mime,'name':'Documento de prueba' if mime=='application/pdf' else 'Imagen de prueba'}]}})['result']
+                    if report_path:
+                        report_path.parent.mkdir(parents=True,exist_ok=True)
+                        report_path.write_text(json.dumps({'status':'IN_PROGRESS','case':name,'lastAnswer':result['text'],'cases':results,'transport':requests,'attachments':attachments},ensure_ascii=False,indent=2),encoding='utf-8')
+                    print('Case',name,'returned',flush=True) if live else None
                     assert parse_answer(result['text'])==expected,(name,result['text'],expected)
                     assert original==hashlib.sha256(path.read_bytes()).hexdigest()
                     results.append({'case':name,'status':'PASS','answer':parse_answer(result['text']),'inputTokens':result.get('inputTokens'),'outputTokens':result.get('outputTokens')})
-                assert any(r['case']=='image' and r['images'] for r in requests),requests
-                assert any(r['case']=='scan' and r['images'] for r in requests),requests
-                assert any(a['operation']=='document' and a['format']=='txt' for a in attachments),attachments
-                assert any(a['operation']=='document' and a['pages']==1 and a['complete'] for a in attachments),attachments
-                assert all(r['thinking']=={'type':'enabled'} and r['reasoning']=={'effort':'low'} and r['tools']==0 and r['status']==200 for r in requests),requests
+                assert only or any(r['case']=='image' and r['images'] for r in requests),requests
+                assert only or any(r['case']=='scan' and r['images'] for r in requests),requests
+                assert only or any(a['operation']=='document' and a['format']=='txt' for a in attachments),attachments
+                assert only or any(a['operation']=='document' and a['pages']==1 and a['complete'] for a in attachments),attachments
+                assert all(r['thinking']=={'type':'enabled'} and r['reasoning']=={'effort':'low'} and (with_tools or r['tools']==0) and r['status']==200 for r in requests),requests
                 reasoning_tokens=sum(((r.get('usage') or {}).get('output_tokens_details') or {}).get('reasoning_tokens',0) for r in requests)
-                return {'status':'PASS','reasoningTokens':reasoning_tokens,'reasoningObserved':reasoning_tokens>0,'live':live,'desktop':str(desktop),'model':profile['modelId'],'cases':results,'transport':requests,'attachments':attachments,
+                return {'status':'PASS','withTools':with_tools,'reasoningTokens':reasoning_tokens,'reasoningObserved':reasoning_tokens>0,'live':live,'desktop':str(desktop),'model':profile['modelId'],'cases':results,'transport':requests,'attachments':attachments,
                         'originalsPreserved':True,'mediaGenerationSubmitted':False,'productionPreferencesUnchanged':True}
             finally:
                 stop.set()
@@ -175,6 +182,6 @@ class DocumentsAcceptance(unittest.TestCase):
 
 if __name__=='__main__':
     if '--live' in sys.argv:
-        parser=argparse.ArgumentParser();parser.add_argument('--live',action='store_true');parser.add_argument('--desktop-root',type=Path,default=Path(__file__).resolve().parents[1]);parser.add_argument('--report',type=Path,required=True);args=parser.parse_args()
-        report=session(args.desktop_root.resolve(),Path(os.environ['LOCALAPPDATA'])/'NexusDesktop');args.report.parent.mkdir(parents=True,exist_ok=True);args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(report,ensure_ascii=False,indent=2))
+        parser=argparse.ArgumentParser();parser.add_argument('--live',action='store_true');parser.add_argument('--desktop-root',type=Path,default=Path(__file__).resolve().parents[1]);parser.add_argument('--report',type=Path,required=True);parser.add_argument('--case',choices=['image','pdf','scan'],action='append');parser.add_argument('--with-tools',action='store_true');args=parser.parse_args()
+        report=session(args.desktop_root.resolve(),Path(os.environ['LOCALAPPDATA'])/'NexusDesktop',args.case,args.report,args.with_tools);args.report.parent.mkdir(parents=True,exist_ok=True);args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(report,ensure_ascii=False,indent=2))
     else:unittest.main(verbosity=2)
