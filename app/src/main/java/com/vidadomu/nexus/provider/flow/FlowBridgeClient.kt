@@ -111,6 +111,69 @@ internal class FlowBridgeClient(
     @Serializable
     private data class ReferencePayload(@SerialName("reference_id") val referenceId: String)
 
+    // --- Conversación con el agente de Flow (panel «Sesión …» del proyecto abierto) ---
+
+    @Serializable
+    private data class AgentMessagePayload(val message: String)
+
+    @Serializable
+    data class AgentMedia(val row: Int, val index: Int, val kind: String = "image", val label: String = "",
+                          val width: Int = 0, val height: Int = 0)
+
+    @Serializable
+    data class AgentReplyPayload(val text: String = "", val options: List<String> = emptyList(), val media: List<AgentMedia> = emptyList())
+
+    @Serializable
+    private data class AgentJobPayload(@SerialName("job_id") val jobId: String, val state: String,
+                                       val reply: AgentReplyPayload = AgentReplyPayload())
+
+    data class AgentTurn(val id: String, val state: String, val reply: AgentReplyPayload)
+
+    suspend fun agentSend(message: String): Result<AgentTurn> {
+        val clean = message.trim()
+        if (clean.isBlank()) return Result.failure(ProviderError("Escribe el mensaje para el agente de Flow."))
+        if (clean.length > MAX_PROMPT_LIMIT) return Result.failure(ProviderError("El mensaje supera $MAX_PROMPT_LIMIT caracteres."))
+        val body = json.encodeToString(AgentMessagePayload.serializer(), AgentMessagePayload(clean)).toRequestBody(JSON_MEDIA_TYPE)
+        return guarded {
+            val chosen = base()
+            requestJson(authorizedRequest("$chosen/agent").post(body).build()) { raw ->
+                json.decodeFromString<AgentJobPayload>(raw).let { AgentTurn("${tagFor(chosen)}.${it.jobId}", it.state, it.reply) }
+            }
+        }
+    }
+
+    suspend fun agentStatus(id: String): Result<AgentTurn> {
+        if (!JOB_ID.matches(id)) return Result.failure(ProviderError("El identificador de la conversación con Flow no es válido."))
+        return guarded {
+            requestJson(authorizedRequest("${baseFor(id)}/agent/${rawId(id)}").get().build()) { raw ->
+                json.decodeFromString<AgentJobPayload>(raw).let { AgentTurn(id, it.state, it.reply) }
+            }
+        }
+    }
+
+    /** Descarga una imagen o vídeo que generó el agente de Flow en esa respuesta. */
+    suspend fun agentMedia(id: String, media: AgentMedia, destinationDir: File): Result<FlowBridgeDownload> = withContext(Dispatchers.IO) {
+        if (!JOB_ID.matches(id) || media.row !in 0..10_000 || media.index !in 0..200)
+            return@withContext Result.failure(ProviderError("El archivo del agente de Flow no es válido."))
+        try {
+            destinationDir.mkdirs()
+            client.newCall(authorizedRequest("${baseFor(id)}/agent/${rawId(id)}/media/${media.row}/${media.index}").get().build()).awaitResponse().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(bridgeError(response.code, response.body?.string().orEmpty()))
+                val body = response.body ?: return@withContext Result.failure(ProviderError("Flow no devolvió el archivo."))
+                val expected = if (media.kind == "video") "video" else "image"
+                val mime = body.contentType()?.toString()?.substringBefore(';')?.takeIf { it.matches(MIME_TYPE) } ?: fallbackMimeType(expected)
+                val target = File(destinationDir, "FlowAgente-${rawId(id).take(24)}-${media.row}-${media.index}.${extensionFor(mime, expected)}")
+                body.byteStream().use { input -> FileOutputStream(target).use { input.copyTo(it) } }
+                if (target.length() <= 0L) return@withContext Result.failure(ProviderError("Flow devolvió un archivo vacío."))
+                Result.success(FlowBridgeDownload(target, mime))
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Result.failure(flowNetworkError(error))
+        }
+    }
+
     suspend fun job(jobId: String): Result<FlowBridgeJob> {
         if (!JOB_ID.matches(jobId)) return Result.failure(ProviderError("El identificador del trabajo de Flow no es válido."))
         return guarded {

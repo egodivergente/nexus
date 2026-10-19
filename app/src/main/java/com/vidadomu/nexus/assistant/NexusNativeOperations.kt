@@ -71,6 +71,7 @@ class NexusNativeOperations(
                 "web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools", "call_mcp_tool", "disconnect_mcp_server" -> internet.run(operation,input)
                 "get_active_generations" -> active(input)
                 "recover_generation" -> recover(input.requiredText("job_id"))
+                "flow_agent_send", "flow_agent_read" -> FlowAgentOperations(app).run(operation, input)
                 "diagnose_flow" -> flow(false)
                 "repair_flow" -> flow(true)
                 "get_nexus_settings" -> settings()
