@@ -4,6 +4,7 @@ The bridge deliberately drives only the already-open, authenticated Flow page.
 It never reads/export cookies, stores prompts, or uses an undocumented Google API.
 """
 import asyncio
+import base64
 from collections import Counter
 from contextlib import asynccontextmanager, suppress
 import hashlib
@@ -373,47 +374,18 @@ async def flow_api_status():
 
 
 async def download_controls(page):
-    """Return hashes of visible Flow download controls without reading card text."""
-    buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
-    controls = []
-    for index in range(await buttons.count()):
-        button = buttons.nth(index)
-        if not await button.is_visible():
-            continue
-        # The structural signature intentionally excludes inner text, hrefs and
-        # arbitrary attributes, which can contain user-provided prompt material.
-        shape = await button.evaluate("""button => {
-            const attrs = node => ({
-                tag: node.tagName,
-                aria: node.getAttribute('aria-label') || '',
-                title: node.getAttribute('title') || '',
-                id: node.id || '',
-                testid: node.getAttribute('data-testid') || '',
-                role: node.getAttribute('role') || ''
-            });
-            const path = [];
-            let node = button;
-            for (let depth = 0; node && depth < 5; depth += 1) {
-                const parent = node.parentElement;
-                if (!parent) break;
-                const siblings = [...parent.children].filter(child => child.tagName === node.tagName);
-                path.push(`${node.tagName}:${siblings.indexOf(node)}`);
-                node = parent;
-            }
-            return {control: attrs(button), path};
-        }""")
-        signature = hashlib.sha256(json.dumps(shape, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        controls.append({'index': index, 'signature': signature})
-    return controls
+    """Resultados visibles del proyecto: imágenes y vídeos servidos por Flow, identificados por la ruta de su archivo.
+    La Flow actual ya no pone botones «Descargar» en las tarjetas (están en su menú ⋮), así que se usan los medios,
+    que además identifican cada resultado de forma única sin leer el texto de las tarjetas."""
+    items = flow_import.unique_media(await page.evaluate(flow_import.READ_MEDIA))
+    return [{'index': index, 'signature': flow_import.media_signature(item['src']), 'src': item['src'], 'kind': item['kind']}
+            for index, item in enumerate(items)]
 
 
 def new_downloads(job, current_controls):
     """Identify only additions whose identity remains unambiguous across polls."""
     baseline = list(job.get('baseline_downloads', []))
     baseline_counts = Counter(baseline)
-    current_counts = Counter(item['signature'] for item in current_controls)
-    if any(current_counts[signature] < count for signature, count in baseline_counts.items()):
-        return None, 'download_controls_changed'
     additions = []
     seen = Counter()
     for control in current_controls:
@@ -431,9 +403,8 @@ def new_downloads(job, current_controls):
 
 
 def download_control_matches(expected, current_controls):
-    """`index` is the raw locator index; invisible controls are omitted above."""
-    return any(control['index'] == expected['index'] and control['signature'] == expected['signature']
-               for control in current_controls)
+    """Devuelve el resultado actual con la misma identidad; la posición cambia cuando Flow añade otros."""
+    return next((control for control in current_controls if control['signature'] == expected['signature']), None)
 
 
 async def wait_composer_cleared(page, composer, timeout_ms=15000):
@@ -634,29 +605,23 @@ async def download_flow_result(job_id, output_index):
     expected = downloads[output_index]
     async with FLOW_UI_LOCK:
         async def download(page):
-            controls = await download_controls(page)
-            index = expected['index']
-            if not download_control_matches(expected, controls):
+            match = download_control_matches(expected, await download_controls(page))
+            if not match:
                 raise FlowError('download_ambiguous', 409)
-            buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
-            button = buttons.nth(index)
-            if not await button.is_visible() or not await button.is_enabled():
-                raise FlowError('download_unavailable', 409)
             try:
-                async with page.expect_download(timeout=30000) as pending:
-                    await button.click(timeout=10000)
-                result = await pending.value
-                filename = safe_download_filename(result.suggested_filename, output_index)
-                path = private_download_path(job_id, output_index, filename)
-                await result.save_as(str(path))
-                path.chmod(0o600)
-                media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-                return FileResponse(path, media_type=media_type, filename=filename,
-                                    background=BackgroundTask(delete_private_download, path))
-            except FlowError:
-                raise
+                result = await page.evaluate(flow_agent.FETCH_MEDIA, match['src'])
             except Exception as error:
                 raise FlowError('download_failed', 503) from error
+            if not result or 'error' in result:
+                raise FlowError('download_unavailable', 409)
+            media_type = result.get('type') or 'application/octet-stream'
+            extension = mimetypes.guess_extension(media_type) or ('.mp4' if match['kind'] == 'video' else '.jpg')
+            filename = safe_download_filename(f'flow-result-{output_index}{extension}', output_index)
+            path = private_download_path(job_id, output_index, filename)
+            path.write_bytes(base64.b64decode(result['data']))
+            path.chmod(0o600)
+            return FileResponse(path, media_type=media_type, filename=filename,
+                                background=BackgroundTask(delete_private_download, path))
         return await with_flow_project_page(download)
 
 
@@ -937,9 +902,23 @@ async def flow_project_media(project_id: str):
 
 
 @app.get('/api/flow/projects/{project_id}/media/{key}')
-async def flow_project_media_file(project_id: str, key: str):
+async def flow_project_media_file(project_id: str, key: str, size: str | None = None):
+    """Sin size: la versión que muestra Flow. Con size (1K, 2K, 4K, 720p, 1080p, GIF): el menú «Descargar» de Flow."""
+    from fastapi.responses import Response
     if not flow_import.PROJECT_ID.fullmatch(project_id) or not flow_import.MEDIA_KEY.fullmatch(key):
         return JSONResponse({'error': 'result_not_found'}, status_code=404)
+    if size is not None:
+        if size not in flow_import.SIZES:
+            return JSONResponse({'error': 'option_unavailable'}, status_code=400)
+        try:
+            found = await with_flow_browser(lambda browser: flow_import.download_size(browser, project_id, key, size))
+        except FlowError as error:
+            return flow_error_response(error)
+        if isinstance(found, str):
+            return JSONResponse({'error': found}, status_code=404 if found == 'result_not_found' else 409)
+        filename, raw = found
+        return Response(raw, media_type=mimetypes.guess_type(filename)[0] or 'application/octet-stream',
+                        headers={'Content-Disposition': f'attachment; filename="{safe_download_filename(filename, 0)}"'})
     try:
         found = await with_flow_browser(lambda browser: flow_import.fetch_media(browser, project_id, key))
     except FlowError as error:
@@ -947,7 +926,6 @@ async def flow_project_media_file(project_id: str, key: str):
     if not found:
         return JSONResponse({'error': 'download_unavailable'}, status_code=409)
     media_type, raw = found
-    from fastapi.responses import Response
     return Response(raw, media_type=media_type)
 
 

@@ -41,6 +41,8 @@ internal fun FlowImportSheet(onDismiss:()->Unit,onDone:(String)->Unit) {
     var busy by remember {mutableStateOf(true)}
     var progress by remember {mutableStateOf<Pair<Int,Int>?>(null)}
     var error by remember {mutableStateOf<String?>(null)}
+    // Tamaño de descarga: «Rápido» = lo que muestra Flow; 1K/2K/4K usan el menú «Descargar» de Flow (2K/4K mejoran resolución).
+    var size by remember {mutableStateOf(prefs.getString("size",null))}
     LaunchedEffect(bridge) {
         bridge.projects().onSuccess {projects=it}.onFailure {error=it.message ?: "No se pudo leer la galería de Flow."}
         busy=false
@@ -59,11 +61,18 @@ internal fun FlowImportSheet(onDismiss:()->Unit,onDone:(String)->Unit) {
         scope.launch {
             val staging=File(context.cacheDir,"flow-import").apply {mkdirs()}
             val projectId=AssistantRuntime.get(app).settings.activeProjectId()
-            var done=0;var lastError:String?=null
+            var done=0;var lastError:String?=null;var upscaleFallbacks=0
             try {
                 for((index,item) in pending.withIndex()) {
                     progress=index to pending.size
-                    val file=bridge.projectMediaFile(target.id,item,staging).getOrElse {lastError=it.message;null} ?: continue
+                    val wanted=size?.let {flowSizeFor(it,item.kind)}
+                    var result=bridge.projectMediaFile(target.id,item,staging,wanted)
+                    // Si Flow no consigue mejorar la resolución, se trae el original en vez de dejar el archivo fuera.
+                    if(wanted!=null && wanted!="1K" && wanted!="720p" && result.isFailure) {
+                        upscaleFallbacks++
+                        result=bridge.projectMediaFile(target.id,item,staging,if(item.kind=="video") "720p" else "1K")
+                    }
+                    val file=result.getOrElse {lastError=it.message;null} ?: continue
                     try {
                         AgentMediaStore.persist(app,Uri.fromFile(file.file),file.mimeType,projectId)
                         imported=imported+"${target.id}/${item.key}"
@@ -74,7 +83,9 @@ internal fun FlowImportSheet(onDismiss:()->Unit,onDone:(String)->Unit) {
                       finally {file.file.delete()}
                 }
             } finally {busy=false;progress=null}
-            val summary="Importados de Flow: $done de ${pending.size}"+(lastError?.takeIf {done<pending.size}?.let {". $it"} ?: "")
+            val summary="Importados de Flow: $done de ${pending.size}"+
+                (if(upscaleFallbacks>0) ". $upscaleFallbacks en tamaño original (Flow no pudo mejorarlos)" else "")+
+                (lastError?.takeIf {done<pending.size}?.let {". $it"} ?: "")
             if(done==pending.size) onDone(summary) else error=summary
         }
     }
@@ -112,6 +123,19 @@ internal fun FlowImportSheet(onDismiss:()->Unit,onDone:(String)->Unit) {
                         fresh==0 -> "Ya tienes en la Biblioteca los ${items.size} archivos de este proyecto."
                         else -> "${items.size} archivos (${items.size-videos} imágenes, $videos vídeos). Nuevos: $fresh."
                     },style=MaterialTheme.typography.bodyLarge,modifier=Modifier.padding(vertical=NexusTokens.space16))
+                    Text("Tamaño",style=MaterialTheme.typography.labelLarge)
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space8)) {
+                        val options=listOf(null to "Rápido","1K" to "1K","2K" to "2K","4K" to "4K")
+                        options.forEachIndexed {index,(value,label) ->
+                            SegmentedButton(selected=size==value,onClick={size=value;prefs.edit().putString("size",value).apply()},
+                                shape=SegmentedButtonDefaults.itemShape(index,options.size),enabled=!busy) {Text(label)}
+                        }
+                    }
+                    Text(when(size) {
+                        null -> "Rápido: la versión que muestra Flow."
+                        "1K" -> "Original de Flow (vídeo: 720p)."
+                        else -> "Flow mejora la resolución a $size (vídeo: ${flowSizeFor(size!!,"video")}); tarda más por archivo."
+                    },style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(bottom=NexusTokens.space8))
                     Button(onClick={importNew(current,items)},enabled=!busy && fresh>0,modifier=Modifier.fillMaxWidth()) {
                         Text(if(fresh>0) "Importar $fresh" else "Nada nuevo que importar")
                     }
@@ -124,3 +148,7 @@ internal fun FlowImportSheet(onDismiss:()->Unit,onDone:(String)->Unit) {
 }
 
 private const val FLOW_IMPORT_PREFS="flow_import_v1"
+
+/** Equivalencia de tamaños para vídeo en el menú «Descargar» de Flow. */
+internal fun flowSizeFor(size:String,kind:String):String =
+    if(kind!="video") size else when(size) {"1K"->"720p";"2K"->"1080p";else->"4K"}

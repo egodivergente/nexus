@@ -205,20 +205,25 @@ internal class FlowBridgeClient(
         }
     }
 
-    /** Descarga un archivo ya generado de un proyecto de Flow. No genera nada ni gasta créditos. */
-    suspend fun projectMediaFile(projectId: String, media: FlowProjectMedia, destinationDir: File): Result<FlowBridgeDownload> =
+    /**
+     * Descarga un archivo ya generado de un proyecto de Flow. Sin [size], la versión que muestra Flow (rápida);
+     * con size (1K, 2K, 4K para imágenes; 720p, 1080p, 4K para vídeo), el menú «Descargar» de Flow, que mejora
+     * la resolución si se pide 2K/4K. No genera contenido nuevo.
+     */
+    suspend fun projectMediaFile(projectId: String, media: FlowProjectMedia, destinationDir: File, size: String? = null): Result<FlowBridgeDownload> =
         withContext(Dispatchers.IO) {
-            if (!PROJECT_ID.matches(projectId) || !MEDIA_KEY.matches(media.key))
+            if (!PROJECT_ID.matches(projectId) || !MEDIA_KEY.matches(media.key) || (size != null && size !in DOWNLOAD_SIZES))
                 return@withContext Result.failure(ProviderError("El archivo de Flow no es válido."))
             try {
                 destinationDir.mkdirs()
-                importClient.newCall(authorizedRequest("$IMPORT_BASE/projects/$projectId/media/${media.key}").get().build())
+                val query = size?.let { "?size=$it" }.orEmpty()
+                importClient.newCall(authorizedRequest("$IMPORT_BASE/projects/$projectId/media/${media.key}$query").get().build())
                     .awaitResponse().use { response ->
                         if (!response.isSuccessful) return@withContext Result.failure(bridgeError(response.code, response.body?.string().orEmpty()))
                         val body = response.body ?: return@withContext Result.failure(ProviderError("Flow no devolvió el archivo."))
                         val expected = if (media.kind == "video") "video" else "image"
                         val mime = body.contentType()?.toString()?.substringBefore(';')?.takeIf { it.matches(MIME_TYPE) } ?: fallbackMimeType(expected)
-                        val target = File(destinationDir, "Flow-${projectId.take(8)}-${media.key}.${extensionFor(mime, expected)}")
+                        val target = File(destinationDir, "Flow-${projectId.take(8)}-${media.key}${size?.let { "-$it" }.orEmpty()}.${extensionFor(mime, expected)}")
                         body.byteStream().use { input -> FileOutputStream(target).use { input.copyTo(it) } }
                         if (target.length() <= 0L) return@withContext Result.failure(ProviderError("Flow devolvió un archivo vacío."))
                         Result.success(FlowBridgeDownload(target, mime))
@@ -477,6 +482,8 @@ internal class FlowBridgeClient(
 
     private fun referenceErrorMessage(code: String?): String? = when (code) {
         "auth_required" -> "Flow ha cerrado la sesión en el ASUS. Vuelve a entrar desde Ajustes › Google Flow."
+        "upscale_failed" -> "Flow no pudo mejorar la resolución de este archivo (no cobra en ese caso)."
+        "option_unavailable" -> "Flow no ofrece ese tamaño para este archivo."
         "reference_too_large" -> "La referencia supera 16 MB. Reduce su tamaño y vuelve a adjuntarla."
         "invalid_reference_type", "invalid_reference_image" -> "Adjunta una imagen PNG, JPEG o WebP válida."
         "reference_not_found", "reference_integrity_failed", "invalid_reference_ids" -> "La copia privada de una referencia ya no está disponible. Vuelve a adjuntarla."
@@ -558,6 +565,7 @@ internal class FlowBridgeClient(
         private val IMPORT_BASE = HOSTS.last().second
         private val PROJECT_ID = Regex("[A-Za-z0-9-]{8,64}")
         private val MEDIA_KEY = Regex("[0-9a-f]{24}")
+        val DOWNLOAD_SIZES = setOf("1K", "2K", "4K", "720p", "1080p")
         private const val PIN_MS = 10 * 60_000L
         @Volatile private var pinned: Pair<String, Long>? = null
         private const val DEFAULT_PROMPT_LIMIT = 4_000

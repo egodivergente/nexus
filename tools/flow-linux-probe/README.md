@@ -305,3 +305,25 @@ Corrección: el vigilante ya **no pulsa «Siguiente» si el campo no está autoc
 ~6 s y devuelve `password_not_autofilled`). Desplegado en el ASUS. Queda por resolver por qué Chromium
 no autocompleta aquí (entrada añadida desde el gestor sin formulario asociado, página bajo CDP o
 cualquier otro motivo); no se insistirá mientras Google muestre el aviso de intentos fallidos.
+
+### Navegador en su propio servicio y detección de resultados por medios (2026-10-20, 01:10)
+
+- **`nexus-flow-browser.service`** (unidad de usuario, `WantedBy=default.target`) arranca Chromium en Xvfb
+  (`login.py --persistent`) con su `ExecStop` de cierre limpio. `nexus-flow-recovery` ya no es su padre:
+  `start_browser()` lo detecta por `SingletonLock` y el puerto 6099 y no abre otro. Se quitó el drop-in
+  `graceful-browser.conf` del puente. **Comprobado:** reiniciar el puente deja el navegador intacto (mismo
+  PID). El cambio en sí costó una última pérdida de sesión.
+- **Resultados por medios, no por botones.** La Flow actual no muestra «Descargar» en las tarjetas (está en
+  el menú ⋮), y ningún trabajo del ASUS se había completado desde el 09-10 (`flow-jobs.json`: todos
+  `failed`, casi siempre `flow_composer_not_empty`). `download_controls()` devuelve ahora las imágenes y
+  vídeos del proyecto, con la firma SHA-256 de la ruta de su archivo; la descarga se hace con `fetch()`
+  sin clics, y un resultado se busca por su identidad, aunque cambie de posición. Que un resultado antiguo
+  deje de verse ya no invalida el trabajo.
+- **Descarga por tamaño** (`?size=1K|2K|4K|720p|1080p`) con el menú «Descargar» de la tarjeta. Comprobado en
+  real: 1K → JPEG de 1376×768 en 6,5 s; 2K → JPEG de 2752×1536 en 15,6 s.
+- **Panel de ajustes de Flow** (leído en un proyecto vacío y restaurado después): Imagen/Vídeo; en Vídeo,
+  modos «Fotogramas» e «Ingredientes», 16:9/9:16, 360p/720p, 4/6/8/10 s, x1–x4, modelos Omni 1.1 Flash y
+  Veo 3.1 Lite/Fast/Quality, y el coste en puntos. En «Fotogramas», el compositor muestra los botones
+  «Inicio», «Fin» e «Intercambiar».
+- Aprendido: el chip «Agente» del compositor es un interruptor; una sonda lo desactivó por error en el
+  proyecto del gato y se restauró al momento. Las sondas guardan ahora su estado inicial y lo restauran.

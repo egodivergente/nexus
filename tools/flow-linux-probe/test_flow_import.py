@@ -72,6 +72,18 @@ class ImportRoutes(unittest.TestCase):
             response = self.client.get(f'/api/flow/projects/abcdefgh-1234/media/{key}', headers=AUTH)
         self.assertEqual((response.status_code, response.headers['content-type'], response.content), (200, 'image/webp', b'RIFF'))
 
+    def test_sized_download_uses_flow_menu_and_reports_failed_upscale(self):
+        key = flow_import.media_key(IMG)
+        with patch.object(recovery, 'with_flow_browser', AsyncMock(return_value=('cat.png', b'PNG'))):
+            ok = self.client.get(f'/api/flow/projects/abcdefgh-1234/media/{key}?size=2K', headers=AUTH)
+        self.assertEqual((ok.status_code, ok.headers['content-type'], ok.content), (200, 'image/png', b'PNG'))
+        with patch.object(recovery, 'with_flow_browser', AsyncMock(return_value='upscale_failed')):
+            failed = self.client.get(f'/api/flow/projects/abcdefgh-1234/media/{key}?size=4K', headers=AUTH)
+        self.assertEqual((failed.status_code, failed.json()), (409, {'error': 'upscale_failed'}))
+        with patch.object(recovery, 'with_flow_browser', AsyncMock()) as browser:
+            self.assertEqual(self.client.get(f'/api/flow/projects/abcdefgh-1234/media/{key}?size=8K', headers=AUTH).status_code, 400)
+            browser.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

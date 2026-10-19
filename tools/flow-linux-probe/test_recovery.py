@@ -274,27 +274,32 @@ class FlowJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second['state'], 'uncertain')
         drive.assert_awaited_once()
 
-    async def test_changed_or_duplicate_download_controls_are_ambiguous(self):
-        job = {'baseline_downloads': ['old-control']}
+    async def test_duplicate_results_are_ambiguous_and_hidden_old_ones_are_tolerated(self):
+        job = {'baseline_downloads': ['old-result']}
         additions, error = recovery.new_downloads(job, [
-            {'index': 0, 'signature': 'old-control'},
-            {'index': 1, 'signature': 'old-control'},
+            {'index': 0, 'signature': 'old-result'},
+            {'index': 1, 'signature': 'old-result'},
         ])
         self.assertIsNone(additions)
         self.assertEqual(error, 'download_ambiguous')
-        additions, error = recovery.new_downloads(job, [{'index': 0, 'signature': 'other-control'}])
-        self.assertIsNone(additions)
-        self.assertEqual(error, 'download_controls_changed')
+        # Flow pagina la cuadrícula: que un resultado antiguo deje de verse no invalida el nuevo.
+        additions, error = recovery.new_downloads(job, [{'index': 0, 'signature': 'new-result'}])
+        self.assertEqual((additions, error), ([{'index': 0, 'signature': 'new-result'}], None))
 
-    async def test_visible_download_keeps_its_raw_locator_index(self):
-        expected = {'index': 3, 'signature': 'visible-output'}
-        # Index 1 represents a hidden matching button omitted by download_controls.
-        controls = [{'index': 0, 'signature': 'old-output'},
-                    {'index': 3, 'signature': 'visible-output'}]
-        self.assertTrue(recovery.download_control_matches(expected, controls))
-        self.assertFalse(recovery.download_control_matches(
-            {'index': 1, 'signature': 'visible-output'}, controls))
+    async def test_result_is_found_by_identity_even_if_it_moved(self):
+        expected = {'index': 0, 'signature': 'my-output'}
+        controls = [{'index': 0, 'signature': 'newer-output'}, {'index': 1, 'signature': 'my-output'}]
+        self.assertEqual(recovery.download_control_matches(expected, controls)['index'], 1)
+        self.assertIsNone(recovery.download_control_matches({'index': 0, 'signature': 'gone'}, controls))
 
+    async def test_download_controls_are_project_media(self):
+        page = AsyncMock()
+        page.evaluate.return_value = [
+            {'kind': 'image', 'src': 'https://flow.google.com/asb/a?w=1', 'width': 1376, 'height': 768},
+            {'kind': 'image', 'src': 'https://flow.google.com/asb/a?w=2', 'width': 1376, 'height': 768}]
+        controls = await recovery.download_controls(page)
+        self.assertEqual(len(controls), 1)
+        self.assertRegex(controls[0]['signature'], recovery.FLOW_SIGNATURE)
 
 if __name__ == '__main__':
     unittest.main()
