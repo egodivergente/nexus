@@ -2,7 +2,12 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
-## [Sin publicar] - rama `ux/agent-prompt-fiel-20261019`
+## [1.9.50-agent] - 2026-10-19 · cabecera más despejada
+
+- **Un solo botón de ajustes:** el icono de parámetros y la rueda se unen en una rueda con dos entradas, «Asistente: modelo y conexión» y «Aplicación». La cabecera pasa de cinco a cuatro elementos.
+- **Saldo discreto:** el saldo se muestra como texto sin fondo; al tocarlo sigue abriendo el detalle de gasto.
+
+## [1.9.49-agent] - 2026-10-19 · rama `ux/agent-prompt-fiel-20261019`
 
 - **Tu prompt, tal cual:** si entregas un prompt ya hecho, el agente lo envía exactamente como lo escribiste. Solo lo cambia si supera el límite de caracteres del modelo, si el modelo exige otra sintaxis documentada o si el proveedor lo rechazó, y siempre lo dice en una frase (el original se conserva). La memoria del proyecto y las skills ya no se inyectan en prompts tuyos. Regla `PROMPT_FIDELITY_RULES` siempre activa; prueba `PromptFidelityTest`.
 - **Cuadro de texto:** una sola forma (esquinas de 24 dp) que ya no cambia con el contenido ni corta los adjuntos.
