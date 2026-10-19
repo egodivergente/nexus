@@ -3,9 +3,12 @@
 Run every few minutes from nexus-flow-keepalive.timer. It only attaches to the
 already-running browser over loopback CDP and, after a grace period:
 - reopens the last known Flow project when Flow drops back to its gallery;
-- parks a signed-out /about page on about:blank, because that public page alone
-  saturates the ASUS CPU, and records that a human sign-in is needed.
-It never types credentials, creates projects, reloads an open project or submits work.
+- when Flow is signed out, makes at most one sign-in attempt every RELOGIN_COOLDOWN with
+  the password the user saved in this Chromium (autofill): it only clicks the saved
+  account and Next, and stops on any verification, consent or rejection;
+- otherwise parks the signed-out /about page on about:blank, because that public page
+  alone saturates the ASUS CPU, and records that a human sign-in is needed.
+It never types or reads credentials, creates projects, reloads an open project or submits work.
 `--close-browser` closes Chromium cleanly (cookies flushed) for ExecStop.
 """
 import asyncio
@@ -22,6 +25,9 @@ STATE_FILE = ROOT / 'keepalive-state.json'
 CDP = 'http://127.0.0.1:9229'
 REOPEN_AFTER = 10 * 60
 PARK_AFTER = 20 * 60
+RELOGIN_AFTER = 2 * 60
+RELOGIN_COOLDOWN = 6 * 3600
+NEXT = re.compile(r'^(Next|Siguiente)$')
 
 
 def classify(urls):
@@ -43,7 +49,7 @@ def classify(urls):
 
 
 def decide(kind, project_url, state, now):
-    """Return (action, new_state). action is None, 'reopen' or 'park'."""
+    """Return (action, new_state). action is None, 'reopen', 'relogin', 'wake' or 'park'."""
     state = dict(state)
     if kind != state.get('kind'):
         state['kind'], state['since'] = kind, now
@@ -53,6 +59,15 @@ def decide(kind, project_url, state, now):
         return None, state
     if kind in ('login', 'gallery'):
         state['parked'] = False
+    if (kind == 'signed_out' and waited >= RELOGIN_AFTER and not state.get('parked')
+            and now - state.get('last_relogin', float('-inf')) >= RELOGIN_COOLDOWN):
+        # Recorded before acting, so a crash mid-attempt cannot cause a retry loop.
+        state['last_relogin'] = now
+        return 'relogin', state
+    if kind == 'blank' and state.get('parked') and now - state.get('last_relogin', float('-inf')) >= RELOGIN_COOLDOWN:
+        # Bring the signed-out page back so the next run can make the next attempt.
+        state['parked'] = False
+        return 'wake', state
     if kind == 'signed_out' and waited >= PARK_AFTER and not state.get('parked'):
         state['parked'] = True
         return 'park', state
@@ -73,6 +88,56 @@ def load_state():
 def save_state(state):
     os.umask(0o077)
     STATE_FILE.write_text(json.dumps(state), encoding='utf-8')
+
+
+def google_login(url):
+    parts = urlsplit(url)
+    return parts.scheme == 'https' and parts.hostname == 'accounts.google.com'
+
+
+def login_outcome(url):
+    """Classify a URL reached during sign-in: None means keep going."""
+    parts = urlsplit(url)
+    if parts.scheme == 'https' and parts.hostname == 'flow.google.com' and not parts.path.startswith('/about'):
+        return 'signed_in'
+    if not google_login(url):
+        return 'unexpected_destination'
+    if any(s in parts.path for s in ('/rejected', '/denied')):
+        return 'browser_rejected'
+    if '/consent' in parts.path:
+        return 'consent_required'
+    if '/challenge/' in parts.path and '/challenge/pwd' not in parts.path:
+        return 'verification_required'
+    return None
+
+
+async def relogin(page):
+    """One autofill sign-in: click the saved account and Next; never type anything."""
+    if urlsplit(page.url).hostname == 'flow.google.com':
+        link = page.locator('a').filter(has_text=re.compile(r'^\s*(Sign in|Iniciar sesi[oó]n)\s*$', re.I)).first
+        href = await link.get_attribute('href', timeout=5000)
+        if not google_login(href or ''):
+            return 'sign_in_link_not_found'
+        await page.goto(href, wait_until='domcontentloaded', timeout=30000)
+    clicked = set()
+    for _ in range(20):
+        outcome = login_outcome(page.url)
+        if outcome:
+            return outcome
+        chooser = page.locator('[data-identifier]')
+        password = page.locator('input[type="password"]')
+        email = page.locator('input[type="email"]')
+        if 'account' not in clicked and await chooser.count() == 1:
+            await chooser.first.click(timeout=5000)
+            clicked.add('account')
+        elif 'password' not in clicked and await password.count() and await password.first.is_visible():
+            await page.get_by_role('button', name=NEXT).click(timeout=5000)
+            clicked.add('password')
+        elif 'email' not in clicked and await email.count() and await email.first.is_visible():
+            await page.get_by_role('button', name=NEXT).click(timeout=5000)
+            clicked.add('email')
+        await page.wait_for_timeout(1500)
+    return 'needs_user'
 
 
 async def pages(browser):
@@ -96,6 +161,20 @@ async def check():
                            if urlsplit(page.url).hostname == 'flow.google.com' or page.url == 'about:blank'), None)
             if target:
                 await target.goto(state['last_project'], wait_until='domcontentloaded', timeout=45000)
+        elif action == 'relogin':
+            target = next((page for page in open_pages if urlsplit(page.url).hostname == 'flow.google.com'), None)
+            try:
+                result = await relogin(target) if target else 'no_flow_page'
+            except Exception as error:
+                result = 'error_' + type(error).__name__
+            state['relogin_result'] = result
+            print('relogin', result)
+            if result == 'signed_in' and state.get('last_project'):
+                await target.goto(state['last_project'], wait_until='domcontentloaded', timeout=45000)
+        elif action == 'wake':
+            target = next((page for page in open_pages if page.url == 'about:blank'), None)
+            if target:
+                await target.goto('https://flow.google.com/', wait_until='domcontentloaded', timeout=45000)
         elif action == 'park':
             for page in open_pages:
                 if urlsplit(page.url).hostname == 'flow.google.com':

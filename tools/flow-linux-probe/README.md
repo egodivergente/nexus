@@ -240,10 +240,20 @@ navegador, nunca escribe credenciales, nunca crea proyectos ni recarga un proyec
   que las cookies que Google rota queden guardadas. Antes, el último cierre registraba
   `exit_type=Crashed`.
 
-No se automatiza el inicio de sesión: Google ya rechazó el inicio desatendido
-(`/signin/rejected`). Si la sesión cae, se vuelve a iniciar desde el portal.
+**Reinicio de sesión con la contraseña guardada (autorizado por el usuario el 19-10-2026).**
+Si la página sigue en `/about` más de 2 minutos, el vigilante hace **un único intento cada 6 horas**
+con la contraseña que el usuario guardó en este Chromium (autocompletado). Solo pulsa la cuenta
+guardada y «Siguiente»: nunca escribe ni lee la contraseña. Se detiene ante cualquier verificación
+(`/challenge/` salvo `pwd`), consentimiento, rechazo (`/rejected`) o destino inesperado, y guarda el
+motivo en `relogin_result`. El intento se registra antes de actuar, así que un fallo a mitad no
+provoca reintentos en bucle. Tras un fallo, la página se deja en blanco; pasadas 6 horas se reabre
+la portada para el siguiente intento. Si no hay contraseña guardada, el intento termina en
+`needs_user` sin más efecto. Riesgos aceptados por el usuario: Google puede rechazarlo (ya ocurrió
+una vez en 2026-10-06), y el perfil sin llavero del sistema guarda la contraseña con poca
+protección frente a cualquiera que acceda como `vidal`. Conviene mantener activa la verificación en
+dos pasos de la cuenta.
 
-Validación: 10 pruebas unitarias en local y en el ASUS. Comprobación real: estado `project`,
-temporizador activo y puente aún `connected`. **NO PROBADO en real**: reabrir el proyecto,
-dejar la página en blanco y el cierre limpio. Comprobarlo exigiría tirar la sesión a propósito.
+Validación: 12 pruebas unitarias en local y en el ASUS. Comprobación real: estado `project`,
+temporizador activo y puente aún `connected`. **NO PROBADO en real**: reabrir el proyecto, el reinicio de
+sesión, dejar la página en blanco y el cierre limpio. Comprobarlo exigiría tirar la sesión a propósito.
 No reiniciar `nexus-flow-recovery` sin necesidad: reiniciarlo cierra Chromium.

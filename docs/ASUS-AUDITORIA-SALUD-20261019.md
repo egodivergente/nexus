@@ -129,8 +129,10 @@ caída) durante más de dos comprobaciones, la deje en blanco y avise. No está 
   cae. Instalado también: el `ExecStop` de cierre limpio. Detalles y límites en
   `tools/flow-linux-probe/README.md`. No se reinició `nexus-flow-recovery`; el puente sigue
   `connected`.
-- **Reinicio automático de sesión con contraseña: descartado.** Google ya lo rechazó, y
-  repetir intentos automáticos puede bloquear la cuenta.
+- **Reinicio de sesión con la contraseña guardada en Chromium**: autorizado por el usuario con
+  sus riesgos. Un intento cada 6 horas, solo con clics, que se detiene ante cualquier
+  verificación. A las 23:10 el perfil todavía **no tenía ninguna contraseña de Google guardada**
+  (se contaron filas, sin leer valores): el usuario tiene que guardarla.
 
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
