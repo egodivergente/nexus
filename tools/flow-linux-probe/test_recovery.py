@@ -62,7 +62,7 @@ class SessionReuseTests(unittest.IsolatedAsyncioTestCase):
     async def test_open_project_checks_the_native_flow_composer(self):
         page = Page('https://flow.google.com/project/example', composer=True, submit=True)
         self.assertEqual(await recovery.context_status(self.context([page])), 'connected')
-        self.assertTrue(any('input[aria-label="Texto editable"]' in selector for selector in page.selectors))
+        self.assertTrue(any(recovery.COMPOSER in selector for selector in page.selectors))
         self.assertTrue(any('button[aria-label="Iniciar generación"]' in selector for selector in page.selectors))
 
     async def test_active_project_is_authoritative_without_an_account_probe(self):

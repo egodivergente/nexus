@@ -24,7 +24,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
-from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES
+from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
+import flow_agent
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -54,6 +55,10 @@ FLOW_JOB_ID = re.compile(r'^[A-Za-z0-9_-]{16,96}$')
 FLOW_OUTPUTS = {'image', 'video'}
 FLOW_DOWNLOAD_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$')
 FLOW_SIGNATURE = re.compile(r'^[0-9a-f]{64}$')
+
+
+# Longitud del texto escrito en el cuadro (div editable o input); un div vacío deja un salto de línea.
+COMPOSER_LENGTH = 'el => ((el.value ?? el.innerText) || "").trim().length'
 
 
 class FlowError(Exception):
@@ -95,7 +100,7 @@ async def context_status(context):
         if not ready and re.fullmatch(r'/project/[^/]+/?', parts.path):
             # The authenticated project itself is the reliable signal. Flow no longer
             # exposes stable workspace labels, but its composer and submit control do.
-            composer = await visible(page.locator('input[aria-label="Texto editable"]'))
+            composer = await visible(page.locator(COMPOSER))
             submit = await visible(page.locator('button[aria-label="Iniciar generación"]'))
             ready = composer and submit
         if ready:
@@ -316,7 +321,7 @@ async def with_flow_project_page(action):
 
 async def flow_controls(page):
     """Only use the explicitly observed Flow composer and submit controls."""
-    composer = page.locator('input[aria-label="Texto editable"]')
+    composer = page.locator(COMPOSER)
     submit = page.locator('button[aria-label="Iniciar generación"]')
     if await composer.count() != 1 or await submit.count() != 1:
         raise FlowError('flow_controls_unavailable', 409)
@@ -431,7 +436,7 @@ async def wait_composer_cleared(page, composer, timeout_ms=15000):
     """Flow vacía el cuadro al aceptar un envío; así sabemos que podemos lanzar el siguiente del lote."""
     waited = 0
     while waited < timeout_ms:
-        if not await composer.evaluate('input => input.value.length'):
+        if not await composer.evaluate(COMPOSER_LENGTH):
             return True
         await page.wait_for_timeout(250)
         waited += 250
@@ -445,7 +450,7 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
             composer, submit_button = await flow_controls(page)
             if not await composer.is_editable():
                 raise FlowError('flow_composer_not_editable', 409)
-            current_length = await composer.evaluate('input => input.value.length')
+            current_length = await composer.evaluate(COMPOSER_LENGTH)
             if current_length:
                 # Do not overwrite a manual draft in the existing Flow tab.
                 raise FlowError('flow_composer_not_empty', 409)
@@ -841,6 +846,48 @@ async def get_flow_download(job_id: str, output_index: int):
         return await download_flow_result(job_id, output_index)
     except FlowError as error:
         return flow_error_response(error)
+
+
+@app.post('/api/flow/agent')
+async def flow_agent_send(request: Request):
+    """Envía un mensaje al agente de Flow del proyecto abierto y devuelve un trabajo para seguir su respuesta."""
+    try:
+        data = await read_limited_json(request)
+        message = data.get('message')
+        if not isinstance(message, str) or not message.strip():
+            raise FlowError('empty_prompt', 400)
+        if len(message) > FLOW_PROMPT_LIMIT:
+            raise FlowError('prompt_too_long', 413)
+        before = await with_flow_project_page(lambda page: flow_agent.send_agent_message(page, message.strip(), FLOW_UI_LOCK, FlowError))
+        return JSONResponse(flow_agent.public_agent_job(flow_agent.new_agent_job(before)), status_code=201)
+    except FlowError as error:
+        return flow_error_response(error)
+
+
+@app.get('/api/flow/agent/{job_id}')
+async def flow_agent_status(job_id: str):
+    job = flow_agent.AGENT_JOBS.get(job_id)
+    if not job:
+        return JSONResponse({'error': 'job_not_found'}, status_code=404)
+    try:
+        return await with_flow_project_page(lambda page: flow_agent.refresh_agent_job(page, job))
+    except FlowError as error:
+        return flow_error_response(error)
+
+
+@app.get('/api/flow/agent/{job_id}/media/{row}/{index}')
+async def flow_agent_media(job_id: str, row: int, index: int):
+    if job_id not in flow_agent.AGENT_JOBS:
+        return JSONResponse({'error': 'job_not_found'}, status_code=404)
+    try:
+        found = await with_flow_project_page(lambda page: flow_agent.fetch_agent_media(page, row, index))
+    except FlowError as error:
+        return flow_error_response(error)
+    if not found:
+        return JSONResponse({'error': 'download_unavailable'}, status_code=409)
+    media_type, raw = found
+    from fastapi.responses import Response
+    return Response(raw, media_type=media_type)
 
 
 @app.post('/lock')
