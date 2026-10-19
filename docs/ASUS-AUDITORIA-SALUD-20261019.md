@@ -263,3 +263,14 @@ ssh vidal@100.112.57.2 'bash -s' < tools/asus-health/audit.sh > asus-audit.txt
 O con Desktop Commander, cuando la conexión del ASUS vuelva a funcionar: reiniciar en el
 ASUS el terminal o servicio que lo ejecuta. El script no usa `sudo`, no reinicia nada y no borra
 nada. El informe puede incluir rutas y nombres de procesos, así que hay que guardarlo **fuera de Git**.
+
+### 20-10-2026: importación desde Flow y lo aprendido de la sesión
+
+- **Importar de Flow** (Biblioteca › ⋮ › «Importar de Flow»): el puente del ASUS lista tus proyectos y
+  descarga lo ya generado, sin gastar créditos. Probado en real en el ASUS: 21 proyectos y una imagen
+  descargada. La app compila; **la APK no está instalada ni probada en el teléfono**.
+- **Reiniciar el navegador pierde la sesión de Google aunque el cierre sea limpio** (comprobado). El cierre
+  limpio funciona, pero no basta.
+- **El reinicio de sesión automático no funcionó**: Chromium no autocompletó la contraseña guardada. Google
+  muestra «Too many failed attempts». Hay que entrar a mano por el portal.
+- Tras reiniciar el servicio, el navegador no arrancaba solo; corregido (arranca con el servicio).

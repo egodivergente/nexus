@@ -131,6 +131,14 @@ async def relogin(page):
             await chooser.first.click(timeout=5000)
             clicked.add('account')
         elif 'password' not in clicked and await password.count() and await password.first.is_visible():
+            # Sin autocompletado, «Siguiente» enviaría una contraseña vacía y Google lo cuenta como intento fallido.
+            if not await password.first.evaluate("e => e.matches(':autofill')"):
+                waits = len([c for c in clicked if c.startswith('wait')])
+                if waits >= 4:
+                    return 'password_not_autofilled'
+                clicked.add(f'wait{waits}')
+                await page.wait_for_timeout(1500)
+                continue
             await page.get_by_role('button', name=NEXT).click(timeout=5000)
             clicked.add('password')
         elif 'email' not in clicked and await email.count() and await email.first.is_visible():
@@ -153,7 +161,11 @@ async def check():
             print('browser_closed')
             return
         # Leaving this block only drops Playwright's connection, never browser.close().
-        open_pages = await pages(browser)
+        import flow_import
+        all_pages = await pages(browser)
+        # La pestaña de importación es temporal: se cierra si lleva un rato sin usarse y no cuenta como proyecto.
+        await flow_import.close_idle_import_tabs(all_pages)
+        open_pages = [page for page in all_pages if not page.is_closed() and not await flow_import.is_import_page(page)]
         kind, project_url = classify(page.url for page in open_pages)
         action, state = decide(kind, project_url, load_state(), time.time())
         if action == 'reopen':

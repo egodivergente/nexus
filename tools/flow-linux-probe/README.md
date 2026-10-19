@@ -257,3 +257,51 @@ Validación: 12 pruebas unitarias en local y en el ASUS. Comprobación real: est
 temporizador activo y puente aún `connected`. **NO PROBADO en real**: reabrir el proyecto, el reinicio de
 sesión, dejar la página en blanco y el cierre limpio. Comprobarlo exigiría tirar la sesión a propósito.
 No reiniciar `nexus-flow-recovery` sin necesidad: reiniciarlo cierra Chromium.
+
+## Importar a Nexus lo ya generado en Flow (2026-10-20)
+
+`flow_import.py` y tres rutas nuevas del puente permiten traer a la Biblioteca de Nexus lo que ya
+existe en los proyectos de Flow:
+
+- `GET /api/flow/projects`: proyectos de la galería (id y título de la tarjeta).
+- `GET /api/flow/projects/{id}/media`: imágenes y vídeos del proyecto (clave, tipo, tamaño), sin URLs.
+- `GET /api/flow/projects/{id}/media/{clave}`: el archivo.
+
+Trabaja en una pestaña propia, marcada con `window.name = "nexus-import"`, que el puente excluye al
+buscar su proyecto y que el vigilante cierra tras 3 minutos sin uso. Así nunca toca el proyecto con el
+que se genera. Recorre la página desplazándose, porque Flow carga los resultados al hacer scroll, y
+descarga con `fetch()` desde la propia página la versión que Flow muestra (p. ej. WebP de 1376×768
+para Nano Banana). No pulsa Generar, Mejorar ni Descargar y no gasta créditos. Las operaciones se
+serializan con `IMPORT_LOCK`.
+
+Validación en el ASUS (20-10-2026, solo lectura): 21 proyectos en la galería; un proyecto con
+7 imágenes recorrido y una imagen descargada (`image/webp`, 244 534 bytes). Pruebas: 7 nuevas en
+`test_flow_import.py`; total del puente: 45. **NO PROBADO**: proyectos con vídeo y proyectos
+muy largos.
+
+### Reinicio del servicio: cierre limpio comprobado, sesión perdida igualmente (2026-10-20, 00:09)
+
+Reinicio para activar la importación, sin trabajos activos. El `ExecStop` funcionó en real:
+`browser_closed_cleanly` y `exit_type=Normal` (antes, `Crashed`). Aun así, **Google cerró la sesión al
+reabrir el navegador**: las cookies de google.com bajaron de 42 a 27 y Flow cayó en `/about`. Por
+tanto, el cierre abrupto no era la causa (o no la única): reiniciar el navegador basta para perder la
+sesión. Hipótesis no demostrada: sesión ligada al proceso del navegador (p. ej. credenciales atadas al
+dispositivo). Conclusión práctica: **no reiniciar el navegador si no es imprescindible**, y dejar que
+el reinicio de sesión con la contraseña guardada lo resuelva.
+
+Encontrado también: tras reiniciar el servicio, **el navegador no arrancaba solo**; solo se abría al
+entrar en el portal (`/unlock`). Ahora `lifespan` lo arranca si existe `xvfb-run` (ASUS; en Windows lo
+abre su lanzador). Copiado al ASUS; entra en vigor en el próximo reinicio del servicio.
+
+### Primer reinicio de sesión automático en real (2026-10-20, 00:17): no funcionó
+
+Tras perderse la sesión con el reinicio, el vigilante hizo su único intento: eligió la cuenta, pero en
+`/v3/signin/challenge/pwd` **Chromium no autocompletó la contraseña guardada** (campo vacío, sin
+`:autofill`, aunque `Login Data` tiene una entrada para `https://accounts.google.com/` añadida a mano).
+Al pulsar «Siguiente», Google respondió «Enter a password» y además mostraba «Too many failed attempts».
+Resultado: `relogin_result=needs_user`, sin más intentos durante 6 horas.
+
+Corrección: el vigilante ya **no pulsa «Siguiente» si el campo no está autocompletado** (espera hasta
+~6 s y devuelve `password_not_autofilled`). Desplegado en el ASUS. Queda por resolver por qué Chromium
+no autocompleta aquí (entrada añadida desde el gestor sin formulario asociado, página bajo CDP o
+cualquier otro motivo); no se insistirá mientras Google muestre el aviso de intentos fallidos.

@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shutil
 import subprocess
 import time
 from urllib.parse import urlsplit
@@ -26,6 +27,7 @@ from playwright.async_api import async_playwright
 import websockets
 from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
 import flow_agent
+import flow_import
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -308,6 +310,8 @@ async def with_flow_project_page(action):
         async with async_playwright() as playwright:
             browser = await playwright.chromium.connect_over_cdp('http://127.0.0.1:9229', timeout=10000)
             pages = [page for context in browser.contexts for page in context.pages if is_flow_project(page.url)]
+            # La pestaña de importación muestra otros proyectos; nunca es la que usa el puente para generar.
+            pages = [page for page in pages if not await flow_import.is_import_page(page)]
             if not pages:
                 raise FlowError('flow_project_not_open', 409)
             if len(pages) != 1:
@@ -735,6 +739,10 @@ async def lifespan(app):
         TOKEN_FILE.write_text(secrets.token_urlsafe(32))
     TOKEN_FILE.chmod(0o600)
     load_flow_jobs()
+    # En el ASUS el navegador de Flow arranca con el servicio: tras un reinicio (o del propio equipo) el puente
+    # vuelve a estar listo sin esperar a que alguien abra el portal. En Windows el navegador lo abre su lanzador.
+    if shutil.which('xvfb-run'):
+        asyncio.create_task(start_browser())
     yield
 
 
@@ -881,6 +889,59 @@ async def flow_agent_media(job_id: str, row: int, index: int):
         return JSONResponse({'error': 'job_not_found'}, status_code=404)
     try:
         found = await with_flow_project_page(lambda page: flow_agent.fetch_agent_media(page, row, index))
+    except FlowError as error:
+        return flow_error_response(error)
+    if not found:
+        return JSONResponse({'error': 'download_unavailable'}, status_code=409)
+    media_type, raw = found
+    from fastapi.responses import Response
+    return Response(raw, media_type=media_type)
+
+
+async def with_flow_browser(action):
+    """Conecta al navegador autenticado para la importación, sin tocar el proyecto del puente."""
+    try:
+        async with flow_import.IMPORT_LOCK:
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.connect_over_cdp('http://127.0.0.1:9229', timeout=10000)
+                return await action(browser)
+    except FlowError:
+        raise
+    except Exception as error:
+        raise FlowError('flow_browser_unavailable', 503) from error
+
+
+@app.get('/api/flow/projects')
+async def flow_projects():
+    """Proyectos de la galería de Flow (id y título) para importar lo ya generado."""
+    try:
+        projects = await with_flow_browser(flow_import.list_projects)
+    except FlowError as error:
+        return flow_error_response(error)
+    if projects is None:
+        return JSONResponse({'error': 'auth_required'}, status_code=409)
+    return {'projects': projects}
+
+
+@app.get('/api/flow/projects/{project_id}/media')
+async def flow_project_media(project_id: str):
+    if not flow_import.PROJECT_ID.fullmatch(project_id):
+        return JSONResponse({'error': 'project_not_found'}, status_code=404)
+    try:
+        _, items = await with_flow_browser(lambda browser: flow_import.project_media(browser, project_id))
+    except FlowError as error:
+        return flow_error_response(error)
+    if items is None:
+        return JSONResponse({'error': 'auth_required'}, status_code=409)
+    return {'media': flow_import.public_media(items)}
+
+
+@app.get('/api/flow/projects/{project_id}/media/{key}')
+async def flow_project_media_file(project_id: str, key: str):
+    if not flow_import.PROJECT_ID.fullmatch(project_id) or not flow_import.MEDIA_KEY.fullmatch(key):
+        return JSONResponse({'error': 'result_not_found'}, status_code=404)
+    try:
+        found = await with_flow_browser(lambda browser: flow_import.fetch_media(browser, project_id, key))
     except FlowError as error:
         return flow_error_response(error)
     if not found:

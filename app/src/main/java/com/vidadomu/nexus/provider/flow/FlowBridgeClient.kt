@@ -176,6 +176,65 @@ internal class FlowBridgeClient(
         }
     }
 
+    @Serializable
+    data class FlowProject(val id: String, val title: String = "")
+
+    @Serializable
+    data class FlowProjectMedia(val key: String, val kind: String = "image", val width: Int = 0, val height: Int = 0)
+
+    @Serializable
+    private data class ProjectsPayload(val projects: List<FlowProject> = emptyList())
+
+    @Serializable
+    private data class ProjectMediaPayload(val media: List<FlowProjectMedia> = emptyList())
+
+    /** Proyectos de la galería de Flow, para traer a la Biblioteca lo que ya se generó allí. */
+    suspend fun projects(): Result<List<FlowProject>> = guarded {
+        requestJson(authorizedRequest("$IMPORT_BASE/projects").get().build(), importClient) { raw ->
+            json.decodeFromString<ProjectsPayload>(raw).projects.filter { PROJECT_ID.matches(it.id) }
+        }
+    }
+
+    /** Imágenes y vídeos ya generados en un proyecto de Flow (sin descargarlos todavía). */
+    suspend fun projectMedia(projectId: String): Result<List<FlowProjectMedia>> {
+        if (!PROJECT_ID.matches(projectId)) return Result.failure(ProviderError("El proyecto de Flow no es válido."))
+        return guarded {
+            requestJson(authorizedRequest("$IMPORT_BASE/projects/$projectId/media").get().build(), importClient) { raw ->
+                json.decodeFromString<ProjectMediaPayload>(raw).media.filter { MEDIA_KEY.matches(it.key) }
+            }
+        }
+    }
+
+    /** Descarga un archivo ya generado de un proyecto de Flow. No genera nada ni gasta créditos. */
+    suspend fun projectMediaFile(projectId: String, media: FlowProjectMedia, destinationDir: File): Result<FlowBridgeDownload> =
+        withContext(Dispatchers.IO) {
+            if (!PROJECT_ID.matches(projectId) || !MEDIA_KEY.matches(media.key))
+                return@withContext Result.failure(ProviderError("El archivo de Flow no es válido."))
+            try {
+                destinationDir.mkdirs()
+                importClient.newCall(authorizedRequest("$IMPORT_BASE/projects/$projectId/media/${media.key}").get().build())
+                    .awaitResponse().use { response ->
+                        if (!response.isSuccessful) return@withContext Result.failure(bridgeError(response.code, response.body?.string().orEmpty()))
+                        val body = response.body ?: return@withContext Result.failure(ProviderError("Flow no devolvió el archivo."))
+                        val expected = if (media.kind == "video") "video" else "image"
+                        val mime = body.contentType()?.toString()?.substringBefore(';')?.takeIf { it.matches(MIME_TYPE) } ?: fallbackMimeType(expected)
+                        val target = File(destinationDir, "Flow-${projectId.take(8)}-${media.key}.${extensionFor(mime, expected)}")
+                        body.byteStream().use { input -> FileOutputStream(target).use { input.copyTo(it) } }
+                        if (target.length() <= 0L) return@withContext Result.failure(ProviderError("Flow devolvió un archivo vacío."))
+                        Result.success(FlowBridgeDownload(target, mime))
+                    }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(flowNetworkError(error))
+            }
+        }
+
+    // Recorrer un proyecto largo en el navegador del ASUS lleva más que una consulta normal.
+    private val importClient: OkHttpClient by lazy {
+        client.newBuilder().readTimeout(3, java.util.concurrent.TimeUnit.MINUTES).callTimeout(4, java.util.concurrent.TimeUnit.MINUTES).build()
+    }
+
     suspend fun job(jobId: String): Result<FlowBridgeJob> {
         if (!JOB_ID.matches(jobId)) return Result.failure(ProviderError("El identificador del trabajo de Flow no es válido."))
         return guarded {
@@ -285,10 +344,11 @@ internal class FlowBridgeClient(
 
     private suspend fun <T> requestJson(
         request: Request,
+        http: OkHttpClient = client,
         decode: (String) -> T
     ): Result<T> = withContext(Dispatchers.IO) {
         try {
-            client.newCall(request).awaitResponse().use { response ->
+            http.newCall(request).awaitResponse().use { response ->
                 val raw = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     Result.failure(bridgeError(response.code, raw))
@@ -416,6 +476,7 @@ internal class FlowBridgeClient(
     }
 
     private fun referenceErrorMessage(code: String?): String? = when (code) {
+        "auth_required" -> "Flow ha cerrado la sesión en el ASUS. Vuelve a entrar desde Ajustes › Google Flow."
         "reference_too_large" -> "La referencia supera 16 MB. Reduce su tamaño y vuelve a adjuntarla."
         "invalid_reference_type", "invalid_reference_image" -> "Adjunta una imagen PNG, JPEG o WebP válida."
         "reference_not_found", "reference_integrity_failed", "invalid_reference_ids" -> "La copia privada de una referencia ya no está disponible. Vuelve a adjuntarla."
@@ -493,6 +554,10 @@ internal class FlowBridgeClient(
         // Direcciones Tailscale verificadas (independientes del DNS privado de Android): AXELPC primero, ASUS de respaldo.
         val HOSTS = listOf("a" to "http://100.72.111.97:8899/api/flow", "s" to "http://100.112.57.2:8899/api/flow")
         const val BASE_URL = "http://100.112.57.2:8899/api/flow"
+        // La importación desde Flow va siempre al ASUS: está siempre encendido y su puente tiene esta función.
+        private val IMPORT_BASE = HOSTS.last().second
+        private val PROJECT_ID = Regex("[A-Za-z0-9-]{8,64}")
+        private val MEDIA_KEY = Regex("[0-9a-f]{24}")
         private const val PIN_MS = 10 * 60_000L
         @Volatile private var pinned: Pair<String, Long>? = null
         private const val DEFAULT_PROMPT_LIMIT = 4_000
