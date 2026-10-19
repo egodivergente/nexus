@@ -138,6 +138,9 @@ object NativeOperationTools {
                 integer("at_us", "Posición en microsegundos donde empezar a colocarlos; vacío = al final.")
                 string("project_id", "Proyecto; vacío = el abierto.")
             }),
+        NativeTool(operations, "corte_create_project", ToolCategory.ORGANIZE,
+            "Crea un proyecto NUEVO y vacío en Corte y lo abre en pantalla, listo para corte_import_media y corte_apply_ops. Úsalo cuando el usuario quiera montar algo desde cero o no haya ningún proyecto abierto adecuado.",
+            schema { string("name", "Nombre del proyecto; vacío = «Proyecto N».") }),
         NativeTool(operations, "corte_undo", ToolCategory.ORGANIZE,
             "Deshace en Corte la última edición (la del agente si fue la última).",
             schema { string("project_id", "Proyecto; vacío = el abierto.") }),

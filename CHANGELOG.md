@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.48-agent] - 2026-10-19 · «Índigo»
+
+- El agente puede crear proyectos nuevos en Corte (corte_create_project): crea uno vacío, abre Corte en él y deja listo importar clips. Requiere Corte con el puente protocolo 3.
+
 ## [1.9.47-agent] - 2026-10-18 · «Índigo»
 
 - Corrige el cierre al abrir la app en la 1.9.46: una expresión de las plantillas de proveedores no era válida en Android y fallaba al cargar el proveedor BytePlus.
