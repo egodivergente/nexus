@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.53-agent] - 2026-10-20 · jerarquía visual y proveedores unificados
+
+- **Separación visual:** las tarjetas de Ajustes usan una superficie elevada distinta del fondo, cada categoría tiene su color (Apariencia, Agente, Proveedores, Generadores y Sistema) en la baldosa del icono.
+- **Proveedores (fase 2):** Atlas, Crun, Runway y Google Flow comparten la misma tarjeta: estado (conectado o sin clave), clave enmascarada con Añadir, Cambiar o Borrar, saldo con actualización y Probar conexión.
+- **Texto corregido:** el nombre de versión «Índigo» ya no sale con caracteres rotos.
+
 ## [1.9.52-agent] - 2026-10-20 · Ajustes por categorías, cabecera despejada y prompt fiel
 
 - **Ajustes con pantalla de categorías:** en lugar de una lista larga, Ajustes abre una pantalla con cinco categorías (Apariencia y moneda, Agente y modelos, Proveedores de generación, Generadores propios, Sistema y diagnóstico), cada una con su resumen. Cada categoría abre su subpágina y el botón atrás vuelve a la lista.
