@@ -700,6 +700,37 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Lanza un trabajo por prompt con el modelo, parámetros y adjuntos actuales del Lienzo.
+     * Se envían de uno en uno; un fallo no detiene los demás y se informa al final.
+     */
+    fun submitBatch(prompts: List<String>, onProgress: (Int, Int) -> Unit, onDone: (sent: Int, firstError: String?) -> Unit) {
+        if (comparison.sending || _uiState.value.isSubmitting || prompts.isEmpty()) return
+        if (com.vidadomu.nexus.BuildConfig.OFFLINE_QA) { onDone(0, "NEXUS Lab: envío bloqueado; no se ha consumido saldo."); return }
+        val base = _uiState.value
+        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+        viewModelScope.launch {
+            var sent = 0
+            var firstError: String? = null
+            try {
+                for ((index, prompt) in prompts.withIndex()) {
+                    onProgress(index, prompts.size)
+                    try {
+                        GenerationDispatcher(app).submit(base.copy(prompt = prompt))
+                        sent++
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (e: Exception) {
+                        if (firstError == null) firstError = "«${prompt.take(40)}»: ${e.message ?: "no se pudo enviar"}"
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(isSubmitting = false, isUploading = false, uploadProgress = null) }
+                onDone(sent, firstError)
+            }
+        }
+    }
+
+    /**
      * Extracts a reasonable file name from a URI and MIME type.
      */
     private fun extractFileName(uri: Uri, mimeType: String): String {
