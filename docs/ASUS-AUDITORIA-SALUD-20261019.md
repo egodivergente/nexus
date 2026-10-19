@@ -30,10 +30,19 @@
 - **Procesos de larga duración identificados** (`ps` y `systemctl status` del 19-10):
   - PID 1680, 963 MB: **Home Assistant** (`python3 -m homeassistant --config /config`)
     en un contenedor Docker. Es el mayor consumidor de RAM.
+    Contenedor `axel-homeassistant` (imagen 2026.9.3), creado el 24-09 y con la configuración
+    inicial completada. Escucha en `127.0.0.1:8123` y `100.112.57.2:8123` (Tailscale). Su única
+    integración real es **`dreame_vacuum`, «Conga»** (el robot aspirador, añadido el 01-10, con
+    la opción `prefer_cloud`); las demás son las predeterminadas (`sun`, `backup`, `analytics`,
+    `go2rtc`, `google_translate`, `radio_browser`, `shopping_list`). Tiene 4 dispositivos y
+    1 automatización. La búsqueda de `homeassistant|8123` en `/opt/axel-agent` solo encontró
+    datos de botocore (falsos positivos) y `catalog_facts.json`, que está pendiente de revisar.
   - PID 2150, 64–88 MB: **Desktop Commander** remoto (`axel-commander-0.2.51`), en marcha
     pero sin una conexión que responda.
   - PID 1481590, 41–52 MB: **`axel-bridge.service`** («AXEL authenticated durable
     agent», `/opt/axel-agent/server.py`), activo desde el 08-10.
+- `vidal` tiene `sudo` sin contraseña (al menos para `docker`): equivale a acceso de
+  administrador para cualquier agente que entre como `vidal`.
 - No había procesos de Gradle ni de Kotlin activos.
 - Falta la segunda mitad del informe (servicios, puertos, discos, temperatura y batería).
   En esa ejecución `swapon` no se encontraba porque `/usr/sbin` no estaba en el PATH;
