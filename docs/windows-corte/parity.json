@@ -61,11 +61,11 @@
       "id": "LLM-05",
       "android": "BytePlus ModelArk",
       "reference": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm; app/.../AssistantRuntime.kt",
-      "desktop": "Selección runtime conectada a host y DPAPI",
+      "desktop": "Perfil BytePlus Responses con DPAPI; ejecución real en runtime Windows y Corte JVM",
       "dependencies": "Credenciales y endpoint del usuario",
       "windowsAdaptation": "BrainFactory/SDK original con adaptador Windows",
-      "acceptance": "Guardar perfil, inferencia y herramientas según capacidades",
-      "result": "PASS real: Chat, Responses con herramienta y continuidad, conexión y streaming; dola-seed-2-1-turbo-260628. Clave DPAPI. Visión/documentos y herramientas del PC con BytePlus pendientes",
+      "acceptance": "Cuenta real DPAPI → runtime instalado → herramientas nativas → respuesta con valores reales y persistencia Corte",
+      "result": "PASS real: BytePlus Responses/streaming en preview 3 ejecutó ajustes Windows y lectura/edición/relectura Corte; persistencia y deshacer local comprobados. Visión, documentos, razonamiento específico y resto de herramientas pendientes.",
       "classification": "PARCIAL"
     },
     {

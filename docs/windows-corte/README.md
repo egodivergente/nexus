@@ -121,8 +121,8 @@ Pendientes concretos:
    sin copia. El portable Windows conserva procedencia y crea copias de los medios.
 5. BytePlus pasó inferencia mínima, Chat Completions, Responses con herramienta y continuidad,
    y streaming con dola-seed-2-1-turbo-260628. La herramienta de la prueba API devuelve un
-   estado simulado; falta ejecutar herramientas del PC con BytePlus, visión, documentos,
-   razonamiento y las demás cuentas externas. La clave copiada del S25 permanece en DPAPI.
+   estado simulado. La aceptación posterior con herramientas reales de Windows también pasó;
+   faltan visión, documentos, razonamiento específico y las demás cuentas externas. La clave copiada del S25 permanece en DPAPI.
    Listado, activación de modelo e inferencia son resultados distintos.
 6. Certificar multipista, transiciones con handles, VFR, velocidades, keyframes y mezclas
    extensas. La ganancia de audio Windows se evalúa por fotograma; falta equivalencia a nivel
@@ -208,3 +208,27 @@ La aceptación usa el JVM real y Edge, con proveedor HTTP local: roundtrip, mont
 originales intactos, recuperación sin duplicados, corrupción/rutas/relaciones rechazadas,
 cancelación durante inferencia y espera de herramienta, respuesta tardía y continuidad del
 proceso. Son pruebas aisladas; la activación en el perfil real continúa pendiente.
+
+## BytePlus con herramientas Windows — aceptación real del 19 de octubre
+
+`test-byteplus-pc-live.py --live --desktop-root <instalación/desktop> --report <ruta.json>`
+usa la cuenta configurada en DPAPI, con un perfil temporal independiente. Sin `--live` no
+realiza llamadas externas. Nunca imprime ni escribe la clave en texto plano. La prueba
+permite únicamente leer sus ajustes y leer/añadir un marcador al montaje aislado.
+
+PASS en el runtime instalado `2026.10.19-corte-preview.3`, commit `cf055cd`, modelo
+`dola-seed-2-1-turbo-260628`, Responses y streaming: `get_nexus_settings`,
+`corte_read_project`, `corte_apply_ops` y otra lectura devolvieron datos reales del host.
+La respuesta identificó el valor aleatorio de ajustes devuelto por la herramienta y la
+revisión 1. Hubo 83 eventos de streaming, 3 rondas de herramientas, 88 474 tokens de entrada
+y 436 de salida declarados por el proveedor; no se estima un coste sin tarifa verificada.
+
+El marcador quedó guardado, se conservó al reiniciar el proceso Corte y se deshizo usando
+su transacción. El deshacer lo ejecuta la aceptación local; no se atribuye al modelo.
+Ajustes y credenciales de producción conservaron sus huellas. El host Python de la prueba
+coincidía byte a byte con el instalado. No hubo generaciones multimedia ni activación
+sobre el perfil habitual. Esto verifica cuatro llamadas de herramientas, no todas las
+herramientas del PC, ni visión/documentos/razonamiento específico.
+
+La evidencia con auditoría de llamadas está en `outputs/windows-corte/byteplus-pc-live.json`
+(fuera de Git). No se repitió la inferencia real después del resultado satisfactorio.
