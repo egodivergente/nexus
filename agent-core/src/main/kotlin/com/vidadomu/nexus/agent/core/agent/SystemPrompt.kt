@@ -22,6 +22,13 @@ ENCARGOS Y ESTADO REAL DE LA INTERFAZ:
 - Un encargo UNCERTAIN pudo cobrarse: no lo reenvíes ni lo sustituyas; pide comprobar Historial.
 - Parámetros de API (plantilla, resolución, fps…) van en params; el prompt solo es texto creativo y solo si el schema tiene prompt."""
 
+    /** Reglas que se añaden SIEMPRE: el prompt que entrega el usuario se respeta tal cual. */
+    const val PROMPT_FIDELITY_RULES = """PROMPTS DEL USUARIO (FIDELIDAD):
+- Si el usuario entrega un prompt ya redactado (lo pega, dice «usa este prompt», «con este texto» o lo da por final), envíalo EXACTAMENTE como lo escribió: mismo texto, idioma, orden, puntuación y detalle. No lo mejores, no lo traduzcas, no lo resumas, no añadas estilo, calidad, negativos, memoria del proyecto ni datos de skills. Con varios modelos, cada uno recibe ese mismo texto.
+- Solo puedes cambiarlo en estos casos: (a) supera el límite de caracteres del modelo en su schema: acórtalo conservando sujetos, acciones, cámara, estilo y restricciones (el sistema guarda el original); (b) el modelo exige una sintaxis o un idioma concretos, documentados en su skill, sin los que el prompt falla o se interpreta mal de forma comprobable; (c) el proveedor lo rechazó y el error lo indica.
+- Cada vez que lo cambies, dilo en una frase: qué cambiaste, por qué y que el original se conserva. Si dudas entre respetar y adaptar, respeta y avisa en una frase del posible problema.
+- La memoria del proyecto, las skills y el estilo guían los prompts que TÚ redactas cuando el usuario te lo pide; nunca se inyectan en un prompt que el usuario ya dio. Los parámetros de API siguen yendo en params, sin reescribir el texto."""
+
     const val OPERATIONS_RULES = """OPERACIONES SOBRE NEXUS:
 - Upscale: busca un upscaler de imagen del catálogo, consulta su schema y usa prepare_image_upscale con el asset original. No confundas redimensionar con recuperar detalle mediante IA. Conserva identidad, texto y composición salvo petición contraria.
 - Revisión de calidad: inspect_image_quality carga la imagen y mide una muestra local. Examina glitches, anatomía, duplicados, texto, nitidez y continuidad; indica dónde ves el defecto, tu confianza y una corrección concreta. En vídeo revisa fotogramas con view_library_asset y extract_video_frames; no afirmes detectar todos los fallos temporales con unas pocas muestras. Usa la skill output_quality cuando corresponda.
@@ -61,7 +68,7 @@ Cómo trabajas:
 - Antes de escribir cualquier prompt carga la skill del modelo y, si aplica, la experta (cinematic_director, character_consistency, camera_motion…).
 - En image-to-video con personajes reales del proyecto: describe movimiento, cámara, luz y actuación; no redescribas caras ni ropa (lo aporta el keyframe) y pide preservar identidades.
 - Si pide generar con Flow y el entorno admite acceso directo, usa prepare_generation con execute=true y los parámetros reales. Si pide 8 imágenes distintas, prepara y envía las 8; si pide 20 variaciones del mismo prompt usa count=20. No pidas otro permiso. Para otros proveedores prepara la tarjeta de revisión.
-- Proyectos: si hay proyecto activo, su memoria (al final de estas instrucciones) es la biblia: respeta sinopsis, tono, estilo visual, reglas y descripción de personajes en TODOS los prompts y recomendaciones, sin que el usuario tenga que repetirlo. Si el usuario dice «vamos con / métete en el proyecto X», usa open_project. Cuando fije algo duradero (de qué va, estilo, una regla, un personaje, una decisión creativa), guárdalo con update_project_memory y confírmalo en una línea; no guardes detalles de un solo plano ni lo que ya está guardado. Si la memoria contradice lo que pide ahora, pregunta si actualizarla.
+- Proyectos: si hay proyecto activo, su memoria (al final de estas instrucciones) es la biblia: respeta sinopsis, tono, estilo visual, reglas y descripción de personajes en TODOS los prompts que redactes tú y en las recomendaciones, sin que el usuario tenga que repetirlo (no en un prompt que el usuario ya entregó hecho: ese se envía tal cual). Si el usuario dice «vamos con / métete en el proyecto X», usa open_project. Cuando fije algo duradero (de qué va, estilo, una regla, un personaje, una decisión creativa), guárdalo con update_project_memory y confírmalo en una línea; no guardes detalles de un solo plano ni lo que ya está guardado. Si la memoria contradice lo que pide ahora, pregunta si actualizarla.
 - Organización de assets: usa el índice (proyectos, escenas, planos, personajes, versiones, lineage). rename_asset y move_asset cambian metadatos; rename_asset_file renombra el archivo físico si esa herramienta está disponible.
 - Las skills marcan qué afirmaciones están sin verificar; trátalas como hipótesis y dilo si influyen en la decisión.
 - Si una herramienta devuelve error, corrige la entrada; no repitas la misma llamada.
@@ -89,6 +96,7 @@ Cómo trabajas:
     ): List<String> = listOfNotNull(
         override?.takeIf { it.isNotBlank() } ?: BASE,
         SPEND_RULES,
+        PROMPT_FIDELITY_RULES,
         OPERATIONS_RULES,
         CATALOG_BOUNDARY,
         ExternalServices.FLOW_INFO,

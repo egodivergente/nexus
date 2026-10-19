@@ -253,7 +253,7 @@ fun AssistantScreen(
                     when (item) {
                         is ChatItem.User -> Box(Modifier.animateItem()) { UserBubble(item) }
                         is ChatItem.Assistant -> Box(Modifier.animateItem()) { AssistantBubble(item, onOpenHistory) }
-                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory)
+                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory, onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null, onChangeModel = { showSettings = true })
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -532,13 +532,19 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
     val characters = remember(p.id) { vm.projectCharacters(p.id) }
     val assetCount = remember(p.id) { vm.projectAssetCount(p.id) }
             Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Text("El asistente la lee en cada mensaje para que los prompts sean coherentes. También la rellena él cuando le cuentas cosas del proyecto. $assetCount archivos etiquetados con este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                StudioTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                StudioTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                StudioTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
-                StudioTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
-                StudioTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas (una por línea)") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                StudioTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos (uno por línea)") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                Text("El asistente lo lee en cada mensaje para que los prompts sean coherentes, y lo completa él cuando le cuentas cosas del proyecto. $assetCount archivos etiquetados con este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                ProjectGroup(Icons.Default.MenuBook, "La historia") {
+                    StudioTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, placeholder = { Text("Ej.: Drama carcelario en Madrid, 1928") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    StudioTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, placeholder = { Text("De qué va, personajes principales y cómo termina") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
+                }
+                ProjectGroup(Icons.Default.Palette, "Aspecto y tono") {
+                    StudioTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, placeholder = { Text("Ej.: sobrio, tenso, realista") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                    StudioTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, placeholder = { Text("Ej.: 35 mm, luz natural, paleta apagada, grano fino") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
+                }
+                ProjectGroup(Icons.Default.Rule, "Reglas del asistente") {
+                    StudioTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas") }, placeholder = { Text("Una por línea. Ej.: Mateo nunca sonríe") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
+                    StudioTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos") }, placeholder = { Text("Uno por línea. Ej.: Seedance 2.0") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                }
                 if (characters.isNotEmpty()) {
                     Text("Personajes", fontWeight = FontWeight.SemiBold)
                     characters.forEach { c -> Text("• ${c.name}" + (c.description?.let { ": $it" } ?: ""), style = MaterialTheme.typography.bodySmall) }
@@ -561,6 +567,19 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
             }) { Text("Guardar") }
 }
 
+/** Grupo visual del formulario de proyecto: icono y título sobre una tarjeta, para escanear rápido. */
+@Composable
+private fun ProjectGroup(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .35f), shape = NexusTokens.card, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                Text(title, style = MaterialTheme.typography.titleSmall)
+            }
+            content()
+        }
+    }
+}
 @Composable
 private fun UserBubble(item:ChatItem.User) {
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
@@ -695,15 +714,23 @@ private fun formatMediaDuration(seconds:Double):String {
         else "%d:%02d".format(total/60,total%60)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}) {
+private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}, onRetry: (() -> Unit)? = null, onChangeModel: (() -> Unit)? = null) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     if(item.error) {
         var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
         Column(Modifier.animateContentSize()) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle del error" else "Ver detalle del error",color=TextSecondary)}
+            // Todo error ofrece una salida directa: repetir, cambiar de modelo o revisar el historial.
+            FlowRow(verticalArrangement=Arrangement.Center,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                if(onRetry != null) FilledTonalButton(onClick=onRetry,shape=NexusTokens.filter) {
+                    Icon(Icons.Default.Refresh,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
+                }
+                if(onChangeModel != null) TextButton(onClick=onChangeModel) {
+                    Icon(Icons.Default.Tune,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Cambiar modelo")
+                }
                 if(history) HistoryLinkButton(onOpenHistory)
+                TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle" else "Ver detalle del error",color=TextSecondary)}
             }
             if(expanded) Text(item.text,style=MaterialTheme.typography.bodySmall,color=TextSecondary)
         }
@@ -712,7 +739,6 @@ private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}) {
         if(history) HistoryLinkButton(onOpenHistory)
     }
 }
-
 /** Acceso directo a la pestaña Historial desde un aviso que la menciona. */
 @Composable
 private fun HistoryLinkButton(onOpenHistory: () -> Unit) {

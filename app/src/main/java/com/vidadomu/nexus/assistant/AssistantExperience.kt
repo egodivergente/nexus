@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -84,7 +85,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
       Column {
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-        Surface(color=MaterialTheme.colorScheme.surface,shape=if(text.text.contains('\n') || text.text.length>40) NexusTokens.card else NexusTokens.pill,
+        Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
         border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=0.55f)),
         modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
@@ -103,12 +104,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                 }
             }
-            if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                items(ui.pendingAttachments, key = { it.id }) { att ->
-                    InputChip(selected = true, onClick = { onRemove(att.id) },
-                        label = { Text(att.name ?: "Referencia", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp)) },
-                        trailingIcon = { Icon(Icons.Default.Close, "Quitar referencia") })
-                }
+            if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8)) {
+                items(ui.pendingAttachments, key = { it.id }) { att -> AttachmentTile(att) { onRemove(att.id) } }
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 IconButton(onClick = onAttach, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.AttachFile, "Adjuntar") }
@@ -249,5 +247,44 @@ internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         Text("${if(ui.thinking) "Agente trabajando" else "Agente listo"} · $active en curso"+(ui.lastLatencyMs?.let {" · Último turno ${it/1000.0}s"} ?: ""),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
         Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills · ${ui.skillErrors.size} errores de skills. La latencia incluye herramientas.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+    }
+}
+
+/** Forma única del cuadro de texto: no cambia con el contenido, así los adjuntos y los iconos nunca chocan con una esquina. */
+internal val ComposerShape = RoundedCornerShape(24.dp)
+
+/** Miniatura del adjunto pendiente: imagen o primer fotograma del vídeo; audio y documentos, icono y nombre. */
+@Composable
+internal fun AttachmentTile(att: Attachment, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val label = att.name ?: "Archivo"
+    val visual = att.mimeType.startsWith("image/") || att.mimeType.startsWith("video/")
+    Box(Modifier.size(width = 76.dp, height = 76.dp).padding(top = 4.dp, end = 4.dp)) {
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .semantics { contentDescription = "Adjunto: $label" }, contentAlignment = Alignment.Center) {
+            if (visual) {
+                AsyncImage(
+                    model = remember(att.uri) {
+                        coil.request.ImageRequest.Builder(context).data(att.uri).crossfade(120).size(256)
+                            .apply { if (att.mimeType.startsWith("video/")) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }
+                            .build()
+                    },
+                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                if (att.mimeType.startsWith("video/")) Icon(Icons.Default.PlayArrow, null, tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(26.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f), androidx.compose.foundation.shape.CircleShape))
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp)) {
+                    Icon(if (att.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary)
+                    Text(label, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        // Quitar: círculo pequeño en la esquina, con zona de toque ampliada.
+        Box(Modifier.align(Alignment.TopEnd).size(32.dp).clickable(onClick = onRemove).semantics { contentDescription = "Quitar $label" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Close, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurface)
+            }
+        }
     }
 }

@@ -2,6 +2,13 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [Sin publicar] - rama `ux/agent-prompt-fiel-20261019`
+
+- **Tu prompt, tal cual:** si entregas un prompt ya hecho, el agente lo envía exactamente como lo escribiste. Solo lo cambia si supera el límite de caracteres del modelo, si el modelo exige otra sintaxis documentada o si el proveedor lo rechazó, y siempre lo dice en una frase (el original se conserva). La memoria del proyecto y las skills ya no se inyectan en prompts tuyos. Regla `PROMPT_FIDELITY_RULES` siempre activa; prueba `PromptFidelityTest`.
+- **Cuadro de texto:** una sola forma (esquinas de 24 dp) que ya no cambia con el contenido ni corta los adjuntos.
+- **Adjuntos pendientes en miniatura:** imagen, primer fotograma del vídeo, o icono con nombre para audio y documentos, con botón para quitar en la esquina.
+- **Errores con salida:** el aviso de error del chat incluye «Reintentar» (si hay un turno que repetir), «Cambiar modelo» e «Historial» cuando aplica.
+- **Formulario de proyecto:** campos agrupados en tarjetas (La historia, Aspecto y tono, Reglas del asistente) con icono y ejemplos.
 ## [1.9.48-agent] - 2026-10-19 · «Índigo»
 
 - El agente puede crear proyectos nuevos en Corte (corte_create_project): crea uno vacío, abre Corte en él y deja listo importar clips. Requiere Corte con el puente protocolo 3.
