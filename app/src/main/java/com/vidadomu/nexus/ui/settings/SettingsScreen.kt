@@ -22,8 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +43,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
+fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val settingsRepo = app.settingsRepository
@@ -87,10 +89,25 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
     var accountDetails by remember {mutableStateOf(false)}
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())})}) {padding ->
+    var pageName by rememberSaveable { mutableStateOf<String?>(null) }
+    val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
+    var assistantSettingsOpen by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = page != null) { pageName = null }
+    val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
+        listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured").count { it }
+    }
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
+        navigationIcon={ if(page != null) IconButton(onClick={pageName=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a Ajustes")} })}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            // 1 · Personalización
-            item {SettingsHeader("Personalización",Icons.Default.Palette)}
+            when(page) {
+                null -> {
+                    item {HubRow(SettingsPage.APPEARANCE.icon,SettingsPage.APPEARANCE.title,"${selectedTheme.label} · ${currencyState.preference.displayName}") {pageName=SettingsPage.APPEARANCE.name}}
+                    item {HubRow(SettingsPage.AGENT.icon,SettingsPage.AGENT.title,"Modelo del asistente, consumo, herramientas y cerebros") {pageName=SettingsPage.AGENT.name}}
+                    item {HubRow(SettingsPage.PROVIDERS.icon,SettingsPage.PROVIDERS.title,"$keysConfigured de 3 con clave · Google Flow") {pageName=SettingsPage.PROVIDERS.name}}
+                    item {HubRow(SettingsPage.CUSTOM.icon,SettingsPage.CUSTOM.title,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
+                    item {HubRow(SettingsPage.SYSTEM.icon,SettingsPage.SYSTEM.title,"Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»" + (if(isMockMode) " · proveedor simulado activo" else "")) {pageName=SettingsPage.SYSTEM.name}}
+                }
+                SettingsPage.APPEARANCE -> {
             item {SettingsCard {
                 SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true})
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
@@ -98,11 +115,13 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true})
             }}
-            // 2 · Agente
-            item {SettingsHeader("Agente",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
-            item {SettingsCard {BrainsSettingsSection()}}
-            // 3 · Generación
-            item {SettingsHeader("Proveedores de generación",Icons.Default.CloudQueue,top=NexusTokens.space12)}
+                }
+                SettingsPage.AGENT -> {
+                    if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Modelo, respuesta, consumo, herramientas y skills",{assistantSettingsOpen=true})}}
+                    item {SettingsHeader("Cerebros adicionales",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
+                    item {SettingsCard {BrainsSettingsSection()}}
+                }
+                SettingsPage.PROVIDERS -> {
             item {SettingsCard {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -148,10 +167,11 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 }
             }
             item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
-            item {SettingsHeader("Generadores propios",Icons.Default.Extension,top=NexusTokens.space12)}
+                }
+                SettingsPage.CUSTOM -> {
             item {SettingsCard {MediaProvidersSettingsSection()}}
-            // 4 · Sistema
-            item {SettingsHeader("Sistema",Icons.Default.Settings,top=NexusTokens.space12)}
+                }
+                SettingsPage.SYSTEM -> {
             item {SettingsCard {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
@@ -160,8 +180,11 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 SettingRow("Diagnóstico del sistema","Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»",{showDiagnostics=true})
             }}
+                }
+            }
         }
     }
+    if(assistantSettingsOpen && assistantViewModel != null) com.vidadomu.nexus.assistant.AssistantSettingsSheetHost(assistantViewModel) {assistantSettingsOpen=false}
     if(appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -403,6 +426,32 @@ private fun ProviderCredentialCard(
     }
 }
 
+private enum class SettingsPage(val title:String,val icon:androidx.compose.ui.graphics.vector.ImageVector) {
+    APPEARANCE("Apariencia y moneda",Icons.Default.Palette),
+    AGENT("Agente y modelos",Icons.Default.AutoAwesome),
+    PROVIDERS("Proveedores de generación",Icons.Default.CloudQueue),
+    CUSTOM("Generadores propios",Icons.Default.Extension),
+    SYSTEM("Sistema y diagnóstico",Icons.Default.Settings),
+}
+
+/** Fila de categoría de la pantalla principal de Ajustes: icono en baldosa, título y resumen de su estado. */
+@Composable
+private fun HubRow(icon:androidx.compose.ui.graphics.vector.ImageVector,title:String,summary:String,onClick:()->Unit) {
+    Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
+        border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.fillMaxWidth().clickable(role=Role.Button,onClick=onClick).heightIn(min=NexusTokens.minimumTouch+NexusTokens.space16).padding(NexusTokens.space12),
+            verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.primary.copy(alpha=.14f),modifier=Modifier.size(44.dp)) {
+                Box(contentAlignment=Alignment.Center) {Icon(icon,null,tint=MaterialTheme.colorScheme.primary)}
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title,style=MaterialTheme.typography.titleMedium)
+                Text(summary,style=MaterialTheme.typography.bodyMedium,color=TextSecondary,maxLines=2)
+            }
+            Icon(Icons.Default.ChevronRight,null,tint=TextSecondary)
+        }
+    }
+}
 @Composable
 private fun SettingRow(title:String,subtitle:String,onClick:()->Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).clickable(role=Role.Button,onClick=onClick)

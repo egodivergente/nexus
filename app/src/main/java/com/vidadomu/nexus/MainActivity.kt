@@ -193,7 +193,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.Settings.route) {
-                            SettingsScreen(onCreateInFlow = {
+                            SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {
                                 navController.navigate(Screen.Flow.route) { launchSingleTop = true }
                             })
                         }

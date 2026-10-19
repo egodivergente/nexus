@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.51-agent] - 2026-10-20 · Ajustes por categorías (fase 1)
+
+- **Ajustes con pantalla de categorías:** en lugar de una lista larga, Ajustes abre una pantalla con cinco categorías (Apariencia y moneda, Agente y modelos, Proveedores de generación, Generadores propios, Sistema y diagnóstico), cada una con su resumen. Cada categoría abre su subpágina y el botón atrás vuelve a la lista.
+- **Un camino al asistente:** «Agente y modelos» incluye «Ajustes del asistente» (modelo, respuesta, consumo, herramientas y skills) además de los cerebros adicionales; desde el chat se sigue llegando por la rueda → «Asistente».
+
 ## [1.9.50-agent] - 2026-10-19 · cabecera más despejada
 
 - **Un solo botón de ajustes:** el icono de parámetros y la rueda se unen en una rueda con dos entradas, «Asistente: modelo y conexión» y «Aplicación». La cabecera pasa de cinco a cuatro elementos.

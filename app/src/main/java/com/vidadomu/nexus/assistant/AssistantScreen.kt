@@ -1207,3 +1207,10 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
 
 private data class CardGroup(val cards: List<ChatItem.PlanCard>) { val key get() = "group:" + cards.first().id }
 private data class GroupHeader(val firstId: String, val count: Int)
+
+/** Los ajustes del asistente, abiertos desde Ajustes → Agente y modelos, con el mismo modelo de vista que el chat. */
+@Composable
+internal fun AssistantSettingsSheetHost(vm: AssistantViewModel, onDismiss: () -> Unit) {
+    val ui by vm.ui.collectAsState()
+    AssistantSettingsDialog(ui, vm, onDismiss)
+}
