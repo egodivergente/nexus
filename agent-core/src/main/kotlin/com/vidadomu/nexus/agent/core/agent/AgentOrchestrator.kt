@@ -197,8 +197,11 @@ class AgentOrchestrator(
                 turnTexts += "He alcanzado el limite de llamadas de este mensaje. El trabajo queda conservado."
                 break
             }
-            val readingDocuments = conv.messages.any { m -> m.content.any { it is ContentBlock.Document } }
-            val requestSystem = if (readingDocuments) system +
+            val hasDocuments = conv.messages.any { m -> m.content.any { it is ContentBlock.Document } }
+            val readingDocuments = hasDocuments && !config.documentsInOnePass
+            val requestSystem = if (hasDocuments && config.documentsInOnePass) system +
+                "El contenido original de los documentos está adjunto en este mensaje como texto o páginas visuales, con su cobertura indicada. Atiende la petición directamente con esos datos y respeta el formato solicitado. No vuelvas a buscar los archivos para leerlos ni inventes datos ausentes. Usa herramientas solo si hace falta una acción adicional a leer y responder."
+                else if (readingDocuments) system +
                 "El contenido de los documentos ya está adjunto en este mensaje como texto, archivo o páginas visuales. En esta fase no hay herramientas disponibles: lee directamente ese contenido; no busques de nuevo los adjuntos ni emitas llamadas a herramientas o etiquetas XML. Indica lo que no has podido leer. " +
                 if (!config.toolUse) "Responde directamente a la petición original del usuario, respetando el formato solicitado. No es un resumen intermedio." else
                     "Extrae un resumen de trabajo preciso con hechos, citas de sección y detalles necesarios para la petición. Esta fase solo lee: no afirma haber ejecutado acciones. El original no se reenviará en los siguientes pasos; conserva aquí la información necesaria."

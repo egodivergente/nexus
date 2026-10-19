@@ -30,6 +30,8 @@ data class AgentConfig(
     val temperature: Double? = null,
     val maxTokens: Int = 4096,
     val toolUse: Boolean = true,
+    /** Providers with native mixed text/image input can read documents alongside tools. */
+    val documentsInOnePass: Boolean = false,
     val mode: AgentMode = AgentMode.COPILOT,
     /** Ids de skills activas; vacío = todas las disponibles. */
     val activeSkills: List<String> = emptyList(),

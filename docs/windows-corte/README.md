@@ -58,9 +58,9 @@ caché. Falta implantar un presupuesto global y política de expulsión para esa
 En AXELPC, JDK 17, Gradle 9.1.0, Kotlin 2.3.20, un trabajador y sin compilaciones
 paralelas entre módulos (JVM con SerialGC y dos procesadores lógicos visibles):
 
-- Suites JVM: 229 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
-  almacenamiento. Base sin red: 324 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
-  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 328; las cuatro llamadas reales corresponden a la validación anterior.
+- Suites JVM: 230 pruebas del núcleo (4 omitidas), 15 del runtime, 77 del timeline y 7 de
+  almacenamiento. Base sin red: 325 ejecutadas sin fallos y 4 omitidas. Las cuatro pruebas
+  omitidas de BytePlus se ejecutaron después contra la cuenta real y pasaron: total acumulado 329; las cuatro llamadas reales corresponden a la validación anterior.
 - Aceptación Windows con archivos reales y perfil aislado: importar, duplicar, dividir,
   colores, foco/selección, undo/redo, reapertura, lote inválido, doble envío tras reinicio,
   revisión obsoleta, edición manual posterior, exportación de 8 s con audio, cancelación,
@@ -260,3 +260,11 @@ Ese intento no se considera PASS. Se propaga ahora la capacidad `tools` al orque
 perfiles sin herramientas responden en una sola lectura y conservan el contexto para turnos
 posteriores. La lectura intermedia con herramientas conserva sus dos fases, con instrucciones
 explícitas para usar el contenido recibido y su resumen. Hay una regresión JVM de continuidad.
+
+La comprobación con herramientas activadas también detectó pérdida de precisión al responder
+solo con un resumen intermedio. Responses usa ahora lectura directa con el documento original
+y las herramientas en la misma petición. Conserva sus datos en el contexto bajo el límite de
+documentos del usuario; no los sustituye por un resumen de trabajo. Los otros proveedores
+mantienen su adaptación de lectura. La regresión JVM comprueba acceso a los hechos originales,
+herramientas disponibles y continuidad del siguiente turno. Esta corrección exige repetir la
+aceptación externa; no se da por validada por los resultados de la compilación anterior.

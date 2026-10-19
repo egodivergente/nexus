@@ -227,6 +227,19 @@ class OrchestratorTest {
         assertEquals("Still 131",o.send(conv,"Confirm").text)
     }
 
+    @Test fun `one pass document provider retains original facts with tools and across followups`() = runTest {
+        val h=Harness()
+        val llm=ScriptedLlmProvider(listOf(
+            { r -> assertTrue(r.tools.isNotEmpty());assertTrue(r.messages.any { "Invoice 731: 7*13+3*17-11" in it.text() });text("131") },
+            { r -> assertTrue(r.messages.any { "Invoice 731: 7*13+3*17-11" in it.text() });text("Still 131") }
+        ))
+        val o=AgentOrchestrator(llm,config.copy(documentsInOnePass=true),NexusToolkit.all(h.deps),h.skills,h.assets,
+            documents=com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { com.vidadomu.nexus.agent.core.llm.ContentBlock.Document("txt","Invoice","Invoice 731: 7*13+3*17-11".toByteArray()) })
+        val conv=o.newConversation()
+        assertEquals("131",o.send(conv,"Calculate",listOf(Attachment("doc","file:///doc.pdf","application/pdf","Invoice"))).text)
+        assertEquals("Still 131",o.send(conv,"Confirm").text)
+    }
+
     @Test fun `adjunto se describe al LLM con su id`() = runTest {
         val h = Harness()
         val llm = ScriptedLlmProvider(listOf({ r -> assertTrue(r.messages.last().text().contains("attachment_id=att_1")); text("visto") }))

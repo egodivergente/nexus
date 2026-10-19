@@ -67,7 +67,7 @@ def session(desktop,production=None,only=None,report_path=None,with_tools=False)
                 try:
                     with urllib.request.urlopen(request,timeout=100) as response:status=response.status;output=response.read()
                 except urllib.error.HTTPError as error:status=error.code;output=error.read()
-                parsed=json.loads(output);entry.update(status=status,usage=parsed.get('usage'),effectiveReasoning=parsed.get('reasoning'),effectiveThinking=parsed.get('thinking'))
+                parsed=json.loads(output);entry['responseTools']=[i.get('name') for i in parsed.get('output',[]) if i.get('type')=='function_call'];entry.update(status=status,usage=parsed.get('usage'),effectiveReasoning=parsed.get('reasoning'),effectiveThinking=parsed.get('thinking'))
             else:
                 status=200;output=json.dumps({'status':'completed','output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':json.dumps(current['expected'])}]}],'usage':{'input_tokens':1,'output_tokens':1}}).encode();entry['status']=status
             self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(output)));self.send_header('Connection','close');self.end_headers();self.wfile.write(output)
@@ -96,8 +96,8 @@ def session(desktop,production=None,only=None,report_path=None,with_tools=False)
                 profile=profile or {'id':'local-documents','name':'Local','protocol':'OPENAI_RESPONSES','modelId':'mock'}
                 profile.update(storeOnServer=False,baseUrl=f'http://127.0.0.1:{server.server_port}',endpointPath='',thinking='enabled',reasoningEffort='low',
                                capabilities={**profile.get('capabilities',{}),'vision':True,'streaming':False,'tools':with_tools},
-                               limits={'maxCallsPerTurn':3,'maxToolRounds':2,'maxTokens':2048,'turnTimeoutSeconds':150,'httpTimeoutSeconds':110})
-                host.command({'op':'settings','owner':'documents-qa','args':{'backend':'profile','mode':'ASSISTANT','brainProfile':profile,'brainKey':key}})
+                               limits={'maxCallsPerTurn':6 if with_tools else 3,'maxToolRounds':5 if with_tools else 2,'maxTokens':2048,'turnTimeoutSeconds':150,'httpTimeoutSeconds':110})
+                host.command({'op':'settings','owner':'documents-qa','args':{'backend':'profile','mode':'COPILOT' if with_tools else 'ASSISTANT','brainProfile':profile,'brainKey':key}})
                 thread.start();results=[]
                 for name,mime,prompt,expected in [
                     ('image','image/png','Lee el código superior y cuenta las figuras por forma y color. Responde solo JSON con code, red_circles, blue_squares, green_triangles.',{'code':files['code'],'red_circles':3,'blue_squares':2,'green_triangles':1}),
@@ -109,9 +109,14 @@ def session(desktop,production=None,only=None,report_path=None,with_tools=False)
                     result=host.command({'op':'send','owner':'documents-qa','args':{'text':prompt,'attachments':[{'id':uuid.uuid4().hex,'uri':'/media/'+path.name,'mimeType':mime,'name':'Documento de prueba' if mime=='application/pdf' else 'Imagen de prueba'}]}})['result']
                     if report_path:
                         report_path.parent.mkdir(parents=True,exist_ok=True)
-                        report_path.write_text(json.dumps({'status':'IN_PROGRESS','case':name,'lastAnswer':result['text'],'cases':results,'transport':requests,'attachments':attachments},ensure_ascii=False,indent=2),encoding='utf-8')
+                        report_path.write_text(json.dumps({'status':'IN_PROGRESS','desktop':str(desktop),'withTools':with_tools,'case':name,'lastAnswer':result['text'],'agentTools':result.get('tools'),'cases':results,'transport':requests,'attachments':attachments},ensure_ascii=False,indent=2),encoding='utf-8')
                     print('Case',name,'returned',flush=True) if live else None
-                    assert parse_answer(result['text'])==expected,(name,result['text'],expected)
+                    try:
+                        assert parse_answer(result['text'])==expected,(name,result['text'],expected)
+                    except Exception:
+                        if report_path:
+                            failed=json.loads(report_path.read_text('utf-8'));failed['status']='FAIL';report_path.write_text(json.dumps(failed,ensure_ascii=False,indent=2),encoding='utf-8')
+                        raise
                     assert original==hashlib.sha256(path.read_bytes()).hexdigest()
                     results.append({'case':name,'status':'PASS','answer':parse_answer(result['text']),'inputTokens':result.get('inputTokens'),'outputTokens':result.get('outputTokens')})
                 assert only or any(r['case']=='image' and r['images'] for r in requests),requests
@@ -120,7 +125,7 @@ def session(desktop,production=None,only=None,report_path=None,with_tools=False)
                 assert only or any(a['operation']=='document' and a['pages']==1 and a['complete'] for a in attachments),attachments
                 assert all(r['thinking']=={'type':'enabled'} and r['reasoning']=={'effort':'low'} and (with_tools or r['tools']==0) and r['status']==200 for r in requests),requests
                 reasoning_tokens=sum(((r.get('usage') or {}).get('output_tokens_details') or {}).get('reasoning_tokens',0) for r in requests)
-                return {'status':'PASS','withTools':with_tools,'reasoningTokens':reasoning_tokens,'reasoningObserved':reasoning_tokens>0,'live':live,'desktop':str(desktop),'model':profile['modelId'],'cases':results,'transport':requests,'attachments':attachments,
+                return {'status':'PASS','withTools':with_tools,'mode':'COPILOT' if with_tools else 'ASSISTANT','reasoningTokens':reasoning_tokens,'reasoningObserved':reasoning_tokens>0,'live':live,'desktop':str(desktop),'model':profile['modelId'],'cases':results,'transport':requests,'attachments':attachments,
                         'originalsPreserved':True,'mediaGenerationSubmitted':False,'productionPreferencesUnchanged':True}
             finally:
                 stop.set()

@@ -151,6 +151,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             maxToolRounds = limits.rounds, limits = limits,
             temperature = settings["temperature"]?.jsonPrimitive?.doubleOrNull,
             toolUse = profile?.capabilities?.tools ?: true,
+            documentsInOnePass = profile?.protocol == BrainProtocol.OPENAI_RESPONSES,
             mode = mode, sendImagesToLlm = settings["sendImages"]?.jsonPrimitive?.booleanOrNull ?: true
         ), NexusToolkit.all(deps) +
             ExpertBriefTool(registry, knowledge) { settings.text("excludedFamilies", "veo").split(',', ';').map { it.trim().lowercase() }.toSet() },

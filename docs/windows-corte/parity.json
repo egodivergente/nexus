@@ -9,7 +9,7 @@
       "desktop": "Compila directamente agent-core; se excluye la copia desktop/agent/core/src",
       "dependencies": "JDK17/Kotlin2.3.20",
       "windowsAdaptation": "Mismo sourceSet autoritativo",
-      "acceptance": "229 pruebas JVM del núcleo +15 runtime",
+      "acceptance": "230 pruebas JVM del núcleo +15 runtime",
       "result": "PASS: JVM; instalación en prueba aislada pendiente",
       "classification": "PARCIAL"
     },
