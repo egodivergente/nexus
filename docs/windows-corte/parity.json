@@ -61,11 +61,11 @@
       "id": "LLM-05",
       "android": "BytePlus ModelArk",
       "reference": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm; app/.../AssistantRuntime.kt",
-      "desktop": "Perfil BytePlus Responses con DPAPI; ejecución real en runtime Windows y Corte JVM",
+      "desktop": "Perfil BytePlus Responses con DPAPI, documentos originales en una pasada y páginas visuales PDF locales",
       "dependencies": "Credenciales y endpoint del usuario",
       "windowsAdaptation": "BrainFactory/SDK original con adaptador Windows",
-      "acceptance": "Cuenta real DPAPI → runtime instalado → herramientas nativas → respuesta con valores reales y persistencia Corte",
-      "result": "PASS real: BytePlus Responses/streaming en preview 3 ejecutó ajustes Windows y lectura/edición/relectura Corte; persistencia y deshacer local comprobados. Visión, documentos, razonamiento específico y resto de herramientas pendientes.",
+      "acceptance": "Cuenta real → runtime instalado → ajustes/edición Corte + imagen/PDF textual/escaneado con valores no presentes en el prompt y originales intactos",
+      "result": "PASS real: herramientas PC/Corte, imagen, PDF textual y escaneado; Responses con thinking enabled/low en Copiloto. Cálculo 131 correcto y 130 tokens de razonamiento reportados. Cobertura acotada; documentos complejos y herramientas restantes pendientes.",
       "classification": "PARCIAL"
     },
     {

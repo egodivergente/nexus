@@ -122,7 +122,8 @@ Pendientes concretos:
 5. BytePlus pasó inferencia mínima, Chat Completions, Responses con herramienta y continuidad,
    y streaming con dola-seed-2-1-turbo-260628. La herramienta de la prueba API devuelve un
    estado simulado. La aceptación posterior con herramientas reales de Windows también pasó;
-   faltan visión, documentos, razonamiento específico y las demás cuentas externas. La clave copiada del S25 permanece en DPAPI.
+   también pasaron imagen, PDF textual, PDF escaneado y cálculo básico con razonamiento enabled/low.
+   Falta ampliar a documentos complejos, herramientas restantes y demás cuentas externas. La clave del S25 permanece en DPAPI.
    Listado, activación de modelo e inferencia son resultados distintos.
 6. Certificar multipista, transiciones con handles, VFR, velocidades, keyframes y mezclas
    extensas. La ganancia de audio Windows se evalúa por fotograma; falta equivalencia a nivel
@@ -251,7 +252,7 @@ intervalo posterior al de las primeras ocho páginas ni se certifica todo tipo d
 PDF visual, imagen, límites de páginas y conservación. La prueba `--live` usa BytePlus,
 razonamiento enabled/low, fixtures sintéticos y un relé local que solo registra metadatos
 seleccionados. No registra claves, imágenes codificadas ni contenido de razonamiento.
-La aceptación externa de esta corrección se registrará por separado.
+La aceptación externa de esta corrección se registra al final de este documento.
 
 La primera aceptación externa detectó una segunda discrepancia: los perfiles sin herramientas
 las omitían en HTTP, pero el orquestador aún preparaba una segunda ronda de documento orientada
@@ -266,5 +267,34 @@ solo con un resumen intermedio. Responses usa ahora lectura directa con el docum
 y las herramientas en la misma petición. Conserva sus datos en el contexto bajo el límite de
 documentos del usuario; no los sustituye por un resumen de trabajo. Los otros proveedores
 mantienen su adaptación de lectura. La regresión JVM comprueba acceso a los hechos originales,
-herramientas disponibles y continuidad del siguiente turno. Esta corrección exige repetir la
-aceptación externa; no se da por validada por los resultados de la compilación anterior.
+herramientas disponibles y continuidad del siguiente turno. La aceptación externa posterior pasó los tres casos en modo Copiloto; se detalla a continuación.
+
+## Aceptación final de imagen y documentos con BytePlus
+
+PASS real sobre preview 4 / código `8e8a61e`, perfil temporal, modo COPILOT, Responses,
+`dola-seed-2-1-turbo-260628`, thinking enabled y esfuerzo low. La [API oficial de Responses](https://docs.byteplus.com/en/docs/modelark/create-model-responses-api)
+define esos controles; se verificó también la configuración efectiva devuelta por el servidor.
+
+- Imagen: leyó el código aleatorio 373527 y contó correctamente tres círculos rojos, dos
+  cuadrados azules y un triángulo verde. El código solo figuraba dentro de la imagen.
+- PDF de texto: recuperó la referencia aleatoria y calculó `7*13 + 3*17 - 11 = 131`.
+- PDF escaneado: reconoció el mismo código y figuras desde la página renderizada, sin texto
+  extraíble. La cobertura enviada fue una página de una, completa.
+
+Hubo exactamente tres peticiones, una por caso, con las 71 herramientas disponibles en el
+schema. El modelo no necesitó ejecutarlas para responder; esto no verifica las 71 herramientas.
+Las llamadas nativas PC/Corte se verificaron separadamente en la aceptación anterior. BytePlus
+informó 64 776 tokens de entrada, 254 de salida y 130 tokens de razonamiento. Solo se guardan
+metadatos y respuestas finales, sin contenido de razonamiento ni credenciales. No es una
+certificación general de la precisión del modelo ni de todos los formatos PDF.
+
+La evidencia es `outputs/windows-corte/byteplus-documents-copilot-live.json`, fuera de Git.
+La aceptación sin herramientas también pasó sus tres casos en el build anterior, y las
+pruebas fallidas se conservaron como FAIL; no se confunden con la aceptación final. Los
+originales, ajustes y credenciales de producción se conservaron. No hubo generación de medios.
+
+Compilación final: 325 pruebas JVM ejecutadas sin fallos y 4 de cuenta real omitidas en esa
+suite. Pasan las cuatro regresiones de documentos (transporte, sin visión, vectores y lectura
+parcial) y la aceptación local de herramientas del proveedor. La activación del perfil habitual
+sigue pendiente: permanece en 1.9.5 con dos encargos registrados PROCESSING. La preview no
+modifica sus procesos ni reenvía esos trabajos.
