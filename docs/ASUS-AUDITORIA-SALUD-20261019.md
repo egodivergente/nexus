@@ -102,6 +102,18 @@ Pendiente: para usar Flow hay que volver a iniciar sesión con el portal de recu
 haya un proyecto abierto, el consumo volverá a subir; de ahí el plan de «Chromium en reposo»
 (congelar la pestaña o dejarla ligera entre usos).
 
+### Flow con la sesión iniciada (19-10-2026, ~22:50)
+
+El usuario volvió a iniciar sesión desde el portal. `GET /api/flow/status` (autenticado, en local)
+devolvió `bridge_status=connected`, `generation_ready=true`, `project_open=true` y
+`composer_editable=true`. No se generó nada.
+
+Con un proyecto abierto y en reposo: carga de 0,79, `cpu some` avg10 del 4 % y CPU inactiva
+del ~98 %. **El consumo alto venía de la portada `/about`** (la que aparece cuando se cierra
+la sesión), no de tener un proyecto abierto. Por eso congelar la pestaña no es necesario por
+ahora. Lo que sí conviene es un vigilante que, si la pestaña se queda en `/about` (sesión
+caída) durante más de dos comprobaciones, la deje en blanco y avise. No está implementado.
+
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
 navegador mientras está inactivo (ver «Chromium en reposo»), y decidir
