@@ -204,8 +204,9 @@ Ordenadas por impacto esperado en una máquina de 3,7 GB:
 6. **Actualizaciones**: activar `unattended-upgrades` solo para seguridad, pero **retener
    Chromium** (`apt-mark hold`) y actualizarlo a mano junto a `gflow-cli`, porque una actualización
    sin control puede romper el puente.
-7. **Hardware**: el disco **es un HDD de 5400 rpm**, así que cambiarlo por un SSD SATA barato es la
-   mejora más notable. Ampliar la RAM a 8 GB, si tiene ranura libre, es la segunda.
+7. **Hardware: descartado.** El usuario no quiere gastar dinero en este equipo de 2013, que ya iba a tirar.
+   Solo se aplicarán mejoras de software. Batería: lleva años sin funcionar; no se sustituye.
+   El equipo trabaja enchufado y conectado a internet por cable.
 
 Ninguna de estas acciones se ha ejecutado. Todas requieren acceso al ASUS y, en las que borran
 datos o cambian el arranque, la confirmación del usuario.
