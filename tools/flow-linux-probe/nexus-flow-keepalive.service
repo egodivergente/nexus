@@ -1,0 +1,12 @@
+[Unit]
+Description=NEXUS Flow session keepalive (reopen project, park signed-out page)
+After=nexus-flow-recovery.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/share/nexus-flow-probe
+ExecStart=%h/.local/share/nexus-flow-probe/venv/bin/python %h/.local/share/nexus-flow-probe/flow_keepalive.py
+MemoryMax=300M
+Nice=10
+UMask=0077
+TimeoutStartSec=90

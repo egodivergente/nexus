@@ -223,3 +223,27 @@ The current source adds an explicit, private Flow generation bridge for the NEXU
 - The bridge accepts only the ASUS Tailscale IP and its MagicDNS host. Tokens, prompts, browser cookies and Google credentials are never committed or emitted by the API.
 
 PASS: mocked recovery/API tests cover authentication, host checks, body validation, idempotency and conservative download detection. The updated bridge was also staged and tested with the ASUS virtual environment, then deployed while preserving Chromium; authenticated live status reported the project open, an editable composer and generation readiness. NO PROBADO: Android delivery and a real paid Flow generation. A real generation must remain an explicit user-confirmed action.
+
+## Vigilante de sesión (2026-10-19)
+
+`flow_keepalive.py` se ejecuta cada 5 minutos con `nexus-flow-keepalive.timer` (unidad de
+usuario). Solo se conecta por CDP de loopback al Chromium que ya está abierto; nunca abre otro
+navegador, nunca escribe credenciales, nunca crea proyectos ni recarga un proyecto abierto.
+
+- Recuerda el último proyecto abierto (`keepalive-state.json`, modo 0600, fuera de Git).
+- Si Flow se queda en la galería o en blanco más de 10 minutos, vuelve a abrir ese proyecto.
+- Si la página se queda en `/about` (sesión cerrada) más de 20 minutos, la deja en
+  `about:blank` y marca `needs_login`. La portada pública satura la CPU del ASUS. Una página
+  de `accounts.google.com` (inicio de sesión en curso) no se toca nunca.
+- `nexus-flow-recovery.service.d/graceful-browser.conf` añade un `ExecStop` que cierra
+  Chromium con `Browser.close` antes de que systemd mate la unidad (`TimeoutStopSec=45`), para
+  que las cookies que Google rota queden guardadas. Antes, el último cierre registraba
+  `exit_type=Crashed`.
+
+No se automatiza el inicio de sesión: Google ya rechazó el inicio desatendido
+(`/signin/rejected`). Si la sesión cae, se vuelve a iniciar desde el portal.
+
+Validación: 10 pruebas unitarias en local y en el ASUS. Comprobación real: estado `project`,
+temporizador activo y puente aún `connected`. **NO PROBADO en real**: reabrir el proyecto,
+dejar la página en blanco y el cierre limpio. Comprobarlo exigiría tirar la sesión a propósito.
+No reiniciar `nexus-flow-recovery` sin necesidad: reiniciarlo cierra Chromium.

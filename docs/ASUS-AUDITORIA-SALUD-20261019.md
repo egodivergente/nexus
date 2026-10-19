@@ -114,6 +114,24 @@ la sesión), no de tener un proyecto abierto. Por eso congelar la pestaña no es
 ahora. Lo que sí conviene es un vigilante que, si la pestaña se queda en `/about` (sesión
 caída) durante más de dos comprobaciones, la deje en blanco y avise. No está implementado.
 
+### Por qué se perdía Flow y vigilante instalado (19-10-2026, 22:52)
+
+- **Las cookies de Google de este perfil son persistentes y caducan entre el 05-11-2026 y
+  2027** (solo se contaron, sin leer valores). La sesión no se pierde por tiempo.
+- El último cierre de Chromium quedó registrado como `exit_type=Crashed`: los reinicios del
+  servicio (dos hoy, a las 18:21 y a las 18:48, por despliegues de la rama
+  `codex/windows-corte-integration-20261018`) mataban el navegador sin dejarle guardar las cookies
+  que Google rota. Es la hipótesis más probable de las pérdidas de sesión; no está demostrada.
+- El usuario indica que **Flow le saca del proyecto a la galería** y tiene que volver a entrar.
+  El puente exige un proyecto abierto.
+- Instalado: `nexus-flow-keepalive.timer`, que se ejecuta cada 5 minutos y vuelve a abrir el
+  último proyecto si la pestaña se queda en la galería, o deja la página en blanco si la sesión
+  cae. Instalado también: el `ExecStop` de cierre limpio. Detalles y límites en
+  `tools/flow-linux-probe/README.md`. No se reinició `nexus-flow-recovery`; el puente sigue
+  `connected`.
+- **Reinicio automático de sesión con contraseña: descartado.** Google ya lo rechazó, y
+  repetir intentos automáticos puede bloquear la cuenta.
+
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
 navegador mientras está inactivo (ver «Chromium en reposo»), y decidir
