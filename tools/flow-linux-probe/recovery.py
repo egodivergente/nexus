@@ -26,10 +26,15 @@ from playwright.async_api import async_playwright
 import websockets
 from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES
 
-ROOT = Path.home() / '.local/share/nexus-flow-probe'
+ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
 MAGICDNS_HOST = os.environ.get('NEXUS_FLOW_MAGICDNS_HOST', 'asusvidal.tail6ac6b4.ts.net')
-PORT = 8899
+PORT = int(os.environ.get('NEXUS_FLOW_PORT', '8899'))
+# Lotes: un encargo puede enviar el mismo prompt varias veces seguidas (como hacer «x4» varias veces a mano).
+FLOW_MAX_RUNS = 10
+FLOW_MAX_RESULTS = 40
+# Si ya llegaron resultados y Flow deja de añadir más durante este tiempo, el lote se da por terminado.
+FLOW_STALL_SECONDS = {'image': 120, 'video': 480}
 ORIGIN = f'http://{HOST}:{PORT}'
 ALLOWED_HOSTS = frozenset({f'{HOST}:{PORT}', f'{MAGICDNS_HOST}:{PORT}'})
 ALLOWED_ORIGINS = frozenset({f'http://{HOST}:{PORT}', f'http://{MAGICDNS_HOST}:{PORT}'})
@@ -129,6 +134,9 @@ def public_flow_job(job, replayed=False):
         'result_count': len(job.get('new_downloads', [])),
         'download_available': job['state'] == 'completed' and bool(job.get('new_downloads')),
         'cost_source': 'flow_current_project',
+        'runs': job.get('runs', 1),
+        'runs_submitted': job.get('runs_submitted', job.get('runs', 1)),
+        'expected_results': job.get('expected_results', 0),
     }
     if job.get('error'):
         result['error'] = job['error']
@@ -150,6 +158,10 @@ def persisted_flow_job(job):
         'new_downloads': list(job.get('new_downloads', [])),
         'error': job.get('error'),
         'intent_hash': job.get('intent_hash'),
+        'runs': int(job.get('runs', 1)),
+        'runs_submitted': int(job.get('runs_submitted', job.get('runs', 1))),
+        'expected_results': int(job.get('expected_results', 0)),
+        'last_growth_at': float(job.get('last_growth_at', job.get('updated_at', 0))),
     }
 
 
@@ -268,6 +280,17 @@ def validate_flow_submission(data):
     return prompt, expected_output, client_request_id
 
 
+def validate_flow_batch(data):
+    """`runs`: veces que se pulsa Generar con el mismo prompt; `expected_results`: total que se espera (p. ej. 8 × 4)."""
+    runs = data.get('runs', 1)
+    expected = data.get('expected_results', 0)
+    if not isinstance(runs, int) or isinstance(runs, bool) or not 1 <= runs <= FLOW_MAX_RUNS:
+        raise FlowError('invalid_runs', 400)
+    if not isinstance(expected, int) or isinstance(expected, bool) or not 0 <= expected <= FLOW_MAX_RESULTS:
+        raise FlowError('invalid_expected_results', 400)
+    return runs, expected
+
+
 def is_flow_project(url):
     parts = urlsplit(url)
     return (parts.scheme == 'https' and parts.hostname == 'flow.google.com'
@@ -324,6 +347,8 @@ async def flow_api_status():
         'cost_source': 'flow_current_project',
         'reference_images': True,
         'reference_limit': MAX_IMAGES,
+        'batch_runs_max': FLOW_MAX_RUNS,
+        'batch_results_max': FLOW_MAX_RESULTS,
     }
     if current.get('status') != 'connected':
         response['reason'] = 'flow_not_connected'
@@ -402,8 +427,19 @@ def download_control_matches(expected, current_controls):
                for control in current_controls)
 
 
-async def drive_flow_submission(prompt, references=None):
-    """Fill and click once. Any failure after click start becomes uncertain."""
+async def wait_composer_cleared(page, composer, timeout_ms=15000):
+    """Flow vacía el cuadro al aceptar un envío; así sabemos que podemos lanzar el siguiente del lote."""
+    waited = 0
+    while waited < timeout_ms:
+        if not await composer.evaluate('input => input.value.length'):
+            return True
+        await page.wait_for_timeout(250)
+        waited += 250
+    return False
+
+
+async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
+    """Fill and click `runs` times. Any failure after the first click start becomes uncertain/partial."""
     async with FLOW_UI_LOCK:
         async def submit(page):
             composer, submit_button = await flow_controls(page)
@@ -414,16 +450,32 @@ async def drive_flow_submission(prompt, references=None):
                 # Do not overwrite a manual draft in the existing Flow tab.
                 raise FlowError('flow_composer_not_empty', 409)
             baseline = await download_controls(page)
+            if on_run:
+                # Guardar la referencia antes del primer clic: si el lote se corta, los resultados siguen siendo atribuibles.
+                await on_run(0, [item['signature'] for item in baseline])
             filled = False
             click_started = False
             try:
-                await attach_references(page, references or [])
-                await composer.fill(prompt, timeout=10000)
-                filled = True
-                if not await submit_button.is_enabled():
-                    raise FlowError('flow_submit_unavailable', 409)
-                click_started = True
-                await submit_button.click(timeout=10000)
+                for run in range(runs):
+                    if run == 0:
+                        await attach_references(page, references or [])
+                    elif references:
+                        # Flow suele conservar las referencias tras enviar; si las quitó, se vuelven a poner.
+                        with suppress(ReferenceError):
+                            await attach_references(page, references)
+                    await composer.fill(prompt, timeout=10000)
+                    filled = True
+                    if not await submit_button.is_enabled():
+                        if run == 0:
+                            raise FlowError('flow_submit_unavailable', 409)
+                        break
+                    click_started = True
+                    await submit_button.click(timeout=10000)
+                    if on_run:
+                        await on_run(run + 1, None)
+                    if run + 1 < runs and not await wait_composer_cleared(page, composer):
+                        break
+                    filled = False
                 await page.wait_for_timeout(250)
                 return [item['signature'] for item in baseline]
             except ReferenceError as error:
@@ -443,9 +495,9 @@ async def drive_flow_submission(prompt, references=None):
         return await with_flow_project_page(submit)
 
 
-async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None):
-    """Reserve an idempotent job before the sole UI click, never storing prompt."""
-    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or []],
+async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0):
+    """Reserve an idempotent job before the UI clicks, never storing prompt."""
+    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or []] + ([runs] if runs > 1 else []),
         ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
     async with FLOW_JOB_LOCK:
         existing = next((job for job in FLOW_JOBS.values()
@@ -467,16 +519,31 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
             'intent_hash': intent_hash,
             'new_downloads': [],
             'error': None,
+            'runs': runs,
+            'runs_submitted': 0,
+            'expected_results': expected_results,
+            'last_growth_at': now,
         }
         FLOW_JOBS[job_id] = job
         save_flow_jobs()
+
+    async def on_run(done, baseline):
+        if baseline is not None:
+            await update_flow_job(job_id, baseline_downloads=baseline)
+        else:
+            await update_flow_job(job_id, runs_submitted=done)
     try:
         paths = reference_paths(ROOT, reference_ids or [])
-        baseline = await drive_flow_submission(prompt, paths) if paths else await drive_flow_submission(prompt)
+        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run)
     except ReferenceError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
         raise FlowError(error.code, error.status_code) from error
     except FlowClickUncertain:
+        current = await flow_job(job_id)
+        if runs > 1 and current.get('runs_submitted', 0) >= 1:
+            # Al menos un envío del lote entró: se siguen recogiendo los resultados que vayan saliendo.
+            return await update_flow_job(job_id, state='submitted', error='batch_partial',
+                                         last_growth_at=time.time()), False
         return await update_flow_job(job_id, state='uncertain', error='submit_uncertain'), False
     except FlowError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
@@ -484,7 +551,8 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
     except Exception as error:
         await update_flow_job(job_id, state='failed', error='flow_submit_failed')
         raise FlowError('flow_submit_failed', 503) from error
-    return await update_flow_job(job_id, state='submitted', baseline_downloads=baseline, error=None), False
+    return await update_flow_job(job_id, state='submitted', baseline_downloads=baseline, error=None,
+                                 last_growth_at=time.time()), False
 
 
 async def refresh_flow_job(job):
@@ -503,6 +571,17 @@ async def refresh_flow_job(job):
         # A click with an indeterminate outcome is never promoted automatically.
         return await update_flow_job(job['job_id'], new_downloads=additions,
                                      error='submit_uncertain')
+    expected = int(job.get('expected_results', 0))
+    if job.get('runs', 1) > 1 or expected > 1:
+        # Lote: se espera a que salgan todos; si Flow deja de añadir resultados un buen rato, se entrega lo que haya.
+        now = time.time()
+        grew = len(additions) > len(job.get('new_downloads', []))
+        last = now if grew else float(job.get('last_growth_at', now))
+        stalled = additions and now - last > FLOW_STALL_SECONDS.get(job['expected_output'], 180)
+        if (expected and len(additions) >= expected) or stalled:
+            return await update_flow_job(job['job_id'], state='completed', new_downloads=additions, error=None)
+        return await update_flow_job(job['job_id'], state='generating', new_downloads=additions,
+                                     last_growth_at=last, error=job.get('error') if job.get('error') == 'batch_partial' else None)
     if additions:
         return await update_flow_job(job['job_id'], state='completed', new_downloads=additions, error=None)
     return await update_flow_job(job['job_id'], state='generating', error=None)
@@ -728,9 +807,11 @@ async def create_flow_job(request: Request):
     try:
         data = await read_limited_json(request)
         prompt, expected_output, client_request_id = validate_flow_submission(data)
+        runs, expected_results = validate_flow_batch(data)
         references = data.get('reference_ids', [])
         reference_paths(ROOT, references)
-        job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references) if references else await submit_flow_generation(prompt, expected_output, client_request_id)
+        job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references or None,
+                                                     runs, expected_results)
         return JSONResponse(public_flow_job(job, replayed=replayed), status_code=200 if replayed else 201)
     except ReferenceError as error:
         return JSONResponse({'error': error.code}, status_code=error.status_code)

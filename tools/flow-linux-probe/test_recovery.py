@@ -180,7 +180,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(rejected.json(), {'error': 'confirmation_required'})
         self.assertEqual(accepted.status_code, 201)
         self.assertEqual(accepted.json()['job_id'], job['job_id'])
-        submit.assert_awaited_once_with('hola', 'image', valid_id)
+        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0)
 
     def test_flow_job_poll_uses_mocked_bridge_without_a_browser(self):
         job = {'job_id': 'server-job-1234567', 'client_request_id': 'client-request-123456',
@@ -254,7 +254,8 @@ class FlowJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(replayed_second)
         self.assertEqual(first['job_id'], second['job_id'])
         self.assertEqual(second['state'], 'submitted')
-        drive.assert_awaited_once_with(prompt)
+        drive.assert_awaited_once()
+        self.assertEqual(drive.await_args.args[:3], (prompt, None, 1))
         journal = (self.root / 'flow-jobs.json').read_text()
         self.assertNotIn(prompt, journal)
         self.assertNotIn('token', journal.lower())

@@ -46,7 +46,7 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Google Flow", style = MaterialTheme.typography.titleLarge)
-        Text("Proyecto activo del ASUS", style = MaterialTheme.typography.bodyMedium)
+        Text("Proyecto activo del puente (AXELPC o ASUS)", style = MaterialTheme.typography.bodyMedium)
         Text("La creación usa los ajustes y el coste que muestre Google Flow.",
             style = MaterialTheme.typography.bodySmall)
         FilledTonalButton(onClick = {
@@ -67,10 +67,10 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
     }
     if (pair) AlertDialog(
         onDismissRequest = { pair = false; token = "" },
-        title = { Text("Vincular ASUS") },
+        title = { Text("Vincular puente de Flow") },
         text = {
             OutlinedTextField(value = token, onValueChange = { token = it.trim() },
-                label = { Text("Clave privada del ASUS") }, singleLine = true,
+                label = { Text("Clave privada del puente") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(), shape=NexusTokens.field)
         },

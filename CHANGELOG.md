@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.49-agent] - 2026-10-19 · «Índigo»
+
+- Google Flow en lotes: un encargo pide hasta 40 resultados y el puente pulsa Generar las veces necesarias (según el «xN» de Flow, por defecto 4) y los recoge juntos, en vez de uno detrás de otro.
+- El puente de Flow corre ahora en AXELPC como principal; si AXELPC está apagado o sin Flow listo, Nexus usa el ASUS de respaldo. Cada trabajo se sigue y descarga en el puente donde se envió.
+
 ## [1.9.48-agent] - 2026-10-19 · «Índigo»
 
 - El agente puede crear proyectos nuevos en Corte (corte_create_project): crea uno vacío, abre Corte en él y deja listo importar clips. Requiere Corte con el puente protocolo 3.

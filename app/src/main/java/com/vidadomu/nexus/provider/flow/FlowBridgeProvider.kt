@@ -52,7 +52,7 @@ class FlowBridgeProvider(
             return@withContext Result.failure(ProviderError("Flow solo puede recibir una salida de imagen o vídeo desde esta pantalla."))
         }
         val requestedCount = request.parameters["count"]?.toIntOrNull() ?: 1
-        if(requestedCount !in 1..20) return@withContext Result.failure(ProviderError("Elige de 1 a 20 resultados."))
+        if(requestedCount !in 1..FlowBridgeClient.MAX_RESULT_COUNT) return@withContext Result.failure(ProviderError("Elige de 1 a ${FlowBridgeClient.MAX_RESULT_COUNT} resultados."))
         val expectedOutput = request.parameters[EXPECTED_OUTPUT_KEY]?.lowercase()
             ?: modalityName(request.modality)
         if (expectedOutput != modalityName(request.modality)) {
@@ -92,7 +92,15 @@ class FlowBridgeProvider(
             val requestId = "${job.id}_$block"
             val recovered = queue.getString("remote_$requestId", null)
             val remote = if(recovered != null) bridge.job(recovered) else
-                bridge.submit(job.prompt, modalityName(job.modality), requestId, FlowReferences.savedIds(job.parameters))
+                run {
+                    // Lote: lo que falta se pide de una vez, en tantos envíos como hagan falta según el «xN» de Flow.
+                    val goal = (job.parameters["count"]?.toIntOrNull() ?: 1).coerceIn(1, FlowBridgeClient.MAX_RESULT_COUNT)
+                    val perRun = (job.parameters["per_run"]?.toIntOrNull() ?: 4).coerceIn(1, 4)
+                    val missing = (goal - job.outputs.size).coerceAtLeast(1)
+                    val runs = ((missing + perRun - 1) / perRun).coerceIn(1, FlowBridgeClient.MAX_RUNS)
+                    bridge.submit(job.prompt, modalityName(job.modality), requestId, FlowReferences.savedIds(job.parameters),
+                        runs = runs, expectedResults = if (goal > 1) missing else 0)
+                }
             val submissionError = remote.exceptionOrNull() as? ProviderError
             if (submissionError?.errorCode in setOf("invalid_reference_ids", "invalid_reference_image",
                 "reference_not_found", "reference_integrity_failed", "duplicate_reference",
@@ -310,15 +318,15 @@ class FlowBridgeProvider(
     private fun flowStateMessage(error: String): String = when (error) {
         "flow_project_not_open" -> "El proyecto de Flow no está abierto. Ábrelo y vuelve a consultar."
         "flow_project_ambiguous" -> "Hay más de un proyecto de Flow abierto. Deja abierto solo el proyecto que quieres usar."
-        "flow_not_connected" -> "El ASUS no tiene una sesión de Flow disponible. Vuelve a conectar Flow."
+        "flow_not_connected" -> "El puente (AXELPC o ASUS) no tiene una sesión de Flow disponible. Vuelve a conectar Flow."
         "flow_controls_unavailable" -> "Flow está abierto, pero aún no muestra los controles de creación."
         "flow_composer_not_empty" -> "Hay un borrador escrito en Flow. Revísalo o bórralo antes de enviar desde Nexus."
         "flow_composer_not_editable" -> "El cuadro de texto de Flow no está disponible todavía."
         "flow_submit_unavailable" -> "Flow no habilitó la generación para ese proyecto. Revisa sus ajustes."
         "flow_submit_failed" -> "Flow no confirmó el envío. Comprueba el proyecto antes de repetir."
-        "flow_browser_unavailable" -> "El navegador privado de Flow no está disponible en el ASUS."
+        "flow_browser_unavailable" -> "El navegador privado de Flow no está disponible en el puente (AXELPC o ASUS)."
         "flow_not_ready" -> "Flow no está listo para crear en este momento."
-        "auth_required" -> "Flow necesita volver a iniciar sesión en el ASUS."
+        "auth_required" -> "Flow necesita volver a iniciar sesión en el navegador del puente (AXELPC o ASUS)."
         "submit_uncertain" -> "Flow no confirmó el envío. No se reenviará automáticamente."
         "result_not_ready" -> "El resultado todavía no está listo para descargarse."
         "download_ambiguous" -> "Nexus no puede identificar con seguridad qué resultado descargar. Ábrelo en Flow."
@@ -342,6 +350,6 @@ class FlowBridgeProvider(
         const val PROVIDER_ID = "google_flow"
         const val CURRENT_PROJECT_MODEL = "current_project"
         const val EXPECTED_OUTPUT_KEY = "__flow_expected_output"
-        private const val MAX_RESULT_COUNT = 12
+        private const val MAX_RESULT_COUNT = FlowBridgeClient.MAX_RESULT_COUNT
     }
 }
