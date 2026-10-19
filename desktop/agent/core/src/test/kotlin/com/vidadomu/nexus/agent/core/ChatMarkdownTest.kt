@@ -1,8 +1,12 @@
 package com.vidadomu.nexus.agent.core
 
+import com.vidadomu.nexus.agent.core.chat.CalloutKind
 import com.vidadomu.nexus.agent.core.chat.ChatMarkdown
+import com.vidadomu.nexus.agent.core.chat.ChatWidgets
 import com.vidadomu.nexus.agent.core.chat.MdBlock
 import com.vidadomu.nexus.agent.core.chat.MdSpan
+import com.vidadomu.nexus.agent.core.chat.WidgetOption
+import com.vidadomu.nexus.agent.core.chat.WidgetSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -89,5 +93,76 @@ class ChatMarkdownTest {
         val b = ChatMarkdown.parse("> Ojo: veo está excluido\r\n> por defecto\r\n\r\nVale")
         assertEquals("Ojo: veo está excluido\npor defecto", raw(assertIs<MdBlock.Quote>(b[0]).spans))
         assertEquals(2, b.size)
+    }
+
+    @Test fun `recuadro semantico cerrado con su contenido`() {
+        val b = ChatMarkdown.parse("Intro\n\n:::warn\nEsto **gasta** crédito.\n- Una\n:::\n\nFin")
+        assertEquals(3, b.size)
+        val c = assertIs<MdBlock.Callout>(b[1])
+        assertEquals(CalloutKind.WARN, c.kind)
+        assertIs<MdBlock.Paragraph>(c.blocks[0])
+        assertIs<MdBlock.ListBlock>(c.blocks[1])
+        assertEquals("Fin", raw((b[2] as MdBlock.Paragraph).spans))
+    }
+
+    @Test fun `recuadro sin cerrar llega a la linea en blanco y no se traga el resto`() {
+        val b = ChatMarkdown.parse(":::tldr\nResumen corto\n\nDetalle posterior")
+        assertEquals(CalloutKind.TLDR, assertIs<MdBlock.Callout>(b[0]).kind)
+        assertEquals("Detalle posterior", raw((b[1] as MdBlock.Paragraph).spans))
+        assertFalse(ChatMarkdown.plain(":::tldr\nResumen corto").contains(":::"))
+    }
+
+    @Test fun `un recuadro sin cerrar no se traga al siguiente`() {
+        val b = ChatMarkdown.parse(":::tip\nUno\n:::warn\nDos\n:::")
+        assertEquals(listOf(CalloutKind.TIP, CalloutKind.WARN), b.filterIsInstance<MdBlock.Callout>().map { it.kind })
+    }
+
+    @Test fun `cierre suelto y tipo desconocido no rompen`() {
+        val b = ChatMarkdown.parse("Hola\n:::\n\n:::otro\nTexto")
+        assertTrue(b.none { it is MdBlock.Callout })
+        assertFalse(ChatMarkdown.plain("Hola\n:::").contains(":::"))
+    }
+
+    @Test fun `resaltado solo con marcadores pegados y fuera de palabras`() {
+        assertEquals(listOf(MdSpan("Ojo ", ), MdSpan("clave", mark = true), MdSpan(" aquí")), ChatMarkdown.inline("Ojo ==clave== aquí"))
+        assertEquals("si a == b entonces c == d", raw(ChatMarkdown.inline("si a == b entonces c == d")))
+        assertEquals("x==y==z", raw(ChatMarkdown.inline("x==y==z")))
+        assertTrue(ChatMarkdown.inline("x==y==z").none { it.mark })
+        assertTrue(ChatMarkdown.inline("`==no==`").single().code)
+        assertEquals("==a==", raw(ChatMarkdown.inline("\\==a\\==")))
+    }
+
+    @Test fun `panel de encuesta valido se convierte en widget`() {
+        val md = "Elige:\n\n```nexus-ui\n{\"type\":\"poll\",\"id\":\"fmt\",\"question\":\"¿Formato?\",\"multi\":true," +
+            "\"options\":[{\"id\":\"a\",\"label\":\"16:9\",\"hint\":\"horizontal\"},\"9:16\"]}\n```"
+        val w = assertIs<MdBlock.Widget>(ChatMarkdown.parse(md)[1])
+        val poll = assertIs<WidgetSpec.Poll>(w.spec)
+        assertEquals("fmt", poll.id)
+        assertTrue(poll.multi)
+        assertEquals(listOf(WidgetOption("a", "16:9", "horizontal"), WidgetOption("o1", "9:16")), poll.options)
+        val plain = ChatMarkdown.plain(md)
+        assertTrue(plain.contains("¿Formato?") && plain.contains("16:9 — horizontal") && !plain.contains("nexus-ui"))
+    }
+
+    @Test fun `json invalido o fuera de limites cae a bloque de codigo`() {
+        for (bad in listOf("{no es json", "{\"type\":\"poll\",\"question\":\"¿?\",\"options\":[\"solo una\"]}", "{\"type\":\"desconocido\"}", "[]")) {
+            val b = ChatMarkdown.parse("```nexus-ui\n$bad\n```")
+            assertIs<MdBlock.Code>(b.single(), bad)
+        }
+    }
+
+    @Test fun `panel a medias se oculta mientras llega y se enseña si el texto termino asi`() {
+        val partial = "Mira:\n\n```nexus-ui\n{\"type\":\"poll\",\"que"
+        assertEquals(1, ChatMarkdown.parse(partial, streaming = true).size)
+        assertIs<MdBlock.Code>(ChatMarkdown.parse(partial, streaming = false).last())
+    }
+
+    @Test fun `steps y compare con limites`() {
+        val steps = ChatWidgets.parse("{\"type\":\"steps\",\"title\":\"Antes de rodar\",\"items\":[\"Guion\",\"Referencias\",\"\"]}")
+        assertEquals(listOf("Guion", "Referencias"), assertIs<WidgetSpec.Steps>(steps).items)
+        val many = (1..9).joinToString(",") { "\"Modelo $it\"" }
+        val compare = assertIs<WidgetSpec.Compare>(ChatWidgets.parse("{\"type\":\"compare\",\"options\":[$many]}"))
+        assertEquals(6, compare.options.size)
+        assertEquals(compare.id, assertIs<WidgetSpec.Compare>(ChatWidgets.parse("{\"type\":\"compare\",\"options\":[$many]}")).id)
     }
 }
