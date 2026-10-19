@@ -2,23 +2,32 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
-## [1.9.51-agent] - 2026-10-20 · Ajustes por categorías (fase 1)
+## [1.9.52-agent] - 2026-10-20 · Ajustes por categorías, cabecera despejada y prompt fiel
 
 - **Ajustes con pantalla de categorías:** en lugar de una lista larga, Ajustes abre una pantalla con cinco categorías (Apariencia y moneda, Agente y modelos, Proveedores de generación, Generadores propios, Sistema y diagnóstico), cada una con su resumen. Cada categoría abre su subpágina y el botón atrás vuelve a la lista.
 - **Un camino al asistente:** «Agente y modelos» incluye «Ajustes del asistente» (modelo, respuesta, consumo, herramientas y skills) además de los cerebros adicionales; desde el chat se sigue llegando por la rueda → «Asistente».
-
-## [1.9.50-agent] - 2026-10-19 · cabecera más despejada
-
 - **Un solo botón de ajustes:** el icono de parámetros y la rueda se unen en una rueda con dos entradas, «Asistente: modelo y conexión» y «Aplicación». La cabecera pasa de cinco a cuatro elementos.
 - **Saldo discreto:** el saldo se muestra como texto sin fondo; al tocarlo sigue abriendo el detalle de gasto.
-
-## [1.9.49-agent] - 2026-10-19 · rama `ux/agent-prompt-fiel-20261019`
-
 - **Tu prompt, tal cual:** si entregas un prompt ya hecho, el agente lo envía exactamente como lo escribiste. Solo lo cambia si supera el límite de caracteres del modelo, si el modelo exige otra sintaxis documentada o si el proveedor lo rechazó, y siempre lo dice en una frase (el original se conserva). La memoria del proyecto y las skills ya no se inyectan en prompts tuyos. Regla `PROMPT_FIDELITY_RULES` siempre activa; prueba `PromptFidelityTest`.
 - **Cuadro de texto:** una sola forma (esquinas de 24 dp) que ya no cambia con el contenido ni corta los adjuntos.
 - **Adjuntos pendientes en miniatura:** imagen, primer fotograma del vídeo, o icono con nombre para audio y documentos, con botón para quitar en la esquina.
 - **Errores con salida:** el aviso de error del chat incluye «Reintentar» (si hay un turno que repetir), «Cambiar modelo» e «Historial» cuando aplica.
 - **Formulario de proyecto:** campos agrupados en tarjetas (La historia, Aspecto y tono, Reglas del asistente) con icono y ejemplos.
+
+## [1.9.51-agent] - 2026-10-19 · «Índigo»
+
+- Flow: Nexus espera hasta 15 s a que AXELPC confirme que está listo (antes 4 s y a veces se iba al ASUS sin sesión). El diagnóstico dice qué puente usa.
+
+## [1.9.50-agent] - 2026-10-19 · «Índigo»
+
+- El agente de Nexus habla con el agente de Google Flow (flow_agent_send / flow_agent_read): le encarga generaciones en cantidad, colecciones o descargas, lee su respuesta, negocia si pregunta y trae las imágenes y vídeos a la Biblioteca.
+- El puente de Flow se adapta al nuevo cuadro de Flow (el antiguo campo era el título del proyecto).
+
+## [1.9.49-agent] - 2026-10-19 · «Índigo»
+
+- Google Flow en lotes: un encargo pide hasta 40 resultados y el puente pulsa Generar las veces necesarias (según el «xN» de Flow, por defecto 4) y los recoge juntos, en vez de uno detrás de otro.
+- El puente de Flow corre ahora en AXELPC como principal; si AXELPC está apagado o sin Flow listo, Nexus usa el ASUS de respaldo. Cada trabajo se sigue y descarga en el puente donde se envió.
+
 ## [1.9.48-agent] - 2026-10-19 · «Índigo»
 
 - El agente puede crear proyectos nuevos en Corte (corte_create_project): crea uno vacío, abre Corte en él y deja listo importar clips. Requiere Corte con el puente protocolo 3.
