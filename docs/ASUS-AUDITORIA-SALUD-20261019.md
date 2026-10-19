@@ -132,7 +132,7 @@ caída) durante más de dos comprobaciones, la deje en blanco y avise. No está 
 - **Reinicio de sesión con la contraseña guardada en Chromium**: autorizado por el usuario con
   sus riesgos. Un intento cada 6 horas, solo con clics, que se detiene ante cualquier
   verificación. A las 23:10 el perfil todavía **no tenía ninguna contraseña de Google guardada**
-  (se contaron filas, sin leer valores): el usuario tiene que guardarla.
+  (se contaron filas, sin leer valores). A las 23:49 ya había una, guardada por el usuario.
 
 **Conclusión provisional**: aunque ahora mismo **no compila**, el ASUS está saturado de CPU
 solo por tener Flow abierto. Dedicarlo a Flow tiene sentido, pero hay que reducir el coste del
