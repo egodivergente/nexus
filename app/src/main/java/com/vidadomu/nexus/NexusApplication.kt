@@ -57,6 +57,7 @@ class NexusApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        android.os.Handler(android.os.Looper.getMainLooper()).post {com.vidadomu.nexus.sync.NexusDriveSync.get(this).initialize()}
         runCatching {
             assets.open("atlas_editorial_evidence.json").bufferedReader().use {
                 com.vidadomu.nexus.ui.models.PublishedModelNotes.seed(it.readText())
@@ -92,12 +93,14 @@ class NexusApplication : Application() {
         )
         // Los proveedores API del usuario se registran ANTES de crear el catálogo para que entren en la primera carga.
         customMediaStore = com.vidadomu.nexus.provider.custom.CustomMediaStore(this, okHttpClient)
+        customMediaStore.ensureBytePlus()
         providerRegistry.setCustomProviders(customMediaStore.providers())
         val catalogCache = com.vidadomu.nexus.data.repository.ModelCatalogCache(this)
         modelCatalogRepository = ModelCatalogRepository(providerRegistry, currencyManager, catalogCache, getSharedPreferences("catalog_customization_v1", 0))
         generationRepository = GenerationRepository(this, database, providerRegistry)
         settingsRepository = SettingsRepository(secureStorage, providerRegistry, currencyManager)
         ready.complete(Unit)
+        com.vidadomu.nexus.assistant.BytePlusConsumption.get(this).schedule()
 
         // Asynchronously check and refresh currency rate on startup
         CoroutineScope(Dispatchers.IO).launch {

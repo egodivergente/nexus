@@ -32,8 +32,12 @@ internal class FlowBridgeClient(
     private val secureStorage: SecureStorage
 ) {
     suspend fun status(): Result<FlowBridgeStatus> = guarded {
+        // Comprobar el estado vuelve a elegir puente: si AXELPC se encendió o se apagó, se nota aquí.
+        pinned = null
+        val chosen = base()
+        val where = if (tagFor(chosen) == HOSTS.first().first) "AXELPC" else "ASUS (respaldo; AXELPC no está listo)"
         requestJson(
-            request = authorizedRequest("$BASE_URL/status").get().build(),
+            request = authorizedRequest("$chosen/status").get().build(),
             decode = { raw ->
                 val payload = json.decodeFromString<StatusPayload>(raw)
                 FlowBridgeStatus(
@@ -46,7 +50,7 @@ internal class FlowBridgeClient(
                         .toSet()
                         .ifEmpty { EXPECTED_OUTPUTS },
                     checkedAt = System.currentTimeMillis(),
-                    detail = statusDetail(payload.reason)
+                    detail = listOfNotNull("Puente: $where.", statusDetail(payload.reason)).joinToString(" ")
                 )
             }
         )
@@ -56,7 +60,9 @@ internal class FlowBridgeClient(
         prompt: String,
         expectedOutput: String,
         clientRequestId: String,
-        referenceIds: List<String> = emptyList()
+        referenceIds: List<String> = emptyList(),
+        runs: Int = 1,
+        expectedResults: Int = 0
     ): Result<FlowBridgeJob> {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) return Result.failure(ProviderError("Escribe una instrucción para Flow."))
@@ -77,13 +83,16 @@ internal class FlowBridgeClient(
                 expectedOutput = expectedOutput,
                 clientRequestId = clientRequestId,
                 confirmed = true,
-                referenceIds = referenceIds
+                referenceIds = referenceIds,
+                runs = runs.coerceIn(1, MAX_RUNS),
+                expectedResults = expectedResults.coerceIn(0, MAX_RESULT_COUNT)
             )
         ).toRequestBody(JSON_MEDIA_TYPE)
         return guarded {
+            val chosen = base()
             requestJson(
-                request = authorizedRequest("$BASE_URL/jobs").post(body).build(),
-                decode = ::decodeJob
+                request = authorizedRequest("$chosen/jobs").post(body).build(),
+                decode = { decodeJob(it, tagFor(chosen)) }
             )
         }
     }
@@ -92,7 +101,7 @@ internal class FlowBridgeClient(
         if (mimeType !in FlowReferences.MIME_TYPES || !file.isFile || file.length() !in 1..FlowReferences.MAX_BYTES)
             return Result.failure(ProviderError("Adjunta PNG, JPEG o WebP de hasta 16 MB.", httpStatusCode = 400))
         return guarded {
-            requestJson(authorizedRequest("$BASE_URL/references")
+            requestJson(authorizedRequest("${base()}/references")
                 .post(file.asRequestBody(mimeType.toMediaType())).build()) { raw ->
                 val id = json.decodeFromString<ReferencePayload>(raw).referenceId
                 require(FlowReferences.ID.matches(id))
@@ -104,12 +113,75 @@ internal class FlowBridgeClient(
     @Serializable
     private data class ReferencePayload(@SerialName("reference_id") val referenceId: String)
 
+    // --- Conversación con el agente de Flow (panel «Sesión …» del proyecto abierto) ---
+
+    @Serializable
+    private data class AgentMessagePayload(val message: String)
+
+    @Serializable
+    data class AgentMedia(val row: Int, val index: Int, val kind: String = "image", val label: String = "",
+                          val width: Int = 0, val height: Int = 0)
+
+    @Serializable
+    data class AgentReplyPayload(val text: String = "", val options: List<String> = emptyList(), val media: List<AgentMedia> = emptyList())
+
+    @Serializable
+    private data class AgentJobPayload(@SerialName("job_id") val jobId: String, val state: String,
+                                       val reply: AgentReplyPayload = AgentReplyPayload())
+
+    data class AgentTurn(val id: String, val state: String, val reply: AgentReplyPayload)
+
+    suspend fun agentSend(message: String): Result<AgentTurn> {
+        val clean = message.trim()
+        if (clean.isBlank()) return Result.failure(ProviderError("Escribe el mensaje para el agente de Flow."))
+        if (clean.length > MAX_PROMPT_LIMIT) return Result.failure(ProviderError("El mensaje supera $MAX_PROMPT_LIMIT caracteres."))
+        val body = json.encodeToString(AgentMessagePayload.serializer(), AgentMessagePayload(clean)).toRequestBody(JSON_MEDIA_TYPE)
+        return guarded {
+            val chosen = base()
+            requestJson(authorizedRequest("$chosen/agent").post(body).build()) { raw ->
+                json.decodeFromString<AgentJobPayload>(raw).let { AgentTurn("${tagFor(chosen)}.${it.jobId}", it.state, it.reply) }
+            }
+        }
+    }
+
+    suspend fun agentStatus(id: String): Result<AgentTurn> {
+        if (!JOB_ID.matches(id)) return Result.failure(ProviderError("El identificador de la conversación con Flow no es válido."))
+        return guarded {
+            requestJson(authorizedRequest("${baseFor(id)}/agent/${rawId(id)}").get().build()) { raw ->
+                json.decodeFromString<AgentJobPayload>(raw).let { AgentTurn(id, it.state, it.reply) }
+            }
+        }
+    }
+
+    /** Descarga una imagen o vídeo que generó el agente de Flow en esa respuesta. */
+    suspend fun agentMedia(id: String, media: AgentMedia, destinationDir: File): Result<FlowBridgeDownload> = withContext(Dispatchers.IO) {
+        if (!JOB_ID.matches(id) || media.row !in 0..10_000 || media.index !in 0..200)
+            return@withContext Result.failure(ProviderError("El archivo del agente de Flow no es válido."))
+        try {
+            destinationDir.mkdirs()
+            client.newCall(authorizedRequest("${baseFor(id)}/agent/${rawId(id)}/media/${media.row}/${media.index}").get().build()).awaitResponse().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(bridgeError(response.code, response.body?.string().orEmpty()))
+                val body = response.body ?: return@withContext Result.failure(ProviderError("Flow no devolvió el archivo."))
+                val expected = if (media.kind == "video") "video" else "image"
+                val mime = body.contentType()?.toString()?.substringBefore(';')?.takeIf { it.matches(MIME_TYPE) } ?: fallbackMimeType(expected)
+                val target = File(destinationDir, "FlowAgente-${rawId(id).take(24)}-${media.row}-${media.index}.${extensionFor(mime, expected)}")
+                body.byteStream().use { input -> FileOutputStream(target).use { input.copyTo(it) } }
+                if (target.length() <= 0L) return@withContext Result.failure(ProviderError("Flow devolvió un archivo vacío."))
+                Result.success(FlowBridgeDownload(target, mime))
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Result.failure(flowNetworkError(error))
+        }
+    }
+
     suspend fun job(jobId: String): Result<FlowBridgeJob> {
         if (!JOB_ID.matches(jobId)) return Result.failure(ProviderError("El identificador del trabajo de Flow no es válido."))
         return guarded {
             requestJson(
-                request = authorizedRequest("$BASE_URL/jobs/$jobId").get().build(),
-                decode = ::decodeJob
+                request = authorizedRequest("${baseFor(jobId)}/jobs/${rawId(jobId)}").get().build(),
+                decode = { decodeJob(it, tagOf(jobId)) }
             )
         }
     }
@@ -135,7 +207,7 @@ internal class FlowBridgeClient(
         }
 
         val request = try {
-            authorizedRequest("$BASE_URL/jobs/$jobId/downloads/$index").get().build()
+            authorizedRequest("${baseFor(jobId)}/jobs/${rawId(jobId)}/downloads/$index").get().build()
         } catch (error: Exception) {
             return@withContext Result.failure(error)
         }
@@ -248,12 +320,12 @@ internal class FlowBridgeClient(
     private fun flowNetworkError(error: Throwable): ProviderError = when (error) {
         is ProviderError -> error
         is UnknownHostException -> ProviderError(
-            humanReadableMessage = "No se encuentra el ASUS privado. Activa Tailscale y vuelve a comprobar Flow.",
+            humanReadableMessage = "No se encuentra el puente de Flow (AXELPC o ASUS). Activa Tailscale y vuelve a comprobar Flow.",
             technicalDetails = error.javaClass.simpleName,
             errorCode = "FLOW_PRIVATE_DNS"
         )
         is ConnectException -> ProviderError(
-            humanReadableMessage = "No se puede contactar con el puente de Flow en el ASUS. Comprueba que está encendido y conectado a Tailscale.",
+            humanReadableMessage = "No se puede contactar con el puente de Flow (AXELPC ni ASUS). Comprueba que alguno está encendido y en Tailscale.",
             technicalDetails = error.javaClass.simpleName,
             errorCode = "FLOW_BRIDGE_UNREACHABLE"
         )
@@ -270,7 +342,40 @@ internal class FlowBridgeClient(
         else -> NetworkErrorParser.parse(error)
     }
 
-    private fun decodeJob(raw: String): FlowBridgeJob {
+    /**
+     * AXELPC es el puente principal (más memoria, varios envíos seguidos); el ASUS, siempre encendido, es el respaldo.
+     * Se elige AXELPC solo si responde y tiene Flow listo para crear; la elección se mantiene unos minutos para que
+     * la subida de referencias y el envío vayan al mismo puente. Cada trabajo lleva la marca de su puente (`a.`/`s.`)
+     * y siempre se consulta y descarga allí.
+     */
+    private suspend fun base(): String {
+        pinned?.let { (url, at) -> if (System.currentTimeMillis() - at < PIN_MS) return url }
+        val primary = HOSTS.first().second
+        val ready = withContext(Dispatchers.IO) {
+            runCatching {
+                // AXELPC tarda 1-3 s en comprobar Flow (abre la página por CDP); con poco margen se caía al ASUS sin motivo.
+                val probe = client.newBuilder().callTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build()
+                probe.newCall(authorizedRequest("$primary/status").get().build()).execute().use { response ->
+                    response.isSuccessful && json.decodeFromString<StatusPayload>(response.body?.string().orEmpty()).generationReady
+                }
+            }.getOrDefault(false)
+        }
+        val chosen = if (ready) primary else HOSTS.last().second
+        pinned = chosen to System.currentTimeMillis()
+        return chosen
+    }
+
+    private fun tagFor(base: String): String = HOSTS.firstOrNull { it.second == base }?.first ?: HOSTS.last().first
+    private fun tagOf(jobId: String): String = jobId.substringBefore('.', "").takeIf { t -> HOSTS.any { it.first == t } } ?: HOSTS.last().first
+    private fun rawId(jobId: String): String = if ('.' in jobId) jobId.substringAfter('.') else jobId
+    /** Trabajos antiguos sin marca son del ASUS. */
+    private fun baseFor(jobId: String): String = HOSTS.first { it.first == tagOf(jobId) }.second
+
+    /** Nombre del puente en uso, para los mensajes. */
+    fun hostLabel(jobId: String? = null): String =
+        if ((jobId?.let(::tagOf) ?: pinned?.first?.let(::tagFor)) == HOSTS.first().first) "AXELPC" else "el ASUS"
+
+    private fun decodeJob(raw: String, tag: String): FlowBridgeJob {
         val payload = json.decodeFromString<JobPayload>(raw)
         require(JOB_ID.matches(payload.jobId)) { "Flow devolvió un identificador de trabajo no válido." }
         val state = payload.state.lowercase()
@@ -279,7 +384,7 @@ internal class FlowBridgeClient(
         require(expectedOutput in EXPECTED_OUTPUTS) { "Flow devolvió un tipo de resultado no reconocido." }
         require(payload.resultCount >= 0) { "Flow devolvió un número de resultados no válido." }
         return FlowBridgeJob(
-            id = payload.jobId,
+            id = "$tag.${payload.jobId}",
             state = state,
             expectedOutput = expectedOutput,
             resultCount = payload.resultCount,
@@ -337,16 +442,16 @@ internal class FlowBridgeClient(
 
     private fun statusDetail(reason: String?): String? = when (reason) {
         null, "" -> null
-        "flow_not_connected" -> "El ASUS no tiene una sesión de Flow disponible. Ábrela o vuelve a conectar Flow."
+        "flow_not_connected" -> "El puente (AXELPC o ASUS) no tiene una sesión de Flow disponible. Ábrela o vuelve a conectar Flow."
         "flow_project_not_open" -> "El proyecto de Flow no está abierto. Ábrelo y vuelve a comprobar el puente."
         "flow_project_ambiguous" -> "Hay más de un proyecto de Flow abierto. Deja abierto solo el proyecto que quieres usar."
         "flow_controls_unavailable" -> "Flow está abierto, pero todavía no muestra controles para crear. Espera o revisa el proyecto."
         "flow_composer_not_empty" -> "Hay un borrador escrito en Flow. Revísalo o bórralo antes de enviar desde Nexus."
         "flow_composer_not_editable" -> "El cuadro de texto de Flow no está disponible todavía."
         "flow_submit_unavailable" -> "Flow no habilitó la generación para ese proyecto. Revisa sus ajustes."
-        "flow_browser_unavailable" -> "El navegador privado de Flow no está disponible en el ASUS."
+        "flow_browser_unavailable" -> "El navegador privado de Flow no está disponible en el puente (AXELPC o ASUS)."
         "flow_not_ready" -> "Flow no está listo para crear en este momento."
-        "auth_required" -> "Flow necesita volver a iniciar sesión en el ASUS."
+        "auth_required" -> "Flow necesita volver a iniciar sesión en el navegador del puente (AXELPC o ASUS)."
         else -> "El puente de Flow todavía no está listo para crear."
     }
 
@@ -365,7 +470,9 @@ internal class FlowBridgeClient(
         @SerialName("expected_output") val expectedOutput: String,
         @SerialName("client_request_id") val clientRequestId: String,
         val confirmed: Boolean,
-        @SerialName("reference_ids") val referenceIds: List<String> = emptyList()
+        @SerialName("reference_ids") val referenceIds: List<String> = emptyList(),
+        val runs: Int = 1,
+        @SerialName("expected_results") val expectedResults: Int = 0
     )
 
     @Serializable
@@ -383,16 +490,20 @@ internal class FlowBridgeClient(
     private data class ErrorPayload(val error: String = "")
 
     companion object {
-        // Verified ASUSVIDAL Tailscale address; independent of Android private DNS.
+        // Direcciones Tailscale verificadas (independientes del DNS privado de Android): AXELPC primero, ASUS de respaldo.
+        val HOSTS = listOf("a" to "http://100.72.111.97:8899/api/flow", "s" to "http://100.112.57.2:8899/api/flow")
         const val BASE_URL = "http://100.112.57.2:8899/api/flow"
+        private const val PIN_MS = 10 * 60_000L
+        @Volatile private var pinned: Pair<String, Long>? = null
         private const val DEFAULT_PROMPT_LIMIT = 4_000
         private const val MAX_PROMPT_LIMIT = 4_000
-        private const val MAX_RESULT_COUNT = 12
+        const val MAX_RUNS = 10
+        const val MAX_RESULT_COUNT = 40
         private const val MAX_DOWNLOAD_BYTES = 1_024L * 1_024L * 1_024L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         private val EXPECTED_OUTPUTS = setOf("image", "video")
         private val CLIENT_REQUEST_ID = Regex("[A-Za-z0-9][A-Za-z0-9_-]{15,95}")
-        private val JOB_ID = Regex("[A-Za-z0-9_-]{2,128}")
+        private val JOB_ID = Regex("(?:[as]\\.)?[A-Za-z0-9_-]{2,128}")
         private val MIME_TYPE = Regex("[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+")
         private val JOB_STATES = setOf("submitting", "submitted", "generating", "completed", "uncertain", "failed")
         private val json = Json { ignoreUnknownKeys = true }

@@ -34,6 +34,10 @@ internal class CorteBridge(private val context: Context, private val resolve: (S
             "corte_list_projects" -> "list_projects"
             "corte_read_project" -> "read_project"
             "corte_undo" -> "undo"
+            "corte_create_project" -> {
+                input.str("name")?.let { extras.putString("name", it) }
+                "create_project"
+            }
             "corte_find_silences" -> {
                 (input["clip_ids"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotEmpty() }
                     ?.let { extras.putStringArray("clip_ids", it.toTypedArray()) }
@@ -87,11 +91,18 @@ internal class CorteBridge(private val context: Context, private val resolve: (S
         } ?: throw ToolInputException("Corte no respondió. Ábrelo y vuelve a intentarlo.")
         val raw = reply.getString("json") ?: throw ToolInputException("Corte devolvió una respuesta vacía.")
         val obj = Json.parseToJsonElement(raw).jsonObject
+        // Proyecto nuevo: Nexus (en primer plano) abre Corte directamente en él, listo para importar clips.
+        if (method == "create_project") obj["project_id"]?.jsonPrimitive?.contentOrNull?.let { id ->
+            runCatching {
+                context.startActivity(android.content.Intent().setClassName("com.vidadomu.corte", "com.vidadomu.corte.MainActivity")
+                    .putExtra("open_project_id", id).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+        }
         return if (obj["ok"]?.jsonPrimitive?.contentOrNull == "false")
             buildJsonObject {
                 put("isError", true)
                 val msg = obj["error"]?.jsonPrimitive?.contentOrNull ?: "Corte no pudo completar la operación."
-                put("error", if (msg.startsWith("Método desconocido")) "Esta versión de Corte no sabe importar archivos: actualiza Corte (puente protocolo 2)." else msg)
+                put("error", if (msg.startsWith("Método desconocido")) "Esta versión de Corte no tiene esa función: actualiza Corte (puente protocolo 3)." else msg)
             }
         else obj
     }

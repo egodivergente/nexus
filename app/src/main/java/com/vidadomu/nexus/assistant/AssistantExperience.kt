@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -78,15 +79,15 @@ internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldVal
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
-    onReply: (String) -> Unit = {}) {
+    onReply: (String) -> Unit = {}, onCamera: (() -> Unit)? = null) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
       Column {
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-        Surface(color=MaterialTheme.colorScheme.surface,shape=NexusTokens.card,
+        Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
         border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=0.55f)),
-        modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
+        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
@@ -103,15 +104,16 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                 }
             }
-            if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                items(ui.pendingAttachments, key = { it.id }) { att ->
-                    InputChip(selected = true, onClick = { onRemove(att.id) },
-                        label = { Text(att.name ?: "Referencia", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp)) },
-                        trailingIcon = { Icon(Icons.Default.Close, "Quitar referencia") })
-                }
+            if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8)) {
+                items(ui.pendingAttachments, key = { it.id }) { att -> AttachmentTile(att) { onRemove(att.id) } }
             }
             Row(verticalAlignment = Alignment.Bottom) {
-                IconButton(onClick = onAttach, enabled = !ui.attaching) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                IconButton(onClick = onAttach, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                // La cámara solo con el campo vacío: al escribir, el texto recupera el ancho.
+                if (onCamera != null && text.text.isEmpty()) IconButton(onClick = onCamera, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Default.PhotoCamera, "Hacer una foto")
+                }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
                 val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
@@ -121,7 +123,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
-                        Box(Modifier.padding(vertical = 13.dp), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             inner()
                         }
@@ -163,6 +165,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
     // Con un solo encargo, su tarjeta tiene el único botón: no se repite GENERAR abajo.
     if(pending.size < 2) return
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val limits by AssistantRuntime.get(app).settings.limitsState.collectAsState()
     val currencyState by app.currencyManager.state.collectAsState()
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
@@ -174,7 +177,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
                     style = MaterialTheme.typography.labelSmall)
             }
             val enabled=!ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
-            FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,20)}")}
+            FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,limits.maximum(limits.maxGenerationsPerBatch))}")}
         }
     }
 }
@@ -184,6 +187,8 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
 internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
     val picker=rememberProjectMediaPicker(onAttach)
+    var wall by remember { mutableStateOf(false) }
+    var selectedResult by remember { mutableStateOf<Attachment?>(null) }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
@@ -199,15 +204,22 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
         if(outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(outputs) { uri ->
                 when(p.plan.modality) {
-                    "IMAGE" -> AsyncImage(uri, "Resultado generado", Modifier.width(240.dp).aspectRatio(16f/9f)
-                        .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
+                    "IMAGE" -> AsyncImage(uri, "Resultado generado", Modifier.height(240.dp).widthIn(min = 120.dp, max = 320.dp)
+                        .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.FillHeight)
                     "AUDIO" -> AssistantMediaPreview(Attachment(uri,uri,"audio/mpeg","Resultado de audio"))
                     else -> AssistantMediaPreview(Attachment(uri,uri,"video/mp4","Resultado de vídeo"))
                 }
             }
         }
 
+        if(p.plan.modality in setOf("IMAGE", "VIDEO") && outputs.size > 1) {
+            TextButton(onClick = { wall = true }) { Icon(Icons.Default.GridView, null, Modifier.size(16.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Ver muro · ${outputs.size}") }
+            if (wall) ResultsWallSheet(outputs.mapIndexed { index, uri ->
+                Attachment("${p.jobId}:$index",uri,if(p.plan.modality=="VIDEO") "video/mp4" else "image/*","Resultado ${index+1}")
+            }, onOpen = { selectedResult = it; wall = false }, onDismiss = { wall = false })
+        }
     }
+    selectedResult?.let { media -> ResultMediaSheet(media) { selectedResult = null } }
 }
 
 
@@ -245,5 +257,44 @@ internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         Text("${if(ui.thinking) "Agente trabajando" else "Agente listo"} · $active en curso"+(ui.lastLatencyMs?.let {" · Último turno ${it/1000.0}s"} ?: ""),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
         Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills · ${ui.skillErrors.size} errores de skills. La latencia incluye herramientas.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+    }
+}
+
+/** Forma única del cuadro de texto: no cambia con el contenido, así los adjuntos y los iconos nunca chocan con una esquina. */
+internal val ComposerShape = RoundedCornerShape(24.dp)
+
+/** Miniatura del adjunto pendiente: imagen o primer fotograma del vídeo; audio y documentos, icono y nombre. */
+@Composable
+internal fun AttachmentTile(att: Attachment, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val label = att.name ?: "Archivo"
+    val visual = att.mimeType.startsWith("image/") || att.mimeType.startsWith("video/")
+    Box(Modifier.size(width = 76.dp, height = 76.dp).padding(top = 4.dp, end = 4.dp)) {
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .semantics { contentDescription = "Adjunto: $label" }, contentAlignment = Alignment.Center) {
+            if (visual) {
+                AsyncImage(
+                    model = remember(att.uri) {
+                        coil.request.ImageRequest.Builder(context).data(att.uri).crossfade(120).size(256)
+                            .apply { if (att.mimeType.startsWith("video/")) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }
+                            .build()
+                    },
+                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                if (att.mimeType.startsWith("video/")) Icon(Icons.Default.PlayArrow, null, tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(26.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f), androidx.compose.foundation.shape.CircleShape))
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp)) {
+                    Icon(if (att.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary)
+                    Text(label, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        // Quitar: círculo pequeño en la esquina, con zona de toque ampliada.
+        Box(Modifier.align(Alignment.TopEnd).size(32.dp).clickable(onClick = onRemove).semantics { contentDescription = "Quitar $label" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Close, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurface)
+            }
+        }
     }
 }

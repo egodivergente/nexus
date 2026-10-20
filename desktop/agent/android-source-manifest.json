@@ -22,7 +22,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
-    "sha256": "9288035dce53280ad03b4f5787556bf1e047295a6de0f62591adb83a79eb3565"
+    "sha256": "313f73eedeced75627d52a17e8295c9bee2ccde54191aa5fc31181c112952804"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt",
@@ -167,7 +167,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt",
-    "sha256": "1ea1900f6ccc3229b6a2089038be2a21501e2b5be1810dabe29a53031239b929"
+    "sha256": "20e00f98aebe0d0ab7ad0b7a3454776be4905d157fcd2fceeb24153ed8af20e1"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/orders/OrderBook.kt",
@@ -227,7 +227,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
-    "sha256": "e21d66a9d808c07c1bf057eff41238ffda5af756cffa21dfd8db56e6975c47a7"
+    "sha256": "20fb5eb4583ae8da5db762115febb509df72bf8434fe97302608ac216e83564b"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NexusToolkit.kt",

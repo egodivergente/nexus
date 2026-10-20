@@ -30,6 +30,9 @@ import com.vidadomu.nexus.ui.generations.GenerationsScreen
 import com.vidadomu.nexus.ui.library.LibraryScreen
 import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
+import com.vidadomu.nexus.ui.navigation.adjacentTab
+import com.vidadomu.nexus.ui.navigation.tabSwipe
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.vidadomu.nexus.ui.navigation.Screen
 import com.vidadomu.nexus.ui.navigation.openHistoryTab
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
@@ -50,6 +53,7 @@ class MainActivity : ComponentActivity() {
     private var startupPreviewEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.vidadomu.nexus.sync.DeviceSyncService.resume(this)
         if (!BuildConfig.OFFLINE_QA && savedInstanceState == null && StartupPreview.consume(this)) startupPreviewEpoch = 1
         enableEdgeToEdge()
 
@@ -133,7 +137,15 @@ class MainActivity : ComponentActivity() {
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Assistant.route,
-                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
+                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).tabSwipe(enabled = activeEntry?.destination?.route in Screen.bottomNavItems.map { it.route }) { direction ->
+                            adjacentTab(activeEntry?.destination?.route, direction, Screen.bottomNavItems.map { it.route })?.let { route ->
+                                navController.navigate(route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = route != Screen.Models.route && route != Screen.Assistant.route
+                                }
+                            }
+                        }
                     ) {
                         composable(Screen.Assistant.route) {
                             com.vidadomu.nexus.assistant.AssistantScreen(
@@ -170,7 +182,11 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToOutput = { jobId ->
                                     navController.navigate("output/$jobId")
                                 },
-                                onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}}
+                                onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}},
+                                onSendResultToAgent = { jobId, outputId ->
+                                    assistantViewModel.attachLibraryResult(jobId,outputId)
+                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                }
                             )
                         }
                         composable(Screen.Library.route) {
@@ -185,15 +201,19 @@ class MainActivity : ComponentActivity() {
                                         asset.mimeType ?: if (asset.type == com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO) "video/mp4" else "image/jpeg")
                                     navController.navigate(Screen.Create.route) { launchSingleTop = true }
                                 },
+                                onSendResultToAgent = { jobId, outputId ->
+                                    assistantViewModel.attachLibraryResult(jobId,outputId)
+                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                },
                                 onSendToAgent = { asset ->
-                                    assistantViewModel.attach(listOf(Uri.parse(asset.uri)))
+                                    assistantViewModel.attachLibraryAsset(asset.id)
                                     if (!navController.popBackStack(Screen.Assistant.route, inclusive = false))
                                         navController.navigate(Screen.Assistant.route) { launchSingleTop = true }
                                 }
                             )
                         }
                         composable(Screen.Settings.route) {
-                            SettingsScreen(onCreateInFlow = {
+                            SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {
                                 navController.navigate(Screen.Flow.route) { launchSingleTop = true }
                             })
                         }

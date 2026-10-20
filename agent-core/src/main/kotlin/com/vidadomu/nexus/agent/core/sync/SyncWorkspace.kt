@@ -52,8 +52,17 @@ class SyncWorkspace(
         // Manual copies can have different asset IDs. Keep their history/references,
         // but show identical bytes only once in each project's library.
         var deduplicated=0
-        val copies=result.rows.filter { (key,row)->key.startsWith("assets:") && row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull!=true && row["uri"]?.jsonPrimitive?.content?.startsWith(SyncBlobs.PREFIX)==true }
-            .entries.groupBy { (_,row)->(row["projectId"]?.toString()?:"null")+":"+row["uri"]!!.jsonPrimitive.content.removePrefix(SyncBlobs.PREFIX).substringBefore('.') }
+        val copies=result.rows.filter { (key,row)->
+            val uri=row["uri"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            key.startsWith("assets:") && row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull!=true &&
+                (uri.startsWith(SyncBlobs.PREFIX) || uri.startsWith("https://"))
+        }.entries.groupBy { (_,row)->
+            val uri=row["uri"]!!.jsonPrimitive.content
+            // An unavailable original is still one library pointer when the URL is
+            // exactly equal. Keep both historical IDs, and keep reporting it missing.
+            (row["projectId"]?.toString()?:"null")+":"+
+                if(uri.startsWith(SyncBlobs.PREFIX))"sha:"+uri.removePrefix(SyncBlobs.PREFIX).substringBefore('.')else "url:"+uri
+        }
         for(group in copies.values)for(duplicate in group.sortedBy {it.key}.drop(1)) {
             val row=localized.getValue(duplicate.key)
             localized[duplicate.key]=JsonObject(row+mapOf("libraryDeleted" to JsonPrimitive(true)))

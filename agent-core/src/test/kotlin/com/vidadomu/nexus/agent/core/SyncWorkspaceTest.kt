@@ -14,6 +14,14 @@ class SyncWorkspaceTest {
     private fun workspace(index:AssetIndex,dir:File,cloud:SyncRemote)=SyncWorkspace(index,dir,cloud,open={uri->
         if(uri.startsWith("file:")){val source=File(URI(uri));SyncInput(source.extension,source.inputStream())}else null
     })
+    @Test fun peerUpdateCannotBeOverwrittenByInFlightDriveSnapshot()=runTest {
+        val file=File(root(),"index.json").apply {writeText("""{"projects":[{"id":"p","name":"Proyecto","createdAt":1}]}""")}
+        val index=AssetIndex(file);val expected=index.snapshot()
+        val peer=expected.copy(projects=expected.projects.map {it.copy(description="Editado en otro móvil")})
+        index.mergeFromPeer(peer,expected,false)
+        assertFailsWith<IllegalStateException>{index.applySyncedSnapshot(expected,expected)}
+        assertEquals("Editado en otro móvil",index.snapshot().projects.single().description)
+    }
     @Test fun realBytesMoveBetweenDevicesAndProjectDownloadIsSelective()=runTest {
         val cloud=SyncJournalTest.Cloud();val a=root();val b=root();val original=File(a,"image.png").apply {writeBytes(byteArrayOf(137.toByte(),80,78,71,13,10,26,10,1,2,3))}
         val sourceFile=File(a,"index.json").apply {writeText(buildJsonObject {
@@ -74,5 +82,25 @@ class SyncWorkspaceTest {
         }
         assertEquals(1,cloud.blobs.size)
         assertTrue(File(a,"copy.png").exists());assertTrue(File(b,"copy.png").exists())
+    }
+    @Test fun identicalUnavailableUrlsHaveOneVisiblePointerWithoutInventingOriginalBytes()=runTest {
+        val dir=root();val file=File(dir,"index.json").apply {writeText("""{"assets":[{"id":"a","uri":"https://expired.invalid/original.png","type":"IMAGE","displayName":"Original","createdAt":1},{"id":"b","uri":"https://expired.invalid/original.png","type":"IMAGE","displayName":"Copia","parentAssetId":"a","createdAt":2}]}""")}
+        val index=AssetIndex(file);val cloud=SyncJournalTest.Cloud();val sync=workspace(index,File(dir,"sync"),cloud)
+        repeat(3) {
+            val result=sync.cycle(null)
+            assertEquals("partial",result["state"]!!.jsonPrimitive.content)
+            assertEquals(1,result["missingMedia"]!!.jsonPrimitive.int)
+            assertEquals(setOf("a","b"),index.snapshot().assets.map {it.id}.toSet())
+            assertEquals(1,index.snapshot().assets.count {!it.libraryDeleted})
+            assertEquals("a",index.snapshot().assets.single {it.id=="b"}.parentAssetId)
+        }
+        assertTrue(cloud.blobs.isEmpty())
+        assertTrue(index.snapshot().assets.all {it.uri=="https://expired.invalid/original.png"})
+    }
+    @Test fun unavailableUrlsFromDifferentProjectsOrDifferentSourcesRemainSeparate()=runTest {
+        val dir=root();val file=File(dir,"index.json").apply {writeText("""{"projects":[{"id":"p","name":"P","createdAt":1},{"id":"q","name":"Q","createdAt":1}],"assets":[{"id":"a","projectId":"p","uri":"https://expired.invalid/one.png","type":"IMAGE","displayName":"P","createdAt":1},{"id":"b","projectId":"q","uri":"https://expired.invalid/one.png","type":"IMAGE","displayName":"Q","createdAt":1},{"id":"c","projectId":"p","uri":"https://expired.invalid/two.png","type":"IMAGE","displayName":"Otra","createdAt":1}]}""")}
+        val index=AssetIndex(file)
+        workspace(index,File(dir,"sync"),SyncJournalTest.Cloud()).cycle(null)
+        assertEquals(3,index.snapshot().assets.count {!it.libraryDeleted})
     }
 }

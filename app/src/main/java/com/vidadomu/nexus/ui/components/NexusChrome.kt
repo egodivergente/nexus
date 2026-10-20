@@ -115,7 +115,10 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {}, actions: @Composable RowScope.() -> Unit = {},
     colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(),
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
-    scrollBehavior: TopAppBarScrollBehavior? = null) {
+    scrollBehavior: TopAppBarScrollBehavior? = null,
+    /** Entradas propias de la pantalla dentro del único botón de ajustes (p. ej. modelo y conexión del asistente). */
+    settingsEntries: List<Pair<String, () -> Unit>> = emptyList(),
+    showBalance: Boolean = true) {
     val chrome=LocalChrome.current
     StudioChrome(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
@@ -125,10 +128,21 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
                 actions={
                     actions()
                     chrome?.let {
-                        NexusBalanceChip()
-                        it.openSettings?.let { open -> IconButton(onClick=open) {
-                            Icon(Icons.Outlined.Settings,contentDescription="Ajustes de Nexus")
-                        } }
+                        if (showBalance) NexusBalanceChip()
+                        it.openSettings?.let { open ->
+                            if(settingsEntries.isEmpty()) IconButton(onClick=open) {
+                                Icon(Icons.Outlined.Settings,contentDescription="Ajustes de Nexus")
+                            } else {
+                                var menu by remember { mutableStateOf(false) }
+                                Box {
+                                    IconButton(onClick={menu=true}) { Icon(Icons.Outlined.Settings,contentDescription="Ajustes") }
+                                    DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                                        settingsEntries.forEach { (label,go) -> DropdownMenuItem(text={Text(label)},onClick={menu=false;go()}) }
+                                        DropdownMenuItem(text={Text("Aplicación")},onClick={menu=false;open()})
+                                    }
+                                }
+                            }
+                        }
                     }
                 })
             HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
@@ -151,9 +165,10 @@ internal fun StudioBalanceChip(balance:String,onClick:()->Unit) {
             .semantics(mergeDescendants=true) { contentDescription="Saldo y gasto"; stateDescription=balance }
             .clickable(role=androidx.compose.ui.semantics.Role.Button,onClick=onClick)
     ) {
-        Surface(shape=NexusTokens.filter,color=MaterialTheme.colorScheme.surfaceVariant) {
+        // Saldo discreto: texto sin fondo, para que la cabecera no cargue otro botón-pastilla.
+        Surface(shape=NexusTokens.filter,color=Color.Transparent) {
             Box(contentAlignment=androidx.compose.ui.Alignment.Center,modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=6.dp)) {
-                Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurface,
+                Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines=1,overflow=TextOverflow.Ellipsis)
             }
         }

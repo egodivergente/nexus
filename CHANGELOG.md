@@ -1,6 +1,129 @@
 # Changelog — NEXUS
 
+## 1.9.61-sync (vc95) - 2026-10-20
+
+- La copia inicial de Drive utiliza transferencia prolongada con notificación, conservando la continuidad directa entre móviles.
+- Recuperación del trabajo periódico si una instalación anterior lo dejó fallido o cancelado.
+
+## 1.9.60-sync (vc94) - 2026-10-20
+
+- Una sola APK conserva Google Drive y la continuidad cifrada entre móviles, con controles separados en Ajustes.
+- Proyectos y originales se comparten con Desktop mediante Drive; las copias manuales mantienen sus identidades sin duplicar las entradas visibles de la biblioteca.
+- Las escrituras de ambos transportes usan el mismo bloqueo del índice. Drive reintenta si recibe una edición de otro móvil durante la transferencia.
+
+## 1.9.59-agent (vc93) - 2026-10-20
+
+- Continuidad automática entre móviles para chats, memoria/proyectos, skills, galería y adjuntos, con intercambio cifrado e integridad SHA-256.
+- Sincronización opcional de claves, perfiles, ajustes y autenticación AGY mediante un adaptador privado en Termux. Las rutas locales de los puentes se conservan.
+- Activación, categorías, intervalo, espera, tamaño por archivo, eliminaciones y arranque configurables en la APK. Chats recibidos en el historial y revisiones incompatibles conservadas.
+- Véase `docs/DEVICE-CONTINUITY-1959-20261020.md` para el comportamiento y la evidencia de validación.
+
+## 1.9.58-agent (vc92) - 2026-10-20
+
+- Hojas comunes con cabecera, cierre accesible y acción fija; borrado de credenciales con confirmación antes de guardar.
+- Vídeos del chat con proporción real y FIT; muro de imágenes y vídeos que abre el resultado seleccionado.
+- Biblioteca e Historial permiten añadir un resultado concreto al borrador del chat, conservando texto y referencias; la herramienta `open_results_wall` abre selecciones existentes.
+- Gemini 4 Argon con esfuerzo bajo, medio y alto mediante los IDs anunciados por la CLI y el puente S25. Sin peticiones conversacionales de prueba ni generación de pago.
+- Límites editables desde la APK para lotes, concurrencia, consultas, recomendaciones, memoria y Flow, con 0 = sin límite; sin máximos superiores internos en estos controles. Concurrencia actualizable sin cancelar trabajos activos.
+- Preferencias de concurrencia, profundidad y generación de subagentes guardables desde la APK; diseño para revisión previa, sin habilitar todavía el motor de delegación.
+- Entrega compilada pendiente de instalación y validación visual autorizadas en S25.
+
+
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
+
+## [1.9.57-agent] - 2026-10-20 · modelos del puente Antigravity
+
+- **Antigravity:** la lista incluye Gemini 3.7 Flash, Gemini 3.6 Flash y GPT-OSS 120B, que el puente local ya expone. «4 Argon» no aparece en el puente, así que no se ha añadido.
+
+## [1.9.56-agent] - 2026-10-20 · muro de resultados
+
+- **Ver muro:** los lotes de imágenes tienen un botón «Ver muro» que abre todas las imágenes en cuadrícula escalonada, cada una con su proporción real y sin huecos. Tocar una abre su resultado.
+
+## [1.9.55-agent] - 2026-10-20 · resultados sin huecos
+
+- **Imágenes del agente sin franjas:** los resultados se muestran con su proporción real (verticales, horizontales o cuadradas) en lugar de encajarlos en un marco 16:9 que dejaba espacios vacíos a los lados.
+
+## [1.9.54-agent] - 2026-10-20 · deslizar entre secciones
+
+- **Deslizar entre secciones:** arrastrar el dedo a la izquierda pasa a la siguiente pestaña (Asistente → Lienzo → Modelos → Historial → Biblioteca) y a la derecha a la anterior. Los carruseles y controles con desplazamiento horizontal conservan su gesto.
+
+## [1.9.53-agent] - 2026-10-20 · jerarquía visual y proveedores unificados
+
+- **Separación visual:** las tarjetas de Ajustes usan una superficie elevada distinta del fondo, cada categoría tiene su color (Apariencia, Agente, Proveedores, Generadores y Sistema) en la baldosa del icono.
+- **Proveedores (fase 2):** Atlas, Crun, Runway y Google Flow comparten la misma tarjeta: estado (conectado o sin clave), clave enmascarada con Añadir, Cambiar o Borrar, saldo con actualización y Probar conexión.
+- **Texto corregido:** el nombre de versión «Índigo» ya no sale con caracteres rotos.
+
+## [1.9.52-agent] - 2026-10-20 · Ajustes por categorías, cabecera despejada y prompt fiel
+
+- **Ajustes con pantalla de categorías:** en lugar de una lista larga, Ajustes abre una pantalla con cinco categorías (Apariencia y moneda, Agente y modelos, Proveedores de generación, Generadores propios, Sistema y diagnóstico), cada una con su resumen. Cada categoría abre su subpágina y el botón atrás vuelve a la lista.
+- **Un camino al asistente:** «Agente y modelos» incluye «Ajustes del asistente» (modelo, respuesta, consumo, herramientas y skills) además de los cerebros adicionales; desde el chat se sigue llegando por la rueda → «Asistente».
+- **Un solo botón de ajustes:** el icono de parámetros y la rueda se unen en una rueda con dos entradas, «Asistente: modelo y conexión» y «Aplicación». La cabecera pasa de cinco a cuatro elementos.
+- **Saldo discreto:** el saldo se muestra como texto sin fondo; al tocarlo sigue abriendo el detalle de gasto.
+- **Tu prompt, tal cual:** si entregas un prompt ya hecho, el agente lo envía exactamente como lo escribiste. Solo lo cambia si supera el límite de caracteres del modelo, si el modelo exige otra sintaxis documentada o si el proveedor lo rechazó, y siempre lo dice en una frase (el original se conserva). La memoria del proyecto y las skills ya no se inyectan en prompts tuyos. Regla `PROMPT_FIDELITY_RULES` siempre activa; prueba `PromptFidelityTest`.
+- **Cuadro de texto:** una sola forma (esquinas de 24 dp) que ya no cambia con el contenido ni corta los adjuntos.
+- **Adjuntos pendientes en miniatura:** imagen, primer fotograma del vídeo, o icono con nombre para audio y documentos, con botón para quitar en la esquina.
+- **Errores con salida:** el aviso de error del chat incluye «Reintentar» (si hay un turno que repetir), «Cambiar modelo» e «Historial» cuando aplica.
+- **Formulario de proyecto:** campos agrupados en tarjetas (La historia, Aspecto y tono, Reglas del asistente) con icono y ejemplos.
+
+## [1.9.51-agent] - 2026-10-19 · «Índigo»
+
+- Flow: Nexus espera hasta 15 s a que AXELPC confirme que está listo (antes 4 s y a veces se iba al ASUS sin sesión). El diagnóstico dice qué puente usa.
+
+## [1.9.50-agent] - 2026-10-19 · «Índigo»
+
+- El agente de Nexus habla con el agente de Google Flow (flow_agent_send / flow_agent_read): le encarga generaciones en cantidad, colecciones o descargas, lee su respuesta, negocia si pregunta y trae las imágenes y vídeos a la Biblioteca.
+- El puente de Flow se adapta al nuevo cuadro de Flow (el antiguo campo era el título del proyecto).
+
+## [1.9.49-agent] - 2026-10-19 · «Índigo»
+
+- Google Flow en lotes: un encargo pide hasta 40 resultados y el puente pulsa Generar las veces necesarias (según el «xN» de Flow, por defecto 4) y los recoge juntos, en vez de uno detrás de otro.
+- El puente de Flow corre ahora en AXELPC como principal; si AXELPC está apagado o sin Flow listo, Nexus usa el ASUS de respaldo. Cada trabajo se sigue y descarga en el puente donde se envió.
+
+## [1.9.48-agent] - 2026-10-19 · «Índigo»
+
+- El agente puede crear proyectos nuevos en Corte (corte_create_project): crea uno vacío, abre Corte en él y deja listo importar clips. Requiere Corte con el puente protocolo 3.
+
+## [1.9.47-agent] - 2026-10-18 · «Índigo»
+
+- Corrige el cierre al abrir la app en la 1.9.46: una expresión de las plantillas de proveedores no era válida en Android y fallaba al cargar el proveedor BytePlus.
+
+## [1.9.46-agent] - 2026-10-18 · «Índigo»
+
+- Nuevo proveedor de medios BytePlus (ModelArk) con Seedance 2.0 y 2.0 Fast (texto o imagen a vídeo) y Seedream 5.0 Pro (imagen y edición). Usa la misma clave y el mismo saldo que el cerebro BytePlus; los IDs de modelo se pueden cambiar en Ajustes → Proveedores.
+- La barra de pestañas se esconde al bajar por el chat y vuelve al subir (se puede desactivar en Apariencia).
+- Botón de cámara en el cuadro de texto (solo con el campo vacío).
+- Negritas más ligeras en las respuestas, mensajes que entran con animación y vibración suave al enviar.
+
+## [1.9.45-agent] - 2026-10-18 · «Horizonte»
+
+- Chat más panorámico: cabecera de una sola línea (cerebro y razonamiento pasan junto al cuadro de texto), márgenes laterales de 8 dp y campo de entrada en pastilla más bajo.
+- Tus mensajes van completos, seleccionables, casi a todo el ancho y con el acento en degradado; las respuestas quedan casi sin fondo.
+- Los enlaces «Encargos ↓ / Último ↓» se sustituyen por un botón redondo de bajar (solo si no estás al final) y un panel de encargos con estado, modelo y coste.
+- Los IDs internos (ord_…) ya no aparecen en el texto del chat.
+- Resultados agrupados en carrusel con miniaturas grandes y el modelo debajo.
+- Barra inferior con pastilla activa más clara; tokens de radio y curva únicos.
+- Historial vuelve a mostrar créditos cuando el proveedor no da importe en moneda.
+
+## [1.9.44-agent] - 2026-10-18 · «Horizonte»
+
+- Ajustes del asistente (aportado por el agente de Termux, punto 5): los filtros de proveedor del Cerebro van en una sola fila deslizable en lugar de varias líneas.
+
+## [1.9.43-agent] - 2026-10-18 · «Horizonte»
+
+- Biblioteca: se pueden importar archivos de hasta 4 GB (antes el límite era 512 MB y el fallo era silencioso); si un archivo falla, el aviso dice el motivo.
+- Nunca se muestra «UNKNOWN» al usuario (aportado por el agente de Termux, punto 4).
+
+## [1.9.42-agent] - 2026-10-18 · «Horizonte»
+
+- Modelos (aportado por el agente de Termux): plural correcto en los contadores, descripción a 2 líneas, la píldora de coste solo aparece si hay precio y las tarjetas de la cuadrícula tienen altura uniforme.
+
+## [1.9.41-agent] - 2026-10-18 · «Horizonte»
+
+- Historial (aportado por el agente de Termux): los fallos muestran su motivo en una línea con botón «Reintentar», el coste se ve en una sola unidad, cada día suma su gasto y el prompt ocupa hasta 2 líneas.
+
+## [1.9.40-agent] - 2026-10-18 · «Horizonte»
+
+- Biblioteca (aportado por el agente de Termux): insignia de duplicados exactos, filtro de origen con nombre completo, botón de búsqueda visible y detalles de miniatura ocultos con menos de 3 columnas. La cabecera de día sigue sin ser fija (la cuadrícula no lo admite).
 
 ## [1.9.39-agent] - 2026-10-18 · «Horizonte»
 

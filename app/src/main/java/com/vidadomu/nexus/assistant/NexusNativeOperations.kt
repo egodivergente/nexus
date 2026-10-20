@@ -39,8 +39,8 @@ class NexusNativeOperations(
                 "list_library_assets" -> {
                     runtime.importHistory()
                     val found=runtime.assets.changes.value.assets.filter {!it.libraryDeleted && (input.text("query")?.let {q->it.displayName.contains(q,true)} ?: true)}.sortedByDescending {it.createdAt}
-                    val offset=input.integer("offset",0,0..Int.MAX_VALUE); val limit=input.integer("limit",50,1..100)
-                    buildJsonObject {put("total",found.size);put("assets",JsonArray(found.drop(offset).take(limit).map {runtime.assets.assetJson(it)}));if(offset+limit<found.size) put("next_offset",offset+limit)}
+                    val offset=input.integer("offset",0,0..Int.MAX_VALUE); val limit=runtime.settings.limits().queryLimit((input["limit"] as? JsonPrimitive)?.content?.toIntOrNull(),50)
+                    buildJsonObject {put("total",found.size);put("assets",JsonArray(found.drop(offset).take(limit).map {runtime.assets.assetJson(it)}));if(offset.toLong()+limit<found.size) put("next_offset",offset+limit)}
                 }
                 "view_library_asset", "inspect_image_quality" -> {
                     val a=runtime.assets.asset(input.requiredText("asset_id"))?.takeIf {!it.libraryDeleted} ?: throw ToolInputException("Archivo desconocido.")
@@ -71,6 +71,7 @@ class NexusNativeOperations(
                 "web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools", "call_mcp_tool", "disconnect_mcp_server" -> internet.run(operation,input)
                 "get_active_generations" -> active(input)
                 "recover_generation" -> recover(input.requiredText("job_id"))
+                "flow_agent_send", "flow_agent_read" -> FlowAgentOperations(app).run(operation, input)
                 "diagnose_flow" -> flow(false)
                 "repair_flow" -> flow(true)
                 "get_nexus_settings" -> settings()
@@ -85,7 +86,7 @@ class NexusNativeOperations(
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
                 "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
                 "atlas_get_balance" -> atlasBalance()
-                "corte_status", "corte_list_projects", "corte_read_project", "corte_find_silences", "corte_apply_ops", "corte_undo", "corte_import_media" ->
+                "corte_status", "corte_list_projects", "corte_read_project", "corte_find_silences", "corte_apply_ops", "corte_undo", "corte_import_media", "corte_create_project" ->
                     CorteBridge(app) { id -> AgentVideoOperations(app).source(id) }.run(operation, input)
                 else -> throw ToolInputException("Operación desconocida.")
             }
@@ -154,7 +155,7 @@ class NexusNativeOperations(
         val allowed = setOf("agent_model", "max_tokens", "send_images", "excluded_families", "theme", "remember_parameters")
         if (input.isEmpty() || input.keys.any { it !in allowed }) throw ToolInputException("Indica solo ajustes editables.")
         val model = input.text("agent_model")?.let { name -> MODEL_IDS[name] ?: throw ToolInputException("Modelo no admitido.") }
-        val tokens = if ("max_tokens" in input) input.integer("max_tokens", 4096, 256..32000) else null
+        val tokens = if ("max_tokens" in input) input.integer("max_tokens", 4096, 1..Int.MAX_VALUE) else null
         val sendImages = input.flag("send_images")
         val remember = input.flag("remember_parameters")
         val theme = input.text("theme")?.let { name -> NexusAppearance.entries.firstOrNull { it.name == name } ?: throw ToolInputException("Tema no válido.") }

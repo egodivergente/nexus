@@ -62,7 +62,7 @@ class SessionReuseTests(unittest.IsolatedAsyncioTestCase):
     async def test_open_project_checks_the_native_flow_composer(self):
         page = Page('https://flow.google.com/project/example', composer=True, submit=True)
         self.assertEqual(await recovery.context_status(self.context([page])), 'connected')
-        self.assertTrue(any('input[aria-label="Texto editable"]' in selector for selector in page.selectors))
+        self.assertTrue(any(recovery.COMPOSER in selector for selector in page.selectors))
         self.assertTrue(any('button[aria-label="Iniciar generación"]' in selector for selector in page.selectors))
 
     async def test_active_project_is_authoritative_without_an_account_probe(self):
@@ -109,8 +109,16 @@ class RecoveryTests(unittest.TestCase):
         return self.client.post('/unlock', json={'token': 'private-test-token'})
 
     def test_private_routes_require_auth(self):
-        for path in ['/status', '/vnc.html', '/app/ui.js', '/api/flow/status', '/api/flow/jobs']:
+        for path in ['/status', '/vnc.html', '/app/ui.js', '/api/flow/status', '/api/flow/jobs', '/api/byteplus/usage']:
             self.assertEqual(self.client.get(path).status_code, 401)
+
+    def test_byteplus_reuses_private_auth_and_validates_period(self):
+        import byteplus_admin
+        headers = {'Authorization': 'Bearer private-test-token'}
+        with patch.object(byteplus_admin, 'snapshot', return_value={'schema': 1, 'period': 'day'}):
+            self.assertEqual(self.client.get('/api/byteplus/usage', headers=headers).json()['schema'], 1)
+            self.assertEqual(self.client.get('/api/byteplus/usage?period=invalid', headers=headers).status_code, 400)
+            self.assertEqual(self.client.get('/api/byteplus/usage', headers=dict(headers, Origin='https://other.test')).status_code, 403)
 
     def test_origin_and_host_rejected(self):
         self.assertEqual(self.client.get('/', headers={'Origin': 'https://other.test'}).status_code, 403)
@@ -180,7 +188,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(rejected.json(), {'error': 'confirmation_required'})
         self.assertEqual(accepted.status_code, 201)
         self.assertEqual(accepted.json()['job_id'], job['job_id'])
-        submit.assert_awaited_once_with('hola', 'image', valid_id)
+        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0)
 
     def test_flow_job_poll_uses_mocked_bridge_without_a_browser(self):
         job = {'job_id': 'server-job-1234567', 'client_request_id': 'client-request-123456',
@@ -254,7 +262,8 @@ class FlowJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(replayed_second)
         self.assertEqual(first['job_id'], second['job_id'])
         self.assertEqual(second['state'], 'submitted')
-        drive.assert_awaited_once_with(prompt)
+        drive.assert_awaited_once()
+        self.assertEqual(drive.await_args.args[:3], (prompt, None, 1))
         journal = (self.root / 'flow-jobs.json').read_text()
         self.assertNotIn(prompt, journal)
         self.assertNotIn('token', journal.lower())

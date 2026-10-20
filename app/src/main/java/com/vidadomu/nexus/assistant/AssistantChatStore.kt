@@ -77,7 +77,7 @@ internal class AssistantChatStore(private val context: Context) {
         .filter { it.extension == "json" }.sortedByDescending { it.lastModified() }.mapNotNull { entry ->
             runCatching {
                 val chat = json.decodeFromString<SavedAssistantChat>(entry.readText())
-                AssistantChatEntry(entry.nameWithoutExtension,chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Conversación")
+                AssistantChatEntry(entry.nameWithoutExtension,(if(entry.name.startsWith("sync_")) "↔ " else "") + (chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Conversación"))
             }.getOrNull()
         }
 

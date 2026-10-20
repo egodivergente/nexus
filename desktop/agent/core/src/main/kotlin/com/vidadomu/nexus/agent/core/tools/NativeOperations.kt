@@ -37,6 +37,18 @@ object NativeOperationTools {
         NativeTool(operations, "recover_generation", ToolCategory.ORGANIZE,
             "Consulta de nuevo el proveedor y restaura el seguimiento de UN job existente. No vuelve a generar ni borra resultados.",
             schema { string("job_id", "Id local del historial.", required = true) }),
+        NativeTool(operations, "flow_agent_send", ToolCategory.ORGANIZE,
+            "Habla con el AGENTE de Google Flow (cuenta Ultra del usuario, sin coste por uso) en el proyecto abierto: pídele imágenes o vídeos (muchas variaciones a la vez), que cree o ordene colecciones, que prepare descargas, etc. Escribe en lenguaje natural y concreto (cantidad, estilo, formato). Espera su respuesta (wait_seconds) y devuelve su texto, las opciones que proponga y los archivos generados ya copiados a la Biblioteca de Nexus (asset_ids). Si pregunta o propone opciones, negocia: decide o consulta al usuario y responde con otro flow_agent_send. Para encargos de generación con Flow, prefiere esta vía.",
+            schema {
+                string("message", "Lo que quieres decirle o pedirle al agente de Flow.", required = true)
+                integer("wait_seconds", "Segundos máximos de espera a que responda (0-240; por defecto 90).")
+            }),
+        NativeTool(operations, "flow_agent_read", ToolCategory.READ,
+            "Lee (y espera) la respuesta del agente de Google Flow a un flow_agent_send que aún no había terminado. Copia a la Biblioteca lo que haya generado.",
+            schema {
+                string("conversation_id", "El conversation_id que devolvió flow_agent_send.", required = true)
+                integer("wait_seconds", "Segundos máximos de espera (0-240; por defecto 90).")
+            }),
         NativeTool(operations, "diagnose_flow", ToolCategory.READ,
             "Comprueba conexión, sesión y capacidad real del puente Flow y enumera su cola local.",
             schema {}),
@@ -138,6 +150,9 @@ object NativeOperationTools {
                 integer("at_us", "Posición en microsegundos donde empezar a colocarlos; vacío = al final.")
                 string("project_id", "Proyecto; vacío = el abierto.")
             }),
+        NativeTool(operations, "corte_create_project", ToolCategory.ORGANIZE,
+            "Crea un proyecto NUEVO y vacío en Corte y lo abre en pantalla, listo para corte_import_media y corte_apply_ops. Úsalo cuando el usuario quiera montar algo desde cero o no haya ningún proyecto abierto adecuado.",
+            schema { string("name", "Nombre del proyecto; vacío = «Proyecto N».") }),
         NativeTool(operations, "corte_undo", ToolCategory.ORGANIZE,
             "Deshace en Corte la última edición (la del agente si fue la última).",
             schema { string("project_id", "Proyecto; vacío = el abierto.") }),

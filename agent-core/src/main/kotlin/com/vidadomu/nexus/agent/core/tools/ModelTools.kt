@@ -64,7 +64,7 @@ class ListModelsTool(private val d: ToolDeps) : BaseTool(
         string("capability", "Capacidad del registro, p. ej. IMAGE_TO_VIDEO, TEXT_TO_IMAGE, IMAGE_EDITING, REFERENCE_TO_VIDEO.")
         string("provider_id", "Proveedor exacto del registro actual, incluido cualquier proveedor conectado localmente.")
         integer("offset", "Desde qué posición (0 por defecto).")
-        integer("limit", "Cuántos (máx. 50, 20 por defecto).")
+        integer("limit", "Cuántos; respeta el límite configurable del usuario. 0 = todos.")
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
@@ -75,7 +75,7 @@ class ListModelsTool(private val d: ToolDeps) : BaseTool(
             (modality == null || modality in m.modalities) && (cap == null || cap in m.capabilities) && (prov == null || m.ref.providerId == prov)
         }.sortedWith(compareByDescending<ModelSummary> { it.releaseMonth ?: "" }.thenBy { it.ref.modelId })
         val offset = (input.int("offset") ?: 0).coerceAtLeast(0)
-        val limit = (input.int("limit") ?: 20).coerceIn(1, 50)
+        val limit = d.limits().queryLimit(input.int("limit"),20)
         return ok {
             put("total", all.size)
             put("offset", offset)
@@ -90,13 +90,13 @@ class SearchModelsTool(private val d: ToolDeps) : BaseTool(
     schema {
         string("query", "Texto, p. ej. «kling o3 image to video» o «seedance».", required = true)
         string("modality", "Restringe a una modalidad.", enum = MODALITIES)
-        integer("limit", "Máx. 30, 10 por defecto.")
+        integer("limit", "Cantidad, con el límite configurable del usuario; 0 = todos.")
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val words = AssetIndex.norm(input.req("query")).split(' ').filter { it.isNotBlank() }
         val modality = input.str("modality")?.uppercase()
-        val limit = (input.int("limit") ?: 10).coerceIn(1, 30)
+        val limit = d.limits().queryLimit(input.int("limit"),10)
         val hits = d.registry.list().asSequence()
             .filter { modality == null || modality in it.modalities }
             .map { m ->
@@ -172,7 +172,7 @@ class RecommendModelsTool(private val d: ToolDeps) : BaseTool(
         number("max_cost_usd", "Coste máximo por generación.")
         stringArray("prefer_providers", "Proveedores preferidos.")
         stringArray("exclude_models", "Ids a excluir.")
-        integer("limit", "Candidatos totales (3 por defecto, máx. 6).")
+        integer("limit", "Candidatos totales, según el límite del usuario. 0 = todos.")
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
@@ -190,7 +190,7 @@ class RecommendModelsTool(private val d: ToolDeps) : BaseTool(
             maxCostUsd = input.dbl("max_cost_usd"),
             preferProviders = input.strList("prefer_providers"),
             excludeModels = input.strList("exclude_models"),
-            limit = (input.int("limit") ?: 3).coerceIn(1, 6),
+            limit = d.limits().boundedCount(input.int("limit"),3,d.limits().maxRecommendations),
         )
         if (spec.task !in TASKS) throw ToolInputException("Tarea desconocida «${spec.task}».")
         return ok(d.router.route(spec).toJson())

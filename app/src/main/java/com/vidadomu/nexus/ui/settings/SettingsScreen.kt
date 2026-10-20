@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.components.NexusSheet
+import com.vidadomu.nexus.ui.components.NexusSheetGroup
 import com.vidadomu.nexus.ui.components.StudioCredentialField
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.foundation.rememberScrollState
@@ -22,8 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +45,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
+fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val settingsRepo = app.settingsRepository
@@ -52,6 +56,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     val currencyState by currencyManager.state.collectAsState()
 
     var accountBalance by remember { mutableStateOf<AccountBalance?>(app.secureStorage.getCachedBalance()) }
+    var syncOpen by remember { mutableStateOf(false) }
     var isRefreshingBalance by remember { mutableStateOf(false) }
 
     fun refreshBalance() {
@@ -86,11 +91,28 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
     var appearanceOpen by remember {mutableStateOf(false)}
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
-    var accountDetails by remember {mutableStateOf(false)}
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text("Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())})}) {padding ->
+    var pageName by rememberSaveable { mutableStateOf<String?>(null) }
+    val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
+    var assistantSettingsOpen by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = page != null) { pageName = null }
+    val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
+        listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured").count { it }
+    }
+    val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
+        showBalance=page != SettingsPage.BYTEPLUS,
+        navigationIcon={ if(page != null) IconButton(onClick={pageName=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a Ajustes")} })}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            // 1 · Personalización
-            item {SettingsHeader("Personalización",Icons.Default.Palette)}
+            when(page) {
+                null -> {
+                    item {HubRow(SettingsPage.APPEARANCE,"${selectedTheme.label} · ${currencyState.preference.displayName}") {pageName=SettingsPage.APPEARANCE.name}}
+                    item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
+                    item {HubRow(SettingsPage.AGENT,"Modelo del asistente, consumo, herramientas y cerebros") {pageName=SettingsPage.AGENT.name}}
+                    item {HubRow(SettingsPage.PROVIDERS,"$keysConfigured de 3 con clave · Google Flow") {pageName=SettingsPage.PROVIDERS.name}}
+                    item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
+                    item {HubRow(SettingsPage.SYSTEM,"Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»" + (if(isMockMode) " · proveedor simulado activo" else "")) {pageName=SettingsPage.SYSTEM.name}}
+                }
+                SettingsPage.APPEARANCE -> {
             item {SettingsCard {
                 SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true})
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
@@ -98,60 +120,48 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true})
             }}
-            // 2 · Agente
-            item {SettingsHeader("Agente",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
-            item {SettingsCard {BrainsSettingsSection()}}
-            // 3 · Generación
-            item {SettingsHeader("Proveedores de generación",Icons.Default.CloudQueue,top=NexusTokens.space12)}
-            item {SettingsCard {
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Atlas Cloud",style=MaterialTheme.typography.titleSmall)
-                        Text(if(maskedApiKey=="Not configured") "Sin configurar" else maskedApiKey,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-                    }
-                    Column(horizontalAlignment=Alignment.End) {
-                        Text(accountBalance?.let {currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",style=MaterialTheme.typography.titleSmall.tabularMoney())
-                        TextButton(onClick={accountDetails=!accountDetails},contentPadding=PaddingValues(0.dp)) {Text(if(accountDetails) "Ocultar" else "Detalles",style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
-                    }
-                    IconButton(onClick={refreshBalance()},enabled=!isRefreshingBalance) {Icon(Icons.Default.Refresh,"Actualizar saldo Atlas")}
                 }
-                if(accountDetails) accountBalance?.let {balance ->
-                    Text(currencyManager.formatUsdDetails(balance.availableUsd),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
-                    AccountAmount("Efectivo",currencyManager.formatBalance(balance.cashUsd))
-                    AccountAmount("Bonos",currencyManager.formatBalance(balance.bonusUsd))
-                    AccountAmount("Congelado",currencyManager.formatBalance(balance.frozenUsd))
-                    Text("Consumo oficial por uso en Atlas Cloud",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                SettingsPage.BYTEPLUS -> { item { BytePlusConsumptionSettings() } }
+                SettingsPage.AGENT -> {
+                    item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
+                    item {SettingsCard {SettingRow("Sincronización entre móviles","Chats, memoria, skills, galería y adjuntos",{syncOpen=true})}}
+                    if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Modelo, respuesta, consumo, herramientas y skills",{assistantSettingsOpen=true})}}
+                    item {SettingsHeader("Cerebros adicionales",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
+                    item {SettingsCard {BrainsSettingsSection()}}
                 }
-                FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    FilledTonalButton(onClick={apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true}) {Text("Modificar clave")}
-                    FilledTonalButton(enabled=!isTestingConnection,onClick={
-                        isTestingConnection=true;connectionStatusMessage=null
-                        scope.launch {
-                            val key=settingsRepo.getAtlasApiKey()
-                            val result=settingsRepo.testConnection(key)
-                            isTestingConnection=false
-                            if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud."}
-                            else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión."}
+                SettingsPage.PROVIDERS -> {
+                    item {ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=maskedApiKey!="Not configured") {
+                        ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null})
+                        ProviderBalance(accountBalance?.let{currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",accountBalance?.let{"${currencyManager.formatUsdDetails(it.availableUsd)} · Efectivo ${currencyManager.formatBalance(it.cashUsd)} · Bonos ${currencyManager.formatBalance(it.bonusUsd)}"},isRefreshingBalance,{refreshBalance()})
+                        ProviderTest(enabled=maskedApiKey!="Not configured",testing=isTestingConnection,result=connectionStatusMessage?.let{isConnectionSuccess to it},onTest={
+                            isTestingConnection=true;connectionStatusMessage=null
+                            scope.launch {
+                                val result=settingsRepo.testConnection(settingsRepo.getAtlasApiKey())
+                                isTestingConnection=false
+                                if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud."}
+                                else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión."}
+                            }
+                        })
+                    }}
+                    item {
+                        @Suppress("UNUSED_EXPRESSION")
+                        providerKeyRevision
+                        Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                            app.providerRegistry.getAllProviders().filter {it.id in setOf("crun","runway")}.forEach {provider->
+                                ProviderCredentialCard(provider,app.secureStorage.getMaskedProviderApiKey(provider.id),{app.secureStorage.getProviderApiKey(provider.id)},
+                                    {providerKeyDialogId=provider.id;providerKeyInput=app.secureStorage.getProviderApiKey(provider.id)},
+                                    {app.secureStorage.clearProviderApiKey(provider.id);providerKeyRevision++})
+                            }
                         }
-                    }) {Text(if(isTestingConnection) "Probando…" else "Probar conexión")}
-                }
-                connectionStatusMessage?.let {status->InlineNotice(if(isConnectionSuccess) "Conexión correcta." else noticeMessage(status,"No se pudo conectar con Atlas."),technicalDetails=if(isConnectionSuccess) null else status,isError=!isConnectionSuccess)}
-            }}
-            item {
-                @Suppress("UNUSED_EXPRESSION")
-                providerKeyRevision
-                Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    app.providerRegistry.getAllProviders().filter {it.id in setOf("crun","runway")}.forEach {provider->
-                        ProviderCredentialCard(provider,app.secureStorage.getMaskedProviderApiKey(provider.id),{app.secureStorage.getProviderApiKey(provider.id)},
-                            {providerKeyDialogId=provider.id;providerKeyInput=app.secureStorage.getProviderApiKey(provider.id)})
                     }
+                    item {ProviderCard(name="Google Flow",subtitle="Proyecto activo del puente (AXELPC o ASUS)",icon=Icons.Default.AutoAwesome,tint=ProviderTint,connected=flowLinked,idleLabel="Sin vincular") {
+                        FlowRecoverySettings(onCreateInFlow)
+                    }}
                 }
-            }
-            item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
-            item {SettingsHeader("Generadores propios",Icons.Default.Extension,top=NexusTokens.space12)}
+                SettingsPage.CUSTOM -> {
             item {SettingsCard {MediaProvidersSettingsSection()}}
-            // 4 · Sistema
-            item {SettingsHeader("Sistema",Icons.Default.Settings,top=NexusTokens.space12)}
+                }
+                SettingsPage.SYSTEM -> {
             item {SettingsCard {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
@@ -160,12 +170,15 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 SettingRow("Diagnóstico del sistema","Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»",{showDiagnostics=true})
             }}
+                }
+            }
         }
     }
-    if(appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
+    if(syncOpen) DeviceSyncSettings {syncOpen=false}
+    if(assistantSettingsOpen && assistantViewModel != null) com.vidadomu.nexus.assistant.AssistantSettingsSheetHost(assistantViewModel) {assistantSettingsOpen=false}
+    if(appearanceOpen) NexusSheet("Apariencia", {appearanceOpen=false}, icon=Icons.Default.Palette) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Apariencia",style=MaterialTheme.typography.titleLarge)
+            NexusSheetGroup("Tema", Icons.Default.Palette) {
             NexusAppearance.entries.forEach {option->
                 val preview = remember(option) { palette(option) }
                 Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)})
@@ -188,18 +201,19 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
                 }
             }
             TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            TextButton(onClick={appearanceOpen=false}) {Text("Cerrar apariencia",color=TextSecondary)}
+            }
         }
     }
-    if(currencyOpen) ModalBottomSheet(onDismissRequest={currencyOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
+    if(currencyOpen) NexusSheet("Moneda", {currencyOpen=false}, icon=Icons.Default.CurrencyExchange) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Moneda",style=MaterialTheme.typography.titleLarge)
+            NexusSheetGroup("Preferencia de moneda", Icons.Default.CurrencyExchange) {
             CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth().clickable { currencyManager.setPreference(pref) }
                 .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
                 RadioButton(currencyState.preference==pref,{currencyManager.setPreference(pref)})
                 Column(Modifier.weight(1f)) {Text(pref.displayName,style=MaterialTheme.typography.bodyLarge);Text(pref.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
             }}
+            }
+            NexusSheetGroup("Conversión", Icons.Default.Sync) {
             Text(currencyState.rateSummaryText,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Fuente: BCE / Frankfurter",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
             Text("Última sincronización: ${currencyState.formattedLastUpdated}",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
@@ -208,20 +222,19 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}) {
             currencyState.error?.let {InlineNotice(noticeMessage(it,"No se pudo actualizar la tasa. Se conserva la guardada."),technicalDetails=it)}
             FilledTonalButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
             TextButton(onClick={currencyManager.setPreference(CurrencyPreference.EUR_SMART)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            TextButton(onClick={currencyOpen=false}) {Text("Cerrar moneda",color=TextSecondary)}
+            }
         }
     }
-    if(showDiagnostics) ModalBottomSheet(onDismissRequest={showDiagnostics=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
+    if(showDiagnostics) NexusSheet("Diagnóstico del sistema", {showDiagnostics=false}, icon=Icons.Default.Info) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Diagnóstico del sistema",style=MaterialTheme.typography.titleLarge)
+            NexusSheetGroup("Estado del dispositivo", Icons.Default.Info) {
             Text("Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}» · ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",style=MaterialTheme.typography.bodyMedium)
             Text("Dispositivo: ${Build.MANUFACTURER} ${Build.MODEL}",style=MaterialTheme.typography.bodyMedium)
             Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",style=MaterialTheme.typography.bodyMedium)
             Text(if(app.secureStorage.credentialStorageAvailable) "Almacenamiento cifrado disponible" else "Almacenamiento cifrado no disponible",style=MaterialTheme.typography.bodyMedium)
             Text("Media3 ExoPlayer 1.4.1 · WorkManager 2.9",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Divisas: BCE / Frankfurter",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-            TextButton(onClick={showDiagnostics=false}) {Text("Cerrar diagnóstico",color=TextSecondary)}
+            }
         }
     }
 
@@ -318,8 +331,10 @@ private fun ProviderCredentialCard(
     provider: com.vidadomu.nexus.provider.api.NexusProvider,
     maskedKey: String,
     apiKey: () -> String,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onClear: () -> Unit
 ) {
+    val app = LocalContext.current.applicationContext as NexusApplication
     val scope = rememberCoroutineScope()
     var testing by remember(provider.id) { mutableStateOf(false) }
     var resultText by remember(provider.id) { mutableStateOf<String?>(null) }
@@ -329,80 +344,65 @@ private fun ProviderCredentialCard(
     var balanceError by remember(provider.id, maskedKey) { mutableStateOf<String?>(null) }
     suspend fun refreshBalance() {
         val key = apiKey()
-        if(key.isBlank()) return
+        if (key.isBlank()) return
         val capability = provider.fetchAccountStatus(key) ?: return
         capability.onSuccess { accountStatus = it; balanceError = null }
             .onFailure { balanceError = it.message ?: "No se pudo consultar el saldo." }
     }
     LaunchedEffect(provider.id, maskedKey) {
-        if(apiKey().isNotBlank()) {
+        if (apiKey().isNotBlank()) {
             loadingBalance = true
             refreshBalance()
             loadingBalance = false
         }
     }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = SurfaceDark,
-        border = null,
-        shape = NexusTokens.card
-    ) {
-        Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.CloudQueue, contentDescription = null, tint = PrimaryNeon)
-                Spacer(Modifier.width(NexusTokens.space8))
-                Column(Modifier.weight(1f)) {
-                    Text(provider.displayName, color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text(provider.description, color = TextMuted, style = MaterialTheme.typography.bodySmall)
-                }
+    val hasKey = maskedKey != "Not configured"
+    ProviderCard(name = provider.displayName, subtitle = provider.description, icon = Icons.Default.CloudQueue,
+        tint = ProviderTint, connected = hasKey) {
+        ProviderKeyRow(if (hasKey) maskedKey else null, onEdit, if (hasKey) onClear else null)
+        if (accountStatus != null || loadingBalance) ProviderBalance(
+            value = accountStatus?.balanceLabel?.let { presentBalance(it, app.currencyManager) } ?: "Consultando…",
+            detail = accountStatus?.details,
+            busy = loadingBalance,
+            onRefresh = { scope.launch { loadingBalance = true; refreshBalance(); loadingBalance = false } })
+        balanceError?.let { InlineNotice(noticeMessage(it, "No se pudo consultar el saldo."), technicalDetails = it) }
+        ProviderTest(enabled = hasKey, testing = testing, result = resultText?.let { success to it }, onTest = {
+            testing = true
+            resultText = null
+            scope.launch {
+                val result = provider.testConnection(apiKey())
+                testing = false
+                success = result.isSuccess
+                resultText = if (result.isSuccess) "Conexión correcta." else result.exceptionOrNull()?.message ?: "Fallo de conexión."
+                if (result.isSuccess) refreshBalance()
             }
-            Divider(color = BorderSubtle)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(maskedKey.takeUnless {it=="Not configured"} ?: "Sin configurar", modifier = Modifier.weight(1f), color = if (maskedKey == "Not configured") AccentCoral else TextPrimary,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                TextButton(onClick = onEdit) { Text("Modificar") }
+        })
+    }
+}
+private enum class SettingsPage(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tint: androidx.compose.ui.graphics.Color) {
+    APPEARANCE("Apariencia y moneda", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
+    BYTEPLUS("Consumo BytePlus", Icons.Default.AccountBalanceWallet, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
+    AGENT("Agente y modelos", Icons.Default.AutoAwesome, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
+    PROVIDERS("Proveedores de generación", Icons.Default.CloudQueue, androidx.compose.ui.graphics.Color(0xFF34D399)),
+    CUSTOM("Generadores propios", Icons.Default.Extension, androidx.compose.ui.graphics.Color(0xFFFBBF24)),
+    SYSTEM("Sistema y diagnóstico", Icons.Default.Settings, androidx.compose.ui.graphics.Color(0xFF94A3B8)),
+}
+
+/** Fila de categoría de Ajustes: baldosa del color de su categoría, título y resumen de su estado. */
+@Composable
+private fun HubRow(page: SettingsPage, summary: String, onClick: () -> Unit) {
+    Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 2.dp) {
+        Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).heightIn(min = NexusTokens.minimumTouch + NexusTokens.space16).padding(NexusTokens.space12),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+            CategoryTile(page.icon, page.tint)
+            Column(Modifier.weight(1f)) {
+                Text(page.title, style = MaterialTheme.typography.titleMedium)
+                Text(summary, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 2)
             }
-            if(accountStatus != null || loadingBalance) {
-                Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = NexusTokens.field) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = PrimaryNeon,
-                            modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(NexusTokens.space8))
-                        Column(Modifier.weight(1f)) {
-                            Text("Saldo", color = TextMuted, style = MaterialTheme.typography.labelSmall)
-                            Text(accountStatus?.balanceLabel?.let {presentBalance(it,(LocalContext.current.applicationContext as NexusApplication).currencyManager)} ?: "Consultando…", color = TextPrimary,
-                                fontWeight = FontWeight.Medium,style=MaterialTheme.typography.headlineSmall.tabularMoney())
-                        }
-                        if(loadingBalance) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    }
-                }
-            }
-            balanceError?.let {InlineNotice(noticeMessage(it,"No se pudo consultar el saldo."),technicalDetails=it)}
-            FilledTonalButton(
-                onClick = {
-                    testing = true
-                    resultText = null
-                    scope.launch {
-                        val result = provider.testConnection(apiKey())
-                        testing = false
-                        success = result.isSuccess
-                        resultText = if (result.isSuccess) "Conexión correcta." else result.exceptionOrNull()?.message ?: "Fallo de conexión."
-                        if(result.isSuccess) refreshBalance()
-                    }
-                },
-                enabled = !testing && apiKey().isNotBlank()
-            ) {
-                if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(NexusTokens.space4))
-                Text(if (testing) "Probando…" else "Probar conexión")
-            }
-            resultText?.let {InlineNotice(if(success) "Conexión correcta." else noticeMessage(it,"No se pudo conectar con el proveedor."),technicalDetails=if(success) null else it,isError=!success)}
+            Icon(Icons.Default.ChevronRight, null, tint = page.tint)
         }
     }
 }
-
 @Composable
 private fun SettingRow(title:String,subtitle:String,onClick:()->Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).clickable(role=Role.Button,onClick=onClick)
@@ -413,26 +413,17 @@ private fun SettingRow(title:String,subtitle:String,onClick:()->Unit) {
 }
 
 @Composable
-private fun AccountAmount(label:String,amount:String) {
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-        Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-        Text(amount,style=MaterialTheme.typography.bodyMedium.tabularMoney())
-    }
-}
-
-@Composable
 private fun SettingsHeader(title:String,icon:androidx.compose.ui.graphics.vector.ImageVector,top:androidx.compose.ui.unit.Dp=0.dp) {
     Row(Modifier.fillMaxWidth().padding(top=top,start=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         Icon(icon,null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.size(18.dp))
-        Text(title.uppercase(),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.SemiBold,letterSpacing=.8.sp)
+        Text(title,style=MaterialTheme.typography.titleLarge,color=TextPrimary)
     }
 }
 
 /** Contenedor de una sección: tarjeta elevada sobre el fondo, con sus filas separadas por filetes. */
 @Composable
-private fun SettingsCard(content:@Composable ColumnScope.()->Unit) {
-    Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
-        border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
+internal fun SettingsCard(content:@Composable ColumnScope.()->Unit) {
+    Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerHigh,tonalElevation=2.dp) {
         Column(Modifier.padding(horizontal=NexusTokens.space16,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8),content=content)
     }
 }
@@ -450,5 +441,14 @@ private fun FontScaleRow(appearance:AppearancePreferences) {
         }
         Slider(draft,{draft=it},valueRange=.8f..1.4f,steps=11,onValueChangeFinished={appearance.setFontScale(draft)})
         Text("Así se verá el texto de Nexus.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+        // Más espacio para el chat: la barra de pestañas se esconde al bajar y vuelve al subir.
+        var autoHide by remember {mutableStateOf(appearance.autoHideBars())}
+        Row(Modifier.fillMaxWidth().padding(top=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ocultar la barra al bajar por el chat",style=MaterialTheme.typography.bodyLarge)
+                Text("Vuelve en cuanto subes un poco.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            }
+            Switch(autoHide,{autoHide=it;appearance.setAutoHideBars(it)})
+        }
     }
 }

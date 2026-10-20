@@ -1,8 +1,12 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.vidadomu.nexus.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -40,7 +44,9 @@ internal fun generationStatusLabel(job:GenerationJob):String =
         GenerationStatus.UPLOADING->"Subiendo"
     }
 
-/** Only formats existing values. It does not resolve, refresh or compute charges. */
+/** Only formats existing values. It does not resolve, refresh or compute charges.
+ * Una sola unidad de coste en la fila: la moneda si existe; solo si el proveedor
+ * informó únicamente créditos, se muestran los créditos (nunca ambos). */
 internal fun confirmedJobCost(job:GenerationJob,currency:CurrencyManager):String {
     val cost=job.actualCostUsd?.takeIf {it.isFinite() && it>=0}
     val credits=job.parameters["__actual_credits"]?.toDoubleOrNull()?.takeIf {it.isFinite() && it>=0}
@@ -49,7 +55,7 @@ internal fun confirmedJobCost(job:GenerationJob,currency:CurrencyManager):String
 }
 
 @Composable
-fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->Unit,
+fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->Unit,onRetry:()->Unit={},
     menu:@Composable (close:()->Unit)->Unit) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
@@ -67,11 +73,14 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
     // Título útil: el texto del encargo o, si no tiene (upscalers, herramientas), el modelo.
     val title=job.prompt.trim().ifBlank {model}
     // Estado y hora primero: un nombre de modelo largo no puede empujarlos fuera de la línea.
-    val detail=listOfNotNull(generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time,type,
+    // Un fallo muestra su motivo (una línea) en vez de la ficha habitual; el detalle técnico sigue en Diagnóstico.
+    val failureReason=job.error?.trim()?.takeIf {it.isNotBlank()}
+    val detail=if(job.status==GenerationStatus.FAILED && failureReason!=null) failureReason
+        else listOfNotNull(generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time,type,
         model.takeIf {job.prompt.isNotBlank()}).joinToString(" · ")
     // Solo un coste real; un trabajo fallido o en curso no muestra «Por confirmar».
     val cost=costText.takeIf {job.status==GenerationStatus.COMPLETED && it!="Por confirmar"}
-    Row(Modifier.fillMaxWidth().heightIn(min=60.dp).clickable(onClick=onOpen)
+    Row(Modifier.fillMaxWidth().heightIn(min=60.dp).combinedClickable(onClick=onOpen,onLongClick={menuOpen=true},onLongClickLabel="Opciones del resultado")
         .padding(start=NexusTokens.screenMargin,end=NexusTokens.space4,top=6.dp,bottom=6.dp),
         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         Box(Modifier.size(NexusTokens.minimumTouch).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer),contentAlignment=Alignment.Center) {
@@ -88,9 +97,12 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
             },generationStatusLabel(job),tint=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary)
         }
         Column(Modifier.weight(1f)) {
-            Text(title,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(title,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,maxLines=2,overflow=TextOverflow.Ellipsis)
             Text(detail,style=MaterialTheme.typography.labelMedium,maxLines=1,overflow=TextOverflow.Ellipsis,
                 color=if(job.status==GenerationStatus.FAILED) MaterialTheme.colorScheme.error else TextSecondary)
+        }
+        if(job.status==GenerationStatus.FAILED) TextButton(onClick=onRetry,contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {
+            Text("Reintentar",style=MaterialTheme.typography.labelMedium)
         }
         cost?.let {Text(it,modifier=Modifier.widthIn(max=96.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,
             maxLines=1,overflow=TextOverflow.Ellipsis)}

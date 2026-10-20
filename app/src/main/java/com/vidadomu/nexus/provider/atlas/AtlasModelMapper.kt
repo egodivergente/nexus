@@ -577,13 +577,13 @@ object AtlasModelMapper {
             "1k_chars" -> "1k car."
             "generation" -> "gen"
             "token" -> "token"
-            else -> rawUnit?.takeIf { it.isNotBlank() } ?: "unidad sin especificar"
+            else -> rawUnit?.takeIf { it.isNotBlank() && it.lowercase() != "unknown" } ?: "unidad sin especificar"
         }
     }
 
     private fun formatPricingInfo(priceUsd: Double?, unit: String, discount: String?): String {
         if (priceUsd == null || priceUsd == 0.0) {
-            return if (priceUsd == 0.0) "0 · tarifa publicada" else "Precio por consultar"
+            return if (priceUsd == 0.0) "0 · tarifa publicada" else "Sin precio publicado"
         }
         val cents = priceUsd * 100
         val priceStr = if (cents < 0.1) {

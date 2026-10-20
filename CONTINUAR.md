@@ -1,4 +1,17 @@
+# Continuidad entre dispositivos - 2026-10-20
+
+Rama `feat/device-continuity-20261020`, checkout `C:/Users/User/Documents/nexus-audit/agent-ux`.
+Codigo vc93; validacion fisica bidireccional sobre la integracion vc94 instalada
+ en S25 y Pixel. Pruebas: 617 PASS, 4 omitidas, 2 Node PASS.
+Ver `docs/DEVICE-CONTINUITY-1959-20261020.md`.
+Drive usa `codex/nexus-drive-sync-android-20261020` y prepara una APK posterior.
+No instalar vc93 sobre esa integracion. Credenciales y backups fuera de Git.
+`gradlew.bat` contiene trabajo ajeno y no se incluye en esta entrega.
+Los estados siguientes se conservan como historial, no como estado actual.
+
 # Continuar NEXUS
+
+Actualización comprobada 2026-10-20 (CODEX): **S25 1.9.58-agent-preview / vc92**, consumo BytePlus nativo integrado y puente ASUS administrativo ampliado. Rama `codex/byteplus-consumption-20261020`, reconciliada desde `a4088da` (1.9.57/vc91 instalada realmente). Véase `docs/BYTEPLUS-CONSUMPTION.md` para fuentes, firma, pruebas, despliegue y límites de validación. Las versiones antiguas que siguen abajo son antecedentes históricos.
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
 Estado actual: Android 1.9.34-agent-preview / vc68 (BytePlus, cerebros y generadores propios, límites del usuario) en el Pixel; el S25 sigue en 1.9.18/vc52 (no estaba alcanzable). Rama eat/byteplus-custom-providers-20261017 (sobre la de Antigravity eat/agy-provider-s25-20261016), sin fusionar en main; Windows 1.9.5-agent-desktop.

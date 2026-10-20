@@ -58,7 +58,7 @@ class ConfigurableLimitsTest {
 
     @Test fun `sin limite es un numero grande que no desborda al sumar`() {
         val l = AgentLimits(maxToolRounds = 0, maxMessages = 0)
-        assertTrue(l.rounds + 1 > 0 && l.messages + 1 > 0)
+        assertTrue(l.rounds.toLong() + 1 > 0 && l.messages.toLong() + 1 > 0)
         assertEquals(null, AgentLimits(turnTimeoutSeconds = 0).turnTimeoutMillis)
         assertEquals(30_000L, AgentLimits(turnTimeoutSeconds = 30).turnTimeoutMillis)
     }
@@ -69,6 +69,17 @@ class ConfigurableLimitsTest {
         assertEquals(0, merged.maxToolRounds)
         assertEquals(600, merged.turnTimeoutSeconds)
         assertEquals(200_000, merged.maxTokens)
+    }
+
+    @Test fun `sin tope de pasos permite ejecutar la primera llamada sin desbordar`() = runTest {
+        val h = Harness()
+        val limits = AgentLimits(maxToolRounds = 0)
+        val o = AgentOrchestrator(
+            ScriptedLlmProvider(listOf({ text("ok") })),
+            base.copy(maxToolRounds = limits.rounds, limits = limits),
+            emptyList(), h.skills, h.assets,
+        )
+        assertEquals("ok", o.send(o.newConversation(), "Hola").text)
     }
 
     @Test fun `la validacion solo rechaza negativos, sin topes artificiales`() {

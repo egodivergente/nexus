@@ -177,7 +177,7 @@ class AgentOrchestrator(
         val events = mutableListOf<UiEvent>()
         val calls = mutableListOf<String>()
         val turnId = kotlin.coroutines.coroutineContext[com.vidadomu.nexus.agent.core.llm.LlmTurnContext]!!.turnId
-        var llmCalls = 0
+        var llmCalls = 0L
         var input = 0; var output = 0; var rounds = 0
         var stop = "END_TURN"
         var selfCorrected = false
@@ -192,7 +192,7 @@ class AgentOrchestrator(
         )
 
         while (true) {
-            if (llmCalls >= config.maxToolRounds + 1) {
+            if (llmCalls >= config.maxToolRounds.toLong() + 1L) {
                 stop = "MAX_ROUNDS"
                 turnTexts += "He alcanzado el limite de llamadas de este mensaje. El trabajo queda conservado."
                 break
@@ -261,7 +261,7 @@ class AgentOrchestrator(
                 // el agente la rehace con el estado real delante (puede consultar herramientas).
                 val contradictions = if (selfCorrected || response.stopReason != StopReason.END_TURN) emptyList()
                     else runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(msg.text(), it) }.orEmpty()
-                if (contradictions.isNotEmpty() && llmCalls < config.maxToolRounds + 1) {
+                if (contradictions.isNotEmpty() && llmCalls < config.maxToolRounds.toLong() + 1L) {
                     selfCorrected = true
                     logger.log("W", "respuesta contradice el estado verificado: ${contradictions.joinToString { it.claim.name }}")
                     conv.messages += LlmMessage(Role.USER, listOf(ContentBlock.Text(verificationPrompt(contradictions))))

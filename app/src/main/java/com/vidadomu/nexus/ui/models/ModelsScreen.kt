@@ -214,7 +214,7 @@ fun LegacyModelsScreen(
                             )
                         )
                         Text(
-                            text = "${models.size} modelos de ${availableProviders.size} proveedores líderes",
+                            text = "${pluralModelos(models.size)} de ${pluralProveedores(availableProviders.size)} líderes",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
                                 fontSize = MaterialTheme.typography.labelMedium.fontSize
@@ -543,7 +543,7 @@ fun LegacyModelsScreen(
                                 )
                             )
                             Text(
-                                text = "Mostrando ${filteredModels.size} modelos",
+                                text = "Mostrando ${pluralModelos(filteredModels.size)}",
                                 style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
                             )
                         }
@@ -770,7 +770,7 @@ fun LegacyModelsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(NexusTokens.space8))
                                 Text(
-                                    text = "Ver los ${filteredModels.size} modelos del catálogo completo",
+                                    text = "Ver ${pluralModelos(filteredModels.size)} del catálogo completo",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         color = PrimaryNeon,
                                         fontWeight = FontWeight.Bold,
@@ -1306,3 +1306,9 @@ private fun FullCatalogModelRow(
         }
     }
 }
+
+/** Pluraliza "modelo"/"modelos" según el conteo (ej. "1 modelo", "3 modelos"). */
+fun pluralModelos(count: Int): String = if (count == 1) "1 modelo" else "$count modelos"
+
+/** Pluraliza "proveedor"/"proveedores" según el conteo. */
+fun pluralProveedores(count: Int): String = if (count == 1) "1 proveedor" else "$count proveedores"

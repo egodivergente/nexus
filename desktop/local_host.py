@@ -116,6 +116,8 @@ def agent_host():
             if not OFFLINE_QA:
                 from drive_sync import DriveSync
                 _agent.drive_sync = DriveSync(_agent)
+                from device_continuity import DeviceContinuity
+                _agent.device_continuity = DeviceContinuity(_agent)
     return _agent
 
 
@@ -363,6 +365,10 @@ def save_remote(url):
 
 
 def dispatch(keys, operation, args):
+    if operation == 'deviceContinuity':
+        if OFFLINE_QA:
+            return {'enabled': False, 'configured': False, 'status': 'Laboratorio sin conexion'}
+        return agent_host().device_continuity.command(args)
     if operation == 'driveSync':
         if OFFLINE_QA:
             return {'state':'unavailable','connected':False,'configured':False,'enabled':False,'conflicts':[]}
@@ -501,7 +507,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '2026.10.20-desktop-local-4gb.1', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'version': '2026.10.20-device-continuity.2', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -726,6 +732,8 @@ class Handler(BaseHTTPRequestHandler):
                     or not isinstance(payload.get('args', {}), dict)):
                 self.send_error(400); return
             message = payload
+            if not OFFLINE_QA:
+                self.server.keys = windows_keys(KEY_FILE)
             value = dispatch(self.server.keys, message.get('op'), message.get('args') or {})
             answer = {'id': message.get('id'), 'ok': True, 'value': value}
         except Exception as error:
@@ -866,9 +874,11 @@ def run_server(options):
         server = LoopbackHTTPServer(('127.0.0.1', 0), Handler)
     server.token = secrets.token_urlsafe(32)
     server.keys = keys
+    if not OFFLINE_QA:
+        agent_host()  # Resume configured background sync even before opening Agent/Settings.
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.20-desktop-local-4gb.1'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.20-device-continuity.2'}),
         encoding='utf-8',
     )
     if options.headless:

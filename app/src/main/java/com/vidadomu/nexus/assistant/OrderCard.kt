@@ -337,18 +337,17 @@ internal fun GeneratedGroupCard(items: List<GroupEntry>, onOpen: (String) -> Uni
                     Text(models.take(3).joinToString(" · ") + if (models.size > 3) " +${models.size - 3}" else "",
                         style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                TextButton(onClick = onExpand, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Ver tarjetas") }
+                OutlinedButton(onClick = onExpand, shape = NexusTokens.pill, contentPadding = PaddingValues(horizontal = NexusTokens.space12)) { Text("Ver tarjetas") }
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items.take(15).forEach { e ->
-                    Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail).clickable { e.jobId?.let(onOpen) }, contentAlignment = Alignment.Center) {
+            // Carrusel horizontal: miniaturas grandes con el modelo debajo (hasta 2 líneas, sin cortar).
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                items(items, key = { it.jobId ?: it.uri }) { e ->
+                    Column(Modifier.width(112.dp).clickable { e.jobId?.let(onOpen) }, verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                         AsyncImage(model = coil.request.ImageRequest.Builder(context).data(e.uri).crossfade(120)
                             .apply { if (e.modality == "VIDEO") decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }.build(),
-                            contentDescription = "Abrir resultado de ${e.model}", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            contentDescription = "Abrir resultado de ${e.model}", modifier = Modifier.size(112.dp).clip(NexusTokens.card), contentScale = ContentScale.Crop)
+                        Text(e.model, style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                }
-                if (items.size > 15) Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail).clickable(onClick = onExpand), contentAlignment = Alignment.Center) {
-                    Text("+${items.size - 15}", style = MaterialTheme.typography.titleSmall, color = TextSecondary)
                 }
             }
         }

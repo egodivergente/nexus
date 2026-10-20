@@ -171,7 +171,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { _ ->
                         val brief=section.models.firstNotNullOfOrNull(CatalogFocus::forModel)
-                        NavigationCard(section.family,section.family,brief?.let {"${children.size} modelos · ${it.good}"} ?: "${children.size} modelos",section.models,modality,
+                        NavigationCard(section.family,section.family,brief?.let {"${pluralModelos(children.size)} · ${it.good}"} ?: pluralModelos(children.size),section.models,modality,
                             onClick={family=section.family;filters=false}, compact=compactCards,grid=useGrid,
                             onLongClick={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
@@ -290,7 +290,8 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     val currency by app.currencyManager.state.collectAsState()
     val price=routes.mapNotNull(::referencePrice).minOrNull()
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
-    Surface(modifier=cardModifier.fillMaxWidth().combinedClickable(onClick=onClick,
+    // Altura mínima fija en grid para que las tarjetas no bailen cuando falta releaseLabel/highlight.
+    Surface(modifier=cardModifier.fillMaxWidth().then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick=onClick,
         onLongClickLabel="Opciones de $title",onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
         Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -301,7 +302,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                             fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
                     Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                        maxLines=if(compact) 1 else 4,overflow=TextOverflow.Ellipsis)
+                        maxLines=if(compact) 1 else 2,overflow=TextOverflow.Ellipsis)
                     releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
                 }
                 if(!grid) Text(displayPrice ?: "Ver coste",
@@ -310,10 +311,11 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=TextSecondary)}
             }
             if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
-                    Text(displayPrice?.let {"Desde $it"} ?: "Coste en opciones",Modifier.padding(horizontal=10.dp,vertical=5.dp),
+                // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.
+                if(displayPrice!=null) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
+                    Text("Desde $displayPrice",Modifier.padding(horizontal=10.dp,vertical=5.dp),
                         style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
-                }
+                } else Spacer(Modifier.weight(1f))
                 if(dragModifier==null) IconButton(onClick=onLongClick,modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)
                 }

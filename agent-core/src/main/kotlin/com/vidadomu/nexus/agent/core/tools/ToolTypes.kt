@@ -36,6 +36,7 @@ sealed interface UiEvent {
     data class GenerationSubmitted(val plan: GenerationPlan, val jobId: String, val orderId: String? = null) : UiEvent
     data class AwaitingConfirmation(val planId: String) : UiEvent
     data class ProposedAction(val id: String, val description: String) : UiEvent
+    data class ResultsWall(val media: List<Attachment>) : UiEvent
     data class Info(val text: String) : UiEvent
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     data class StreamingText(val text: String) : UiEvent

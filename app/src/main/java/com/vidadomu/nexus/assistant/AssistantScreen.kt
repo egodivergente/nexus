@@ -5,6 +5,12 @@ package com.vidadomu.nexus.assistant
 import androidx.compose.foundation.background
 import com.vidadomu.nexus.ui.components.*
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import com.vidadomu.nexus.ui.components.NexusTopAppBar
 import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.noticeMessage
@@ -19,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import com.vidadomu.nexus.agent.core.llm.AntigravityReasoning
 import com.vidadomu.nexus.agent.core.llm.BrainAuthMode
 import com.vidadomu.nexus.agent.core.llm.BrainProfile
 import com.vidadomu.nexus.agent.core.llm.BrainProtocol
@@ -36,6 +43,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -88,6 +96,10 @@ fun AssistantScreen(
     vm: AssistantViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    var wallResult by remember { mutableStateOf<Attachment?>(null) }
+    if (ui.resultsWall.isNotEmpty()) ResultsWallSheet(ui.resultsWall,
+        onOpen = { wallResult = it; vm.closeResultsWall() }, onDismiss = vm::closeResultsWall)
+    wallResult?.let { media -> ResultMediaSheet(media) { wallResult = null } }
     val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -95,12 +107,26 @@ fun AssistantScreen(
     var input by rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString("text", "").orEmpty())) }
     var showSettings by remember { mutableStateOf(false) }
     var showProject by remember {mutableStateOf(false)}
+    var ordersPanel by remember {mutableStateOf(false)}
     val dirtyPlans=remember {mutableStateMapOf<String,Boolean>()}
     val included=ui.plans.values.count {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION)}
     val primaryPlanId=ui.items.filterIsInstance<ChatItem.PlanCard>().lastOrNull {ui.plans[it.planId]?.let {p->p.executable && p.state !in setOf(PlanState.SUBMITTED,PlanState.DISCARDED,PlanState.UNCERTAIN)}==true}?.planId
     val activeProject=ui.projects.firstOrNull {it.id==ui.activeProjectId}
     val listState = rememberLazyListState()
     val picker = rememberProjectMediaPicker { uris -> vm.attach(uris) }
+    // Cámara: la foto va a la caché (FileProvider) y se adjunta como cualquier referencia.
+    val context = LocalContext.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val camera = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.TakePicture()) { ok ->
+        cameraUri?.takeIf { ok }?.let { vm.attach(listOf(it)) }
+    }
+    val takePhoto: () -> Unit = {
+        runCatching {
+            val file = java.io.File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+            FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file).also { cameraUri = it; camera.launch(it) }
+        }.onFailure { Toast.makeText(context, "No se pudo abrir la cámara", Toast.LENGTH_SHORT).show() }
+    }
 
     var following by rememberSaveable { mutableStateOf(true) }
     var automaticScroll by remember { mutableStateOf(false) }
@@ -188,28 +214,29 @@ fun AssistantScreen(
             contentDescription="Abrir proyecto"
             stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
         },verticalArrangement=Arrangement.Center) {
+            // Una sola línea: el proyecto. Cerebro y razonamiento van junto al cuadro de texto; escena y referencias, en la hoja del proyecto.
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
                 Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
             }
-            val projectContext=listOfNotNull(
-                ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},
-                ui.projectAssets.size.takeIf {it>0}?.let {"$it referencias"}
-            ).joinToString(" · ")
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                BrainPicker(ui,vm)
-                if(LocalDensity.current.fontScale<1.3f && projectContext.isNotBlank()) Text("· $projectContext",
-                    style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,
-                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
-            }
-        }},actions={
-            IconButton(onClick={showSettings=true}) {Icon(Icons.Default.Tune,"Ajustes del asistente")}})
+        }},settingsEntries=listOf("Asistente: modelo y conexión" to { showSettings=true }))
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState,
-                contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+            // Al bajar por el chat se esconde la barra inferior para ganar espacio; al subir vuelve (Ajustes → Apariencia).
+            val appearance = com.vidadomu.nexus.ui.theme.rememberAppearancePreferences()
+            val autoHide = remember(appearance) { appearance.autoHideBars() }
+            DisposableEffect(Unit) { onDispose { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = true } }
+            val hideOnScroll = remember(autoHide) { object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (autoHide && kotlin.math.abs(available.y) > 6f) com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = available.y > 0
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+            } }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(Modifier.fillMaxSize().nestedScroll(hideOnScroll), state = listState,
+                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is CardGroup) {
@@ -228,9 +255,9 @@ fun AssistantScreen(
                     }
                     val item = row as ChatItem
                     when (item) {
-                        is ChatItem.User -> UserBubble(item)
-                        is ChatItem.Assistant -> AssistantBubble(item, onOpenHistory)
-                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory)
+                        is ChatItem.User -> Box(Modifier.animateItem()) { UserBubble(item) }
+                        is ChatItem.Assistant -> Box(Modifier.animateItem()) { AssistantBubble(item, onOpenHistory) }
+                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory, onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null, onChangeModel = { showSettings = true })
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -277,24 +304,37 @@ fun AssistantScreen(
                 }
                 if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(NexusTokens.space8)); Text("Pensando…", color = TextMuted) } }
             }
-            // «Encargos» solo aparece cuando NINGUNA tarjeta está a la vista; sin contador y sin reordenar nada: lleva a la última.
-            val cardKeys = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id }.toSet() }
-            val cardsOffscreen by remember(cardKeys) { derivedStateOf {
-                cardKeys.isNotEmpty() && listState.layoutInfo.visibleItemsInfo.none { it.key in cardKeys } } }
-            val showReasoning = reasoningAvailable(ui)
-            // Una sola fila fina sobre el cuadro de texto: atajos a la izquierda, modo de razonamiento a la derecha.
-            if (cardsOffscreen || !following || showReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (cardsOffscreen) QuickLink("Encargos ↓") {
-                    following = false
-                    scope.launch { listState.animateScrollToItem(visibleItems.indexOfLast { it is ChatItem.PlanCard }.coerceAtLeast(0)) }
+            // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
+            val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
+            Column(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                AnimatedVisibility(cardIds.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+                    SmallFloatingActionButton(onClick = { ordersPanel = true }, shape = NexusTokens.pill,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = TextPrimary) {
+                        Icon(Icons.Default.Inventory2, "Ver encargos")
+                    }
                 }
-                if (!following) QuickLink("Último ↓") { following = true; scope.launch { followLast() } }
+                AnimatedVisibility(!following, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                    SmallFloatingActionButton(onClick = { following = true; scope.launch { followLast() } }, shape = NexusTokens.pill,
+                        containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
+                        Icon(Icons.Default.KeyboardArrowDown, "Bajar al final")
+                    }
+                }
+            }
+            }
+            if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
+                ordersPanel = false; following = false
+                scope.launch { listState.animateScrollToItem(visibleItems.indexOfFirst { it is ChatItem.PlanCard && it.id == id }.coerceAtLeast(0)) }
+            }
+            // Fila fina sobre el cuadro de texto: cerebro a la izquierda, modo de razonamiento a la derecha.
+            Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+                BrainPicker(ui, vm)
                 Spacer(Modifier.weight(1f))
                 ReasoningPicker(ui, vm)
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
-                onSend = { if(vm.send(input.text)) {draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) })
+                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto)
         }
     }
 }
@@ -339,13 +379,15 @@ private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
 @Composable
 private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val brain = ui.settings.brain
-    if (brain == null || !brain.capabilities.reasoning || brain.protocol == BrainProtocol.CUSTOM_REST) return
+    val argon = if(ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY) AntigravityReasoning.effort(ui.settings.modelId) else null
+    if (argon == null && (brain == null || !brain.capabilities.reasoning || brain.protocol == BrainProtocol.CUSTOM_REST)) return
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val modes = listOf<Triple<String, String?, String?>>(
+    val modes = if(argon != null) listOf<Triple<String,String?,String?>>(Triple("Bajo","low",null),Triple("Medio","medium",null),Triple("Alto","high",null))
+    else listOf<Triple<String, String?, String?>>(
         Triple("Auto", null, null), Triple("Rápido", null, "disabled"), Triple("Mínimo", "minimal", null),
         Triple("Bajo", "low", null), Triple("Medio", "medium", null), Triple("Alto", "high", null))
-    val current = modes.firstOrNull { it.second == brain.reasoningEffort && it.third == brain.thinking }?.first ?: "Auto"
+    val current = modes.firstOrNull { it.second == (argon ?: brain?.reasoningEffort) && it.third == brain?.thinking }?.first ?: "Auto"
     Box {
         TextButton(onClick = { open = true }, enabled = !ui.thinking, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
             modifier = Modifier.height(28.dp).semantics { contentDescription = "Modo de razonamiento: $current. Cambiar" }) {
@@ -362,7 +404,46 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
 }
 
 private fun reasoningAvailable(ui: AssistantUiState): Boolean =
+    (ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(ui.settings.modelId) != null) ||
     ui.settings.brain?.let { it.capabilities.reasoning && it.protocol != BrainProtocol.CUSTOM_REST } == true
+
+/** Los IDs internos (ord_…) no se enseñan en el chat; la tarjeta y su «Detalles» ya identifican el encargo. Copiar conserva el texto original. */
+internal fun hideOrderIds(text: String): String =
+    text.replace(Regex("""[ \t]*\(?`?ord_[0-9a-f]{6,}`?\)?"""), "").replace(Regex(" {2,}"), " ")
+
+/** Panel propio de encargos: estado con icono, modelo y coste; tocar uno lleva a su tarjeta en el chat. Sin IDs. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OrdersSheet(cards: List<ChatItem.PlanCard>, ui: AssistantUiState, onClose: () -> Unit, onPick: (String) -> Unit) {
+    val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val currencyState by app.currencyManager.state.collectAsState()
+    NexusSheet("Encargos", onClose, subtitle = "${cards.size} encargos", icon = Icons.Default.Assignment) {
+        LazyColumn(contentPadding = PaddingValues(bottom = NexusTokens.space24)) {
+            items(cards.asReversed(), key = { it.id }) { card ->
+                val plan = ui.plans[card.planId]?.plan
+                val status = card.orderId?.let { ui.orders[it] }?.status
+                val (icon, tint, label) = when (status) {
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED -> Triple(Icons.Default.CheckCircle, MaterialTheme.colorScheme.primary, "Listo")
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED, com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN -> Triple(Icons.Default.Warning, MaterialTheme.colorScheme.error, "Error")
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.SUBMITTING, com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING -> Triple(Icons.Default.Autorenew, TextSecondary, "En curso")
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED -> Triple(Icons.Default.Close, TextSecondary, "Descartado")
+                    else -> Triple(Icons.Default.Schedule, TextSecondary, "Pendiente")
+                }
+                val cost = remember(plan?.estimate, currencyState) { plan?.estimate?.amountUsd?.let(app.currencyManager::formatCost) }
+                Row(Modifier.fillMaxWidth().clickable { onPick(card.id) }.heightIn(min = NexusTokens.minimumTouch)
+                    .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space8),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                    Icon(icon, label, tint = tint, modifier = Modifier.size(20.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(plan?.modelName ?: "Encargo", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    }
+                    cost?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = TextSecondary) }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun QuickLink(text: String, onClick: () -> Unit) {
@@ -387,7 +468,7 @@ private fun EmptyHint() {
             contentScale = ContentScale.Fit
         )
         Surface(
-            shape = RoundedCornerShape(999.dp),
+            shape = NexusTokens.pill,
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
         ) {
@@ -413,16 +494,14 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
     var creating by remember {mutableStateOf(false)}
     var name by rememberSaveable {mutableStateOf("")}
     val active=ui.projects.firstOrNull {it.id==ui.activeProjectId}
-    val conversations=remember {vm.conversations()}
-    ModalBottomSheet(onDismissRequest=onClose,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
+    val syncRevision by com.vidadomu.nexus.sync.DeviceSync.get(androidx.compose.ui.platform.LocalContext.current).revision.collectAsState()
+    val conversations=remember(syncRevision) {vm.conversations()}
+    var saveProject by remember { mutableStateOf<(() -> Unit)?>(null) }
+    NexusSheet(active?.name ?: "Proyecto", onClose, subtitle = "Cambiar proyecto y editar su memoria", icon = Icons.Default.MenuBook,
+        primaryAction = { Button(onClick={if(active==null) onClose() else saveProject?.invoke()},
+            enabled=active==null || saveProject!=null, modifier=Modifier.fillMaxWidth()) { Text(if(active==null) "Listo" else "Guardar proyecto") } }) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
             .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Text(active?.name ?: "Proyecto",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                IconButton(onClick=onClose) {Icon(Icons.Default.Close,"Cerrar proyecto")}
-            }
-            Text("Cambiar proyecto",style=MaterialTheme.typography.titleMedium)
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 item {StudioFilterChip(active==null,{vm.selectProject(null)},label={Text("Sin proyecto")},shape=NexusTokens.filter)}
                 items(ui.projects,key={it.id}) {p->StudioFilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},shape=NexusTokens.filter)}
@@ -430,9 +509,9 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
             TextButton(onClick={creating=!creating},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}
             if(creating) {
                 StudioTextField(name,{name=it.take(80)},singleLine=true,label={Text("Nombre")},shape=NexusTokens.field,modifier=Modifier.fillMaxWidth())
-                TextButton(onClick={vm.createProject(name);name="";creating=false},enabled=name.isNotBlank()) {Text("Crear")}
+                FilledTonalButton(onClick={vm.createProject(name);name="";creating=false},enabled=name.isNotBlank()) {Text("Crear")}
             }
-            if(active!=null) holder.SaveableStateProvider(active.id) {ProjectMemoryEditor(active,vm,onClose)}
+            if(active!=null) holder.SaveableStateProvider(active.id) {ProjectMemoryEditor(active,vm,onClose) { saveProject=it }}
             ProjectReferences(ui,vm,expandedByDefault=true)
             HorizontalDivider()
             Text("Conversaciones",style=MaterialTheme.typography.titleMedium)
@@ -445,7 +524,7 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
 
 /** Biblia del proyecto: lo que el asistente lee en cada mensaje mientras el proyecto está activo. */
 @Composable
-private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project, vm: AssistantViewModel, onClose: () -> Unit) {
+private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project, vm: AssistantViewModel, onClose: () -> Unit, onSaveReady: ((() -> Unit)?) -> Unit) {
     val m = p.memory
     var description by rememberSaveable(p.id) { mutableStateOf(p.description.orEmpty()) }
     var synopsis by rememberSaveable(p.id) { mutableStateOf(m.synopsis.orEmpty()) }
@@ -457,13 +536,19 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
     val characters = remember(p.id) { vm.projectCharacters(p.id) }
     val assetCount = remember(p.id) { vm.projectAssetCount(p.id) }
             Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Text("El asistente la lee en cada mensaje para que los prompts sean coherentes. También la rellena él cuando le cuentas cosas del proyecto. $assetCount archivos etiquetados con este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                StudioTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                StudioTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                StudioTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
-                StudioTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
-                StudioTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas (una por línea)") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                StudioTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos (uno por línea)") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                Text("El asistente lo lee en cada mensaje para que los prompts sean coherentes, y lo completa él cuando le cuentas cosas del proyecto. $assetCount archivos etiquetados con este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                ProjectGroup(Icons.Default.MenuBook, "La historia") {
+                    StudioTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, placeholder = { Text("Ej.: Drama carcelario en Madrid, 1928") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    StudioTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, placeholder = { Text("De qué va, personajes principales y cómo termina") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
+                }
+                ProjectGroup(Icons.Default.Palette, "Aspecto y tono") {
+                    StudioTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, placeholder = { Text("Ej.: sobrio, tenso, realista") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                    StudioTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, placeholder = { Text("Ej.: 35 mm, luz natural, paleta apagada, grano fino") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
+                }
+                ProjectGroup(Icons.Default.Rule, "Reglas del asistente") {
+                    StudioTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas") }, placeholder = { Text("Una por línea. Ej.: Mateo nunca sonríe") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
+                    StudioTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos") }, placeholder = { Text("Uno por línea. Ej.: Seedance 2.0") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                }
                 if (characters.isNotEmpty()) {
                     Text("Personajes", fontWeight = FontWeight.SemiBold)
                     characters.forEach { c -> Text("• ${c.name}" + (c.description?.let { ": $it" } ?: ""), style = MaterialTheme.typography.bodySmall) }
@@ -479,19 +564,34 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
                     }
                 }
             }
-            TextButton(onClick = {
-                vm.saveProjectMemory(p.id, description, synopsis, tone, style, rules, models,
-                    keepNotes = if (removed.isEmpty()) null else m.notes.map { it.at }.filter { it !in removed }.toSet())
-                onClose()
-            }) { Text("Guardar") }
+    val saveLatest by rememberUpdatedState<() -> Unit> {
+        vm.saveProjectMemory(p.id, description, synopsis, tone, style, rules, models,
+            keepNotes = if (removed.isEmpty()) null else m.notes.map { it.at }.filter { it !in removed }.toSet())
+        onClose()
+    }
+    DisposableEffect(p.id) {
+        onSaveReady { saveLatest() }
+        onDispose { onSaveReady(null) }
+    }
 }
 
+/** Grupo visual del formulario de proyecto: icono y título sobre una tarjeta, para escanear rápido. */
+@Composable
+private fun ProjectGroup(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+    NexusSheetGroup(title, icon, content)
+}
 @Composable
 private fun UserBubble(item:ChatItem.User) {
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
-        Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=NexusTokens.card,modifier=Modifier.widthIn(max=300.dp).padding(top=NexusTokens.space4,start=NexusTokens.space32)) {
-            Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=6.dp),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
+        // Tu mensaje: completo (nunca truncado), ancho casi total para ganar altura, con el acento en degradado y seleccionable.
+        val accent=MaterialTheme.colorScheme.primary
+        val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.30f),accent.copy(alpha=.16f)))}
+        Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)
+            .background(brush,NexusTokens.card)) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
+            }
         }
     }
 }
@@ -505,12 +605,12 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         if(item.text.isNotBlank()) {
             // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
-            // Fondo propio, como el de tus mensajes pero más suave, para separar quién habla.
-            Surface(color=MaterialTheme.colorScheme.surfaceContainer,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
+            // Casi sin fondo: tus mensajes llevan el acento y las respuestas quedan limpias, a todo el ancho.
+            Surface(color=MaterialTheme.colorScheme.surfaceContainer.copy(alpha=.35f),shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
                 .pointerInput(Unit) {detectTapGestures(onLongPress={actionsExpanded=true})}
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-                ChatMarkdownView(item.text)
+                ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) })
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
@@ -550,12 +650,30 @@ internal fun AssistantMediaPreview(media: Attachment) {
                     playWhenReady=false
                 }
             }
-            DisposableEffect(player) { onDispose { player.release() } }
-            AndroidView(
-                factory={viewContext -> PlayerView(viewContext).apply { this.player=player; useController=true }},
-                update={it.player=player},
-                modifier=Modifier.width(280.dp).aspectRatio(16f/9f).clip(NexusTokens.card),
-            )
+            var ratio by remember(media.uri) { mutableStateOf(mediaAspectRatio(media.width, media.height)) }
+            var playbackError by remember(media.uri) { mutableStateOf(false) }
+            DisposableEffect(player) {
+                val listener = object : Player.Listener {
+                    override fun onVideoSizeChanged(size: androidx.media3.common.VideoSize) {
+                        ratio = mediaAspectRatio(size.width, size.height, size.pixelWidthHeightRatio, size.unappliedRotationDegrees)
+                    }
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { playbackError = true }
+                }
+                player.addListener(listener)
+                onDispose { player.removeListener(listener); player.release() }
+            }
+            Column(Modifier.widthIn(max = 280.dp)) {
+                AndroidView(
+                    factory={viewContext -> PlayerView(viewContext).apply {
+                        this.player=player; useController=true
+                        resizeMode=androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }},
+                    update={it.player=player},
+                    modifier=Modifier.fillMaxWidth().aspectRatio(ratio ?: 1f).clip(NexusTokens.card),
+                )
+                if (playbackError) Text("No se pudo cargar el vídeo. Comprueba el archivo o vuelve a descargarlo.",
+                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+            }
         }
         media.mimeType.startsWith("audio/") -> {
             val player=remember(media.uri) {
@@ -614,15 +732,23 @@ private fun formatMediaDuration(seconds:Double):String {
         else "%d:%02d".format(total/60,total%60)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}) {
+private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}, onRetry: (() -> Unit)? = null, onChangeModel: (() -> Unit)? = null) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     if(item.error) {
         var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
         Column(Modifier.animateContentSize()) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle del error" else "Ver detalle del error",color=TextSecondary)}
+            // Todo error ofrece una salida directa: repetir, cambiar de modelo o revisar el historial.
+            FlowRow(verticalArrangement=Arrangement.Center,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                if(onRetry != null) FilledTonalButton(onClick=onRetry,shape=NexusTokens.filter) {
+                    Icon(Icons.Default.Refresh,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
+                }
+                if(onChangeModel != null) TextButton(onClick=onChangeModel) {
+                    Icon(Icons.Default.Tune,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Cambiar modelo")
+                }
                 if(history) HistoryLinkButton(onOpenHistory)
+                TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle" else "Ver detalle del error",color=TextSecondary)}
             }
             if(expanded) Text(item.text,style=MaterialTheme.typography.bodySmall,color=TextSecondary)
         }
@@ -631,7 +757,6 @@ private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}) {
         if(history) HistoryLinkButton(onOpenHistory)
     }
 }
-
 /** Acceso directo a la pestaña Historial desde un aviso que la menciona. */
 @Composable
 private fun HistoryLinkButton(onOpenHistory: () -> Unit) {
@@ -878,6 +1003,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var baseUrl by remember { mutableStateOf(s.llmBaseUrl) }
     var apiKey by remember { mutableStateOf("") }
     var clearApiKey by remember { mutableStateOf(false) }
+    var deleteCredential by remember { mutableStateOf<String?>(null) }
     var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
     var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
@@ -906,27 +1032,14 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
             antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }), newToken, newSecret, newApiKey)
         if (error == null) onDismiss()
     }
-    ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.96f)) {
-            // Cabecera fija: título, estado y una línea de resumen.
-            Column(Modifier.padding(horizontal = NexusTokens.screenMargin)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ajustes del asistente", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                    Surface(shape = NexusTokens.filter, color = if (ui.thinking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) {
-                        Text(if (ui.thinking) "Trabajando" else "Listo", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium,
-                            color = if (ui.thinking) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
-                    }
-                }
-                Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills" + (if (ui.skillErrors.isNotEmpty()) " · ${ui.skillErrors.size} con errores" else "") +
-                    (ui.lastLatencyMs?.let { " · último turno ${"%.1f".format(it / 1000.0)} s" } ?: ""),
-                    style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            }
+    NexusSheet("Ajustes del asistente", onDismiss, icon = Icons.Default.AutoAwesome,
+        subtitle = "${ui.catalog.size} modelos · ${ui.skillsCount} skills · " + if (ui.thinking) "Trabajando" else "Listo",
+        primaryAction = { Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Guardar") } }) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8),
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 // 1 · Cerebro
                 AgentSection("Cerebro", Icons.Default.AutoAwesome) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                         listOf(
                             AssistantSettings.BACKEND_DIRECT to "Bedrock",
                             AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
@@ -980,9 +1093,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         }
                         StudioCredentialField(apiKey, { apiKey = it; clearApiKey = false }, shape = NexusTokens.field,
                             label = { Text(if (maskedKey.isNotBlank()) "Clave de API ($maskedKey)" else "Clave de API") }, singleLine = true)
-                        if (maskedKey.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(clearApiKey, { clearApiKey = it }); Text("Borrar la clave guardada", style = MaterialTheme.typography.bodySmall)
-                        }
+                        if (maskedKey.isNotBlank()) OutlinedButton(onClick = { deleteCredential = "api" }) { Text(if (clearApiKey) "Se borrará al guardar" else "Borrar clave") }
                         if (backend == AssistantSettings.BACKEND_OPENAI) {
                             Text("Tarifa para el límite de consumo (opcional, USD por millón de tokens). Sin ella solo se limita el número de llamadas por mensaje.",
                                 style = MaterialTheme.typography.bodySmall, color = TextMuted)
@@ -1003,18 +1114,14 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         StudioCredentialField(accessKey, { accessKey = it.trim() }, shape = NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
                         StudioCredentialField(secret, { secret = it; clearSecret = false }, shape = NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
                             singleLine = true)
-                        if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
-                        }
+                        if (s.maskedAwsSecret.isNotBlank()) OutlinedButton(onClick = { deleteCredential = "secret" }) { Text(if (clearSecret) "Se borrará al guardar" else "Borrar clave") }
                         StudioTextField(region, { region = it }, shape = NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     } else {
                         Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                         StudioTextField(endpoint, { endpoint = it }, shape = NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         StudioCredentialField(token, { token = it; clearToken = false }, shape = NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
                             singleLine = true)
-                        if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
-                        }
+                        if (s.maskedToken.isNotBlank()) OutlinedButton(onClick = { deleteCredential = "token" }) { Text(if (clearToken) "Se borrará al guardar" else "Borrar clave") }
                     }
                     if (!isCustom) StudioTextField(modelId, { modelId = it.trim() }, shape = NexusTokens.field, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(when (backend) {
@@ -1030,7 +1137,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         else -> AssistantSettings.KNOWN_MODELS
                     }
                     if (!isCustom && modelChips.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                        modelChips.forEach { (id, name) -> StudioFilterChip(modelId == id, { modelId = id }, label = { Text(name) }) }
+                        modelChips.forEach { (id, name) -> StudioFilterChip((modelId == id || (backend == AssistantSettings.BACKEND_ANTIGRAVITY && id == AntigravityReasoning.DEFAULT_MODEL && AntigravityReasoning.effort(modelId) != null)), { modelId = id }, label = { Text(name) }) }
+                    }
+                    if(backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(modelId) != null) {
+                        Text("Razonar",style=MaterialTheme.typography.titleSmall)
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            listOf("low" to "Bajo","medium" to "Medio","high" to "Alto").forEach { (effort,label) ->
+                                StudioFilterChip(AntigravityReasoning.effort(modelId)==effort,{modelId=AntigravityReasoning.model(effort)},label={Text(label)})
+                            }
+                        }
                     }
                     if (!isCustom && modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
@@ -1080,17 +1195,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 }
                 error?.let { InlineNotice(noticeMessage(it, "Revisa los ajustes antes de guardar."), technicalDetails = it) }
             }
-            // Botonera fija: siempre a la vista, sin tener que llegar al final de la lista.
-            Surface(color = com.vidadomu.nexus.ui.theme.LocalChromeColor.current) {
-                Column {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)) { Text("Cerrar") }
-                        Button(onClick = { save() }, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)) { Text("Guardar") }
-                    }
-                }
-            }
-        }
+    }
+    deleteCredential?.let { target ->
+        AlertDialog(onDismissRequest = { deleteCredential = null }, title = { Text("¿Borrar la clave guardada?") },
+            text = { Text("Se eliminará al guardar los ajustes. Puedes cerrar sin guardar para conservarla.") },
+            confirmButton = { Button(onClick = {
+                when (target) { "api" -> { clearApiKey = true; apiKey = "" }; "secret" -> { clearSecret = true; secret = "" }; "token" -> { clearToken = true; token = "" } }
+                deleteCredential = null
+            }) { Text("Borrar clave") } },
+            dismissButton = { TextButton(onClick = { deleteCredential = null }) { Text("Cancelar") } })
     }
     if (addingBrain || editingBrain != null) BrainEditorDialog(editingBrain, brainStore) { saved ->
         addingBrain = false; editingBrain = null; brainTick++
@@ -1101,3 +1214,10 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
 
 private data class CardGroup(val cards: List<ChatItem.PlanCard>) { val key get() = "group:" + cards.first().id }
 private data class GroupHeader(val firstId: String, val count: Int)
+
+/** Los ajustes del asistente, abiertos desde Ajustes → Agente y modelos, con el mismo modelo de vista que el chat. */
+@Composable
+internal fun AssistantSettingsSheetHost(vm: AssistantViewModel, onDismiss: () -> Unit) {
+    val ui by vm.ui.collectAsState()
+    AssistantSettingsDialog(ui, vm, onDismiss)
+}

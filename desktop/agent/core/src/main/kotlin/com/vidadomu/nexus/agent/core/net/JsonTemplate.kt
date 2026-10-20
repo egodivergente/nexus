@@ -14,7 +14,7 @@ import kotlinx.serialization.json.contentOrNull
  */
 object JsonPaths {
     private fun tokens(path: String): List<String> =
-        path.trim().replace(Regex("\\[(\\d+|\\*)]"), ".$1").split('.').map { it.trim() }.filter { it.isNotEmpty() }
+        path.trim().replace(Regex("\\[(\\d+|\\*)\\]"), ".$1").split('.').map { it.trim() }.filter { it.isNotEmpty() }
 
     fun get(root: JsonElement, path: String): JsonElement? = all(root, path).firstOrNull()
 
@@ -59,8 +59,8 @@ object JsonPaths {
  * mezclado el marcador se sustituye por vacío.
  */
 object JsonTemplate {
-    private val placeholder = Regex("\\{\\{\\s*([A-Za-z0-9_.\\-]+)\\s*}}")
-    private val whole = Regex("^\\s*\\{\\{\\s*([A-Za-z0-9_.\\-]+)\\s*}}\\s*$")
+    private val placeholder = Regex("\\{\\{\\s*([A-Za-z0-9_.\\-]+)\\s*\\}\\}")
+    private val whole = Regex("^\\s*\\{\\{\\s*([A-Za-z0-9_.\\-]+)\\s*\\}\\}\\s*$")
     private val json = Json { ignoreUnknownKeys = true }
 
     fun parse(template: String): JsonElement = json.parseToJsonElement(template)
