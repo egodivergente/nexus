@@ -38,11 +38,22 @@ try:
    print(json.dumps({'errors':errors,'state':page.evaluate('({view,rpcErrors:qaRpcErrors,corte:{...Corte,selected:[...Corte.selected]},agentError:Agent.error,agentBusy:Agent.busy,content:document.body.innerText.slice(-4000)})')},ensure_ascii=False,default=str))
    page.screenshot(path=str(out/'failure.png'),full_page=True)
    raise
+  assert page.locator('[data-corte=split]').is_disabled()
+  assert page.locator('[data-corte=preview]').is_disabled()
   page.evaluate("async()=>{await agentCall('importReferences',{projectId:Corte.projectId,files:[{uri:'/media/"+video.name+"',mime:'video/mp4',name:'Plano de prueba'}]});renderCorteAssets();}")
+  search=page.get_by_role('searchbox',name='Buscar medios del proyecto')
+  search.fill('no-coincide-con-ningun-medio');assert page.get_by_text('Sin coincidencias',exact=True).is_visible()
+  search.fill('');assert page.locator('.corte-asset').count()==1
+  page.get_by_role('button',name='Vista de enfoque',exact=True).click()
+  assert not page.locator('.corte-media').is_visible() and not page.locator('#corte-chat').is_visible()
+  assert page.get_by_role('button',name='Vista de enfoque',exact=True).get_attribute('aria-pressed')=='true'
+  page.get_by_role('button',name='Vista de enfoque',exact=True).click()
+  assert page.locator('.corte-media').is_visible() and page.locator('#corte-chat').is_visible()
   page.locator('[data-corte-place]').first.click()
   page.wait_for_selector('.corte-clip')
   page.locator('.corte-clip').first.click()
   page.wait_for_function('()=>Corte.selected.size>0&&!Corte.busy')
+  assert page.locator('[data-corte=split]').is_enabled()
   page.locator('[data-corte=duplicate]').click()
   try:
    page.wait_for_function('()=>corteClips().filter(c=>c.kind==="VIDEO").length===2&&!Corte.busy')
@@ -58,6 +69,9 @@ try:
   page.screenshot(path=str(out/'editor.png'),full_page=True)
   page.locator('[data-corte=chat]').click();assert not page.locator('#corte-chat').is_visible()
   page.locator('[data-corte=chat]').click();assert page.locator('#corte-chat').is_visible()
+  page.evaluate('()=>{renderAssistant();renderAssistant();renderAssistant();}')
+  assert page.locator('#brain-quick').count()==1
+  assert page.locator('#corte-chat .corte-agent-details > summary').count()==1
   page.evaluate('agentSettings()');page.wait_for_selector('#brain-settings-form')
   page.select_option('#brain-template','byteplus')
   assert page.locator('[name=backend]').input_value()=='profile'
@@ -65,8 +79,20 @@ try:
   page.locator('[data-brain=close]').click()
   page.evaluate("navigate('library')");page.wait_for_timeout(500)
   page.evaluate("navigate('editor')");page.wait_for_selector('.corte-clip')
+  page.locator('[data-corte=media]').click()
+  page.get_by_role('button',name='Biblioteca',exact=True).click()
+  page.get_by_role('button',name='Corte',exact=True).click()
+  assert not page.locator('.corte-media').is_visible()
+  page.locator('[data-corte=media]').click()
+  page.set_viewport_size({'width':1280,'height':800})
+  page.screenshot(path=str(out/'editor-1280.png'),full_page=True)
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+  page.set_viewport_size({'width':1000,'height':800})
+  page.screenshot(path=str(out/'editor-1000.png'),full_page=True)
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+  page.set_viewport_size({'width':1600,'height':1000})
   assert not errors,errors
-  (out/'result.json').write_text(json.dumps({'result':'PASS','installedRoot':str(root),'hostSession':json.loads((data/'local-session.json').read_text('utf-8')),'runtimeHashes':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'desktop/agent/runtime').glob('*.jar')},'browserErrors':errors,'checks':['same-window-editor-chat','shared-project','library-placement','manual-engine-edit','preview-output-playback','collapsible-chat','brain-profile-form','navigation-preserves-montage'],'screenshots':['editor.png','brain-settings.png']},indent=2),encoding='utf-8')
+  (out/'result.json').write_text(json.dumps({'result':'PASS','installedRoot':str(root),'hostSession':json.loads((data/'local-session.json').read_text('utf-8')),'runtimeHashes':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'desktop/agent/runtime').glob('*.jar')},'browserErrors':errors,'checks':['same-window-editor-chat','shared-project','library-placement','manual-engine-edit','preview-output-playback','collapsible-chat','brain-profile-form','navigation-preserves-montage','media-search','focus-mode','selection-aware-controls','panel-preferences','responsive-1280-1000','single-model-selector-after-refresh'],'screenshots':['editor.png','brain-settings.png']},indent=2),encoding='utf-8')
   print((out/'result.json').read_text('utf-8'));browser.close()
 finally:
  host.terminate()

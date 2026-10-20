@@ -30,9 +30,21 @@ document.addEventListener('click',async e=>{
 });
 const beforeBrainRender=renderAssistant;
 renderAssistant=function(){
+ const projectToolsOpen=document.querySelector('#corte-chat .corte-agent-details')?.open||false;
  beforeBrainRender();
+ if(view==='editor'){
+  const empty=document.querySelector('#corte-chat .agent-empty');if(empty){empty.classList.remove('nx-assistant-welcome');empty.classList.add('corte-agent-empty');empty.innerHTML='<span class="corte-kicker">AGENTE DE MONTAJE</span><h2>Dale intención a cada plano.</h2><p>Pídeme que organice medios, revise el montaje o prepare una edición.</p>';}
+  const toolbar=document.querySelector('#corte-chat .agent-toolbar'),tools=toolbar?.querySelector('.agent-project');
+  if(tools&&!toolbar.querySelector('.corte-agent-details')){
+   const details=document.createElement('details');details.className='corte-agent-details';details.open=projectToolsOpen;
+   const summary=document.createElement('summary');summary.textContent='Proyecto y conversación';details.append(summary);tools.before(details);details.append(tools);
+  }
+ }
  if(view==='editor'&&!document.querySelector('#corte-chat [data-corte-resize]')){const divider=document.createElement('div');divider.className='corte-divider chat';divider.dataset.corteResize='chat';divider.setAttribute('role','separator');divider.setAttribute('aria-label','Ancho del agente');document.querySelector('#corte-chat')?.append(divider);}
  const container=document.querySelector('.agent-session-info');if(!container)return;
+ // The compose form is retained between updates; replace its added controls once.
+ container.querySelectorAll('#brain-quick').forEach(previous=>{if(previous.nextElementSibling?.matches('.select-trigger'))previous.nextElementSibling.remove();previous.remove();});
+ document.querySelectorAll('#agent-compose .agent-quick-replies').forEach(row=>row.remove());
  const s=Agent.settings,profiles=Object.values(s.brainProfiles||{});
  const select=document.createElement('select');select.id='brain-quick';select.setAttribute('aria-label','Cambiar cerebro');
  select.innerHTML=`<option value="">Cambiar cerebro…</option>${[['direct','Bedrock'],['proxy','Proxy / Sol'],['anthropic','Anthropic'],['antigravity','Antigravity'],['openai','Compatible OpenAI']].map(([id,name])=>`<option value="${id}" ${s.backend===id?'selected':''}>${name}</option>`).join('')}${profiles.map(p=>`<option value="profile:${escape(p.id)}" ${s.backend==='profile'&&s.brainProfile?.id===p.id?'selected':''}>${escape(p.name)}</option>`).join('')}`;
