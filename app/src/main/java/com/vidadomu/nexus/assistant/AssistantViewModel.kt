@@ -185,10 +185,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
         _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
-        // A ViewModel coroutine keeps the turn alive across navigation, but Android may reclaim
-        // the app once its Activity is backgrounded. Promote the user-started request first.
-        runCatching { AssistantTurnService.start(app) }
-            .onFailure { android.util.Log.w("NexusAssistant", "Could not promote agent turn", it) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -199,7 +195,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
                 }
                 // Tiempo máximo por mensaje = ajuste del usuario; 0 = sin límite.
-                val r = limits.turnTimeoutMillis?.let { ms -> kotlinx.coroutines.withTimeout(ms) { run() } } ?: run()
+                val r = AssistantTurnService.runTurn(app) {
+                    limits.turnTimeoutMillis?.let { ms -> kotlinx.coroutines.withTimeout(ms) { run() } } ?: run()
+                }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
                         conv.session.renderedMedia.values.toList()), streamingText = "") }
@@ -220,7 +218,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 failedTurn = clean to atts
                 notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
             } finally {
-                AssistantTurnService.stop(app)
                 _ui.update { state ->
                     // Solo las tarjetas NUEVAS de este turno van tras la respuesta; las existentes
                     // se actualizan en su sitio y no saltan de posición.
@@ -572,13 +569,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val conv = conversation
         conv.session.mode = AgentMode.ASSISTANT
         _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList()), thinking = true, scrollRequest = it.scrollRequest + 1) }
-        runCatching { AssistantTurnService.start(app) }
-            .onFailure { android.util.Log.w("NexusAssistant", "Could not promote diagnostic turn", it) }
         val started = android.os.SystemClock.elapsedRealtime()
         turnJob = viewModelScope.launch {
             try {
-                val result = kotlinx.coroutines.withTimeout(180_000L) {
-                    orchestrator.send(conv, diagnostic) // La sesión está en modo de solo lectura durante este análisis.
+                val result = AssistantTurnService.runTurn(app) {
+                    kotlinx.coroutines.withTimeout(180_000L) {
+                        orchestrator.send(conv, diagnostic) // Solo lectura; el servicio posee la ejecución.
+                    }
                 }
                 val response = result.text.trim().ifBlank { "No he podido explicar la causa con los datos disponibles. El trabajo conserva su diagnóstico en Historial." }
                 _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop), scrollRequest = it.scrollRequest + 1) }
@@ -593,7 +590,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 notice("No se pudo analizar el fallo: ${Redactor.redact(e.message?.take(200) ?: e.javaClass.simpleName)}", error = true)
             } finally {
                 conv.session.mode = previousMode
-                AssistantTurnService.stop(app)
                 _ui.update { it.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started) }
             }
         }

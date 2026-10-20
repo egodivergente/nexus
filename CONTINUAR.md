@@ -1,3 +1,13 @@
+# Agente Android en segundo plano - 2026-10-20
+
+Estado comprobado: **Pixel 8 Pro y S25 Ultra, 1.9.62-background-preview / vc96**,
+actualizados sobre vc95 con firma compatible y datos comprobados. Rama
+`codex/android-agent-background-20261020`; conserva Drive y continuidad de
+`c650f14` e incorpora controles de evidencia visual. Núcleo: 284 PASS, 4 omitidas.
+Pixel físico: 4/4 pruebas del servicio y ciclo de vida PASS con proveedor simulado.
+Ver `docs/AGENT-BACKGROUND-1962-20261020.md` para APK, firma y límites de validación.
+Los estados siguientes son históricos; no instalar una APK anterior sobre vc96.
+
 # Continuidad entre dispositivos - 2026-10-20
 
 Rama `feat/device-continuity-20261020`, checkout `C:/Users/User/Documents/nexus-audit/agent-ux`.

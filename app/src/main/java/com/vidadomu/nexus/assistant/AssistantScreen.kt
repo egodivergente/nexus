@@ -93,7 +93,7 @@ fun AssistantScreen(
     onOpenSettings: () -> Unit = {},
     /** Abre la pestaña Historial: los avisos que la mencionan llevan aquí en un toque. */
     onOpenHistory: () -> Unit = {},
-    vm: AssistantViewModel = viewModel(),
+    vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
     var wallResult by remember { mutableStateOf<Attachment?>(null) }

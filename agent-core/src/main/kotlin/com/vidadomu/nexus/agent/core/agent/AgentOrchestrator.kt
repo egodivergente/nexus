@@ -46,6 +46,7 @@ fun interface AttachmentVideoLoader {
 
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
 class AgentConversation(val session: AgentSession) {
+    internal val visualEvidence = VisualEvidence()
     internal var reasoningModelId: String? = null
     internal val messages = mutableListOf<LlmMessage>()
     internal val mutex = Mutex()
@@ -135,12 +136,27 @@ class AgentOrchestrator(
             if(!imageCache.containsKey(key)) imageCache[key]=images?.load(a)
             return imageCache[key]
         }
+        suspend fun videoFor(a: Attachment): List<ContentBlock> {
+            val frames = requireNotNull(videos).load(a)
+            require(frames.count { it is ContentBlock.Image } == VIDEO_FRAMES_PER_ATTACHMENT &&
+                frames.filterIsInstance<ContentBlock.Image>().all { it.bytes.isNotEmpty() } &&
+                frames.all { it is ContentBlock.Image || it is ContentBlock.Text }) {
+                "No se pudieron obtener los 6 fotogramas del vídeo. No se ha analizado su contenido."
+            }
+            return conv.visualEvidence.loaded(a, listOf(ContentBlock.Text(
+                "Vídeo ${a.name ?: a.id}: análisis visual muestreado de 6 fotogramas. SIN audio; no es una lectura completa del vídeo y puede omitir acciones entre muestras."
+            )) + frames)
+        }
         blocks += ContentBlock.Text(userText(text, newAttachments))
         runCatching { uiContext?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(config.limits.uiContextChars)) }
         val loader = images
         if (config.sendImagesToLlm && loader != null) {
             newAttachments.filter { it.mimeType.startsWith("image/") }.take(config.limits.images).forEach { a ->
-                try {imageFor(a)?.let {blocks+=it}} catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) { }
+                try {imageFor(a)?.let { blocks += conv.visualEvidence.loaded(a, listOf(it)) }
+                    ?: run { blocks += ContentBlock.Text("No se pudo cargar la imagen ${a.id}; no se ha visto su contenido.") }
+                } catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) {
+                    blocks += ContentBlock.Text("No se pudo cargar la imagen ${a.id}; no se ha visto su contenido.")
+                }
             }
         }
         val videoAttachments = newAttachments.filter { it.mimeType.startsWith("video/") }
@@ -151,13 +167,7 @@ class AgentOrchestrator(
                     "Tu límite actual es de ${config.limits.maxVideosPerTurn} vídeos por mensaje (puedes cambiarlo en Ajustes → Límites). Envía los demás en otro turno; los originales se conservan."
                 }
                 for (attachment in videoAttachments) {
-                    val frames = videoLoader.load(attachment)
-                    require(frames.count { it is ContentBlock.Image } == VIDEO_FRAMES_PER_ATTACHMENT &&
-                        frames.all { it is ContentBlock.Image || it is ContentBlock.Text }) {
-                        "No se pudieron obtener los 6 fotogramas del vídeo. No se ha analizado su contenido."
-                    }
-                    blocks += ContentBlock.Text("Vídeo ${attachment.name ?: attachment.id}: análisis visual muestreado de 6 fotogramas. SIN audio; no es una lectura completa del vídeo y puede omitir acciones entre muestras.")
-                    blocks += frames
+                    blocks += videoFor(attachment)
                 }
             } else {
                 blocks += ContentBlock.Text("Los vídeos adjuntos NO se han leído: el análisis visual está desactivado o no disponible. No se han enviado fotogramas ni audio; no afirmes haber visto su contenido.")
@@ -209,7 +219,7 @@ class AgentOrchestrator(
                 llmCalls++
                 val req = LlmRequest(
                     modelId = config.modelId,
-                    system = requestSystem,
+                    system = requestSystem + conv.visualEvidence.requestContext(requestMessages),
                     messages = requestMessages,
                     tools = if (readingDocuments) emptyList() else specs,
                     maxTokens = config.maxTokens,
@@ -306,8 +316,8 @@ class AgentOrchestrator(
                 try {
                     loaded += ContentBlock.Text("Archivo solicitado de la biblioteca: ${a.name ?: a.id}")
                     when {
-                        a.mimeType.startsWith("image/") && config.sendImagesToLlm && images!=null -> loaded += imageFor(a) ?: ContentBlock.Text("No se pudo cargar esta imagen; no afirmes haberla visto.")
-                        a.mimeType.startsWith("video/") && config.sendImagesToLlm && videos!=null -> {loaded += ContentBlock.Text("Muestra visual de fotogramas; no incluye audio.");loaded += videos.load(a)}
+                        a.mimeType.startsWith("image/") && config.sendImagesToLlm && images!=null -> loaded += imageFor(a)?.let { conv.visualEvidence.loaded(a, listOf(it)) } ?: listOf(ContentBlock.Text("No se pudo cargar esta imagen; no afirmes haberla visto."))
+                        a.mimeType.startsWith("video/") && config.sendImagesToLlm && videos!=null -> loaded += videoFor(a)
                         !a.mimeType.startsWith("image/") && !a.mimeType.startsWith("video/") && documents!=null -> loaded += documents.load(a) ?: ContentBlock.Text("Formato no legible; usa read_library_text.")
                         else -> loaded += ContentBlock.Text("Lectura visual desactivada en los ajustes del agente.")
                     }
