@@ -12,6 +12,10 @@ internal object FlowReferences {
     val MIME_TYPES = setOf("image/png", "image/jpeg", "image/webp")
     val ID = Regex("ref_[a-f0-9]{64}")
 
+    fun swapFrames(start: AttachedMedia, end: AttachedMedia): Pair<AttachedMedia, AttachedMedia> =
+        end.copy(id = start.id, fieldKey = "initial_frame", slotType = MediaSlotType.PRIMARY_IMAGE) to
+            start.copy(id = end.id, fieldKey = "end_frame", slotType = MediaSlotType.LAST_FRAME)
+
     data class Inputs(val references: List<String>, val initialFrame: String? = null, val endFrame: String? = null)
 
     fun inputs(inputs: List<MediaInput>): Inputs {

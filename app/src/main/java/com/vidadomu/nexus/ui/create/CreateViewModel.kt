@@ -251,6 +251,19 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update {it.copy(attachedMedia=(it.attachedMedia+media).distinctBy {item->Triple(item.slotType,item.fieldKey,item.uriString)})}
     }
 
+    fun swapFlowFrames() {
+        _uiState.update { state ->
+            val start = state.attachedMedia.firstOrNull { it.fieldKey == "initial_frame" } ?: return@update state
+            val end = state.attachedMedia.firstOrNull { it.fieldKey == "end_frame" } ?: return@update state
+            val (swappedStart, swappedEnd) = com.vidadomu.nexus.provider.flow.FlowReferences.swapFrames(start, end)
+            state.copy(attachedMedia = state.attachedMedia.map { media -> when (media.id) {
+                start.id -> swappedStart
+                end.id -> swappedEnd
+                else -> media
+            }})
+        }
+    }
+
     fun selectModality(modality: Modality) {
         mediaSession.reset()
         val allModels = modelCatalogRepo.models.value

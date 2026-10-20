@@ -351,10 +351,10 @@ fun CreateScreen(
     if(showMedia) CanvasSheet("Medios de entrada",{showMedia=false}) {
                 state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
                     if(model.contractEndpoint==null && model.contractMedia.isNotEmpty()) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia)
+                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia,viewModel::swapFlowFrames)
                     }
                     if(model.contractEndpoint!=null) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia)
+                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia,viewModel::swapFlowFrames)
                     } else AdaptiveModelMediaInput(
                         model = model,
                         attachedMedia = state.attachedMedia.filter { it.fieldKey==null },
@@ -1718,7 +1718,7 @@ private fun ModelPickerSheet(
 }
 
 @Composable
-private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit) {
+private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit,onSwapFrames:()->Unit) {
     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         model.contractMedia.forEach { field ->
             val selected=media.filter { it.fieldKey==field.key }
@@ -1737,6 +1737,10 @@ private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPic
                     if(field.maximum>1) Text("${selected.size} de ${field.maximum} archivos",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 }
             }
+        }
+        if(model.providerId=="google_flow" && model.modalities.contains(com.vidadomu.nexus.core.model.Modality.VIDEO) &&
+            media.any { it.fieldKey=="initial_frame" } && media.any { it.fieldKey=="end_frame" }) {
+            TextButton(onClick=onSwapFrames,modifier=Modifier.fillMaxWidth()) {Text("Intercambiar")}
         }
     }
 }

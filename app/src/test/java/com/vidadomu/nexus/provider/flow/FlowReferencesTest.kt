@@ -57,4 +57,16 @@ class FlowReferencesTest {
         assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(end)) }
         assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(start, start)) }
     }
+
+    @Test fun interchangeMovesBothFilesAndTheirRolesTogether() {
+        val start = com.vidadomu.nexus.core.model.AttachedMedia(uriString = "file:///a.png", mimeType = "image/png",
+            slotType = MediaSlotType.PRIMARY_IMAGE, fieldKey = "initial_frame")
+        val end = com.vidadomu.nexus.core.model.AttachedMedia(uriString = "file:///b.png", mimeType = "image/png",
+            slotType = MediaSlotType.LAST_FRAME, fieldKey = "end_frame")
+        val (newStart, newEnd) = FlowReferences.swapFrames(start, end)
+        assertEquals("file:///b.png", newStart.uriString)
+        assertEquals("initial_frame", newStart.fieldKey)
+        assertEquals("file:///a.png", newEnd.uriString)
+        assertEquals("end_frame", newEnd.fieldKey)
+    }
 }
