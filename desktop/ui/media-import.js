@@ -2,7 +2,6 @@
 // File.slice keeps memory bounded for 4 GiB videos. RPC payloads stay below 20 MiB.
 window.NexusImports = (() => {
  const maxBytes=4*1024**3;
- providers.local_media ||= 'Archivos locales';
  let busy=false;
  function syncGallery(){
   if(!Agent.snapshot||Agent.busy||Agent.generating)return false;
