@@ -13,6 +13,7 @@ import com.google.android.gms.auth.api.identity.Identity
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.launch
 
 @Composable fun DriveSyncSettings() {
     val context=LocalContext.current
@@ -22,9 +23,12 @@ import kotlinx.serialization.json.*
     var message by remember {mutableStateOf<String?>(null)}
     var connecting by remember {mutableStateOf(false)}
     val client=remember {Identity.getAuthorizationClient(context)}
+    val scope=rememberCoroutineScope()
     fun complete(result:com.google.android.gms.auth.api.identity.AuthorizationResult) {
-        runCatching {manager.authorized(result)}.onFailure {message="No se pudo completar la conexión de Google."}
-        connecting=false;revision++
+        scope.launch {
+            runCatching {manager.authorized(result)}.onFailure {message="No se pudo completar la conexión de Google."}
+            connecting=false;revision++
+        }
     }
     val launcher=rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {result->
         val intent=result.data

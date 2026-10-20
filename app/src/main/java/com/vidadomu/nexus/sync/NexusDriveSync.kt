@@ -41,9 +41,19 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         prefs.getString("account",null)?.let {builder.setAccount(Account(it,"com.google"))}
         return builder.build()
     }
-    @Suppress("DEPRECATION") fun authorized(result:AuthorizationResult) {
+    suspend fun authorized(result:AuthorizationResult)=withContext(Dispatchers.IO) {
         require(!result.hasResolution() && !result.accessToken.isNullOrBlank() && DriveRemote.SCOPE in result.grantedScopes)
-        val account=result.toGoogleSignInAccount()?.email?:error("Google no identificó la cuenta autorizada.")
+        // Authorization alone need not provide a sign-in profile. Drive about.get
+        // identifies the token's account with the same drive.file permission.
+        val client=OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).build()
+        val account=client.newCall(Request.Builder().url("https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)")
+            .header("Authorization","Bearer "+result.accessToken).build()).execute().use {response->
+                check(response.isSuccessful) {"Google no identificó la cuenta autorizada."}
+                val raw=response.body?.string()?:error("Google no identificó la cuenta autorizada.")
+                require(raw.length<=65536)
+                Json.parseToJsonElement(raw).jsonObject["user"]?.jsonObject?.get("emailAddress")?.jsonPrimitive?.contentOrNull
+                    ?.takeIf {it.isNotBlank()}?:error("Google no identificó la cuenta autorizada.")
+            }
         val prior=prefs.getString("account",null)
         require(prior==null || prior==account) {"Desconecta la cuenta anterior antes de cambiarla."}
         prefs.edit().putString("account",account).putBoolean("enabled",true).apply()

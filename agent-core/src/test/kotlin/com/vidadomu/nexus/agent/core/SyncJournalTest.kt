@@ -88,4 +88,19 @@ class SyncJournalTest {
         assertFailsWith<IllegalArgumentException>{journal.exchange(mapOf("credentials:secret" to row("x")))}
         assertFailsWith<IllegalArgumentException>{SyncBlobs(file().parentFile,cloud).obtain("nexus-sync:../../private")}
     }
+    @Test fun devicePathAndVerifiedPortableCopyAreTheSameAssetVersion() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        val local=buildJsonObject {put("id","a");put("name","Original");put("uri","content://other-device/original")}
+        val portable=JsonObject(local+mapOf("uri" to JsonPrimitive(SyncBlobs.PREFIX+"a".repeat(64)+".png")))
+        cycle(a,mapOf("assets:a" to local));val received=cycle(b,mapOf("assets:a" to portable))
+        assertTrue(received.conflicts.isEmpty());assertEquals(portable,received.rows["assets:a"])
+        val merged=cycle(a,mapOf("assets:a" to local));assertTrue(merged.conflicts.isEmpty());assertEquals(portable,merged.rows["assets:a"])
+        assertTrue(cycle(a,merged.rows).conflicts.isEmpty())
+    }
+    @Test fun differentVerifiedOriginalBytesStillRequireExplicitConflictResolution() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        fun original(hash:String)=buildJsonObject {put("id","a");put("name","Original");put("uri",SyncBlobs.PREFIX+hash.repeat(64)+".png")}
+        cycle(a,mapOf("assets:a" to original("a")))
+        assertEquals(1,cycle(b,mapOf("assets:a" to original("b"))).conflicts.size)
+    }
 }
