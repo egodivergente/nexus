@@ -10,12 +10,12 @@ import zipfile
 parser=argparse.ArgumentParser();parser.add_argument('--install',action='store_true');args=parser.parse_args()
 root=Path(__file__).resolve().parents[2];desktop=root/'desktop';out=root/'entregas';out.mkdir(exist_ok=True)
 subprocess.run(['python','-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
-version='2026.10.20-desktop-local-4gb.1'
+version='2026.10.20-device-continuity.1'
 files={}
 def include(path,relative):
     if path.is_file():files[str(relative).replace('\\','/')]=path
 for p in desktop.glob('*.py'):include(p,Path('desktop')/p.name)
-for name in ['install-local.ps1','run.vbs','Nexus-Studio.bat','nexus.ico','requirements-media.txt','setup-media.ps1']:
+for name in ['install-local.ps1','run.vbs','Nexus-Studio.bat','nexus.ico','requirements-media.txt','requirements-continuity.txt','setup-media.ps1']:
     include(desktop/name,Path('desktop')/name)
 for folder in ['ui','agent/runtime','agent/assets']:
     for p in (desktop/folder).rglob('*'):

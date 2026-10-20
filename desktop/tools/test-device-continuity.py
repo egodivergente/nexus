@@ -1,6 +1,7 @@
 import base64
 import copy
 import io
+import http.client
 import json
 from pathlib import Path
 import subprocess
@@ -8,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from device_continuity import (DeviceContinuity, encoded, digest, encrypt, decrypt,
@@ -128,6 +130,15 @@ class Tests(unittest.TestCase):
         try:
             result = json.loads(b.fetch('http://127.0.0.1:' + str(a.server.server_port), '/manifest'))
             self.assertEqual(a.config['device'], result['device'])
+            connection = http.client.HTTPConnection('127.0.0.1', a.server.server_port)
+            token = request_token('/manifest', self.key)
+            connection.request('GET', '/manifest', headers={'X-Nexus-Sync': token})
+            response = connection.getresponse()
+            self.assertEqual(11, response.version)  # Android requires HTTP/1.1 framing.
+            output = io.BytesIO()
+            decrypt(response, output, self.key, token)
+            self.assertEqual(a.config['device'], json.loads(output.getvalue())['device'])
+            connection.close()
         finally:
             a.server.shutdown()
             a.server.server_close()
@@ -195,6 +206,27 @@ class Tests(unittest.TestCase):
             self.assertFalse((a.skills / 'SKILL.md').exists())
         finally:
             a.host.lock.release()
+
+    def test_agy_partial_write_rolls_back_the_whole_revision(self):
+        a = self.peer('a')
+        def auth(expiry, installation):
+            payload = base64.urlsafe_b64encode(encoded({'exp': expiry})).decode().rstrip('=')
+            return {'antigravity-oauth-token': json.dumps({'id_token': 'e30.' + payload + '.sample'}), 'installation_id': installation}
+        old, new = auth(1, 'old-install'), auth(2, 'new-install')
+        state = a.receive_credentials({'keys': {}, 'settings': {}, 'agy': old}, {}, ['agy'])
+        from device_continuity import atomic
+        failed = []
+        def write(path, data):
+            if path.name == 'installation_id' and data == b'new-install' and not failed:
+                failed.append(True)
+                raise OSError('simulated interruption')
+            atomic(path, data)
+        with patch('device_continuity.atomic', write):
+            with self.assertRaises(OSError):
+                a.receive_credentials({'keys': {}, 'settings': {}, 'agy': new}, state, ['agy'])
+        self.assertEqual(old, a.private()['shared']['agy'])
+        for name, value in old.items():
+            self.assertEqual(value, (Path(a.config['agyDirectory']) / name).read_text('utf-8'))
 
     def test_unchanged_replica_does_not_overwrite_author_edit(self):
         a, b = self.peer('a'), self.peer('b')

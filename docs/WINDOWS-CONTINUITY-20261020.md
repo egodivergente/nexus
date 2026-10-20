@@ -33,7 +33,7 @@ estan en la carpeta que el usuario configura.
 Dependencia de Windows: `desktop/requirements-continuity.txt`. El Python firmado
 del PC dispone de cryptography 50; no se instala software dentro de Termux.
 
-Validacion de fuente: 14 pruebas de continuidad PASS (cifrado Node/Android,
+Validacion de fuente: 15 pruebas de continuidad PASS (cifrado Node/Android,
 tramas alteradas/truncadas, HTTP cifrado, claves existentes, limites/perfiles,
 conflictos y retorno de skills), 6 pruebas del host/DPAPI PASS; sintaxis Python/JS
 PASS. La validacion fisica y activacion se registran al cerrar la integracion;
@@ -44,3 +44,7 @@ conectar al puerto Windows 8797. Pixel no estaba disponible por ADB/Tailscale en
 ese instante. Vinculacion preconfigurada en el perfil real con DPAPI, todavia
 desactivada hasta la activacion coordinada del host. No se han alterado las
 credenciales existentes de proveedores ni el respaldo Drive durante esta prueba.
+
+La entrega Windows se identifica como 2026.10.20-device-continuity.1; su paquete
+incluye las 15 bibliotecas JVM ya instaladas y verificadas byte a byte, sin
+reconstruir ni sustituir el motor Corte/Drive durante el desarrollo del enlace.

@@ -339,6 +339,8 @@ class DeviceContinuity:
     def start_server(self):
         owner = self
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+
             def log_message(self, *args):
                 pass
 
@@ -466,8 +468,25 @@ class DeviceContinuity:
             for name in ('antigravity-oauth-token', 'installation_id'):
                 if name not in auth or not isinstance(auth[name], str):
                     raise ValueError('Incomplete AGY auth revision')
-            for name in ('antigravity-oauth-token', 'installation_id'):
-                atomic(directory / name, auth[name].encode('utf-8'))
+            names = ('antigravity-oauth-token', 'installation_id')
+            prior = {name: (directory / name).read_bytes() if (directory / name).is_file() else None for name in names}
+            private = self.private()
+            if own_auth:
+                private.setdefault('authPrevious', {})[digest(encoded(own_auth))] = own_auth
+                self.host.write_secret(self.secret_file, private)
+            try:
+                for name in names:
+                    atomic(directory / name, auth[name].encode('utf-8'))
+            except Exception:
+                for name, data in prior.items():
+                    if data is None:
+                        (directory / name).unlink(missing_ok=True)
+                    else:
+                        atomic(directory / name, data)
+                private = self.private()
+                private['shared']['agy'] = own_auth
+                self.host.write_secret(self.secret_file, private)
+                raise
         return json.loads(encoded(dict(base=scoped, localBase=merged)))
 
     def cycle(self, peer):
@@ -524,6 +543,7 @@ class DeviceContinuity:
                     destination = skill_path(self.skills, name)
                     if destination.is_file() and digest(destination.read_bytes()) == state.get('hash'):
                         destination.unlink()
+                        self.dirty = True
                         private['peers'].pop(state_key)
                         private.get('replicas', {}).pop('private/' + destination.relative_to(self.skills).as_posix(), None)
             self.host.write_secret(self.secret_file, private)
