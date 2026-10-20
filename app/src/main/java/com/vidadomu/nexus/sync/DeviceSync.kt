@@ -30,6 +30,7 @@ data class SyncOptions(
     val deletions: Boolean = false, val afterBoot: Boolean = true,
     val credentials: Boolean = true, val agy: Boolean = true, val settings: Boolean = true,
     val agyEndpoint: String = "http://127.0.0.1:8796",
+    val desktop: Boolean = true,
 )
 
 /** One paired peer. Data categories are explicit; device routes and pairing material remain local. */
@@ -57,13 +58,14 @@ class DeviceSync private constructor(private val app: NexusApplication) {
     @Volatile private var manifest: SyncManifest? = null
     @Volatile private var server: ServerSocket? = null
     @Volatile private var wake: CompletableDeferred<Unit>? = null
+    private val pendingPeers = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceId: String = prefs.getString("device_id", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("device_id", it).commit() }
     fun options() = SyncOptions(
         prefs.getBoolean("enabled", false), prefs.getString("peer", "").orEmpty(), prefs.getInt("port", 8795),
         prefs.getLong("interval", 30), prefs.getLong("timeout", 120), prefs.getLong("max_file_mb", 0),
         prefs.getBoolean("chats", true), prefs.getBoolean("memory", true), prefs.getBoolean("skills", true),
         prefs.getBoolean("gallery", true), prefs.getBoolean("attachments", true), prefs.getBoolean("deletions", false), prefs.getBoolean("after_boot", true),
-        prefs.getBoolean("credentials", true), prefs.getBoolean("agy", true), prefs.getBoolean("settings", true), prefs.getString("agy_endpoint", "http://127.0.0.1:8796").orEmpty(),
+        prefs.getBoolean("credentials", true), prefs.getBoolean("agy", true), prefs.getBoolean("settings", true), prefs.getString("agy_endpoint", "http://127.0.0.1:8796").orEmpty(), prefs.getBoolean("desktop", true),
     )
     fun pairingKey(): String = app.secureStorage.getProviderApiKey(KEY)
     fun configure(o: SyncOptions, key: String = pairingKey()) {
@@ -82,7 +84,7 @@ class DeviceSync private constructor(private val app: NexusApplication) {
             .putBoolean("chats", o.chats).putBoolean("memory", o.memory).putBoolean("skills", o.skills)
             .putBoolean("gallery", o.gallery).putBoolean("attachments", o.attachments).putBoolean("deletions", o.deletions)
             .putBoolean("after_boot", o.afterBoot).commit()
-        prefs.edit().putBoolean("credentials",o.credentials).putBoolean("agy",o.agy).putBoolean("settings",o.settings).putString("agy_endpoint",o.agyEndpoint).commit()
+        prefs.edit().putBoolean("credentials",o.credentials).putBoolean("agy",o.agy).putBoolean("settings",o.settings).putString("agy_endpoint",o.agyEndpoint).putBoolean("desktop",o.desktop).commit()
         // Applied off the main thread; a missing Termux adapter never blocks the settings UI.
         CoroutineScope(Dispatchers.IO).launch { runCatching {
             if (key != previousKey && SyncCrypto.validKey(previousKey)) {
@@ -115,9 +117,12 @@ class DeviceSync private constructor(private val app: NexusApplication) {
         try {
             while (currentCoroutineContext().isActive && options().enabled) {
                 wake = CompletableDeferred()
-                try { cycle() }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { report("Pendiente de conexión · ${e.javaClass.simpleName}. Se reintentará automáticamente.") }
+                for (peer in (listOf(options().peer) + pendingPeers.toList()).distinct()) {
+                    if (peer != options().peer && !options().desktop) { pendingPeers.remove(peer); continue }
+                    try { cycle(peer); pendingPeers.remove(peer) }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { report("Pendiente de conexión · ${e.javaClass.simpleName}. Se reintentará automáticamente.") }
+                }
                 withTimeoutOrNull(options().intervalSeconds.coerceAtMost(Long.MAX_VALUE / 1000) * 1000) { wake?.await() }
             }
         } finally { listener.close(); listenerJob.cancel(); server = null }
@@ -129,11 +134,28 @@ class DeviceSync private constructor(private val app: NexusApplication) {
         val input = socket.getInputStream()
         fun line(): String { val s = StringBuilder(); while (true) { val c = input.read(); require(c >= 0); if (c == 10) return s.toString().trimEnd('\r'); require(s.length < 8192); s.append(c.toChar()) } }
         val request = line().split(' ')
-        require(request.size == 3 && request[0] == "GET")
+        require(request.size == 3 && request[0] in setOf("GET", "POST"))
         val path = request[1]
         var token = ""
-        while (true) { val h = line(); if (h.isEmpty()) break; if (h.startsWith("X-Nexus-Sync:", true)) token = h.substringAfter(':').trim() }
+        var length = 0
+        while (true) { val h = line(); if (h.isEmpty()) break; if (h.startsWith("X-Nexus-Sync:", true)) token = h.substringAfter(':').trim(); if(h.startsWith("Content-Length:",true)) length=h.substringAfter(':').trim().toInt() }
         require(options().enabled && SyncCrypto.authorized(token, path, pairingKey()))
+        if (request[0] == "POST") {
+            require(path == "/sync" && options().desktop && length in 1..65536)
+            val packet=ByteArray(length); java.io.DataInputStream(input).readFully(packet)
+            val value=SyncCrypto.decrypt(packet.inputStream(),pairingKey(),token).use {json.parseToJsonElement(it.readBytes().toString(Charsets.UTF_8)).jsonObject}
+            require(value.keys == setOf("endpoint"))
+            val endpoint=value.getValue("endpoint").jsonPrimitive.content.trimEnd('/')
+            val address=java.net.URI(endpoint)
+            require(address.scheme in setOf("http","https") && address.userInfo==null && address.rawQuery==null && address.rawFragment==null && address.path.orEmpty().isEmpty())
+            // A paired caller can request a return connection only to its own network address.
+            require(java.net.InetAddress.getByName(address.host)==socket.inetAddress)
+            pendingPeers += endpoint; syncSoon()
+            val output=socket.getOutputStream()
+            output.write("HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".toByteArray())
+            SyncCrypto.encrypt(output,pairingKey(),token).use {it.write("{\"queued\":true}".toByteArray())}
+            return
+        }
         val current = manifest ?: error("Snapshot pending")
         val source: InputStream = when {
             path == "/manifest" -> json.encodeToString(current).byteInputStream()
@@ -353,13 +375,13 @@ class DeviceSync private constructor(private val app: NexusApplication) {
         return SyncManifest(device = deviceId, documents = docs.associateBy { it.kind to it.name }.values.toList(), scopes = scopes) to missing.size
     }
 
-    private suspend fun cycle() = mutex.withLock {
+    private suspend fun cycle(endpoint: String = options().peer) = mutex.withLock {
         report("Preparando cambios…")
         val (own, missing) = snapshot()
         manifest = own
         run {
             var remote: SyncManifest? = null
-            fetch("/manifest") { remote = json.decodeFromString<SyncManifest>(it.readBytes().toString(Charsets.UTF_8)) }
+            fetch("/manifest", endpoint) { remote = json.decodeFromString<SyncManifest>(it.readBytes().toString(Charsets.UTF_8)) }
             val incoming = requireNotNull(remote)
             require(incoming.protocol == 1 && incoming.device.matches(Regex("[a-f0-9-]{36}")) && incoming.device != deviceId)
             val o = options()
@@ -375,7 +397,7 @@ class DeviceSync private constructor(private val app: NexusApplication) {
                 if (existing != null && verified(existing, hash)) return existing
                 val tmp = File.createTempFile("download-", ".part", root)
                 try {
-                    fetch("/blob/$hash") { input -> tmp.outputStream().use { out ->
+                    fetch("/blob/$hash", endpoint) { input -> tmp.outputStream().use { out ->
                         val buffer = ByteArray(65536); var count = 0L
                         while (true) { val n = input.read(buffer); if (n < 0) break; count += n
                             check(o.maxFileMb == 0L || count / 1048576.0 <= o.maxFileMb) { "Archivo supera el límite elegido" }; out.write(buffer, 0, n) }
@@ -410,7 +432,7 @@ class DeviceSync private constructor(private val app: NexusApplication) {
                 report("Recibiendo ${doc.kind} · ${++applied}/${selected.size}")
                 if (sensitive) {
                     var incomingAuth = ByteArray(0)
-                    fetch("/blob/${doc.hash}") { incomingAuth = it.readBytes() }
+                    fetch("/blob/${doc.hash}", endpoint) { incomingAuth = it.readBytes() }
                     check(SyncCrypto.hash(incomingAuth) == doc.hash)
                     val received = json.parseToJsonElement(incomingAuth.toString(Charsets.UTF_8)).jsonObject
                     val local = authSnapshot()

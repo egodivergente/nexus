@@ -32,6 +32,7 @@ fun DeviceSyncSettings(onDismiss: () -> Unit) {
             Text(status, style = MaterialTheme.typography.bodyMedium)
             Text("Los dos móviles deben estar vinculados y conectados. Puedes usar sus direcciones Tailscale para continuar fuera de casa. Los cambios pendientes se recuperan al reconectar.")
             SyncToggle("Sincronización automática", options.enabled) { options = options.copy(enabled = it) }
+            SyncToggle("Intercambiar también con Nexus Windows vinculado", options.desktop) { options = options.copy(desktop = it) }
             OutlinedTextField(peer, { peer = it }, label = { Text("Dirección del otro móvil") }, placeholder = { Text("http://100.x.x.x:8795") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(key, { key = it.trim() }, label = { Text("Misma clave de vinculación en ambos") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

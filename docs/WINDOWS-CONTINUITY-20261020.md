@@ -1,0 +1,40 @@
+# Continuidad Nexus Windows y moviles
+
+Drive conserva el intercambio existente de proyectos, memoria, galeria,
+generaciones, chats como historial inerte y montajes Corte. El complemento
+`desktop/device_continuity.py` comparte skills personales, ajustes compatibles,
+claves de proveedores y sesion AGY con los dos telefonos, sin subir secretos a
+Drive. Usa el protocolo AES-256-GCM de continuidad Android y guarda clave de
+vinculacion, bases y conflictos sensibles con Windows DPAPI.
+
+En Ajustes de Windows, Continuidad con tus moviles permite editar:
+activacion, lista de direcciones, direccion publica privada del PC, puerto,
+clave, intervalo, espera de red (0 ilimitado), MB por archivo (0 ilimitado),
+carpeta local AGY y cada categoria. Las eliminaciones son opcionales y no pisan
+una edicion local concurrente. Deben estar abiertos Nexus Windows y la
+continuidad habilitada en los telefonos. La APK permite desactivar el intercambio
+Windows independientemente de la conexion entre moviles.
+
+El PC solicita una devolucion mediante POST /sync cifrado y autenticado.
+El telefono solo permite volver a la misma IP de quien firma la solicitud;
+la operacion se encola sin sustituir la pareja S25-Pixel. Los errores de una
+pareja no impiden procesar las otras. Las solicitudes de red de Windows no
+retienen el bloqueo de turnos del agente. Los planes y autorizaciones de chats
+no se ejecutan al importar.
+
+Los ajustes propios de plataforma (rutas de puentes, proyecto abierto) siguen
+locales. Se traducen las claves nativas a los almacenes que usa Windows,
+incluidos Bedrock, cerebros y proveedores de medios personalizados. Los perfiles,
+modo, modelo, region y limites compatibles se traducen sin copiar rutas localhost
+de un telefono al PC. La sesion de AGY se trata como una revision de dos archivos;
+sus versiones conservadas permanecen en DPAPI y los archivos de uso de la CLI
+estan en la carpeta que el usuario configura.
+
+Dependencia de Windows: `desktop/requirements-continuity.txt`. El Python firmado
+del PC dispone de cryptography 50; no se instala software dentro de Termux.
+
+Validacion de fuente: 11 pruebas de continuidad PASS (cifrado Node/Android,
+tramas alteradas/truncadas, HTTP cifrado, claves existentes, limites/perfiles,
+conflictos y retorno de skills), 6 pruebas del host/DPAPI PASS; sintaxis Python/JS
+PASS. La validacion fisica y activacion se registran al cerrar la integracion;
+la APK Android se construye e instala una sola vez con la entrega Studio vc96.

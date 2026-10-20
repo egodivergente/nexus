@@ -116,6 +116,8 @@ def agent_host():
             if not OFFLINE_QA:
                 from drive_sync import DriveSync
                 _agent.drive_sync = DriveSync(_agent)
+                from device_continuity import DeviceContinuity
+                _agent.device_continuity = DeviceContinuity(_agent)
     return _agent
 
 
@@ -363,6 +365,10 @@ def save_remote(url):
 
 
 def dispatch(keys, operation, args):
+    if operation == 'deviceContinuity':
+        if OFFLINE_QA:
+            return {'enabled': False, 'configured': False, 'status': 'Laboratorio sin conexion'}
+        return agent_host().device_continuity.command(args)
     if operation == 'driveSync':
         if OFFLINE_QA:
             return {'state':'unavailable','connected':False,'configured':False,'enabled':False,'conflicts':[]}
