@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 import com.vidadomu.nexus.ui.components.BrandLogo
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 import com.vidadomu.nexus.ui.theme.rememberSystemAnimatorsEnabled
 
 /** A curated slot. Any [alternatives] set must be fully contained in the model tokens; [excluded] rules out siblings. */
@@ -128,6 +130,7 @@ internal fun FlagshipStudioHeader(
     onOpenFlow: () -> Unit,
 ) {
     val animate = rememberSystemAnimatorsEnabled()
+    val haptics = rememberNexusHaptics()
     val matches = remember(catalog, modality, selectedModel?.id) { matchFlagships(catalog, modality, selectedModel) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -154,7 +157,10 @@ internal fun FlagshipStudioHeader(
         LazyRow(state = rail, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
             items(matches, key = { it.model.providerId + "/" + it.model.id }) { match ->
                 val active = match.model.id == selectedModel?.id && match.model.providerId == selectedModel?.providerId
-                FlagshipCard(match, active, animate) { onChoose(match.model) }
+                FlagshipCard(match, active, animate) {
+                    haptics.perform(NexusHapticEvent.SELECTION, changed = !active)
+                    onChoose(match.model)
+                }
             }
             item(key = "all-models") { AllModelsCard(onAllModels) }
         }
@@ -164,6 +170,7 @@ internal fun FlagshipStudioHeader(
 @Composable
 private fun StudioModalitySegments(modality: Modality, animate: Boolean, onModality: (Modality) -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = rememberNexusHaptics()
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.action, color = scheme.surfaceContainerHigh) {
         Row(Modifier.padding(NexusTokens.space4)) {
             listOf(Modality.IMAGE to "Imagen", Modality.VIDEO to "Vídeo").forEach { (target, label) ->
@@ -174,7 +181,12 @@ private fun StudioModalitySegments(modality: Modality, animate: Boolean, onModal
                     if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Segment text $label")
                 Surface(Modifier.weight(1f).heightIn(min = 40.dp)
                     .semantics { this.selected = selected }
-                    .clickable(role = Role.Tab) { if (!selected) onModality(target) },
+                    .clickable(role = Role.Tab) {
+                        if (!selected) {
+                            haptics.perform(NexusHapticEvent.SELECTION)
+                            onModality(target)
+                        }
+                    },
                     shape = NexusTokens.action, color = container) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
                         Text(label, style = MaterialTheme.typography.labelLarge, color = content,
@@ -237,6 +249,7 @@ private fun AllModelsCard(onClick: () -> Unit) {
 @Composable
 internal fun BatchCountChips(selected: Int, enabledFor: (Int) -> Boolean, onSelect: (Int) -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = rememberNexusHaptics()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Cantidad", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant,
@@ -246,7 +259,10 @@ internal fun BatchCountChips(selected: Int, enabledFor: (Int) -> Boolean, onSele
             val enabled = enabledFor(count)
             Surface(Modifier.heightIn(min = 36.dp).width(48.dp)
                 .semantics { contentDescription = "Generar $count"; this.selected = isSelected }
-                .clickable(enabled = enabled, role = Role.RadioButton) { onSelect(count) },
+                .clickable(enabled = enabled, role = Role.RadioButton) {
+                    haptics.perform(NexusHapticEvent.SELECTION, changed = !isSelected)
+                    onSelect(count)
+                },
                 shape = NexusTokens.filter,
                 color = if (isSelected) scheme.primary else scheme.surfaceContainerHigh) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp)) {

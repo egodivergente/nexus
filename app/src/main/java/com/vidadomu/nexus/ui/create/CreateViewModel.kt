@@ -17,6 +17,7 @@ import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 import com.vidadomu.nexus.core.work.GenerationPollingWorker
 import kotlinx.coroutines.CancellationException
+import com.vidadomu.nexus.ui.components.MediaSniffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
@@ -393,9 +394,9 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
      */
     private suspend fun persistMediaUri(uri: Uri, mimeType: String): Result<Pair<Uri, String>> = withContext(Dispatchers.IO) {
         val scheme = uri.scheme?.lowercase()
-        val resolvedMime = mimeType.takeIf { it.isNotBlank() && it != "application/octet-stream" }
-            ?: app.contentResolver.getType(uri)
-            ?: "application/octet-stream"
+        val providerMime = if (scheme == "http" || scheme == "https") null else runCatching { app.contentResolver.getType(uri) }.getOrNull()
+        val resolvedMime = mimeType.takeUnless(MediaSniffer::isGeneric) ?: providerMime?.takeUnless(MediaSniffer::isGeneric)
+            ?: MediaSniffer.resolve(if (scheme == "http" || scheme == "https") null else sniffHeader(uri), mimeType, providerMime)
         if (scheme == "http" || scheme == "https") {
             return@withContext Result.success(uri to resolvedMime)
         }
@@ -450,6 +451,9 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         } finally { incompleteCopy?.delete() }
     }
 
+    private fun sniffHeader(uri: Uri): ByteArray? =
+        runCatching { app.contentResolver.openInputStream(uri)?.use(MediaSniffer::readHeader) }.getOrNull()
+
     private fun beginMediaCopy() {
         pendingMediaCopies++
         _uiState.update { it.copy(isPreparingMedia = true, errorMessage = null) }
@@ -462,12 +466,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun cacheMedia(rawUri: Uri, rawMime: String, slot: MediaSlotType, fieldKey: String? = null, append: Boolean = slot == MediaSlotType.VIDEO_REFERENCE, onReady: (Uri, String) -> Unit) {
         val expected=if(slot in setOf(MediaSlotType.VIDEO_INPUT,MediaSlotType.VIDEO_REFERENCE)) "video/" else null
-        if(expected!=null && !rawMime.startsWith(expected)) {_uiState.update {it.copy(errorMessage="Elige un archivo de vídeo.")};return}
+        if(expected!=null && !rawMime.startsWith(expected) && !MediaSniffer.isGeneric(rawMime)) {_uiState.update {it.copy(errorMessage="Elige un archivo de vídeo.")};return}
         val token = mediaSession.begin(slot, append = append, fieldKey = fieldKey)
         beginMediaCopy()
         viewModelScope.launch {
             try {
                 val (uri, mimeType) = persistMediaUri(rawUri, rawMime).getOrThrow()
+                require(expected==null || mimeType.startsWith(expected)) { "Elige un archivo de vídeo." }
                 if(uri.scheme=="file") withContext(Dispatchers.IO) { LocalMediaInspector.inspect(app,uri,mimeType) }
                 if (mediaSession.accepts(token)) onReady(uri, mimeType)
             } catch (cancelled: CancellationException) {
@@ -667,11 +672,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update { it.copy(errorMessage = "Selecciona un modelo de vídeo que admita imágenes para usar este archivo.") }
                 return@launch
             }
+            val remote = uri.scheme?.lowercase() in setOf("http", "https")
             val resolved = mimeType?.takeIf { it.startsWith("image/") }
-                ?: app.contentResolver.getType(uri)
-                ?: android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(
-                    uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase())
-                ?: "application/octet-stream"
+                ?: app.contentResolver.getType(uri)?.takeUnless(MediaSniffer::isGeneric)
+                ?: (if (remote) android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                    uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase()) else null)
+                ?: MediaSniffer.resolve(if (remote) null else withContext(Dispatchers.IO) { sniffHeader(uri) })
             val selected = _uiState.value.selectedModel!!
             if (selected.providerId == "google_flow") {
                 updateParameter("mode", "Fotogramas")

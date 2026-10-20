@@ -22,8 +22,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.vidadomu.nexus.ui.theme.NexusInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -297,7 +298,7 @@ fun FlowStudioScreen(
                 Button(
                     onClick = ::sendAll,
                     enabled = canSend,
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                    modifier = Modifier.fillMaxWidth().windowInsetsPadding(NexusInsets.bottomEdge)
                         .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
                         .heightIn(min = NexusTokens.minimumTouch),
                     shape = NexusTokens.field
@@ -317,7 +318,7 @@ fun FlowStudioScreen(
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).imePadding(),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding),
             contentPadding = PaddingValues(NexusTokens.space16),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {

@@ -45,6 +45,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import com.vidadomu.nexus.ui.components.MediaSniffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -314,7 +315,9 @@ object AgentMediaStore {
             return@withContext Attachment(existing.id, existing.uri, existing.mimeType ?: mime ?: "image/*",
                 existing.displayName, existing.width, existing.height, existing.durationSec, assetId = existing.id)
         }
-        var resolved = mime?.takeIf { it.isNotBlank() && it != "application/octet-stream" } ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
+        val providerMime = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+        var resolved = mime.takeUnless(MediaSniffer::isGeneric) ?: providerMime?.takeUnless(MediaSniffer::isGeneric)
+            ?: MediaSniffer.resolve(runCatching { context.contentResolver.openInputStream(uri)?.use(MediaSniffer::readHeader) }.getOrNull(), mime, providerMime)
         val name = runCatching {
             context.contentResolver.query(uri, arrayOf("_display_name"), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
         }.getOrNull() ?: uri.lastPathSegment ?: "adjunto"

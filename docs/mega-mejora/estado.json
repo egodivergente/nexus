@@ -362,9 +362,12 @@
       "title": "Importe visible antes del compromiso",
       "priority": "P1",
       "acceptance": "Bajo umbral y precio conocido sigue un toque; desconocido exige aceptación explícita y nunca usa 0 como importe.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "coste",
+      "implementation_evidence": [
+        "PARCIAL. AtlasPriceQuote.kt marca isRequestTotal solo en totales de calculadora/tarifa por tramos; PriceEstimate.kt lo propaga; GenerationCostGuard.kt exige total confirmado y, si no, aceptación explícita (también créditos Crun). FlagshipStudio.kt muestra importe por unidad y aviso 'sin tarifa confirmada' en lotes.",
+        "GenerationCostGuardTest.kt ampliado; compilado en CI d727728 (GitHub Actions), sin prueba física."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -444,9 +447,12 @@
       "title": "Tipo de archivo comprensible",
       "priority": "P1",
       "acceptance": "PNG con MIME genérico se previsualiza como imagen; bytes desconocidos no se etiquetan como imagen por su nombre.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "medios",
+      "implementation_evidence": [
+        "PARCIAL. MediaSniffer.kt (firma de bytes) usado en CreateViewModel.persistMediaUri/reuseImageInput/cacheMedia y NexusAgentAdapters.AgentMediaStore solo con MIME genérico; bytes desconocidos no pasan a imagen por extensión. MediaSnifferTest.kt.",
+        "Escrito 20-10 tanda 3; compilación en GitHub Actions pendiente."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -556,9 +562,12 @@
       "title": "Contrato de insets y teclado",
       "priority": "P1",
       "acceptance": "Campo enfocado y acción visibles en 411/448 dp, IME y teclado físico; sin padding doble.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "insets",
+      "implementation_evidence": [
+        "PARCIAL. NexusInsets.kt (chromeOnly/bottomEdge); AssistantScreen.kt aplica max(IME,nav) una vez con consumeWindowInsets y sigue al último mensaje al enfocar; CreateScreen.kt y FlowStudioScreen.kt sin padding doble; chips de lote ocultos con teclado en alto <500 dp. Sin prueba en 411/448 dp ni teclado físico.",
+        "Escrito 20-10 tanda 3; compilación en GitHub Actions pendiente."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -640,7 +649,8 @@
       "owner": "movimiento",
       "implementation_evidence": [
         "PARCIAL. NexusMotionPolicy.kt: política de animaciones dependiente de ajuste y visibilidad; LiveRenderPill.kt, StudioCanvasComponents.kt y GenerationActivity.kt la aplican a sus bucles propios. Múltiples spinners indeterminados ajenos siguen sin adaptar.",
-        "NexusMotionPolicyTest.kt (JVM) y NexusMotionLifecycleUiTest.kt (Compose) escritos, no compilados ni ejecutados; escala 0/ciclo de vida sin prueba física."
+        "NexusMotionPolicyTest.kt (JVM) y NexusMotionLifecycleUiTest.kt (Compose) escritos, no compilados ni ejecutados; escala 0/ciclo de vida sin prueba física.",
+        "AgentStage.kt y FlowStudioScreen.kt (20-10 tanda 2) también condicionan su animación a rememberNexusMotionAllowed; NexusMotionPolicyTest pasa a exigirlo en todo app/src/main (falló en CI probe y se corrigió en d727728)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -672,9 +682,12 @@
       "title": "Selección semántica",
       "priority": "P2",
       "acceptance": "Un tick por selección real; ninguno en navegación pasiva. Prueba física pendiente; el sistema puede omitir el efecto.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "haptica",
+      "implementation_evidence": [
+        "PARCIAL. NexusHaptics.kt; FlagshipStudio.kt: tick solo si cambia modelo, modalidad o tamaño de lote. NexusHapticsTest.kt. Sin prueba física.",
+        "Escrito 20-10 tanda 3; compilación en GitHub Actions pendiente."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -760,9 +773,12 @@
       "title": "Toggle decisivo",
       "priority": "P3",
       "acceptance": "En la prueba propuesta, solo los interruptores definidos como decisivos emiten una señal; los cambios automáticos y secundarios no añaden vibración. Comprobar que no haya duplicados del sistema.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "haptica",
+      "implementation_evidence": [
+        "PARCIAL. Política TOGGLE_DECISIVE en NexusHaptics.kt; ningún interruptor conectado todavía.",
+        "Escrito 20-10 tanda 3; compilación en GitHub Actions pendiente."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -771,9 +787,12 @@
       "title": "Cancelación confirmada efectiva",
       "priority": "P2",
       "acceptance": "Pulsar cancelar sin efecto no vibra. Prueba física pendiente; el sistema puede omitir el efecto.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "haptica",
+      "implementation_evidence": [
+        "PARCIAL. GenerationsScreen.kt: CONFIRM solo si cancelRemoteGeneration tuvo éxito o stopTrackingJob detuvo algo. Sin prueba física.",
+        "Escrito 20-10 tanda 3; compilación en GitHub Actions pendiente."
+      ],
       "test_evidence": [],
       "device_verified": false
     },

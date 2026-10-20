@@ -228,7 +228,8 @@ fun CreateScreen(
         snackbarHost = { SnackbarHost(batchSnackbar) },
         bottomBar = {
             StudioChrome(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(horizontal=screenMargin, vertical=8.dp),
+                Column(Modifier.fillMaxWidth().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
+                    .padding(horizontal=screenMargin, vertical=8.dp),
                     verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
                     if(!busy) readiness.message?.let { reason ->
@@ -249,7 +250,7 @@ fun CreateScreen(
                             Icon(Icons.Default.ChevronRight, null)
                         }
                     }
-                    if(state.selectedModality == Modality.IMAGE && state.schemaReady && !busy) {
+                    if(state.selectedModality == Modality.IMAGE && state.schemaReady && !busy && !compactTyping) {
                         val shownCount = countParam?.let { param ->
                             state.parameters[param.key]?.toIntOrNull() ?: param.defaultValue.toIntOrNull() ?: 1
                         } ?: batchCount

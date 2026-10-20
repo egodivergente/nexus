@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -186,6 +187,12 @@ fun AssistantScreen(
     LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest) {
         if (following) followLast()
     }
+    // Al enfocar el compositor (IME o teclado físico) el último mensaje queda justo encima del campo.
+    var composerFocused by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(composerFocused, imeVisible) {
+        if (composerFocused) { following = true; followLast() }
+    }
     LaunchedEffect(ui.scrollRequest) {
         if (ui.scrollRequest > 0) { following = true; followLast() }
     }
@@ -212,7 +219,7 @@ fun AssistantScreen(
     // Lienzo: al desplazar o escribir, la barra superior se reduce a una franja fina.
     val scrolledAway by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 } }
     val slimTop = scrolledAway || input.text.isNotEmpty()
-    Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
+    Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
         Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
@@ -252,7 +259,7 @@ fun AssistantScreen(
         }},settingsEntries=listOf("Asistente: modelo y conexión" to { showSettings=true }))
       }
     }) {pad ->
-        Column(Modifier.fillMaxSize().padding(pad)) {
+        Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             // Al bajar por el chat se esconde la barra inferior para ganar espacio; al subir vuelve (Ajustes → Apariencia).
@@ -384,8 +391,10 @@ fun AssistantScreen(
                 ReasoningPicker(ui, vm)
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
+            Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
                 onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto)
+            }
         }
     }
 }
