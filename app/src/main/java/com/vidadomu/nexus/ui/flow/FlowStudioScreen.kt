@@ -96,6 +96,7 @@ import com.vidadomu.nexus.ui.theme.ScreenBackground
 import com.vidadomu.nexus.ui.theme.SurfaceDark
 import com.vidadomu.nexus.ui.theme.TextMuted
 import com.vidadomu.nexus.ui.theme.TextPrimary
+import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -567,13 +568,17 @@ private fun ResultCell(output: GenerationOutput, onOpen: () -> Unit, onDownload:
 @Composable
 private fun PendingCell(job: GenerationJob) {
     val active = FlowStudioPlan.isActive(job.status)
-    val transition = rememberInfiniteTransition(label = "flow_render")
-    val pulse by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-        label = "flow_render_pulse"
-    )
+    val motion = rememberNexusMotionAllowed(active)
+    val pulse = if (motion) {
+        val transition = rememberInfiniteTransition(label = "flow_render")
+        val animated by transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+            label = "flow_render_pulse"
+        )
+        animated
+    } else 1f
     Box(
         Modifier.fillMaxWidth().aspectRatio(1f).clip(NexusTokens.field).background(BackgroundDark),
         contentAlignment = Alignment.Center
