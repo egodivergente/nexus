@@ -47,8 +47,8 @@ val SurfaceHighlight: Color @Composable get() = MaterialTheme.colorScheme.outlin
 /** Studio foundation: elevation is tonal rather than a perimeter stroke. */
 object StudioPalette {
     val Background = Color(0xFF0A0D12)
-    val Surface = Color(0xFF131922)
-    val Interactive = Color(0xFF1C2533)
+    val Surface = Color(0xFF17202C)
+    val Interactive = Color(0xFF263346)
     val Accent = Color(0xFF4EBAE8)
     val Glass = Color(0xE60A0D12)
 }
@@ -89,8 +89,8 @@ internal fun palette(theme: NexusAppearance): ColorScheme {
     val quartz = theme == NexusAppearance.QUARTZ
     val accent = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Accent else Color(if(theme == NexusAppearance.OCEAN) 0xFF7DD3FC else if(theme == NexusAppearance.FOREST) 0xFFA3D9AB else if (light) 0xFF243E74 else if (quartz) 0xFFE0C598 else 0xFF4EBAE8)
     val bg = if(theme == NexusAppearance.AURORA) StudioPalette.Background else Color(if(theme == NexusAppearance.OCEAN) 0xFF0A1420 else if(theme == NexusAppearance.FOREST) 0xFF0D1712 else if (theme == NexusAppearance.OLED) 0xFF000000 else if (light) 0xFFF1F3F8 else if (quartz) 0xFF14110F else 0xFF0A0D12)
-    val surface = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Surface else Color(if(theme == NexusAppearance.OCEAN) 0xFF122437 else if(theme == NexusAppearance.FOREST) 0xFF182A20 else if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF131922)
-    val variant = if(!light && !quartz) StudioPalette.Interactive else Color(if (light) 0xFFE4E8F1 else if (quartz) 0xFF302820 else 0xFF1C2533)
+    val surface = if(theme == NexusAppearance.AURORA || theme == NexusAppearance.OLED) StudioPalette.Surface else Color(if(theme == NexusAppearance.OCEAN) 0xFF122437 else if(theme == NexusAppearance.FOREST) 0xFF182A20 else if (light) 0xFFFFFFFF else if (quartz) 0xFF201B17 else 0xFF17202C)
+    val variant = if(!light && !quartz) StudioPalette.Interactive else Color(if (light) 0xFFE4E8F1 else if (quartz) 0xFF302820 else 0xFF263346)
     val ink = Color(if (light) 0xFF191C23 else if (quartz) 0xFFF6EDE0 else 0xFFF0F3F8)
     val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)
     val base = if (light) lightColorScheme() else darkColorScheme()

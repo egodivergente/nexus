@@ -15,13 +15,13 @@ class GetProjectOverviewTool(private val d:ToolDeps):BaseTool(
         val jobs=index.generations.filter {it.projectId==p.id}.sortedByDescending {it.createdAt}
         return ok {
             put("project_id",p.id);put("name",p.name)
-            put("memory",d.assets.projectContext(p.id,3000).orEmpty())
+            put("memory",d.assets.projectContext(p.id,d.limits().maximum(d.limits().maxProjectContextChars)).orEmpty())
             put("asset_counts",buildJsonObject {media.groupingBy {it.type.name}.eachCount().forEach {(type,count)->put(type,count)}})
             put("generation_counts",buildJsonObject {jobs.groupingBy {it.status}.eachCount().forEach {(status,count)->put(status,count)}})
-            put("scenes",buildJsonArray {index.scenes.filter {it.projectId==p.id}.take(20).forEach {s->add(buildJsonObject {put("id",s.id);put("code",s.code);s.title?.let {put("title",it)}})}})
+            put("scenes",buildJsonArray {index.scenes.filter {it.projectId==p.id}.take(d.limits().maximum(d.limits().maxOverviewScenes)).forEach {s->add(buildJsonObject {put("id",s.id);put("code",s.code);s.title?.let {put("title",it)}})}})
             put("shot_count",index.shots.count {it.projectId==p.id})
-            put("recent_outputs",buildJsonArray {media.sortedByDescending {it.createdAt}.take(8).forEach {a->add(buildJsonObject {put("asset_id",a.id);put("name",a.displayName);put("type",a.type.name);a.shotId?.let {put("shot_id",it)}})}})
-            put("recent_generations",buildJsonArray {jobs.take(6).forEach {j->add(buildJsonObject {put("id",j.id);j.nexusJobId?.let {put("job_id",it)};put("status",j.status);put("prompt",j.prompt.take(180))})}})
+            put("recent_outputs",buildJsonArray {media.sortedByDescending {it.createdAt}.take(d.limits().maximum(d.limits().maxOverviewOutputs)).forEach {a->add(buildJsonObject {put("asset_id",a.id);put("name",a.displayName);put("type",a.type.name);a.shotId?.let {put("shot_id",it)}})}})
+            put("recent_generations",buildJsonArray {jobs.take(d.limits().maximum(d.limits().maxOverviewGenerations)).forEach {j->add(buildJsonObject {put("id",j.id);j.nexusJobId?.let {put("job_id",it)};put("status",j.status);put("prompt",j.prompt.take(d.limits().maximum(d.limits().maxOverviewPromptChars)))})}})
             put("note","Para detalles antiguos usa search_project_memory; para archivos concretos usa search_assets. No hace falta cargar toda la biblioteca.")
         }
     }
@@ -44,6 +44,6 @@ class SearchProjectMemoryTool(private val d:ToolDeps):BaseTool(
             index.shots.filter {it.projectId==p.id}.forEach {add("plano ${it.code}" to "${it.code}: ${it.description.orEmpty()}")}
         }
         val hits=entries.map {entry->entry to words.count {it in AssetIndex.norm(entry.first+" "+entry.second)}}.filter {it.second>0}.sortedByDescending {it.second}
-        return ok {put("project_id",p.id);put("matches",hits.size);put("results",buildJsonArray {hits.take(12).forEach {(entry,_)->add(buildJsonObject {put("source",entry.first);put("text",entry.second.take(900))})}})}
+        return ok {put("project_id",p.id);put("matches",hits.size);put("results",buildJsonArray {hits.take(d.limits().maximum(d.limits().maxMemorySearchResults)).forEach {(entry,_)->add(buildJsonObject {put("source",entry.first);put("text",entry.second.take(d.limits().maximum(d.limits().maxMemoryExcerptChars)))})}})}
     }
 }

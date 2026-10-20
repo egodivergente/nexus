@@ -62,7 +62,8 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
 @Composable
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
-    onSendToAgent:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null) {
+    onSendToAgent:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
+    onSendResultToAgent:((String,String)->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -215,7 +216,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 runtime.assets.deleteLibraryAssets(assets.map {it.id}.toSet())
                 hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
                 snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
-            }},onError={message -> scope.launch {snackbar.showSnackbar(message)}})
+            }},onError={message -> scope.launch {snackbar.showSnackbar(message)}},
+            onAddToChat=onSendResultToAgent?.let { send -> { send(job.id,output.id) } }, onSelect={toggleMark(token)})
     }
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={if(selecting) LibrarySelectionBar(markedVisible.size,markedVisible.size==1,
         favoritesOn=markedVisible.isNotEmpty() && markedVisible.all {it in favorites},
@@ -324,7 +326,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                                 val token=OutputFiles.token(output)
                                 LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<3,
                                     mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris,
-                                    onActions={toggleMark(token)}) {
+                                    onActions={if(selecting) toggleMark(token) else actionTarget=job to output}) {
                                     if(selecting) toggleMark(token)
                                     else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(output)) else onNavigateToOutput(job.id)
                                 }

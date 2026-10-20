@@ -18,22 +18,10 @@ import androidx.compose.ui.unit.sp
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.TextSecondary
 
-// Cabecera de sección de los ajustes del asistente: icono y título en el color de acento.
+// Grupos de ajustes con la misma jerarquía que la memoria del proyecto.
 @Composable
 internal fun AgentSection(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        Row(Modifier.padding(start = NexusTokens.space4, top = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-            Text(title.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold, letterSpacing = .8.sp)
-        }
-        Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(.5.dp, MaterialTheme.colorScheme.outlineVariant)) {
-            Column(Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12),
-                verticalArrangement = Arrangement.spacedBy(NexusTokens.space12), content = content)
-        }
-    }
+    com.vidadomu.nexus.ui.components.NexusSheetGroup(title, icon, content)
 }
 
 // Fila plegable: título a la izquierda, resumen a la derecha y flecha; sustituye a los botones de texto sueltos.

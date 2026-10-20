@@ -4,68 +4,50 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.NexusApplication
-import com.vidadomu.nexus.agent.core.config.AgentLimits
 import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.TextSecondary
 
-/**
- * Límites del agente en un solo sitio. Ninguna de estas cifras está fijada en el prompt ni en el código:
- * lo que pongas aquí es lo que el agente recibe como límite vigente. En todos, 0 = sin límite.
- */
 @Composable
 internal fun AgentLimitsSettings() {
-    val app = LocalContext.current.applicationContext as NexusApplication
-    val store = remember { AssistantRuntime.get(app).settings }
-    val current = remember { store.limits() }
-    var expanded by remember { mutableStateOf(false) }
-    var rounds by remember { mutableStateOf(current.maxToolRounds.toString()) }
-    var timeout by remember { mutableStateOf(current.turnTimeoutSeconds.toString()) }
-    var flow by remember { mutableStateOf(current.flowMaxResults.toString()) }
-    var images by remember { mutableStateOf(current.maxImagesPerTurn.toString()) }
-    var videos by remember { mutableStateOf(current.maxVideosPerTurn.toString()) }
-    var documents by remember { mutableStateOf(current.maxDocumentsPerTurn.toString()) }
-    var messages by remember { mutableStateOf(current.maxMessages.toString()) }
-    var toolChars by remember { mutableStateOf(current.maxToolResultChars.toString()) }
-    var uiChars by remember { mutableStateOf(current.maxUiContextChars.toString()) }
-    var tracking by remember { mutableStateOf(current.jobTrackingMinutes.toString()) }
-    var message by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
-    FoldHeader("Límites del agente", "${rounds} pasos · ${timeout} s", expanded) { expanded = !expanded }
-    if (expanded) Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        Text("Son tuyos: el agente los recibe como límite vigente y mandan sobre cualquier cifra de sus instrucciones. 0 = sin límite. Cada proveedor puede tener los suyos.",
-            style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        val number = KeyboardOptions(keyboardType = KeyboardType.Number)
-        @Composable fun field(value: String, onChange: (String) -> Unit, label: String) =
-            StudioTextField(value, { onChange(it.filter(Char::isDigit)) }, shape = NexusTokens.field, singleLine = true, modifier = Modifier.fillMaxWidth(), label = { Text(label) }, keyboardOptions = number)
-        field(rounds, { rounds = it }, "Pasos seguidos por mensaje")
-        field(timeout, { timeout = it }, "Tiempo máximo por mensaje (s)")
-        field(flow, { flow = it }, "Resultados por encargo en Flow")
-        field(images, { images = it }, "Imágenes por mensaje que ve el agente")
-        field(videos, { videos = it }, "Vídeos por mensaje que ve el agente")
-        field(documents, { documents = it }, "Documentos por mensaje")
-        field(messages, { messages = it }, "Mensajes de historial que se reenvían")
-        field(toolChars, { toolChars = it }, "Caracteres por resultado de herramienta")
-        field(uiChars, { uiChars = it }, "Caracteres del estado de la interfaz")
-        field(tracking, { tracking = it }, "Minutos de seguimiento de un trabajo en curso")
-        FilledTonalButton(onClick = {
-            fun n(s: String, d: Int) = s.toIntOrNull() ?: d
-            val limits = AgentLimits(
-                maxToolRounds = n(rounds, current.maxToolRounds), turnTimeoutSeconds = n(timeout, current.turnTimeoutSeconds),
-                maxTokens = current.maxTokens, flowMaxResults = n(flow, current.flowMaxResults).coerceAtLeast(1),
-                maxImagesPerTurn = n(images, current.maxImagesPerTurn), maxVideosPerTurn = n(videos, current.maxVideosPerTurn),
-                maxDocumentsPerTurn = n(documents, current.maxDocumentsPerTurn), maxMessages = n(messages, current.maxMessages),
-                maxToolResultChars = n(toolChars, current.maxToolResultChars), maxUiContextChars = n(uiChars, current.maxUiContextChars),
-                jobTrackingMinutes = n(tracking, current.jobTrackingMinutes),
-            )
-            message = runCatching { store.saveLimits(limits) }
-                .fold({ "Límites guardados. Se aplican al siguiente mensaje." to false }, { (it.message ?: "No se pudieron guardar.") to true })
-        }) { Text("Guardar límites") }
-        message?.let { (text, isError) -> InlineNotice(text, isError = isError) }
+    val app=LocalContext.current.applicationContext as NexusApplication
+    val store=remember {AssistantRuntime.get(app).settings}
+    val original=remember {AgentLimitForm.values(store.limits())}
+    val order=remember {original.keys.toList()}
+    val booleanKeys=remember {original.filterValues {it=="true" || it=="false"}.keys}
+    val values=remember {mutableStateMapOf<String,String>().apply {putAll(original)}}
+    var expanded by remember {mutableStateOf(false)}
+    var message by remember {mutableStateOf<Pair<String,Boolean>?>(null)}
+    FoldHeader("Límites del agente","Configurables · 0 = sin límite",expanded) {expanded=!expanded}
+    if(expanded) Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        Text("Tus valores mandan sobre las instrucciones del agente. Cada máximo de esta lista se aplica tal cual; 0 lo desactiva. Los límites reales de cada proveedor dependen de su contrato.",
+            style=MaterialTheme.typography.bodySmall,color=TextSecondary)
+        val subagents=setOf("maxConcurrentSubagents","maxSubagentDepth","allowSubagentGeneration")
+        @Composable fun control(key:String) {
+            val value=values.getValue(key)
+            val label=AgentLimitForm.labels[key] ?: key
+            if(key in booleanKeys) Row(verticalAlignment=Alignment.CenterVertically) {
+                Text(label,Modifier.weight(1f));Switch(value=="true",{values[key]=it.toString()})
+            } else StudioTextField(value,{values[key]=it},singleLine=true,modifier=Modifier.fillMaxWidth(),shape=NexusTokens.field,
+                label={Text("$label (0 = sin límite)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
+        }
+        order.filter {it!="maxTokens" && it !in subagents}.forEach {control(it)}
+        Text("Máx. tokens se cambia en Respuesta, en esta misma hoja.",style=MaterialTheme.typography.bodySmall,color=TextSecondary)
+        HorizontalDivider()
+        Text("Preferencias de subagentes",style=MaterialTheme.typography.titleMedium)
+        Text("Se guardan para la futura delegación. El motor de subagentes aún no está habilitado.",style=MaterialTheme.typography.bodySmall,color=TextSecondary)
+        subagents.forEach {control(it)}
+        FilledTonalButton(onClick={
+            message=runCatching {store.saveLimits(AgentLimitForm.parse(store.limits(),values))}
+                .fold({"Límites guardados. Los envíos pendientes respetan la concurrencia elegida; los demás se aplican al siguiente uso." to false},
+                    {(it.message ?: "No se pudieron guardar.") to true})
+        }) {Text("Guardar límites")}
+        message?.let {(text,error)->InlineNotice(text,isError=error)}
     }
 }

@@ -25,7 +25,10 @@ internal class FlowAgentOperations(private val app: NexusApplication) {
     private val bridge = FlowBridgeClient(com.vidadomu.nexus.core.network.OkHttpClientFactory.create(app.secureStorage), app.secureStorage)
 
     suspend fun run(operation: String, input: JsonObject): JsonObject {
-        val wait = ((input["wait_seconds"] as? JsonPrimitive)?.longOrNull ?: 90L).coerceIn(0L, 240L)
+        val limits=AssistantRuntime.get(app).settings.limits()
+        val requested=(input["wait_seconds"] as? JsonPrimitive)?.longOrNull ?: 90L
+        require(requested>=0) {"La espera no puede ser negativa."}
+        val wait=if(limits.maxFlowWaitSeconds==0) requested else minOf(requested,limits.maxFlowWaitSeconds.toLong())
         val turn = when (operation) {
             "flow_agent_send" -> {
                 val message = (input["message"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
@@ -40,7 +43,8 @@ internal class FlowAgentOperations(private val app: NexusApplication) {
             else -> throw ToolInputException("Operación de Flow desconocida.")
         }
         var current = turn
-        val deadline = System.currentTimeMillis() + wait * 1000
+        val now=System.currentTimeMillis()
+        val deadline=now+minOf(wait,(Long.MAX_VALUE-now)/1000)*1000
         while (current.state != "completed" && System.currentTimeMillis() < deadline) {
             delay(5_000)
             current = bridge.agentStatus(current.id).getOrElse { throw ToolInputException(it.message ?: "Se perdió la conexión con Flow.") }
@@ -69,7 +73,7 @@ internal class FlowAgentOperations(private val app: NexusApplication) {
     private suspend fun saveMedia(turn: FlowBridgeClient.AgentTurn): List<Pair<String, FlowBridgeClient.AgentMedia>> {
         val known = SAVED.getOrPut(turn.id) { ConcurrentHashMap() }
         val temp = File(app.cacheDir, "flow_agent").apply { mkdirs() }
-        return turn.reply.media.take(MAX_MEDIA).mapNotNull { media ->
+        return turn.reply.media.take(AssistantRuntime.get(app).settings.limits().let {it.maximum(it.maxFlowMedia)}).mapNotNull { media ->
             val key = "${media.row}/${media.index}"
             known[key]?.let { return@mapNotNull it to media }
             val file = bridge.agentMedia(turn.id, media, temp).getOrNull() ?: return@mapNotNull null
@@ -83,7 +87,6 @@ internal class FlowAgentOperations(private val app: NexusApplication) {
     }
 
     companion object {
-        private const val MAX_MEDIA = 20
         private val SAVED = ConcurrentHashMap<String, ConcurrentHashMap<String, String>>()
     }
 }

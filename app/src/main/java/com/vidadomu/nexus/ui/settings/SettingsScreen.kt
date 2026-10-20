@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.components.NexusSheet
+import com.vidadomu.nexus.ui.components.NexusSheetGroup
 import com.vidadomu.nexus.ui.components.StudioCredentialField
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.foundation.rememberScrollState
@@ -96,7 +98,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured").count { it }
     }
     val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         navigationIcon={ if(page != null) IconButton(onClick={pageName=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a Ajustes")} })}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             when(page) {
@@ -167,10 +169,9 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
         }
     }
     if(assistantSettingsOpen && assistantViewModel != null) com.vidadomu.nexus.assistant.AssistantSettingsSheetHost(assistantViewModel) {assistantSettingsOpen=false}
-    if(appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
+    if(appearanceOpen) NexusSheet("Apariencia", {appearanceOpen=false}, icon=Icons.Default.Palette) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Apariencia",style=MaterialTheme.typography.titleLarge)
+            NexusSheetGroup("Tema", Icons.Default.Palette) {
             NexusAppearance.entries.forEach {option->
                 val preview = remember(option) { palette(option) }
                 Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)})
@@ -193,18 +194,19 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 }
             }
             TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            TextButton(onClick={appearanceOpen=false}) {Text("Cerrar apariencia",color=TextSecondary)}
+            }
         }
     }
-    if(currencyOpen) ModalBottomSheet(onDismissRequest={currencyOpen=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
+    if(currencyOpen) NexusSheet("Moneda", {currencyOpen=false}, icon=Icons.Default.CurrencyExchange) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Moneda",style=MaterialTheme.typography.titleLarge)
+            NexusSheetGroup("Preferencia de moneda", Icons.Default.CurrencyExchange) {
             CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth().clickable { currencyManager.setPreference(pref) }
                 .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
                 RadioButton(currencyState.preference==pref,{currencyManager.setPreference(pref)})
                 Column(Modifier.weight(1f)) {Text(pref.displayName,style=MaterialTheme.typography.bodyLarge);Text(pref.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
             }}
+            }
+            NexusSheetGroup("Conversión", Icons.Default.Sync) {
             Text(currencyState.rateSummaryText,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Fuente: BCE / Frankfurter",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
             Text("Última sincronización: ${currencyState.formattedLastUpdated}",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
@@ -213,20 +215,19 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             currencyState.error?.let {InlineNotice(noticeMessage(it,"No se pudo actualizar la tasa. Se conserva la guardada."),technicalDetails=it)}
             FilledTonalButton(onClick={scope.launch {currencyManager.refreshRate()}},enabled=!currencyState.isUpdating,colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {Text(if(currencyState.isUpdating) "Sincronizando…" else "Actualizar tasa")}
             TextButton(onClick={currencyManager.setPreference(CurrencyPreference.EUR_SMART)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            TextButton(onClick={currencyOpen=false}) {Text("Cerrar moneda",color=TextSecondary)}
+            }
         }
     }
-    if(showDiagnostics) ModalBottomSheet(onDismissRequest={showDiagnostics=false},shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
+    if(showDiagnostics) NexusSheet("Diagnóstico del sistema", {showDiagnostics=false}, icon=Icons.Default.Info) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            Text("Diagnóstico del sistema",style=MaterialTheme.typography.titleLarge)
+            NexusSheetGroup("Estado del dispositivo", Icons.Default.Info) {
             Text("Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}» · ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",style=MaterialTheme.typography.bodyMedium)
             Text("Dispositivo: ${Build.MANUFACTURER} ${Build.MODEL}",style=MaterialTheme.typography.bodyMedium)
             Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",style=MaterialTheme.typography.bodyMedium)
             Text(if(app.secureStorage.credentialStorageAvailable) "Almacenamiento cifrado disponible" else "Almacenamiento cifrado no disponible",style=MaterialTheme.typography.bodyMedium)
             Text("Media3 ExoPlayer 1.4.1 · WorkManager 2.9",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Divisas: BCE / Frankfurter",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-            TextButton(onClick={showDiagnostics=false}) {Text("Cerrar diagnóstico",color=TextSecondary)}
+            }
         }
     }
 
@@ -407,7 +408,7 @@ private fun SettingRow(title:String,subtitle:String,onClick:()->Unit) {
 private fun SettingsHeader(title:String,icon:androidx.compose.ui.graphics.vector.ImageVector,top:androidx.compose.ui.unit.Dp=0.dp) {
     Row(Modifier.fillMaxWidth().padding(top=top,start=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         Icon(icon,null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.size(18.dp))
-        Text(title.uppercase(),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.SemiBold,letterSpacing=.8.sp)
+        Text(title,style=MaterialTheme.typography.titleLarge,color=TextPrimary)
     }
 }
 

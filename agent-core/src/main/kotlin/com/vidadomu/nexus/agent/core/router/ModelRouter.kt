@@ -74,6 +74,7 @@ class ModelRouter(
      * prepare_generation lo sigue aceptando: solo deja de proponerse.
      */
     private val excludedFamilies: () -> Set<String> = { emptySet() },
+    private val schemaCheckLimit: () -> Int = { schemaChecks },
 ) {
 
     suspend fun route(task: TaskSpec): RouteResult {
@@ -101,7 +102,7 @@ class ModelRouter(
             .groupBy({ it.first }, { it.second }).mapValues { (_, v) -> v.max() }
         val scored = pre.map { m -> preliminary(m, task, latest) }.sortedByDescending { it.score }
         // Verificar con el schema real a los mejores, intentando cubrir familias distintas.
-        val toCheck = diversify(scored, schemaChecks)
+        val toCheck = diversify(scored, schemaCheckLimit())
         val checked = toCheck.mapNotNull { c -> verify(c, task)?.also { } ?: run { reject("schema incompatible"); null } }
             .let { list -> applyCost(list, task) { reject(it) } }
             .sortedByDescending { it.score }

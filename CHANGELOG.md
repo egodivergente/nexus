@@ -1,5 +1,16 @@
 # Changelog — NEXUS
 
+## 1.9.58-agent (vc92) - 2026-10-20
+
+- Hojas comunes con cabecera, cierre accesible y acción fija; borrado de credenciales con confirmación antes de guardar.
+- Vídeos del chat con proporción real y FIT; muro de imágenes y vídeos que abre el resultado seleccionado.
+- Biblioteca e Historial permiten añadir un resultado concreto al borrador del chat, conservando texto y referencias; la herramienta `open_results_wall` abre selecciones existentes.
+- Gemini 4 Argon con esfuerzo bajo, medio y alto mediante los IDs anunciados por la CLI y el puente S25. Sin peticiones conversacionales de prueba ni generación de pago.
+- Límites editables desde la APK para lotes, concurrencia, consultas, recomendaciones, memoria y Flow, con 0 = sin límite; sin máximos superiores internos en estos controles. Concurrencia actualizable sin cancelar trabajos activos.
+- Preferencias de concurrencia, profundidad y generación de subagentes guardables desde la APK; diseño para revisión previa, sin habilitar todavía el motor de delegación.
+- Entrega compilada pendiente de instalación y validación visual autorizadas en S25.
+
+
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
 ## [1.9.57-agent] - 2026-10-20 · modelos del puente Antigravity
