@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 
 from native_operations import atomic_json
 
@@ -44,6 +45,8 @@ class DriveSync:
 
     def command(self, args):
         op = args.get('op', 'status')
+        if op == 'verifyConnection':
+            return self.verify_connection()
         if op == 'diagnostics':
             # Local, session-protected support information; never returns token contents.
             return {'profile': str(self.root.resolve()), 'configurationExists': self.config_file.is_file(),
@@ -85,6 +88,39 @@ class DriveSync:
         elif op != 'status':
             raise ValueError('Operación de sincronización desconocida.')
         return self.public()
+
+    def verify_connection(self):
+        """Read the effective Google account and folder from this running instance."""
+        token = self.token()
+        def read(suffix):
+            request = urllib.request.Request('https://www.googleapis.com/drive/v3/' + suffix,
+                headers={'Authorization': 'Bearer ' + token})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read(2_000_001)
+                if len(raw) > 2_000_000:
+                    raise ValueError('La respuesta de Drive supera el límite de diagnóstico.')
+                return json.loads(raw)
+        try:
+            account = read('about?fields=user(emailAddress)').get('user', {}).get('emailAddress')
+            folder = self.config.get('folderId')
+            result = {'account': account, 'folderId': folder, 'clientId': self.config.get('client_id'),
+                      'folderAccessible': False, 'files': 0, 'commits': 0}
+            if not folder:
+                return result
+            try:
+                read('files/' + urllib.parse.quote(folder, safe='') + '?fields=id')
+            except urllib.error.HTTPError as error:
+                if error.code == 404:
+                    return result
+                raise
+            result['folderAccessible'] = True
+            page = read('files?' + urllib.parse.urlencode({'q': "'" + folder + "' in parents and trashed = false",
+                'fields': 'nextPageToken,files(name)', 'pageSize': 1000}))
+            result.update(files=len(page.get('files', [])), commits=sum(f.get('name', '').startswith('commit-') for f in page.get('files', [])),
+                          hasMore=bool(page.get('nextPageToken')))
+            return result
+        except (OSError, ValueError):
+            raise ValueError('No se pudo comprobar la conexión efectiva de Google Drive.') from None
 
     def _token_request(self, fields):
         data = urllib.parse.urlencode(fields).encode()
