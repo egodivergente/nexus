@@ -164,12 +164,7 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
             setStatus(result)
             !prefs.getBoolean("dirty",false)
         }catch(e:CancellationException){throw e}
-        catch(e:Exception){setStatus(buildJsonObject {
-            put("state",if(e.message=="authorization_required")"authorization_required" else "retry")
-            put("message",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "Sincronización pendiente. Tus archivos locales se conservan.")
-            // Only code locations and exception types: never URLs, tokens or response bodies.
-            put("diagnostic",e.javaClass.simpleName+":"+(e.stackTrace.firstOrNull {it.className.startsWith("com.vidadomu.nexus.")}?.let {it.fileName+":"+it.lineNumber}?:"external"))
-        });false}
+        catch(e:Exception){setStatus(buildJsonObject {put("state",if(e.message=="authorization_required")"authorization_required" else "retry");put("message",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "Sincronización pendiente. Tus archivos locales se conservan.")});false}
     }
 }
 
