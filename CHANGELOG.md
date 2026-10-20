@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.56-agent] - 2026-10-20 · muro de resultados
+
+- **Ver muro:** los lotes de imágenes tienen un botón «Ver muro» que abre todas las imágenes en cuadrícula escalonada, cada una con su proporción real y sin huecos. Tocar una abre su resultado.
+
 ## [1.9.55-agent] - 2026-10-20 · resultados sin huecos
 
 - **Imágenes del agente sin franjas:** los resultados se muestran con su proporción real (verticales, horizontales o cuadradas) en lugar de encajarlos en un marco 16:9 que dejaba espacios vacíos a los lados.

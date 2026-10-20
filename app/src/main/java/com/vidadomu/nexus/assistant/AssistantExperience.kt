@@ -186,6 +186,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
 internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
     val picker=rememberProjectMediaPicker(onAttach)
+    var wall by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
@@ -209,6 +210,10 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
             }
         }
 
+        if(p.plan.modality == "IMAGE" && outputs.size > 1) {
+            TextButton(onClick = { wall = true }) { Icon(Icons.Default.GridView, null, Modifier.size(16.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Ver muro · ${outputs.size}") }
+            if (wall) ResultsWallSheet(outputs, onOpen = { wall = false; onOpenOutput() }, onDismiss = { wall = false })
+        }
     }
 }
 
