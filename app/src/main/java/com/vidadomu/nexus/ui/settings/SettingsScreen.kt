@@ -99,11 +99,13 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     }
     val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
+        showBalance=page != SettingsPage.BYTEPLUS,
         navigationIcon={ if(page != null) IconButton(onClick={pageName=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a Ajustes")} })}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             when(page) {
                 null -> {
                     item {HubRow(SettingsPage.APPEARANCE,"${selectedTheme.label} · ${currencyState.preference.displayName}") {pageName=SettingsPage.APPEARANCE.name}}
+                    item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
                     item {HubRow(SettingsPage.AGENT,"Modelo del asistente, consumo, herramientas y cerebros") {pageName=SettingsPage.AGENT.name}}
                     item {HubRow(SettingsPage.PROVIDERS,"$keysConfigured de 3 con clave · Google Flow") {pageName=SettingsPage.PROVIDERS.name}}
                     item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
@@ -118,6 +120,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true})
             }}
                 }
+                SettingsPage.BYTEPLUS -> { item { BytePlusConsumptionSettings() } }
                 SettingsPage.AGENT -> {
                     item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
                     if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Modelo, respuesta, consumo, herramientas y skills",{assistantSettingsOpen=true})}}
@@ -375,6 +378,7 @@ private fun ProviderCredentialCard(
 }
 private enum class SettingsPage(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tint: androidx.compose.ui.graphics.Color) {
     APPEARANCE("Apariencia y moneda", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
+    BYTEPLUS("Consumo BytePlus", Icons.Default.AccountBalanceWallet, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
     AGENT("Agente y modelos", Icons.Default.AutoAwesome, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
     PROVIDERS("Proveedores de generación", Icons.Default.CloudQueue, androidx.compose.ui.graphics.Color(0xFF34D399)),
     CUSTOM("Generadores propios", Icons.Default.Extension, androidx.compose.ui.graphics.Color(0xFFFBBF24)),
@@ -415,7 +419,7 @@ private fun SettingsHeader(title:String,icon:androidx.compose.ui.graphics.vector
 
 /** Contenedor de una sección: tarjeta elevada sobre el fondo, con sus filas separadas por filetes. */
 @Composable
-private fun SettingsCard(content:@Composable ColumnScope.()->Unit) {
+internal fun SettingsCard(content:@Composable ColumnScope.()->Unit) {
     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerHigh,tonalElevation=2.dp) {
         Column(Modifier.padding(horizontal=NexusTokens.space16,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8),content=content)
     }

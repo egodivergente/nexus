@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.File
 
 plugins {
     id("com.android.application")
@@ -44,6 +45,19 @@ android {
         }
     }
 
+    // Preserve the installed Agent certificate. This private file stays outside Git.
+    val agentSigningFile = providers.gradleProperty("nexusAgentSigningFile").orElse(
+        File(System.getProperty("user.home"), ".gradle/nexus-agent-signing.properties").absolutePath).get()
+    val agentSigning = file(agentSigningFile).takeIf { it.isFile }?.let { configFile ->
+        val values = Properties().apply { configFile.inputStream().use { load(it) } }
+        signingConfigs.create("installedAgent") {
+            storeFile = file(values.getProperty("storeFile"))
+            storePassword = values.getProperty("storePassword")
+            keyAlias = values.getProperty("keyAlias")
+            keyPassword = values.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         create("offlineQa") {
             initWith(getByName("debug"))
@@ -58,6 +72,7 @@ android {
         create("agentPreview") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".agent"
+            signingConfig = agentSigning // Without the private config, produce unsigned rather than replace the installed identity.
             versionNameSuffix = "-preview"
             isDebuggable = true
             matchingFallbacks += listOf("debug")
@@ -72,17 +87,6 @@ android {
         debug {
             // Keep stable package ID
         }
-    }
-    // Existing installations retain their signing identity. The private file stays outside Git.
-    (project.findProperty("nexusSigningFile") as String?)?.let { location ->
-        val identity=Properties().apply {file(location).inputStream().use {load(it)}}
-        val stable=signingConfigs.create("nexusExistingIdentity") {
-            storeFile=file(identity.getProperty("storeFile"))
-            storePassword=identity.getProperty("storePassword")
-            keyAlias=identity.getProperty("keyAlias")
-            keyPassword=identity.getProperty("keyPassword")
-        }
-        buildTypes.getByName("agentPreview").signingConfig=stable
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -169,4 +173,10 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// Preview: skip the Kotlin JVM boxing optimizer, which can stall on large Compose
+// settings functions. Android's runtime still optimizes the installed bytecode.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name == "compileAgentPreviewKotlin") compilerOptions.freeCompilerArgs.add("-Xno-optimize")
 }

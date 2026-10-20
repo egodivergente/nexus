@@ -100,6 +100,7 @@ class NexusApplication : Application() {
         generationRepository = GenerationRepository(this, database, providerRegistry)
         settingsRepository = SettingsRepository(secureStorage, providerRegistry, currencyManager)
         ready.complete(Unit)
+        com.vidadomu.nexus.assistant.BytePlusConsumption.get(this).schedule()
 
         // Asynchronously check and refresh currency rate on startup
         CoroutineScope(Dispatchers.IO).launch {

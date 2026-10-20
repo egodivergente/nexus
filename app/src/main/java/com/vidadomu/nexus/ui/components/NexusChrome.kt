@@ -117,7 +117,8 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     /** Entradas propias de la pantalla dentro del único botón de ajustes (p. ej. modelo y conexión del asistente). */
-    settingsEntries: List<Pair<String, () -> Unit>> = emptyList()) {
+    settingsEntries: List<Pair<String, () -> Unit>> = emptyList(),
+    showBalance: Boolean = true) {
     val chrome=LocalChrome.current
     StudioChrome(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
@@ -127,7 +128,7 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
                 actions={
                     actions()
                     chrome?.let {
-                        NexusBalanceChip()
+                        if (showBalance) NexusBalanceChip()
                         it.openSettings?.let { open ->
                             if(settingsEntries.isEmpty()) IconButton(onClick=open) {
                                 Icon(Icons.Outlined.Settings,contentDescription="Ajustes de Nexus")
