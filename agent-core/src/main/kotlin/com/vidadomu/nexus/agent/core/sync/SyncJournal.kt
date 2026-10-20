@@ -50,11 +50,39 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
     }
     /** A verified portable copy supersedes a device path, without hiding real byte changes. */
     private fun values(heads:List<SyncRevision>):List<JsonObject?> {
+        if(heads.firstOrNull()?.key?.startsWith("generations:")==true)return generationValues(heads)
         if(heads.firstOrNull()?.key?.startsWith("assets:")!=true)return heads.map {it.value}
         val portable=heads.mapNotNull {it.value?.get("uri")?.jsonPrimitive?.contentOrNull?.takeIf {uri->uri.startsWith(SyncBlobs.PREFIX)}}.distinct()
         if(portable.isEmpty() || portable.map {it.removePrefix(SyncBlobs.PREFIX).substringBefore('.')}.distinct().size!=1)return heads.map {it.value}
         val canonical=portable.sorted().last()
         return heads.map {head->head.value?.let {row->if(row["uri"]?.jsonPrimitive?.isString==true)JsonObject(row+mapOf("uri" to JsonPrimitive(canonical)))else row}}
+    }
+    private fun generationValues(versions:List<SyncRevision>):List<JsonObject?> {
+        if(versions.any {it.value==null})return versions.map {it.value}
+        var rows=versions.map {it.value!!}
+        fun normalize(field:String,canonical:(List<String>)->String?) {
+            val arrays=rows.map {it[field] as? JsonArray?:return}
+            if(arrays.map {it.size}.distinct().size!=1)return
+            val replacements=(0 until arrays.first().size).map {position->
+                val strings=arrays.map {it[position].jsonPrimitive.content}
+                canonical(strings)
+            }
+            rows=rows.mapIndexed {index,row->JsonObject(row+mapOf(field to JsonArray(arrays[index].mapIndexed {position,value->replacements[position]?.let(::JsonPrimitive)?:value})))}
+        }
+        normalize("referenceUris") {uris->
+            val portable=uris.filter {it.startsWith(SyncBlobs.PREFIX) && SyncBlobs.NAME.matches(it.removePrefix(SyncBlobs.PREFIX))}
+            if(portable.isNotEmpty() && portable.map {it.removePrefix(SyncBlobs.PREFIX).substringBefore('.')}.distinct().size==1)portable.maxOrNull()else null
+        }
+        normalize("outputAssetIds") {ids->
+            val identities=ids.map {id->
+                val originals=heads("assets:$id").mapNotNull {it.value}
+                val hashes=originals.mapNotNull {it["uri"]?.jsonPrimitive?.contentOrNull?.takeIf {uri->uri.startsWith(SyncBlobs.PREFIX) && SyncBlobs.NAME.matches(uri.removePrefix(SyncBlobs.PREFIX))}?.removePrefix(SyncBlobs.PREFIX)?.substringBefore('.')}.distinct()
+                val projects=originals.map {it["projectId"]?:JsonNull}.distinct()
+                if(hashes.size==1 && projects.size==1)projects.single().toString()+":"+hashes.single()else null
+            }
+            if(identities.all {it!=null} && identities.distinct().size==1)ids.minOrNull()else null
+        }
+        return rows
     }
     private fun append(revisions:List<SyncRevision>,baseline:Map<String,JsonObject> = state.baseline,baselineHeads:Map<String,List<String>> = state.baselineHeads) {
         if(revisions.isEmpty())return
@@ -110,8 +138,9 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         for(key in state.revisions.values.map {it.key}.distinct().sorted()) {
             val h=heads(key)
             require(h.isNotEmpty()) {"Historial de sincronización inválido."}
-            if(h.size>1 && values(h).distinct().size>1)conflicts+=SyncConflict(key,h)
-            h.last().value?.let {rows[key]=it}
+            val normalized=values(h)
+            if(h.size>1 && normalized.distinct().size>1)conflicts+=SyncConflict(key,h)
+            normalized.last()?.let {rows[key]=it}
         }
         return SyncResult(rows,conflicts,uploaded,downloaded)
     }
@@ -123,6 +152,6 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
     }
     @Synchronized fun resolve(key:String,revisionId:String) {
         val h=heads(key);val selected=h.firstOrNull {it.id==revisionId}?:error("La versión ya no está disponible.")
-        append(listOf(SyncRevision(UUID.randomUUID().toString(),key,h.map {it.id},selected.value,state.label,System.currentTimeMillis())))
+        append(listOf(SyncRevision(UUID.randomUUID().toString(),key,h.map {it.id},values(h)[h.indexOf(selected)],state.label,System.currentTimeMillis())))
     }
 }
