@@ -214,6 +214,7 @@ internal fun OrderCard(
                 if (outputs.isNotEmpty() && (!compact || outputs.size > 1)) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     items(if (compact) outputs.drop(1) else outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput, presentation.cardSize) }
                 }
+                // Save the prompt draft before a parameter edit rebuilds this plan.
                 if (order.status == OrderStatus.AWAITING_CONFIRMATION && !p.busy && !assistantBusy && !dirty) {
                     QuickOrderParamStrip(plan = plan, onEdit = onEdit, onCustomEdit = { k, v -> editParam = k to v })
                 }

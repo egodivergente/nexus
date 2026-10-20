@@ -22,6 +22,16 @@ import kotlinx.coroutines.flow.first
 
 class NexusApplication : Application() {
 
+    // The chat is an application session, not the lifetime of a particular screen/Activity.
+    private val assistantOwner = object : androidx.lifecycle.ViewModelStoreOwner {
+        override val viewModelStore = androidx.lifecycle.ViewModelStore()
+    }
+    fun assistantViewModel(): com.vidadomu.nexus.assistant.AssistantViewModel =
+        androidx.lifecycle.ViewModelProvider(assistantOwner,
+            androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(this))[
+            com.vidadomu.nexus.assistant.AssistantViewModel::class.java]
+
+
     /**
      * Se completa al terminar la inicialización síncrona de onCreate. Los ContentProvider (puente
      * NexusAgentProvider) pueden recibir llamadas antes de que Application.onCreate acabe en un

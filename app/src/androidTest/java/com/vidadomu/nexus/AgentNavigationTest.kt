@@ -35,11 +35,11 @@ class AgentNavigationTest {
                 }
             }
         }
-        compose.onNodeWithText(Screen.Assistant.title).performClick()
+        compose.onNodeWithContentDescription(Screen.Assistant.title).performClick()
         compose.onNodeWithText("Abrir configuración").performClick()
         compose.onNodeWithTag("settings").assertExists()
-        compose.onNodeWithText(Screen.Models.title).performClick()
-        compose.onNodeWithText(Screen.Assistant.title).performClick()
+        compose.onNodeWithContentDescription(Screen.Models.title).performClick()
+        compose.onNodeWithContentDescription(Screen.Assistant.title).performClick()
         compose.onNodeWithTag("assistant").assertExists()
         compose.onNodeWithTag("settings").assertDoesNotExist()
     }

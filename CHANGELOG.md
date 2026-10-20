@@ -1,5 +1,12 @@
 # Changelog — NEXUS
 
+## 1.9.62-background (vc96) - 2026-10-20
+
+- El turno del agente se ejecuta en un servicio de primer plano con bloqueo parcial de CPU; la sesión continúa al destruir la pantalla y puede detenerse desde la notificación.
+- El inicio del servicio comunica los errores y las interrupciones no repiten solicitudes automáticamente.
+- Integra los controles de evidencia visual y conserva la sincronización móvil y Drive de vc95.
+- Validación y entrega: `docs/AGENT-BACKGROUND-1962-20261020.md`.
+
 ## 1.9.61-sync (vc95) - 2026-10-20
 
 - La copia inicial de Drive utiliza transferencia prolongada con notificación, conservando la continuidad directa entre móviles.

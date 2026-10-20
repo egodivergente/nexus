@@ -1,4 +1,21 @@
 ﻿{
+    "androidBackground20261020": {
+        "branch": "codex/android-agent-background-20261020",
+        "versionName": "1.9.62-background-preview",
+        "versionCode": 96,
+        "installedDevices": [
+            "Pixel 8 Pro",
+            "SM-S938B"
+        ],
+        "apkSha256": "e8a45b8d08605a5e0f03a3a574f78a9b73c0f74d560ab71be54957dcfc995d8e",
+        "corePassed": 284,
+        "coreSkipped": 4,
+        "pixelInstrumentationPassed": 4,
+        "provider": "local simulated LLM; no paid calls",
+        "dataHashesPreserved": true,
+        "documentation": "docs/AGENT-BACKGROUND-1962-20261020.md",
+        "note": "Fields below are historical"
+    },
     "deviceContinuity20261020": {
         "branch": "feat/device-continuity-20261020",
         "sourceVersionCode": 93,

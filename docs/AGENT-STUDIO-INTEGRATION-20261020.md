@@ -2,7 +2,7 @@
 
 Base: `c650f14e39bce30185bf8ba5d48c451b15e29f6b`, publicación Android vc95 con Drive y continuidad entre teléfonos.
 Rama de entrega: `codex/agent-studio-integration-20261020`. Paquete conservado: `com.vidadomu.nexus.agent`.
-Versión prevista: `1.9.62-agent-preview` / vc96; certificado instalado conservado mediante configuración privada externa.
+Versión compilada: `1.9.62-agent-preview` / vc96; certificado instalado conservado mediante configuración privada externa.
 
 ## Funciones integradas
 
@@ -27,5 +27,11 @@ No se cambia el identificador a `.studio`, no se copia la importación de creden
 
 ## Validación
 
-En curso: pruebas JVM del núcleo y Android, compilación arm64, pruebas físicas de laboratorio separadas de los datos habituales.
-La instalación final se coordina con las tareas Drive/continuidad para conservar la copia de originales que está en curso.
+- Compilación arm64 y pruebas JVM correctas: 700 pruebas superadas (298 núcleo + 402 app), 4 omitidas y ningún fallo.
+- Diez casos físicos superados en Pixel 8 Pro con el paquete aislado `com.vidadomu.nexus.mediaqa`: PNG real y cancelación, fuente inválida, A/B visual y accesible, XLSX/DTD, resultado adjuntado desde la píldora, captura al Lienzo, tres transcripciones Whisper con reutilización/liberación, historial SQLite, navegación y persistencia. Se verificaron mediante ejecuciones dirigidas; no se afirma que las diez pasaran en una única ejecución.
+- La prueba de captura detectó un Toast fuera del hilo principal. Corregido iniciando la acción en `Dispatchers.Main.immediate`; la extracción mantiene su trabajo pesado en IO. La repetición física de la captura pasa.
+- El test de navegación usaba texto excluido de la semántica accesible. Actualizado para accionar las pestañas por su descripción real; comprobación física correcta.
+- Whisper nativo del APK final tiene el mismo SHA-256 que el binario físico probado: `2285788d57e27a072ff15a0b4af66131545aaf0d51627653910941b81d89742d`.
+- APK Agent vc96: SHA-256 `09cb6cb744f57ffcb399b1bac766a584eb3f393aeae77bc8c7ec64cc96bd528b`; certificado SHA-256 `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`. Manifiesto sin `testOnly`; instalable como actualización del paquete existente.
+- No se han ejecutado generaciones de pago. Flow remoto y los proveedores requieren sus puentes/configuraciones; las pruebas locales no acreditan cada proveedor.
+- Instalación de producción coordinada con Drive/continuidad: pendiente de completar y registrar. Los metadatos privados y registros se guardan en `outputs/studio-integration/`, fuera de Git.
