@@ -33,7 +33,7 @@ estan en la carpeta que el usuario configura.
 Dependencia de Windows: `desktop/requirements-continuity.txt`. El Python firmado
 del PC dispone de cryptography 50; no se instala software dentro de Termux.
 
-Validacion de fuente: 15 pruebas de continuidad PASS (cifrado Node/Android,
+Validacion de fuente: 16 pruebas de continuidad PASS (cifrado Node/Android,
 tramas alteradas/truncadas, HTTP cifrado, claves existentes, limites/perfiles,
 conflictos y retorno de skills), 6 pruebas del host/DPAPI PASS; sintaxis Python/JS
 PASS. La validacion fisica y activacion se registran al cerrar la integracion;
@@ -48,3 +48,8 @@ credenciales existentes de proveedores ni el respaldo Drive durante esta prueba.
 La entrega Windows se identifica como 2026.10.20-device-continuity.1; su paquete
 incluye las 15 bibliotecas JVM ya instaladas y verificadas byte a byte, sin
 reconstruir ni sustituir el motor Corte/Drive durante el desarrollo del enlace.
+
+Pixel reconectado: verificados tambien manifiesto cifrado Pixel y retorno TCP
+desde Pixel al puerto8797 del PC. Ambos enlaces de red estan comprobados.
+La integracion conserva la renovacion de token Drive posterior a preparar
+originales del commit32d1595; 11 pruebas Drive PASS.

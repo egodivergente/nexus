@@ -242,6 +242,25 @@ class Tests(unittest.TestCase):
         a.cycle('b')
         self.assertEqual(b'local edit', path.read_bytes())
 
+    def test_received_skill_update_relays_to_a_third_device(self):
+        a, b, c = self.peer('a'), self.peer('b'), self.peer('c')
+        def link(receiver, sender):
+            receiver.fetch = lambda _, route: encoded(sender.manifest) if route == '/manifest' else sender.sources.get(route[6:], sender.private_sources.get(route[6:]))
+        path = b.skills / 'SKILL.md'
+        path.write_bytes(b'first')
+        b.publish()
+        link(a, b)
+        a.cycle('b')
+        a.publish()
+        link(c, a)
+        c.cycle('a')
+        path.write_bytes(b'new revision')
+        b.publish()
+        a.cycle('b')
+        a.publish()
+        c.cycle('a')
+        self.assertEqual(b'new revision', (c.skills / 'SKILL.md').read_bytes())
+
 
 if __name__ == '__main__':
     unittest.main()

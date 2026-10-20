@@ -525,7 +525,9 @@ class DeviceContinuity:
                     else:
                         atomic(destination, data)
                         self.dirty = True
-                        private.setdefault('replicas', {})['private/' + destination.relative_to(self.skills).as_posix()] = doc['hash']
+                        # Preserve the last applied revision when relaying an update to a
+                        # third device. An unchanged first replica stays marked as such.
+                        private.setdefault('replicas', {})['private/' + destination.relative_to(self.skills).as_posix()] = state.get('localHash') or doc.get('baseHash') or doc['hash']
                         self.host.write_secret(self.secret_file, private)
                     state = {'localHash': digest(destination.read_bytes()) if destination.exists() else None}
                 private = self.private()
