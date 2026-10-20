@@ -347,6 +347,38 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             }
             "reload" -> { skills = loadSkills(); deps = deps(); orchestrator = makeOrchestrator() }
             "snapshot" -> Unit
+            "driveSync" -> {
+                val accessToken=args.text("accessToken")
+                require(accessToken.isNotBlank()) {"Conecta Google Drive."}
+                val rootId=args.text("rootId").ifBlank {com.vidadomu.nexus.agent.core.sync.DriveRemote.findOrCreateRoot {accessToken}}
+                val directory=File(data,"sync/workspaces/$rootId")
+                val remote=com.vidadomu.nexus.agent.core.sync.DriveRemote({accessToken},rootId,sessionDirectory=File(directory,"uploads"))
+                val paths=args["paths"]?.jsonObject.orEmpty()
+                val documents=com.vidadomu.nexus.agent.core.sync.SyncDocuments(directory)
+                val chats=args["chats"]?.jsonArray.orEmpty().map {it.jsonObject}
+                val montages=args["montages"]?.jsonObject.orEmpty().mapValues {it.value.jsonObject}
+                val workspace=com.vidadomu.nexus.agent.core.sync.SyncWorkspace(assets,directory,remote,open={uri->
+                    val path=paths[uri]?.jsonPrimitive?.contentOrNull
+                    val candidate=path?.let(::File)?:if(uri.startsWith("file:"))File(java.net.URI(uri))else if(uri.matches(Regex("/media/[a-f0-9]{32}\\.[a-z0-9]{1,8}")))File(data.parentFile,uri.removePrefix("/"))else null
+                    val source=candidate?.canonicalFile
+                    val mediaRoot=File(data.parentFile,"media").canonicalFile.toPath()
+                    val syncedRoot=File(data,"sync").canonicalFile.toPath()
+                    if(source==null || !source.isFile || !(source.toPath().startsWith(mediaRoot)||source.toPath().startsWith(syncedRoot)))null
+                    else com.vidadomu.nexus.agent.core.sync.SyncInput(source.extension.lowercase().ifBlank {"bin"},source.inputStream())
+                },localUri={source->
+                    val name=source.name.take(32)+"."+source.extension
+                    val destination=File(data.parentFile,"media/$name")
+                    if(destination.exists())require(com.vidadomu.nexus.agent.core.sync.SyncBlobs.hash(destination)==source.name.substringBefore('.'))
+                    else java.nio.file.Files.copy(source.toPath(),destination.toPath())
+                    "/media/$name"
+                },deviceLabel=System.getenv("COMPUTERNAME")?:"Windows")
+                args["resolve"]?.takeIf {it!=JsonNull}?.jsonObject?.let {workspace.resolve(it.text("key"),it.text("revision"))}
+                val result=workspace.cycle(null,documents.capture(chats,montages)){rows->
+                    callback("syncApplyDocuments",JsonObject(rows))
+                    documents.apply(rows){_,_->}
+                }
+                return JsonObject(result+mapOf("rootId" to JsonPrimitive(rootId)))
+            }
             "importProjectBundle" -> assets.importProject(json.decodeFromJsonElement<IndexData>(args.getValue("index")))
             "validateProjectBundle" -> AssetIndex(null).importProject(json.decodeFromJsonElement<IndexData>(args.getValue("index")))
             "importAssets" -> args["assets"]!!.jsonArray.forEach { element ->

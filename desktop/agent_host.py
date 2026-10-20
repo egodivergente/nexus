@@ -182,7 +182,8 @@ class AgentHost:
 
     def _exchange(self, op, args, request_id):
         self.write({'op':op,'args':args,'requestId':request_id})
-        seconds = 600 if op == 'rewritePrompt' else 170
+        # Media transfers have resumable network timeouts and can exceed a chat turn.
+        seconds = 0 if op == 'driveSync' else 600 if op == 'rewritePrompt' else 170
         if op == 'send':
             settings = self.settings()
             limits = settings.get('limits') or {}
@@ -209,6 +210,14 @@ class AgentHost:
                     raise RuntimeError(response.get('error', 'Error del asistente'))
                 return response.get('value')
             name = response['callback']
+            if name == 'syncApplyDocuments' and op == 'driveSync':
+                try:
+                    value = self.drive_sync.apply_documents(response['args'])
+                    reply = {'ok': True, 'value': value}
+                except Exception:
+                    reply = {'ok': False, 'error': 'El proyecto cambió durante la sincronización. Se reintentará.'}
+                self.write({**reply, 'requestId': request_id})
+                continue
             if self.active_exchange and self.active_exchange.get('cancelled'):
                 self.write({'ok':False,'cancelled':True,'error':'Turno detenido','requestId':request_id})
                 continue
