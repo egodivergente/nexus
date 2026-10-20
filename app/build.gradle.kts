@@ -24,8 +24,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 94
-        versionName = "1.9.60-sync"
+        versionCode = 96
+        versionName = "1.9.62-background"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -62,7 +62,7 @@ android {
         create("offlineQa") {
             initWith(getByName("debug"))
             // UI audit runs in its own sandbox, preserving earlier QA installations.
-            applicationIdSuffix = when {project.hasProperty("nexusMediaQa") -> ".mediaqa";project.hasProperty("nexusUiQa") -> ".uiqa";else -> ".qa"}
+            applicationIdSuffix = when {project.hasProperty("nexusBackgroundQa") -> ".backgroundqa";project.hasProperty("nexusMediaQa") -> ".mediaqa";project.hasProperty("nexusUiQa") -> ".uiqa";else -> ".qa"}
             isDebuggable = true
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "OFFLINE_QA", "true")
@@ -178,5 +178,5 @@ dependencies {
 // Preview: skip the Kotlin JVM boxing optimizer, which can stall on large Compose
 // settings functions. Android's runtime still optimizes the installed bytecode.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    if (name == "compileAgentPreviewKotlin") compilerOptions.freeCompilerArgs.add("-Xno-optimize")
+    if (name in listOf("compileAgentPreviewKotlin", "compileOfflineQaKotlin")) compilerOptions.freeCompilerArgs.add("-Xno-optimize")
 }

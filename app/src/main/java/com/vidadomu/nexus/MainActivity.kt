@@ -69,8 +69,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
                 val createViewModel: CreateViewModel = viewModel()
-                // Ligado a la actividad (como el Lienzo): la conversación y el plan pendiente sobreviven a «Atrás» y al cambio de pestaña.
-                val assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel = viewModel()
+                val assistantViewModel = (application as NexusApplication).assistantViewModel()
                 agentDraft?.let {draft ->
                     androidx.compose.material3.AlertDialog(onDismissRequest={agentDraft=null},
                         title={androidx.compose.material3.Text("Borrador de ChatGPT")},
