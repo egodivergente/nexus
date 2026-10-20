@@ -44,6 +44,10 @@ class DriveSync:
 
     def command(self, args):
         op = args.get('op', 'status')
+        if op == 'diagnostics':
+            # Local, session-protected support information; never returns token contents.
+            return {'profile': str(self.root.resolve()), 'configurationExists': self.config_file.is_file(),
+                    'tokenStoreExists': self.secret_file.is_file(), **self.public()}
         if op == 'configure':
             path = self.host.data.parent / 'media' / args['id']
             if path.parent != self.host.data.parent / 'media' or not path.is_file() or path.stat().st_size > 65536:

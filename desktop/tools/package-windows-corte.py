@@ -10,7 +10,7 @@ import zipfile
 parser=argparse.ArgumentParser();parser.add_argument('--install',action='store_true');args=parser.parse_args()
 root=Path(__file__).resolve().parents[2];desktop=root/'desktop';out=root/'entregas';out.mkdir(exist_ok=True)
 subprocess.run(['python','-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
-version='2026.10.20-sync-preview.1'
+version='2026.10.20-sync-preview.2'
 files={}
 def include(path,relative):
     if path.is_file():files[str(relative).replace('\\','/')]=path

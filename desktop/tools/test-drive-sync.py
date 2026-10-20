@@ -74,6 +74,7 @@ class DriveSyncTest(unittest.TestCase):
         self.assertNotIn('test-access', public)
         self.assertNotIn('test-refresh', public)
         self.assertNotIn('test-only', public)
+        self.assertNotIn('test-refresh', json.dumps(self.service.command({'op': 'diagnostics'})))
 
     def test_denied_scope_never_enables_sync(self):
         url = self.service.begin()

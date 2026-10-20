@@ -44,4 +44,24 @@ class SyncWorkspaceTest {
         var count=0;docs.apply(rows){_,value->count=value["items"]!!.jsonArray.size}
         assertEquals(2,count);assertEquals(rows,docs.capture(emptyList(),emptyMap()))
     }
+    @Test fun manuallyCopiedBytesHaveOneLibraryEntryAndKeepHistoricalIdentities()=runTest {
+        val cloud=SyncJournalTest.Cloud();val a=root();val b=root()
+        fun seed(directory:File,id:String):AssetIndex {
+            val original=File(directory,"copy.png").apply {writeBytes(byteArrayOf(1,2,3,4))}
+            val file=File(directory,"index.json").apply {writeText(buildJsonObject {
+                put("projects",buildJsonArray {add(buildJsonObject {put("id","p");put("name","Proyecto");put("createdAt",1)})})
+                put("assets",buildJsonArray {add(buildJsonObject {put("id",id);put("projectId","p");put("uri",original.toURI().toString());put("type","IMAGE");put("displayName","Copia manual");put("createdAt",1)})})
+            }.toString())}
+            return AssetIndex(file)
+        }
+        val first=seed(a,"a");val second=seed(b,"b")
+        repeat(3){workspace(first,File(a,"sync"),cloud).cycle(null);workspace(second,File(b,"sync"),cloud).cycle(null)}
+        for(index in listOf(first,second)) {
+            assertEquals(1,index.snapshot().assets.count {!it.libraryDeleted})
+            assertEquals(setOf("a","b"),index.snapshot().assets.map {it.id}.toSet())
+            for(asset in index.snapshot().assets)assertTrue(File(URI(asset.uri)).exists())
+        }
+        assertEquals(1,cloud.blobs.size)
+        assertTrue(File(a,"copy.png").exists());assertTrue(File(b,"copy.png").exists())
+    }
 }

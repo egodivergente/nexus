@@ -12,6 +12,12 @@ Los medios disponibles se copian como originales verificados por SHA-256.
 Un enlace caducado que ya no permite obtener el original aparece como pendiente;
 la sincronización no puede recuperar bytes que el proveedor haya eliminado.
 
+Se reutilizan las identidades existentes entre dispositivos. Si dos copias
+manuales tienen IDs distintos pero bytes idénticos, queda una entrada visible
+por proyecto en la biblioteca. Se conservan las identidades históricas y sus
+referencias de montajes e historial; no se borran los originales. No se fusionan
+proyectos diferentes solo porque tengan el mismo nombre.
+
 Las conversaciones se importan como historial de texto. Los planes ejecutables,
 autorizaciones de herramientas, credenciales y tarjetas de acciones no se
 reactivan en el otro dispositivo. Los documentos Corte, incluido su historial

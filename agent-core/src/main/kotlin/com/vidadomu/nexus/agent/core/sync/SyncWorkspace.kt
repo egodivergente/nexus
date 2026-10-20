@@ -47,6 +47,16 @@ class SyncWorkspace(
         val localized=result.rows.mapValues {(_,row)->
             val project=row["projectId"]?.jsonPrimitive?.contentOrNull?:row["id"]?.jsonPrimitive?.contentOrNull
             SyncBlobs.rewrite(row){deviceUri(it,downloadProjects==null || project==null || project in downloadProjects)}.jsonObject
+        }.toMutableMap()
+        // Manual copies can have different asset IDs. Keep their history/references,
+        // but show identical bytes only once in each project's library.
+        var deduplicated=0
+        val copies=result.rows.filter { (key,row)->key.startsWith("assets:") && row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull!=true && row["uri"]?.jsonPrimitive?.content?.startsWith(SyncBlobs.PREFIX)==true }
+            .entries.groupBy { (_,row)->(row["projectId"]?.toString()?:"null")+":"+row["uri"]!!.jsonPrimitive.content.removePrefix(SyncBlobs.PREFIX).substringBefore('.') }
+        for(group in copies.values)for(duplicate in group.sortedBy {it.key}.drop(1)) {
+            val row=localized.getValue(duplicate.key)
+            localized[duplicate.key]=JsonObject(row+mapOf("libraryDeleted" to JsonPrimitive(true)))
+            deduplicated++
         }
         val next=buildJsonObject {
             put("schemaVersion",1)
@@ -63,7 +73,7 @@ class SyncWorkspace(
             put("key",conflict.key);put("versions",JsonArray(conflict.versions.map {version->buildJsonObject {put("id",version.id);put("device",version.device);put("at",version.at);put("value",version.value?:JsonNull)}}))
         }})
         SyncJournal.atomic(File(directory,"conflicts.json"),conflicts.toString())
-        return buildJsonObject {put("state",if(conflicts.isNotEmpty())"conflicts" else if(missing.isNotEmpty())"partial"else "synced");put("uploaded",result.uploaded);put("downloaded",result.downloaded);put("missingMedia",missing.size);put("conflicts",conflicts);put("completedAt",System.currentTimeMillis())}
+        return buildJsonObject {put("state",if(conflicts.isNotEmpty())"conflicts" else if(missing.isNotEmpty())"partial"else "synced");put("uploaded",result.uploaded);put("downloaded",result.downloaded);put("missingMedia",missing.size);put("deduplicated",deduplicated);put("conflicts",conflicts);put("completedAt",System.currentTimeMillis())}
     }
     fun resolve(key:String,revision:String)=journal.resolve(key,revision)
 }

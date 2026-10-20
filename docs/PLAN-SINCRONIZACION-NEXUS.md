@@ -67,5 +67,12 @@ https://developers.google.com/identity/protocols/oauth2#expiration
   del editor Corte y tres de transporte de proyectos también pasados.
 - El usuario no dispone de web y solicita preparar la política de privacidad.
   Borrador en `docs/privacy/nexus-sync.html`, sin publicación ni dominio ficticio.
+- El usuario confirma que puso los archivos al día manualmente y solicita
+  guardar también los originales antiguos en Drive, sin duplicarlos en la app.
+  La comparación privada de índices encuentra 601 identidades comunes entre
+  Pixel y S25 y 258 comunes con Windows. No se modifican las copias manuales.
+- Catorce casos de sincronización JVM Desktop pasados, incluido el caso de dos
+  copias con IDs diferentes y bytes idénticos: una entrada visible por proyecto,
+  identidades históricas conservadas, originales intactos y ciclos repetidos.
 - La prueba real de transporte no demuestra todavía el recorrido físico completo
   Pixel → AXELPC → S25, ni recuperación de todos los medios antiguos.
