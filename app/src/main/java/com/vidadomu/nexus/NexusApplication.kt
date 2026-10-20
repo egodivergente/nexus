@@ -57,6 +57,7 @@ class NexusApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        android.os.Handler(android.os.Looper.getMainLooper()).post {com.vidadomu.nexus.sync.NexusDriveSync.get(this).initialize()}
         runCatching {
             assets.open("atlas_editorial_evidence.json").bufferedReader().use {
                 com.vidadomu.nexus.ui.models.PublishedModelNotes.seed(it.readText())

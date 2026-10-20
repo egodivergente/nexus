@@ -23,8 +23,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 91
-        versionName = "1.9.57-agent"
+        versionCode = 93
+        versionName = "1.9.59-sync"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -73,6 +73,17 @@ android {
             // Keep stable package ID
         }
     }
+    // Existing installations retain their signing identity. The private file stays outside Git.
+    (project.findProperty("nexusSigningFile") as String?)?.let { location ->
+        val identity=Properties().apply {file(location).inputStream().use {load(it)}}
+        val stable=signingConfigs.create("nexusExistingIdentity") {
+            storeFile=file(identity.getProperty("storeFile"))
+            storePassword=identity.getProperty("storePassword")
+            keyAlias=identity.getProperty("keyAlias")
+            keyPassword=identity.getProperty("keyPassword")
+        }
+        buildTypes.getByName("agentPreview").signingConfig=stable
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -105,6 +116,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     // Núcleo del asistente (Kotlin puro, probado en JVM).
     implementation(project(":agent-core"))
     implementation("sh.calvin.reorderable:reorderable:2.4.3")

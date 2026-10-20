@@ -159,6 +159,17 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     fun snapshot(): IndexData = data
 
+    /** Sync must not overwrite edits made while network transfers were in progress. */
+    suspend fun applySyncedSnapshot(expected:IndexData,incoming:IndexData) = edit { current ->
+        check(current==expected) { "El proyecto cambió durante la sincronización. Se reintentará." }
+        require(incoming.schemaVersion==1)
+        val projectIds=incoming.projects.map {it.id}.toSet()
+        require(projectIds.size==incoming.projects.size)
+        require(incoming.assets.map {it.id}.distinct().size==incoming.assets.size)
+        require(incoming.assets.all {it.projectId==null || it.projectId in projectIds}) {"Falta el proyecto de un medio sincronizado."}
+        incoming.copy(projectSessions=current.projectSessions) to Unit
+    }
+
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
         persist(next)

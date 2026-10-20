@@ -117,6 +117,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             }}
                 }
                 SettingsPage.AGENT -> {
+                    item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
                     if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Modelo, respuesta, consumo, herramientas y skills",{assistantSettingsOpen=true})}}
                     item {SettingsHeader("Cerebros adicionales",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
                     item {SettingsCard {BrainsSettingsSection()}}
