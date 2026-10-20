@@ -172,7 +172,6 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         incoming.copy(projectSessions=current.projectSessions) to Unit
     }
 
-<<<<<<< HEAD
     /** Applies a peer snapshot under the same lock as agent/editor writes, and notifies the UI. */
     suspend fun mergeFromPeer(remote: IndexData, base: IndexData?, deletions: Boolean,
         memory: Boolean = true, gallery: Boolean = true, localBase: IndexData? = base,
@@ -201,7 +200,8 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
             assets = if (gallery) merged.assets else local.assets,
             generations = if (gallery) merged.generations else local.generations)
         next to PeerIndexMerge(next, result.conflicts)
-=======
+    }
+
     /** One atomic insertion; callers remap imported identities and materialize files first. */
     suspend fun importProject(bundle: IndexData): Project = edit { current ->
         require(bundle.schemaVersion == 1 && bundle.projects.size == 1 && bundle.projectSessions.isEmpty()) { "Paquete de proyecto incompatible" }
@@ -229,7 +229,6 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         current.copy(projects=current.projects+bundle.projects,scenes=current.scenes+bundle.scenes,
             shots=current.shots+bundle.shots,characters=current.characters+bundle.characters,
             assets=current.assets+bundle.assets,generations=current.generations+bundle.generations) to project
->>>>>>> 685cf7d
     }
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
