@@ -44,8 +44,9 @@ class SyncWorkspace(
             val file=if(download)blobs.obtain(uri) else blobs.existing(uri)
             return file?.let(localUri)?.also {downloaded[uri]=it}?:uri
         }
-        val localized=result.rows.mapValues {(_,row)->
-            val project=row["projectId"]?.jsonPrimitive?.contentOrNull?:row["id"]?.jsonPrimitive?.contentOrNull
+        val localized=result.rows.mapValues {(key,row)->
+            val project=row["projectId"]?.jsonPrimitive?.contentOrNull
+                ?:if(key.startsWith("projects:"))row["id"]?.jsonPrimitive?.contentOrNull else null
             SyncBlobs.rewrite(row){deviceUri(it,downloadProjects==null || project==null || project in downloadProjects)}.jsonObject
         }.toMutableMap()
         // Manual copies can have different asset IDs. Keep their history/references,

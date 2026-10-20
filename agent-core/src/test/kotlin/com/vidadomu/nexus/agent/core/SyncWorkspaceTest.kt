@@ -36,6 +36,17 @@ class SyncWorkspaceTest {
         assertEquals("partial",result["state"]!!.jsonPrimitive.content)
         assertEquals(1,result["missingMedia"]!!.jsonPrimitive.int)
     }
+    @Test fun originalsWithoutAProjectRemainAvailableOnMobile()=runTest {
+        val cloud=SyncJournalTest.Cloud();val a=root();val b=root()
+        val original=File(a,"unassigned.png").apply {writeBytes(byteArrayOf(11,22,33,44))}
+        val file=File(a,"index.json").apply {writeText(buildJsonObject {
+            put("assets",buildJsonArray {add(buildJsonObject {put("id","unassigned");put("uri",original.toURI().toString());put("type","IMAGE");put("displayName","Original");put("createdAt",1)})})
+        }.toString())}
+        workspace(AssetIndex(file),File(a,"sync"),cloud).cycle(null)
+        val target=AssetIndex(File(b,"index.json"))
+        workspace(target,File(b,"sync"),cloud).cycle(emptySet())
+        assertContentEquals(original.readBytes(),File(URI(target.snapshot().assets.single().uri)).readBytes())
+    }
     @Test fun conversationsImportAsHistoryWithoutRunnablePlansOrCredentials() {
         val docs=SyncDocuments(root())
         val chat=Json.parseToJsonElement("""{"items":[{"type":"com.nexus.ChatItem.User","id":"1","text":"Hola"},{"type":"com.nexus.ChatItem.Assistant","id":"2","text":"Respuesta"}],"plans":{"danger":{"confirmed":true}},"credentials":{"token":"must-not-sync"}}""").jsonObject
