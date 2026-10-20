@@ -36,16 +36,22 @@ class GenerationPollingWorker(
             if (pollResult.isSuccess) {
                 val job = pollResult.getOrThrow()
                 if (job.status == GenerationStatus.COMPLETED) {
+                    val modalityLabel = when (job.modality.name) {
+                        "VIDEO" -> "Vídeo listo"
+                        "IMAGE" -> "Imagen lista"
+                        "AUDIO" -> "Audio listo"
+                        else -> "Resultado listo"
+                    }
                     showCompletionNotification(
-                        title = "Nexus: ${job.modality.name.lowercase().replaceFirstChar { it.uppercase() }} Ready",
-                        message = "Generation finished: \"${job.prompt.take(40)}...\"",
+                        title = "Nexus: $modalityLabel",
+                        message = "Generación completada: «${job.prompt.take(40)}…»",
                         jobId = jobId
                     )
                     return Result.success()
                 } else if (job.status == GenerationStatus.FAILED) {
                     showCompletionNotification(
-                        title = if(job.parameters["__tracking_paused"]=="true") "Nexus: seguimiento pausado" else "Nexus: Generation Failed",
-                        message = job.error ?: "Unable to complete generation.",
+                        title = if(job.parameters["__tracking_paused"]=="true") "Nexus: seguimiento pausado" else "Nexus: Generación fallida",
+                        message = job.error ?: "No se pudo completar la generación.",
                         jobId = jobId
                     )
                     return Result.failure()
@@ -96,10 +102,10 @@ class GenerationPollingWorker(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Nexus Generations",
+                "Generaciones de Nexus",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications for finished AI generations in Nexus"
+                description = "Avisos cuando terminan tus generaciones en segundo plano"
             }
             manager.createNotificationChannel(channel)
         }

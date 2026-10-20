@@ -131,7 +131,23 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
                     bottomBar = {
-                        if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)
+                        if(!WindowInsets.isImeVisible) {
+                            androidx.compose.foundation.layout.Column {
+                                val currentRoute = activeEntry?.destination?.route
+                                if (currentRoute?.startsWith("output") != true) {
+                                    com.vidadomu.nexus.ui.components.LiveRenderPill(
+                                        onOpenOutput = { id -> navController.navigate("output/$id") },
+                                        onSendToAgent = { jobId, outputId ->
+                                            assistantViewModel.attachLibraryResult(jobId, outputId)
+                                            if (!navController.popBackStack(Screen.Assistant.route, false)) {
+                                                navController.navigate(Screen.Assistant.route) { launchSingleTop = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                NexusBottomBar(navController = navController)
+                            }
+                        }
                     }
                 ) { innerPadding ->
                     NavHost(
@@ -233,11 +249,10 @@ class MainActivity : ComponentActivity() {
                                 initialOutputIndex = backStackEntry.arguments?.getInt("index") ?: 0,
                                 onBack = { navController.popBackStack() },
                                 onOpenHistory = { navController.openHistoryTab() },
-                                onReuseAsInput = { content ->
-                                    if (content.startsWith("http://") || content.startsWith("https://") || content.startsWith("content://") || content.startsWith("file://")) {
-                                        // User clicked "Animar" on an image: switch to video & attach image as input
-                                        createViewModel.selectModality(com.vidadomu.nexus.core.model.Modality.VIDEO)
-                                        createViewModel.setMediaInput(Uri.parse(content), "image/jpeg")
+                                onReuseAsInput = { content, mimeType ->
+                                    if (mimeType != null) {
+                                        // Media and prompt reuse are explicit, including prompts that happen to be URLs.
+                                        createViewModel.reuseImageInput(Uri.parse(content), mimeType)
                                     } else {
                                         // User clicked "Remezclar": copy prompt
                                         createViewModel.updatePrompt(content)

@@ -103,7 +103,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
             historyError?.let { raw -> InlineNotice(noticeMessage(raw,"No se ha podido cargar el historial."),
                 modifier=Modifier.padding(horizontal=NexusTokens.screenMargin),technicalDetails=raw,actionLabel="Reintentar",
                 onAction={scope.launch {app.generationRepository.reloadHistory()}}) }
-            if(searchVisible || searchQuery.isNotBlank()) OutlinedTextField(searchQuery,{searchQuery=it},
+            if(searchVisible || searchQuery.isNotBlank()) com.vidadomu.nexus.ui.components.StudioTextField(searchQuery,{searchQuery=it},
                 modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),singleLine=true,
                 placeholder={Text("Buscar modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={IconButton(onClick={searchQuery="";searchVisible=false}) {Icon(Icons.Default.Close,"Cerrar búsqueda")}})

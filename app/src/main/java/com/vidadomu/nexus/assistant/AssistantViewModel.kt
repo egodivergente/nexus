@@ -279,13 +279,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun newConversation() = switchConversation(null)
 
+    fun continueFailedTurnInNewChat() {
+        val request = failedTurn ?: return
+        switchConversation(null, request)
+    }
+
     internal fun conversations(): List<AssistantChatEntry> = chatStore.conversations()
     internal fun openConversation(id: String) = switchConversation(id)
 
-    private fun switchConversation(id: String?) {
-        failedTurn = null
+    private fun switchConversation(id: String?, retry: Pair<String, List<Attachment>>? = null) {
         val current = _ui.value
         if(current.thinking || current.plans.values.any { it.busy }) return
+        failedTurn = null
         _ui.update { it.copy(thinking = true) }
         viewModelScope.launch {
             try {
@@ -297,6 +302,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
                 _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
+                if(retry != null) send(retry.first, retry.second)
             } catch(error: Exception) {
                 _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
             }

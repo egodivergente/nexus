@@ -404,7 +404,8 @@ class AgentOrchestrator(
         if (last != null && last.role == Role.USER) {
             val existingDocuments=last.content.filterIsInstance<ContentBlock.Document>().map {it.name}.toSet()
             val merged=last.content + blocks.filterNot {it is ContentBlock.Document && it.name in existingDocuments}
-            require(merged.count {it is ContentBlock.Document}<=5) {"Este mensaje ya contiene 5 documentos. Completa el turno antes de añadir más."}
+            val docLimit = config.limits.documents
+            require(merged.count {it is ContentBlock.Document} <= docLimit) {"Este mensaje ya contiene $docLimit documentos. Completa el turno antes de añadir más."}
             conv.messages[conv.messages.lastIndex] = last.copy(content = merged)
         }
         else conv.messages += LlmMessage(Role.USER, blocks)

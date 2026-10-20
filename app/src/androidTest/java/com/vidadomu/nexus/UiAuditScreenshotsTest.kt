@@ -99,7 +99,7 @@ class UiAuditScreenshotsTest {
                             "modelos" -> ModelsScreen({})
                             "modelo-opciones" -> ModelOptionsScreen(CatalogModelGroup("ui-audit", "GPT Image", listOf(model)), emptySet(), {}, {})
                             "biblioteca" -> LibraryScreen({})
-                            "visor" -> OutputViewerScreen(id, {}, {})
+                            "visor" -> OutputViewerScreen(id, {}, { _, _ -> })
                             "asistente", "proyecto" -> AssistantScreen(onOpenInCanvas = {}, onNavigateToOutput = {}, onOpenSettings = {}, vm = assistant)
                             "ajustes" -> SettingsScreen({})
                             "flow" -> FlowCreateScreen({}, {})

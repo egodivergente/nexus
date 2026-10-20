@@ -61,28 +61,38 @@ data class CreateUiState(
                     } else if(prompt.isBlank()) add("Descripción de la canción")
                 }
                 model.contractMedia.filter { it.required && attachedMedia.none { media -> media.fieldKey==it.key } }.forEach { add(it.label) }
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Fotogramas" &&
+                    attachedMedia.none { it.fieldKey=="initial_frame" }) add("Fotograma Inicio")
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Referencias" &&
+                    attachedMedia.none { it.fieldKey=="reference_ids" }) add("Imágenes de referencia")
                 model.parameters.filter { it.isRequired && parameters[it.key].isNullOrBlank() }.forEach { add(it.displayName) }
             }
-            model.nativeRequiredFields.filter { field ->
-                when (field) {
-                    "model" -> false
-                    in model.contractMedia.map { it.key } -> attachedMedia.none { media -> media.fieldKey==field }
-                    "prompt" -> prompt.isBlank()
-                    model.firstFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.PRIMARY_IMAGE }
-                    model.lastFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.LAST_FRAME }
-                    model.imagesArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.REFERENCE_IMAGE }
-                    model.videoField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_INPUT }
-                    model.videosArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_REFERENCE }
-                    else -> parameters[field].isNullOrBlank()
-                }
-            }.map { field -> when (field) {
-                "prompt" -> "Prompt"
-                model.firstFrameField -> "Imagen de entrada"
-                model.lastFrameField -> "Último fotograma"
-                model.imagesArrayField -> "Imágenes de referencia"
-                model.videoField, model.videosArrayField -> "Vídeo de entrada"
-                else -> model.parameters.find { it.key == field }?.displayName ?: field
-            } }
+            else buildList<String> {
+                addAll(model.nativeRequiredFields.filter { field ->
+                    when (field) {
+                        "model" -> false
+                        in model.contractMedia.map { it.key } -> attachedMedia.none { media -> media.fieldKey==field }
+                        "prompt" -> prompt.isBlank()
+                        model.firstFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.PRIMARY_IMAGE }
+                        model.lastFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.LAST_FRAME }
+                        model.imagesArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.REFERENCE_IMAGE }
+                        model.videoField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_INPUT }
+                        model.videosArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_REFERENCE }
+                        else -> parameters[field].isNullOrBlank()
+                    }
+                }.map { field -> when (field) {
+                    "prompt" -> "Prompt"
+                    model.firstFrameField -> "Imagen de entrada"
+                    model.lastFrameField -> "Último fotograma"
+                    model.imagesArrayField -> "Imágenes de referencia"
+                    model.videoField, model.videosArrayField -> "Vídeo de entrada"
+                    else -> model.parameters.find { it.key == field }?.displayName ?: field
+                } })
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Fotogramas" &&
+                    attachedMedia.none { it.fieldKey=="initial_frame" }) add("Fotograma Inicio")
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Referencias" &&
+                    attachedMedia.none { it.fieldKey=="reference_ids" }) add("Imágenes de referencia")
+            }
         }.orEmpty()
     val inputMediaUri: Uri?
         get() = attachedMedia.firstOrNull()?.uriString?.let { Uri.parse(it) }
@@ -249,6 +259,19 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             parameters=model.parameters.associate {it.key to it.defaultValue},attachedMedia=media,schemaReady=true)
         restoreDraftIfMatching(model)
         _uiState.update {it.copy(attachedMedia=(it.attachedMedia+media).distinctBy {item->Triple(item.slotType,item.fieldKey,item.uriString)})}
+    }
+
+    fun swapFlowFrames() {
+        _uiState.update { state ->
+            val start = state.attachedMedia.firstOrNull { it.fieldKey == "initial_frame" } ?: return@update state
+            val end = state.attachedMedia.firstOrNull { it.fieldKey == "end_frame" } ?: return@update state
+            val (swappedStart, swappedEnd) = com.vidadomu.nexus.provider.flow.FlowReferences.swapFrames(start, end)
+            state.copy(attachedMedia = state.attachedMedia.map { media -> when (media.id) {
+                start.id -> swappedStart
+                end.id -> swappedEnd
+                else -> media
+            }})
+        }
     }
 
     fun selectModality(modality: Modality) {
@@ -600,6 +623,43 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(attachedMedia = emptyList()) }
     }
 
+    /** Wait for the real media contract before attaching a frame or animating an image. */
+    private var reuseImageJob: kotlinx.coroutines.Job? = null
+    fun reuseImageInput(uri: Uri, mimeType: String?) {
+        reuseImageJob?.cancel()
+        reuseImageJob = viewModelScope.launch {
+            selectModality(Modality.VIDEO)
+            var expectedId = _uiState.value.selectedModel?.id
+            schemaJob?.join()
+            if (_uiState.value.selectedModel?.id != expectedId) return@launch
+            fun acceptsImage(m: NexusModel) = m.inputMode != ModelInputMode.VIDEO_INPUT && (
+                m.inputMode in setOf(ModelInputMode.SINGLE_IMAGE, ModelInputMode.DUAL_FRAME, ModelInputMode.MULTI_IMAGE) ||
+                m.firstFrameField != null || m.inputImageField != null || m.imagesArrayField != null ||
+                m.contractMedia.any { it.mime.startsWith("image/") })
+            if (_uiState.value.selectedModel?.let(::acceptsImage) != true) {
+                val target = _uiState.value.availableModels.firstOrNull(::acceptsImage)
+                if (target != null) { selectModel(target); expectedId=target.id; schemaJob?.join() }
+                if (_uiState.value.selectedModel?.id != expectedId) return@launch
+            }
+            if (_uiState.value.selectedModel?.let(::acceptsImage) != true || !_uiState.value.schemaReady) {
+                _uiState.update { it.copy(errorMessage = "Selecciona un modelo de vídeo que admita imágenes para usar este archivo.") }
+                return@launch
+            }
+            val resolved = mimeType?.takeIf { it.startsWith("image/") }
+                ?: app.contentResolver.getType(uri)
+                ?: android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                    uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase())
+                ?: "application/octet-stream"
+            val selected = _uiState.value.selectedModel!!
+            if (selected.providerId == "google_flow") {
+                updateParameter("mode", "Fotogramas")
+                selected.contractMedia.firstOrNull { it.key == "initial_frame" }?.let { setContractMedia(it, uri, resolved) }
+            } else if (selected.contractEndpoint != null) {
+                selected.contractMedia.firstOrNull { it.mime.startsWith("image/") }?.let { setContractMedia(it, uri, resolved) }
+            } else setMediaInput(uri, resolved)
+        }
+    }
+
     fun setMediaInput(uri: Uri?, mimeType: String?) {
         if (uri == null) {
             clearAllMedia()
@@ -695,6 +755,40 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update {
                     it.copy(isSubmitting = false, isUploading = false, uploadProgress = null)
                 }
+            }
+        }
+    }
+
+    /**
+     * Lanza un trabajo por prompt con el modelo, parámetros y adjuntos actuales del Lienzo.
+     * Se envían de uno en uno; un fallo no detiene los demás y se informa al final.
+     */
+    fun submitBatch(prompts: List<String>, onProgress: (Int, Int) -> Unit, onDone: (sent: Int, firstError: String?) -> Unit) {
+        if (comparison.sending || _uiState.value.isSubmitting || prompts.isEmpty()) return
+        if (com.vidadomu.nexus.BuildConfig.OFFLINE_QA) { onDone(0, "NEXUS Lab: envío bloqueado; no se ha consumido saldo."); return }
+        val batchSettings = com.vidadomu.nexus.assistant.AssistantRuntime.get(app).settings
+        val batchLimit = batchSettings.effectiveLimits(batchSettings.load()).maxGenerationsPerBatch
+        if (batchLimit > 0 && prompts.size > batchLimit) { onDone(0, "El lote supera tu límite de $batchLimit trabajos."); return }
+        val base = _uiState.value
+        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+        viewModelScope.launch {
+            var sent = 0
+            var firstError: String? = null
+            try {
+                for ((index, prompt) in prompts.withIndex()) {
+                    onProgress(index, prompts.size)
+                    try {
+                        GenerationDispatcher(app).submit(base.copy(prompt = prompt))
+                        sent++
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (e: Exception) {
+                        if (firstError == null) firstError = "«${prompt.take(40)}»: ${e.message ?: "no se pudo enviar"}"
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(isSubmitting = false, isUploading = false, uploadProgress = null) }
+                onDone(sent, firstError)
             }
         }
     }
