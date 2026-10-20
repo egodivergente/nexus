@@ -48,6 +48,30 @@ jobs:
           path: app/build/outputs/apk/agentPreview/*.apk
           if-no-files-found: error
 
+      # Firma la APK de pruebas con la clave del dispositivo (secreto NEXUS_DEBUG_KEYSTORE_B64, fuera de Git),
+      # para que se instale encima de la que ya tiene el teléfono sin perder datos.
+      - name: Sign Agent APK with the device key
+        env:
+          NEXUS_DEBUG_KEYSTORE_B64: ${{ secrets.NEXUS_DEBUG_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$NEXUS_DEBUG_KEYSTORE_B64" || { echo "Falta el secreto NEXUS_DEBUG_KEYSTORE_B64"; exit 1; }
+          KEYSTORE="$RUNNER_TEMP/device.keystore"
+          echo "$NEXUS_DEBUG_KEYSTORE_B64" | base64 -d > "$KEYSTORE"
+          mkdir -p signed
+          cp app/build/outputs/apk/agentPreview/*.apk signed/agent-preview-device-signed.apk
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android signed/agent-preview-device-signed.apk
+          "$APKSIGNER" verify --print-certs signed/agent-preview-device-signed.apk | grep -i "SHA-256"
+          rm -f "$KEYSTORE"
+
+      - name: Upload device-signed Agent APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-agent-preview-device-signed
+          path: signed/agent-preview-device-signed.apk
+          if-no-files-found: error
+
       - name: Run unit tests
         run: |
           set -o pipefail
