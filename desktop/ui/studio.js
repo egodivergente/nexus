@@ -99,14 +99,13 @@ async function studioAttach(files,fieldKey){
  if(!field)throw Error('Este modelo no admite estos archivos.');
  if(files.length+state.draft.media.filter(f=>f.field===field.key).length>(field.maximum||1))throw Error('Se supera el numero de referencias admitidas.');
  if(files.some(f=>!f.type.startsWith(field.mime.split('/')[0]+'/')))throw Error('El formato no corresponde a este campo.');
- if(files.some(f=>f.size>12*1024*1024))throw Error('Para archivos de mas de 12 MB usa el boton de adjuntar.');
+ if(files.some(f=>f.size>4*1024**3))throw Error('Máximo 4 GiB por archivo.');
  if(!initial.browserImport)throw Error('Reabre Nexus para activar pegar y arrastrar archivos.');
  Studio.importing=true;
  try{
  const modelId=loaded.id,imports=[];
  for(const file of files){
-  const content=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=reject;reader.readAsDataURL(file);});
-  const item=await rpc('importMedia',{name:file.name,mime:file.type,content});
+  const item=await NexusImports.importFile(file);
   if(file.type.startsWith('video/')||file.type.startsWith('audio/')){
    item.duration=await new Promise(resolve=>{
     const media=document.createElement(file.type.startsWith('video/')?'video':'audio');

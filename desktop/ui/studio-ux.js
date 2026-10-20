@@ -53,7 +53,7 @@
   let panel=$('#studio-start-guide');
   if(!show){panel?.remove();return;}
   if(panel)return;
-  const ver=(typeof initial!=='undefined'&&initial?.version)?('v'+String(initial.version).replace(/^v/i,'')):'v1.9.5-agent-desktop';
+  const ver=(typeof initial!=='undefined'&&initial?.version)?('v'+String(initial.version).replace(/^v/i,'')):'v2026.10.19-corte-preview.4';
   panel=document.createElement('section');panel.id='studio-start-guide';panel.setAttribute('aria-label','Primeros pasos');
   panel.innerHTML='<div class="studio-guide-heading"><div class="nx-guide-brand"><img src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="52" height="50"><div><strong>Tu primera creación</strong><span class="nx-version-badge" data-nx-version>'+ver+'</span></div></div><button type="button" data-studio-help="dismiss" aria-label="Cerrar guía">Cerrar</button></div><ol><li><button type="button" data-studio-help="model">Elige un modelo</button><span>Imagen o vídeo, con las entradas que necesitas.</span></li><li><button type="button" data-studio-help="prompt">Describe tu idea</button><span>Añade referencias y ajusta sus opciones.</span></li><li><button type="button" data-studio-help="results">Revisa tus resultados</button><span>Consulta el coste antes de generar. Tus creaciones quedan en la galería.</span></li></ol>';
   $('#content').prepend(panel);

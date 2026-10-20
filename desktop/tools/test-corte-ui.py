@@ -1,0 +1,124 @@
+"""Browser/host/JVM integration with a private test profile and synthetic media."""
+from pathlib import Path
+import json
+import hashlib
+import os
+import subprocess
+import sys
+import time
+import uuid
+from playwright.sync_api import sync_playwright
+
+root=Path(__file__).resolve().parents[2]
+out=root/'outputs/windows-corte/ui';out.mkdir(parents=True,exist_ok=True)
+data=out/('profile-'+uuid.uuid4().hex[:8]);(data/'assistant').mkdir(parents=True)
+(data/'media').mkdir()
+(data/'state.json').write_text(json.dumps({'jobs':[],'draft':{'prompt':'','values':{},'media':[]}}),encoding='utf-8')
+sys.path.insert(0,str(root/'desktop'))
+from native_operations import NativeOperations
+native=NativeOperations(data,None,lambda:{},lambda _:None,None,lambda:{})
+video=data/'media'/('b'*32+'.mp4')
+native.encode(['-f','lavfi','-i','testsrc2=s=320x240:r=25:d=4','-f','lavfi','-i','sine=frequency=440:duration=4','-c:v','libx264','-c:a','aac',video])
+sound=data/'media'/('c'*32+'.wav')
+native.encode(['-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=4','-c:a','pcm_s16le',sound])
+native.executor.shutdown()
+host=subprocess.Popen([sys.executable,str(root/'desktop/local_host.py'),'--headless','--offline-qa','--data-dir',str(data)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+try:
+ url=json.loads(host.stdout.readline())['url']
+ with sync_playwright() as p:
+  browser=p.chromium.launch(channel='msedge',headless=True)
+  page=browser.new_page(viewport={'width':1600,'height':1000});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+  page.goto(url)
+  page.wait_for_function('()=>typeof Corte!=="undefined"&&Boolean(initial)&&Boolean(window.NexusAgentParity)',timeout=45000)
+  page.evaluate("()=>{window.qaRpcErrors=[];const before=rpc;rpc=async(op,args={})=>{try{return await before(op,args);}catch(e){qaRpcErrors.push({op,method:args.method,subop:args.op,error:e.message});throw e;}};}")
+  page.evaluate("async()=>{await ensureAssistantReady();await agentCall('createProject',{name:'Montaje Windows · prueba local'});}")
+  page.get_by_role('button',name='Corte',exact=True).click()
+  page.wait_for_function("()=>document.querySelector('#navigation [data-nav=editor]')?.textContent.includes('Corte')&&document.querySelector('#title')?.textContent==='Corte · Montaje'")
+  try:
+   page.wait_for_function('()=>Boolean(Corte.snapshot)&&!Agent.busy',timeout=45000)
+  except Exception:
+   print(json.dumps({'errors':errors,'state':page.evaluate('({view,rpcErrors:qaRpcErrors,corte:{...Corte,selected:[...Corte.selected]},agentError:Agent.error,agentBusy:Agent.busy,content:document.body.innerText.slice(-4000)})')},ensure_ascii=False,default=str))
+   page.screenshot(path=str(out/'failure.png'),full_page=True)
+   raise
+  assert page.locator('[data-corte=split]').is_disabled()
+  assert page.locator('[data-corte=preview]').is_disabled()
+  page.evaluate("async()=>{await agentCall('importReferences',{projectId:Corte.projectId,files:[{uri:'/media/"+video.name+"',mime:'video/mp4',name:'Plano de prueba'},{uri:'/media/"+sound.name+"',mime:'audio/wav',name:'Música de prueba'}]});renderCorteAssets();}")
+  search=page.get_by_role('searchbox',name='Buscar medios del proyecto')
+  search.fill('no-coincide-con-ningun-medio');assert page.get_by_text('Sin coincidencias',exact=True).is_visible()
+  search.fill('');assert page.locator('.corte-asset').count()==2
+  page.get_by_role('button',name='Vista de enfoque',exact=True).click()
+  assert not page.locator('.corte-media').is_visible() and not page.locator('#corte-chat').is_visible()
+  assert page.get_by_role('button',name='Vista de enfoque',exact=True).get_attribute('aria-pressed')=='true'
+  page.get_by_role('button',name='Vista de enfoque',exact=True).click()
+  assert page.locator('.corte-media').is_visible() and page.locator('#corte-chat').is_visible()
+  page.locator('[data-corte-place]').first.click()
+  page.wait_for_selector('.corte-clip')
+  page.locator('.corte-clip').first.click()
+  page.wait_for_function('()=>Corte.selected.size>0&&!Corte.busy')
+  assert page.locator('[data-corte=split]').is_enabled()
+  page.locator('[data-corte=duplicate]').click()
+  try:
+   page.wait_for_function('()=>corteClips().filter(c=>c.kind==="VIDEO").length===2&&!Corte.busy')
+  except Exception:
+   print(json.dumps(page.evaluate('({errors:qaRpcErrors,clips:corteClips(),selected:[...Corte.selected],busy:Corte.busy,error:Corte.error,toast:document.querySelector("#toast").textContent})'),ensure_ascii=False))
+   raise
+  page.get_by_role('button',name='Añadir pista de audio',exact=True).click()
+  page.locator('#corte-audio-new [name=name]').fill('Música')
+  page.locator('#corte-audio-new [name=role]').select_option('MUSIC')
+  page.get_by_role('button',name='Crear pista',exact=True).click()
+  page.wait_for_function('()=>Corte.snapshot.project.timeline.audioTracks.length===2&&!Corte.busy')
+  page.locator('[data-corte-time="0"]').click();page.wait_for_function('()=>!Corte.busy')
+  page.locator('.corte-asset').filter(has_text='Música de prueba').get_by_role('button',name='Añadir al cabezal',exact=True).click()
+  page.wait_for_function('()=>Corte.snapshot.project.timeline.audioTracks[1].clips.length===1&&!Corte.busy')
+  assert page.evaluate('Corte.snapshot.project.timeline.videoTracks[0].clips[0].timelineStartUs')==0
+  page.get_by_role('button',name='Silenciar Música',exact=True).click()
+  page.wait_for_function('()=>Corte.snapshot.project.timeline.audioTracks[1].muted&&!Corte.busy')
+  page.get_by_role('button',name='Silenciar Música',exact=True).click()
+  page.wait_for_function('()=>!Corte.snapshot.project.timeline.audioTracks[1].muted&&!Corte.busy')
+  page.get_by_role('button',name='Solo Música',exact=True).click()
+  page.wait_for_function('()=>Corte.snapshot.project.timeline.audioTracks[1].solo&&!Corte.busy')
+  page.get_by_role('button',name='Solo Música',exact=True).click()
+  page.wait_for_function('()=>!Corte.snapshot.project.timeline.audioTracks[1].solo&&!Corte.busy')
+  page.get_by_role('button',name='Ajustar pista Música',exact=True).click()
+  page.locator('#corte-audio-settings [name=name]').fill('Banda sonora')
+  page.locator('#corte-audio-settings [name=gain_db]').fill('-6')
+  page.get_by_role('button',name='Guardar pista',exact=True).click()
+  page.wait_for_function('()=>Corte.snapshot.project.timeline.audioTracks[1].gainDb===-6&&!Corte.busy')
+  page.locator('[data-corte=preview]').click()
+  page.wait_for_function('()=>Corte.jobs.some(j=>j.kind==="preview"&&["COMPLETED","FAILED"].includes(j.state))',timeout=180000)
+  jobs=page.evaluate('Corte.jobs');assert jobs[0]['state']=='COMPLETED',jobs
+  page.wait_for_function('()=>document.querySelector("#corte-video").readyState>=2',timeout=30000)
+  page.evaluate("()=>{document.querySelector('#corte-video').currentTime=1;}")
+  page.wait_for_timeout(800)
+  page.screenshot(path=str(out/'editor.png'),full_page=True)
+  page.locator('[data-corte=chat]').click();assert not page.locator('#corte-chat').is_visible()
+  page.locator('[data-corte=chat]').click();assert page.locator('#corte-chat').is_visible()
+  page.evaluate('()=>{renderAssistant();renderAssistant();renderAssistant();}')
+  assert page.locator('#brain-quick').count()==1
+  assert page.locator('#corte-chat .corte-agent-details > summary').count()==1
+  page.evaluate('agentSettings()');page.wait_for_selector('#brain-settings-form')
+  page.select_option('#brain-template','byteplus')
+  assert page.locator('[name=backend]').input_value()=='profile'
+  page.screenshot(path=str(out/'brain-settings.png'),full_page=True)
+  page.locator('[data-brain=close]').click()
+  page.evaluate("navigate('library')");page.wait_for_timeout(500)
+  page.evaluate("navigate('editor')");page.wait_for_selector('.corte-clip')
+  page.locator('[data-corte=media]').click()
+  page.get_by_role('button',name='Biblioteca',exact=True).click()
+  page.get_by_role('button',name='Corte',exact=True).click()
+  assert not page.locator('.corte-media').is_visible()
+  page.locator('[data-corte=media]').click()
+  page.set_viewport_size({'width':1280,'height':800})
+  page.screenshot(path=str(out/'editor-1280.png'),full_page=True)
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+  page.set_viewport_size({'width':1000,'height':800})
+  page.screenshot(path=str(out/'editor-1000.png'),full_page=True)
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+  page.set_viewport_size({'width':1600,'height':1000})
+  assert not errors,errors
+  (out/'result.json').write_text(json.dumps({'result':'PASS','installedRoot':str(root),'hostSession':json.loads((data/'local-session.json').read_text('utf-8')),'runtimeHashes':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'desktop/agent/runtime').glob('*.jar')},'browserErrors':errors,'checks':['same-window-editor-chat','shared-project','library-placement','manual-engine-edit','preview-output-playback','collapsible-chat','brain-profile-form','navigation-preserves-montage','media-search','focus-mode','selection-aware-controls','panel-preferences','responsive-1280-1000','single-model-selector-after-refresh','create-audio-track','target-audio-track','track-mute-solo-gain','multitrack-playback'],'screenshots':['editor.png','brain-settings.png']},indent=2),encoding='utf-8')
+  print((out/'result.json').read_text('utf-8'));browser.close()
+finally:
+ host.terminate()
+ try:host.wait(timeout=10)
+ except subprocess.TimeoutExpired:host.kill()

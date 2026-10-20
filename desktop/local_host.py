@@ -39,12 +39,18 @@ SCHEMA_LOCK = threading.Lock()
 ALLOWED_PROVIDERS = {'atlas_cloud': 'https://api.atlascloud.ai',
                      'runway': 'https://api.dev.runwayml.com',
                      'crun': 'https://api.crun.ai'}
-MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif':'image/gif',
-        '.webp': 'image/webp', '.mp4': 'video/mp4', '.mov': 'video/quicktime',
-        '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
-        '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
-        '.pdf': 'application/pdf', '.txt': 'text/plain', '.md': 'text/markdown',
-        '.csv': 'text/csv', '.html': 'text/html', '.srt': 'text/plain', '.zip': 'application/zip'}
+from media_import import MIME, MAX_IMPORT_BYTES, MediaImporter
+_IMPORTERS = {}
+_IMPORTERS_LOCK = threading.Lock()
+
+
+def media_importer():
+    with _IMPORTERS_LOCK:
+        key = str(MEDIA)
+        if key not in _IMPORTERS:
+            _IMPORTERS[key] = MediaImporter(MEDIA)
+        return _IMPORTERS[key]
+
 
 
 class Blob(ctypes.Structure):
@@ -105,6 +111,11 @@ def agent_host():
             _agent = AgentHost(ROOT, DATA, windows_keys, write_secret)
             from native_operations import NativeOperations
             _agent.native = NativeOperations(DATA, _agent, read_state, write_state, provider_request, windows_keys)
+            from corte_host import CorteHost
+            _agent.corte = CorteHost(ROOT, DATA, _agent.native)
+            if not OFFLINE_QA:
+                from drive_sync import DriveSync
+                _agent.drive_sync = DriveSync(_agent)
     return _agent
 
 
@@ -248,20 +259,8 @@ def select_files():
         names = app.tk.splitlist(filedialog.askopenfilenames(parent=app, title='Añadir archivos a Nexus'))
     finally:
         app.destroy()
-    files = []
-    for name in names:
-        source = Path(name)
-        if not source.is_file() or source.stat().st_size > 512 * 1024 * 1024:
-            raise ValueError('El archivo no existe o supera los 512 MB.')
-        ext = source.suffix.lower()
-        if ext not in MIME:
-            raise ValueError('Nexus no admite este formato de archivo.')
-        identifier = uuid.uuid4().hex + ext
-        target = MEDIA / identifier
-        shutil.copy2(source, target)
-        files.append({'id': identifier, 'name': source.name, 'size': target.stat().st_size,
-                      'mime': MIME[ext], 'url': '/media/' + identifier})
-    return files
+    return [media_importer().copy(name) for name in names]
+
 
 
 def media_path(identifier):
@@ -364,6 +363,29 @@ def save_remote(url):
 
 
 def dispatch(keys, operation, args):
+    if operation == 'driveSync':
+        if OFFLINE_QA:
+            return {'state':'unavailable','connected':False,'configured':False,'enabled':False,'conflicts':[]}
+        host = agent_host()
+        with _agent_lock:
+            if not hasattr(host, 'drive_sync'):
+                from drive_sync import DriveSync
+                host.drive_sync = DriveSync(host)
+        return host.drive_sync.command(args)
+    if operation == 'agentCancel':
+        return agent_host().cancel(args.get('owner'),args.get('turn_id'))
+    if operation == 'portableProject' or operation == 'exportProject' and 'assetIds' not in args:
+        from portable_project import PortableProject
+        return PortableProject(agent_host(),allow_network=not OFFLINE_QA).command(args['op'] if operation=='portableProject' else 'export',args)
+    if operation == 'customMedia':
+        if OFFLINE_QA and args.get('op') in {'submit', 'status', 'upload', 'test'}:
+            raise ValueError('Operaciones de red desactivadas en el perfil de prueba.')
+        host = agent_host()
+        with _agent_lock:
+            if not hasattr(host, 'custom_media'):
+                from custom_media import CustomMedia
+                host.custom_media = CustomMedia(DATA, host.corte.exchange, windows_keys, write_secret)
+        return host.custom_media.command(args['op'], args.get('args', {}))
     if operation == 'readCredential':
         if args.get('provider') in ALLOWED_PROVIDERS:
             return {'value': keys.get(args['provider'], '')}
@@ -448,8 +470,10 @@ def dispatch(keys, operation, args):
                 _, source = native.asset(asset['id'], assets)
                 archive.write(source, 'media/'+asset['id']+source.suffix)
         return {'url': '/media/'+identifier, 'name': project['name']+'.zip', 'assets': len(assets)}
+    if operation == 'corte':
+        return agent_host().corte.run(args)
     if operation == 'nativeOperation':
-        if OFFLINE_QA and args.get('operation') in {'web_search', 'read_web_page', 'connect_mcp_server', 'call_mcp_tool', 'atlas_get_balance', 'diagnose_flow', 'repair_flow', 'recover_generation'}:
+        if OFFLINE_QA and args.get('operation') in {'web_search', 'read_web_page', 'connect_mcp_server', 'call_mcp_tool', 'atlas_get_balance', 'diagnose_flow', 'repair_flow', 'recover_generation', 'run_windows_command', 'open_windows_item'}:
             raise ValueError('Laboratorio: operación de red bloqueada.')
         return agent_host().native.run(args)
     if operation == 'mediaJobs':
@@ -476,9 +500,9 @@ def dispatch(keys, operation, args):
         flow_models = flow_provider.catalog()
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
-        return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '1.9.5-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
-                'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
+        return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
+                'version': '2026.10.20-desktop-local-4gb.1', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
             return {'status': 'unavailable', 'checked_at': 0}
@@ -507,6 +531,14 @@ def dispatch(keys, operation, args):
         write_state(args); return True
     if operation == 'pick':
         return select_files()
+    if operation == 'importBegin':
+        return media_importer().begin(args.get('name', ''), args.get('size'))
+    if operation == 'importChunk':
+        return media_importer().append(args.get('import_id'), args.get('offset'), args.get('content'))
+    if operation == 'importFinish':
+        return media_importer().finish(args.get('import_id'))
+    if operation == 'importAbort':
+        return media_importer().abort(args.get('import_id'))
     if operation == 'importMedia':
         name = Path(str(args.get('name', 'image.png'))).name
         ext = Path(name).suffix.lower()
@@ -594,6 +626,14 @@ def dispatch(keys, operation, args):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def handle(self):
+        try:
+            super().handle()
+        except ConnectionError:
+            # Closing a tab or cancelling playback can close an in-flight response.
+            # The dispatched operation is not retried.
+            pass
+
     server_version = 'NexusLocal/1.0'
 
     def log_message(self, *args):
@@ -809,6 +849,8 @@ def main():
 
 
 class LoopbackHTTPServer(ThreadingHTTPServer):
+    # Static UI modules and concurrent agent/editor RPCs share this loopback listener.
+    request_queue_size = 64
     def server_bind(self):
         # The address is explicitly loopback; startup does not need reverse DNS.
         socketserver.TCPServer.server_bind(self)
@@ -826,7 +868,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.5-agent-desktop'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.20-desktop-local-4gb.1'}),
         encoding='utf-8',
     )
     if options.headless:

@@ -14,6 +14,7 @@ class SyncWorkspaceTest {
     private fun workspace(index:AssetIndex,dir:File,cloud:SyncRemote)=SyncWorkspace(index,dir,cloud,open={uri->
         if(uri.startsWith("file:")){val source=File(URI(uri));SyncInput(source.extension,source.inputStream())}else null
     })
+<<<<<<< HEAD
     @Test fun peerUpdateCannotBeOverwrittenByInFlightDriveSnapshot()=runTest {
         val file=File(root(),"index.json").apply {writeText("""{"projects":[{"id":"p","name":"Proyecto","createdAt":1}]}""")}
         val index=AssetIndex(file);val expected=index.snapshot()
@@ -22,6 +23,8 @@ class SyncWorkspaceTest {
         assertFailsWith<IllegalStateException>{index.applySyncedSnapshot(expected,expected)}
         assertEquals("Editado en otro móvil",index.snapshot().projects.single().description)
     }
+=======
+>>>>>>> 685cf7d
     @Test fun realBytesMoveBetweenDevicesAndProjectDownloadIsSelective()=runTest {
         val cloud=SyncJournalTest.Cloud();val a=root();val b=root();val original=File(a,"image.png").apply {writeBytes(byteArrayOf(137.toByte(),80,78,71,13,10,26,10,1,2,3))}
         val sourceFile=File(a,"index.json").apply {writeText(buildJsonObject {

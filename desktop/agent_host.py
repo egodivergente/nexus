@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 import uuid
+from jvm_protocol import decode_line
 
 
 class AgentHost:
@@ -22,6 +23,9 @@ class AgentHost:
         self.lock = threading.Lock()
         self.pending_lock = threading.Lock()
         self.pending = {}
+        self.write_lock = threading.Lock()
+        self.active_exchange = None
+        self.turn_id = None
         self.lines = queue.Queue()
         self.owner = None
         self.native = None
@@ -50,7 +54,7 @@ class AgentHost:
     def save_settings(self, args):
         settings = self.settings()
         fields = {'backend', 'region', 'modelId', 'mode', 'maxTokens', 'sendImages',
-                  'excludedFamilies', 'endpoint', 'temperature', 'projectId', 'perTurnUsd', 'dailyUsd', 'perTurnCalls'}
+                  'excludedFamilies', 'endpoint', 'temperature', 'projectId', 'perTurnUsd', 'dailyUsd', 'perTurnCalls', 'brainProfile', 'limits'}
         settings.update({k: v for k, v in args.items() if k in fields})
         import re
         from urllib.parse import urlsplit
@@ -63,26 +67,32 @@ class AgentHost:
             raise ValueError('URL del proxy no valida.')
         if not re.fullmatch(r'[a-z]{2}(-[a-z]+)+-\d', str(settings['region'])):
             raise ValueError('Region de AWS no valida.')
-        if settings['backend'] not in {'direct', 'proxy'} or settings['mode'] not in {'ASSISTANT', 'COPILOT', 'AGENT'}:
+        if settings['backend'] not in {'direct', 'proxy', 'profile', 'anthropic', 'openai', 'antigravity'} or settings['mode'] not in {'ASSISTANT', 'COPILOT', 'AGENT'}:
             raise ValueError('Modo no valido.')
         settings['endpoint'] = endpoint
-        settings['maxTokens'] = max(256, min(32000, int(settings['maxTokens'])))
+        settings['maxTokens'] = max(1, int(settings['maxTokens']))
         for field in ('perTurnUsd', 'dailyUsd'):
             if field in settings:
                 import math
                 value = float(settings[field])
-                if not math.isfinite(value) or value <= 0:
-                    raise ValueError('El límite de consumo debe ser mayor que cero.')
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError('El límite de consumo no puede ser negativo.')
                 settings[field] = value
         if 'perTurnCalls' in settings:
-            settings['perTurnCalls'] = max(1, min(64, int(settings['perTurnCalls'])))
+            settings['perTurnCalls'] = max(0, int(settings['perTurnCalls']))
         secret = self.read_secret(self.data / 'credentials.dpapi')
-        for key in ('accessKey', 'secretKey', 'sessionToken', 'token'):
+        profile = settings.get('brainProfile') or {}
+        if args.get('brainProfile'):
+            profiles = dict(settings.get('brainProfiles') or {})
+            profiles[profile['id']] = profile
+            settings['brainProfiles'] = profiles
+        for key in ('accessKey', 'secretKey', 'sessionToken', 'token', 'apiKey', 'brainKey'):
             if key in args:
+                stored_key = ('brain:'+profile['id']) if key == 'brainKey' and profile.get('id') else ('api:'+settings['backend']) if key == 'apiKey' else key
                 if str(args[key]).strip():
-                    secret[key] = str(args[key]).strip()
+                    secret[stored_key] = str(args[key]).strip()
                 elif args.get('clearCredentials'):
-                    secret.pop(key, None)
+                    secret.pop(stored_key, None)
         self.write_secret(self.data / 'credentials.dpapi', secret)
         temporary = self.data / 'settings.json.tmp'
         temporary.write_text(json.dumps(settings, ensure_ascii=False), encoding='utf-8')
@@ -92,6 +102,14 @@ class AgentHost:
     def public_settings(self):
         secret = self.read_secret(self.data / 'credentials.dpapi')
         return {**self.settings(), 'configured': [key for key, value in secret.items() if value]}
+
+    def runtime_secrets(self):
+        secret = dict(self.read_secret(self.data / 'credentials.dpapi'))
+        settings = self.settings()
+        profile = settings.get('brainProfile') or {}
+        secret['apiKey'] = secret.get('api:'+settings['backend'], secret.get('apiKey', ''))
+        secret['brainKey'] = secret.get('brain:'+str(profile.get('id', '')), secret.get('brainKey', ''))
+        return secret
 
     def start(self):
         if self.process and self.process.poll() is None:
@@ -103,7 +121,7 @@ class AgentHost:
             raise RuntimeError('Falta Java 17 o el motor del asistente.')
         self.lines = queue.Queue()
         self.process = subprocess.Popen(
-            [java, '-Xms32m', '-Xmx256m', '-Dfile.encoding=UTF-8', '-cp',
+            [java, '-Xms32m', '-Xmx256m', '-XX:+UseSerialGC', '-XX:ActiveProcessorCount=2', '-Xlog:all=warning:stderr', '-Dfile.encoding=UTF-8', '-cp',
              str(self.root / 'runtime' / '*'), 'DesktopAgentKt', str(self.root), str(self.data)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding='utf-8', bufsize=1,
@@ -117,7 +135,7 @@ class AgentHost:
             lines.put(None)
         threading.Thread(target=read_lines, daemon=True).start()
         self.exchange('init', {'settings': self.settings(),
-                              'secrets': self.read_secret(self.data / 'credentials.dpapi')})
+                              'secrets': self.runtime_secrets()})
 
     def events(self, owner):
         with self.pending_lock:
@@ -138,24 +156,71 @@ class AgentHost:
             item['event'].set()
         return True
 
+    def write(self, message):
+        with self.write_lock:
+            self.process.stdin.write(json.dumps(message)+'\n')
+            self.process.stdin.flush()
+
+    def cancel(self, owner, turn_id):
+        with self.pending_lock:
+            active=self.active_exchange
+            if not active or active['op'] not in {'send','rewritePrompt','testBrain'} or active['owner']!=owner or not turn_id or active['turn_id']!=turn_id:
+                raise ValueError('Ese turno ya terminó o pertenece a otra ventana.')
+            active['cancelled']=True
+            self.write({'op':'__cancel','requestId':active['id']})
+            for item in self.pending.values():
+                item['reply']={'ok':False,'cancelled':True,'error':'Turno detenido'};item['event'].set()
+        return {'requested':True,'remoteJobsCancelled':False}
+
     def exchange(self, op, args):
-        self.process.stdin.write(json.dumps({'op': op, 'args': args}) + '\n')
-        self.process.stdin.flush()
-        deadline = time.monotonic() + (600 if op in {'send', 'rewritePrompt'} else 170)
+        request_id=uuid.uuid4().hex
+        with self.pending_lock:
+            self.active_exchange={'id':request_id,'op':op,'owner':self.owner,'turn_id':self.turn_id,'cancelled':False}
+        try:return self._exchange(op,args,request_id)
+        finally:
+            with self.pending_lock:self.active_exchange=None
+
+    def _exchange(self, op, args, request_id):
+        self.write({'op':op,'args':args,'requestId':request_id})
+        # Media transfers have resumable network timeouts and can exceed a chat turn.
+        seconds = 0 if op == 'driveSync' else 600 if op == 'rewritePrompt' else 170
+        if op == 'send':
+            settings = self.settings()
+            limits = settings.get('limits') or {}
+            override = (settings.get('brainProfile') or {}).get('limits') or {} if settings.get('backend') == 'profile' else {}
+            seconds = override.get('turnTimeoutSeconds', limits.get('turnTimeoutSeconds', 600))
+        deadline = time.monotonic() + seconds + 30 if seconds else None
         while True:
             try:
-                line = self.lines.get(timeout=max(0.1, deadline - time.monotonic()))
+                line = self.lines.get(timeout=max(0.1, deadline - time.monotonic()) if deadline else None)
             except queue.Empty:
                 self.close()
                 raise TimeoutError('El asistente ha agotado el tiempo de espera. Comprueba el historial antes de repetir.')
             if line is None:
                 raise RuntimeError('El motor del asistente se ha cerrado.')
-            response = json.loads(line)
+            try:
+                response = decode_line(line)
+            except ValueError:
+                self.close()
+                raise
+            if response is None:
+                continue
             if 'callback' not in response:
                 if not response.get('ok'):
                     raise RuntimeError(response.get('error', 'Error del asistente'))
                 return response.get('value')
             name = response['callback']
+            if name == 'syncApplyDocuments' and op == 'driveSync':
+                try:
+                    value = self.drive_sync.apply_documents(response['args'])
+                    reply = {'ok': True, 'value': value}
+                except Exception:
+                    reply = {'ok': False, 'error': 'El proyecto cambió durante la sincronización. Se reintentará.'}
+                self.write({**reply, 'requestId': request_id})
+                continue
+            if self.active_exchange and self.active_exchange.get('cancelled'):
+                self.write({'ok':False,'cancelled':True,'error':'Turno detenido','requestId':request_id})
+                continue
             if name in {'native', 'document', 'video', 'thumbnail'} and self.native is not None:
                 try:
                     if name == 'native':
@@ -168,10 +233,9 @@ class AgentHost:
                     reply = {'ok': True, 'value': value}
                 except Exception as error:
                     reply = {'ok': False, 'error': str(error)[:1500]}
-                self.process.stdin.write(json.dumps(reply) + '\n')
-                self.process.stdin.flush()
+                self.write({**reply,'requestId':request_id})
                 continue
-            if name not in {'models', 'schema', 'quote', 'submit', 'status', 'cancel', 'history', 'thumbnail'}:
+            if name not in {'models', 'schema', 'quote', 'submit', 'status', 'cancel', 'history', 'thumbnail', 'progress', 'stream', 'uiEvent'}:
                 raise RuntimeError('Operacion del motor no admitida.')
             if name == 'submit' and op != 'confirm':
                 submission = response.get('args') or {}
@@ -182,13 +246,14 @@ class AgentHost:
                 if not count.is_integer() or not 1 <= count <= 20:
                     raise ValueError('Puedes pedir hasta 20 resultados de Flow por encargo.')
             reply = self.browser_reply(name, response['args'], deadline)
-            self.process.stdin.write(json.dumps(reply) + '\n')
-            self.process.stdin.flush()
+            self.write({**reply,'requestId':request_id})
 
     def browser_reply(self, name, args, deadline=None):
         identifier = uuid.uuid4().hex
         item = {'op': name, 'args': args, 'event': threading.Event()}
         with self.pending_lock:
+            if self.active_exchange and self.active_exchange.get('cancelled'):
+                return {'ok':False,'cancelled':True,'error':'Turno detenido'}
             self.pending[identifier] = item
         answered = item['event'].wait(timeout=max(.1, (deadline or time.monotonic()+120)-time.monotonic()))
         with self.pending_lock:
@@ -206,6 +271,7 @@ class AgentHost:
             raise RuntimeError('El asistente esta ocupado.')
         try:
             self.owner = args.get('owner')
+            self.turn_id = args.get('turn_id')
             if not isinstance(self.owner, str) or not self.owner:
                 raise ValueError('Falta la sesion de la ventana.')
             if args.get('op') in {'send', 'rewritePrompt'}:
@@ -215,7 +281,7 @@ class AgentHost:
             op = args.get('op', 'snapshot')
             body = dict(args.get('args') or {})
             allowed = {'snapshot', 'send', 'new', 'mode', 'project', 'createProject', 'memory',
-                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference', 'rewritePrompt', 'importAssets', 'deleteLibrary', 'restoreHistory', 'projectNote'}
+                       'apply', 'reject', 'discard', 'edit', 'confirm', 'sync', 'reload', 'settings', 'importHistory', 'importReferences', 'renameReference', 'rewritePrompt', 'importAssets', 'deleteLibrary', 'restoreHistory', 'projectNote', 'validateBrain', 'discoverBrain', 'testBrain', 'validateLimits'}
             if op not in allowed:
                 raise ValueError('Operacion no admitida.')
             if op == 'importReferences':
@@ -232,16 +298,35 @@ class AgentHost:
                     if not path.is_file():
                         raise ValueError('El archivo importado ya no está disponible.')
             if op == 'settings':
+                if body.get('limits') is not None:
+                    check = self.exchange('validateLimits', {'limits': body['limits']})
+                    if check.get('problems'):
+                        raise ValueError('; '.join(check['problems']))
+                if body.get('brainProfile') is not None:
+                    check = self.exchange('validateBrain', {'profile': body['brainProfile']})
+                    if check.get('problems'):
+                        raise ValueError('; '.join(check['problems']))
                 body = {'settings': self.save_settings(body),
-                        'secrets': self.read_secret(self.data / 'credentials.dpapi')}
+                        'secrets': self.runtime_secrets()}
             elif op in {'mode', 'project'}:
                 self.save_settings({'mode': body['mode']} if op == 'mode' else {'projectId': body.get('id', '')})
             if op == 'send':
                 body['runtimeSettings'] = self.settings()
+                project_id = body['runtimeSettings'].get('projectId')
+                if getattr(self, 'corte', None) and project_id:
+                    self.corte.run({'method':'create_project', 'project_id':project_id, 'name':project_id})
+                    current=self.corte.run({'method':'read_project', 'project_id':project_id})
+                    self.corte.agent_context={**current, 'agent_transaction_id':None}
+                    body['text']=str(body.get('text',''))+'\n\nEstado explícito del montaje Corte (datos): '+json.dumps({k:current[k] for k in ('project_id','revision','playhead_us','selection')})
+                elif getattr(self, 'corte', None):
+                    self.corte.agent_context=None
             result = self.exchange(op, body)
+            if op == 'send' and isinstance(result, dict) and isinstance(result.get('snapshot'), dict):
+                self.save_settings({'projectId': result['snapshot'].get('projectId') or ''})
             if op == 'createProject':
                 self.save_settings({'projectId': result.get('projectId', '')})
             return {'result': result, 'settings': self.public_settings()}
         finally:
             self.owner = None
+            self.turn_id = None
             self.lock.release()

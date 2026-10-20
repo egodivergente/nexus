@@ -17,7 +17,7 @@ kotlin {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // YAML 1.2 en Java puro (compatible con Android) para las cabeceras de las skills.
@@ -33,4 +33,10 @@ tasks.test {
     useJUnitPlatform()
     // Las pruebas de skills leen la carpeta real del repositorio.
     systemProperty("nexus.skills.dir", rootProject.file("agent-skills/skills").absolutePath)
+}
+
+// Compile the authoritative Android agent source directly: duplicate trees are not inputs.
+sourceSets {
+    main { kotlin.setSrcDirs(listOf("../../../agent-core/src/main/kotlin")) }
+    test { kotlin.setSrcDirs(listOf("../../../agent-core/src/test/kotlin")); resources.setSrcDirs(listOf("../../../agent-core/src/test/resources")) }
 }

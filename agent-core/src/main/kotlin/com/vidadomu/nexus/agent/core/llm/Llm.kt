@@ -16,7 +16,8 @@ sealed interface ContentBlock {
     class Reasoning(val content: JsonObject) : ContentBlock {
         override fun toString() = "Reasoning([private provider context])"
     }
-    class Document(val format: String, val name: String, val bytes: ByteArray) : ContentBlock {
+    class Document(val format: String, val name: String, val bytes: ByteArray,
+        val visualPages: List<Image> = emptyList(), val visualCoverage: String? = null) : ContentBlock {
         override fun toString() = "Document($format, ${bytes.size} bytes)"
     }
 

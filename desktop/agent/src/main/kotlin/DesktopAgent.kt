@@ -18,6 +18,10 @@ import kotlinx.serialization.json.*
 
 private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 private val input = System.`in`.bufferedReader()
+private val callbackReplies=java.util.concurrent.LinkedBlockingQueue<JsonObject>()
+@Volatile private var activeRequestId=""
+private val protocolOutput=Any()
+private fun emit(value: JsonObject) = synchronized(protocolOutput) { println(value) }
 private fun JsonObject.text(key: String, fallback: String = "") = this[key]?.jsonPrimitive?.contentOrNull ?: fallback
 private inline fun <reified T> encoded(value: T) = json.encodeToJsonElement(value)
 private fun obj(vararg pairs: Pair<String, JsonElement>) = JsonObject(pairs.toMap())
@@ -45,8 +49,11 @@ private fun markdownHtml(text: String) = ChatMarkdown.parse(text).joinToString("
 
 // Private stdin/stdout protocol; the Windows host services bounded callbacks.
 private fun callback(op: String, args: JsonElement = JsonObject(emptyMap())): JsonElement {
-    println(obj("callback" to JsonPrimitive(op), "args" to args))
-    val reply = json.parseToJsonElement(input.readLine() ?: error("Host disconnected")).jsonObject
+    emit(obj("callback" to JsonPrimitive(op), "args" to args, "requestId" to JsonPrimitive(activeRequestId)))
+    val reply = try { callbackReplies.take() } catch(e: InterruptedException) {
+        throw kotlinx.coroutines.CancellationException("Turno detenido").also { it.initCause(e) }
+    }
+    if(reply["cancelled"]?.jsonPrimitive?.booleanOrNull==true) throw kotlinx.coroutines.CancellationException("Turno detenido")
     if (reply["ok"]?.jsonPrimitive?.boolean != true) error(reply.text("error", "Host operation failed"))
     return reply["value"] ?: JsonNull
 }
@@ -64,9 +71,12 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         override suspend fun schema(ref: ModelRef): ModelSchema = turnSchemas[ref] ?: json.decodeFromJsonElement<ModelSchema>(callback("schema", encoded(ref))).also { turnSchemas[ref] = it }
     }
     private var skills = loadSkills()
-    private fun loadSkills() = SkillStore(listOf(
-        DirectorySkillSource(File(root, "agent-skills/skills"), "bundled"),
-        DirectorySkillSource(File(data, "skills"), "personal")))
+    private fun loadSkills(): SkillStore {
+        val source = File(root.parentFile.parentFile, "agent-skills/skills")
+        val bundled = if (source.isDirectory) source else File(root, "agent-skills/skills")
+        return SkillStore(listOf(DirectorySkillSource(bundled, "bundled"),
+            DirectorySkillSource(File(data, "skills"), "personal")))
+    }
     private val published = PublishedRateEstimator.fromJson(File(root, "assets/atlas_published_prices.json").readText())
     private val cost = object : CostEstimator {
         override suspend fun estimate(model: ModelSummary, params: Map<String, String>): CostEstimate =
@@ -86,52 +96,84 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         }), guard, GuardedExecutor(backend, guard), assets,
             GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) }, directFlow = true,
             adaptPrompt = { prompt, schema, target -> promptAdapter.adapt(prompt, schema.textLimits["prompt"], target) },
-            nativeOperations = NativeOperations { operation, arguments, session ->
-                val response = callback("native", obj("operation" to JsonPrimitive(operation), "input" to arguments,
-                    "assets" to encoded(assets.snapshot().assets), "projectId" to (session.activeProjectId?.let(::JsonPrimitive) ?: JsonNull))).jsonObject
-                response["_assets"]?.jsonArray?.forEach { element ->
-                    val asset = json.decodeFromJsonElement<Asset>(element)
-                    if (assets.asset(asset.id) == null) assets.addAsset(asset) else assets.updateAsset(asset.id) { asset }
-                }
-                JsonObject(response.filterKeys { it != "_assets" })
-            })
+            nativeOperations = NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) })
+    private suspend fun runNative(operation: String, arguments: JsonObject, session: AgentSession): JsonObject {
+        val response = callback("native", obj("operation" to JsonPrimitive(operation), "input" to arguments,
+            "assets" to encoded(assets.snapshot().assets), "projectId" to (session.activeProjectId?.let(::JsonPrimitive) ?: JsonNull))).jsonObject
+        response["_assets"]?.jsonArray?.forEach { element ->
+            val asset = json.decodeFromJsonElement<Asset>(element)
+            if (assets.asset(asset.id) == null) assets.addAsset(asset) else assets.updateAsset(asset.id) { asset }
+        }
+        response["_attachments"]?.jsonArray?.forEach { element ->
+            val attachment=json.decodeFromJsonElement<Attachment>(element)
+            session.attachments.removeAll { it.id == attachment.id }; session.attachments.add(attachment)
+            viewedAssets.removeAll { it.id == attachment.id }; viewedAssets.add(attachment)
+        }
+        return JsonObject(response.filterKeys { it !in setOf("_assets", "_attachments") })
+    }
+
     private var deps = deps()
+    private val viewedAssets = mutableListOf<Attachment>()
+    private var activeLimits = AgentLimits()
     private var offline = true
     private lateinit var llmProvider: LlmProvider
-    private val promptAdapter = PromptAdapter({ llmProvider }, { settings.text("modelId", "us.anthropic.claude-sonnet-4-6") })
+    private fun modelId() = if(settings.text("backend") == "profile") settings["brainProfile"]?.jsonObject?.text("modelId").orEmpty() else settings.text("modelId", "us.anthropic.claude-sonnet-4-6")
+    private val promptAdapter = PromptAdapter({ llmProvider }, { modelId() })
     private val knowledge = ExpertKnowledge(File(root, "assets/expert-guides.json"))
     private val budget = LlmBudgetLedger(File(data, "llm-budget.json"))
     private fun makeOrchestrator(): AgentOrchestrator {
-        val direct = settings.text("backend", "direct") != "proxy"
-        val llm: LlmProvider = if (direct && secrets.text("accessKey").isNotBlank() && secrets.text("secretKey").isNotBlank()) {
-            BedrockDirectProvider(settings.text("region", "us-east-1"), {
-                AwsCredentials(secrets.text("accessKey"), secrets.text("secretKey"), secrets.text("sessionToken").ifBlank { null })
-            })
-        } else if (!direct && settings.text("endpoint").isNotBlank() && secrets.text("token").isNotBlank()) {
-            BedrockProxyProvider(settings.text("endpoint"), { secrets.text("token") })
-        } else OfflinePlannerProvider()
+        val backend = settings.text("backend", "direct")
+        val profile = if(backend == "profile") settings["brainProfile"]?.let { json.decodeFromJsonElement<BrainProfile>(it) } else null
+        val llm: LlmProvider = when(backend) {
+            "profile" -> BrainFactory.create(profile ?: error("Falta el perfil del cerebro"), { secrets.text("brainKey") })
+            "anthropic" -> AnthropicProvider({ secrets.text("apiKey") }, settings.text("endpoint").ifBlank { "https://api.anthropic.com" })
+            "openai" -> OpenAiCompatibleProvider(settings.text("endpoint"), { secrets.text("apiKey") })
+            "antigravity" -> AntigravityProvider(settings.text("endpoint"), { secrets.text("apiKey") })
+            "proxy" -> if(settings.text("endpoint").isNotBlank() && secrets.text("token").isNotBlank())
+                BedrockProxyProvider(settings.text("endpoint"), { secrets.text("token") }) else OfflinePlannerProvider()
+            "direct" -> if(secrets.text("accessKey").isNotBlank() && secrets.text("secretKey").isNotBlank())
+                BedrockDirectProvider(settings.text("region", "us-east-1"), { AwsCredentials(secrets.text("accessKey"), secrets.text("secretKey"), secrets.text("sessionToken").ifBlank { null }) }) else OfflinePlannerProvider()
+            else -> error("Cerebro desconocido: $backend")
+        }
+        val limits = (settings["limits"]?.let { json.decodeFromJsonElement<AgentLimits>(it) } ?: AgentLimits(
+            maxTokens=settings["maxTokens"]?.jsonPrimitive?.intOrNull ?: 4096)).let { if(profile != null) it.with(profile.limits) else it }
+        require(limits.problems().isEmpty()) { limits.problems().joinToString("; ") }
+        activeLimits = limits
         offline = llm is OfflinePlannerProvider
-        val effective = if (llm is BedrockDirectProvider) BudgetedLlmProvider(llm, budget) {
-            LlmLimits(perTurnUsd = settings["perTurnUsd"]?.jsonPrimitive?.doubleOrNull ?: 1.0,
-                dailyUsd = settings["dailyUsd"]?.jsonPrimitive?.doubleOrNull ?: 5.0,
-                perTurnCalls = settings["perTurnCalls"]?.jsonPrimitive?.intOrNull ?: 8)
-        } else llm
+        val effective = if (llm is BedrockDirectProvider || backend in setOf("profile", "anthropic", "openai")) budgeted(llm, budget,
+            customRates = { profile?.inputUsdPerM?.let { i -> profile.outputUsdPerM?.let { o -> i to o } } },
+            limits = {
+                fun amount(v: Double) = if(v == 0.0) Double.MAX_VALUE else v
+                LlmLimits(perTurnUsd=amount(profile?.limits?.turnUsd ?: settings["perTurnUsd"]?.jsonPrimitive?.doubleOrNull ?: 1.0),
+                    dailyUsd=amount(profile?.limits?.dailyUsd ?: settings["dailyUsd"]?.jsonPrimitive?.doubleOrNull ?: 5.0),
+                    perTurnCalls=(profile?.limits?.maxCallsPerTurn ?: settings["perTurnCalls"]?.jsonPrimitive?.intOrNull ?: 8).let { if(it==0) Int.MAX_VALUE else it })
+            }) else llm
         llmProvider = effective
-        return AgentOrchestrator(effective, AgentConfig(
-            provider = llm.id, modelId = settings.text("modelId", "us.anthropic.claude-sonnet-4-6"),
+        return AgentOrchestrator(WindowsToolProvider.wrap(effective), AgentConfig(
+            provider = llm.id, modelId = profile?.modelId ?: settings.text("modelId", "us.anthropic.claude-sonnet-4-6"),
             region = settings.text("region", "us-east-1"), endpoint = settings.text("endpoint"),
-            maxTokens = settings["maxTokens"]?.jsonPrimitive?.intOrNull?.coerceIn(256, 32000) ?: 4096,
-            maxToolRounds = 7,
+            maxTokens = limits.maxTokens,
+            maxToolRounds = limits.rounds, limits = limits,
+            systemPromptOverride = SystemPrompt.BASE + "\n" + WindowsTools.PROMPT,
             temperature = settings["temperature"]?.jsonPrimitive?.doubleOrNull,
+            toolUse = profile?.capabilities?.tools ?: true,
+            documentsInOnePass = profile?.protocol == BrainProtocol.OPENAI_RESPONSES,
             mode = mode, sendImagesToLlm = settings["sendImages"]?.jsonPrimitive?.booleanOrNull ?: true
-        ), NexusToolkit.all(deps).filterNot { it.name == "suggest_replies" } + // Windows no pinta botones de respuesta rápida
+        ), NexusToolkit.all(deps) + WindowsTools.all(NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) }) +
             ExpertBriefTool(registry, knowledge) { settings.text("excludedFamilies", "veo").split(',', ';').map { it.trim().lowercase() }.toSet() },
             skills, assets, images = AttachmentImageLoader { attachment ->
             val response = callback("thumbnail", encoded(attachment)).jsonObject
             ContentBlock.Image(response.text("format"), Base64.getDecoder().decode(response.text("bytes")))
         }, documents = AttachmentDocumentLoader { attachment ->
-            val response = callback("document", encoded(attachment)).jsonObject
-            ContentBlock.Document(response.text("format"), response.text("name"), Base64.getDecoder().decode(response.text("bytes")))
+            val profile=settings["brainProfile"]?.jsonObject
+            val responses=settings.text("backend")=="profile" && profile?.text("protocol")=="OPENAI_RESPONSES"
+            val vision=profile?.get("capabilities")?.jsonObject?.get("vision")?.jsonPrimitive?.booleanOrNull==true
+            val response = callback("document", JsonObject(encoded(attachment).jsonObject + ("render_pdf" to JsonPrimitive(responses && vision)))).jsonObject
+            val pages=response["pages"]?.jsonArray.orEmpty().map { page ->
+                val p=page.jsonObject;ContentBlock.Image(p.text("format"),Base64.getDecoder().decode(p.text("bytes")))
+            }
+            require(!responses || response.text("format")!="pdf" || pages.isNotEmpty()) { "Este PDF requiere un cerebro Responses con visión y renderizado local de páginas." }
+            ContentBlock.Document(response.text("format"), response.text("name"), Base64.getDecoder().decode(response.text("bytes")),pages,response.text("coverage").ifBlank { null })
         }, videos = AttachmentVideoLoader { attachment ->
             val response = callback("video", encoded(attachment)).jsonObject
             response["frames"]!!.jsonArray.flatMap { element ->
@@ -169,6 +211,19 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 conversation.session.mode = mode
                 conversation.session.activeProjectId = settings.text("projectId").ifBlank { null }
             }
+            "validateLimits" -> {
+                val limits=json.decodeFromJsonElement<AgentLimits>(args["limits"] ?: encoded(AgentLimits()))
+                return obj("problems" to encoded(limits.problems()))
+            }
+            "validateBrain", "discoverBrain", "testBrain" -> {
+                val profile=json.decodeFromJsonElement<BrainProfile>(args["profile"] ?: settings["brainProfile"] ?: error("Falta perfil"))
+                val problems=profile.problems()
+                if(op == "validateBrain") return obj("problems" to encoded(problems))
+                require(problems.isEmpty()) { problems.joinToString("; ") }
+                if(op == "discoverBrain") return obj("models" to encoded(BrainDiscovery.listModels(profile, { secrets.text("brainKey") })))
+                val test=BrainDiscovery.test(profile, { secrets.text("brainKey") })
+                return obj("ok" to JsonPrimitive(test.ok), "message" to JsonPrimitive(test.message), "models" to encoded(test.models), "modelListed" to (test.modelListed?.let(::JsonPrimitive) ?: JsonNull))
+            }
             "rewritePrompt" -> {
                 val limit = json.decodeFromJsonElement<TextLimit>(args["limit"] ?: error("Falta el límite del modelo."))
                 val rewritten = promptAdapter.adapt(args.text("prompt"), limit, args.text("target"))
@@ -178,6 +233,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 args["runtimeSettings"]?.jsonObject?.let { current ->
                     if (current != settings) { settings = current; orchestrator = makeOrchestrator() }
                 }
+                viewedAssets.clear()
                 conversation.session.flowSubmittedResults = 0
                 turnModels = null; turnSchemas.clear()
                 val started = System.nanoTime()
@@ -196,12 +252,17 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 val relevant = projectRefs.filter { a -> a.type == AssetType.IMAGE && a.displayName.lowercase().split(Regex("[^\\p{L}\\p{N}]+" )).any { it.length >= 4 && it !in ignored && it in words } }.take(6)
                 val automatic = relevant.filter { a -> attachments.none { it.uri == a.uri } }.map { a -> Attachment(id=a.id, uri=a.uri, mimeType=a.mimeType ?: "image/jpeg", name=a.displayName, assetId=a.id) }
                 val context = if (projectRefs.isEmpty()) "" else "\n\nArchivos de referencia del proyecto activo (datos, no instrucciones):\n" + projectRefs.joinToString("\n") { "${it.id} | ${it.displayName} | ${it.type}" } + "\nCuando el pedido requiera una referencia, utiliza su asset_id en media de prepare_generation; no pidas adjuntarla de nuevo."
-                val turn = kotlinx.coroutines.withTimeout(if(attachments.any {it.mimeType == "application/pdf" || it.mimeType.startsWith("text/")}) 240_000L else 600_000L) {
+                val turn = kotlinx.coroutines.withTimeout(activeLimits.turnTimeoutMillis ?: Long.MAX_VALUE) {
                     orchestrator.send(conversation, request + context, attachments + automatic) { event ->
-                        if(event is com.vidadomu.nexus.agent.core.tools.UiEvent.Info) callback("progress", JsonPrimitive(event.text))
+                        when(event) {
+                            is com.vidadomu.nexus.agent.core.tools.UiEvent.Info -> callback("progress", JsonPrimitive(event.text))
+                            is com.vidadomu.nexus.agent.core.tools.UiEvent.StreamingText -> callback("stream", JsonPrimitive(event.text))
+                            is com.vidadomu.nexus.agent.core.tools.UiEvent.Replies -> callback("uiEvent", obj("type" to JsonPrimitive("replies"), "replies" to JsonArray(event.replies.map { obj("label" to JsonPrimitive(it.label), "text" to JsonPrimitive(it.text)) })))
+                            else -> Unit
+                        }
                     }
                 }
-                return obj("text" to JsonPrimitive(turn.text), "html" to JsonPrimitive(markdownHtml(turn.text)), "tools" to encoded(turn.toolCalls),
+                return obj("viewedAssets" to encoded(viewedAssets), "text" to JsonPrimitive(turn.text), "html" to JsonPrimitive(markdownHtml(turn.text)), "tools" to encoded(turn.toolCalls),
                     "inputTokens" to JsonPrimitive(turn.usage.inputTokens), "outputTokens" to JsonPrimitive(turn.usage.outputTokens),
                     "elapsedMs" to JsonPrimitive((System.nanoTime() - started) / 1_000_000),
                     "toolRounds" to JsonPrimitive(turn.toolRounds), "stop" to JsonPrimitive(turn.stop),
@@ -270,24 +331,62 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             }
             "sync" -> deps.lifecycle.sync(args.text("id"))
             "importHistory" -> {
-                val history = json.decodeFromJsonElement<List<HistoryEntry>>(callback("history", JsonPrimitive(10000)))
+                val rawHistory = callback("history", JsonPrimitive(10000)).jsonArray
+                val history = json.decodeFromJsonElement<List<HistoryEntry>>(rawHistory)
+                val byJob = rawHistory.associateBy { it.jsonObject.text("jobId") }
                 for (job in history.filter { it.status == "COMPLETED" && it.outputs.isNotEmpty() }) {
-                    if (assets.generation(job.jobId) != null) continue
+                    val existing = assets.generation(job.jobId)
+                    if (existing?.status == "COMPLETED" && existing.outputAssetIds.mapNotNull { assets.asset(it)?.uri }.toSet() == job.outputs.toSet()) continue
                     val type = runCatching { AssetType.valueOf(job.modality) }.getOrDefault(AssetType.OTHER)
-                    val record = GenerationRecord(id = AssetIndex.newId("gen"), nexusJobId = job.jobId,
+                    val projectId = byJob[job.jobId]?.jsonObject?.text("projectId")?.takeIf { assets.findProject(it) != null }
+                    val record = existing ?: GenerationRecord(id = AssetIndex.newId("gen"), nexusJobId = job.jobId,
                         providerId = job.providerId, modelId = job.modelId, modality = job.modality,
-                        prompt = job.prompt, status = job.status, createdAt = job.createdAt)
+                        prompt = job.prompt, status = job.status, createdAt = job.createdAt, projectId = projectId)
                     val outputIds = job.outputs.mapIndexed { index, uri ->
                         assets.assetByUri(uri)?.id ?: assets.addAsset(Asset(id = "", uri = uri,
                             type = type, role = AssetRole.OUTPUT, source = AssetSource.GENERATED,
                             displayName = "${job.modelId.substringAfterLast('/')} ${index + 1}",
-                            generationId = record.id, createdAt = job.createdAt)).id
+                            generationId = record.id, projectId = record.projectId, shotId = record.shotId, createdAt = job.createdAt)).id
                     }
-                    assets.upsertGeneration(record.copy(outputAssetIds = outputIds))
+                    assets.upsertGeneration(record.copy(status = "COMPLETED", outputAssetIds = outputIds, completedAt = record.completedAt ?: System.currentTimeMillis()))
                 }
             }
             "reload" -> { skills = loadSkills(); deps = deps(); orchestrator = makeOrchestrator() }
             "snapshot" -> Unit
+            "driveSync" -> {
+                val accessToken=args.text("accessToken")
+                require(accessToken.isNotBlank()) {"Conecta Google Drive."}
+                val rootId=args.text("rootId").ifBlank {com.vidadomu.nexus.agent.core.sync.DriveRemote.findOrCreateRoot {accessToken}}
+                val directory=File(data,"sync/workspaces/$rootId")
+                val remote=com.vidadomu.nexus.agent.core.sync.DriveRemote({accessToken},rootId,sessionDirectory=File(directory,"uploads"))
+                val paths=args["paths"]?.jsonObject.orEmpty()
+                val documents=com.vidadomu.nexus.agent.core.sync.SyncDocuments(directory)
+                val chats=args["chats"]?.jsonArray.orEmpty().map {it.jsonObject}
+                val montages=args["montages"]?.jsonObject.orEmpty().mapValues {it.value.jsonObject}
+                val workspace=com.vidadomu.nexus.agent.core.sync.SyncWorkspace(assets,directory,remote,open={uri->
+                    val path=paths[uri]?.jsonPrimitive?.contentOrNull
+                    val candidate=path?.let(::File)?:if(uri.startsWith("file:"))File(java.net.URI(uri))else if(uri.matches(Regex("/media/[a-f0-9]{32}\\.[a-z0-9]{1,8}")))File(data.parentFile,uri.removePrefix("/"))else null
+                    val source=candidate?.canonicalFile
+                    val mediaRoot=File(data.parentFile,"media").canonicalFile.toPath()
+                    val syncedRoot=File(data,"sync").canonicalFile.toPath()
+                    if(source==null || !source.isFile || !(source.toPath().startsWith(mediaRoot)||source.toPath().startsWith(syncedRoot)))null
+                    else com.vidadomu.nexus.agent.core.sync.SyncInput(source.extension.lowercase().ifBlank {"bin"},source.inputStream())
+                },localUri={source->
+                    val name=source.name.take(32)+"."+source.extension
+                    val destination=File(data.parentFile,"media/$name")
+                    if(destination.exists())require(com.vidadomu.nexus.agent.core.sync.SyncBlobs.hash(destination)==source.name.substringBefore('.'))
+                    else java.nio.file.Files.copy(source.toPath(),destination.toPath())
+                    "/media/$name"
+                },deviceLabel=System.getenv("COMPUTERNAME")?:"Windows")
+                args["resolve"]?.takeIf {it!=JsonNull}?.jsonObject?.let {workspace.resolve(it.text("key"),it.text("revision"))}
+                val result=workspace.cycle(null,documents.capture(chats,montages)){rows->
+                    callback("syncApplyDocuments",JsonObject(rows))
+                    documents.apply(rows){_,_->}
+                }
+                return JsonObject(result+mapOf("rootId" to JsonPrimitive(rootId)))
+            }
+            "importProjectBundle" -> assets.importProject(json.decodeFromJsonElement<IndexData>(args.getValue("index")))
+            "validateProjectBundle" -> AssetIndex(null).importProject(json.decodeFromJsonElement<IndexData>(args.getValue("index")))
             "importAssets" -> args["assets"]!!.jsonArray.forEach { element ->
                 val asset = json.decodeFromJsonElement<Asset>(element)
                 if (assets.asset(asset.id) == null) assets.addAsset(asset) else assets.updateAsset(asset.id) { asset }
@@ -301,16 +400,38 @@ private class DesktopRuntime(private val root: File, private val data: File) {
     }
 }
 
-fun main(args: Array<String>) = runBlocking {
+fun main(args: Array<String>) {
     val runtime = DesktopRuntime(File(args[0]), File(args[1]).also { it.mkdirs() })
+    val worker=java.util.concurrent.atomic.AtomicReference<Thread?>()
+    val cancelled=java.util.concurrent.atomic.AtomicBoolean(false)
     while (true) {
         val line = input.readLine() ?: break
-        try {
-            val request = json.parseToJsonElement(line).jsonObject
-            val result = runtime.command(request.text("op"), request["args"]?.jsonObject ?: JsonObject(emptyMap()))
-            println(obj("ok" to JsonPrimitive(true), "value" to result))
-        } catch (e: Exception) {
-            println(obj("ok" to JsonPrimitive(false), "error" to JsonPrimitive(Redactor.redact(e.message ?: "Error del agente"))))
+        val request=runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull() ?: continue
+        if(request.text("op")=="__cancel") {
+            if(request.text("requestId")==activeRequestId && worker.get()!=null) {
+                cancelled.set(true)
+                callbackReplies.offer(obj("ok" to JsonPrimitive(false),"cancelled" to JsonPrimitive(true),"error" to JsonPrimitive("Turno detenido")))
+                worker.get()?.interrupt()
+            }
+            continue
         }
+        if("op" !in request) {
+            if(worker.get()!=null && request.text("requestId")==activeRequestId) callbackReplies.offer(request)
+            continue
+        }
+        if(worker.get()!=null) { emit(obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive("El agente está ocupado")));continue }
+        val id=request.text("requestId");activeRequestId=id;callbackReplies.clear();cancelled.set(false)
+        val thread=Thread({
+            val reply=try {
+                val result=runBlocking { runtime.command(request.text("op"),request["args"]?.jsonObject ?: JsonObject(emptyMap())) }
+                obj("ok" to JsonPrimitive(true),"value" to result)
+            } catch(e: Exception) {
+                obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive(if(cancelled.get()) "Turno detenido por el usuario. Las operaciones ya enviadas conservan su estado." else Redactor.redact(e.message ?: "Error del agente")))
+            }
+            activeRequestId="";worker.set(null)
+            emit(JsonObject(reply + ("requestId" to JsonPrimitive(id))))
+        },"nexus-command")
+        worker.set(thread);thread.start()
     }
+    worker.get()?.interrupt()
 }

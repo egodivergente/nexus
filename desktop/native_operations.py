@@ -26,7 +26,7 @@ WHISPER_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-ba
 WHISPER_SHA = '60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe'
 WHISPER_BIN = 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.7.6/whisper-bin-x64.zip'
 FLAGS = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-EXTENSIONS = 'png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a|pdf|txt|md|csv|html|srt|ogg|flac|zip'
+EXTENSIONS = 'png|jpe?g|webp|gif|mp4|mov|webm|mp3|wav|m4a|pdf|txt|md|csv|html|srt|ogg|flac|zip|json|py|js|sh|ps1'
 
 
 def atomic_json(path, data):
@@ -138,7 +138,7 @@ class NativeOperations:
                 cached = cache.get(identifier)
                 if cached:
                     return result, resolve_media(self.data, cached)
-                extension = mimetypes.guess_extension(result.get('mimeType', '')) or Path(urllib.parse.urlsplit(result['uri']).path).suffix or ('.mp4' if result.get('type') == 'VIDEO' else '.wav')
+                extension = mimetypes.guess_extension(result.get('mimeType') or '') or Path(urllib.parse.urlsplit(result['uri']).path).suffix or ({'VIDEO':'.mp4','IMAGE':'.png'}.get(result.get('type'),'.wav'))
                 if not re.fullmatch(r'\.('+EXTENSIONS+')', extension):
                     raise ValueError('Formato remoto no admitido para edición local.')
                 target = self.new_path(extension)
@@ -206,10 +206,22 @@ class NativeOperations:
                 raise ValueError('Encargo local desconocido.')
             job = json.loads(path.read_text('utf-8'))
             if job['state'] not in {'QUEUED', 'RUNNING'} or time.monotonic() >= deadline:
-                return {**job, '_assets': job['results']}
+                result = {**job, '_assets': job['results']}
+                if job['operation'] == 'detect_video_scenes' and job['state'] == 'COMPLETED':
+                    report = next(a for a in job['results'] if a['type'] == 'OTHER')
+                    result['scene_analysis'] = json.loads(resolve_media(self.data, report['uri']).read_text('utf-8'))
+                    result['_attachments'] = [{'id': a['id'], 'assetId': a['id'], 'uri': a['uri'],
+                        'mimeType': a['mimeType'], 'name': a['displayName']} for a in job['results'] if a['type'] == 'IMAGE']
+                return result
             time.sleep(.25)
 
     def edit(self, operation, args, assets):
+        if operation == 'detect_video_scenes':
+            from scene_analysis import detect
+            return detect(self, args, assets)
+        if operation == 'analyze_audio_asset':
+            from native_library import analyze_audio
+            return analyze_audio(self, args, assets)
         if operation == 'edit_video_assets':
             identifiers = args.get('asset_ids', [])
             if not 1 <= len(identifiers) <= 12:
@@ -374,7 +386,11 @@ class NativeOperations:
                 text = extract_pdf(path)
                 if text is not None:
                     format_name, payload = 'txt', text.encode('utf-8')
-            return {'format': format_name, 'name': re.sub(r'[^\w -]', ' ', args.get('name', 'Documento'))[:100], 'bytes': base64.b64encode(payload).decode()}
+            result={'format': format_name, 'name': re.sub(r'[^\w -]', ' ', args.get('name', 'Documento'))[:100], 'bytes': base64.b64encode(payload).decode()}
+            if format_name=='pdf' and args.get('render_pdf'):
+                from document_reader import render_pdf
+                result.update(render_pdf(path))
+            return result
         if operation == 'video':
             info = self.inspect(path)
             frames = []
@@ -390,6 +406,14 @@ class NativeOperations:
     def run(self, payload):
         operation, args = payload['operation'], payload.get('input', {})
         assets = self.assets(payload)
+        from windows_operations import OPERATIONS as WINDOWS, run as run_windows
+        if operation in WINDOWS:
+            return run_windows(self, operation, args, payload)
+        from native_library import OPERATIONS, run as run_library
+        if operation in OPERATIONS:
+            return run_library(self, operation, args, assets, payload)
+        if operation.startswith('corte_'):
+            return self.host.corte.agent_run(operation, payload)
         if operation in {'web_search', 'read_web_page', 'list_mcp_servers', 'connect_mcp_server', 'list_mcp_tools', 'call_mcp_tool', 'disconnect_mcp_server'}:
             from native_internet import run
             return run(self, operation, args)
@@ -434,7 +458,7 @@ class NativeOperations:
             return self.whisper_status()
         if operation == 'prepare_whisper_model':
             return self.prepare_whisper()
-        if operation in {'edit_video_assets', 'extract_video_frames', 'transcribe_media_asset'}:
+        if operation in {'edit_video_assets', 'extract_video_frames', 'transcribe_media_asset', 'detect_video_scenes'}:
             # Resolve before enqueue, then operate only on this immutable asset snapshot.
             for identifier in args.get('asset_ids', [args.get('asset_id')]):
                 self.asset(identifier, assets)

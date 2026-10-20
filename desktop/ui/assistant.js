@@ -101,7 +101,7 @@ const planCost=plan=>Number.isFinite(plan.estimate?.amountUsd)?money(plan.estima
 
 async function agentCall(op,args={}) {
  if(Agent.busy)throw Error('Espera a que termine el asistente.');
- Agent.busy=true;if(view==='assistant')renderAssistant();
+ Agent.busy=true;if(view==='assistant'||view==='editor')renderAssistant();
  let processing=false;
  const pump=async()=>{
   if(processing)return;processing=true;
@@ -115,9 +115,10 @@ async function agentCall(op,args={}) {
  const interval=setInterval(pump,180);
  try{
   const response=await rpc('agent',{op,args,owner:Agent.owner});Agent.settings=response.settings;
-  Agent.snapshot=response.result.snapshot||response.result;
+  if(response.result?.snapshot)Agent.snapshot=response.result.snapshot;
+  else if(response.result?.index)Agent.snapshot=response.result;
   return response.result;
- }finally{clearInterval(interval);Agent.busy=false;if(view==='assistant')renderAssistant();}
+ }finally{clearInterval(interval);Agent.busy=false;if(view==='assistant'||view==='editor')renderAssistant();}
 }
 async function agentModel(ref){
  const raw=models.find(m=>m.id===ref.modelId&&m.providerId===ref.providerId);
@@ -161,6 +162,14 @@ function agentMedia(plan,m){
  });
 }
 async function agentCallback(op,args){
+ if(op==='stream'){
+  const messages=document.querySelector('.agent-messages');if(!messages)return true;
+  let node=messages.querySelector('.agent-stream');if(!node){node=document.createElement('div');node.className='agent-stream agent-text';messages.append(node);}
+  if(args==='')node.textContent='';else node.textContent+=String(args);return true;
+ }
+ if(op==='uiEvent'){
+  if(args.type==='replies'){Agent.replies=args.replies;window.dispatchEvent(new CustomEvent('nexus:replies'));}return true;
+ }
  if(op==='progress'){const node=document.querySelector('.agent-thinking');if(node)node.textContent=String(args);return true;}
  switch(op){
   case'models':return models.filter(m=>!state.hidden.includes(m.id)).map(agentSummary);
@@ -287,7 +296,7 @@ async function consolidateBatch(batch,prompt=batch.plan.prompt){
 }
 async function generateAgentEntries(entries){
  if(Agent.generating||Agent.busy)return;
- Agent.generating=true;if(view==='assistant')renderAssistant();
+ Agent.generating=true;if(view==='assistant'||view==='editor')renderAssistant();
  const failures=[];
  try{
   for(const selected of entries){
@@ -303,12 +312,12 @@ async function generateAgentEntries(entries){
    finally{Agent.approved=null;}
   }
   await flush();
- }finally{Agent.generating=false;if(view==='assistant')renderAssistant();}
+ }finally{Agent.generating=false;if(view==='assistant'||view==='editor')renderAssistant();}
  if(failures.length)toast(failures.join(' · '));
 }
 function renderAssistant(){
  if(!Agent.restored){Agent.restored=true;const saved=state.agentConversation;Agent.draft=saved?.draft||Agent.draft;if(saved?.items?.length){Agent.items=saved.items;for(const [key,index] of Object.entries(saved.anchors||{}))if(Agent.items[index])Agent.cardAnchors.set(key,Agent.items[index]);}}
- const content=$('#content'),oldMessages=$('.agent-messages'),oldCompose=$('#agent-compose');
+ const content=(view==='editor'?$('#corte-chat'):$('#content')),oldMessages=$('.agent-messages'),oldCompose=$('#agent-compose');
  AgentViewport.capture(oldMessages);
  const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),busyUi=Agent.busy&&!Agent.initPromise,disabled=busyUi||Agent.generating?'disabled':'';
  const ready=agentPendingEntries(),readyCount=ready.reduce((sum,e)=>sum+planOutputCount(e.plan),0),readyModels=[...new Set(ready.map(e=>e.plan.modelName))];
@@ -320,8 +329,8 @@ function renderAssistant(){
   }
  }
  const generationMarkup=renderGenerationPlans(s,disabled),proposalMarkup=(s?.proposals||[]).map(p=>`<article class="agent-plan" data-agent-card="proposal:${escape(p.id)}"><p>${escape(p.description)}</p><button data-agent-apply="${p.id}" ${disabled}>Aplicar</button> <button data-agent-reject="${p.id}" ${disabled}>Descartar</button></article>`).join('');
- const messageMarkup=Agent.items.length?Agent.items.map(i=>`<article data-agent-message="${i.id||=crypto.randomUUID()}" class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}${i.failed?'<small class="hint">Envío no confirmado. Tu mensaje se conserva.</small>':''}</article>`).join(''):(!generationMarkup&&!proposalMarkup?'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>':'');
- $('#content').classList.add('agent-view');
+ const messageMarkup=Agent.items.length?Agent.items.map(i=>`<article data-agent-message="${i.id||=crypto.randomUUID()}" class="agent-message ${i.role}"><div class="agent-author">${i.role==='user'?'Tú':'Nexus'}</div><div class="agent-text">${i.role==='assistant'&&i.html?i.html:escape(i.text)}</div>${(i.attachments||[]).map(f=>`<span class="agent-file">${i.role==='assistant'&&f.mime?.startsWith('image/')?`<img src="${escape(f.url)}" alt="${escape(f.name)}" style="max-width:100%;max-height:300px">`:i.role==='assistant'&&f.mime?.startsWith('video/')?`<video src="${escape(f.url)}" controls style="max-width:100%"></video>`:''}<a href="${escape(f.url||'#')}" download>${escape(f.name)}</a></span>`).join('')}${i.usage?`<small class="hint">${i.usage}</small>`:''}${i.cancelled?'<small class="hint">Turno detenido. Tu mensaje se conserva.</small>':i.failed?'<small class="hint">Envío no confirmado. Tu mensaje se conserva.</small>':''}</article>`).join(''):(!generationMarkup&&!proposalMarkup?'<div class="agent-empty"><h2>¿Qué quieres crear?</h2></div>':'');
+ content.classList.add('agent-view');
  const template=document.createElement('template');
  template.innerHTML=`<div class="agent-toolbar"><div class="tabs" role="group" aria-label="Modo del asistente">${[['ASSISTANT','Asistente'],['COPILOT','Copiloto'],['AGENT','Agente']].map(([id,name])=>`<button data-agent-mode="${id}" class="${s?.mode===id?'active':''}" ${disabled}>${name}</button>`).join('')}</div><div class="agent-project"><select id="agent-project" aria-label="Proyecto activo" ${disabled}><option value="">Sin proyecto</option>${(s?.index.projects||[]).filter(p=>!p.archived).map(p=>`<option value="${escape(p.id)}" ${p.id===s.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select><button type="button" class="nx-toolbar-btn" data-agent="project-new" title="Nuevo proyecto" aria-label="Nuevo proyecto" ${busyUi?'disabled':''}>+ Proyecto</button><button type="button" class="nx-toolbar-btn" data-parity="project" title="Memoria y ajustes del proyecto" aria-label="Proyecto" ${busyUi?'disabled':''}>Proyecto</button><button type="button" class="nx-toolbar-btn" data-project-references ${disabled}>Referencias</button><button type="button" class="nx-toolbar-btn" data-parity="conversations" title="Historial de conversaciones" ${disabled}>Conversaciones</button><button type="button" class="nx-toolbar-btn" data-parity="media-jobs" title="Ediciones locales" ${disabled}>Ediciones</button><button type="button" class="nx-toolbar-btn" data-agent="new" title="Nueva conversación" aria-label="Nueva conversación" ${busyUi?'disabled':''}>Nueva charla</button></div></div>
  ${Agent.error?`<div class="agent-error inline-notice" role="alert"><span>No se pudo completar el mensaje. Tu texto y los adjuntos se conservan.</span><button type="button" data-agent="reconnect" ${disabled}>Comprobar conexión</button><details><summary>Detalles</summary><pre>${escape(Agent.error)}</pre></details></div>`:''}
@@ -395,15 +404,15 @@ async function sendAgent(requestText){
  window.NexusModelSuggestions?.close();
  Agent.error='';
  if(!Agent.snapshot||Agent.snapshot.offline){
-  try{await ensureAssistantReady();}catch(error){Agent.error=error.message;if(view==='assistant')renderAssistant();return;}
+  try{await ensureAssistantReady();}catch(error){Agent.error=error.message;if(view==='assistant'||view==='editor')renderAssistant();return;}
   if(Agent.snapshot.offline){toast('El asistente necesita una conexion LLM. Configurala en sus ajustes.');agentSettings();return;}
  }
  const attachments=Agent.attachments.slice(),sent={role:'user',text,attachments};Agent.items.push(sent);Agent.draft='';Agent.attachments=[];AgentViewport.latest();
  $('#agent-input')?.focus({preventScroll:true});
  try{const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
-  Agent.items.push({role:'assistant',text:result.text,html:result.html,usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
- }catch(error){sent.failed=true;Agent.error=error.message;if(!Agent.draft){Agent.draft=text;Agent.attachments=attachments;}}
- if(view==='assistant')renderAssistant();
+  Agent.items.push({role:'assistant',text:result.text,html:result.html,attachments:(result.viewedAssets||[]).map(a=>({id:a.id,url:a.uri,mime:a.mimeType,name:a.name})),usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
+ }catch(error){sent.cancelled=error.message.startsWith('Turno detenido por el usuario.');sent.failed=!sent.cancelled;Agent.error=error.message;if(!sent.cancelled&&!Agent.draft){Agent.draft=text;Agent.attachments=attachments;}}
+ if(view==='assistant'||view==='editor')renderAssistant();
 }
 function agentSettings(){
  const s=Agent.settings;
@@ -454,7 +463,7 @@ document.addEventListener('click',async e=>{
    await generateAgentEntries([entry]);return;
   }
   switch(b.dataset.agent){
-   case'reconnect':try{await rpc('init');await agentCall('snapshot');Agent.error='';toast('Conexión local comprobada. No se ha reenviado el mensaje.');}catch(error){Agent.error=error.message;}if(view==='assistant')renderAssistant();break;
+   case'reconnect':try{await rpc('init');await agentCall('snapshot');Agent.error='';toast('Conexión local comprobada. No se ha reenviado el mensaje.');}catch(error){Agent.error=error.message;}if(view==='assistant'||view==='editor')renderAssistant();break;
    case'send':e.preventDefault();await sendAgent();break;
    case'generate-ready':await generateAgentEntries(agentPendingEntries());break;
    case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
