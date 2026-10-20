@@ -42,9 +42,10 @@ class AssistantBackgroundTurnTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val calls = AtomicInteger()
-        val answer = "Respuesta local terminada en segundo plano"
+        val answer = "Respuesta local terminada en segundo plano ${java.util.UUID.randomUUID()}"
         lateinit var vm: AssistantViewModel
         var vmReady = false
+        var phase = "start provider"
         val screenWasOn = app.getSystemService(PowerManager::class.java).isInteractive
         try {
             scenario!!.onActivity {
@@ -66,19 +67,30 @@ class AssistantBackgroundTurnTest {
                 assertTrue(vm.send("Petición local de prueba de segundo plano"))
             }
             withTimeout(15_000) {started.await()}
+            phase = "inspect foreground service"
             assertTrue(serviceRunning()); assertTrue(wakeHeld())
             scenario!!.close(); scenario = null
+            phase = "background response"
             shell("input keyevent KEYCODE_SLEEP")
             assertTrue(vm.ui.value.thinking)
             release.complete(Unit)
             waitUntil {!vm.ui.value.thinking}
+            phase = "persist response"
             assertTrue(vm.ui.value.items.filterIsInstance<ChatItem.Assistant>().any {it.text==answer})
-            waitUntil {AssistantChatStore(app).load()?.items?.filterIsInstance<ChatItem.Assistant>()?.any {it.text==answer} == true}
+            // AtomicFile.openRead() may discard an in-progress .new file. Poll the committed
+            // base without recovery side effects, then exercise the normal reader once saved.
+            val committedChat = java.io.File(app.filesDir,"assistant/chat-v1.json")
+            waitUntil {runCatching {committedChat.readText().contains(answer)}.getOrDefault(false)}
+            assertTrue(AssistantChatStore(app).load()?.items?.filterIsInstance<ChatItem.Assistant>()?.any {it.text==answer} == true)
             assertEquals(1,calls.get())
+            phase = "release service"
             waitUntil {!serviceRunning() && !wakeHeld()}
             if (screenWasOn) shell("input keyevent KEYCODE_WAKEUP")
             scenario = ActivityScenario.launch(MainActivity::class.java)
             scenario!!.onActivity {assertSame(vm,app.assistantViewModel())}
+        } catch (error: TimeoutCancellationException) {
+            val notices = if(vmReady) vm.ui.value.items.filterIsInstance<ChatItem.Notice>().joinToString {it.text} else "no view model"
+            throw AssertionError("phase=$phase provider_calls=${calls.get()} thinking=${if(vmReady) vm.ui.value.thinking else false} notices=$notices",error)
         } finally {
             release.complete(Unit)
             if (vmReady) instrumentation.runOnMainSync {vm.stop()}
