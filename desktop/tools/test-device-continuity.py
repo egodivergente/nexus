@@ -61,6 +61,17 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             peer.command({'op': 'configure', 'address': 'http://100.72.111.97:8797\nhttps://user:password@example.invalid'})
 
+    def test_return_route_rejection_falls_back_without_failing_the_peer(self):
+        peer = self.peer('route-fallback')
+        peer.config['address'] = 'http://100.72.111.97:8797\nhttp://192.168.1.147:8797'
+        with patch.object(peer, 'fetch', side_effect=[ConnectionResetError(), b'{"queued":true}']) as fetch:
+            peer.notify('http://192.168.1.134:8795')
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual(fetch.call_args.args[2]['endpoint'], 'http://192.168.1.147:8797')
+        with patch.object(peer, 'fetch', side_effect=ConnectionResetError()):
+            with self.assertRaises(ConnectionResetError):
+                peer.notify('http://192.168.1.134:8795')
+
     def test_frames_context_tamper_truncation_and_size(self):
         source = bytes(range(256)) * 800
         packet = io.BytesIO()

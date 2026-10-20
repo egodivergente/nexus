@@ -108,3 +108,9 @@ mantener la direccion Tailscale y agregar LAN con la misma identidad/clave.
 La APK96 background conserva un JSON de preferencias incompatible; la entrega
 Android97 unifica su servicio foreground, Studio y la correccion de transporte.
 No se declara comprobado el intercambio de claves con Windows antes de97.
+
+Las rutas de retorno se prueban en orden hasta que una responde. Android conserva
+su comprobacion: el hostname anunciado debe coincidir con la IP del llamante.
+Por eso la ruta Tailscale rechazada desde LAN permite probar la siguiente ruta
+LAN, sin debilitar autenticacion ni comprobacion de direccion.26tests PASS,
+incluyendo rechazo de primera ruta, exito de segunda y fallo de todas.

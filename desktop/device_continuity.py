@@ -679,6 +679,17 @@ class DeviceContinuity:
                         private.get('replicas', {}).pop('private/' + destination.relative_to(self.skills).as_posix(), None)
             self.host.write_secret(self.secret_file, private)
 
+    def notify(self, peer):
+        failure = None
+        for address in self.config['address'].splitlines():
+            try:
+                self.fetch(peer, '/sync', {'endpoint': address})
+                return
+            except Exception as error:
+                failure = error
+        if failure is not None:
+            raise failure
+
     def loop(self):
         while True:
             self.wake.clear()
@@ -699,8 +710,7 @@ class DeviceContinuity:
                     # Network requests never hold the agent turn lock.
                     for peer in self.config['peers']:
                         try:
-                            for address in self.config['address'].splitlines():
-                                self.fetch(peer, '/sync', {'endpoint': address})
+                            self.notify(peer)
                         except Exception as error:
                             failures.append(type(error).__name__)
                     if self.dirty and self.host.lock.acquire(False):
