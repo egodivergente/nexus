@@ -331,6 +331,9 @@ class DeviceContinuity:
             names = ('antigravity-oauth-token', 'installation_id')
             if all((directory / name).is_file() for name in names):
                 result['agy'] = {name: (directory / name).read_text('utf-8') for name in names}
+            elif self.config['deletions'] and result.get('agy') is not None and not (directory / names[0]).exists():
+                # A missing token after an established session is an intentional logout.
+                result['agy'] = {name: (directory / name).read_text('utf-8') for name in names if (directory / name).is_file()}
         return result
 
     def publish(self):
@@ -407,8 +410,14 @@ class DeviceContinuity:
                        state.get('base'), state.get('localBase'), self.config['deletions'])
         own_auth, incoming_auth = local.get('agy'), received.get('agy')
         auth = own_auth
-        if self.config['agy'] and 'agy' in scopes and incoming_auth and (not own_auth or auth_rank(incoming_auth) > auth_rank(own_auth)):
-            auth = incoming_auth
+        agy_base = state.get('agyBase')
+        if self.config['agy'] and 'agy' in scopes and isinstance(incoming_auth, dict):
+            complete = all(isinstance(incoming_auth.get(name), str) for name in ('antigravity-oauth-token', 'installation_id'))
+            logout = self.config['deletions'] and 'antigravity-oauth-token' not in incoming_auth
+            if (complete or logout) and incoming_auth != own_auth and incoming_auth != agy_base:
+                if own_auth is None or own_auth == agy_base or auth_rank(incoming_auth) > auth_rank(own_auth):
+                    auth = incoming_auth
+            agy_base = incoming_auth
         if merged != scoped:
             private.setdefault('conflicts', {})[digest(encoded(received))] = received
         prior_keys = private.get('shared', {}).get('keys', {})
@@ -495,12 +504,11 @@ class DeviceContinuity:
             elif backend in {'direct', 'proxy', 'anthropic', 'openai', 'antigravity'}:
                 settings['backend'] = backend
             atomic(settings_file, encoded(settings))
-        if auth and auth != own_auth:
+        if auth is not None and auth != own_auth:
             directory = Path(self.config['agyDirectory'])
             # CLI session files are the CLI's normal store; revisions/backups stay DPAPI.
-            for name in ('antigravity-oauth-token', 'installation_id'):
-                if name not in auth or not isinstance(auth[name], str):
-                    raise ValueError('Incomplete AGY auth revision')
+            if not set(auth).issubset({'antigravity-oauth-token', 'installation_id'}) or not all(isinstance(value, str) for value in auth.values()):
+                raise ValueError('Invalid AGY auth revision')
             names = ('antigravity-oauth-token', 'installation_id')
             prior = {name: (directory / name).read_bytes() if (directory / name).is_file() else None for name in names}
             private = self.private()
@@ -509,7 +517,10 @@ class DeviceContinuity:
                 self.host.write_secret(self.secret_file, private)
             try:
                 for name in names:
-                    atomic(directory / name, auth[name].encode('utf-8'))
+                    if name in auth:
+                        atomic(directory / name, auth[name].encode('utf-8'))
+                    elif self.config['deletions']:
+                        (directory / name).unlink(missing_ok=True)
             except Exception:
                 for name, data in prior.items():
                     if data is None:
@@ -520,7 +531,7 @@ class DeviceContinuity:
                 private['shared']['agy'] = own_auth
                 self.host.write_secret(self.secret_file, private)
                 raise
-        return json.loads(encoded(dict(base=scoped, localBase=merged)))
+        return json.loads(encoded(dict(base=scoped, localBase=merged, agyBase=agy_base)))
 
     def cycle(self, peer):
         manifest = json.loads(self.fetch(peer, '/manifest'))

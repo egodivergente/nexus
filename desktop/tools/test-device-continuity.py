@@ -235,6 +235,21 @@ class Tests(unittest.TestCase):
             self.assertEqual(value, (Path(a.config['agyDirectory']) / name).read_text('utf-8'))
         self.assertFalse(list(a.root.glob('*.json.enc')))
 
+    def test_opted_in_agy_logout_is_not_resurrected_by_an_unchanged_peer(self):
+        a = self.peer('a')
+        auth = {'antigravity-oauth-token': '{"id_token":"sample"}', 'installation_id': 'synthetic-installation'}
+        state = a.receive_credentials({'keys': {}, 'settings': {}, 'agy': auth}, {}, ['agy'])
+        a.config['deletions'] = True
+        (Path(a.config['agyDirectory']) / 'antigravity-oauth-token').unlink()
+        self.assertEqual({'installation_id': 'synthetic-installation'}, a.credential_snapshot()['agy'])
+        a.receive_credentials({'keys': {}, 'settings': {}, 'agy': auth}, state, ['agy'])
+        self.assertFalse((Path(a.config['agyDirectory']) / 'antigravity-oauth-token').exists())
+        b = self.peer('b')
+        state = b.receive_credentials({'keys': {}, 'settings': {}, 'agy': auth}, {}, ['agy'])
+        b.config['deletions'] = True
+        b.receive_credentials({'keys': {}, 'settings': {}, 'agy': {}}, state, ['agy'])
+        self.assertFalse((Path(b.config['agyDirectory']) / 'antigravity-oauth-token').exists())
+
     def test_busy_agent_never_receives_writes_during_turn(self):
         a, b = self.peer('a'), self.peer('b')
         (b.skills / 'SKILL.md').write_bytes(b'synthetic')
