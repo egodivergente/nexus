@@ -130,7 +130,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 SettingsPage.AGENT -> {
                     item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
                     item {SettingsCard {SettingRow("Sincronización entre móviles","Chats, memoria, skills, galería y adjuntos",{syncOpen=true})}}
-                    if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Modelo, respuesta, consumo, herramientas y skills",{assistantSettingsOpen=true})}}
+                    if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Proveedor, modelo, respuesta y herramientas",{assistantSettingsOpen=true})}}
                     item {SettingsHeader("Cerebros adicionales",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
                     item {SettingsCard {BrainsSettingsSection()}}
                 }

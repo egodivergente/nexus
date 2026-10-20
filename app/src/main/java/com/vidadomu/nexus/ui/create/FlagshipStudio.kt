@@ -32,6 +32,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -148,7 +150,19 @@ internal fun FlagshipStudioHeader(
 ) {
     val animate = rememberSystemAnimatorsEnabled()
     val haptics = rememberNexusHaptics()
-    val matches = remember(catalog, modality, selectedModel?.id) { matchFlagships(catalog, modality, selectedModel) }
+    val context = LocalContext.current
+    val favoritesStore = remember(context) { StudioFavoritesStore(context) }
+    var favoritesRevision by remember { mutableStateOf(0) }
+    var editingFavorites by remember { mutableStateOf(false) }
+    val savedFavorites = remember(modality, favoritesRevision) { favoritesStore.read(modality) }
+    val matches = remember(catalog, modality, savedFavorites) { studioFavorites(catalog, modality, savedFavorites) }
+    if (editingFavorites) StudioFavoritesEditor(modality, catalog, savedFavorites,
+        onSave = { keys ->
+            favoritesStore.save(modality, keys)
+            favoritesRevision++
+            editingFavorites = false
+            haptics.perform(NexusHapticEvent.SELECTION)
+        }, onDismiss = { editingFavorites = false })
     val imeVisible = WindowInsets.isImeVisible
     var expanded by rememberSaveable { mutableStateOf(true) }
     var collapsedByIme by rememberSaveable { mutableStateOf(false) }
@@ -172,6 +186,9 @@ internal fun FlagshipStudioHeader(
                 BrandLogo(organization = "Google", size = 18.dp)
                 Spacer(Modifier.width(NexusTokens.space8))
                 Text("Google Flow", style = MaterialTheme.typography.labelLarge)
+            }
+            IconButton(onClick = { editingFavorites = true }, modifier = Modifier.size(NexusTokens.minimumTouch)) {
+                Icon(Icons.Default.Tune, "Personalizar modelos destacados", Modifier.size(20.dp))
             }
             if (expanded) {
                 IconButton(onClick = toggle, modifier = Modifier.size(NexusTokens.minimumTouch)
@@ -207,7 +224,7 @@ internal fun FlagshipStudioHeader(
         }
         val rail = rememberLazyListState()
         val activeIndex = matches.indexOfFirst { it.model.id == selectedModel?.id && it.model.providerId == selectedModel?.providerId }
-        LaunchedEffect(modality, activeIndex) {
+        LaunchedEffect(modality, activeIndex, matches.map { it.model.studioKey() }) {
             if (activeIndex >= 0) { if (animate) rail.animateScrollToItem(activeIndex) else rail.scrollToItem(activeIndex) }
             else rail.scrollToItem(0)
         }

@@ -223,7 +223,12 @@ internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, 
                 .map { LibraryPick(job.id, it.id, it.localUri!!, it.type == Modality.VIDEO, job.prompt.take(40).ifBlank { "Resultado" }) }
         }.take(24).toList()
     }
-    if (recent.isEmpty()) return
+    if (recent.isEmpty()) {
+        Text("Aún no hay imágenes o vídeos descargados en la Biblioteca.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier.padding(NexusTokens.space12))
+        return
+    }
     Column(modifier.fillMaxWidth()) {
         Text("De tu Biblioteca", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = NexusTokens.space12, bottom = 2.dp))

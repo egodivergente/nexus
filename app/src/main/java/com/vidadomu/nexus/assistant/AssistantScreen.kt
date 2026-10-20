@@ -101,6 +101,14 @@ fun AssistantScreen(
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    var libraryExpanded by remember { mutableStateOf(false) }
+    val libraryHaptics = rememberNexusHaptics()
+    fun openLibrary() {
+        if (!libraryExpanded) {
+            libraryExpanded = true
+            libraryHaptics.perform(NexusHapticEvent.SELECTION)
+        }
+    }
     var stage by remember { mutableStateOf<Pair<List<Attachment>, Int>?>(null) }
     if (ui.resultsWall.isNotEmpty()) ResultsWallSheet(ui.resultsWall,
         onOpen = { media -> val wall = ui.resultsWall; stage = wall to wall.indexOf(media).coerceAtLeast(0); vm.closeResultsWall() }, onDismiss = vm::closeResultsWall)
@@ -251,7 +259,7 @@ fun AssistantScreen(
             stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias",
                 projectDrafts.size.takeIf { it > 0 }?.let { if (it == 1) "1 borrador de memoria sin guardar" else "$it borradores de memoria sin guardar" }).joinToString(" · ")
         },verticalArrangement=Arrangement.Center) {
-            // Una sola línea: el proyecto. Cerebro y razonamiento van junto al cuadro de texto; escena y referencias, en la hoja del proyecto.
+            // Una sola línea: el proyecto. El proveedor se configura en Ajustes y el razonamiento en el cuadro de texto; escena y referencias, en la hoja del proyecto.
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
                 Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
@@ -380,55 +388,18 @@ fun AssistantScreen(
                 ordersPanel = false; following = false
                 scope.launch { listState.animateScrollToItem(visibleItems.indexOfFirst { it is ChatItem.PlanCard && it.id == id }.coerceAtLeast(0)) }
             }
-            // Resultados recientes de la Biblioteca: un toque los adjunta. Se apartan al escribir para dejar sitio al lienzo.
-            if (input.text.isEmpty() && ui.pendingAttachments.isEmpty())
-                LibraryCarousel(onPick = { jobId, outputId -> vm.attachLibraryResult(jobId, outputId) }, enabled = !ui.attaching && !ui.thinking,
-                    modifier = Modifier.padding(top = NexusTokens.space4))
-            // Selectores en una sola fila compacta; si no caben, la fila se desplaza en horizontal en vez de crecer.
-            // Ancho acotado: dentro de un scroll horizontal el texto con weight colapsaba y las píldoras crecían en vertical.
-            Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { BrainPicker(ui, vm) }
-                Box(Modifier.weight(1f)) { ReasoningPicker(ui, vm) }
+            RecentLibraryPanel(libraryExpanded, onClose = { libraryExpanded = false }) {
+                LibraryCarousel(onPick = { jobId, outputId ->
+                    vm.attachLibraryResult(jobId, outputId)
+                    libraryExpanded = false
+                }, enabled = !ui.attaching && !ui.thinking)
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
-                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto)
-            }
-        }
-    }
-}
-
-/** Cerebro activo en la barra del Agente: un toque lista Bedrock, Claude, Antigravity, BytePlus/Dola y los propios, y cambia sin abrir Ajustes. */
-@Composable
-private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
-    var open by remember { mutableStateOf(false) }
-    var tick by remember { mutableStateOf(0) }
-    val store = vm.runtime.settings.brains
-    val brains = remember(tick, open) { store.all() }
-    val builtins = listOf(
-        AssistantSettings.BACKEND_DIRECT to "Bedrock", AssistantSettings.BACKEND_ANTHROPIC to "Claude API",
-        AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI", AssistantSettings.BACKEND_PROXY to "Proxy",
-        AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity",
-    )
-    val current = ui.settings.backend
-    val options = builtins + brains.map { BrainStore.backendFor(it.id) to it.name }
-    val label = agentBrainLabel(current, options)
-    val context = LocalContext.current
-    Box {
-        AgentControlButton("Proveedor", label, Icons.Default.Psychology, enabled = !ui.thinking,
-            description = "Proveedor del agente: $label. Cambiar", onClick = { open = true },
-            state = if (ui.thinking) "$label. $AGENT_CONTROL_BUSY" else label)
-        DropdownMenu(open, { open = false }) {
-            options.forEach { (backend, name) ->
-                DropdownMenuItem(text = { Text(name) },
-                    trailingIcon = { if (backend == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = {
-                        open = false
-                        vm.switchBrain(backend)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
-                        tick++
-                    })
+                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto,
+                onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
+                reasoningControl = { ReasoningPicker(ui, vm) })
             }
         }
     }
@@ -441,9 +412,7 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val argon = if(ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY) AntigravityReasoning.effort(ui.settings.modelId) else null
     // Sin soporte se muestra desactivado (no oculto) para que el control siga siendo reconocible.
     if (!reasoningAvailable(ui)) {
-        AgentControlButton("Razonamiento", "No disponible", Icons.Default.Speed, enabled = false,
-            description = "Modo de razonamiento no disponible con este proveedor", onClick = {},
-            state = "Este proveedor no admite elegir el razonamiento")
+        ReasoningIcon("No disponible", enabled = false, onClick = {})
         return
     }
     var open by remember { mutableStateOf(false) }
@@ -451,9 +420,7 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val modes = agentReasoningModes(antigravity = argon != null)
     val current = agentReasoningCurrent(modes, argon ?: brain?.reasoningEffort, brain?.thinking)
     Box {
-        AgentControlButton("Razonamiento", current, Icons.Default.Speed, enabled = !ui.thinking,
-            description = "Modo de razonamiento: $current. Cambiar", onClick = { open = true },
-            state = if (ui.thinking) "$current. $AGENT_CONTROL_BUSY" else current)
+        ReasoningIcon(current, enabled = !ui.thinking, onClick = { open = true })
         DropdownMenu(open, { open = false }) {
             modes.forEach { (name, effort, thinking) ->
                 DropdownMenuItem(text = { Text(name) },

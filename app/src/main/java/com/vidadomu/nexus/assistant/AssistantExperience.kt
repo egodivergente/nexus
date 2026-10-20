@@ -79,7 +79,9 @@ internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldVal
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
-    onReply: (String) -> Unit = {}, onCamera: (() -> Unit)? = null) {
+    onReply: (String) -> Unit = {}, onCamera: (() -> Unit)? = null,
+    onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
+    reasoningControl: @Composable () -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
@@ -87,7 +89,10 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
         Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
         border=androidx.compose.foundation.BorderStroke(1.dp,com.vidadomu.nexus.ui.theme.BorderEssential),
-        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
+        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)
+            .then(if (onShowLibrary != null) Modifier.recentLibraryGesture(opening = !libraryExpanded) {
+                if (libraryExpanded) onHideLibrary() else onShowLibrary()
+            } else Modifier)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
@@ -109,7 +114,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                 items(ui.pendingAttachments, key = { it.id }) { att -> AttachmentTile(att) { onRemove(att.id) } }
             }
             Row(verticalAlignment = Alignment.Bottom) {
-                IconButton(onClick = onAttach, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.AttachFile, "Adjuntar") }
+                LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
+                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded)
                 // La cámara solo con el campo vacío: al escribir, el texto recupera el ancho.
                 if (onCamera != null && text.text.isEmpty()) IconButton(onClick = onCamera, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Default.PhotoCamera, "Hacer una foto")
@@ -128,6 +134,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                             inner()
                         }
                     })
+                reasoningControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else if(!canSend && !ui.attaching) {
                     // Nada que enviar: el botón es el micrófono. El dictado se inserta en el campo SIN enviarlo.
