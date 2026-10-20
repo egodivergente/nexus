@@ -101,7 +101,7 @@ class SearchAssetsTool(private val d: ToolDeps) : BaseTool(
         string("type", "Tipo.", enum = TYPES)
         string("role", "Rol.", enum = ROLES)
         string("model_id", "Modelo que lo generó (subcadena).")
-        integer("limit", "Máx. 50.")
+        integer("limit", "Cantidad, según el límite configurable del usuario; 0 = todos.")
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
@@ -110,7 +110,7 @@ class SearchAssetsTool(private val d: ToolDeps) : BaseTool(
             character = input.str("character"),
             type = input.str("type")?.uppercase()?.let { t -> AssetType.entries.firstOrNull { it.name == t } ?: throw ToolInputException("Tipo «$t» no válido.") },
             role = input.str("role")?.uppercase()?.let { r -> AssetRole.entries.firstOrNull { it.name == r } ?: throw ToolInputException("Rol «$r» no válido.") },
-            modelId = input.str("model_id"), limit = (input.int("limit") ?: 20).coerceIn(1, 50),
+            modelId = input.str("model_id"), limit = d.limits().queryLimit(input.int("limit"),20),
         )
         if (q.projectId != null && d.assets.findProject(q.projectId) == null) return fail("No existe el proyecto «${q.projectId}».")
         val found = d.assets.search(q)
@@ -192,11 +192,11 @@ class GenerationHistoryTool(private val d: ToolDeps) : BaseTool(
     "Historial de generaciones: las del índice (con proyecto/plano y lineage) y las recientes de Nexus.",
     schema {
         string("project", "Filtra por proyecto.")
-        integer("limit", "Máx. 50.")
+        integer("limit", "Cantidad, según el límite configurable del usuario; 0 = todos.")
     },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
-        val limit = (input.int("limit") ?: 15).coerceIn(1, 50)
+        val limit = d.limits().queryLimit(input.int("limit"),15)
         val project = input.str("project")
         val indexed = d.assets.history(project, limit)
         val nexus = if (project == null) runCatching { d.history?.recent(limit) }.getOrNull().orEmpty() else emptyList()
@@ -286,5 +286,25 @@ class RenameAssetTool(private val d: ToolDeps) : BaseTool(
         val name = input.req("display_name").take(120)
         val updated = d.assets.updateAsset(input.req("asset_id")) { it.copy(displayName = name) }
         return ok { put("asset", d.assets.assetJson(updated)); put("file_renamed", false) }
+    }
+}
+
+/** Opens only existing visible visual assets; never executes generation or adds model context. */
+class OpenResultsWallTool(private val d: ToolDeps) : BaseTool(
+    "open_results_wall", ToolCategory.READ,
+    "Abre un muro con imágenes y vídeos existentes de la biblioteca. Usa search_assets o list_library_assets para obtener asset_ids. No genera ni adjunta archivos al LLM.",
+    schema { stringArray("asset_ids", "Ids de imágenes o vídeos, en el orden del muro.", required = true) },
+) {
+    override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
+        val ids = input.strList("asset_ids").distinct()
+        if (ids.isEmpty()) return fail("Indica al menos un asset_id.")
+        val assets = ids.map { id -> d.assets.asset(id)?.takeIf { !it.libraryDeleted }
+            ?: return fail("Archivo desconocido o eliminado de la biblioteca: $id.") }
+        if (assets.any { it.type !in setOf(AssetType.IMAGE, AssetType.VIDEO) })
+            return fail("El muro admite imágenes y vídeos.")
+        val media = assets.map { a -> Attachment(a.id,a.uri,
+            a.mimeType ?: if(a.type==AssetType.VIDEO) "video/mp4" else "image/*",
+            a.displayName,a.width,a.height,a.durationSec,a.id) }
+        return ok(buildJsonObject { put("opened", true); put("count", media.size) }, listOf(UiEvent.ResultsWall(media)))
     }
 }

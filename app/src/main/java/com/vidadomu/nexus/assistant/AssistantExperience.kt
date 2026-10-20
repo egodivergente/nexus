@@ -165,6 +165,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
     // Con un solo encargo, su tarjeta tiene el único botón: no se repite GENERAR abajo.
     if(pending.size < 2) return
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val limits by AssistantRuntime.get(app).settings.limitsState.collectAsState()
     val currencyState by app.currencyManager.state.collectAsState()
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
@@ -176,7 +177,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
                     style = MaterialTheme.typography.labelSmall)
             }
             val enabled=!ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
-            FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,20)}")}
+            FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,limits.maximum(limits.maxGenerationsPerBatch))}")}
         }
     }
 }
@@ -187,6 +188,7 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
     val picker=rememberProjectMediaPicker(onAttach)
     var wall by remember { mutableStateOf(false) }
+    var selectedResult by remember { mutableStateOf<Attachment?>(null) }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
@@ -210,11 +212,14 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
             }
         }
 
-        if(p.plan.modality == "IMAGE" && outputs.size > 1) {
+        if(p.plan.modality in setOf("IMAGE", "VIDEO") && outputs.size > 1) {
             TextButton(onClick = { wall = true }) { Icon(Icons.Default.GridView, null, Modifier.size(16.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Ver muro · ${outputs.size}") }
-            if (wall) ResultsWallSheet(outputs, onOpen = { wall = false; onOpenOutput() }, onDismiss = { wall = false })
+            if (wall) ResultsWallSheet(outputs.mapIndexed { index, uri ->
+                Attachment("${p.jobId}:$index",uri,if(p.plan.modality=="VIDEO") "video/mp4" else "image/*","Resultado ${index+1}")
+            }, onOpen = { selectedResult = it; wall = false }, onDismiss = { wall = false })
         }
     }
+    selectedResult?.let { media -> ResultMediaSheet(media) { selectedResult = null } }
 }
 
 

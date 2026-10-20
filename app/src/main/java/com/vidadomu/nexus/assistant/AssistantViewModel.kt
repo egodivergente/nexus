@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.withLock
 
 /** Elementos del chat. Las tarjetas de plan se pintan a partir de [AssistantUiState.plans]. */
@@ -92,6 +91,7 @@ data class AssistantUiState(
     val projects: List<Project> = emptyList(),
     val activeProjectId: String? = null,
     val pendingAttachments: List<Attachment> = emptyList(),
+    val resultsWall: List<Attachment> = emptyList(),
     val attaching: Boolean = false,
     val skillsCount: Int = 0,
     val skillErrors: List<String> = emptyList(),
@@ -114,8 +114,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var conversation: AgentConversation
     private var turnJob: Job? = null
     private val chatStore = AssistantChatStore(app)
-    private val submitSlots = kotlinx.coroutines.sync.Semaphore(3)
-    private val flowLane = kotlinx.coroutines.sync.Mutex()
+    private val submitSlots = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentGenerations)
+    private val flowLane = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentFlowGenerations)
     // StateFlow can emit synchronously in init; callbacks need initialized state.
     private val synced = mutableSetOf<String>()
     private var completedSeen = -1
@@ -125,6 +125,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private val reportedJobStates = mutableSetOf<String>()
 
     init {
+        viewModelScope.launch {runtime.settings.limitsState.collect { limits ->
+            submitSlots.setLimit(limits.maxConcurrentGenerations)
+            flowLane.setLimit(limits.maxConcurrentFlowGenerations)
+        }}
         val s = runtime.settings.load()
         orchestrator = runtime.orchestrator(s)
         val savedProject = runtime.settings.activeProjectId()?.takeIf { id -> runtime.assets.findProject(id)?.id == id }
@@ -261,6 +265,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 showPlan(ev.plan, ev.orderId, executable = false)
                 setPlan(ev.plan.id) { it.copy(state = PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING") }
             }
+            is UiEvent.ResultsWall -> _ui.update { it.copy(resultsWall = ev.media) }
             is UiEvent.Info -> notice(ev.text)
             is UiEvent.StreamingText -> _ui.update { it.copy(streamingText = ev.text) }
             is UiEvent.Replies -> _ui.update { it.copy(replies = ev.replies) }
@@ -322,6 +327,58 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             }
             _ui.update { it.copy(pendingAttachments = (it.pendingAttachments + added).distinctBy { attachment -> attachment.id }, attaching = false) }
             refreshProjects()
+        }
+    }
+
+    fun closeResultsWall() = _ui.update { it.copy(resultsWall = emptyList()) }
+
+    /** Resolve a library output locally, preserving the active draft and existing references. */
+    fun attachLibraryResult(jobId: String, outputId: String) = prepareLibraryAttachment {
+        runtime.importHistory()
+        val jobs = app.generationRepository.allJobs.value
+        val output = jobs.firstOrNull { it.id == jobId }
+            ?.outputs?.firstOrNull { it.id == outputId } ?: error("El resultado ya no está disponible.")
+        val local = com.vidadomu.nexus.core.model.OutputFiles.trustedLocalUri(output,
+            com.vidadomu.nexus.core.model.OutputFiles.conflictingLocalUris(jobs.flatMap { it.outputs }))
+            ?: error("Descarga el resultado desde su visor y vuelve a añadirlo al chat.")
+        val asset = runtime.assets.assetByUri(local) ?: runtime.assets.assetByUri(output.url)
+            ?: error("El resultado aún no está en la biblioteca. Vuelve a intentarlo.")
+        asset.copy(uri=local,mimeType=output.mimeType.ifBlank {asset.mimeType},
+            width=output.width ?: asset.width,height=output.height ?: asset.height)
+    }
+
+    fun attachLibraryAsset(id: String) = prepareLibraryAttachment {
+        runtime.assets.asset(id) ?: error("El archivo ya no está disponible.")
+    }
+
+    private fun prepareLibraryAttachment(resolve: suspend () -> com.vidadomu.nexus.agent.core.assets.Asset) {
+        val targetConversation = conversation
+        viewModelScope.launch {
+            _ui.update { it.copy(attaching = true) }
+            try {
+                val att = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val asset = resolve()
+                    require(!asset.libraryDeleted) { "El archivo se ha eliminado de la biblioteca." }
+                    val source = if (Uri.parse(asset.uri).scheme in setOf("file","content")) asset
+                        else AgentVideoOperations(app).source(asset.id)
+                    val uri = Uri.parse(source.uri)
+                    app.contentResolver.openInputStream(uri)?.use { } ?: error("No se pudo leer el archivo.")
+                    Attachment(source.id,source.uri,source.mimeType ?: when(source.type) {
+                        com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO -> "video/mp4"
+                        com.vidadomu.nexus.agent.core.assets.AssetType.AUDIO -> "audio/*"
+                        com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE -> "image/*"
+                        else -> "application/octet-stream"
+                    },source.displayName,source.width,source.height,source.durationSec,source.id)
+                }
+                if (conversation === targetConversation) _ui.update { state ->
+                    state.copy(pendingAttachments = mergeReferenceAttachments(state.pendingAttachments,att))
+                } else notice("La conversación cambió. Añade de nuevo la referencia al chat que quieras.")
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                val message=if(e.message?.contains("antes de editarlo")==true) "Descarga el resultado desde su visor y vuelve a añadirlo al chat." else e.message?.take(160)
+                notice("No se pudo añadir al chat: $message",true)
+            }
+            finally { _ui.update { it.copy(attaching = false) } }
         }
     }
 
@@ -398,7 +455,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun generatePending() {
         if(_ui.value.thinking || _ui.value.plans.values.any { it.busy }) return
         _ui.value.plans.values.filter { it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) }
-            .take(20).forEach { generate(it.plan.id, it.plan.fingerprint()) }
+            .take(runtime.settings.limits().maximum(runtime.settings.limits().maxGenerationsPerBatch)).forEach { generate(it.plan.id, it.plan.fingerprint()) }
     }
 
     fun outputs(jobId: String?): List<String> = app.generationRepository.allJobs.value.firstOrNull { it.id == jobId }?.outputs?.map { it.localUri ?: it.url }.orEmpty()
@@ -696,7 +753,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         chatStore.save(_ui.value, runtime.orders.snapshot())
                         return runtime.deps.lifecycle.confirmAndSubmit(planId, shownFingerprint)
                     }
-                    if (p.plan.ref.providerId == "google_flow") flowLane.withLock { submitNow() }
+                    if (p.plan.ref.providerId == "google_flow") flowLane.withPermit { submitNow() }
                     else submitNow()
                 }
                 val sent = runtime.guard.plan(planId) ?: p.plan
@@ -807,6 +864,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Modo de razonamiento del cerebro activo (esfuerzo / pensar): se guarda en su perfil y se aplica ya. */
     fun setReasoning(effort: String?, thinking: String?): String? {
+        val current = _ui.value.settings
+        if (current.backend == AssistantSettings.BACKEND_ANTIGRAVITY &&
+            com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.effort(current.modelId) != null) {
+            if (effort !in com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.efforts || thinking != null)
+                return "Argon admite bajo, medio o alto."
+            return saveSettings(current.copy(modelId = com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.model(effort!!)),null)
+        }
         val brain = _ui.value.settings.brain ?: return "Este proveedor no tiene modo de razonamiento configurable."
         return try {
             runtime.settings.brains.save(brain.copy(reasoningEffort = effort, thinking = thinking), null)

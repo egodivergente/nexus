@@ -31,7 +31,7 @@ private suspend fun submitAccountFlow(d: ToolDeps, plan: GenerationPlan, session
         ?: throw ToolInputException("Cantidad no válida.")
     // El máximo es un ajuste del usuario (Ajustes → Límites), no una cifra fija.
     val flowMax = d.limits().flowMaxResults
-    if (count !in 1..flowMax || session.flowSubmittedResults + count > flowMax)
+    if (count < 1 || (flowMax > 0 && (count > flowMax || session.flowSubmittedResults.toLong() + count > flowMax)))
         throw ToolInputException("Tu límite actual es de $flowMax resultados de Flow por encargo (se cambia en Ajustes → Límites).")
     if (d.guard.state(plan.id) in listOf(PlanState.SUBMITTED, PlanState.UNCERTAIN, PlanState.DISCARDED, PlanState.CONFIRMED))
         throw ToolInputException("Este trabajo ya se envió o se descartó; consulta su estado.")

@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import com.vidadomu.nexus.agent.core.llm.AntigravityReasoning
 import com.vidadomu.nexus.agent.core.llm.BrainAuthMode
 import com.vidadomu.nexus.agent.core.llm.BrainProfile
 import com.vidadomu.nexus.agent.core.llm.BrainProtocol
@@ -95,6 +96,10 @@ fun AssistantScreen(
     vm: AssistantViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    var wallResult by remember { mutableStateOf<Attachment?>(null) }
+    if (ui.resultsWall.isNotEmpty()) ResultsWallSheet(ui.resultsWall,
+        onOpen = { wallResult = it; vm.closeResultsWall() }, onDismiss = vm::closeResultsWall)
+    wallResult?.let { media -> ResultMediaSheet(media) { wallResult = null } }
     val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -374,13 +379,15 @@ private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
 @Composable
 private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val brain = ui.settings.brain
-    if (brain == null || !brain.capabilities.reasoning || brain.protocol == BrainProtocol.CUSTOM_REST) return
+    val argon = if(ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY) AntigravityReasoning.effort(ui.settings.modelId) else null
+    if (argon == null && (brain == null || !brain.capabilities.reasoning || brain.protocol == BrainProtocol.CUSTOM_REST)) return
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val modes = listOf<Triple<String, String?, String?>>(
+    val modes = if(argon != null) listOf<Triple<String,String?,String?>>(Triple("Bajo","low",null),Triple("Medio","medium",null),Triple("Alto","high",null))
+    else listOf<Triple<String, String?, String?>>(
         Triple("Auto", null, null), Triple("Rápido", null, "disabled"), Triple("Mínimo", "minimal", null),
         Triple("Bajo", "low", null), Triple("Medio", "medium", null), Triple("Alto", "high", null))
-    val current = modes.firstOrNull { it.second == brain.reasoningEffort && it.third == brain.thinking }?.first ?: "Auto"
+    val current = modes.firstOrNull { it.second == (argon ?: brain?.reasoningEffort) && it.third == brain?.thinking }?.first ?: "Auto"
     Box {
         TextButton(onClick = { open = true }, enabled = !ui.thinking, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
             modifier = Modifier.height(28.dp).semantics { contentDescription = "Modo de razonamiento: $current. Cambiar" }) {
@@ -397,6 +404,7 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
 }
 
 private fun reasoningAvailable(ui: AssistantUiState): Boolean =
+    (ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(ui.settings.modelId) != null) ||
     ui.settings.brain?.let { it.capabilities.reasoning && it.protocol != BrainProtocol.CUSTOM_REST } == true
 
 /** Los IDs internos (ord_…) no se enseñan en el chat; la tarjeta y su «Detalles» ya identifican el encargo. Copiar conserva el texto original. */
@@ -409,8 +417,7 @@ internal fun hideOrderIds(text: String): String =
 private fun OrdersSheet(cards: List<ChatItem.PlanCard>, ui: AssistantUiState, onClose: () -> Unit, onPick: (String) -> Unit) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currencyState by app.currencyManager.state.collectAsState()
-    ModalBottomSheet(onDismissRequest = onClose, shape = NexusTokens.sheet, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Text("Encargos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space8))
+    NexusSheet("Encargos", onClose, subtitle = "${cards.size} encargos", icon = Icons.Default.Assignment) {
         LazyColumn(contentPadding = PaddingValues(bottom = NexusTokens.space24)) {
             items(cards.asReversed(), key = { it.id }) { card ->
                 val plan = ui.plans[card.planId]?.plan
@@ -488,15 +495,12 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
     var name by rememberSaveable {mutableStateOf("")}
     val active=ui.projects.firstOrNull {it.id==ui.activeProjectId}
     val conversations=remember {vm.conversations()}
-    ModalBottomSheet(onDismissRequest=onClose,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
+    var saveProject by remember { mutableStateOf<(() -> Unit)?>(null) }
+    NexusSheet(active?.name ?: "Proyecto", onClose, subtitle = "Cambiar proyecto y editar su memoria", icon = Icons.Default.MenuBook,
+        primaryAction = { Button(onClick={if(active==null) onClose() else saveProject?.invoke()},
+            enabled=active==null || saveProject!=null, modifier=Modifier.fillMaxWidth()) { Text(if(active==null) "Listo" else "Guardar proyecto") } }) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
             .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Text(active?.name ?: "Proyecto",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                IconButton(onClick=onClose) {Icon(Icons.Default.Close,"Cerrar proyecto")}
-            }
-            Text("Cambiar proyecto",style=MaterialTheme.typography.titleMedium)
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 item {StudioFilterChip(active==null,{vm.selectProject(null)},label={Text("Sin proyecto")},shape=NexusTokens.filter)}
                 items(ui.projects,key={it.id}) {p->StudioFilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},shape=NexusTokens.filter)}
@@ -504,9 +508,9 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
             TextButton(onClick={creating=!creating},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}
             if(creating) {
                 StudioTextField(name,{name=it.take(80)},singleLine=true,label={Text("Nombre")},shape=NexusTokens.field,modifier=Modifier.fillMaxWidth())
-                TextButton(onClick={vm.createProject(name);name="";creating=false},enabled=name.isNotBlank()) {Text("Crear")}
+                FilledTonalButton(onClick={vm.createProject(name);name="";creating=false},enabled=name.isNotBlank()) {Text("Crear")}
             }
-            if(active!=null) holder.SaveableStateProvider(active.id) {ProjectMemoryEditor(active,vm,onClose)}
+            if(active!=null) holder.SaveableStateProvider(active.id) {ProjectMemoryEditor(active,vm,onClose) { saveProject=it }}
             ProjectReferences(ui,vm,expandedByDefault=true)
             HorizontalDivider()
             Text("Conversaciones",style=MaterialTheme.typography.titleMedium)
@@ -519,7 +523,7 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
 
 /** Biblia del proyecto: lo que el asistente lee en cada mensaje mientras el proyecto está activo. */
 @Composable
-private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project, vm: AssistantViewModel, onClose: () -> Unit) {
+private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project, vm: AssistantViewModel, onClose: () -> Unit, onSaveReady: ((() -> Unit)?) -> Unit) {
     val m = p.memory
     var description by rememberSaveable(p.id) { mutableStateOf(p.description.orEmpty()) }
     var synopsis by rememberSaveable(p.id) { mutableStateOf(m.synopsis.orEmpty()) }
@@ -559,25 +563,21 @@ private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project,
                     }
                 }
             }
-            TextButton(onClick = {
-                vm.saveProjectMemory(p.id, description, synopsis, tone, style, rules, models,
-                    keepNotes = if (removed.isEmpty()) null else m.notes.map { it.at }.filter { it !in removed }.toSet())
-                onClose()
-            }) { Text("Guardar") }
+    val saveLatest by rememberUpdatedState<() -> Unit> {
+        vm.saveProjectMemory(p.id, description, synopsis, tone, style, rules, models,
+            keepNotes = if (removed.isEmpty()) null else m.notes.map { it.at }.filter { it !in removed }.toSet())
+        onClose()
+    }
+    DisposableEffect(p.id) {
+        onSaveReady { saveLatest() }
+        onDispose { onSaveReady(null) }
+    }
 }
 
 /** Grupo visual del formulario de proyecto: icono y título sobre una tarjeta, para escanear rápido. */
 @Composable
 private fun ProjectGroup(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .35f), shape = NexusTokens.card, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                Text(title, style = MaterialTheme.typography.titleSmall)
-            }
-            content()
-        }
-    }
+    NexusSheetGroup(title, icon, content)
 }
 @Composable
 private fun UserBubble(item:ChatItem.User) {
@@ -649,12 +649,30 @@ internal fun AssistantMediaPreview(media: Attachment) {
                     playWhenReady=false
                 }
             }
-            DisposableEffect(player) { onDispose { player.release() } }
-            AndroidView(
-                factory={viewContext -> PlayerView(viewContext).apply { this.player=player; useController=true }},
-                update={it.player=player},
-                modifier=Modifier.width(280.dp).aspectRatio(16f/9f).clip(NexusTokens.card),
-            )
+            var ratio by remember(media.uri) { mutableStateOf(mediaAspectRatio(media.width, media.height)) }
+            var playbackError by remember(media.uri) { mutableStateOf(false) }
+            DisposableEffect(player) {
+                val listener = object : Player.Listener {
+                    override fun onVideoSizeChanged(size: androidx.media3.common.VideoSize) {
+                        ratio = mediaAspectRatio(size.width, size.height, size.pixelWidthHeightRatio, size.unappliedRotationDegrees)
+                    }
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { playbackError = true }
+                }
+                player.addListener(listener)
+                onDispose { player.removeListener(listener); player.release() }
+            }
+            Column(Modifier.widthIn(max = 280.dp)) {
+                AndroidView(
+                    factory={viewContext -> PlayerView(viewContext).apply {
+                        this.player=player; useController=true
+                        resizeMode=androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }},
+                    update={it.player=player},
+                    modifier=Modifier.fillMaxWidth().aspectRatio(ratio ?: 1f).clip(NexusTokens.card),
+                )
+                if (playbackError) Text("No se pudo cargar el vídeo. Comprueba el archivo o vuelve a descargarlo.",
+                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+            }
         }
         media.mimeType.startsWith("audio/") -> {
             val player=remember(media.uri) {
@@ -984,6 +1002,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var baseUrl by remember { mutableStateOf(s.llmBaseUrl) }
     var apiKey by remember { mutableStateOf("") }
     var clearApiKey by remember { mutableStateOf(false) }
+    var deleteCredential by remember { mutableStateOf<String?>(null) }
     var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
     var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
@@ -1012,22 +1031,9 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
             antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }), newToken, newSecret, newApiKey)
         if (error == null) onDismiss()
     }
-    ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.96f)) {
-            // Cabecera fija: título, estado y una línea de resumen.
-            Column(Modifier.padding(horizontal = NexusTokens.screenMargin)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ajustes del asistente", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                    Surface(shape = NexusTokens.filter, color = if (ui.thinking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) {
-                        Text(if (ui.thinking) "Trabajando" else "Listo", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium,
-                            color = if (ui.thinking) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
-                    }
-                }
-                Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills" + (if (ui.skillErrors.isNotEmpty()) " · ${ui.skillErrors.size} con errores" else "") +
-                    (ui.lastLatencyMs?.let { " · último turno ${"%.1f".format(it / 1000.0)} s" } ?: ""),
-                    style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            }
+    NexusSheet("Ajustes del asistente", onDismiss, icon = Icons.Default.AutoAwesome,
+        subtitle = "${ui.catalog.size} modelos · ${ui.skillsCount} skills · " + if (ui.thinking) "Trabajando" else "Listo",
+        primaryAction = { Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Guardar") } }) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8),
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 // 1 · Cerebro
@@ -1086,9 +1092,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         }
                         StudioCredentialField(apiKey, { apiKey = it; clearApiKey = false }, shape = NexusTokens.field,
                             label = { Text(if (maskedKey.isNotBlank()) "Clave de API ($maskedKey)" else "Clave de API") }, singleLine = true)
-                        if (maskedKey.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(clearApiKey, { clearApiKey = it }); Text("Borrar la clave guardada", style = MaterialTheme.typography.bodySmall)
-                        }
+                        if (maskedKey.isNotBlank()) OutlinedButton(onClick = { deleteCredential = "api" }) { Text(if (clearApiKey) "Se borrará al guardar" else "Borrar clave") }
                         if (backend == AssistantSettings.BACKEND_OPENAI) {
                             Text("Tarifa para el límite de consumo (opcional, USD por millón de tokens). Sin ella solo se limita el número de llamadas por mensaje.",
                                 style = MaterialTheme.typography.bodySmall, color = TextMuted)
@@ -1109,18 +1113,14 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         StudioCredentialField(accessKey, { accessKey = it.trim() }, shape = NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
                         StudioCredentialField(secret, { secret = it; clearSecret = false }, shape = NexusTokens.field, label = { Text(if (s.maskedAwsSecret.isNotBlank()) "AWS Secret (${s.maskedAwsSecret})" else "AWS Secret Access Key") },
                             singleLine = true)
-                        if (s.maskedAwsSecret.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(clearSecret, { clearSecret = it }); Text("Borrar secret guardado", style = MaterialTheme.typography.bodySmall)
-                        }
+                        if (s.maskedAwsSecret.isNotBlank()) OutlinedButton(onClick = { deleteCredential = "secret" }) { Text(if (clearSecret) "Se borrará al guardar" else "Borrar clave") }
                         StudioTextField(region, { region = it }, shape = NexusTokens.field, label = { Text("Región (us-east-1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     } else {
                         Text("La app habla con tu proxy (APK → proxy → Bedrock); las claves de AWS se quedan en el proxy.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                         StudioTextField(endpoint, { endpoint = it }, shape = NexusTokens.field, label = { Text("URL del proxy (https://…)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         StudioCredentialField(token, { token = it; clearToken = false }, shape = NexusTokens.field, label = { Text(if (s.maskedToken.isNotBlank()) "Token del dispositivo (${s.maskedToken})" else "Token del dispositivo") },
                             singleLine = true)
-                        if (s.maskedToken.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(clearToken, { clearToken = it }); Text("Borrar token guardado", style = MaterialTheme.typography.bodySmall)
-                        }
+                        if (s.maskedToken.isNotBlank()) OutlinedButton(onClick = { deleteCredential = "token" }) { Text(if (clearToken) "Se borrará al guardar" else "Borrar clave") }
                     }
                     if (!isCustom) StudioTextField(modelId, { modelId = it.trim() }, shape = NexusTokens.field, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(when (backend) {
@@ -1136,7 +1136,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         else -> AssistantSettings.KNOWN_MODELS
                     }
                     if (!isCustom && modelChips.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                        modelChips.forEach { (id, name) -> StudioFilterChip(modelId == id, { modelId = id }, label = { Text(name) }) }
+                        modelChips.forEach { (id, name) -> StudioFilterChip((modelId == id || (backend == AssistantSettings.BACKEND_ANTIGRAVITY && id == AntigravityReasoning.DEFAULT_MODEL && AntigravityReasoning.effort(modelId) != null)), { modelId = id }, label = { Text(name) }) }
+                    }
+                    if(backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(modelId) != null) {
+                        Text("Razonar",style=MaterialTheme.typography.titleSmall)
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            listOf("low" to "Bajo","medium" to "Medio","high" to "Alto").forEach { (effort,label) ->
+                                StudioFilterChip(AntigravityReasoning.effort(modelId)==effort,{modelId=AntigravityReasoning.model(effort)},label={Text(label)})
+                            }
+                        }
                     }
                     if (!isCustom && modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
@@ -1186,17 +1194,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 }
                 error?.let { InlineNotice(noticeMessage(it, "Revisa los ajustes antes de guardar."), technicalDetails = it) }
             }
-            // Botonera fija: siempre a la vista, sin tener que llegar al final de la lista.
-            Surface(color = com.vidadomu.nexus.ui.theme.LocalChromeColor.current) {
-                Column {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)) { Text("Cerrar") }
-                        Button(onClick = { save() }, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)) { Text("Guardar") }
-                    }
-                }
-            }
-        }
+    }
+    deleteCredential?.let { target ->
+        AlertDialog(onDismissRequest = { deleteCredential = null }, title = { Text("¿Borrar la clave guardada?") },
+            text = { Text("Se eliminará al guardar los ajustes. Puedes cerrar sin guardar para conservarla.") },
+            confirmButton = { Button(onClick = {
+                when (target) { "api" -> { clearApiKey = true; apiKey = "" }; "secret" -> { clearSecret = true; secret = "" }; "token" -> { clearToken = true; token = "" } }
+                deleteCredential = null
+            }) { Text("Borrar clave") } },
+            dismissButton = { TextButton(onClick = { deleteCredential = null }) { Text("Cancelar") } })
     }
     if (addingBrain || editingBrain != null) BrainEditorDialog(editingBrain, brainStore) { saved ->
         addingBrain = false; editingBrain = null; brainTick++
