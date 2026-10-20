@@ -5,7 +5,7 @@ Conectar la misma cuenta en los tres dispositivos. Los clientes Desktop y
 Android deben pertenecer al mismo proyecto Google Cloud para compartir los
 archivos visibles con el permiso `drive.file`.
 
-La APK unificada 1.9.60-sync/vc94 conserva también la continuidad directa entre
+La APK unificada 1.9.61-sync/vc95 conserva también la continuidad directa entre
 móviles. Sus controles aparecen separados: **Google Drive** y **Sincronización
 entre móviles**. Drive mantiene la copia compartida con Desktop; la continuidad
 directa conserva sus categorías y su vinculación existente. Ambos transportes
@@ -37,6 +37,9 @@ Windows intenta sincronizar cada 30 segundos cuando el agente está disponible.
 Android solicita sincronización al cambiar el índice y al volver a la app;
 WorkManager proporciona recuperación periódica a partir de 15 minutos. Android
 puede aplazar esos trabajos por ahorro de batería y condiciones de red.
+La transferencia usa un servicio de primer plano con notificación para admitir
+la primera copia de originales aunque dure más de diez minutos. Al inicializar
+se vuelve a programar un trabajo periódico que haya quedado fallido o cancelado.
 La opción Solo Wi-Fi usa una conexión no medida. El proyecto activo y los
 seleccionados se descargan para uso local. Los demás conservan sus metadatos.
 
