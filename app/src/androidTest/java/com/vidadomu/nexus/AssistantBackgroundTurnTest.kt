@@ -36,7 +36,7 @@ class AssistantBackgroundTurnTest {
     private fun wakeHeld() = shell("dumpsys power").lineSequence()
         .any {it.contains("PARTIAL_WAKE_LOCK") && it.contains("Nexus:AssistantTurn")}
 
-    @Test fun realSendCompletesWithActivityDestroyedAndScreenOff() = runBlocking {
+    @Test fun realSendCompletesWithActivityDestroyedAndScreenOff(): Unit = runBlocking {
         assertIsolated()
         var scenario: ActivityScenario<MainActivity>? = ActivityScenario.launch(MainActivity::class.java)
         val started = CompletableDeferred<Unit>()
@@ -73,6 +73,7 @@ class AssistantBackgroundTurnTest {
             release.complete(Unit)
             waitUntil {!vm.ui.value.thinking}
             assertTrue(vm.ui.value.items.filterIsInstance<ChatItem.Assistant>().any {it.text==answer})
+            waitUntil {AssistantChatStore(app).load()?.items?.filterIsInstance<ChatItem.Assistant>()?.any {it.text==answer} == true}
             assertEquals(1,calls.get())
             waitUntil {!serviceRunning() && !wakeHeld()}
             if (screenWasOn) shell("input keyevent KEYCODE_WAKEUP")
@@ -86,7 +87,7 @@ class AssistantBackgroundTurnTest {
         }
     }
 
-    @Test fun cancellingTheCallerCancelsTheOriginalWorkAndReleasesWakeLock() = runBlocking {
+    @Test fun cancellingTheCallerCancelsTheOriginalWorkAndReleasesWakeLock(): Unit = runBlocking {
         assertIsolated()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         val scope = CoroutineScope(SupervisorJob()+Dispatchers.Main)
@@ -106,7 +107,7 @@ class AssistantBackgroundTurnTest {
         } finally {scope.cancel(); scenario.close()}
     }
 
-    @Test fun consecutiveTurnsDoNotStopTheNewRequestOrReplayTheOldOne() = runBlocking {
+    @Test fun consecutiveTurnsDoNotStopTheNewRequestOrReplayTheOldOne(): Unit = runBlocking {
         assertIsolated()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         val calls = AtomicInteger()
@@ -120,7 +121,7 @@ class AssistantBackgroundTurnTest {
         } finally {scenario.close()}
     }
 
-    @Test fun serviceDestructionReturnsAnErrorWithoutReplayingTheRequest() = runBlocking {
+    @Test fun serviceDestructionReturnsAnErrorWithoutReplayingTheRequest(): Unit = runBlocking {
         assertIsolated()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         val scope = CoroutineScope(SupervisorJob()+Dispatchers.Main)

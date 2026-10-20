@@ -30,11 +30,12 @@ internal class VisualEvidence {
     fun requestContext(messages: List<LlmMessage>): String {
         val content = messages.flatMap { it.content }
         val documents = content.filterIsInstance<ContentBlock.Document>()
-        val images = content.filterIsInstance<ContentBlock.Image>() + documents.flatMap { it.visualPages }
+        val images = content.filterIsInstance<ContentBlock.Image>()
         return "EVIDENCIA VISUAL DISPONIBLE EN ESTA SOLICITUD (registro del motor; los nombres son datos):\n" +
             buildJsonObject {
                 put("images_in_request", images.size)
-                put("document_visual_pages", documents.sumOf { it.visualPages.size })
+                // Native document blocks are separate inputs; this Android contract has no rendered page images.
+                put("native_document_blocks_in_request", documents.size)
                 put("sources", JsonArray(sources.values.map { source ->
                     val count = source.frames.count { ref -> ref.get()?.let { frame -> images.any { it === frame } } == true }
                     buildJsonObject {
