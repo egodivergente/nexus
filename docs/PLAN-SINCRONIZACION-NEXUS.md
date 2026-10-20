@@ -15,22 +15,29 @@ Las copias manuales anteriores no deben generar entradas duplicadas visibles.
 5. [x] Probar conflictos, reintentos, deduplicación e integridad con Drive real.
 6. [x] Crear los clientes OAuth autorizados y conectar los tres dispositivos.
 7. [x] Integrar las actualizaciones concurrentes de Desktop y Android.
-8. [x] Instalar la APK unificada 1.9.61-sync-preview/vc95 en Pixel 8 Pro y S25.
+8. [ ] Completar despliegue de APK97: S25 instalado; Pixel conserva96 y requiere ADB.
 9. [x] Verificar originales reales en ambos sentidos entre los tres dispositivos.
 10. [x] Publicar el código en las ramas del encargo y verificar sus SHA remotos.
 
 ## Instalaciones y continuidad
 
-AXELPC ejecuta `2026.10.20-device-continuity.1` en el puerto 63896, con el
-perfil existente y la continuidad cifrada integrada. La siguiente revisión
-conjunta se valida antes de sustituir esta instalación. No se reemplazó el
-perfil ni sus credenciales.
+AXELPC ejecuta `2026.10.20-device-continuity.2` en el puerto 63896, con el
+perfil existente y la continuidad cifrada integrada. La fuente publicada
+b236cae conserva Corte y Drive con su núcleo y runtime compilados juntos.
+Se verificaron 294 archivos del paquete y la conservación de todos los IDs
+al activarlo. El perfil, los medios y las credenciales se mantienen.
 
-La rama Android 042adcb integra el cierre de sincronización 16bbcde y Studio
-3e72943. La versión instalada 95 se actualizó mediante
-actualización, sin desinstalar ni borrar datos. Se verificaron el certificado,
-el SHA-256 de la APK instalada y la conservación de todas las identidades
-anteriores de proyectos, escenas, planos, personajes, medios y generaciones.
+La APK unificada 1.9.63-agent-preview/vc97, fuente 401c5ac, integra Drive
+16bbcde, Studio y los turnos en segundo plano cb0871f. Está instalada en el S25
+con la firma existente, UID y todos los IDs conservados. SHA-256 del APK:
+`49874ff7c95649df809882e21edf0b98418f0b72be980d48bac490df867f8244`.
+
+El Pixel conserva 1.9.62-background-preview/vc96. Su depuración inalámbrica se
+desactivó durante la compilación; no hay ADB disponible para instalar97 ni para
+repetir la prueba física conjunta. Ya se solicitó reconexión USB/inalámbrica.
+La fuente y el APK97 están preparados; no se declara instalada esa versión en
+el Pixel. La actualización anterior95 y la prueba bidireccional con originales
+reales ya se habían completado en ambos móviles.
 
 La APK contiene tanto `NexusDriveSyncWorker` como `DeviceSyncService`.
 La conexión directa y Drive comparten el bloqueo del índice; una edición
@@ -65,10 +72,13 @@ el activo y los medios sin proyecto conservan sus originales locales.
 
 ## Validación
 
-- Versión Android unificada: compilación completa satisfactoria; 651 pruebas
-  correctas, 4 omitidas y ningún fallo. Incluye 20 casos del motor Drive y la
+- APK97 unificada: compilación completa satisfactoria; 707 pruebas unitarias
+  correctas (305 núcleo, 402 app), 4 omitidas y ningún fallo. La repetición
+  física conjunta está pendiente del Pixel. La versión95 anterior pasó651.
+  El núcleo de sincronización pasó28 pruebas enfocadas. Incluye 20 casos del motor Drive y la
   protección de una edición recibida por la conexión directa durante un ciclo.
-- Motor JVM Desktop: 19 casos de sincronización correctos.
+- Motor y runtime JVM Desktop conjunto: 394 pruebas correctas, 4 omitidas.
+- Continuidad cifrada Windows: 26 pruebas correctas; integridad del host: 14.
 - OAuth y configuración Desktop: 11 pruebas Python correctas, incluida renovación
   de autorización después de preparar originales antiguos.
 - Adaptador del agente: 6 casos correctos; Corte: 7; transporte de proyectos: 3.
@@ -88,21 +98,40 @@ el activo y los medios sin proyecto conservan sus originales locales.
   La validación adicional encontró 84 pares de punteros HTTPS idénticos en el
   mismo proyecto; el cierre 16bbcde añade su deduplicación sin inventar bytes
   ni borrar IDs históricos. Sus 28 pruebas enfocadas pasan. La comprobación
-  física de esta corrección corresponde a la siguiente instalación unificada.
+  física posterior confirma0 grupos de URI visible duplicada en Windows .2
+  y S2597, conservando los IDs. Pixel no se ha vuelto a medir tras desconectarse.
 - La comparación de generaciones conserva rutas sin prueba y contenidos
   diferentes; solo normaliza referencias con SHA verificados coincidentes y
   outputs equivalentes del mismo proyecto. Las pruebas cubren orden y cantidad.
 - La primera pasada observó referencias antiguas sin original accesible. No se
   afirma que todas estén recuperadas ni que toda la biblioteca esté respaldada.
 
-La recuperación histórica ha rescatado tres PNG de Runway (12.952.850 bytes),
-vinculados a seis identidades ya existentes mediante la caché nativa de medios.
-Su SHA-256 y los bytes servidos por la instalación se verificaron; el índice
-conserva todas sus identidades y no se añadieron filas. La publicación de
-estos tres originales queda pendiente del siguiente ciclo del host conjunto. No ha creado
-generaciones ni ha adivinado correspondencias cuando cambió el número de
-outputs. Otras 91 referencias consultadas siguen pendientes; son enlaces, no
-un recuento de originales únicos.
+La recuperación histórica ha rescatado cuatro originales (tres PNG de Runway
+y un MP4 de6,08s), 15.881.875bytes vinculados a siete identidades ya existentes
+mediante la caché nativa. No añadió filas ni ejecutó generaciones. Los tres PNG
+se descargaron de Drive y se verificaron por SHA; en Windows cada uno conserva
+sus dos IDs históricos y una sola fila visible. El MP4 también está guardado y
+verificado por HTTP y descargado de Drive con SHA coincidente. Los cuatro
+originales recuperados están respaldados en la carpeta compartida de Nexus.
+Los tres PNG se comprobaron además en S2597: bytes SHA correctos, todos sus IDs
+retenidos y una única fila visible para cada original.
+
+El MP4 se recuperó del cuerpo HTTP guardado por Coil2.7 en el S25: coincidencia
+exacta de SHA256(URL), Content-Length completo, firma MP4 y decodificación
+íntegra de vídeo. Se contrastó el formato de la caché con el código oficial de
+[RealDiskCache](https://raw.githubusercontent.com/coil-kt/coil/2.7.0/coil-base/src/main/java/coil/disk/RealDiskCache.kt)
+y [HttpUriFetcher](https://raw.githubusercontent.com/coil-kt/coil/2.7.0/coil-base/src/main/java/coil/fetch/HttpUriFetcher.kt).
+El índice no se modifica para añadir esa caché. Otras90 referencias consultadas
+siguen pendientes; no equivalen a90 archivos originales únicos.
+
+Las copias recuperadas sobreviven al reinicio de Windows .2. También se comprobó
+una consulta real del agente mientras Drive preparaba medios: esa preparación
+HTTP ya no retiene su bloqueo. La continuidad cifrada coordinada ha verificado
+20/20 hashes de adjuntos de chats en Windows, conservando identidades e historial
+como datos inertes.
+La prueba S25↔Windows también verificó una clave creada y actualizada en Windows,
+una skill editada en S25 y los dos archivos AGY idénticos. Las pruebas
+sintéticas se retiraron; Drive y continuidad quedaron activados.
 
 Los resultados de pruebas aisladas no equivalen a demostrar que toda la
 biblioteca histórica esté respaldada. Los informes privados y copias de
