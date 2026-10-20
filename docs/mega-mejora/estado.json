@@ -343,9 +343,12 @@
       "title": "Error útil antes del diagnóstico",
       "priority": "P1",
       "acceptance": "Caso sin trabajo dice No se ha enviado; caso incierto dice Verificando sin invitar a duplicar; una acción lleva a la conexión relevante.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "errores",
+      "implementation_evidence": [
+        "PARCIAL. SubmitFailure.kt clasifica NOT_SENT/UNCERTAIN/REJECTED recorriendo causas; CreateViewModel.launchGeneration y CreateScreen muestran 'No se ha enviado' / 'Verificando… No vuelvas a generar todavía' / rechazo, con 'Revisar conexión' (Flow Studio o modelos). Solo Lienzo; Agente y Flow Studio sin adaptar.",
+        "SubmitFailureTest.kt; compilación CI pendiente; sin prueba física."
+      ],
       "test_evidence": [],
       "device_verified": false
     },

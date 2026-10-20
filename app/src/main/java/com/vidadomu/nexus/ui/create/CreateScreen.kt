@@ -419,7 +419,12 @@ fun CreateScreen(
                     actionLabel="Reintentar",onAction=if(state.isLoadingSchema) null else viewModel::retryConfiguration)
             } }
             state.errorMessage?.let { raw -> item {
-                InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa sus detalles antes de volver a generar."),technicalDetails=raw)
+                val failure=state.submitFailure?.takeIf { it.message==raw }
+                if(failure!=null) {
+                    val viaFlow=state.selectedModel?.providerId?.contains("flow",ignoreCase=true)==true
+                    InlineNotice(failure.message,technicalDetails=failure.technicalDetails,
+                        actionLabel="Revisar conexión",onAction=if(viaFlow) onOpenFlow else onBrowseModels)
+                } else InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa sus detalles antes de volver a generar."),technicalDetails=raw)
             } }
         }
     }

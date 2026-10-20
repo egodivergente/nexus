@@ -18,6 +18,8 @@ import com.vidadomu.nexus.core.model.NexusModel
 import com.vidadomu.nexus.core.work.GenerationPollingWorker
 import kotlinx.coroutines.CancellationException
 import com.vidadomu.nexus.ui.components.MediaSniffer
+import com.vidadomu.nexus.ui.components.SubmitFailure
+import com.vidadomu.nexus.ui.components.describeSubmitFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
@@ -49,7 +51,8 @@ data class CreateUiState(
     val schemaMessage: String? = null,
     val schemaUnsupported: Boolean = false,
     val uploadProgress: Float? = null,      // 0..1 upload progress (null = indeterminate)
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val submitFailure: SubmitFailure? = null
 ) {
     val missingRequiredFields: List<String>
         get() = selectedModel?.let { model ->
@@ -821,7 +824,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun launchGeneration(state: CreateUiState, onSuccess: (String) -> Unit) {
-        _uiState.update { it.copy(isSubmitting = true, isUploading = false, errorMessage = null) }
+        _uiState.update { it.copy(isSubmitting = true, isUploading = false, errorMessage = null, submitFailure = null) }
 
         viewModelScope.launch {
             try {
@@ -833,8 +836,9 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 throw cancelled
             } catch (e: Exception) {
                 android.util.Log.e("CreateViewModel", "Generation pipeline failed: ${e.javaClass.simpleName}")
+                val failure = describeSubmitFailure(e)
                 _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Error al iniciar la generación.")
+                    it.copy(errorMessage = failure.message, submitFailure = failure)
                 }
             } finally {
                 _uiState.update {
