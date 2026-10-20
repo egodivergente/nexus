@@ -1,6 +1,15 @@
 package com.vidadomu.nexus.ui.flow
 
+import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,6 +21,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +59,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -129,7 +141,9 @@ fun FlowStudioScreen(
     var connection by remember { mutableStateOf<FlowStudioConnection>(FlowStudioConnection.Checking) }
     var isSubmitting by remember { mutableStateOf(false) }
     var progressLabel by remember { mutableStateOf<String?>(null) }
-    var pendingDownload by remember { mutableStateOf<GenerationOutput?>(null) }
+    var exportTarget by remember { mutableStateOf<GenerationOutput?>(null) }
+    var pendingExport by remember { mutableStateOf<Pair<GenerationOutput, FlowExportPlan>?>(null) }
+    val exportMime = remember { mutableStateOf("application/octet-stream") }
     var costDetails by rememberSaveable { mutableStateOf(false) }
 
     suspend fun refreshConnection() {
@@ -180,21 +194,54 @@ fun FlowStudioScreen(
         }
     }
 
-    val saveDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { target: Uri? ->
-        val output = pendingDownload
-        pendingDownload = null
-        if (target == null || output == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val copied = withContext(Dispatchers.IO) {
-                runCatching {
-                    val source = File(requireNotNull(Uri.parse(requireNotNull(output.localUri)).path))
-                    context.contentResolver.openOutputStream(target)?.use { out ->
-                        source.inputStream().use { it.copyTo(out) }
-                    } ?: error("destino")
-                }.isSuccess
+    val saveDocument = rememberLauncherForActivityResult(
+        remember {
+            object : ActivityResultContracts.CreateDocument("application/octet-stream") {
+                override fun createIntent(context: Context, input: String): Intent =
+                    super.createIntent(context, input).setType(exportMime.value)
             }
-            snackbarHost.showSnackbar(if (copied) "Original guardado." else "No se pudo guardar el original. El archivo de Nexus se conserva.")
         }
+    ) { target: Uri? ->
+        val pending = pendingExport
+        pendingExport = null
+        if (target == null || pending == null) return@rememberLauncherForActivityResult
+        val (output, plan) = pending
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { writeExport(context.contentResolver, exportSourceUri(requireNotNull(output.localUri)), plan, target) }
+            }
+            val error = result.exceptionOrNull()
+            if (error is CancellationException) throw error
+            snackbarHost.showSnackbar(if (error == null) "Guardado"
+                else "No se pudo guardar: ${error.message ?: error::class.java.simpleName}")
+        }
+    }
+
+    exportTarget?.let { output ->
+        FlowExportSheet(
+            output = output,
+            onDismiss = { exportTarget = null },
+            onSave = { format, size ->
+                exportTarget = null
+                scope.launch {
+                    val bounds = withContext(Dispatchers.IO) {
+                        runCatching { readBounds(context.contentResolver, exportSourceUri(requireNotNull(output.localUri)), output) }
+                    }
+                    val plan = runCatching {
+                        FlowExport.plan(output.id, output.mimeType, output.type == Modality.VIDEO, bounds.getOrNull(), format, size)
+                    }.getOrElse {
+                        snackbarHost.showSnackbar("No se pudo preparar la descarga: ${it.message}")
+                        return@launch
+                    }
+                    pendingExport = output to plan
+                    exportMime.value = plan.mimeType
+                    runCatching { saveDocument.launch(plan.fileName) }.onFailure {
+                        pendingExport = null
+                        snackbarHost.showSnackbar("No se pudo abrir el selector de archivos: ${it.message}")
+                    }
+                }
+            }
+        )
     }
 
     suspend fun uploadReferences(): Boolean {
@@ -378,10 +425,7 @@ fun FlowStudioScreen(
                     JobResultGroup(
                         job = job,
                         onOpen = { onNavigateToOutput(job.id) },
-                        onDownload = { output ->
-                            pendingDownload = output
-                            saveDocument.launch(suggestedName(output))
-                        }
+                        onDownload = { output -> exportTarget = output }
                     )
                 }
             }
@@ -389,13 +433,121 @@ fun FlowStudioScreen(
     }
 }
 
-private fun suggestedName(output: GenerationOutput): String {
-    val local = output.localUri?.let { Uri.parse(it).lastPathSegment }
-    return local?.takeIf { it.contains('.') } ?: "flow_${output.id}" + when {
-        output.mimeType.contains("png") -> ".png"
-        output.mimeType.contains("webp") -> ".webp"
-        output.mimeType.startsWith("video") -> ".mp4"
-        else -> ".jpg"
+private fun exportSourceUri(localUri: String): Uri {
+    val parsed = Uri.parse(localUri)
+    return if (parsed.scheme.isNullOrBlank()) Uri.fromFile(File(localUri)) else parsed
+}
+
+private fun readBounds(resolver: ContentResolver, source: Uri, output: GenerationOutput): FlowExportDimensions? {
+    if (output.type == Modality.VIDEO) {
+        val w = output.width
+        val h = output.height
+        return if (w != null && h != null && w > 0 && h > 0) FlowExportDimensions(w, h) else null
+    }
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    val stream = resolver.openInputStream(source) ?: error("No se puede leer el original")
+    stream.use { BitmapFactory.decodeStream(it, null, options) }
+    return if (options.outWidth > 0 && options.outHeight > 0) FlowExportDimensions(options.outWidth, options.outHeight) else null
+}
+
+private fun writeExport(resolver: ContentResolver, source: Uri, plan: FlowExportPlan, target: Uri) {
+    val encodeAs = plan.encodeAs
+    if (encodeAs == null) {
+        resolver.openOutputStream(target)?.use { out ->
+            resolver.openInputStream(source)?.use { it.copyTo(out) } ?: error("No se puede leer el original")
+        } ?: error("No se puede escribir en el destino")
+        return
+    }
+    val size = requireNotNull(plan.target)
+    val decoded = decodeScaled(resolver, source, size)
+    val bitmap = if (encodeAs == FlowExportFormat.JPG && decoded.hasAlpha()) {
+        Bitmap.createBitmap(decoded.width, decoded.height, Bitmap.Config.ARGB_8888).also { flat ->
+            Canvas(flat).apply { drawColor(Color.WHITE); drawBitmap(decoded, 0f, 0f, null) }
+            decoded.recycle()
+        }
+    } else decoded
+    try {
+        val (format, quality) = when (encodeAs) {
+            FlowExportFormat.PNG -> Bitmap.CompressFormat.PNG to 100
+            FlowExportFormat.JPG -> Bitmap.CompressFormat.JPEG to FlowExport.JPG_QUALITY
+            FlowExportFormat.WEBP -> webpLossy() to FlowExport.WEBP_QUALITY
+            FlowExportFormat.ORIGINAL -> error("Formato de exportación no resuelto")
+        }
+        resolver.openOutputStream(target)?.use { out ->
+            check(bitmap.compress(format, quality, out)) { "El codificador ${encodeAs.label} falló" }
+        } ?: error("No se puede escribir en el destino")
+    } finally {
+        bitmap.recycle()
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun webpLossy(): Bitmap.CompressFormat =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP
+
+private fun decodeScaled(resolver: ContentResolver, source: Uri, size: FlowExportDimensions): Bitmap {
+    val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, source)) { decoder, _, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            decoder.setTargetSize(size.width, size.height)
+        }
+    } else {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(source)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = FlowExport.sampleSize(bounds.outWidth, bounds.outHeight, size)
+        }
+        resolver.openInputStream(source)?.use { BitmapFactory.decodeStream(it, null, options) }
+            ?: error("No se pudo decodificar la imagen")
+    }
+    if (decoded.width == size.width && decoded.height == size.height) return decoded
+    return Bitmap.createScaledBitmap(decoded, size.width, size.height, true).also { if (it !== decoded) decoded.recycle() }
+}
+
+@Composable
+private fun FlowExportSheet(
+    output: GenerationOutput,
+    onDismiss: () -> Unit,
+    onSave: (FlowExportFormat, FlowExportSize) -> Unit
+) {
+    val isVideo = output.type == Modality.VIDEO
+    var format by rememberSaveable(output.id) { mutableStateOf(FlowExportFormat.ORIGINAL) }
+    var size by rememberSaveable(output.id) { mutableStateOf(FlowExportSize.ORIGINAL) }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SurfaceDark) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16).padding(bottom = NexusTokens.space24),
+            verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)
+        ) {
+            Text("Descargar", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+            if (isVideo) {
+                Text(FlowExport.VIDEO_ORIGINAL_ONLY, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            } else {
+                ExportChoiceRow("Formato", FlowExportFormat.entries, format, { it.label }) { format = it }
+                ExportChoiceRow("Tamaño", FlowExportSize.entries, size, { it.label }) { size = it }
+                Text("Nunca se amplía: si el original es menor, se mantiene su tamaño.",
+                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            }
+            Button(onClick = { if (isVideo) onSave(FlowExportFormat.ORIGINAL, FlowExportSize.ORIGINAL) else onSave(format, size) },
+                modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(NexusTokens.space8))
+                Text("Guardar")
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> ExportChoiceRow(title: String, options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = TextMuted)
+        Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            options.forEach { option ->
+                FilterChip(selected = option == selected, onClick = { onSelect(option) },
+                    label = { Text(label(option), maxLines = 1) })
+            }
+        }
     }
 }
 
@@ -537,7 +689,6 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            Text(FlowStudioPlan.DOWNLOAD_FORMAT_REASON, style = MaterialTheme.typography.bodySmall, color = TextMuted)
             if (job.modality == Modality.VIDEO) {
                 OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Extender vídeo") }
                 Text(FlowStudioPlan.EXTEND_VIDEO_REASON, style = MaterialTheme.typography.bodySmall, color = TextMuted)
@@ -561,7 +712,7 @@ private fun ResultCell(output: GenerationOutput, onOpen: () -> Unit, onDownload:
         TextButton(onClick = { onDownload(output) }, enabled = output.localUri != null, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(NexusTokens.space4))
-            Text("Original")
+            Text("Descargar")
         }
     }
 }

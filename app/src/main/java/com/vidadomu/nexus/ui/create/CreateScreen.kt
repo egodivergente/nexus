@@ -156,6 +156,13 @@ fun CreateScreen(
     var showBatch by remember { mutableStateOf(false) }
     val batchSnackbar = remember { SnackbarHostState() }
     val batchScope = rememberCoroutineScope()
+    val switchNotice by viewModel.modelSwitchNotice.collectAsState()
+    LaunchedEffect(switchNotice?.id) {
+        val notice = switchNotice ?: return@LaunchedEffect
+        batchSnackbar.currentSnackbarData?.dismiss()
+        if (batchSnackbar.showSnackbar(notice.message, actionLabel = "Volver", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed)
+            viewModel.undoModelSwitch()
+    }
     if(showBatch) PromptBatchSheet(state, estimate.amount, estimate.usd, viewModel, { showBatch=false }) { summary ->
         showBatch=false
         batchScope.launch { batchSnackbar.showSnackbar(summary) }

@@ -329,9 +329,12 @@
       "title": "Variantes sin borrar el trabajo",
       "priority": "P1",
       "acceptance": "Fixture de 3 referencias y prompt largo conserva todo lo compatible; Volver restaura exactamente el borrador anterior.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "lienzo",
+      "implementation_evidence": [
+        "PARCIAL. ModelWorkDrafts.kt (borradores por modelo + ModelSwitchUndo) y CreateViewModel.undoModelSwitch(): snackbar 'Cambiado a X · N referencias guardadas' con 'Volver' restaura modelo, modalidad, prompt, parámetros y medios exactos; se invalida al editar o generar.",
+        "ModelWorkDraftsTest.kt y ModelSwitchUndoTest.kt; compilación CI pendiente; sin prueba física."
+      ],
       "test_evidence": [],
       "device_verified": false
     },

@@ -113,6 +113,10 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val workDraftStore = ModelWorkDraftStore(app)
     @Volatile private var workDrafts = workDraftStore.load()
     private var pendingSwitchParameters: Pair<String, Map<String, String>>? = null
+    @Volatile private var switchUndo: ModelSwitchSnapshot? = null
+    private var switchNoticeId = 0L
+    private val _modelSwitchNotice = MutableStateFlow<ModelSwitchNotice?>(null)
+    val modelSwitchNotice: StateFlow<ModelSwitchNotice?> = _modelSwitchNotice.asStateFlow()
     private var draftRestored = false
     private var localPreview = false
     private var pendingMediaCopies = 0
@@ -214,6 +218,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     /** Saves the work of the model being left and plans what the target model starts with. */
     private fun switchWorkDraft(current:CreateUiState,target:NexusModel):ModelSwitchPlan? {
         val leaving=current.selectedModel?.takeIf {it.id!=target.id} ?: return null
+        switchUndo=ModelSwitchUndo.snapshot(current)
         val configured=current.schemaReady && !current.isLoadingSchema
         val saved=ModelWorkDraft(leaving.id,current.prompt,current.negativePrompt,
             if(configured) current.parameters else ModelWorkDrafts.find(workDrafts,leaving.id)?.parameters ?: current.parameters,
@@ -224,6 +229,27 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         pendingSwitchParameters=target.id to plan.parameters
         return plan
     }
+    private fun forgetModelSwitch() {
+        switchUndo=null
+        _modelSwitchNotice.value=null
+    }
+    private fun announceSwitch(target:NexusModel,plan:ModelSwitchPlan?) {
+        if(plan==null || switchUndo==null) return
+        val parked=ModelSwitchUndo.parked(plan.media,compatibleModelMedia(target,plan.media)).size
+        _modelSwitchNotice.value=ModelSwitchNotice(++switchNoticeId,target.displayName,parked)
+    }
+    /** Restores exactly the state before the last model switch; the new model's work stays saved as its draft. */
+    fun undoModelSwitch():Boolean {
+        val snapshot=switchUndo ?: return false
+        mediaSession.reset()
+        switchWorkDraft(_uiState.value,snapshot.model)
+        forgetModelSwitch()
+        pendingSwitchParameters=snapshot.model.id to snapshot.parameters
+        app.secureStorage.setLastModelId(snapshot.modality,snapshot.model.id)
+        _uiState.update {ModelSwitchUndo.restore(it,snapshot)}
+        loadNativeConfiguration(snapshot.model)
+        return true
+    }
     private fun ModelSwitchPlan.notice():String? =
         if(missingMedia>0) "Borrador del modelo recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null
     private fun restoreDraftIfMatching(model:NexusModel) {
@@ -233,13 +259,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update {it.copy(prompt=draft.prompt,negativePrompt=draft.negativePrompt,parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(model,draft.parameters),
             attachedMedia=compatibleModelMedia(model,available),errorMessage=if(available.size<draft.media.size) "Borrador recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null)}
     }
-    fun applyPreset(preset:CreationPreset) { val model=_uiState.value.selectedModel ?: return
+    fun applyPreset(preset:CreationPreset) { forgetModelSwitch(); val model=_uiState.value.selectedModel ?: return
         _uiState.update {it.copy(parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(model,preset.values),errorMessage=null)}
     }
-    fun restoreModelDefaults() {val model=_uiState.value.selectedModel ?: return
+    fun restoreModelDefaults() { forgetModelSwitch();val model=_uiState.value.selectedModel ?: return
         _uiState.update {it.copy(parameters=model.parameters.associate {p->p.key to p.defaultValue},errorMessage=null)}
     }
-    fun preparePrevious(job:com.vidadomu.nexus.core.model.GenerationJob) {
+    fun preparePrevious(job:com.vidadomu.nexus.core.model.GenerationJob) { forgetModelSwitch();
         val model=modelCatalogRepo.getModelById(job.modelId)
         if(model==null) {_uiState.update {it.copy(errorMessage="El modelo de esta creación ya no está disponible.")};return}
         selectModality(job.modality); selectModel(model); updatePrompt(job.prompt)
@@ -254,14 +280,14 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
      * Abre en el Lienzo un plan del asistente (modelo ya configurado con su schema, valores y medios
      * en sus ranuras). Sustituye el borrador actual. No envía nada: el usuario revisa y pulsa Generar.
      */
-    fun openAssistantPlan(state:CreateUiState) {
+    fun openAssistantPlan(state:CreateUiState) { forgetModelSwitch();
         schemaJob?.cancel(); schemaRequest++
         draftRestored=true; mediaSession.reset(); pendingSwitchParameters=null
         val model=state.selectedModel ?: return
         _uiState.value=state.copy(availableModels=modelCatalogRepo.models.value.filter {it.modalities.contains(state.selectedModality)}
             .ifEmpty {listOf(model)},isLoadingSchema=false,schemaReady=true,errorMessage=null)
     }
-    fun prepareAgentDraft(draft:com.vidadomu.nexus.agent.AgentDraft) {
+    fun prepareAgentDraft(draft:com.vidadomu.nexus.agent.AgentDraft) { forgetModelSwitch();
         check(com.vidadomu.nexus.BuildConfig.DEBUG)
         viewModelScope.launch {
             try {
@@ -291,7 +317,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update {it.copy(attachedMedia=(it.attachedMedia+media).distinctBy {item->Triple(item.slotType,item.fieldKey,item.uriString)})}
     }
 
-    fun swapFlowFrames() {
+    fun swapFlowFrames() { forgetModelSwitch();
         _uiState.update { state ->
             val start = state.attachedMedia.firstOrNull { it.fieldKey == "initial_frame" } ?: return@update state
             val end = state.attachedMedia.firstOrNull { it.fieldKey == "end_frame" } ?: return@update state
@@ -305,6 +331,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectModality(modality: Modality) {
+        forgetModelSwitch()
         mediaSession.reset()
         val allModels = modelCatalogRepo.models.value
         val filtered = allModels.filter { it.modalities.contains(modality) }
@@ -326,7 +353,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 errorMessage = plan?.notice()
             )
         }
-        newSelected?.let { loadNativeConfiguration(it) }
+        newSelected?.let { announceSwitch(it, plan); loadNativeConfiguration(it) }
     }
 
     fun switchToEditModel(): NexusModel? {
@@ -361,6 +388,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectModel(model: NexusModel) {
+        forgetModelSwitch()
         mediaSession.reset()
         val modality = _uiState.value.selectedModality.takeIf { it in model.modalities } ?: model.modalities.first()
         app.secureStorage.setLastModelId(modality, model.id)
@@ -379,6 +407,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 errorMessage = plan?.notice()
             )
         }
+        announceSwitch(model, plan)
         loadNativeConfiguration(model)
     }
 
@@ -422,7 +451,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             }
             val dir = java.io.File(app.filesDir, "draft_media")
             check(dir.exists() || dir.mkdirs()) { "No se pudo preparar la caché privada de medios." }
-            val protectedUris = (_uiState.value.attachedMedia + creationPreferences.draft()?.media.orEmpty() + workDrafts.flatMap { it.media }).map {it.uriString}.toSet() + generationRepo.allJobs.value.mapNotNull {it.inputMediaUri}
+            val protectedUris = (_uiState.value.attachedMedia + creationPreferences.draft()?.media.orEmpty() + workDrafts.flatMap { it.media } + switchUndo?.media.orEmpty()).map {it.uriString}.toSet() + generationRepo.allJobs.value.mapNotNull {it.inputMediaUri}
             val protectedPaths = protectedUris.mapNotNull { runCatching {Uri.parse(it).path}.getOrNull() }.toSet()
             val occupied = PrivateMediaStorage.prepare(dir, protectedPaths)
             val targetFile = java.io.File(dir, "nexus_media_${UUID.randomUUID()}.$ext")
@@ -487,7 +516,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setContractMedia(field:ContractMediaField, uri:Uri, mime:String) {
+    fun setContractMedia(field:ContractMediaField, uri:Uri, mime:String) { forgetModelSwitch();
         val selectedId=_uiState.value.selectedModel?.id
         if(!mime.startsWith(field.mime.substringBefore('/'))) {
             _uiState.update { it.copy(errorMessage="Elige un archivo compatible con ${field.label}.") };return
@@ -502,15 +531,15 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun updatePrompt(text: String) {
+    fun updatePrompt(text: String) { forgetModelSwitch();
         _uiState.update { it.copy(prompt = text, errorMessage = null) }
     }
 
-    fun updateNegativePrompt(text: String) {
+    fun updateNegativePrompt(text: String) { forgetModelSwitch();
         _uiState.update { it.copy(negativePrompt = text) }
     }
 
-    fun updateParameter(key: String, value: String) {
+    fun updateParameter(key: String, value: String) { forgetModelSwitch();
         _uiState.update {
             val updated = it.parameters.toMutableMap()
             updated[key] = value
@@ -518,7 +547,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setPrimaryImage(rawUri: Uri, rawMime: String) {
+    fun setPrimaryImage(rawUri: Uri, rawMime: String) { forgetModelSwitch();
         cacheMedia(rawUri, rawMime, MediaSlotType.PRIMARY_IMAGE) { uri, mimeType ->
             val fileName = extractFileName(uri, mimeType)
             _uiState.update { current ->
@@ -538,7 +567,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setLastFrameImage(rawUri: Uri, rawMime: String) {
+    fun setLastFrameImage(rawUri: Uri, rawMime: String) { forgetModelSwitch();
         cacheMedia(rawUri, rawMime, MediaSlotType.LAST_FRAME) { uri, mimeType ->
             val fileName = extractFileName(uri, mimeType)
             _uiState.update { current ->
@@ -556,7 +585,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun addReferenceImages(urisWithMime: List<Pair<Uri, String>>) {
+    fun addReferenceImages(urisWithMime: List<Pair<Uri, String>>) { forgetModelSwitch();
         if (urisWithMime.isEmpty()) return
         val token = mediaSession.begin(MediaSlotType.REFERENCE_IMAGE, append = true)
         beginMediaCopy()
@@ -605,7 +634,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setVideoInput(rawUri: Uri, rawMime: String) {
+    fun setVideoInput(rawUri: Uri, rawMime: String) { forgetModelSwitch();
         val model = _uiState.value.selectedModel
         val targetSlot = if(model?.videoField == null && model?.videosArrayField != null)
             MediaSlotType.VIDEO_REFERENCE else MediaSlotType.VIDEO_INPUT
@@ -631,28 +660,28 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun removeMedia(id: String) {
+    fun removeMedia(id: String) { forgetModelSwitch();
         _uiState.value.attachedMedia.find { it.id == id }?.let { mediaSession.invalidate(it.slotType,it.fieldKey) }
         _uiState.update { current ->
             current.copy(attachedMedia = current.attachedMedia.filter { it.id != id })
         }
     }
 
-    fun clearSlot(slotType: MediaSlotType) {
+    fun clearSlot(slotType: MediaSlotType) { forgetModelSwitch();
         mediaSession.invalidate(slotType)
         _uiState.update { current ->
             current.copy(attachedMedia = current.attachedMedia.filter { it.slotType != slotType })
         }
     }
 
-    fun clearAllMedia() {
+    fun clearAllMedia() { forgetModelSwitch();
         mediaSession.reset()
         _uiState.update { it.copy(attachedMedia = emptyList()) }
     }
 
     /** Wait for the real media contract before attaching a frame or animating an image. */
     private var reuseImageJob: kotlinx.coroutines.Job? = null
-    fun reuseImageInput(uri: Uri, mimeType: String?) {
+    fun reuseImageInput(uri: Uri, mimeType: String?) { forgetModelSwitch();
         reuseImageJob?.cancel()
         reuseImageJob = viewModelScope.launch {
             selectModality(Modality.VIDEO)
@@ -688,7 +717,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setMediaInput(uri: Uri?, mimeType: String?) {
+    fun setMediaInput(uri: Uri?, mimeType: String?) { forgetModelSwitch();
         if (uri == null) {
             clearAllMedia()
         } else {
@@ -705,7 +734,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun clearMediaInput() {
+    fun clearMediaInput() { forgetModelSwitch();
         clearAllMedia()
     }
 
@@ -747,7 +776,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val _pendingCostAcceptance = MutableStateFlow<GenerationCostQuote?>(null)
     val pendingCostAcceptance: StateFlow<GenerationCostQuote?> = _pendingCostAcceptance.asStateFlow()
 
-    fun requestGeneration(quote: GenerationCostQuote, onSuccess: (String) -> Unit) {
+    fun requestGeneration(quote: GenerationCostQuote, onSuccess: (String) -> Unit) { forgetModelSwitch();
         _pendingCostAcceptance.value = null
         if(comparison.sending) return
         val state = _uiState.value
@@ -759,7 +788,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun acceptUnknownCost(onSuccess: (String) -> Unit) {
+    fun acceptUnknownCost(onSuccess: (String) -> Unit) { forgetModelSwitch();
         val pending = _pendingCostAcceptance.value ?: return
         _pendingCostAcceptance.value = null
         if(comparison.sending) return
@@ -819,7 +848,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
      * Lanza un trabajo por prompt con el modelo, parámetros y adjuntos actuales del Lienzo.
      * Se envían de uno en uno; un fallo no detiene los demás y se informa al final.
      */
-    fun submitBatch(prompts: List<String>, onProgress: (Int, Int) -> Unit, onDone: (sent: Int, firstError: String?) -> Unit) {
+    fun submitBatch(prompts: List<String>, onProgress: (Int, Int) -> Unit, onDone: (sent: Int, firstError: String?) -> Unit) { forgetModelSwitch();
         if (comparison.sending || _uiState.value.isSubmitting || prompts.isEmpty()) return
         if (com.vidadomu.nexus.BuildConfig.OFFLINE_QA) { onDone(0, "NEXUS Lab: envío bloqueado; no se ha consumido saldo."); return }
         val batchSettings = com.vidadomu.nexus.assistant.AssistantRuntime.get(app).settings
