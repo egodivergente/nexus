@@ -1,6 +1,13 @@
 package com.vidadomu.nexus.ui.create
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -8,6 +15,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,7 +33,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +44,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,6 +135,7 @@ internal fun matchFlagships(catalog: List<NexusModel>, modality: Modality, selec
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun FlagshipStudioHeader(
     modality: Modality,
@@ -132,7 +149,21 @@ internal fun FlagshipStudioHeader(
     val animate = rememberSystemAnimatorsEnabled()
     val haptics = rememberNexusHaptics()
     val matches = remember(catalog, modality, selectedModel?.id) { matchFlagships(catalog, modality, selectedModel) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+    val imeVisible = WindowInsets.isImeVisible
+    var expanded by rememberSaveable { mutableStateOf(true) }
+    var collapsedByIme by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && expanded) { expanded = false; collapsedByIme = true }
+        else if (!imeVisible && collapsedByIme) { expanded = true; collapsedByIme = false }
+    }
+    val toggle = {
+        haptics.perform(NexusHapticEvent.SELECTION)
+        collapsedByIme = false
+        expanded = !expanded
+    }
+    val enter = if (animate) expandVertically(tween(NexusTokens.contentDuration)) + fadeIn(tween(NexusTokens.contentDuration)) else EnterTransition.None
+    val exit = if (animate) shrinkVertically(tween(NexusTokens.contentDuration)) + fadeOut(tween(NexusTokens.contentDuration)) else ExitTransition.None
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Estudio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
@@ -142,7 +173,33 @@ internal fun FlagshipStudioHeader(
                 Spacer(Modifier.width(NexusTokens.space8))
                 Text("Google Flow", style = MaterialTheme.typography.labelLarge)
             }
+            if (expanded) {
+                IconButton(onClick = toggle, modifier = Modifier.size(NexusTokens.minimumTouch)
+                    .semantics { contentDescription = "Ocultar modelos insignia" }) {
+                    Icon(Icons.Default.KeyboardArrowUp, null)
+                }
+            }
         }
+        AnimatedVisibility(visible = !expanded, enter = enter, exit = exit) {
+            Row(Modifier.fillMaxWidth().height(NexusTokens.minimumTouch), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                Row(Modifier.weight(1f).height(NexusTokens.minimumTouch)
+                    .semantics(mergeDescendants = true) { contentDescription = "Mostrar modelos insignia" }
+                    .clickable(role = Role.Button, onClick = toggle),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    BrandLogo(organization = selectedModel?.organization, family = selectedModel?.family,
+                        modelId = selectedModel?.id, size = 20.dp, containerSize = 28.dp)
+                    Spacer(Modifier.width(NexusTokens.space8))
+                    Text(selectedModel?.displayName ?: "Elige modelo", style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StudioModalitySegments(modality, animate, onModality, Modifier.width(168.dp), segmentHeight = 36.dp)
+            }
+        }
+        AnimatedVisibility(visible = expanded, enter = enter, exit = exit) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         StudioModalitySegments(modality, animate, onModality)
         if (selectedModel != null && matches.none { it.model.id == selectedModel.id && it.model.providerId == selectedModel.providerId }) {
             Text("Activo: ${selectedModel.displayName}", style = MaterialTheme.typography.labelMedium,
@@ -164,14 +221,22 @@ internal fun FlagshipStudioHeader(
             }
             item(key = "all-models") { AllModelsCard(onAllModels) }
         }
+        }
+        }
     }
 }
 
 @Composable
-private fun StudioModalitySegments(modality: Modality, animate: Boolean, onModality: (Modality) -> Unit) {
+private fun StudioModalitySegments(
+    modality: Modality,
+    animate: Boolean,
+    onModality: (Modality) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    segmentHeight: androidx.compose.ui.unit.Dp = 40.dp,
+) {
     val scheme = MaterialTheme.colorScheme
     val haptics = rememberNexusHaptics()
-    Surface(Modifier.fillMaxWidth(), shape = NexusTokens.action, color = scheme.surfaceContainerHigh) {
+    Surface(modifier, shape = NexusTokens.action, color = scheme.surfaceContainerHigh) {
         Row(Modifier.padding(NexusTokens.space4)) {
             listOf(Modality.IMAGE to "Imagen", Modality.VIDEO to "Vídeo").forEach { (target, label) ->
                 val selected = modality == target
@@ -179,7 +244,7 @@ private fun StudioModalitySegments(modality: Modality, animate: Boolean, onModal
                     if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Segment $label")
                 val content by animateColorAsState(if (selected) scheme.onPrimary else scheme.onSurfaceVariant,
                     if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Segment text $label")
-                Surface(Modifier.weight(1f).heightIn(min = 40.dp)
+                Surface(Modifier.weight(1f).heightIn(min = segmentHeight)
                     .semantics { this.selected = selected }
                     .clickable(role = Role.Tab) {
                         if (!selected) {
@@ -188,7 +253,7 @@ private fun StudioModalitySegments(modality: Modality, animate: Boolean, onModal
                         }
                     },
                     shape = NexusTokens.action, color = container) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.heightIn(min = segmentHeight).padding(vertical = NexusTokens.space4)) {
                         Text(label, style = MaterialTheme.typography.labelLarge, color = content,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                     }
@@ -205,23 +270,23 @@ private fun FlagshipCard(match: FlagshipMatch, active: Boolean, animate: Boolean
         if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Flagship border")
     val container by animateColorAsState(if (active) scheme.primary.copy(alpha = .10f) else scheme.surface,
         if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Flagship container")
-    Surface(Modifier.width(148.dp).height(120.dp)
+    Surface(Modifier.width(128.dp).height(96.dp)
         .semantics(mergeDescendants = true) {
             contentDescription = "Modelo ${match.model.displayName}" + if (active) ", activo" else ""
             selected = active
         }
         .clickable(role = Role.Button, onClick = onClick),
         shape = NexusTokens.card, color = container, border = BorderStroke(if (active) 1.5.dp else .5.dp, border)) {
-        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.padding(NexusTokens.space8), verticalArrangement = Arrangement.SpaceBetween) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 BrandLogo(organization = match.model.organization, family = match.model.family, modelId = match.model.id,
-                    size = 24.dp, containerSize = 40.dp)
+                    size = 22.dp, containerSize = 32.dp)
                 Spacer(Modifier.weight(1f))
                 if (active) Icon(Icons.Default.Check, null, tint = scheme.primary, modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.weight(1f))
             Text(match.model.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(match.model.organization, style = MaterialTheme.typography.labelSmall,
                 color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -232,11 +297,11 @@ private fun FlagshipCard(match: FlagshipMatch, active: Boolean, animate: Boolean
 private fun AllModelsCard(onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     // Label differs from the overflow menu's "Todos los modelos" (catalog screen): this one opens the in-place picker.
-    Surface(Modifier.width(112.dp).height(120.dp)
+    Surface(Modifier.width(104.dp).height(96.dp)
         .semantics(mergeDescendants = true) { contentDescription = "Ver todos los modelos" }
         .clickable(role = Role.Button, onClick = onClick),
         shape = NexusTokens.card, color = scheme.surfaceContainerHigh) {
-        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.Center,
+        Column(Modifier.padding(NexusTokens.space8), verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Add, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(NexusTokens.space8))
