@@ -2,7 +2,7 @@
 
 Base: `c650f14e39bce30185bf8ba5d48c451b15e29f6b`, publicación Android vc95 con Drive y continuidad entre teléfonos.
 Rama de entrega: `codex/agent-studio-integration-20261020`. Paquete conservado: `com.vidadomu.nexus.agent`.
-Versión compilada: `1.9.62-agent-preview` / vc96; certificado instalado conservado mediante configuración privada externa.
+Versión unificada: `1.9.63-agent-preview` / vc97; certificado instalado conservado mediante configuración privada externa.
 
 ## Funciones integradas
 
@@ -16,9 +16,11 @@ Versión compilada: `1.9.62-agent-preview` / vc96; certificado instalado conserv
 - Historial: actualización de la lista en memoria después de transacciones, evitando consultar todo el historial en cada progreso. Se mantiene la exclusión mutua de las importaciones de continuidad y se reordena si cambia la fecha del trabajo. Esta operación no se presenta como O(1).
 - Whisper: un contexto reutilizable, con mutex, comprobación de modelo y liberación tras 60 segundos sin uso o presión de memoria. Hilos limitados a 1–4 según hardware; no se atribuye una aceleración sin medirla.
 - Límite de documentos del usuario, cierre por timeout del servicio del asistente, notificaciones en español y tipografía de al menos 12 sp. La recuperación en un chat nuevo conserva proyecto y reenvía el turno fallido con sus adjuntos.
-- Continuidad Windows: se incorporan exclusivamente `DeviceSync.kt` y `DeviceSyncSettings.kt` publicados por la tarea correspondiente en `3f9f0170a727483a2eded5533766acc9bdd307ed`, con JSON estricto de `239df6f` y `ad5a6ec`.
+- Continuidad Windows: motor y ajustes de `DeviceSync`, publicados por la tarea correspondiente en `3f9f0170a727483a2eded5533766acc9bdd307ed`, con JSON estricto de `239df6f` y `ad5a6ec`.
 
 - Cierre Drive `16bbcde` (incluye `edf8d7c` y `9fda60`): equivalencia solo por SHA demostrado; rutas locales desconocidas conservan conflictos. Oculta copias de la misma URL en el mismo proyecto conservando todos los IDs y el historial. La solicitud manual tiene cola independiente de la espera automática y no cancela transferencias activas.
+
+- Turnos reales en segundo plano y evidencia visual: fusión completa de `cb0871f822630543537ebe80cfa151941c8f00a5`. Sesión del asistente en Application; servicio con bloqueo parcial de CPU, cancelación y timeout, sin reenvío automático. Registro de píxeles realmente presentes y marcas de muestreo de vídeos. Conserva las mejoras ya instaladas en la variante background vc96.
 
 ## Procedencia y decisiones
 
@@ -27,11 +29,14 @@ No se cambia el identificador a `.studio`, no se copia la importación de creden
 
 ## Validación
 
-- Compilación arm64 y pruebas JVM correctas: 700 pruebas superadas (298 núcleo + 402 app), 4 omitidas y ningún fallo.
-- Diez casos físicos superados en Pixel 8 Pro con el paquete aislado `com.vidadomu.nexus.mediaqa`: PNG real y cancelación, fuente inválida, A/B visual y accesible, XLSX/DTD, resultado adjuntado desde la píldora, captura al Lienzo, tres transcripciones Whisper con reutilización/liberación, historial SQLite, navegación y persistencia. Se verificaron mediante ejecuciones dirigidas; no se afirma que las diez pasaran en una única ejecución.
+- Compilación arm64 y pruebas JVM correctas: 707 pruebas superadas (305 núcleo + 402 app), 4 omitidas y ningún fallo.
+- Validación física previa a la reconciliación background: diez casos superados en Pixel 8 Pro con el paquete aislado `com.vidadomu.nexus.mediaqa`: PNG real y cancelación, fuente inválida, A/B visual y accesible, XLSX/DTD, resultado adjuntado desde la píldora, captura al Lienzo, tres transcripciones Whisper con reutilización/liberación, historial SQLite, navegación y persistencia. Se verificaron mediante ejecuciones dirigidas; no se afirma que las diez pasaran en una única ejecución.
 - La prueba de captura detectó un Toast fuera del hilo principal. Corregido iniciando la acción en `Dispatchers.Main.immediate`; la extracción mantiene su trabajo pesado en IO. La repetición física de la captura pasa.
 - El test de navegación usaba texto excluido de la semántica accesible. Actualizado para accionar las pestañas por su descripción real; comprobación física correcta.
 - Whisper nativo del APK final tiene el mismo SHA-256 que el binario físico probado: `2285788d57e27a072ff15a0b4af66131545aaf0d51627653910941b81d89742d`.
-- APK Agent vc96: SHA-256 `09cb6cb744f57ffcb399b1bac766a584eb3f393aeae77bc8c7ec64cc96bd528b`; certificado SHA-256 `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`. Manifiesto sin `testOnly`; instalable como actualización del paquete existente.
+- APK unificada Agent vc97: SHA-256 `49874ff7c95649df809882e21edf0b98418f0b72be980d48bac490df867f8244`; certificado SHA-256 `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`. Manifiesto sin `testOnly`; instalable como actualización del paquete existente.
 - No se han ejecutado generaciones de pago. Flow remoto y los proveedores requieren sus puentes/configuraciones; las pruebas locales no acreditan cada proveedor.
-- Instalación de producción coordinada con Drive/continuidad: pendiente de completar y registrar. Los metadatos privados y registros se guardan en `outputs/studio-integration/`, fuera de Git.
+- Compilación unificada: `:agent-core:test :app:testAgentPreviewUnitTest :app:assembleAgentPreview :app:assembleOfflineQa :app:assembleOfflineQaAndroidTest`, offline, un worker, sin paralelismo y con prioridad baja en AXELPC. Resultado correcto, 19 min 44 s.
+- S25 Ultra (SM-S938B): actualización real vc96 → vc97 sin abrir MainActivity, UID conservado, SHA del APK instalado idéntico al entregable. Los 1030 medios, 4 proyectos y 563 generaciones conservan todos sus IDs; índice idéntico inmediatamente después de instalar. Copia privada previa de metadatos realizada; sin borrado de datos. Proveedor DeviceSync despertado y habilitado.
+- Pixel: la instalación principal sigue en vc96 background. ADB y mDNS dejaron de estar disponibles al terminar el build; instalación vc97 y repetición física conjunta pendientes de recuperar USB/depuración inalámbrica. No se atribuyen las pruebas anteriores al artefacto vc97.
+- Los metadatos privados y registros se guardan en `outputs/studio-integration/`, fuera de Git. Las pruebas reales Drive/Windows posteriores a la actualización las ejecutan sus tareas coordinadas; se incorporarán solo al disponer de su resultado.

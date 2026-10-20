@@ -1,4 +1,22 @@
 ﻿{
+    "agentStudioIntegration20261020": {
+        "branch": "codex/agent-studio-integration-20261020",
+        "sourceCommit": "401c5ac94fc43c171d5193867f9a33d62364def3",
+        "versionCode": 97,
+        "versionName": "1.9.63-agent-preview",
+        "apkSha256": "49874ff7c95649df809882e21edf0b98418f0b72be980d48bac490df867f8244",
+        "unitTestsPassed": 707,
+        "unitTestsSkipped": 4,
+        "installedDevices": [
+                "SM-S938B"
+        ],
+        "pixelStatus": "vc96 background retained; ADB unavailable; unified physical replay and vc97 install pending",
+        "s25OriginalAssetIdsPreserved": 1030,
+        "s25OriginalProjectsPreserved": 4,
+        "s25OriginalGenerationIdsPreserved": 563,
+        "documentation": "docs/AGENT-STUDIO-INTEGRATION-20261020.md",
+        "note": "Background cb0871f and Drive16bbcde preserved; lower fields historical"
+},
     "androidBackground20261020": {
         "branch": "codex/android-agent-background-20261020",
         "versionName": "1.9.62-background-preview",

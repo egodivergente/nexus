@@ -1,3 +1,13 @@
+# Integración Studio + segundo plano + Drive - 2026-10-20
+
+Fuente unificada `401c5ac`, rama `codex/agent-studio-integration-20261020`.
+**S25 Ultra: 1.9.63-agent-preview / vc97 instalada**, misma firma, datos e IDs conservados.
+Pixel todavía vc96 background: pendiente recuperar ADB para repetir QA e instalar97.
+707 pruebas unitarias PASS, 4 omitidas. Diez casos físicos Studio previos PASS en Pixel;
+la reconciliación background se ha compilado y requiere la repetición física conjunta.
+Ver `docs/AGENT-STUDIO-INTEGRATION-20261020.md` para procedencia, APK y límites.
+No instalar una variante vc96 sobre la nueva97. Los estados inferiores son históricos.
+
 # Agente Android en segundo plano - 2026-10-20
 
 Estado comprobado: **Pixel 8 Pro y S25 Ultra, 1.9.62-background-preview / vc96**,
