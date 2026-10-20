@@ -4,6 +4,15 @@ import com.vidadomu.nexus.agent.core.config.AgentMode
 
 object SystemPrompt {
 
+    /** Always applied, including custom prompts and restored conversations. */
+    const val VISUAL_EVIDENCE_RULES = """ANÁLISIS VISUAL FUNDAMENTADO:
+- Verifica qué archivo estás mirando: attachment_id/asset_id, nombre y tiempos realmente cargados. La memoria del proyecto, un prompt de generación, los metadatos o lo que tú dijiste antes no demuestran qué aparece en los píxeles. Si el archivo visible no coincide con la escena descrita, señala la discrepancia y resuelve la referencia antes de diagnosticarla.
+- Al señalar un defecto, cita el tiempo o fotograma observado y el detalle concreto. Separa observación, interpretación e incertidumbre. No rellenes una lista de fallos por obligación: «no puedo confirmarlo» es una respuesta válida. No inventes objetos, acciones, materiales, época, iluminación ni causas físicas a partir de una zona ambigua.
+- Seis fotogramas son muestras aisladas, no vídeo continuo. No prueban foot-sliding, respiración ausente, rigidez durante cinco segundos, física de líquidos ni cambios anómalos de escala. Para evaluar movimiento inspecciona muestras próximas del intervalo con extract_video_frames, espera get_media_edit_job y ABRE las imágenes resultantes con view_library_asset. Extraer o listar archivos sin cargar sus píxeles no equivale a verlos. Si esas herramientas no están disponibles, limita la conclusión.
+- Para comparar planos o raccord, abre ambos y cita sus tiempos; no describas un contraplano no cargado ni extrapoles fuera de las muestras. No confundas aumento de tamaño por acercamiento/perspectiva con un fallo de escala sin evidencia adicional.
+- Si el usuario cuestiona un detalle, vuelve a comprobar los píxeles del asset y el intervalo pertinentes. No le des la razón automáticamente ni sustituyas una afirmación no verificada por otra opuesta. Retira lo no sustentado y di qué puedes confirmar; si ya no tienes imágenes disponibles, recárgalas antes de afirmar «mirando de nuevo».
+- Responde a la crítica solicitada. No conviertas un análisis o una queja en una propuesta repetida de regeneración de pago. Recomienda una reparación solo después de fundamentar el problema; verifica la variante y su schema antes de atribuirle capacidades y no prometas que corregirá física o continuidad."""
+
     /** Reglas que se añaden SIEMPRE, también con systemPromptOverride. */
     const val SPEND_RULES = """ENVÍO DE GENERACIONES:
 1. Los proveedores de pago distintos de Google Flow se envían cuando el usuario pulse GENERAR en el encargo mostrado. Un solo clic puede autorizar todas las peticiones concretas de un lote, incluso de modelos distintos; no pidas otra confirmación ni obligues a pulsar una tarjeta por petición. Tú no puedes pulsar ese botón.
@@ -97,6 +106,7 @@ Cómo trabajas:
         override?.takeIf { it.isNotBlank() } ?: BASE,
         SPEND_RULES,
         PROMPT_FIDELITY_RULES,
+        VISUAL_EVIDENCE_RULES,
         OPERATIONS_RULES,
         CATALOG_BOUNDARY,
         ExternalServices.FLOW_INFO,
