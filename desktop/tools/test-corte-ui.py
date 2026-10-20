@@ -29,7 +29,9 @@ try:
   page.goto(url)
   page.wait_for_function('()=>typeof Corte!=="undefined"&&Boolean(initial)&&Boolean(window.NexusAgentParity)',timeout=45000)
   page.evaluate("()=>{window.qaRpcErrors=[];const before=rpc;rpc=async(op,args={})=>{try{return await before(op,args);}catch(e){qaRpcErrors.push({op,method:args.method,subop:args.op,error:e.message});throw e;}};}")
-  page.evaluate("async()=>{await ensureAssistantReady();await agentCall('createProject',{name:'Montaje Windows · prueba local'});navigate('editor');}")
+  page.evaluate("async()=>{await ensureAssistantReady();await agentCall('createProject',{name:'Montaje Windows · prueba local'});}")
+  page.get_by_role('button',name='Corte',exact=True).click()
+  page.wait_for_function("()=>document.querySelector('#navigation [data-nav=editor]')?.textContent.includes('Corte')&&document.querySelector('#title')?.textContent==='Corte · Montaje'")
   try:
    page.wait_for_function('()=>Boolean(Corte.snapshot)&&!Agent.busy',timeout=45000)
   except Exception:
