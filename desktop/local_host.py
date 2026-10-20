@@ -732,6 +732,8 @@ class Handler(BaseHTTPRequestHandler):
                     or not isinstance(payload.get('args', {}), dict)):
                 self.send_error(400); return
             message = payload
+            if not OFFLINE_QA:
+                self.server.keys = windows_keys(KEY_FILE)
             value = dispatch(self.server.keys, message.get('op'), message.get('args') or {})
             answer = {'id': message.get('id'), 'ok': True, 'value': value}
         except Exception as error:
@@ -872,6 +874,8 @@ def run_server(options):
         server = LoopbackHTTPServer(('127.0.0.1', 0), Handler)
     server.token = secrets.token_urlsafe(32)
     server.keys = keys
+    if not OFFLINE_QA:
+        agent_host()  # Resume configured background sync even before opening Agent/Settings.
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
         json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.20-desktop-local-4gb.1'}),

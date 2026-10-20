@@ -138,8 +138,6 @@ def merge(local, remote, base=None, own_base=None, deletions=False):
     missing = object()
     if local == remote or remote == base:
         return local
-    if local == own_base or local is None:
-        return remote
     if isinstance(local, dict) and isinstance(remote, dict):
         result = dict(local)
         for key in local.keys() | remote.keys():
@@ -152,6 +150,8 @@ def merge(local, remote, base=None, own_base=None, deletions=False):
             else:
                 result[key] = merge(local[key], remote[key], (base or {}).get(key), (own_base or {}).get(key), deletions)
         return result
+    if local == own_base or local is None:
+        return remote
     return local
 
 

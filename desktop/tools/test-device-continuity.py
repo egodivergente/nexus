@@ -88,6 +88,7 @@ class Tests(unittest.TestCase):
         self.assertEqual({'a': 4}, merge({'a': 2}, {'a': 4}, {'a': 1}, {'a': 2}))
         self.assertEqual({'a': 2}, merge({'a': 2}, {}, {'a': 1}, {'a': 1}, True))
         self.assertEqual({}, merge({'a': 1}, {}, {'a': 1}, {'a': 1}, True))
+        self.assertEqual({'a': 1}, merge({'a': 1}, {}, {'a': 1}, {'a': 1}, False))
 
     def test_skill_cannot_escape_or_use_windows_stream(self):
         for name in ('private/../outside', 'private/C:/x', 'private/a:stream', 'private/\\x', 'private//x'):
@@ -160,6 +161,40 @@ class Tests(unittest.TestCase):
         a.config['credentials'] = False
         a.receive_credentials({'keys': {'atlas_cloud_api_key': 'synthetic'}, 'settings': {}, 'agy': None}, {}, ['credentials'])
         self.assertFalse(a.host.read_secret(a.host.data.parent / 'credentials.dpapi'))
+
+    def test_optional_deletion_preserves_local_key_edits(self):
+        a = self.peer('a')
+        incoming = {'keys': {'atlas_cloud_api_key': 'first'}, 'settings': {}, 'agy': None}
+        state = a.receive_credentials(incoming, {}, ['credentials'])
+        state = a.receive_credentials({'keys': {}, 'settings': {}, 'agy': None}, state, ['credentials'])
+        self.assertEqual('first', a.host.read_secret(a.host.data.parent / 'credentials.dpapi')['atlas_cloud'])
+        a.config['deletions'] = True
+        state = a.receive_credentials(incoming, state, ['credentials'])
+        a.host.write_secret(a.host.data.parent / 'credentials.dpapi', {'atlas_cloud': 'local edit'})
+        a.receive_credentials({'keys': {}, 'settings': {}, 'agy': None}, state, ['credentials'])
+        self.assertEqual('local edit', a.host.read_secret(a.host.data.parent / 'credentials.dpapi')['atlas_cloud'])
+
+    def test_agy_revision_is_complete_and_previous_auth_is_dpapi(self):
+        a = self.peer('a')
+        auth = {'antigravity-oauth-token': '{"id_token":"sample"}', 'installation_id': 'synthetic-installation'}
+        a.receive_credentials({'keys': {}, 'settings': {}, 'agy': auth}, {}, ['agy'])
+        self.assertEqual(auth, a.private()['shared']['agy'])
+        for name, value in auth.items():
+            self.assertEqual(value, (Path(a.config['agyDirectory']) / name).read_text('utf-8'))
+        self.assertFalse(list(a.root.glob('*.json.enc')))
+
+    def test_busy_agent_never_receives_writes_during_turn(self):
+        a, b = self.peer('a'), self.peer('b')
+        (b.skills / 'SKILL.md').write_bytes(b'synthetic')
+        b.publish()
+        a.fetch = lambda _, route: encoded(b.manifest) if route == '/manifest' else b.sources.get(route[6:], b.private_sources.get(route[6:]))
+        a.host.lock.acquire()
+        try:
+            with self.assertRaises(RuntimeError):
+                a.cycle('b')
+            self.assertFalse((a.skills / 'SKILL.md').exists())
+        finally:
+            a.host.lock.release()
 
     def test_unchanged_replica_does_not_overwrite_author_edit(self):
         a, b = self.peer('a'), self.peer('b')
