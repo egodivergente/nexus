@@ -1,4 +1,17 @@
 ﻿{
+    "deviceContinuity20261020": {
+        "branch": "feat/device-continuity-20261020",
+        "sourceVersionCode": 93,
+        "physicallyVerifiedIntegrationVersionCode": 94,
+        "unitTestsPassed": 617,
+        "unitTestsSkipped": 4,
+        "nodeTestsPassed": 2,
+        "bidirectionalExchange": "PASS chats, attachments, memory, skills, keys",
+        "bidirectionalUpdates": "PASS existing keys, memory, received skill edit return",
+        "agyAdapter": "authenticated GET and unchanged POST PASS; reboot not tested",
+        "documentation": "docs/DEVICE-CONTINUITY-1959-20261020.md",
+        "note": "Fields below are historical; coordinate installs with Drive branch"
+    },
     "name":  "nexus",
     "status":  "BYTEPLUS_CUSTOM_PROVIDERS_LIMITS_1923_INSTALLED_PIXEL",
     "verifiedAt":  "2026-10-16",

@@ -1,5 +1,10 @@
 # Changelog — NEXUS
 
+## 1.9.61-sync (vc95) - 2026-10-20
+
+- La copia inicial de Drive utiliza transferencia prolongada con notificación, conservando la continuidad directa entre móviles.
+- Recuperación del trabajo periódico si una instalación anterior lo dejó fallido o cancelado.
+
 ## 1.9.60-sync (vc94) - 2026-10-20
 
 - Una sola APK conserva Google Drive y la continuidad cifrada entre móviles, con controles separados en Ajustes.
