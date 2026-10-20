@@ -45,7 +45,7 @@ class FlowBridgeProvider(
         bridgeStatus().map { it.isReady }
 
     override suspend fun submitGeneration(request: GenerationRequest): Result<GenerationJob> = withContext(Dispatchers.IO) {
-        val references = try { FlowReferences.ids(request.mediaInputs) } catch (error: IllegalArgumentException) {
+        val flowInputs = try { FlowReferences.inputs(request.mediaInputs) } catch (error: IllegalArgumentException) {
             return@withContext Result.failure(ProviderError(error.message ?: "Revisa las referencias de Flow.", httpStatusCode = 400))
         }
         if (request.modality !in setOf(Modality.IMAGE, Modality.VIDEO)) {
@@ -66,11 +66,14 @@ class FlowBridgeProvider(
                 modality = request.modality, prompt = request.prompt, negativePrompt = request.negativePrompt,
                 providerJobId = "queue_${request.id}", status = GenerationStatus.QUEUED,
                 parameters = request.parameters + mapOf("__flow_queue_previous" to previous.orEmpty(),
-                    FlowReferences.PARAMETER to references.joinToString(",")),
+                    FlowReferences.PARAMETER to flowInputs.references.joinToString(","),
+                    FlowReferences.INITIAL_FRAME to flowInputs.initialFrame.orEmpty(),
+                    FlowReferences.END_FRAME to flowInputs.endFrame.orEmpty()),
                 inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
                 technicalDetails = "En cola de Flow; se enviará automáticamente sin una segunda confirmación."))
         }
-        bridge.submit(request.prompt, expectedOutput, request.id, references).map { remote ->
+        bridge.submit(request.prompt, expectedOutput, request.id, flowInputs.references,
+            initialFrameId = flowInputs.initialFrame, endFrameId = flowInputs.endFrame).map { remote ->
             initialJob(request, remote)
         }
     }
@@ -101,6 +104,8 @@ class FlowBridgeProvider(
                     val missing = (goal - job.outputs.size).coerceAtLeast(1)
                     val runs = ((missing + perRun - 1) / perRun).coerceIn(1, FlowBridgeClient.MAX_RUNS)
                     bridge.submit(job.prompt, modalityName(job.modality), requestId, FlowReferences.savedIds(job.parameters),
+                        initialFrameId = job.parameters[FlowReferences.INITIAL_FRAME]?.takeIf { it.isNotBlank()},
+                        endFrameId = job.parameters[FlowReferences.END_FRAME]?.takeIf { it.isNotBlank()},
                         runs = runs, expectedResults = if (goal > 1) missing else 0)
                 }
             val submissionError = remote.exceptionOrNull() as? ProviderError
@@ -281,7 +286,10 @@ class FlowBridgeProvider(
         modality = request.modality,
         prompt = request.prompt,
         negativePrompt = request.negativePrompt,
-        parameters = request.parameters + (FlowReferences.PARAMETER to FlowReferences.ids(request.mediaInputs).joinToString(",")),
+        parameters = request.parameters + mapOf(
+            FlowReferences.PARAMETER to FlowReferences.inputs(request.mediaInputs).references.joinToString(","),
+            FlowReferences.INITIAL_FRAME to FlowReferences.inputs(request.mediaInputs).initialFrame.orEmpty(),
+            FlowReferences.END_FRAME to FlowReferences.inputs(request.mediaInputs).endFrame.orEmpty()),
         inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
         status = statusFor(remote.state),
         progress = progressFor(remote.state, null),

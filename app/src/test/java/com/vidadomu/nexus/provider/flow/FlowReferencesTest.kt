@@ -42,4 +42,19 @@ class FlowReferencesTest {
             FlowReferences.savedIds(mapOf(FlowReferences.PARAMETER to List(13) { id }.joinToString(",")))
         }
     }
+
+    @Test fun videoContractExposesStartAndOptionalEndFrames() {
+        val model = FlowReferences.model(Modality.VIDEO)
+        assertEquals(listOf("initial_frame", "end_frame", "reference_ids"), model.contractMedia.map { it.key })
+        assertFalse(model.contractMedia[0].required)
+        assertFalse(model.contractMedia[1].required)
+    }
+
+    @Test fun startAndEndFramesKeepTheirRolesAndCannotBeReversedOrDuplicated() {
+        val start = input().copy(fieldKey = "initial_frame", slotType = MediaSlotType.PRIMARY_IMAGE)
+        val end = input("ref_" + "b".repeat(64)).copy(fieldKey = "end_frame", slotType = MediaSlotType.LAST_FRAME)
+        assertEquals(FlowReferences.Inputs(emptyList(), id, end.remoteUrl), FlowReferences.inputs(listOf(start, end)))
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(end)) }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(start, start)) }
+    }
 }

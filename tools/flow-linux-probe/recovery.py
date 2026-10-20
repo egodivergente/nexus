@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
-from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
+from flow_references import receive_reference, reference_paths, frame_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
 import flow_agent
 import flow_import
 
@@ -475,9 +475,10 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
         return await with_flow_project_page(submit)
 
 
-async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0):
+async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0,
+                                 initial_frame_id=None, end_frame_id=None):
     """Reserve an idempotent job before the UI clicks, never storing prompt."""
-    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or []] + ([runs] if runs > 1 else []),
+    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or [], initial_frame_id, end_frame_id] + ([runs] if runs > 1 else []),
         ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
     async with FLOW_JOB_LOCK:
         existing = next((job for job in FLOW_JOBS.values()
@@ -513,7 +514,8 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
         else:
             await update_flow_job(job_id, runs_submitted=done)
     try:
-        paths = reference_paths(ROOT, reference_ids or [])
+        frames = frame_paths(ROOT, initial_frame_id, end_frame_id)
+        paths = frames + reference_paths(ROOT, reference_ids or [])
         baseline = await drive_flow_submission(prompt, paths or None, runs, on_run)
     except ReferenceError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
@@ -788,8 +790,13 @@ async def create_flow_job(request: Request):
         runs, expected_results = validate_flow_batch(data)
         references = data.get('reference_ids', [])
         reference_paths(ROOT, references)
+        initial_frame_id = data.get('initial_frame_id')
+        end_frame_id = data.get('end_frame_id')
+        resolved_frames = frame_paths(ROOT, initial_frame_id, end_frame_id)
+        if resolved_frames and expected_output != 'video':
+            raise ReferenceError('frames_require_video', 400)
         job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references or None,
-                                                     runs, expected_results)
+                                                     runs, expected_results, initial_frame_id, end_frame_id)
         return JSONResponse(public_flow_job(job, replayed=replayed), status_code=200 if replayed else 201)
     except ReferenceError as error:
         return JSONResponse({'error': error.code}, status_code=error.status_code)

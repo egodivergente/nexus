@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 import flow_import
 import recovery
+import flow_references
 
 AUTH = {'Authorization': 'Bearer private-test-token'}
 IMG = 'https://flow.google.com/asb/ANqvLOabc?w=1376'
@@ -29,6 +30,21 @@ class MediaHelpers(unittest.TestCase):
         public = flow_import.public_media(flow_import.unique_media([{'kind': 'image', 'src': IMG, 'width': 1, 'height': 1}]))
         self.assertNotIn('src', public[0])
         self.assertEqual(set(public[0]), {'key', 'kind', 'width', 'height'})
+
+    def test_frame_pair_requires_uploaded_start_and_preserves_order(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            directory = root / 'flow-references'
+            directory.mkdir()
+            image = b'\x89PNG\r\n\x1a\n' + b'frame'
+            import hashlib
+            start = 'ref_' + hashlib.sha256(image).hexdigest()
+            (directory / (start + '.png')).write_bytes(image)
+            self.assertEqual([directory / (start + '.png')], flow_references.frame_paths(root, start))
+            with self.assertRaises(flow_references.ReferenceError):
+                flow_references.frame_paths(root, end_frame_id=start)
+            with self.assertRaises(flow_references.ReferenceError):
+                flow_references.frame_paths(root, 'https://example.test/frame')
 
 
 class ImportRoutes(unittest.TestCase):

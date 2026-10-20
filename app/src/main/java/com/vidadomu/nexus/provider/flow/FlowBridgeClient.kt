@@ -61,6 +61,8 @@ internal class FlowBridgeClient(
         expectedOutput: String,
         clientRequestId: String,
         referenceIds: List<String> = emptyList(),
+        initialFrameId: String? = null,
+        endFrameId: String? = null,
         runs: Int = 1,
         expectedResults: Int = 0
     ): Result<FlowBridgeJob> {
@@ -71,6 +73,12 @@ internal class FlowBridgeClient(
         }
         if (expectedOutput !in EXPECTED_OUTPUTS) {
             return Result.failure(ProviderError("El tipo de resultado esperado no es compatible con el puente de Flow."))
+        }
+        if ((initialFrameId != null && !FlowReferences.ID.matches(initialFrameId)) ||
+            (endFrameId != null && !FlowReferences.ID.matches(endFrameId)) ||
+            (endFrameId != null && initialFrameId == null) ||
+            (expectedOutput != "video" && (initialFrameId != null || endFrameId != null))) {
+            return Result.failure(ProviderError("Los fotogramas de inicio y fin no son válidos para esta solicitud."))
         }
         if (!CLIENT_REQUEST_ID.matches(clientRequestId)) {
             return Result.failure(ProviderError("El identificador de la solicitud de Flow no es válido."))
@@ -84,6 +92,8 @@ internal class FlowBridgeClient(
                 clientRequestId = clientRequestId,
                 confirmed = true,
                 referenceIds = referenceIds,
+                initialFrameId = initialFrameId,
+                endFrameId = endFrameId,
                 runs = runs.coerceIn(1, MAX_RUNS),
                 expectedResults = expectedResults.coerceIn(0, MAX_RESULT_COUNT)
             )
@@ -539,6 +549,8 @@ internal class FlowBridgeClient(
         @SerialName("client_request_id") val clientRequestId: String,
         val confirmed: Boolean,
         @SerialName("reference_ids") val referenceIds: List<String> = emptyList(),
+        @SerialName("initial_frame_id") val initialFrameId: String? = null,
+        @SerialName("end_frame_id") val endFrameId: String? = null,
         val runs: Int = 1,
         @SerialName("expected_results") val expectedResults: Int = 0
     )

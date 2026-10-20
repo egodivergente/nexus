@@ -86,6 +86,18 @@ async def receive_reference(request, root):
         temporary.unlink(missing_ok=True)
 
 
+def frame_paths(root, initial_frame_id=None, end_frame_id=None):
+    """Resolve one or two uploaded frame IDs without accepting arbitrary paths or URLs."""
+    if end_frame_id is not None and initial_frame_id is None:
+        raise ReferenceError('end_frame_requires_initial', 400)
+    ids = [value for value in (initial_frame_id, end_frame_id) if value is not None]
+    if any(not isinstance(value, str) or not REFERENCE_ID.fullmatch(value) for value in ids):
+        raise ReferenceError('invalid_frame_ids', 400)
+    if len(ids) != len(set(ids)):
+        raise ReferenceError('duplicate_frame', 400)
+    return reference_paths(root, ids)
+
+
 # Flow (oct 2026) movió el cuadro de prompt a un div editable «¿Qué quieres crear?» (también el del agente de Flow).
 # El antiguo input «Texto editable» es ahora el TÍTULO del proyecto: no se debe escribir ahí nunca.
 COMPOSER = ('[contenteditable="true"][aria-label="¿Qué quieres crear?"], '

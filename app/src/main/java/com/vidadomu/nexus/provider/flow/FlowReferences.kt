@@ -7,21 +7,39 @@ internal object FlowReferences {
     const val MAX_IMAGES = 12
     const val MAX_BYTES = 16L * 1024 * 1024
     const val PARAMETER = "__flow_reference_ids"
+    const val INITIAL_FRAME = "__flow_initial_frame_id"
+    const val END_FRAME = "__flow_end_frame_id"
     val MIME_TYPES = setOf("image/png", "image/jpeg", "image/webp")
     val ID = Regex("ref_[a-f0-9]{64}")
 
-    fun ids(inputs: List<MediaInput>): List<String> {
-        require(inputs.size <= MAX_IMAGES) { "El puente de Nexus permite hasta $MAX_IMAGES referencias por encargo." }
-        return inputs.map {
-            require(it.type == Modality.IMAGE && it.mimeType in MIME_TYPES) { "Flow necesita referencias PNG, JPEG o WebP." }
-            require(it.slotType in setOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE)) {
-                "Esta ruta envía ingredientes; los fotogramas de inicio/final necesitan una ruta específica."
-            }
-            requireNotNull(it.remoteUrl).also { id ->
-                require(ID.matches(id)) { "La referencia todavía no se ha subido al puente privado." }
+    data class Inputs(val references: List<String>, val initialFrame: String? = null, val endFrame: String? = null)
+
+    fun inputs(inputs: List<MediaInput>): Inputs {
+        val references = mutableListOf<String>()
+        var initial: String? = null
+        var end: String? = null
+        inputs.forEach { item ->
+            require(item.type == Modality.IMAGE && item.mimeType in MIME_TYPES) { "Flow necesita referencias PNG, JPEG o WebP." }
+            val id = requireNotNull(item.remoteUrl) { "La referencia todavía no se ha subido al puente privado." }
+            require(ID.matches(id)) { "La referencia todavía no se ha subido al puente privado." }
+            when (item.fieldKey) {
+                "initial_frame" -> { require(initial == null); initial = id }
+                "end_frame" -> { require(end == null); end = id }
+                else -> {
+                    require(item.slotType in setOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE)) {
+                        "Flow admite referencias de imagen o los fotogramas Inicio y Fin."
+                    }
+                    references += id
+                }
             }
         }
+        require(references.size <= MAX_IMAGES) { "El puente de Nexus permite hasta $MAX_IMAGES referencias por encargo." }
+        require(inputs.mapNotNull { it.remoteUrl }.distinct().size == inputs.size) { "No se pueden repetir referencias de Flow." }
+        require(end == null || initial != null) { "Añade primero el fotograma Inicio antes de Fin." }
+        return Inputs(references, initial, end)
     }
+
+    fun ids(inputs: List<MediaInput>): List<String> = inputs(inputs).references
 
     fun savedIds(parameters: Map<String, String>): List<String> =
         parameters[PARAMETER]?.takeIf { it.isNotBlank() }?.split(',').orEmpty().also { ids ->
@@ -34,7 +52,7 @@ internal object FlowReferences {
         providerId = FlowBridgeProvider.PROVIDER_ID, organization = "Google", modalities = listOf(modality),
         capabilities = if (modality == Modality.IMAGE)
             listOf(ModelCapability.TEXT_TO_IMAGE, ModelCapability.IMAGE_TO_IMAGE)
-        else listOf(ModelCapability.TEXT_TO_VIDEO, ModelCapability.REFERENCE_TO_VIDEO),
+        else listOf(ModelCapability.TEXT_TO_VIDEO, ModelCapability.IMAGE_TO_VIDEO, ModelCapability.REFERENCE_TO_VIDEO),
         parameters = listOf(ModelParameter("count", "Resultados solicitados", ParameterType.INTEGER,
             "4", minValue = 1f, maxValue = FlowBridgeClient.MAX_RESULT_COUNT.toFloat(), nativeType = "integer"),
             ModelParameter("per_run", "Resultados por envío (el «xN» puesto en Flow)", ParameterType.INTEGER,
@@ -43,7 +61,11 @@ internal object FlowReferences {
         inputMode = ModelInputMode.MULTI_IMAGE, imagesArrayField = "reference_ids",
         supportsImageInput = true, supportsReferenceImages = true, maxImages = MAX_IMAGES,
         isMediaRequired = false,
-        contractMedia = listOf(ContractMediaField("reference_ids", "Imágenes de referencia", "image/*",
+        contractMedia = if (modality == Modality.VIDEO) listOf(
+            ContractMediaField("initial_frame", "Fotograma Inicio", "image/*", required = false, maximum = 1),
+            ContractMediaField("end_frame", "Fotograma Fin (opcional)", "image/*", required = false, maximum = 1),
+            ContractMediaField("reference_ids", "Imágenes de referencia", "image/*", required = false, maximum = MAX_IMAGES, encoding = "array")
+        ) else listOf(ContractMediaField("reference_ids", "Imágenes de referencia", "image/*",
             required = false, maximum = MAX_IMAGES, encoding = "array"))
     )
 }
