@@ -2,12 +2,34 @@
 'use strict';
 (()=>{
  const failed=new Set();
+ // Family logos precede their parent companies when both appear in a model path.
+ const brands=[
+  ['nanobanana','Nano Banana','nano[ _-]?banana'],['sora','Sora'],['grok','Grok'],
+  ['claude','Claude'],['kimi','Kimi'],['glm','GLM'],['hailuo','Hailuo'],
+  ['flux','Flux'],['qwen','Qwen'],['wan','Wan'],['vidu','Vidu'],['kling','Kling'],
+  ['runway','Runway'],['pixverse','PixVerse'],['pika','Pika'],['luma','Luma'],
+  ['ideogram','Ideogram'],['midjourney','Midjourney'],['krea','Krea'],
+  ['hunyuan','Hunyuan'],['happyhorse','HappyHorse','happy[ _-]?horse'],
+  ['zimage','Z-Image','z[ _-]?image'],['suno','Suno'],['tripo','Tripo'],
+  ['elevenlabs','ElevenLabs','eleven[ _-]?labs'],['doubao','Doubao'],['ernie','ERNIE'],
+  ['longcat','LongCat','long[ _-]?cat'],['deepseek','DeepSeek'],
+  ['stability','Stability AI','stability(?:[ _-]?ai)?|stable[ _-]?diffusion|sdxl'],
+  ['bfl','Black Forest Labs','bfl|black[ _-]?forest[ _-]?labs'],
+  ['minimax','MiniMax'],['moonshot','Moonshot'],['zai','Z.ai','z[ ._-]?ai|zhipu'],
+  ['xai','xAI','x[ ._-]?ai'],['anthropic','Anthropic'],['openai','OpenAI','open[ _-]?ai|gpt'],
+  ['google','Google','google|veo|imagen|gemini'],['microsoft','Microsoft'],['nvidia','NVIDIA'],
+  ['bytedance','ByteDance','byte[ _-]?dance|byteplus'],['atlascloud','Atlas Cloud','atlas[ _-]?(?:cloud)?']
+ ].map(([id,name,pattern=id])=>Object.freeze({id,name,pattern:new RegExp('(?:^|[^a-z0-9])(?:'+pattern+')(?=$|[^a-z]|[0-9])')}));
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function identity(asset,index){
   const generation=(index?.generations||[]).find(g=>g.id===asset.generationId);
   const descriptions=[generation?.modelId,asset.modelId,generation?.providerId,asset.providerId,asset.source==='GENERATED'?asset.displayName:''].filter(Boolean).map(value=>String(value).toLowerCase());
-  const rules=[[/seedream/, 'bytedance','Seedream'],[/seedance/,'bytedance','Seedance'],[/bytedance|byteplus/,'bytedance','ByteDance'],[/qwen/,'qwen','Qwen'],[/flux/,'flux','Flux'],[/runway/,'runway','Runway'],[/kling/,'kling','Kling'],[/google|veo|nano.?banana/,'google','Google'],[/atlas/,'atlascloud','Atlas Cloud']];
-  for(const description of descriptions){const found=rules.find(([pattern])=>pattern.test(description));if(found)return {logo:'branding/providers/'+found[1]+'.png',name:found[2]};}return null;
+  for(const description of descriptions){
+   const seed=/(?:^|[^a-z0-9])(seedream|seedance)(?=$|[^a-z]|[0-9])/.exec(description);
+   if(seed)return {logo:'branding/providers/bytedance.png',name:seed[1]==='seedream'?'Seedream':'Seedance'};
+   const brand=brands.find(brand=>brand.pattern.test(description));
+   if(brand)return {logo:'branding/providers/'+brand.id+'.png',name:brand.name};
+  }return null;
  }
  function previewSource(uri){
   if(typeof uri!=='string'||uri.length>8192)return null;
@@ -26,5 +48,5 @@
   img.hidden=true;img.parentElement.title='Vista previa no disponible';const status=img.closest('.corte-asset')?.querySelector('.corte-preview-status');if(status)status.hidden=false;
  },true);
  document.addEventListener('load',event=>{if(event.target.matches?.('img[data-corte-preview]'))event.target.classList.add('loaded');},true);
- window.CorteMedia={identity,previewSource,markup};
+ window.CorteMedia={identity,previewSource,markup,brands:Object.freeze(brands)};
 })();

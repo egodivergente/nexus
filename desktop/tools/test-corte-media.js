@@ -22,7 +22,21 @@ const failed=media.markup(asset,{},false,glyph);assert(!failed.includes('data-co
 assert(media.markup({...asset,uri:'https://invalid.example/new.png'}, {},false,glyph).includes('data-corte-preview='));
 assert(media.markup({...asset,uri:'content://old-phone/image'}, {},false,glyph).includes('Vista no disponible'));
 let loaded=false;listeners.load({target:{matches:()=>true,classList:{add:c=>loaded=c==='loaded'}}});assert(loaded);
-for(const name of ['bytedance','qwen','flux','runway','kling','google','atlascloud']){
+assert.equal(media.brands.length,42);
+for(const brand of media.brands){
+ const name=brand.id;
  const bytes=fs.readFileSync(path.join(__dirname,'../ui/branding/providers',name+'.png'));assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ assert.equal(media.identity({modelId:name},{}).logo,'branding/providers/'+name+'.png',name);
+ assert.equal(media.identity({providerId:name},{}).name,brand.name,name);
 }
-console.log('PASS: model identity, seven logo files, safe URLs, escaped names, failed previews, retry after URI change and successful image loading');
+for(const [model,expected] of [
+ ['google/nano-banana-2','nanobanana'],['openai/sora-2','sora'],['x-ai/grok-imagine','grok'],
+ ['anthropic/claude-4.5','claude'],['moonshot/kimi-k2','kimi'],['z-ai/glm-4','glm'],
+ ['minimax/hailuo-2.3','hailuo'],['black-forest-labs/flux-2','flux'],['alibaba/wan2.6','wan'],
+ ['z-image-turbo','zimage'],['happy-horse-1','happyhorse'],['stable-diffusion-xl','stability'],
+ ['bytedance/seedance-2','bytedance'],['google/veo-3','google']
+]) assert.equal(media.identity({modelId:model,providerId:'atlas_cloud'},{}).logo,'branding/providers/'+expected+'.png',model);
+assert.equal(media.identity({modelId:'unknown',providerId:'not-a-vendor',source:'IMPORTED',displayName:'sora.png'},{}),null);
+assert.equal(media.identity({modelId:'swan-animation'},{}),null);
+assert.equal(media.identity({modelId:'image-editor'},{}),null);
+console.log('PASS: 42 original logos, model-family precedence, metadata identity, safe URLs, escaped names and preview recovery');
