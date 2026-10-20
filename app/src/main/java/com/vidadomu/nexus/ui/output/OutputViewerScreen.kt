@@ -345,7 +345,7 @@ private fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)?
                     exoPlayer.pause()
                     capturingFrame = true
                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    scope.launch {
+                    scope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
                         val captured = try { captureVideoFrameToLocalUri(context, videoUrl, posMs) }
                             finally { capturingFrame = false }
                         if (captured != null) {
