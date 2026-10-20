@@ -601,7 +601,6 @@ object AtlasModelMapper {
     private fun extractBadge(tags: List<String>, discount: String?): String? {
         val upperTags = tags.map { it.uppercase() }
         return when {
-            upperTags.contains("HOT") -> "HOT"
             upperTags.contains("NEW") -> "NUEVO"
             upperTags.contains("PRO") -> "PRO"
             upperTags.contains("FAST") -> "RÁPIDO"

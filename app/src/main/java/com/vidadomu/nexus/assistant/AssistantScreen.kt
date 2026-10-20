@@ -16,6 +16,7 @@ import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.noticeMessage
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import android.net.Uri
 import android.content.Intent
 import android.widget.Toast
@@ -47,6 +48,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -107,6 +109,8 @@ fun AssistantScreen(
     var input by rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString("text", "").orEmpty())) }
     var showSettings by remember { mutableStateOf(false) }
     var showProject by remember {mutableStateOf(false)}
+    val projectDrafts = rememberSaveable(saver = ProjectMemoryDraftsSaver) { mutableStateMapOf<String, ProjectMemoryDraft>() }
+    var editingProjectId by rememberSaveable { mutableStateOf<String?>(null) }
     var ordersPanel by remember {mutableStateOf(false)}
     val dirtyPlans=remember {mutableStateMapOf<String,Boolean>()}
     val included=ui.plans.values.count {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION)}
@@ -184,7 +188,12 @@ fun AssistantScreen(
     LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
 
     if(showSettings) AssistantSettingsDialog(ui,vm,onDismiss={showSettings=false})
-    if(showProject) ProjectSheet(ui,vm) {showProject=false}
+    LaunchedEffect(ui.projects, editingProjectId) { pruneProjectDrafts(projectDrafts, ui.projects, keep = editingProjectId) }
+    if(showProject) ProjectSheet(ui,vm,projectDrafts,editingProjectId,{editingProjectId=it},
+        onDraftKept = { id, name -> scope.launch {
+            val result = snackbar.showSnackbar("Borrador de la memoria de «$name» conservado sin guardar.", actionLabel = "Seguir editando", withDismissAction = true)
+            if (result == SnackbarResult.ActionPerformed && projectDrafts[id] != null) { editingProjectId = id; showProject = true }
+        } }) {showProject=false}
 
     val latestFailure=ui.items.filterIsInstance<ChatItem.Notice>().lastOrNull {it.error}
     var shownFailure by rememberSaveable {mutableStateOf(latestFailure?.id)}
@@ -212,7 +221,8 @@ fun AssistantScreen(
             },
             title={Column(Modifier.heightIn(min=NexusTokens.minimumTouch).clickable {showProject=true}.semantics {
             contentDescription="Abrir proyecto"
-            stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias").joinToString(" · ")
+            stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias",
+                projectDrafts.size.takeIf { it > 0 }?.let { if (it == 1) "1 borrador de memoria sin guardar" else "$it borradores de memoria sin guardar" }).joinToString(" · ")
         },verticalArrangement=Arrangement.Center) {
             // Una sola línea: el proyecto. Cerebro y razonamiento van junto al cuadro de texto; escena y referencias, en la hoja del proyecto.
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -334,10 +344,10 @@ fun AssistantScreen(
                 ordersPanel = false; following = false
                 scope.launch { listState.animateScrollToItem(visibleItems.indexOfFirst { it is ChatItem.PlanCard && it.id == id }.coerceAtLeast(0)) }
             }
-            // Fila fina sobre el cuadro de texto: cerebro a la izquierda, modo de razonamiento a la derecha.
-            Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12).heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Dos selectores etiquetados sobre el cuadro de texto; si no caben en una línea pasan a la siguiente sin recortar.
+            FlowRow(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12),
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                 BrainPicker(ui, vm)
-                Spacer(Modifier.weight(1f))
                 ReasoningPicker(ui, vm)
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
@@ -360,17 +370,15 @@ private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
         AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity",
     )
     val current = ui.settings.backend
-    val label = builtins.firstOrNull { it.first == current }?.second
-        ?: brains.firstOrNull { BrainStore.backendFor(it.id) == current }?.name ?: "Cerebro"
+    val options = builtins + brains.map { BrainStore.backendFor(it.id) to it.name }
+    val label = agentBrainLabel(current, options)
     val context = LocalContext.current
     Box {
-        // Texto discreto bajo el título (sin recuadro): el nombre corto del cerebro y una flecha.
-        val short = if (label.length > 12) label.substringBefore(' ') else label
-        Text("$short ▾", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1,
-            modifier = Modifier.clickable(enabled = !ui.thinking) { open = true }.padding(vertical = 4.dp)
-                .semantics { contentDescription = "Cerebro del agente: $label. Cambiar" })
+        AgentControlButton("Proveedor", label, Icons.Default.Psychology, enabled = !ui.thinking,
+            description = "Proveedor del agente: $label. Cambiar", onClick = { open = true },
+            state = if (ui.thinking) "$label. $AGENT_CONTROL_BUSY" else label)
         DropdownMenu(open, { open = false }) {
-            (builtins.map { it.first to it.second } + brains.map { BrainStore.backendFor(it.id) to it.name }).forEach { (backend, name) ->
+            options.forEach { (backend, name) ->
                 DropdownMenuItem(text = { Text(name) },
                     trailingIcon = { if (backend == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = {
@@ -388,19 +396,21 @@ private fun BrainPicker(ui: AssistantUiState, vm: AssistantViewModel) {
 private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val brain = ui.settings.brain
     val argon = if(ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY) AntigravityReasoning.effort(ui.settings.modelId) else null
-    if (argon == null && (brain == null || !brain.capabilities.reasoning || brain.protocol == BrainProtocol.CUSTOM_REST)) return
+    // Sin soporte se muestra desactivado (no oculto) para que el control siga siendo reconocible.
+    if (!reasoningAvailable(ui)) {
+        AgentControlButton("Razonamiento", "No disponible", Icons.Default.Speed, enabled = false,
+            description = "Modo de razonamiento no disponible con este proveedor", onClick = {},
+            state = "Este proveedor no admite elegir el razonamiento")
+        return
+    }
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val modes = if(argon != null) listOf<Triple<String,String?,String?>>(Triple("Bajo","low",null),Triple("Medio","medium",null),Triple("Alto","high",null))
-    else listOf<Triple<String, String?, String?>>(
-        Triple("Auto", null, null), Triple("Rápido", null, "disabled"), Triple("Mínimo", "minimal", null),
-        Triple("Bajo", "low", null), Triple("Medio", "medium", null), Triple("Alto", "high", null))
-    val current = modes.firstOrNull { it.second == (argon ?: brain?.reasoningEffort) && it.third == brain?.thinking }?.first ?: "Auto"
+    val modes = agentReasoningModes(antigravity = argon != null)
+    val current = agentReasoningCurrent(modes, argon ?: brain?.reasoningEffort, brain?.thinking)
     Box {
-        TextButton(onClick = { open = true }, enabled = !ui.thinking, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-            modifier = Modifier.height(28.dp).semantics { contentDescription = "Modo de razonamiento: $current. Cambiar" }) {
-            Text("Razonar · $current ▾", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-        }
+        AgentControlButton("Razonamiento", current, Icons.Default.Speed, enabled = !ui.thinking,
+            description = "Modo de razonamiento: $current. Cambiar", onClick = { open = true },
+            state = if (ui.thinking) "$current. $AGENT_CONTROL_BUSY" else current)
         DropdownMenu(open, { open = false }) {
             modes.forEach { (name, effort, thinking) ->
                 DropdownMenuItem(text = { Text(name) },
@@ -496,30 +506,89 @@ private fun EmptyHint() {
     }
 }
 
+/**
+ * Elegir proyecto y editar su memoria son pasos distintos: la lista cambia el contexto en un toque y
+ * «Editar memoria» abre el formulario de ESE proyecto. Los borradores viven en [drafts] por proyecto.
+ */
 @Composable
-private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->Unit) {
-    val holder=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:MutableMap<String,ProjectMemoryDraft>,
+    editingId:String?,onEditingChange:(String?)->Unit,onDraftKept:(String,String)->Unit,onClose:()->Unit) {
     var creating by remember {mutableStateOf(false)}
     var name by rememberSaveable {mutableStateOf("")}
+    var leaving by remember {mutableStateOf(false)}
     val active=ui.projects.firstOrNull {it.id==ui.activeProjectId}
+    val editing=editingId?.let {id->ui.projects.firstOrNull {it.id==id}}
+    val draft=editing?.let {drafts[it.id]}
+    LaunchedEffect(editingId,editing) {if(editingId!=null && editing==null) onEditingChange(null)}
+    LaunchedEffect(editing?.id,draft==null) {if(editing!=null && draft==null) drafts[editing.id]=ProjectMemoryDraft.from(editing)}
+    val dirty=editing!=null && draft?.isDirty(editing)==true
     val syncRevision by com.vidadomu.nexus.sync.DeviceSync.get(androidx.compose.ui.platform.LocalContext.current).revision.collectAsState()
     val conversations=remember(syncRevision) {vm.conversations()}
-    var saveProject by remember { mutableStateOf<(() -> Unit)?>(null) }
-    NexusSheet(active?.name ?: "Proyecto", onClose, subtitle = "Cambiar proyecto y editar su memoria", icon = Icons.Default.MenuBook,
-        primaryAction = { Button(onClick={if(active==null) onClose() else saveProject?.invoke()},
-            enabled=active==null || saveProject!=null, modifier=Modifier.fillMaxWidth()) { Text(if(active==null) "Listo" else "Guardar proyecto") } }) {
+    val draftIds=ui.projects.filter {p->drafts[p.id]?.isDirty(p)==true}.map {it.id}.toSet()
+    fun startEditing(p:com.vidadomu.nexus.agent.core.assets.Project) {
+        if(drafts[p.id]==null) drafts[p.id]=ProjectMemoryDraft.from(p)
+        onEditingChange(p.id)
+    }
+    fun leaveEditor(keep:Boolean) {
+        editing?.let {p-> if(!keep) drafts.remove(p.id)}
+        leaving=false; onEditingChange(null)
+    }
+    fun save() {
+        val p=editing ?: return
+        val d=drafts[p.id] ?: return
+        drafts[p.id]=d.copy(saveRequested=true)
+        vm.saveProjectMemory(p.id,d.description,d.synopsis,d.tone,d.style,d.rules,d.models,keepNotes=d.keepNotes(p))
+        leaving=false; onEditingChange(null); onClose()
+    }
+    // Cerrar la hoja con cambios no guarda nada: conserva el borrador y lo avisa.
+    val dismiss:()->Unit={
+        if(editing!=null) {
+            if(dirty) onDraftKept(editing.id,editing.name) else drafts.remove(editing.id)
+            onEditingChange(null)
+        }
+        onClose()
+    }
+    if(leaving && editing!=null) ProjectLeaveDialog(editing.name,onSave=::save,onKeep={leaveEditor(keep=true)},
+        onDiscard={leaveEditor(keep=false)},onStay={leaving=false})
+    if(editing!=null && draft!=null) {
+        NexusSheet("Memoria de ${editing.name}", dismiss, subtitle = if(dirty) "Cambios sin guardar" else "Lo que el agente lee en cada mensaje", icon = Icons.Default.EditNote,
+            primaryAction = { Button(onClick=::save, modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)) { Text("Guardar memoria") } }) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
+                .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                TextButton(onClick={if(dirty) leaving=true else leaveEditor(keep=false)},modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack,null);Spacer(Modifier.width(NexusTokens.space8));Text("Volver a proyectos")
+                }
+                if(draft.isStale(editing)) InlineNotice("La memoria de este proyecto ha cambiado después de empezar este borrador; puede haberla completado el agente.",
+                    technicalDetails="Al guardar, los campos de este borrador sustituyen a los actuales solo en «${editing.name}».",
+                    actionLabel="Descartar borrador y ver la actual",onAction={drafts[editing.id]=ProjectMemoryDraft.from(editing)})
+                val characters=remember(editing.id) {vm.projectCharacters(editing.id)}
+                val assetCount=remember(editing.id) {vm.projectAssetCount(editing.id)}
+                ProjectMemoryForm(draft,{drafts[editing.id]=it},assetCount,characters,editing.memory.notes)
+            }
+        }
+        return
+    }
+    NexusSheet(active?.name ?: "Proyecto", onClose, subtitle = if(active==null) "Sin proyecto activo" else "Proyecto actual", icon = Icons.Default.MenuBook,
+        primaryAction = { FilledTonalButton(onClick=onClose, modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)) { Text("Listo") } }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
             .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
-            LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                item {StudioFilterChip(active==null,{vm.selectProject(null)},label={Text("Sin proyecto")},shape=NexusTokens.filter)}
-                items(ui.projects,key={it.id}) {p->StudioFilterChip(active?.id==p.id,{vm.selectProject(p.id)},label={Text(p.name,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},shape=NexusTokens.filter)}
+            if(active!=null) {
+                active.description?.takeIf {it.isNotBlank()}?.let {Text(it,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
+                FilledTonalButton(onClick={startEditing(active)},modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {
+                    Icon(Icons.Default.EditNote,null);Spacer(Modifier.width(NexusTokens.space8))
+                    Text(if(active.id in draftIds) "Retomar borrador de memoria" else "Editar memoria")
+                }
             }
-            TextButton(onClick={creating=!creating},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}
+            Text("Cambiar de proyecto (${ui.projects.size})",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics {heading()})
+            ProjectPickerList(ui.projects,ui.activeProjectId,draftIds,onSelect={vm.selectProject(it)})
+            ui.projects.filter {it.id in draftIds && it.id!=active?.id}.forEach {p->
+                TextButton(onClick={startEditing(p)},modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {Text("Retomar borrador de «${p.name}»")}
+            }
+            TextButton(onClick={creating=!creating},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary),modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}
             if(creating) {
                 StudioTextField(name,{name=it.take(80)},singleLine=true,label={Text("Nombre")},shape=NexusTokens.field,modifier=Modifier.fillMaxWidth())
                 FilledTonalButton(onClick={vm.createProject(name);name="";creating=false},enabled=name.isNotBlank()) {Text("Crear")}
             }
-            if(active!=null) holder.SaveableStateProvider(active.id) {ProjectMemoryEditor(active,vm,onClose) { saveProject=it }}
             ProjectReferences(ui,vm,expandedByDefault=true)
             HorizontalDivider()
             Text("Conversaciones",style=MaterialTheme.typography.titleMedium)
@@ -530,64 +599,6 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
     }
 }
 
-/** Biblia del proyecto: lo que el asistente lee en cada mensaje mientras el proyecto está activo. */
-@Composable
-private fun ProjectMemoryEditor(p: com.vidadomu.nexus.agent.core.assets.Project, vm: AssistantViewModel, onClose: () -> Unit, onSaveReady: ((() -> Unit)?) -> Unit) {
-    val m = p.memory
-    var description by rememberSaveable(p.id) { mutableStateOf(p.description.orEmpty()) }
-    var synopsis by rememberSaveable(p.id) { mutableStateOf(m.synopsis.orEmpty()) }
-    var tone by rememberSaveable(p.id) { mutableStateOf(m.tone.orEmpty()) }
-    var style by rememberSaveable(p.id) { mutableStateOf(m.visualStyle.orEmpty()) }
-    var rules by rememberSaveable(p.id) { mutableStateOf(m.rules.joinToString("\n")) }
-    var models by rememberSaveable(p.id) { mutableStateOf(m.preferredModels.joinToString("\n")) }
-    var removed by rememberSaveable(p.id) {mutableStateOf(listOf<Long>())}
-    val characters = remember(p.id) { vm.projectCharacters(p.id) }
-    val assetCount = remember(p.id) { vm.projectAssetCount(p.id) }
-            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Text("El asistente lo lee en cada mensaje para que los prompts sean coherentes, y lo completa él cuando le cuentas cosas del proyecto. $assetCount archivos etiquetados con este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                ProjectGroup(Icons.Default.MenuBook, "La historia") {
-                    StudioTextField(description, { description = it.take(400) }, shape=NexusTokens.field, label = { Text("Descripción corta") }, placeholder = { Text("Ej.: Drama carcelario en Madrid, 1928") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    StudioTextField(synopsis, { synopsis = it.take(2000) }, shape=NexusTokens.field, label = { Text("Sinopsis") }, placeholder = { Text("De qué va, personajes principales y cómo termina") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                }
-                ProjectGroup(Icons.Default.Palette, "Aspecto y tono") {
-                    StudioTextField(tone, { tone = it.take(2000) }, shape=NexusTokens.field, label = { Text("Tono / género") }, placeholder = { Text("Ej.: sobrio, tenso, realista") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
-                    StudioTextField(style, { style = it.take(2000) }, shape=NexusTokens.field, label = { Text("Estilo visual") }, placeholder = { Text("Ej.: 35 mm, luz natural, paleta apagada, grano fino") }, minLines = 2, maxLines = 6, modifier = Modifier.fillMaxWidth())
-                }
-                ProjectGroup(Icons.Default.Rule, "Reglas del asistente") {
-                    StudioTextField(rules, { rules = it.take(6000) }, shape=NexusTokens.field, label = { Text("Reglas fijas") }, placeholder = { Text("Una por línea. Ej.: Mateo nunca sonríe") }, minLines = 2, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                    StudioTextField(models, { models = it.take(800) }, shape=NexusTokens.field, label = { Text("Modelos preferidos") }, placeholder = { Text("Uno por línea. Ej.: Seedance 2.0") }, minLines = 1, maxLines = 4, modifier = Modifier.fillMaxWidth())
-                }
-                if (characters.isNotEmpty()) {
-                    Text("Personajes", fontWeight = FontWeight.SemiBold)
-                    characters.forEach { c -> Text("• ${c.name}" + (c.description?.let { ": $it" } ?: ""), style = MaterialTheme.typography.bodySmall) }
-                }
-                val notes = m.notes.filter { it.at !in removed }
-                if (notes.isNotEmpty()) {
-                    Text("Notas y decisiones", fontWeight = FontWeight.SemiBold)
-                    notes.asReversed().forEach { n ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(n.text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { removed += n.at }) { Icon(Icons.Default.Delete, "Borrar nota", Modifier.size(18.dp)) }
-                        }
-                    }
-                }
-            }
-    val saveLatest by rememberUpdatedState<() -> Unit> {
-        vm.saveProjectMemory(p.id, description, synopsis, tone, style, rules, models,
-            keepNotes = if (removed.isEmpty()) null else m.notes.map { it.at }.filter { it !in removed }.toSet())
-        onClose()
-    }
-    DisposableEffect(p.id) {
-        onSaveReady { saveLatest() }
-        onDispose { onSaveReady(null) }
-    }
-}
-
-/** Grupo visual del formulario de proyecto: icono y título sobre una tarjeta, para escanear rápido. */
-@Composable
-private fun ProjectGroup(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
-    NexusSheetGroup(title, icon, content)
-}
 @Composable
 private fun UserBubble(item:ChatItem.User) {
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
@@ -759,26 +770,10 @@ private fun NoticeRow(
     onNewChat: (() -> Unit)? = null,
 ) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
-    if(item.error) {
-        var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
-        Column(Modifier.animateContentSize()) {
-            // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
-            FlowRow(verticalArrangement=Arrangement.Center,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                if(onNewChat != null) FilledTonalButton(onClick=onNewChat,shape=NexusTokens.filter) {
-                    Icon(Icons.Default.AddComment,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Continuar en chat nuevo")
-                }
-                if(onRetry != null) FilledTonalButton(onClick=onRetry,shape=NexusTokens.filter) {
-                    Icon(Icons.Default.Refresh,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
-                }
-                if(onChangeModel != null) TextButton(onClick=onChangeModel) {
-                    Icon(Icons.Default.Tune,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Cambiar modelo")
-                }
-                if(history) HistoryLinkButton(onOpenHistory)
-                TextButton(onClick={expanded=!expanded}) {Text(if(expanded) "Ocultar detalle" else "Ver detalle del error",color=TextSecondary)}
-            }
-            if(expanded) Text(item.text,style=MaterialTheme.typography.bodySmall,color=TextSecondary)
-        }
-    } else Column {
+    // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
+    if(item.error) AgentErrorNotice(item.id, item.text, onRetry = onRetry, onChangeModel = onChangeModel, onNewChat = onNewChat,
+        onOpenHistory = if(history) onOpenHistory else null)
+    else Column {
         Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         if(history) HistoryLinkButton(onOpenHistory)
     }

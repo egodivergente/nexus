@@ -1,6 +1,10 @@
 package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.ModelParameter
+import com.vidadomu.nexus.core.model.ParameterBounds
+import com.vidadomu.nexus.core.model.ParameterLabels
+import com.vidadomu.nexus.core.model.ParameterType
+import java.util.Locale
 import kotlin.math.abs
 
 /** Display-only labels. The dropdown always sends the original option to the provider. */
@@ -36,15 +40,36 @@ internal object ParameterPresentation {
             "seed" -> "Semilla"
             "output_format" -> "Tipo de archivo"
             "num_images", "number_of_images" -> "Número de imágenes"
-            else -> parameter.displayName
+            else -> if (ParameterLabels.isRawKey(parameter.key, parameter.displayName)) ParameterLabels.label(parameter.key)
+                else parameter.displayName
         }
+
+    fun help(parameter: ModelParameter): String = ParameterLabels.help(parameter.key) ?: ParameterLabels.UNKNOWN_HELP
+
+    /** Text published by the provider, shown untranslated and attributed, only when it adds something. */
+    fun providerNote(parameter: ModelParameter): String? =
+        parameter.description.trim().takeIf { it.isNotEmpty() && it != ParameterLabels.help(parameter.key) }
+
+    /** Native key for diagnostics only; never used as the visible title. */
+    fun diagnosticKey(parameter: ModelParameter): String = "Clave técnica: " + parameter.key
+
+    fun range(parameter: ModelParameter, locale: Locale = ParameterBounds.spanish): String? =
+        ParameterBounds.range(parameter, locale)
+
+    /** Boolean choices: Automático ("") is a distinct third state and is never folded into "false". */
+    fun booleanChoices(parameter: ModelParameter): List<Pair<String, String>> =
+        (if (parameter.isRequired) emptyList() else listOf("" to "Automático")) + listOf("true" to "Sí", "false" to "No")
+
+    /** Spoken label; selection itself is announced through stateDescription. */
+    fun chipDescription(parameter: ModelParameter, option: String, optionTitle: String? = null): String =
+        title(parameter) + ": " + (optionTitle ?: describe(parameter, option))
 
     fun proportion(parameter: ModelParameter, value: String): Float? =
         if (parameter.key in formatKeys) dimensions(value)?.let { (w,h) -> w.toFloat() / h } else null
 
     fun label(parameter: ModelParameter, value: String): Label {
         if(value.isBlank()) return Label("Automático")
-        if(parameter.type == com.vidadomu.nexus.core.model.ParameterType.BOOLEAN)
+        if(parameter.type == ParameterType.BOOLEAN)
             return Label(when(value) { "true" -> "Sí"; "false" -> "No"; else -> value })
         if(parameter.key.lowercase() in setOf("duration", "duration_seconds", "seconds") && value.toDoubleOrNull() != null)
             return Label("$value s")

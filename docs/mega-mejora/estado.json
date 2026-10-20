@@ -1,0 +1,924 @@
+{
+  "base_android": "517d707562ed0b346447ff7c88b5defecc806084",
+  "branch": "aki/mega-mejora-20261020",
+  "production_updated": false,
+  "items": [
+    {
+      "id": "V01",
+      "title": "Aviso de error con jerarquía",
+      "priority": "P1",
+      "acceptance": "Con el mismo error, causa y acción se reconocen sin abrir detalle; botones con área táctil ≥48 dp.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "agente",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V02",
+      "title": "Controles del agente reconocibles",
+      "priority": "P2",
+      "acceptance": "5 de 5 usuarios encuentran ambos selectores sin ayuda; ningún texto cortado a 130 %.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "agente",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V03",
+      "title": "Proyecto largo sin recorte opaco",
+      "priority": "P1",
+      "acceptance": "Con 6 proyectos y nombres de 40 caracteres se accede a todos y se ve el nombre completo al elegir.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "agente",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V04",
+      "title": "Memoria con menos marcos",
+      "priority": "P2",
+      "acceptance": "Ningún campo está dentro de tres superficies dibujadas; mismos campos y textos accesibles.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "agente",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V05",
+      "title": "Cabecera de parámetros coherente",
+      "priority": "P2",
+      "acceptance": "Tocar cualquier punto de la cabecera abre/cierra; estado accesible expandido o contraído.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "integracion",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V06",
+      "title": "Motivo de bloqueo junto a Generar",
+      "priority": "P1",
+      "acceptance": "Estado vacío explica el siguiente paso; razón textual ≥4,5:1, sin exigir ese umbral al botón deshabilitado.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "integracion",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V07",
+      "title": "Barra de herramientas sin medias palabras",
+      "priority": "P1",
+      "acceptance": "A 411 y 448 dp no hay palabras recortadas; todas las acciones siguen a ≤2 toques.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "integracion",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V08",
+      "title": "Semilla y límites numéricos exactos",
+      "priority": "P1",
+      "acceptance": "JSON maximum=2147483647 conserva ese valor y se muestra 2.147.483.647; no E9 ni 2.147.483.648.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "parametros",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V09",
+      "title": "Parámetros en español funcional",
+      "priority": "P1",
+      "acceptance": "prompt_extend tiene etiqueta española; claves desconocidas muestran ayuda de no disponibilidad, no traducción inventada.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "parametros",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V10",
+      "title": "Selección distinguible sin depender del borde",
+      "priority": "P2",
+      "acceptance": "En monocromo se identifica la selección; TalkBack distingue las tres opciones; no se transforma Automático en No.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "parametros",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V11",
+      "title": "Precio desconocido sin muro de avisos",
+      "priority": "P1",
+      "acceptance": "Con 20 modelos sin tarifa no aparecen 20 mensajes de fallo; un error real ofrece reintento y un precio desconocido nunca dice gratis.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "integracion",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V12",
+      "title": "Marca correcta, insignias con significado",
+      "priority": "P1",
+      "acceptance": "Prueba con el ID real reproduce y corrige su logo; ningún distintivo se basa solo en publicidad del proveedor sin explicación.",
+      "status": "en_desarrollo",
+      "owner": "catalogo",
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V13",
+      "title": "Pie seguro en hojas largas",
+      "priority": "P1",
+      "acceptance": "Último elemento íntegro sobre barra gestual con IME cerrado/abierto y a 130 %, sin padding doble.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "integracion",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V14",
+      "title": "Catálogo con descripciones útiles",
+      "priority": "P2",
+      "acceptance": "Con 411 dp se lee una función completa por familia; la búsqueda conserva espacio.",
+      "status": "en_desarrollo",
+      "owner": "catalogo",
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V15",
+      "title": "Ficha de modelo mejor compuesta",
+      "priority": "P2",
+      "acceptance": "En la primera pantalla se entienden entrada admitida, salida y unidad de coste; campos desconocidos se rotulan sin dato.",
+      "status": "en_desarrollo",
+      "owner": "catalogo",
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V16",
+      "title": "Variantes comparables",
+      "priority": "P1",
+      "acceptance": "Cada variante tiene diferencia respaldada o No documentada; ejemplo de 5 s incluye unidad y carácter estimado.",
+      "status": "en_desarrollo",
+      "owner": "catalogo",
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V17",
+      "title": "Historial que distingue intentos",
+      "priority": "P1",
+      "acceptance": "10 intentos del mismo prompt se distinguen por nombre/fecha/variante sin abrirlos; ninguna fila se titula solo puntos suspensivos.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V18",
+      "title": "Cabecera de biblioteca más tranquila",
+      "priority": "P2",
+      "acceptance": "Título completo a 411 dp; buscar/importar a un toque; densidad elegida por el usuario intacta.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V19",
+      "title": "Ajustes que muestran estado",
+      "priority": "P1",
+      "acceptance": "Un proveedor caído se refleja en su fila; dato antiguo se identifica; versión coincide con PackageInfo.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "V20",
+      "title": "Contraste de contornos funcionales",
+      "priority": "P1",
+      "acceptance": "Tests de paleta ≥3:1 para bordes esenciales y ≥4,5:1 texto normal en los 8 temas; verificación visual sin cambiar el tema preferido.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U01",
+      "title": "Un selector guiado por la intención",
+      "priority": "P1",
+      "acceptance": "Desde una imagen de referencia, la primera lista admite esa entrada; cambio deliberado de tipo mantiene los medios o advierte incompatibilidad.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "integracion",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U02",
+      "title": "Variantes sin borrar el trabajo",
+      "priority": "P1",
+      "acceptance": "Fixture de 3 referencias y prompt largo conserva todo lo compatible; Volver restaura exactamente el borrador anterior.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U03",
+      "title": "Error útil antes del diagnóstico",
+      "priority": "P1",
+      "acceptance": "Caso sin trabajo dice No se ha enviado; caso incierto dice Verificando sin invitar a duplicar; una acción lleva a la conexión relevante.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U04",
+      "title": "Histórico no confundido con estado actual",
+      "priority": "P1",
+      "acceptance": "Mensaje antiguo conserva su fecha; estado de cabecera indica última comprobación; no se reescribe la conversación.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U05",
+      "title": "Importe visible antes del compromiso",
+      "priority": "P1",
+      "acceptance": "Bajo umbral y precio conocido sigue un toque; desconocido exige aceptación explícita y nunca usa 0 como importe.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U06",
+      "title": "Flow con control de destino explícito",
+      "priority": "P1",
+      "acceptance": "Si no se sabe modelo o coste aparece No verificado; el usuario confirma destino; no se inventa una cotización.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U07",
+      "title": "Preflight de referencias",
+      "priority": "P1",
+      "acceptance": "Con entrada no admitida se bloquea solo esa referencia y se explica motivo; ninguna subida al proveedor antes del consentimiento.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U08",
+      "title": "Preparar de nuevo con diferencias claras",
+      "priority": "P1",
+      "acceptance": "Preparar de nuevo produce 0 llamadas de generación; conserva referencias disponibles y enumera las que faltan.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U09",
+      "title": "Operaciones inciertas sin falso cierre",
+      "priority": "P1",
+      "acceptance": "Proveedor simulado que ignora cancelar permanece Pendiente de confirmación; no se muestra éxito ni se relanza automáticamente.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U10",
+      "title": "Búsqueda vacía que permite recuperarse",
+      "priority": "P1",
+      "acceptance": "Desde búsqueda sin coincidencias se recupera la biblioteca en un toque sin borrar archivos ni preferencias permanentes.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U11",
+      "title": "Un contrato común para abrir medios",
+      "priority": "P1",
+      "acceptance": "Imagen local y generada ofrecen las mismas acciones aplicables; las no disponibles explican por qué sin fingir soporte.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U12",
+      "title": "Tipo de archivo comprensible",
+      "priority": "P1",
+      "acceptance": "PNG con MIME genérico se previsualiza como imagen; bytes desconocidos no se etiquetan como imagen por su nombre.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U13",
+      "title": "Deshacer también en la hoja local",
+      "priority": "P1",
+      "acceptance": "Quitar y Deshacer restauran el mismo ID y pertenencia al proyecto; archivo original no cambia.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U14",
+      "title": "Destino claro para referencias al agente",
+      "priority": "P1",
+      "acceptance": "Al Agente conserva archivo y abre borrador en proyecto visible; contador de mensajes enviados no cambia.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U15",
+      "title": "Herramientas del agente en lenguaje de tarea",
+      "priority": "P2",
+      "acceptance": "Fixture con tres herramientas indica una acción pendiente y qué es lectura; no afirma resultado hasta confirmarlo.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U16",
+      "title": "Orientación inicial sin temporizador obligatorio",
+      "priority": "P2",
+      "acceptance": "Con lector de pantalla la ayuda no desaparece sola; salir no configura proveedores ni inicia generación.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U17",
+      "title": "Saldo con alcance explícito",
+      "priority": "P1",
+      "acceptance": "Cuenta identificable a un toque; no se suman euros y créditos; importes sin dato no pasan a cero.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U18",
+      "title": "Navegación atrás predecible",
+      "priority": "P1",
+      "acceptance": "Matriz de 12 combinaciones sin salida prematura ni doble back; el gesto cancelado deja la misma pantalla y selección.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U19",
+      "title": "Edición de proyecto separada de elegirlo",
+      "priority": "P2",
+      "acceptance": "Cambiar proyecto sin edición tarda ≤2 toques; salir con edición informa, sin autosobrescribir otros proyectos.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "agente",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "U20",
+      "title": "Fallo externo con recuperación visible",
+      "priority": "P1",
+      "acceptance": "Con Alexia ausente aparece aviso accionable; no se descarga, envía o elimina nada automáticamente.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D01",
+      "title": "Contrato de insets y teclado",
+      "priority": "P1",
+      "acceptance": "Campo enfocado y acción visibles en 411/448 dp, IME y teclado físico; sin padding doble.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D02",
+      "title": "Diseño por ventana, no por nombre Ultra",
+      "priority": "P2",
+      "acceptance": "411,448,600,840 dp sin controles inaccesibles; redimensionar conserva borrador y selección.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D03",
+      "title": "S Pen preciso, no mando remoto",
+      "priority": "P3",
+      "acceptance": "Hover no ejecuta acciones; tocar con lápiz equivale a dedo; nada requiere Bluetooth ni pulsa Generar desde hover.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D04",
+      "title": "Accesibilidad comprobada con contexto real",
+      "priority": "P1",
+      "acceptance": "20 tareas críticas completables sin visión; sin texto esencial cortado a 200 %; tamaño táctil medido ≥48 dp.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D05",
+      "title": "Fluidez medida por recorrido",
+      "priority": "P1",
+      "acceptance": "En 5 repeticiones de scroll y visor, ≥99 % frames dentro de su deadline, cero frames >100 ms y primera respuesta local p95≤100 ms; metas, no resultados.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D06",
+      "title": "Reanudar con el mismo contexto",
+      "priority": "P1",
+      "acceptance": "Fixture se recrea en mitad de edición y conserva texto y medios; 0 envíos nuevos; confirmación económica caducada se pide de nuevo.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D07",
+      "title": "Intercambio con otras apps predecible",
+      "priority": "P2",
+      "acceptance": "JPEG,PNG,MP4,WAV y texto entran/salen en fixtures; cancelar produce 0 activos huérfanos; no se lee portapapeles sin gesto del usuario.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D08",
+      "title": "Movimiento reducido de principio a fin",
+      "priority": "P1",
+      "acceptance": "Con animación desactivada o app no visible no queda ningún pulso infinito; sigue presente el estado textual y no aparece porcentaje ficticio.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D09",
+      "title": "Revisión cómoda con una mano",
+      "priority": "P2",
+      "acceptance": "Prueba física con 5 personas y ambas manos: abrir, volver, marcar toma, comparar y buscar sin reagarre en ≥90 % de intentos; S Pen y TalkBack siguen operables.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "D10",
+      "title": "Temas útiles dentro y fuera de casa",
+      "priority": "P2",
+      "acceptance": "Modo automático cambia al cambiar el sistema en un dispositivo de prueba; elegir tema manual lo anula; la imagen conserva píxeles/perfil y todos los controles cumplen contraste.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H01",
+      "title": "Selección semántica",
+      "priority": "P2",
+      "acceptance": "Un tick por selección real; ninguno en navegación pasiva. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H02",
+      "title": "Confirmar acción aceptada",
+      "priority": "P2",
+      "acceptance": "En la prueba propuesta, las acciones fallidas o pendientes no emiten señal de éxito; una acción aceptada emite como máximo una. Prueba física pendiente.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H03",
+      "title": "Inicio de arrastre",
+      "priority": "P2",
+      "acceptance": "Una vibración por arrastre; ninguna si se cancela antes del umbral. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H04",
+      "title": "Cruce de posiciones al reordenar",
+      "priority": "P3",
+      "acceptance": "Un tick por cruce; sin ráfagas. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H05",
+      "title": "Centro de cortinilla con histéresis",
+      "priority": "P3",
+      "acceptance": "No hay doble disparo al oscilar alrededor del centro. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H06",
+      "title": "Límite de deslizador discreto",
+      "priority": "P3",
+      "acceptance": "Una vez al llegar al extremo; nada en listas. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H07",
+      "title": "Error iniciado por el usuario",
+      "priority": "P2",
+      "acceptance": "Ninguna háptica en errores de sistema o automáticos. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H08",
+      "title": "Fin de trabajo",
+      "priority": "P1",
+      "acceptance": "El mismo trabajo no vibra dos veces tras muerte de proceso. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H09",
+      "title": "Toggle decisivo",
+      "priority": "P3",
+      "acceptance": "En la prueba propuesta, solo los interruptores definidos como decisivos emiten una señal; los cambios automáticos y secundarios no añaden vibración. Comprobar que no haya duplicados del sistema.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "H10",
+      "title": "Cancelación confirmada efectiva",
+      "priority": "P2",
+      "acceptance": "Pulsar cancelar sin efecto no vibra. Prueba física pendiente; el sistema puede omitir el efecto.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P01",
+      "title": "Notas en el fotograma exacto",
+      "priority": "P1",
+      "acceptance": "Crear nota a 7,2 s; reabrir el resultado y ver el marcador en 7,2 s ±1 fotograma; marcarla resuelta la oculta del filtro 'abiertas'; al pedir regeneración el prompt del agente incluye texto y timecode (test unitario del constructor de contexto).",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P02",
+      "title": "Linaje de resultados",
+      "priority": "P1",
+      "acceptance": "Para una generación con 2 regeneraciones el panel muestra padre e hijas con enlaces correctos; para generaciones antiguas muestra 'origen no registrado' sin inventar datos; test de migración conserva todos los IDs.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P03",
+      "title": "Elegida no equivale a completada",
+      "priority": "P1",
+      "acceptance": "Marcar toma como elegida deja la anterior como 'alternativa'; filtro 'elegidas' devuelve solo ellas; la decisión persiste tras reinicio y se transmite al otro dispositivo en la siguiente sincronización (prueba con dos instancias de test).",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P04",
+      "title": "Comparar movimiento sincronizado",
+      "priority": "P2",
+      "acceptance": "Con dos vídeos de igual duración, desfase de cabezal entre paneles ≤1 fotograma tras 30 s de reproducción y tras 10 saltos; pausa/seek afectan a todos; con vídeo de distinta duración se avisa en lugar de desincronizar.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P05",
+      "title": "Animatic antes de gastar en vídeo",
+      "priority": "P2",
+      "acceptance": "Con 8 imágenes y un audio de 60 s se obtiene un MP4 de 60 s ±0,1 s con cada imagen en su rango; cambiar duración de un plano re-exporta sin regenerar medios; 0 llamadas a proveedores en exportación local; costes previos de las imágenes no se ocultan.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P06",
+      "title": "Revisión asistida de identidad",
+      "priority": "P2",
+      "acceptance": "La pantalla muestra siempre 'sugerencia, no veredicto' y las limitaciones; el usuario puede aprobar contra la sugerencia; ningún plano cambia de estado sin acción humana (test de UI); cada análisis muestra coste antes de ejecutarse.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P07",
+      "title": "Presupuesto por plano",
+      "priority": "P1",
+      "acceptance": "Con 3 pedidos de coste conocido el total coincide con la suma ±0,01; gasto sin dato se muestra 'desconocido', no 0; superar el tope bloquea el envío hasta confirmación explícita.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P08",
+      "title": "Memoria con cambios explicados",
+      "priority": "P2",
+      "acceptance": "Tras editar la memoria desde el agente y desde el usuario, el historial lista 2 entradas con origen correcto; restaurar la primera devuelve el texto exacto (hash igual) y crea una entrada nueva sin borrar las demás.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P09",
+      "title": "Recetas reutilizables",
+      "priority": "P3",
+      "acceptance": "Guardar receta de 3 pasos y aplicarla a un plano nuevo genera 3 pedidos con parámetros válidos; al cambiar de modelo los parámetros no soportados se listan antes de enviar; nada se envía sin la confirmación existente.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P10",
+      "title": "Recuperar originales caducados",
+      "priority": "P2",
+      "acceptance": "Para un asset con URL caducada y copia SHA-verificada en otro dispositivo, la acción recupera y el estado pasa a disponible; sin copia, ofrece regenerar tras confirmar coste, como versión nueva y conserva el ID y el historial.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P11",
+      "title": "Enlazar planos por fotograma",
+      "priority": "P3",
+      "acceptance": "Con dos planos de iluminación distinta se muestra aviso con valores medidos; con similares no aparece; aceptar crea el input de Lienzo con MIME PNG.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "P12",
+      "title": "Estilo visible heredado",
+      "priority": "P2",
+      "acceptance": "Editar la ficha cambia el contexto mostrado en la tarjeta del siguiente pedido; el usuario puede desactivarla por pedido; persiste y llega al otro dispositivo en categoría 'memoria/proyectos'.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W01",
+      "title": "Resolver solo con intención explícita",
+      "priority": "P1",
+      "acceptance": "Con N conflictos de prueba, tocar el nombre de una versión solo abre el detalle y no llama a resolve (test de UI con contador de llamadas =0); resolver exige confirmar y llama a resolve exactamente una vez; la lista muestra primero un resumen y pagina o agrupa.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "conflictos",
+      "implementation_evidence": [
+        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W02",
+      "title": "Comparar versiones con contexto",
+      "priority": "P1",
+      "acceptance": "Cada conflicto muestra nombre legible (no ID) y al menos 3 campos comparados; 'conservar ambas' deja las dos versiones y cierra el aviso; no se borra ningún original sin acción confirmada.",
+      "status": "codigo_pendiente_validacion",
+      "owner": "conflictos",
+      "implementation_evidence": [
+        "Comparación y elección explícita; conservar ambas NO implementado."
+      ],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W03",
+      "title": "Dispositivos con estado reciente",
+      "priority": "P1",
+      "acceptance": "El panel muestra cada par con marca temporal; si no hay latido en el umbral aparece 'desactualizado' en lugar del último estado; la versión mostrada coincide con versionName del dispositivo en test con dispositivos simulados.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W04",
+      "title": "Continuar sin reenviar",
+      "priority": "P2",
+      "acceptance": "Tras el handoff, el receptor abre el proyecto y el borrador con las referencias; el contador de trabajos enviados no cambia (0 llamadas al proveedor); repetirlo no duplica borradores.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W05",
+      "title": "Aprobación única entre dispositivos",
+      "priority": "P1",
+      "acceptance": "Simular aprobar el mismo pedido desde dos instancias: solo una genera envío al proveedor simulado (contador=1); la otra muestra 'ya aprobado en <dispositivo>'; tras reintento tampoco duplica.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W06",
+      "title": "Saber dónde está el original",
+      "priority": "P2",
+      "acceptance": "Un asset sin original muestra insignia 'miniatura'; la acción descarga y, verificado el SHA, la insignia desaparece; si el origen no lo tiene, muestra el dispositivo que lo tendría o 'no disponible' sin reintentar en bucle.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W07",
+      "title": "Capturar aquí, usar allí",
+      "priority": "P2",
+      "acceptance": "Enviar un fotograma desde el móvil hace que aparezca en 'Referencias · N+1' del proyecto en el PC con SHA igual; no crea proyectos nuevos ni generaciones.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    },
+    {
+      "id": "W08",
+      "title": "Revisar el montaje desde el móvil",
+      "priority": "P3",
+      "acceptance": "Un edit.json de prueba se muestra como lista de planos con duración total ±0,1 s; editar en PC y recibir en móvil actualiza la lista; una edición concurrente conserva ambas revisiones y avisa, sin sobrescribir.",
+      "status": "pendiente",
+      "owner": null,
+      "implementation_evidence": [],
+      "test_evidence": [],
+      "device_verified": false
+    }
+  ],
+  "validation": {
+    "build": "pendiente",
+    "tests": "creados_no_ejecutados",
+    "ci_blocker": "GitHub Actions job 118555144973: account payments/spending limit"
+  }
+}

@@ -31,6 +31,9 @@ import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.noticeMessage
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,6 +98,7 @@ fun CreateScreen(
     val compactTyping = configuration.screenHeightDp < 500 && WindowInsets.isImeVisible
     val generateAction = { viewModel.submitGeneration(onNavigateToOutput) }
     val canvasScroll = rememberLazyListState()
+    val promptFocus = remember { FocusRequester() }
     LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollToItem(0) }
     val inputVideo = state.attachedMedia.singleOrNull { it.mimeType.startsWith("video/") }
     var videoSeconds by remember(inputVideo?.uriString) { mutableStateOf<Double?>(null) }
@@ -125,6 +129,9 @@ fun CreateScreen(
     var showRequestInspector by remember { mutableStateOf(false) }
     var showPersonalPresets by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
+    var inlineParametersExpanded by rememberSaveable { mutableStateOf(true) }
+    var showToolMenu by remember { mutableStateOf(false) }
+    var pendingModel by remember { mutableStateOf<NexusModel?>(null) }
     var showMedia by remember { mutableStateOf(false) }
     var showInspiration by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -206,13 +213,24 @@ fun CreateScreen(
                 Column(Modifier.fillMaxWidth().padding(horizontal=screenMargin, vertical=8.dp),
                     verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
+                    if(!busy) readiness.message?.let { reason ->
+                        TextButton(onClick={
+                            when {
+                                readiness.phase == CreationPhase.CHOOSE_MODEL -> showModelPickerSheet=true
+                                state.missingRequiredFields.firstOrNull() in listOf("Prompt", "Instrucciones") ->
+                                    batchScope.launch { canvasScroll.animateScrollToItem(1); promptFocus.requestFocus() }
+                                state.missingRequiredFields.isNotEmpty() -> showMedia=true
+                                else -> showParameters=true
+                            }
+                        }, modifier=Modifier.fillMaxWidth()) {
+                            Text(reason, color=MaterialTheme.colorScheme.onSurface,
+                                style=MaterialTheme.typography.bodyMedium, modifier=Modifier.weight(1f))
+                            Icon(Icons.Default.ChevronRight, null)
+                        }
+                    }
                     StudioGenerateButton(estimate.amount, readiness.canSubmit, busy,
                         if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
                         generateAction)
-                    if(!busy) readiness.message?.let {
-                        Text(it, color=TextSecondary, style=MaterialTheme.typography.labelSmall,
-                            modifier=Modifier.padding(horizontal=12.dp))
-                    }
                 }
             }
         },
@@ -245,7 +263,8 @@ fun CreateScreen(
             item { CompactModelSelectionCard(state.selectedModel,currencyManager) { showModelPickerSheet=true } }
             item {
                 StudioPromptField(state.prompt, viewModel::updatePrompt,
-                    if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…")
+                    if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
+                    focusRequester=promptFocus)
                 // Sin altura fija: con una caja del 32 % de la pantalla la 8.ª línea, «Expandir» y el contador quedaban recortados.
             }
 
@@ -304,17 +323,22 @@ fun CreateScreen(
             item {
                 StudioToolRow {
                     StudioToolChip("Inspirar") {showInspiration=true}
-                    StudioToolChip(parameterSummary(state), "Parámetros del modelo") {showParameters=true}
-                    if(state.selectedModality == Modality.IMAGE) {
-                        StudioToolChip(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Varios modelos",
-                            enabled=!state.isSubmitting && !state.isPreparingMedia) {
-                            viewModel.comparison.open(state);showComparison=true
+                    StudioToolChip("Parámetros", "Parámetros del modelo") {showParameters=true}
+                    StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
+                    Box {
+                        StudioToolChip("Más", "Más herramientas del Lienzo") {showToolMenu=true}
+                        DropdownMenu(expanded=showToolMenu,onDismissRequest={showToolMenu=false}) {
+                            if(state.selectedModality == Modality.IMAGE) DropdownMenuItem(
+                                text={Text(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Varios modelos")},
+                                enabled=!state.isSubmitting && !state.isPreparingMedia,
+                                onClick={showToolMenu=false;viewModel.comparison.open(state);showComparison=true})
+                            DropdownMenuItem(text={Text("Mis ajustes")},enabled=state.schemaReady && !state.isSubmitting,
+                                onClick={showToolMenu=false;showPersonalPresets=true})
                         }
                     }
-                    StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
-                    StudioToolChip("Mis ajustes",enabled=state.schemaReady && !state.isSubmitting) {showPersonalPresets=true}
                 }
             }
+
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
                 val inline=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty().filter {!it.isAdvanced}
@@ -322,12 +346,22 @@ fun CreateScreen(
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
                         Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                            Row(verticalAlignment=Alignment.CenterVertically) {
-                                Text("Ajustes del modelo",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.primary)
-                                TextButton(onClick={showParameters=true}) {Text(if(inline.size>6) "Ver todos (${inline.size})" else "Ampliar",color=TextSecondary)}
+                            Row(Modifier.fillMaxWidth().heightIn(min=48.dp)
+                                .semantics(mergeDescendants=true) { stateDescription=if(inlineParametersExpanded) "Expandido" else "Contraído" }
+                                .clickable(role=androidx.compose.ui.semantics.Role.Button) {inlineParametersExpanded=!inlineParametersExpanded},
+                                verticalAlignment=Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Ajustes del modelo",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
+                                    Text(parameterSummary(state),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Icon(if(inlineParametersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
                             }
-                            inline.take(6).forEach { param ->
-                                key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
+                            if(inlineParametersExpanded) {
+                                inline.take(6).forEach { param ->
+                                    key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
+                                }
+                                if(inline.size>6 || state.selectedModel?.parameters?.any {it.isAdvanced} == true)
+                                    TextButton(onClick={showParameters=true}) {Text("Todas las opciones")}
                             }
                         }
                     }
@@ -422,13 +456,25 @@ fun CreateScreen(
         ModelPickerSheet(
             availableModels = (LocalContext.current.applicationContext as NexusApplication).modelCatalogRepository.models.collectAsState().value,
             selectedModel = state.selectedModel,
+            initialModality = state.selectedModality,
+            media = state.attachedMedia,
             currencyManager = currencyManager,
             onSelectModel = { model ->
-                viewModel.selectModel(model)
+                if(model.id != state.selectedModel?.id || model.providerId != state.selectedModel?.providerId) {
+                    if(state.attachedMedia.isNotEmpty()) pendingModel=model
+                    else viewModel.selectModel(model)
+                }
                 showModelPickerSheet = false
             },
             onDismiss = { showModelPickerSheet = false }
         )
+    }
+
+    pendingModel?.let { target ->
+        AlertDialog(onDismissRequest={pendingModel=null}, title={Text("Cambiar de modelo")},
+            text={Text("Tienes ${state.attachedMedia.size} referencias preparadas. Al cambiar a ${target.displayName}, solo se mantendrán las que admita su configuración. Las demás saldrán del borrador, no de la Biblioteca ni del archivo original. El prompt se conserva y las opciones pasan a las del nuevo modelo. No se enviará ninguna generación.")},
+            confirmButton={TextButton(onClick={pendingModel=null;viewModel.selectModel(target)}) {Text("Cambiar y revisar")}},
+            dismissButton={TextButton(onClick={pendingModel=null;showModelPickerSheet=true}) {Text("Conservar modelo")}})
     }
 
     // Modal Bottom Sheet para Inspector de Solicitud (DEBUG)
@@ -1471,251 +1517,6 @@ private fun CreativePresetsRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ModelPickerSheet(
-    availableModels: List<NexusModel>,
-    selectedModel: NexusModel?,
-    currencyManager: CurrencyManager,
-    onSelectModel: (NexusModel) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedOrg by remember { mutableStateOf<String?>(null) }
-    var modalityFilter by remember { mutableStateOf<Modality?>(null) }
-
-    val filteredModels = remember(availableModels, searchQuery, selectedOrg, modalityFilter) {
-        var list = availableModels.filter { modalityFilter == null || modalityFilter in it.modalities }
-        if (!selectedOrg.isNullOrBlank()) {
-            list = list.filter { it.organization.equals(selectedOrg, ignoreCase = true) }
-        }
-        if (searchQuery.isNotBlank()) {
-            val q = searchQuery.trim().lowercase()
-            list = list.filter {
-                it.displayName.lowercase().contains(q) ||
-                it.id.lowercase().contains(q) ||
-                it.organization.lowercase().contains(q) ||
-                it.family?.lowercase()?.contains(q) == true
-            }
-        }
-        list
-    }
-
-    val orgs = remember(availableModels) {
-        availableModels.map { it.organization }.distinct().sorted()
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceDark,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = NexusTokens.space16)
-                .padding(bottom = NexusTokens.space24)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = NexusTokens.space8),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Seleccionar Modelo",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Text(
-                    text = "${filteredModels.size} disponibles",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = PrimaryNeon,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-            }
-
-            LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                item { FilterChip(modalityFilter==null,{modalityFilter=null;selectedOrg=null},label={Text("Todos los tipos")}) }
-                items(listOf(Modality.IMAGE to "Imagen", Modality.VIDEO to "Vídeo", Modality.AUDIO to "Audio")) { (value,label) ->
-                    FilterChip(modalityFilter==value,{modalityFilter=value;selectedOrg=null},label={Text(label)})
-                }
-            }
-            // Search all modalities without returning to the catalog.
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = NexusTokens.space8),
-                shape = NexusTokens.thumbnail,
-                color = MaterialTheme.colorScheme.onPrimary,
-                border = null
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = TextMuted,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(NexusTokens.space8))
-                    StudioTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Buscar modelo...", color = TextMuted, fontSize = MaterialTheme.typography.bodyMedium.fontSize) },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-
-                    )
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(
-                            onClick = { searchQuery = "" },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-            }
-
-            // Provider Filter Chips
-            if (orgs.size > 1) {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = NexusTokens.space8),
-                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
-                ) {
-                    item {
-                        val isAll = selectedOrg == null
-                        Box(
-                            modifier = Modifier
-                                .clip(NexusTokens.thumbnail)
-                                .background(if (isAll) PrimaryNeon.copy(alpha = 0.15f) else SurfaceVariantDark)
-
-                                .clickable { selectedOrg = null }
-                                .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
-                        ) {
-                            Text(
-                                text = "Todos",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = if (isAll) PrimaryNeon else TextSecondary,
-                                    fontWeight = if (isAll) FontWeight.Bold else FontWeight.Normal
-                                )
-                            )
-                        }
-                    }
-                    items(orgs) { org ->
-                        val isSelected = selectedOrg == org
-                        Box(
-                            modifier = Modifier
-                                .clip(NexusTokens.thumbnail)
-                                .background(if (isSelected) PrimaryNeon.copy(alpha = 0.15f) else SurfaceVariantDark)
-
-                                .clickable { selectedOrg = if (isSelected) null else org }
-                                .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
-                        ) {
-                            Text(
-                                text = org,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = if (isSelected) PrimaryNeon else TextSecondary,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Models List
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(NexusTokens.space4),
-                modifier = Modifier.heightIn(max = 420.dp)
-            ) {
-                items(filteredModels, key = { it.id }) { model ->
-                    val isSelected = model.id == selectedModel?.id
-                    val formattedPrice = rememberPriceEstimate(model).amount
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(NexusTokens.field)
-                            .clickable { onSelectModel(model) },
-                        color = if (isSelected) SurfaceVariantDark else SurfaceDark,
-                        border = null,
-                        shape = NexusTokens.field
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(NexusTokens.space8),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            BrandLogo(
-                                organization = model.organization,
-                                family = model.family,
-                                modelId = model.id,
-                                size = 18.dp,
-                                containerSize = 34.dp
-                            )
-                            Spacer(modifier = Modifier.width(NexusTokens.space8))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = model.displayName,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = TextPrimary
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    model.badge?.let { badge ->
-                                        Spacer(modifier = Modifier.width(NexusTokens.space4))
-                                        Surface(
-                                            shape = NexusTokens.thumbnail,
-                                            color = PrimaryNeon.copy(alpha = 0.12f)
-                                        ) {
-                                            Text(
-                                                text = badge,
-                                                modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    color = PrimaryNeon,
-                                                    fontSize = MaterialTheme.typography.labelMedium.fontSize
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                                Text(
-                                    text = "${model.organization} • $formattedPrice",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = AccentEmerald,
-                                        fontSize = MaterialTheme.typography.labelMedium.fontSize
-                                    )
-                                )
-                            }
-                            if (isSelected) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = PrimaryNeon,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit,onSwapFrames:()->Unit) {

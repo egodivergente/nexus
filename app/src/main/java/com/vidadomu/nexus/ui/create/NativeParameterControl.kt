@@ -12,6 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.core.model.ModelParameter
 import com.vidadomu.nexus.core.model.ParameterType
@@ -26,6 +31,7 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
     val colors = MaterialTheme.colorScheme
     val title = ParameterPresentation.title(param)
     val choices = ParameterPresentation.options(param)
+    val range = ParameterPresentation.range(param, LocalConfiguration.current.locales[0])
     Surface(shape = NexusTokens.field, color = colors.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -36,10 +42,12 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                     "duration", "duration_seconds", "seconds" -> Icons.Default.Timer
                     "aspect_ratio", "aspectratio", "ratio", "size", "image_size" -> Icons.Default.AspectRatio
                     "resolution" -> Icons.Default.HighQuality
-                    else -> Icons.Default.Tune
+                    else -> null
                 }
-                Icon(icon, null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
-                Spacer(Modifier.width(8.dp))
+                if (icon != null) {
+                    Icon(icon, null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(title + if (param.isRequired) " *" else "", Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall)
                 IconButton(onClick = { showDetails = true }) {
@@ -49,9 +57,9 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
             when {
                 param.type == ParameterType.BOOLEAN -> {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (!param.isRequired) ParameterChip(param, "", value, onChange, "Automático")
-                        ParameterChip(param, "true", value, onChange, "Sí")
-                        ParameterChip(param, "false", value, onChange, "No")
+                        ParameterPresentation.booleanChoices(param).forEach { (option, label) ->
+                            ParameterChip(param, option, value, onChange, label)
+                        }
                     }
                 }
                 choices.isNotEmpty() && choices.size <= 6 -> {
@@ -70,10 +78,12 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                             modifier = Modifier.menuAnchor().fillMaxWidth(), shape = NexusTokens.field)
                         ExposedDropdownMenu(expanded, { expanded = false }) {
                             if (!param.isRequired) DropdownMenuItem(text = { Text("Automático") },
+                                trailingIcon = if (value.isEmpty()) {{ Icon(Icons.Default.Check, "Seleccionado") }} else null,
                                 onClick = { onChange(""); expanded = false })
                             choices.forEach { option ->
                                 DropdownMenuItem(text = { Text(ParameterPresentation.describe(param, option)) },
                                     leadingIcon = { FormatPreview(param, option) },
+                                    trailingIcon = if (value == option) {{ Icon(Icons.Default.Check, "Seleccionado") }} else null,
                                     onClick = { onChange(option); expanded = false })
                             }
                         }
@@ -83,9 +93,7 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                 else -> {
                     StudioTextField(value, onChange, modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text(if (param.isRequired) "Introduce un valor" else "Automático") },
-                        supportingText = if (param.minValue == null && param.maxValue == null) null else {{
-                            Text("Rango: ${param.minValue ?: "—"} – ${param.maxValue ?: "—"}")
-                        }}, shape = NexusTokens.field)
+                        supportingText = range?.let { r -> { Text("Rango: $r") } }, shape = NexusTokens.field)
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -95,9 +103,12 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Actual: ${ParameterPresentation.describe(param, value)}")
             Text("Predeterminado: ${ParameterPresentation.describe(param, param.defaultValue)}")
+            Text(ParameterPresentation.help(param))
+            ParameterPresentation.providerNote(param)?.let { Text("Texto del proveedor: $it", style = MaterialTheme.typography.bodySmall) }
             if (!param.isRequired) Text("Automático deja que el proveedor elija el valor.")
-            if (param.minValue != null || param.maxValue != null)
-                Text("Rango: ${param.minValue ?: "—"} – ${param.maxValue ?: "—"}")
+            range?.let { Text("Rango: $it") }
+            Text(ParameterPresentation.diagnosticKey(param), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }, confirmButton = { TextButton(onClick = { onChange(param.defaultValue); showDetails = false }) {
             Text("Restaurar")
         } }, dismissButton = { TextButton(onClick = { showDetails = false }) { Text("Cerrar") } })
@@ -107,15 +118,33 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
 private fun ParameterChip(param: ModelParameter, option: String, value: String,
     onChange: (String) -> Unit, title: String? = null) {
     val label = ParameterPresentation.label(param, option)
-    FilterChip(selected = value == option, onClick = { onChange(option) },
+    val selected = value == option
+    val colors = MaterialTheme.colorScheme
+    val hasPreview = ParameterPresentation.proportion(param, option) != null
+    val description = ParameterPresentation.chipDescription(param, option, title)
+    FilterChip(selected = selected, onClick = { onChange(option) },
+        modifier = Modifier.semantics {
+            contentDescription = description
+            stateDescription = if (selected) "Seleccionado" else "No seleccionado"
+        },
         label = { Column {
-            Text(title ?: label.primary)
+            Text(title ?: label.primary, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
             label.secondary?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
-        } }, leadingIcon = if (ParameterPresentation.proportion(param, option) == null) null
-            else {{ FormatPreview(param, option) }},
+        } },
+        leadingIcon = when {
+            selected && hasPreview -> {{ Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Check, null, Modifier.size(18.dp)); FormatPreview(param, option)
+            } }}
+            selected -> {{ Icon(Icons.Default.Check, null, Modifier.size(18.dp)) }}
+            hasPreview -> {{ FormatPreview(param, option) }}
+            else -> null
+        },
         shape = NexusTokens.field,
-        border = BorderStroke(1.dp, if (value == option) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outlineVariant))
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = colors.secondaryContainer,
+            selectedLabelColor = colors.onSecondaryContainer,
+            selectedLeadingIconColor = colors.onSecondaryContainer),
+        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.primary else colors.outlineVariant))
 }
 
 @Composable

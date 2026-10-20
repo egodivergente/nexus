@@ -122,7 +122,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 it.copy(
                     selectedModel = model.copy(parameters=com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters)),
                     parameters = creationPreferences.values(model),
-                    attachedMedia = compatibleMedia(model, it.attachedMedia),
+                    attachedMedia = compatibleModelMedia(model, it.attachedMedia),
                     isLoadingSchema = false,
                     schemaReady = true,
                     schemaMessage = null
@@ -138,7 +138,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 if (schemaRequest == request && _uiState.value.selectedModel?.id == model.id) {
                     _uiState.update { it.copy(selectedModel = config.model,
                         parameters = creationPreferences.values(config.model),
-                        attachedMedia = compatibleMedia(config.model, it.attachedMedia),
+                        attachedMedia = compatibleModelMedia(config.model, it.attachedMedia),
                         schemaReady = config.unsupportedRequired.isEmpty(),
                         schemaMessage = if(config.unsupportedRequired.isEmpty()) config.notices.takeIf { notes -> notes.isNotEmpty() }?.joinToString("\n") else
                             "Este modelo requiere entradas aún no compatibles: " + config.unsupportedRequired.joinToString()) }
@@ -201,7 +201,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             uri.scheme in setOf("https","http") || (uri.scheme=="file" && java.io.File(uri.path.orEmpty()).isFile)
         }
         _uiState.update {it.copy(prompt=draft.prompt,negativePrompt=draft.negativePrompt,parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(model,draft.parameters),
-            attachedMedia=compatibleMedia(model,available),errorMessage=if(available.size<draft.media.size) "Borrador recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null)}
+            attachedMedia=compatibleModelMedia(model,available),errorMessage=if(available.size<draft.media.size) "Borrador recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null)}
     }
     fun applyPreset(preset:CreationPreset) { val model=_uiState.value.selectedModel ?: return
         _uiState.update {it.copy(parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(model,preset.values),errorMessage=null)}
@@ -350,20 +350,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         if (!_uiState.value.isLoadingSchema) _uiState.value.selectedModel?.let { loadNativeConfiguration(it) }
     }
 
-    private fun compatibleMedia(model: NexusModel, attached: List<AttachedMedia>): List<AttachedMedia> {
-        if(model.contractEndpoint!=null) return attached.filter { media -> model.contractMedia.any { it.key==media.fieldKey } }
-        val images = attached.filter { it.fieldKey==null && it.mimeType.startsWith("image/") }
-        val videos = attached.filter { it.fieldKey==null && it.mimeType.startsWith("video/") }
-        return buildList {
-            addAll(attached.filter {media -> media.fieldKey!=null && model.contractMedia.any {it.key==media.fieldKey}})
-            var index = 0
-            if (model.firstFrameField != null) images.getOrNull(index++)?.let { add(it.copy(slotType = MediaSlotType.PRIMARY_IMAGE)) }
-            if (model.lastFrameField != null) images.getOrNull(index++)?.let { add(it.copy(slotType = MediaSlotType.LAST_FRAME)) }
-            if (model.imagesArrayField != null) addAll(images.drop(index).take(model.maxImages).map { it.copy(slotType = MediaSlotType.REFERENCE_IMAGE) })
-            if (model.videoField != null) videos.firstOrNull()?.let { add(it.copy(slotType = MediaSlotType.VIDEO_INPUT)) }
-            if (model.videosArrayField != null) addAll(videos.drop(if(model.videoField != null) 1 else 0).take(model.maxVideos).map { it.copy(slotType = MediaSlotType.VIDEO_REFERENCE) })
-        }
-    }
+
 
     /**
      * Persists an incoming URI into a private app cache file so that Android transient

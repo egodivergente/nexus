@@ -67,7 +67,9 @@ data class ModelParameter(
     val step: Float? = null,
     val isAdvanced: Boolean = false,
     val isRequired: Boolean = false,
-    val nativeType: String? = null
+    val nativeType: String? = null,
+    val minExact: String? = null,
+    val maxExact: String? = null
 )
 
 enum class ModelInputMode {

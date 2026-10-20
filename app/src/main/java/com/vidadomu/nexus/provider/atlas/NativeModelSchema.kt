@@ -150,22 +150,14 @@ object NativeModelSchema {
                 type == "string" -> ParameterType.TEXT
                 else -> { if(key in required) unsupported += key; return@mapNotNull null }
             }
-            ModelParameter(key = key,
-                displayName = when(key) {
-                    "character_orientation"->"Orientación del personaje"; "keep_original_sound"->"Conservar sonido original";
-                    "aspect_ratio"->"Formato"; "resolution"->"Resolución"; "duration"->"Duración"
-                    "size"->"Tamaño"; "quality"->"Calidad"; "seed"->"Semilla"; "negative_prompt"->"Prompt negativo"
-                    "ratio"->"Formato"; "audio"->"Generar sonido"; "generate_audio"->"Generar sonido"
-                    "n","num_images"->"Número de imágenes"; "output_format"->"Formato de archivo"
-                    "background"->"Fondo"; "moderation"->"Moderación"; "guidance_scale","cfg_scale"->"Fidelidad a las instrucciones"
-                    "num_inference_steps","steps"->"Pasos"; "enable_safety_checker"->"Comprobación de seguridad"
-                    "prompt_enhancement","enable_prompt_expansion"->"Ampliar instrucciones"; "watermark"->"Marca de agua"
-                    else->key.replace('_',' ')
-                }, type = kind, defaultValue = defaultValue,
-                options = options, minValue = (p["minimum"] as? JsonPrimitive)?.floatOrNull,
-                maxValue = (p["maximum"] as? JsonPrimitive)?.floatOrNull,
+            val minExact = ParameterBounds.exact(bound(p, "minimum"))
+            val maxExact = ParameterBounds.exact(bound(p, "maximum"))
+            ModelParameter(key = key, displayName = ParameterLabels.label(key), type = kind, defaultValue = defaultValue,
+                description = ParameterLabels.help(key) ?: (p["description"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
+                options = options, minValue = ParameterBounds.legacyFloat(minExact, upper = false),
+                maxValue = ParameterBounds.legacyFloat(maxExact, upper = true),
                 isAdvanced = key !in required && key !in setOf("aspect_ratio","resolution","duration","size","quality"),
-                isRequired = key in required, nativeType = type)
+                isRequired = key in required, nativeType = type, minExact = minExact, maxExact = maxExact)
         }
         // Absence of maxItems means unspecified, NOT one image.
         fun limit(key:String?): Int = key?.let { (props[it]?.jsonObject?.get("maxItems") as? JsonPrimitive)?.intOrNull }?.coerceAtLeast(0) ?: Int.MAX_VALUE
@@ -202,6 +194,9 @@ object NativeModelSchema {
             supportsFirstFrame = first != null, supportsReferenceImages = images != null,
             supportsVideoInput = video != null || videos != null), unsupported, notices)
     }
+
+    private fun bound(schema: JsonObject, name: String): String? =
+        (schema[name] as? JsonPrimitive)?.contentOrNull
 
     private val conditionsByModel = java.util.concurrent.ConcurrentHashMap<String, Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>>>()
 
@@ -273,6 +268,16 @@ object NativeModelSchema {
                 val max = (p["maxLength"] as? JsonPrimitive)?.intOrNull
                 val min = (p["minLength"] as? JsonPrimitive)?.intOrNull
                 if(max != null && value.length > max || min != null && value.length < min) return "Revisa la longitud de " + key
+                val numericType = (p["type"] as? JsonPrimitive)?.contentOrNull ?: model.parameters.firstOrNull { it.key == key }?.nativeType
+                if(numericType in setOf("integer", "number")) {
+                    val minimum = ParameterBounds.exact(bound(p, "minimum"))?.toBigDecimal()
+                    val maximum = ParameterBounds.exact(bound(p, "maximum"))?.toBigDecimal()
+                    if(ParameterBounds.outOfRange(value, minimum, maximum)) {
+                        val name = model.parameters.firstOrNull { it.key == key }?.displayName ?: ParameterLabels.label(key)
+                        return "«$name» debe estar entre " + (minimum?.let(ParameterBounds::format) ?: "—") +
+                            " y " + (maximum?.let(ParameterBounds::format) ?: "—") + "."
+                    }
+                }
             }
             return null
         }

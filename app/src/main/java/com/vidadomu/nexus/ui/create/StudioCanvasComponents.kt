@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -39,16 +41,13 @@ import com.vidadomu.nexus.ui.theme.tabularMoney
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun StudioToolRow(content: @Composable () -> Unit) {
-    if(LocalDensity.current.fontScale>=1.3f) {
-        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
-            verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {content()}
-    } else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {content()}
+    FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+        verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {content()}
 }
 
 @Composable
 internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
-    placeholder: String, modifier: Modifier = Modifier) {
+    placeholder: String, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -59,6 +58,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     Column(modifier.fillMaxWidth().clip(NexusTokens.prompt).background(tone)
         .animateContentSize(tween(NexusTokens.contentDuration))) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
+            .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .semantics { contentDescription = "Prompt de creación" }
             .padding(start = 16.dp, end = 16.dp, top = 12.dp),

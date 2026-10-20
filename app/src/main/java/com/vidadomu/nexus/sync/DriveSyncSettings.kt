@@ -64,15 +64,12 @@ import kotlinx.coroutines.launch
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(project.name,Modifier.weight(1f));Checkbox(checked=selected,onCheckedChange={manager.selectProject(project.id,it);revision++})}
             }
         }
-        val missing=status["missingMedia"]?.jsonPrimitive?.intOrNull?:0
-        if(missing>0)Text("$missing archivos necesitan recuperar el original.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-        for(entry in status["conflicts"]?.jsonArray.orEmpty()) {
-            val conflict=entry.jsonObject
-            Text("Versiones conservadas · "+conflict["key"]!!.jsonPrimitive.content,style=MaterialTheme.typography.labelLarge)
-            for(element in conflict["versions"]!!.jsonArray){
-                val version=element.jsonObject;val value=version["value"]?.takeIf {it!=JsonNull}?.jsonObject
-                TextButton(onClick={manager.resolve(conflict["key"]!!.jsonPrimitive.content,version["id"]!!.jsonPrimitive.content)}){Text((value?.get("name")?.jsonPrimitive?.content?:value?.get("displayName")?.jsonPrimitive?.content?:if(value==null)"Confirmar retirada"else "Conservar versión")+" · "+(version["device"]?.jsonPrimitive?.content?:"Dispositivo"))}
-            }
+        val projectNames=projects.projects.associate {it.id to it.name}
+        val summary=remember(status,projectNames) {DriveConflictPresentation.summarize(status,projectNames)}
+        // A malformed pending value still blocks new choices; the manager would overwrite it.
+        val pendingKey=remember(status,revision) {
+            manager.prefs.getString("resolution",null)?.let {raw->runCatching {Json.parseToJsonElement(raw).jsonObject["key"]?.jsonPrimitive?.contentOrNull}.getOrNull()?:""}
         }
+        DriveConflictReview(summary,pendingKey,onResolve={key,version->manager.resolve(key,version);revision++})
     }
 }

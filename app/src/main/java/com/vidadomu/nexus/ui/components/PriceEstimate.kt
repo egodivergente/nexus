@@ -9,7 +9,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 data class EstimateUi(val amount: String = "…", val details: String = "", val usd: Double? = null,
-    val retry: (() -> Unit)? = null, val hasPrice:Boolean = usd!=null)
+    val retry: (() -> Unit)? = null, val hasPrice:Boolean = usd!=null,
+    val availability: PriceAvailability = if(hasPrice) PriceAvailability.KNOWN else PriceAvailability.UNAVAILABLE)
 
 @Composable
 fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = null,
@@ -19,14 +20,16 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
     var attempt by remember(model,parameters,images,enabled,videoSeconds) { mutableIntStateOf(0) }
     var quote by remember(model,parameters,images,enabled,videoSeconds) { mutableStateOf<PriceQuote?>(null) }
     var pending by remember(model,parameters,images,enabled,videoSeconds) { mutableStateOf(enabled) }
+    var queryFailed by remember(model,parameters,images,enabled,videoSeconds) { mutableStateOf(false) }
     LaunchedEffect(model,parameters,images,enabled,videoSeconds,attempt) {
+        queryFailed = false
         pending = enabled
         if(model==null || !enabled) { pending=false;return@LaunchedEffect }
         if(model.providerId != AtlasCloudProvider.PROVIDER_ID) { quote=null;pending=false;return@LaunchedEffect }
         delay(400)
         try { quote=AtlasPriceQuote.fetch(model,parameters,images,videoSeconds) }
         catch(e: CancellationException) { throw e }
-        catch(_: Exception) { quote = VideoPricePreview.fallback(model,parameters,videoSeconds) }
+        catch(_: Exception) { queryFailed = true; quote = VideoPricePreview.fallback(model,parameters,videoSeconds) }
         finally { pending=false }
     }
     currency.preference // subscribe to instant currency/rate changes
@@ -50,9 +53,16 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
             "Base publicada · $date · varía según opciones"
         } else listOfNotNull(if(quote == null) "Tarifa guardada" else "Estimación", it.configuration.takeIf { text -> text.isNotBlank() }).joinToString(" · ")
         EstimateUi(amount, details, it.usd)
-    } ?: EstimateUi(if(pending) "Consultando precio…" else "No se pudo consultar el precio",
-        if(pending) "" else "Falló la consulta a Atlas. Reintenta para conocer el coste antes de generar.",
-        retry = if(pending || model == null) null else ({ attempt++ }))
+    } ?: run {
+        val availability=priceAvailability(pending,queryFailed)
+        EstimateUi(availability.label,
+            when(availability) {
+                PriceAvailability.LOADING -> "Consultando la tarifa, todavía no hay un importe confirmado."
+                PriceAvailability.ERROR -> "Falló la consulta de precio. Puedes reintentar; no equivale a coste cero."
+                else -> "No hay una tarifa utilizable para esta configuración. No equivale a coste cero."
+            }, retry=if(availability==PriceAvailability.ERROR && model!=null) ({attempt++}) else null,
+            availability=availability)
+    }
 }
 
 
@@ -60,10 +70,10 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
 private fun rememberCrunEstimate(model:NexusModel,parameters:Map<String,String>?,prompt:String,enabled:Boolean):EstimateUi {
     val app=LocalContext.current.applicationContext as NexusApplication
     var attempt by remember(model.id,parameters,prompt,enabled) {mutableIntStateOf(0)}
-    var result by remember(model.id,parameters,prompt,enabled) { mutableStateOf(EstimateUi("Consultando tarifa…")) }
+    var result by remember(model.id,parameters,prompt,enabled) { mutableStateOf(EstimateUi("Consultando tarifa…",availability=PriceAvailability.LOADING)) }
     LaunchedEffect(model.id,parameters,prompt,enabled,attempt) {
-        if(!enabled) {result=EstimateUi("Preparando opciones…");return@LaunchedEffect}
-        result=EstimateUi("Consultando tarifa…")
+        if(!enabled) {result=EstimateUi("Preparando opciones…",availability=PriceAvailability.LOADING);return@LaunchedEffect}
+        result=EstimateUi("Consultando tarifa…",availability=PriceAvailability.LOADING)
         delay(500)
         val provider=app.providerRegistry.getProviderById("crun") as? com.vidadomu.nexus.provider.crun.CrunProvider
         result=try {
@@ -74,7 +84,7 @@ private fun rememberCrunEstimate(model:NexusModel,parameters:Map<String,String>?
         } catch(e:CancellationException) {throw e} catch(e:Exception) {
             val reason=(e as? com.vidadomu.nexus.core.model.ProviderError)?.humanReadableMessage
                 ?: "Crun no ha devuelto una cotización para estas opciones."
-            EstimateUi("Precio por confirmar",reason+" No equivale a coste cero.",retry={attempt++})
+            EstimateUi("Precio por confirmar",reason+" No equivale a coste cero.",retry={attempt++},availability=PriceAvailability.ERROR)
         }
     }
     return result

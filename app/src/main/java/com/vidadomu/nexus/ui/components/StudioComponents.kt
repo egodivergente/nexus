@@ -91,11 +91,11 @@ fun StudioToolChip(label: String, description: String = label, enabled: Boolean 
             contentColor = if(enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             shape = NexusTokens.filter, modifier = Modifier
                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                .height(36.dp)
+                .heightIn(min=36.dp)
                 .semantics { contentDescription = description; if(description!=label) stateDescription=label }) {
-            // 36 dp visibles dentro de 48 dp táctiles, con el texto centrado: todas las pastillas igual de altas.
+            // Minimum height only: large fonts may grow without clipping the label.
             Box(contentAlignment = Alignment.Center) {
-                Text(label, Modifier.padding(horizontal = NexusTokens.space12),
+                Text(label, Modifier.padding(horizontal = NexusTokens.space12, vertical = 6.dp),
                     style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
