@@ -5,6 +5,8 @@ Fuente unificada `401c5ac`, rama `codex/agent-studio-integration-20261020`.
 Pixel todavía vc96 background: pendiente recuperar ADB para repetir QA e instalar97.
 707 pruebas unitarias PASS, 4 omitidas. Diez casos físicos Studio previos PASS en Pixel;
 la reconciliación background se ha compilado y requiere la repetición física conjunta.
+Continuidad real S25 vc97 ↔ Windows PASS: retorno cifrado, claves, skill ida/vuelta, 20/20 adjuntos.
+Para device_sync_configure, enviar peer explícito al reactivar; su omisión lo vacía.
 Ver `docs/AGENT-STUDIO-INTEGRATION-20261020.md` para procedencia, APK y límites.
 No instalar una variante vc96 sobre la nueva97. Los estados inferiores son históricos.
 

@@ -14,6 +14,9 @@
         "s25OriginalAssetIdsPreserved": 1030,
         "s25OriginalProjectsPreserved": 4,
         "s25OriginalGenerationIdsPreserved": 563,
+        "s25WindowsContinuity": "PASS encrypted LAN callback, credential create/update and skill edit roundtrip",
+        "verifiedWindowsChatOriginals": 20,
+        "verifiedWindowsRichChats": 15,
         "documentation": "docs/AGENT-STUDIO-INTEGRATION-20261020.md",
         "note": "Background cb0871f and Drive16bbcde preserved; lower fields historical"
 },
