@@ -214,10 +214,20 @@ internal fun OrderCard(
                 if (outputs.isNotEmpty() && (!compact || outputs.size > 1)) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     items(if (compact) outputs.drop(1) else outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput, presentation.cardSize) }
                 }
+                if (order.status == OrderStatus.AWAITING_CONFIRMATION && !p.busy && !assistantBusy && !dirty) {
+                    QuickOrderParamStrip(plan = plan, onEdit = onEdit, onCustomEdit = { k, v -> editParam = k to v })
+                }
                 if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
-                    val click = when (shown.action) {
-                        CardAction.GENERATE, CardAction.RETRY -> onGenerate
-                        CardAction.APPLY_FIX -> onApplyFix
+                    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                    val click: () -> Unit = when (shown.action) {
+                        CardAction.GENERATE, CardAction.RETRY -> ({
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onGenerate()
+                        })
+                        CardAction.APPLY_FIX -> ({
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onApplyFix()
+                        })
                         CardAction.ASK_AGENT -> onAskAgent
                         CardAction.VIEW_RESULT -> onOpenOutput
                         CardAction.CHECK_HISTORY -> onOpenHistory
@@ -265,6 +275,46 @@ private fun StatusPill(text: String, error: Boolean) {
     Surface(shape = NexusTokens.filter, color = if (error) colors.errorContainer else colors.secondaryContainer,
         contentColor = if (error) colors.onErrorContainer else colors.onSecondaryContainer) {
         Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Edits go through plan rebuild and invalidate the previous payment confirmation. */
+@Composable
+private fun QuickOrderParamStrip(
+    plan: com.vidadomu.nexus.agent.core.spend.GenerationPlan,
+    onEdit: (PlanEdit) -> Unit,
+    onCustomEdit: (String, String) -> Unit,
+) {
+    val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var schema by remember(plan.ref) { mutableStateOf<com.vidadomu.nexus.agent.core.registry.ModelSchema?>(null) }
+    LaunchedEffect(plan.ref) {
+        schema = try { AssistantRuntime.get(app).registry.schema(plan.ref) }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { null }
+    }
+    val controls = remember(plan, schema) { quickOrderControls(plan, schema) }
+    if (controls.isEmpty()) return
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()) {
+        items(controls, key = { it.key }) { control ->
+            var menu by remember(control.key) { mutableStateOf(false) }
+            Box {
+                AssistChip(onClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    if (control.options.isEmpty()) onCustomEdit(control.key, control.value) else menu = true
+                }, label = { Text("${control.label}: ${control.value}", style = MaterialTheme.typography.labelMedium) },
+                    shape = NexusTokens.filter, modifier = Modifier.heightIn(min = 48.dp))
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    control.options.forEach { option ->
+                        DropdownMenuItem(text = { Text(option) }, onClick = {
+                            menu = false
+                            if (option != control.value) onEdit(PlanEdit(params = mapOf(control.key to option)))
+                        })
+                    }
+                }
+            }
+        }
     }
 }
 

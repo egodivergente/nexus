@@ -9,6 +9,24 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 
 class DeviceSyncTest {
+    @Test fun preferenceTextNeverBecomesAnUnquotedJsonLiteral() {
+        for (text in listOf("AGENT", "direct", "custom:brain", "model-name-v3", "http://127.0.0.1:8789", "true", "123", "", "a\\b")) {
+            val encoded = buildJsonObject { put("value", syncSettingValue(text)) }.toString()
+            assertEquals(JsonPrimitive(text), Json.parseToJsonElement(encoded).jsonObject.getValue("value"))
+            assertTrue(encoded.contains("\"value\":\""))
+        }
+    }
+    @Test fun preferenceContainersRemainMergeable() {
+        assertIs<JsonArray>(syncSettingValue("[{\"id\":\"brain\"}]"))
+        assertIs<JsonObject>(syncSettingValue("{\"maxToolRounds\":17}"))
+        assertEquals(JsonPrimitive("{broken"), syncSettingValue("{broken"))
+    }
+    @Test fun nestedBareValuesAndNonJsonNumbersStayQuotedAsOriginalText() {
+        for (text in listOf("{\"mode\":AGENT}", "[AGENT]", "[+1]", "[NaN]", "[Infinity]", "[01]", "{\"nested\":[{\"model\":custom}]}")) {
+            assertEquals(JsonPrimitive(text), syncSettingValue(text), text)
+        }
+        assertIs<JsonArray>(syncSettingValue("[null,true,false,0,-1,1.2,1e-9]"))
+    }
     private val json = Json
     private fun value(s: String) = json.parseToJsonElement(s)
     private fun encrypt(bytes: ByteArray, key: String, context: String = "response"): ByteArray = ByteArrayOutputStream().let { out ->

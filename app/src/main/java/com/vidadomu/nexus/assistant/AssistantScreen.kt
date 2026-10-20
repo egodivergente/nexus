@@ -256,8 +256,16 @@ fun AssistantScreen(
                     val item = row as ChatItem
                     when (item) {
                         is ChatItem.User -> Box(Modifier.animateItem()) { UserBubble(item) }
-                        is ChatItem.Assistant -> Box(Modifier.animateItem()) { AssistantBubble(item, onOpenHistory) }
-                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory, onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null, onChangeModel = { showSettings = true })
+                        is ChatItem.Assistant -> Box(Modifier.animateItem()) {
+                            AssistantBubble(item, onOpenHistory,
+                                answered = if ("nexus-ui" in item.text) answerAfter(visibleItems, item) else null,
+                                onReply = { vm.send(it) })
+                        }
+                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory,
+                            onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null,
+                            onChangeModel = { showSettings = true },
+                            onNewChat = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn() &&
+                                (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true))) ({ vm.continueFailedTurnInNewChat() }) else null)
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -596,8 +604,15 @@ private fun UserBubble(item:ChatItem.User) {
     }
 }
 
+/** Lo que el usuario contestó justo después de este mensaje (para bloquear sus paneles y marcar la opción elegida). */
+private fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): String? {
+    val at = items.indexOfFirst { it.id == item.id }
+    if (at < 0) return null
+    return items.drop(at + 1).filterIsInstance<ChatItem.User>().firstOrNull()?.text
+}
+
 @Composable
-private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}) {
+private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
@@ -610,7 +625,9 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
                 .pointerInput(Unit) {detectTapGestures(onLongPress={actionsExpanded=true})}
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-                ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) })
+                val streaming = item.stop == "STREAMING"
+                ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) }, streaming = streaming,
+                    answered = answered, onReply = if (streaming) null else onReply)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
@@ -734,13 +751,22 @@ private fun formatMediaDuration(seconds:Double):String {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}, onRetry: (() -> Unit)? = null, onChangeModel: (() -> Unit)? = null) {
+private fun NoticeRow(
+    item: ChatItem.Notice,
+    onOpenHistory: () -> Unit = {},
+    onRetry: (() -> Unit)? = null,
+    onChangeModel: (() -> Unit)? = null,
+    onNewChat: (() -> Unit)? = null,
+) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     if(item.error) {
         var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
         Column(Modifier.animateContentSize()) {
-            // Todo error ofrece una salida directa: repetir, cambiar de modelo o revisar el historial.
+            // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
             FlowRow(verticalArrangement=Arrangement.Center,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                if(onNewChat != null) FilledTonalButton(onClick=onNewChat,shape=NexusTokens.filter) {
+                    Icon(Icons.Default.AddComment,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Continuar en chat nuevo")
+                }
                 if(onRetry != null) FilledTonalButton(onClick=onRetry,shape=NexusTokens.filter) {
                     Icon(Icons.Default.Refresh,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
                 }

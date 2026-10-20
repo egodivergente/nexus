@@ -180,7 +180,21 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         } finally {
             db.endTransaction()
         }
-        reloadJobsSync()
+        if (!_loading.value && _loadError.value == null) {
+            // Do not retain mutable collections owned by a provider/caller after the transaction.
+            val publishedJob = job.copy(parameters = job.parameters.toMap(), outputs = job.outputs.toList())
+            val current = _jobsFlow.value
+            val idx = current.indexOfFirst { it.id == job.id }
+            _jobsFlow.value = if (idx >= 0) {
+                current.toMutableList().apply { set(idx, publishedJob) }.let { updated ->
+                    if (current[idx].startedAt == job.startedAt) updated else updated.sortedByDescending { it.startedAt }
+                }
+            } else {
+                (listOf(publishedJob) + current).sortedByDescending { it.startedAt }
+            }
+        } else {
+            reloadJobsSync()
+        }
     }
 
     suspend fun getJobById(id: String): GenerationJob? = withContext(Dispatchers.IO) {
@@ -206,7 +220,11 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         } finally {
             db.endTransaction()
         }
-        reloadJobsSync()
+        if (!_loading.value && _loadError.value == null) {
+            _jobsFlow.value = _jobsFlow.value.filterNot { it.id == id }
+        } else {
+            reloadJobsSync()
+        }
     } }
 
     private fun queryAllJobsSync(): List<GenerationJob> {

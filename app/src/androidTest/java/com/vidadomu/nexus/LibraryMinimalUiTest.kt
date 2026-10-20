@@ -32,7 +32,7 @@ class LibraryMinimalUiTest {
         var opened:Pair<String,Int>?=null
         val selected=androidx.compose.runtime.mutableStateOf<Pair<String,Int>?>(null)
         compose.setContent {NexusTheme {NexusChrome({},{}) {
-            selected.value?.let {OutputViewerScreen(it.first,{}, {},initialOutputIndex=it.second)} ?: LibraryScreen({}, {job,index->opened=job to index;selected.value=opened})
+            selected.value?.let {OutputViewerScreen(it.first,{}, { _, _ -> },initialOutputIndex=it.second)} ?: LibraryScreen({}, {job,index->opened=job to index;selected.value=opened})
         }}}
         compose.onNodeWithContentDescription("Importar archivos").assertIsDisplayed()
         compose.onNodeWithContentDescription("Buscar en Biblioteca").performClick()

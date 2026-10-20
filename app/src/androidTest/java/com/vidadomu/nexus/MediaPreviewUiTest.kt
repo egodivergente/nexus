@@ -70,7 +70,7 @@ class MediaPreviewUiTest {
     @Test fun localAudioShowsItsDurationAndAnAccessiblePlayAction() {
         val (app,id)=fixture(Modality.AUDIO,"ui-audit-audio.wav","Audio de prueba local")
         val initial=app.generationRepository.allJobs.value.map {it.id}
-        compose.setContent {NexusTheme {NexusChrome({},{}) {OutputViewerScreen(id,{}, {})}}}
+        compose.setContent {NexusTheme {NexusChrome({},{}) {OutputViewerScreen(id,{}, { _, _ -> })}}}
         compose.waitUntil(10_000) {compose.onAllNodesWithText("0:02").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("Reproducir audio").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithText("0:00").assertIsDisplayed()

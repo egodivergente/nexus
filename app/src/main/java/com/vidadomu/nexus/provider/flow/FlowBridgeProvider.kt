@@ -45,7 +45,8 @@ class FlowBridgeProvider(
         bridgeStatus().map { it.isReady }
 
     override suspend fun submitGeneration(request: GenerationRequest): Result<GenerationJob> = withContext(Dispatchers.IO) {
-        val references = try { FlowReferences.ids(request.mediaInputs) } catch (error: IllegalArgumentException) {
+        val flowMode = if(request.modality==Modality.VIDEO) request.parameters["mode"] ?: "Texto" else "Referencias"
+        val flowInputs = try { FlowReferences.inputs(request.mediaInputs, if (request.modality == Modality.VIDEO) flowMode else null) } catch (error: IllegalArgumentException) {
             return@withContext Result.failure(ProviderError(error.message ?: "Revisa las referencias de Flow.", httpStatusCode = 400))
         }
         if (request.modality !in setOf(Modality.IMAGE, Modality.VIDEO)) {
@@ -66,11 +67,15 @@ class FlowBridgeProvider(
                 modality = request.modality, prompt = request.prompt, negativePrompt = request.negativePrompt,
                 providerJobId = "queue_${request.id}", status = GenerationStatus.QUEUED,
                 parameters = request.parameters + mapOf("__flow_queue_previous" to previous.orEmpty(),
-                    FlowReferences.PARAMETER to references.joinToString(",")),
+                    FlowReferences.PARAMETER to flowInputs.references.joinToString(","),
+                    FlowReferences.INITIAL_FRAME to flowInputs.initialFrame.orEmpty(),
+                    FlowReferences.END_FRAME to flowInputs.endFrame.orEmpty(),
+                    FlowReferences.MODE to flowMode),
                 inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
                 technicalDetails = "En cola de Flow; se enviará automáticamente sin una segunda confirmación."))
         }
-        bridge.submit(request.prompt, expectedOutput, request.id, references).map { remote ->
+        bridge.submit(request.prompt, expectedOutput, request.id, flowInputs.references,
+            mode = flowMode, initialFrameId = flowInputs.initialFrame, endFrameId = flowInputs.endFrame).map { remote ->
             initialJob(request, remote)
         }
     }
@@ -88,8 +93,10 @@ class FlowBridgeProvider(
                     return@withLock Result.success(job.copy(status = GenerationStatus.QUEUED, error = "Esperando al encargo anterior de Flow; su seguimiento sigue activo."))
                 queue.edit().putString("state_$previous", "released").commit()
             }
+            if (FlowRetryPolicy.waiting(job.parameters["__flow_retry_at"]?.toLongOrNull())) return@withLock Result.success(job)
             val block = job.parameters["__flow_block"]?.toIntOrNull() ?: 0
-            val requestId = "${job.id}_$block"
+            val attempt = job.parameters["__flow_attempt"]?.toIntOrNull() ?: 0
+            val requestId = FlowRetryPolicy.requestId(job.id, block, attempt)
             val recovered = queue.getString("remote_$requestId", null)
             val remote = if(recovered != null) bridge.job(recovered) else
                 run {
@@ -99,18 +106,28 @@ class FlowBridgeProvider(
                     val missing = (goal - job.outputs.size).coerceAtLeast(1)
                     val runs = ((missing + perRun - 1) / perRun).coerceIn(1, FlowBridgeClient.MAX_RUNS)
                     bridge.submit(job.prompt, modalityName(job.modality), requestId, FlowReferences.savedIds(job.parameters),
+                        mode = job.parameters[FlowReferences.MODE] ?: "Texto",
+                        initialFrameId = job.parameters[FlowReferences.INITIAL_FRAME]?.takeIf { it.isNotBlank()},
+                        endFrameId = job.parameters[FlowReferences.END_FRAME]?.takeIf { it.isNotBlank()},
                         runs = runs, expectedResults = if (goal > 1) missing else 0)
                 }
             val submissionError = remote.exceptionOrNull() as? ProviderError
             if (submissionError?.errorCode in setOf("invalid_reference_ids", "invalid_reference_image",
                 "reference_not_found", "reference_integrity_failed", "duplicate_reference",
                 "flow_references_not_empty", "flow_reference_controls_unavailable",
-                "flow_reference_multiple_unavailable", "flow_reference_upload_failed", "flow_references_unconfirmed")) {
+                "flow_reference_multiple_unavailable", "flow_reference_upload_failed", "flow_references_unconfirmed",
+                "invalid_frame_ids", "duplicate_frame", "end_frame_requires_initial", "initial_frame_required",
+                "flow_frame_mode_unavailable", "flow_frame_controls_unavailable", "flow_frame_upload_failed",
+                "invalid_video_mode", "text_mode_has_media", "references_mode_requires_images", "frame_mode_has_references")) {
                 queue.edit().putString("state_${job.id}", "failed").commit()
                 return@withLock Result.success(job.copy(providerJobId = null, status = GenerationStatus.FAILED,
                     completedAt = System.currentTimeMillis(), error = submissionError?.humanReadableMessage))
             }
             remote.map { submitted ->
+                if (submitted.state == "failed" && FlowRetryPolicy.shouldRetry(submitted.error, attempt)) {
+                    queue.edit().putString("state_${job.id}", "active").commit()
+                    return@withLock Result.success(retryLater(job, submitted.error, attempt))
+                }
                 queue.edit().putString("remote_$requestId", submitted.id).putString("state_${job.id}", if(submitted.state == "failed") "failed" else "active").commit()
                 job.copy(providerJobId = submitted.id, status = statusFor(submitted.state),
                     parameters = job.parameters + ("__tracking_started_at" to System.currentTimeMillis().toString()),
@@ -145,7 +162,10 @@ class FlowBridgeProvider(
                     }
                 }
                 }
-                "failed" -> Result.success(
+                "failed" -> if (queue != null && FlowRetryPolicy.shouldRetry(remote.error, job.parameters["__flow_attempt"]?.toIntOrNull() ?: 0)) {
+                    queue.edit().putString("state_${job.id}", "active").commit()
+                    Result.success(retryLater(job, remote.error, job.parameters["__flow_attempt"]?.toIntOrNull() ?: 0))
+                } else Result.success(
                     job.copy(
                         status = GenerationStatus.FAILED,
                         completedAt = System.currentTimeMillis(),
@@ -264,22 +284,30 @@ class FlowBridgeProvider(
         )
     }
 
-    private fun initialJob(request: GenerationRequest, remote: FlowBridgeJob): GenerationJob = GenerationJob(
-        id = request.id,
-        providerJobId = remote.id,
-        providerId = id,
-        modelId = request.modelId,
-        modality = request.modality,
-        prompt = request.prompt,
-        negativePrompt = request.negativePrompt,
-        parameters = request.parameters + (FlowReferences.PARAMETER to FlowReferences.ids(request.mediaInputs).joinToString(",")),
-        inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
-        status = statusFor(remote.state),
-        progress = progressFor(remote.state, null),
-        completedAt = if (remote.state == "failed") System.currentTimeMillis() else null,
-        error = if (remote.state == "failed") flowFailureMessage(remote.error) else pendingMessage(remote),
-        technicalDetails = flowDetails(remote)
-    )
+    private fun initialJob(request: GenerationRequest, remote: FlowBridgeJob): GenerationJob {
+        val flowMode = if (request.modality == Modality.VIDEO) request.parameters["mode"] ?: "Texto" else "Referencias"
+        val flowInputs = FlowReferences.inputs(request.mediaInputs, if (request.modality == Modality.VIDEO) flowMode else null)
+        return GenerationJob(
+            id = request.id,
+            providerJobId = remote.id,
+            providerId = id,
+            modelId = request.modelId,
+            modality = request.modality,
+            prompt = request.prompt,
+            negativePrompt = request.negativePrompt,
+            parameters = request.parameters + mapOf(
+                FlowReferences.PARAMETER to flowInputs.references.joinToString(","),
+                FlowReferences.INITIAL_FRAME to flowInputs.initialFrame.orEmpty(),
+                FlowReferences.END_FRAME to flowInputs.endFrame.orEmpty(),
+                FlowReferences.MODE to flowMode),
+            inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
+            status = statusFor(remote.state),
+            progress = progressFor(remote.state, null),
+            completedAt = if (remote.state == "failed") System.currentTimeMillis() else null,
+            error = if (remote.state == "failed") flowFailureMessage(remote.error) else pendingMessage(remote),
+            technicalDetails = flowDetails(remote)
+        )
+    }
 
     private fun statusFor(state: String): GenerationStatus = when (state) {
         "submitting" -> GenerationStatus.QUEUED
@@ -298,6 +326,13 @@ class FlowBridgeProvider(
         "completed" -> previous?.coerceAtLeast(0.9f) ?: 0.9f
         else -> previous
     }
+
+    /** Vuelve a la cola de Flow para un nuevo intento dentro de [FlowRetryPolicy.DELAY_MS]. */
+    private fun retryLater(job: GenerationJob, error: String?, attempt: Int): GenerationJob = job.copy(
+        providerJobId = "queue_${job.id}", status = GenerationStatus.QUEUED, completedAt = null,
+        parameters = job.parameters + mapOf("__flow_attempt" to (attempt + 1).toString(),
+            "__flow_retry_at" to (System.currentTimeMillis() + FlowRetryPolicy.DELAY_MS).toString()),
+        error = "Reintento automático ${attempt + 1} de ${FlowRetryPolicy.MAX_RETRIES}: ${flowFailureMessage(error)}")
 
     private fun flowDetails(remote: FlowBridgeJob): String = buildString {
         append("Flow bridge state: ").append(remote.state)

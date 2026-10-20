@@ -25,6 +25,7 @@
     <application
         android:name=".NexusApplication"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:requestLegacyExternalStorage="true"
         android:dataExtractionRules="@null"
         android:fullBackupContent="false"

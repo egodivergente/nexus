@@ -42,4 +42,42 @@ class FlowReferencesTest {
             FlowReferences.savedIds(mapOf(FlowReferences.PARAMETER to List(13) { id }.joinToString(",")))
         }
     }
+
+    @Test fun videoContractExposesStartAndOptionalEndFrames() {
+        val model = FlowReferences.model(Modality.VIDEO)
+        assertEquals(listOf("initial_frame", "end_frame", "reference_ids"), model.contractMedia.map { it.key })
+        assertFalse(model.contractMedia[0].required)
+        assertFalse(model.contractMedia[1].required)
+    }
+
+    @Test fun startAndEndFramesKeepTheirRolesAndCannotBeReversedOrDuplicated() {
+        val start = input().copy(fieldKey = "initial_frame", slotType = MediaSlotType.PRIMARY_IMAGE)
+        val end = input("ref_" + "b".repeat(64)).copy(fieldKey = "end_frame", slotType = MediaSlotType.LAST_FRAME)
+        assertEquals(FlowReferences.Inputs(emptyList(), id, end.remoteUrl), FlowReferences.inputs(listOf(start, end)))
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(end)) }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(start, start)) }
+    }
+
+    @Test fun interchangeMovesBothFilesAndTheirRolesTogether() {
+        val start = com.vidadomu.nexus.core.model.AttachedMedia(uriString = "file:///a.png", mimeType = "image/png",
+            slotType = MediaSlotType.PRIMARY_IMAGE, fieldKey = "initial_frame")
+        val end = com.vidadomu.nexus.core.model.AttachedMedia(uriString = "file:///b.png", mimeType = "image/png",
+            slotType = MediaSlotType.LAST_FRAME, fieldKey = "end_frame")
+        val (newStart, newEnd) = FlowReferences.swapFrames(start, end)
+        assertEquals("file:///b.png", newStart.uriString)
+        assertEquals("initial_frame", newStart.fieldKey)
+        assertEquals("file:///a.png", newEnd.uriString)
+        assertEquals("end_frame", newEnd.fieldKey)
+    }
+
+    @Test fun videoModesRequireMatchingImageInputs() {
+        val start = input().copy(fieldKey = "initial_frame", slotType = MediaSlotType.PRIMARY_IMAGE)
+        assertEquals(id, FlowReferences.inputs(listOf(start), "Fotogramas").initialFrame)
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(emptyList(), "Fotogramas") }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(start), "Texto") }
+        assertThrows(IllegalArgumentException::class.java) {
+            FlowReferences.inputs(listOf(start, input("ref_" + "b".repeat(64))), "Fotogramas")
+        }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(emptyList(), "Referencias") }
+    }
 }

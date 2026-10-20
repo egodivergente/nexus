@@ -18,6 +18,24 @@ data class SyncDocument(val kind: String, val name: String, val hash: String, va
 @Serializable
 data class SyncManifest(val protocol: Int = 1, val device: String, val documents: List<SyncDocument>, val scopes: Set<String> = emptySet())
 
+/** Preferences retain their string type; only actual containers participate in structural merge.
+ * Kotlin's element parser accepts bare words, whose toString() is not portable JSON.
+ */
+fun syncSettingValue(value: String): JsonElement {
+    val number = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
+    fun portable(element: JsonElement): Boolean = when (element) {
+        is JsonObject -> element.values.all(::portable)
+        is JsonArray -> element.all(::portable)
+        is JsonPrimitive -> element.isString || element.content in setOf("null", "true", "false") || number.matches(element.content)
+    }
+    val start = value.trimStart().firstOrNull()
+    if (start == '{' || start == '[') {
+        val parsed = runCatching { Json.parseToJsonElement(value) }.getOrNull()
+        if ((parsed is JsonObject || parsed is JsonArray) && portable(parsed)) return parsed
+    }
+    return JsonPrimitive(value)
+}
+
 /** The pairing key never travels over HTTP. Requests and streamed replies are authenticated GCM. */
 object SyncCrypto {
     fun newKey(): String = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })

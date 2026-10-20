@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
 import com.vidadomu.nexus.ui.components.InlineNotice
 import com.vidadomu.nexus.ui.components.noticeMessage
@@ -127,6 +128,13 @@ fun CreateScreen(
     var showMedia by remember { mutableStateOf(false) }
     var showInspiration by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showBatch by remember { mutableStateOf(false) }
+    val batchSnackbar = remember { SnackbarHostState() }
+    val batchScope = rememberCoroutineScope()
+    if(showBatch) PromptBatchSheet(state, estimate.amount, estimate.usd, viewModel, { showBatch=false }) { summary ->
+        showBatch=false
+        batchScope.launch { batchSnackbar.showSnackbar(summary) }
+    }
     val clipboard = LocalClipboardManager.current
     if(showPersonalPresets) CreationPresetsSheet(state,viewModel) { showPersonalPresets=false }
     val readiness=creationReadiness(if(comparisonState.phase == ComparisonPhase.SENDING) state.copy(isSubmitting = true) else state)
@@ -192,6 +200,7 @@ fun CreateScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(batchSnackbar) },
         bottomBar = {
             StudioChrome(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(horizontal=screenMargin, vertical=8.dp),
@@ -215,6 +224,8 @@ fun CreateScreen(
                         IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
                         DropdownMenu(expanded=showMenu,onDismissRequest={showMenu=false}) {
                             DropdownMenuItem(text={Text("Todos los modelos")}, onClick={showMenu=false;onBrowseModels()})
+                            if(state.selectedModality != Modality.CHAT)
+                                DropdownMenuItem(text={Text("Lote desde archivo…")}, onClick={showMenu=false;showBatch=true})
                             if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality != Modality.CHAT) {
                                 DropdownMenuItem(text={Text("Diagnóstico local")}, onClick={showMenu=false;showRequestInspector=true})
                                 DropdownMenuItem(text={Text("Copiar diagnóstico")}, onClick={
@@ -340,10 +351,10 @@ fun CreateScreen(
     if(showMedia) CanvasSheet("Medios de entrada",{showMedia=false}) {
                 state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
                     if(model.contractEndpoint==null && model.contractMedia.isNotEmpty()) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia)
+                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia,viewModel::swapFlowFrames)
                     }
                     if(model.contractEndpoint!=null) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia)
+                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia,viewModel::swapFlowFrames)
                     } else AdaptiveModelMediaInput(
                         model = model,
                         attachedMedia = state.attachedMedia.filter { it.fieldKey==null },
@@ -1707,7 +1718,7 @@ private fun ModelPickerSheet(
 }
 
 @Composable
-private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit) {
+private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit,onSwapFrames:()->Unit) {
     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         model.contractMedia.forEach { field ->
             val selected=media.filter { it.fieldKey==field.key }
@@ -1726,6 +1737,10 @@ private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPic
                     if(field.maximum>1) Text("${selected.size} de ${field.maximum} archivos",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
                 }
             }
+        }
+        if(model.providerId=="google_flow" && model.modalities.contains(com.vidadomu.nexus.core.model.Modality.VIDEO) &&
+            media.any { it.fieldKey=="initial_frame" } && media.any { it.fieldKey=="end_frame" }) {
+            TextButton(onClick=onSwapFrames,modifier=Modifier.fillMaxWidth()) {Text("Intercambiar")}
         }
     }
 }
