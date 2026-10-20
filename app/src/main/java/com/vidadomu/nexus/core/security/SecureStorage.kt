@@ -71,6 +71,22 @@ class SecureStorage(context: Context) : ISecureStorage {
         sharedPreferences.edit().remove(keyForProvider(providerId)).apply()
     }
 
+    /** Credentials only, with the device-pairing key excluded. No balances, counters or UI state. */
+    fun syncCredentials(): Map<String, String> {
+        check(credentialStorageAvailable)
+        return sharedPreferences.all.filterKeys { it.endsWith("_api_key") && it != keyForProvider("nexus_device_sync_pair") }
+            .mapNotNull { (k, v) -> (v as? String)?.let { k to it } }.toMap()
+    }
+
+    fun applySyncedCredentials(values: Map<String, String>, removeMissing: Boolean = false) {
+        check(credentialStorageAvailable)
+        require(values.keys.all { it.endsWith("_api_key") && it != keyForProvider("nexus_device_sync_pair") })
+        val editor = sharedPreferences.edit()
+        if (removeMissing) (syncCredentials().keys - values.keys).forEach { editor.remove(it) }
+        values.forEach { (k, v) -> editor.putString(k, v) }
+        check(editor.commit())
+    }
+
     override fun getMaskedProviderApiKey(providerId: String): String = maskApiKey(getProviderApiKey(providerId))
 
     override fun saveAtlasApiKey(apiKey: String) {

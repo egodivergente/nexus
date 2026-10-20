@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.assistant
 
+import kotlinx.coroutines.flow.asStateFlow
+
 import kotlinx.coroutines.sync.withLock
 import android.content.Context
 import android.os.Environment
@@ -422,6 +424,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     })
 
     @Volatile var skills: SkillStore = loadSkills(); private set
+    private val mutableSkillsRevision = kotlinx.coroutines.flow.MutableStateFlow(0L)
+    val skillsRevision = mutableSkillsRevision.asStateFlow()
     @Volatile var deps: ToolDeps = buildDeps(); private set
 
     private fun loadSkills() = SkillStore(listOf(
@@ -448,7 +452,7 @@ class AssistantRuntime(private val app: NexusApplication) {
     )
 
     /** Relee skills (assets + files/skills + Documents/ALEXIA/Nexus/Skills) sin recompilar. */
-    fun reloadSkills(): SkillStore { skills = loadSkills(); deps = buildDeps(); return skills }
+    fun reloadSkills(): SkillStore { skills = loadSkills(); deps = buildDeps(); mutableSkillsRevision.value++; return skills }
 
     fun llm(s: AssistantSettings): LlmProvider =
         when {

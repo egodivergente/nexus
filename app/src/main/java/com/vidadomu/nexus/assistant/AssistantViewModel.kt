@@ -137,6 +137,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { runCatching { runtime.assets.startProjectSession(savedProject); runtime.importHistory() }; refreshProjects() }
         restoreChat()
         viewModelScope.launch { runtime.assets.changes.collect { refreshProjects() } }
+        viewModelScope.launch { runtime.skillsRevision.collect {
+            val settings = runtime.settings.load()
+            orchestrator = runtime.orchestrator(settings)
+            _ui.update { it.copy(settings = settings, skillsCount = runtime.skills.all().size, skillErrors = runtime.skills.errors) }
+        } }
         viewModelScope.launch { app.modelCatalogRepository.models.collect { models ->
             _ui.update { it.copy(catalog = (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary)) }
         } }

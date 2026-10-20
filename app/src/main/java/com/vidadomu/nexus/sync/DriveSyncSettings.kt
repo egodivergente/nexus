@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
     }
     val projects by AssistantRuntime.get(context.applicationContext as NexusApplication).assets.changes.collectAsState()
     Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        Text("Sincronización",style=MaterialTheme.typography.titleMedium)
+        Text("Google Drive",style=MaterialTheme.typography.titleMedium)
         val state=status["state"]?.jsonPrimitive?.content
         Text(when(state){"syncing"->"Sincronizando…";"synced"->"Al día";"partial"->"Faltan originales por recuperar";"conflicts"->"Versiones para revisar";"authorization_required"->"Vuelve a conectar Google";"retry"->"Pendiente de reintento";else->"Comparte tus proyectos con tus otros dispositivos"})
         message?.let {Text(it,color=MaterialTheme.colorScheme.error)}

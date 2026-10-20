@@ -119,6 +119,18 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
     }
 
     suspend fun insertOrUpdateJob(job: GenerationJob) = withContext(Dispatchers.IO) { mutationLock.withLock {
+        writeJobSync(job)
+    } }
+
+    /** Peer import never changes a running local job or submits work to a provider. */
+    suspend fun mergeCompletedJobFromPeer(job: GenerationJob) = withContext(Dispatchers.IO) { mutationLock.withLock {
+        check(!_loading.value && _loadError.value == null)
+        val local = _jobsFlow.value.firstOrNull { it.id == job.id }
+        val next = com.vidadomu.nexus.sync.mergeCompletedPeerJob(local, job)
+        if (next != null && next != local) writeJobSync(next)
+    } }
+
+    private fun writeJobSync(job: GenerationJob) {
         val db = writableDatabase
         db.beginTransaction()
         try {
@@ -169,7 +181,7 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
             db.endTransaction()
         }
         reloadJobsSync()
-    } }
+    }
 
     suspend fun getJobById(id: String): GenerationJob? = withContext(Dispatchers.IO) {
         val db = readableDatabase

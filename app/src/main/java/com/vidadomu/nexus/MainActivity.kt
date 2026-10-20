@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
     private var startupPreviewEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.vidadomu.nexus.sync.DeviceSyncService.resume(this)
         if (!BuildConfig.OFFLINE_QA && savedInstanceState == null && StartupPreview.consume(this)) startupPreviewEpoch = 1
         enableEdgeToEdge()
 

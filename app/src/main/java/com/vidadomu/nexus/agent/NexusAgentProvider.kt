@@ -54,6 +54,45 @@ class NexusAgentProvider:ContentProvider() {
             return buildJsonObject {put("ok",true);put("whisper",state)}
         }
         fun text(key:String)=input[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+        if(method=="device_sync_probe") {
+            val id=text("id")
+            require(id.matches(Regex("sync_probe_[a-f0-9]{32}")))
+            val runtime=com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            val index=runtime.assets
+            val key="nexus_$id"
+            when(text("action")) {
+                "create" -> {
+                    index.mergeFromPeer(com.vidadomu.nexus.agent.core.assets.IndexData(projects=listOf(
+                        com.vidadomu.nexus.agent.core.assets.Project(id,"Comprobación de sincronización",description=id,createdAt=System.currentTimeMillis(),
+                            memory=com.vidadomu.nexus.agent.core.assets.ProjectMemory(tone=text("marker"))))),null,false)
+                    app.secureStorage.saveProviderApiKey(key,text("marker"))
+                }
+                "remove" -> {
+                    val before=index.snapshot()
+                    require(before.projects.none {it.id==id && it.description!=id})
+                    require(before.assets.none {it.projectId==id})
+                    index.mergeFromPeer(before.copy(projects=before.projects.filterNot {it.id==id}),before,true)
+                    app.secureStorage.clearProviderApiKey(key)
+                }
+                "read" -> Unit
+                else -> error("Acción de prueba desconocida")
+            }
+            return buildJsonObject {put("ok",true);put("memoryMatches",index.findProject(id)?.memory?.tone==text("marker"))
+                put("credentialMatches",app.secureStorage.getProviderApiKey(key)==text("marker"))}
+        }
+        if(method=="device_sync_status") {
+            val sync=com.vidadomu.nexus.sync.DeviceSync.get(app)
+            return buildJsonObject {put("ok",true);put("enabled",sync.options().enabled);put("status",sync.status.value)
+                put("conversations",java.io.File(app.filesDir,"assistant/conversations").listFiles().orEmpty().count {it.extension=="json"})}
+        }
+        if(method=="device_sync_configure") {
+            require(input.keys.all {it in setOf("peer","key","enabled","interval","port")})
+            val sync=com.vidadomu.nexus.sync.DeviceSync.get(app)
+            val o=sync.options().copy(peer=text("peer"),enabled=input["enabled"]?.jsonPrimitive?.booleanOrNull ?: true,
+                intervalSeconds=input["interval"]?.jsonPrimitive?.longOrNull ?: 30,port=input["port"]?.jsonPrimitive?.intOrNull ?: 8795)
+            sync.configure(o,text("key").ifBlank {sync.pairingKey()})
+            return buildJsonObject {put("ok",true)}
+        }
         if(method=="flow_recovery_pair") {
             val token=text("token")
             require(token.matches(Regex("[A-Za-z0-9_-]{43}"))) {"Clave privada no v\u00e1lida."}

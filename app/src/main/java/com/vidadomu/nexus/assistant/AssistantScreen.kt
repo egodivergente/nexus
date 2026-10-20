@@ -494,7 +494,8 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,onClose:()->U
     var creating by remember {mutableStateOf(false)}
     var name by rememberSaveable {mutableStateOf("")}
     val active=ui.projects.firstOrNull {it.id==ui.activeProjectId}
-    val conversations=remember {vm.conversations()}
+    val syncRevision by com.vidadomu.nexus.sync.DeviceSync.get(androidx.compose.ui.platform.LocalContext.current).revision.collectAsState()
+    val conversations=remember(syncRevision) {vm.conversations()}
     var saveProject by remember { mutableStateOf<(() -> Unit)?>(null) }
     NexusSheet(active?.name ?: "Proyecto", onClose, subtitle = "Cambiar proyecto y editar su memoria", icon = Icons.Default.MenuBook,
         primaryAction = { Button(onClick={if(active==null) onClose() else saveProject?.invoke()},

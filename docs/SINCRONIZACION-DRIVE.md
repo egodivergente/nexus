@@ -5,6 +5,13 @@ Conectar la misma cuenta en los tres dispositivos. Los clientes Desktop y
 Android deben pertenecer al mismo proyecto Google Cloud para compartir los
 archivos visibles con el permiso `drive.file`.
 
+La APK unificada 1.9.60-sync/vc94 conserva también la continuidad directa entre
+móviles. Sus controles aparecen separados: **Google Drive** y **Sincronización
+entre móviles**. Drive mantiene la copia compartida con Desktop; la continuidad
+directa conserva sus categorías y su vinculación existente. Ambos transportes
+escriben mediante el bloqueo común del índice; una edición recibida durante una
+transferencia de Drive provoca un reintento, conservando la edición reciente.
+
 ## Qué se comparte
 
 Proyectos, escenas, planos, personajes, biblioteca y registros de generaciones.
