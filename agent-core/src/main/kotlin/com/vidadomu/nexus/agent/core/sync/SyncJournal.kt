@@ -71,7 +71,7 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         }
         normalize("referenceUris") {uris->
             val portable=uris.filter {it.startsWith(SyncBlobs.PREFIX) && SyncBlobs.NAME.matches(it.removePrefix(SyncBlobs.PREFIX))}
-            if(portable.isNotEmpty() && portable.map {it.removePrefix(SyncBlobs.PREFIX).substringBefore('.')}.distinct().size==1)portable.maxOrNull()else null
+            if(portable.size==uris.size && portable.isNotEmpty() && portable.map {it.removePrefix(SyncBlobs.PREFIX).substringBefore('.')}.distinct().size==1)portable.maxOrNull()else null
         }
         normalize("outputAssetIds") {ids->
             val identities=ids.map {id->
