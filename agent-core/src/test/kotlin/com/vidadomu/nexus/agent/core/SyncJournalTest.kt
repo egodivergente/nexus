@@ -103,4 +103,11 @@ class SyncJournalTest {
         cycle(a,mapOf("assets:a" to original("a")))
         assertEquals(1,cycle(b,mapOf("assets:a" to original("b"))).conflicts.size)
     }
+    @Test fun sameVerifiedBytesWithDifferentExtensionsAreTheSameAssetVersion() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        fun original(extension:String)=buildJsonObject {put("id","a");put("name","Original");put("uri",SyncBlobs.PREFIX+"a".repeat(64)+"."+extension)}
+        cycle(a,mapOf("assets:a" to original("jpeg")))
+        assertTrue(cycle(b,mapOf("assets:a" to original("jpg"))).conflicts.isEmpty())
+        assertTrue(cycle(a,mapOf("assets:a" to original("jpeg"))).conflicts.isEmpty())
+    }
 }

@@ -79,7 +79,7 @@ https://developers.google.com/identity/protocols/oauth2#expiration
 
 ## Validación y activación del 20 de octubre
 
-- Motor final: 16 pruebas de sincronización pasadas en JVM Desktop y Android.
+- Motor: 16 pruebas de sincronización pasadas en JVM Desktop y Android.
   Dos cubren la migración de rutas locales a originales portables: el mismo
   archivo no crea conflicto por cambiar de ruta; hashes diferentes sí conservan
   ambas versiones para revisión.
@@ -92,3 +92,8 @@ https://developers.google.com/identity/protocols/oauth2#expiration
   con rutas antiguas pendientes de recuperar desde los teléfonos.
 - Las pruebas físicas y la copia completa de los originales siguen pendientes;
   estos resultados no prueban que toda la biblioteca esté respaldada.
+- Ampliación final: 19 pruebas JVM Desktop pasadas. Se cubre la descarga móvil
+  de originales sin proyecto, la equivalencia jpg/jpeg con el mismo SHA-256
+  (tres casos observados en las copias reales) y una sola consulta de carpeta
+  para reconocer originales ya existentes durante cada ciclo. Android pendiente
+  de terminar el empaquetado final y de vincular ambos dispositivos físicos.

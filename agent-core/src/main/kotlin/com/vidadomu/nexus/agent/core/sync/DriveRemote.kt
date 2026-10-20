@@ -29,6 +29,7 @@ class DriveRemote(
         }
     }
     private val known=mutableMapOf<String,SyncObject>()
+    private var indexed=false
     init {require(rootId.isEmpty() || rootId.matches(Regex("[a-zA-Z0-9_-]{1,200}")))}
     private fun request(builder:Request.Builder,allowed:Set<Int> = emptySet()):Response {
         val response=client.newCall(builder.header("Authorization","Bearer "+token()).build()).execute()
@@ -69,6 +70,10 @@ class DriveRemote(
         require(bytes.size<=8_388_608);bytes
     }
     private fun find(name:String):SyncObject? {
+        if(!indexed) {
+            for(item in list("'$rootId' in parents and trashed = false"))known.putIfAbsent(item.name,item)
+            indexed=true
+        }
         known[name]?.let {return it}
         val found=list("'$rootId' in parents and trashed = false and name = '$name'")
         return found.firstOrNull()?.also {known[name]=it}

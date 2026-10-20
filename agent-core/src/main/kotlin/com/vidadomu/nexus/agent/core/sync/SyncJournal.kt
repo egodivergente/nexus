@@ -52,8 +52,9 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
     private fun values(heads:List<SyncRevision>):List<JsonObject?> {
         if(heads.firstOrNull()?.key?.startsWith("assets:")!=true)return heads.map {it.value}
         val portable=heads.mapNotNull {it.value?.get("uri")?.jsonPrimitive?.contentOrNull?.takeIf {uri->uri.startsWith(SyncBlobs.PREFIX)}}.distinct()
-        if(portable.size!=1)return heads.map {it.value}
-        return heads.map {head->head.value?.let {row->if(row["uri"]?.jsonPrimitive?.isString==true)JsonObject(row+mapOf("uri" to JsonPrimitive(portable.single())))else row}}
+        if(portable.isEmpty() || portable.map {it.removePrefix(SyncBlobs.PREFIX).substringBefore('.')}.distinct().size!=1)return heads.map {it.value}
+        val canonical=portable.sorted().last()
+        return heads.map {head->head.value?.let {row->if(row["uri"]?.jsonPrimitive?.isString==true)JsonObject(row+mapOf("uri" to JsonPrimitive(canonical)))else row}}
     }
     private fun append(revisions:List<SyncRevision>,baseline:Map<String,JsonObject> = state.baseline,baselineHeads:Map<String,List<String>> = state.baselineHeads) {
         if(revisions.isEmpty())return
