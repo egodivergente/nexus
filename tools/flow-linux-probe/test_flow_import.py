@@ -46,6 +46,14 @@ class MediaHelpers(unittest.TestCase):
             with self.assertRaises(flow_references.ReferenceError):
                 flow_references.frame_paths(root, 'https://example.test/frame')
 
+    def test_frames_mode_has_explicit_start_and_optional_end_controls_in_order(self):
+        from pathlib import Path
+        start, end = Path('start.png'), Path('end.png')
+        self.assertEqual([('Inicio', start), ('Fin', end)], flow_references.frame_upload_sequence(start, end))
+        self.assertEqual([('Inicio', start)], flow_references.frame_upload_sequence(start))
+        with self.assertRaises(flow_references.ReferenceError):
+            flow_references.frame_upload_sequence(None, end)
+
 
 class ImportRoutes(unittest.TestCase):
     def setUp(self):

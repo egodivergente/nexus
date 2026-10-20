@@ -61,28 +61,38 @@ data class CreateUiState(
                     } else if(prompt.isBlank()) add("Descripción de la canción")
                 }
                 model.contractMedia.filter { it.required && attachedMedia.none { media -> media.fieldKey==it.key } }.forEach { add(it.label) }
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Fotogramas" &&
+                    attachedMedia.none { it.fieldKey=="initial_frame" }) add("Fotograma Inicio")
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Referencias" &&
+                    attachedMedia.none { it.fieldKey=="reference_ids" }) add("Imágenes de referencia")
                 model.parameters.filter { it.isRequired && parameters[it.key].isNullOrBlank() }.forEach { add(it.displayName) }
             }
-            model.nativeRequiredFields.filter { field ->
-                when (field) {
-                    "model" -> false
-                    in model.contractMedia.map { it.key } -> attachedMedia.none { media -> media.fieldKey==field }
-                    "prompt" -> prompt.isBlank()
-                    model.firstFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.PRIMARY_IMAGE }
-                    model.lastFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.LAST_FRAME }
-                    model.imagesArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.REFERENCE_IMAGE }
-                    model.videoField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_INPUT }
-                    model.videosArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_REFERENCE }
-                    else -> parameters[field].isNullOrBlank()
-                }
-            }.map { field -> when (field) {
-                "prompt" -> "Prompt"
-                model.firstFrameField -> "Imagen de entrada"
-                model.lastFrameField -> "Último fotograma"
-                model.imagesArrayField -> "Imágenes de referencia"
-                model.videoField, model.videosArrayField -> "Vídeo de entrada"
-                else -> model.parameters.find { it.key == field }?.displayName ?: field
-            } }
+            else buildList<String> {
+                addAll(model.nativeRequiredFields.filter { field ->
+                    when (field) {
+                        "model" -> false
+                        in model.contractMedia.map { it.key } -> attachedMedia.none { media -> media.fieldKey==field }
+                        "prompt" -> prompt.isBlank()
+                        model.firstFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.PRIMARY_IMAGE }
+                        model.lastFrameField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.LAST_FRAME }
+                        model.imagesArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.REFERENCE_IMAGE }
+                        model.videoField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_INPUT }
+                        model.videosArrayField -> attachedMedia.none { it.fieldKey==null && it.slotType == MediaSlotType.VIDEO_REFERENCE }
+                        else -> parameters[field].isNullOrBlank()
+                    }
+                }.map { field -> when (field) {
+                    "prompt" -> "Prompt"
+                    model.firstFrameField -> "Imagen de entrada"
+                    model.lastFrameField -> "Último fotograma"
+                    model.imagesArrayField -> "Imágenes de referencia"
+                    model.videoField, model.videosArrayField -> "Vídeo de entrada"
+                    else -> model.parameters.find { it.key == field }?.displayName ?: field
+                } })
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Fotogramas" &&
+                    attachedMedia.none { it.fieldKey=="initial_frame" }) add("Fotograma Inicio")
+                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Referencias" &&
+                    attachedMedia.none { it.fieldKey=="reference_ids" }) add("Imágenes de referencia")
+            }
         }.orEmpty()
     val inputMediaUri: Uri?
         get() = attachedMedia.firstOrNull()?.uriString?.let { Uri.parse(it) }

@@ -8,9 +8,9 @@ Repositorio: `egodivergente/nexus`. Trabaja sobre esta rama; no hagas force-push
 - **Puente de Flow en el ASUS** (`tools/flow-linux-probe/`): listar proyectos, leer medios, descargar archivos,
   descarga por tamaño 1K/2K/4K (probada en real: 1376×768, 2752×1536 y 5504×3072), vigilante de sesión
   (`flow_keepalive.py`, timer cada 5 min) y navegador en servicio propio (`nexus-flow-browser.service`).
-  Pruebas unitarias: 47 (`python -m unittest test_flow_import test_recovery test_flow_keepalive`).
+  Pruebas unitarias: 51 (`python -m unittest test_flow_import test_recovery test_flow_keepalive`).
 - **Importar de Flow en la app Android** (Biblioteca › ⋮ › «Importar de Flow», `FlowImportSheet.kt`).
-  Compila; pruebas de la app en verde (369 en la última ejecución local).
+  Compila; 377 pruebas de la app pasaron en la última ejecución local antes del último guardado de modo.
 - **Lote desde archivo en el Lienzo** (`PromptBatch.kt`, `PromptBatchSheet.kt`): CSV/TSV, XLSX y TXT.
 - **Reintento automático de encargos de Flow** (`FlowRetryPolicy.kt`): solo errores anteriores al clic en Generar.
 - **Agente de Nexus**: Flow (cuenta Ultra) se usa con iniciativa para bocetos; Atlas/Crun/Runway no.
@@ -23,8 +23,11 @@ Repositorio: `egodivergente/nexus`. Trabaja sobre esta rama; no hagas force-push
    - La compilación en GitHub Actions no arranca: la cuenta tiene el límite de gasto o el pago fallido.
    - Compilar en la nube falla al descargar whisper.cpp v1.7.6 desde GitHub (la sandbox no tiene acceso).
    El código de whisper sí existe en el ASUS: `~/audit-nexus-6874e34/app/.cxx/Release/4q712105/arm64-v8a/_deps/whisper-src`.
-2. **Fotogramas inicio/fin de Vídeo en Flow**: explorado (Vídeo › Fotogramas, botones «Inicio», «Fin»,
-   «Intercambiar», modelos Veo 3.1 Lite/Fast/Quality), **sin programar ni probar**.
+2. **Fotogramas inicio/fin de Vídeo en Flow**: programados en la app y el puente (modo Vídeo › Fotogramas,
+   controles «Inicio», «Fin» e «Intercambiar»). Las 51 pruebas del puente pasan. La API autenticada
+   `/api/flow/status` respondió `connected` y `generation_ready`; no se envió ninguna generación. La app tuvo
+   377 pruebas en verde antes de la última validación añadida; repetir `:app:testDebugUnitTest` falló por OOM
+   del host Windows, así que queda pendiente repetirla con recursos disponibles.
 3. **Vídeo a 4K**: sin probar. Cuesta más puntos; no ejecutar sin confirmación del usuario.
 4. **Prueba de la importación completa en el teléfono** (la app con el botón nuevo), pendiente de la APK.
 

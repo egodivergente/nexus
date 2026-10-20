@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
-from flow_references import receive_reference, reference_paths, frame_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
+from flow_references import receive_reference, reference_paths, frame_paths, attach_video_frames, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
 import flow_agent
 import flow_import
 
@@ -418,7 +418,7 @@ async def wait_composer_cleared(page, composer, timeout_ms=15000):
     return False
 
 
-async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
+async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, mode='Texto', frames=None):
     """Fill and click `runs` times. Any failure after the first click start becomes uncertain/partial."""
     async with FLOW_UI_LOCK:
         async def submit(page):
@@ -437,7 +437,13 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
             click_started = False
             try:
                 for run in range(runs):
-                    if run == 0:
+                    if mode == 'Fotogramas' and frames:
+                        if run == 0:
+                            await attach_video_frames(page, frames[0], frames[1] if len(frames) > 1 else None)
+                        else:
+                            with suppress(ReferenceError):
+                                await attach_video_frames(page, frames[0], frames[1] if len(frames) > 1 else None)
+                    elif run == 0:
                         await attach_references(page, references or [])
                     elif references:
                         # Flow suele conservar las referencias tras enviar; si las quitó, se vuelven a poner.
@@ -476,9 +482,9 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
 
 
 async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0,
-                                 initial_frame_id=None, end_frame_id=None):
+                                 initial_frame_id=None, end_frame_id=None, mode='Texto'):
     """Reserve an idempotent job before the UI clicks, never storing prompt."""
-    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or [], initial_frame_id, end_frame_id] + ([runs] if runs > 1 else []),
+    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, mode, reference_ids or [], initial_frame_id, end_frame_id] + ([runs] if runs > 1 else []),
         ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
     async with FLOW_JOB_LOCK:
         existing = next((job for job in FLOW_JOBS.values()
@@ -515,8 +521,8 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
             await update_flow_job(job_id, runs_submitted=done)
     try:
         frames = frame_paths(ROOT, initial_frame_id, end_frame_id)
-        paths = frames + reference_paths(ROOT, reference_ids or [])
-        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run)
+        references = reference_paths(ROOT, reference_ids or [])
+        baseline = await drive_flow_submission(prompt, references or None, runs, on_run, mode, frames or None)
     except ReferenceError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
         raise FlowError(error.code, error.status_code) from error
@@ -793,10 +799,25 @@ async def create_flow_job(request: Request):
         initial_frame_id = data.get('initial_frame_id')
         end_frame_id = data.get('end_frame_id')
         resolved_frames = frame_paths(ROOT, initial_frame_id, end_frame_id)
-        if resolved_frames and expected_output != 'video':
+        mode = data.get('mode')
+        if expected_output == 'video':
+            mode = mode or ('Fotogramas' if resolved_frames else 'Referencias' if references else 'Texto')
+            if mode not in {'Texto', 'Fotogramas', 'Referencias'}:
+                raise ReferenceError('invalid_video_mode', 400)
+            if mode == 'Fotogramas' and not resolved_frames:
+                raise ReferenceError('initial_frame_required', 400)
+            if mode == 'Fotogramas' and references:
+                raise ReferenceError('frame_mode_has_references', 400)
+            if mode == 'Texto' and (resolved_frames or references):
+                raise ReferenceError('text_mode_has_media', 400)
+            if mode == 'Referencias' and (resolved_frames or not references):
+                raise ReferenceError('references_mode_requires_images', 400)
+        elif resolved_frames:
             raise ReferenceError('frames_require_video', 400)
+        else:
+            mode = 'Referencias'
         job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references or None,
-                                                     runs, expected_results, initial_frame_id, end_frame_id)
+                                                     runs, expected_results, initial_frame_id, end_frame_id, mode)
         return JSONResponse(public_flow_job(job, replayed=replayed), status_code=200 if replayed else 201)
     except ReferenceError as error:
         return JSONResponse({'error': error.code}, status_code=error.status_code)

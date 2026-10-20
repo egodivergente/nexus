@@ -180,7 +180,35 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(rejected.json(), {'error': 'confirmation_required'})
         self.assertEqual(accepted.status_code, 201)
         self.assertEqual(accepted.json()['job_id'], job['job_id'])
-        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0, None, None)
+        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0, None, None, 'Referencias')
+
+    def test_video_frame_job_preserves_mode_and_start_end_ids(self):
+        valid_id = 'client-request-123456'
+        start, end = 'ref_' + 'a' * 64, 'ref_' + 'b' * 64
+        job = {'job_id': 'server-job-1234567', 'client_request_id': valid_id,
+               'state': 'submitted', 'expected_output': 'video', 'created_at': 1,
+               'updated_at': 1, 'baseline_downloads': [], 'new_downloads': [], 'error': None}
+        with patch.object(recovery, 'frame_paths', return_value=[Path('start.png'), Path('end.png')]), \
+             patch.object(recovery, 'reference_paths', return_value=[]), \
+             patch.object(recovery, 'submit_flow_generation', AsyncMock(return_value=(job, False))) as submit:
+            response = self.client.post('/api/flow/jobs', headers={'Authorization': 'Bearer private-test-token'}, json={
+                'prompt': 'plano cinematográfico', 'expected_output': 'video', 'client_request_id': valid_id,
+                'confirmed': True, 'mode': 'Fotogramas', 'initial_frame_id': start, 'end_frame_id': end})
+        self.assertEqual(response.status_code, 201)
+        submit.assert_awaited_once_with('plano cinematográfico', 'video', valid_id, None, 1, 0, start, end, 'Fotogramas')
+
+    def test_frame_mode_rejects_reference_images_instead_of_ignoring_them(self):
+        valid_id = 'client-request-123456'
+        start, reference = 'ref_' + 'a' * 64, 'ref_' + 'b' * 64
+        with patch.object(recovery, 'frame_paths', return_value=[Path('start.png')]), \
+             patch.object(recovery, 'reference_paths', return_value=[Path('reference.png')]), \
+             patch.object(recovery, 'submit_flow_generation', AsyncMock()) as submit:
+            response = self.client.post('/api/flow/jobs', headers={'Authorization': 'Bearer private-test-token'}, json={
+                'prompt': 'plano cinematográfico', 'expected_output': 'video', 'client_request_id': valid_id,
+                'confirmed': True, 'mode': 'Fotogramas', 'initial_frame_id': start,
+                'reference_ids': [reference]})
+        self.assertEqual((response.status_code, response.json()), (400, {'error': 'frame_mode_has_references'}))
+        submit.assert_not_awaited()
 
     def test_flow_job_poll_uses_mocked_bridge_without_a_browser(self):
         job = {'job_id': 'server-job-1234567', 'client_request_id': 'client-request-123456',

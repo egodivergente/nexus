@@ -69,4 +69,15 @@ class FlowReferencesTest {
         assertEquals("file:///a.png", newEnd.uriString)
         assertEquals("end_frame", newEnd.fieldKey)
     }
+
+    @Test fun videoModesRequireMatchingImageInputs() {
+        val start = input().copy(fieldKey = "initial_frame", slotType = MediaSlotType.PRIMARY_IMAGE)
+        assertEquals(id, FlowReferences.inputs(listOf(start), "Fotogramas").initialFrame)
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(emptyList(), "Fotogramas") }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(start), "Texto") }
+        assertThrows(IllegalArgumentException::class.java) {
+            FlowReferences.inputs(listOf(start, input("ref_" + "b".repeat(64))), "Fotogramas")
+        }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(emptyList(), "Referencias") }
+    }
 }

@@ -61,6 +61,7 @@ internal class FlowBridgeClient(
         expectedOutput: String,
         clientRequestId: String,
         referenceIds: List<String> = emptyList(),
+        mode: String = "Texto",
         initialFrameId: String? = null,
         endFrameId: String? = null,
         runs: Int = 1,
@@ -80,6 +81,12 @@ internal class FlowBridgeClient(
             (expectedOutput != "video" && (initialFrameId != null || endFrameId != null))) {
             return Result.failure(ProviderError("Los fotogramas de inicio y fin no son válidos para esta solicitud."))
         }
+        if (mode !in setOf("Texto", "Fotogramas", "Referencias") || (expectedOutput == "video" &&
+            ((mode == "Fotogramas" && (initialFrameId == null || referenceIds.isNotEmpty())) ||
+            (mode == "Texto" && (initialFrameId != null || endFrameId != null || referenceIds.isNotEmpty())) ||
+            (mode == "Referencias" && (referenceIds.isEmpty() || initialFrameId != null || endFrameId != null))))) {
+            return Result.failure(ProviderError("Las entradas no coinciden con el modo de vídeo de Flow."))
+        }
         if (!CLIENT_REQUEST_ID.matches(clientRequestId)) {
             return Result.failure(ProviderError("El identificador de la solicitud de Flow no es válido."))
         }
@@ -92,6 +99,7 @@ internal class FlowBridgeClient(
                 clientRequestId = clientRequestId,
                 confirmed = true,
                 referenceIds = referenceIds,
+                mode = mode,
                 initialFrameId = initialFrameId,
                 endFrameId = endFrameId,
                 runs = runs.coerceIn(1, MAX_RUNS),
@@ -501,6 +509,12 @@ internal class FlowBridgeClient(
         "flow_references_not_empty" -> "Hay ingredientes pendientes en el compositor de Flow. Revísalos antes de enviar."
         "flow_reference_controls_unavailable", "flow_reference_multiple_unavailable" -> "No se pudo usar el selector de ingredientes del proyecto Flow. Revisa el compositor; no se ha generado nada."
         "flow_reference_upload_failed", "flow_references_unconfirmed" -> "Flow no confirmó todas las referencias. Revisa los ingredientes en el proyecto; no se ha generado solo con texto."
+        "flow_frame_mode_unavailable", "flow_frame_controls_unavailable" -> "Flow no muestra los controles de Vídeo > Fotogramas. Revisa el proyecto; no se ha generado nada."
+        "flow_frame_upload_failed" -> "Flow no confirmó la carga de los fotogramas. Revisa Inicio y Fin; no se ha generado nada."
+        "initial_frame_required", "end_frame_requires_initial" -> "Añade primero el fotograma Inicio."
+        "duplicate_frame" -> "Inicio y Fin deben ser imágenes distintas."
+        "invalid_frame_ids" -> "Vuelve a seleccionar los fotogramas Inicio y Fin."
+        "invalid_video_mode", "text_mode_has_media", "references_mode_requires_images", "frame_mode_has_references" -> "Revisa el modo de vídeo y sus imágenes de entrada."
         "client_request_conflict" -> "Este identificador ya pertenece a otro encargo de Flow. Revisa su historial antes de repetir."
         else -> null
     }
@@ -549,6 +563,7 @@ internal class FlowBridgeClient(
         @SerialName("client_request_id") val clientRequestId: String,
         val confirmed: Boolean,
         @SerialName("reference_ids") val referenceIds: List<String> = emptyList(),
+        val mode: String = "Texto",
         @SerialName("initial_frame_id") val initialFrameId: String? = null,
         @SerialName("end_frame_id") val endFrameId: String? = null,
         val runs: Int = 1,

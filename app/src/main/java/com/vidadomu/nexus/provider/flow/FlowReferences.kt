@@ -9,6 +9,7 @@ internal object FlowReferences {
     const val PARAMETER = "__flow_reference_ids"
     const val INITIAL_FRAME = "__flow_initial_frame_id"
     const val END_FRAME = "__flow_end_frame_id"
+    const val MODE = "__flow_video_mode"
     val MIME_TYPES = setOf("image/png", "image/jpeg", "image/webp")
     val ID = Regex("ref_[a-f0-9]{64}")
 
@@ -18,7 +19,7 @@ internal object FlowReferences {
 
     data class Inputs(val references: List<String>, val initialFrame: String? = null, val endFrame: String? = null)
 
-    fun inputs(inputs: List<MediaInput>): Inputs {
+    fun inputs(inputs: List<MediaInput>, mode: String? = null): Inputs {
         val references = mutableListOf<String>()
         var initial: String? = null
         var end: String? = null
@@ -40,6 +41,17 @@ internal object FlowReferences {
         require(references.size <= MAX_IMAGES) { "El puente de Nexus permite hasta $MAX_IMAGES referencias por encargo." }
         require(inputs.mapNotNull { it.remoteUrl }.distinct().size == inputs.size) { "No se pueden repetir referencias de Flow." }
         require(end == null || initial != null) { "Añade primero el fotograma Inicio antes de Fin." }
+        val effectiveMode = mode ?: when {
+            initial != null || end != null -> "Fotogramas"
+            references.isNotEmpty() -> "Referencias"
+            else -> "Texto"
+        }
+        require(effectiveMode in setOf("Texto", "Fotogramas", "Referencias")) { "El modo de vídeo Flow no es válido." }
+        when (effectiveMode) {
+            "Texto" -> require(initial == null && end == null && references.isEmpty()) { "El modo Texto no admite fotogramas ni referencias." }
+            "Fotogramas" -> require(initial != null && references.isEmpty()) { "Fotogramas requiere Inicio y admite Fin opcional, sin referencias." }
+            "Referencias" -> require(references.isNotEmpty() && initial == null && end == null) { "Añade imágenes de referencia para este modo." }
+        }
         return Inputs(references, initial, end)
     }
 
@@ -57,7 +69,8 @@ internal object FlowReferences {
         capabilities = if (modality == Modality.IMAGE)
             listOf(ModelCapability.TEXT_TO_IMAGE, ModelCapability.IMAGE_TO_IMAGE)
         else listOf(ModelCapability.TEXT_TO_VIDEO, ModelCapability.IMAGE_TO_VIDEO, ModelCapability.REFERENCE_TO_VIDEO),
-        parameters = listOf(ModelParameter("count", "Resultados solicitados", ParameterType.INTEGER,
+        parameters = (if (modality == Modality.VIDEO) listOf(ModelParameter("mode", "Vídeo Flow", ParameterType.ENUM,
+            "Texto", options = listOf("Texto", "Fotogramas", "Referencias"), isRequired = true, nativeType = "string")) else emptyList()) + listOf(ModelParameter("count", "Resultados solicitados", ParameterType.INTEGER,
             "4", minValue = 1f, maxValue = FlowBridgeClient.MAX_RESULT_COUNT.toFloat(), nativeType = "integer"),
             ModelParameter("per_run", "Resultados por envío (el «xN» puesto en Flow)", ParameterType.INTEGER,
             "4", minValue = 1f, maxValue = 4f, nativeType = "integer")),
