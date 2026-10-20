@@ -44,7 +44,16 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
     private fun heads(key:String):List<SyncRevision> {
         val rows=state.revisions.values.filter {it.key==key}
         val superseded=rows.flatMap {it.parents}.toSet()
-        return rows.filter {it.id !in superseded}.sortedBy {it.id}
+        return rows.filter {it.id !in superseded}.sortedWith(compareBy<SyncRevision> {
+            if(it.key.startsWith("assets:") && it.value?.get("uri")?.jsonPrimitive?.contentOrNull?.startsWith(SyncBlobs.PREFIX)==true)1 else 0
+        }.thenBy {it.id})
+    }
+    /** A verified portable copy supersedes a device path, without hiding real byte changes. */
+    private fun values(heads:List<SyncRevision>):List<JsonObject?> {
+        if(heads.firstOrNull()?.key?.startsWith("assets:")!=true)return heads.map {it.value}
+        val portable=heads.mapNotNull {it.value?.get("uri")?.jsonPrimitive?.contentOrNull?.takeIf {uri->uri.startsWith(SyncBlobs.PREFIX)}}.distinct()
+        if(portable.size!=1)return heads.map {it.value}
+        return heads.map {head->head.value?.let {row->if(row["uri"]?.jsonPrimitive?.isString==true)JsonObject(row+mapOf("uri" to JsonPrimitive(portable.single())))else row}}
     }
     private fun append(revisions:List<SyncRevision>,baseline:Map<String,JsonObject> = state.baseline,baselineHeads:Map<String,List<String>> = state.baselineHeads) {
         if(revisions.isEmpty())return
@@ -100,14 +109,14 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         for(key in state.revisions.values.map {it.key}.distinct().sorted()) {
             val h=heads(key)
             require(h.isNotEmpty()) {"Historial de sincronización inválido."}
-            if(h.size>1 && h.map {it.value}.distinct().size>1)conflicts+=SyncConflict(key,h)
+            if(h.size>1 && values(h).distinct().size>1)conflicts+=SyncConflict(key,h)
             h.last().value?.let {rows[key]=it}
         }
         return SyncResult(rows,conflicts,uploaded,downloaded)
     }
     @Synchronized fun acknowledge(rows:Map<String,JsonObject>) {
         val bases=state.revisions.values.map {it.key}.distinct().associateWith {key->
-            val h=heads(key);if(h.map {it.value}.distinct().size>1)listOf(h.last().id)else h.map {it.id}
+            val h=heads(key);if(values(h).distinct().size>1)listOf(h.last().id)else h.map {it.id}
         }
         save(state.copy(baseline=rows,baselineHeads=bases))
     }

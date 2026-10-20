@@ -17,7 +17,7 @@ reintentos persistentes y conservación de versiones en conflictos.
 3. [x] Transporte Drive y autorización nativa en Android y Windows.
 4. [x] Integración de proyectos y medios; cola de sincronización automática,
    estado visible, sincronización manual y selección de proyectos descargados.
-5. [ ] Pruebas con varios dispositivos simulados, archivos reales, conflictos,
+5. [x] Pruebas con varios dispositivos simulados, archivos reales, conflictos,
    reintentos, pérdida de conexión e integridad. Compilación Android y Desktop.
 6. [ ] Alta de Google OAuth, vinculación y prueba física cuando exista acceso.
 7. [ ] Publicación de commits en GitHub y entrega de resultados verificables.
@@ -76,3 +76,19 @@ https://developers.google.com/identity/protocols/oauth2#expiration
   identidades históricas conservadas, originales intactos y ciclos repetidos.
 - La prueba real de transporte no demuestra todavía el recorrido físico completo
   Pixel → AXELPC → S25, ni recuperación de todos los medios antiguos.
+
+## Validación y activación del 20 de octubre
+
+- Motor final: 16 pruebas de sincronización pasadas en JVM Desktop y Android.
+  Dos cubren la migración de rutas locales a originales portables: el mismo
+  archivo no crea conflicto por cambiar de ruta; hashes diferentes sí conservan
+  ambas versiones para revisión.
+- Android integra UX 5150759 y consumo BytePlus 0aafaea. Antes del último ajuste
+  de transporte pasaron 257 pruebas del motor (4 omitidas) y 367 de la app.
+  La APK final se recompila con su firma instalada, versión 93.
+- Desktop preview.3 está activo en AXELPC con el mismo perfil y puerto 63896.
+  La conexión OAuth permanece válida después del reinicio. Primera pasada:
+  199 originales y un registro de metadatos presentes en Drive; estado parcial,
+  con rutas antiguas pendientes de recuperar desde los teléfonos.
+- Las pruebas físicas y la copia completa de los originales siguen pendientes;
+  estos resultados no prueban que toda la biblioteca esté respaldada.
