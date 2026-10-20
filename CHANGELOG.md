@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.57-agent] - 2026-10-20 · modelos del puente Antigravity
+
+- **Antigravity:** la lista incluye Gemini 3.7 Flash, Gemini 3.6 Flash y GPT-OSS 120B, que el puente local ya expone. «4 Argon» no aparece en el puente, así que no se ha añadido.
+
 ## [1.9.56-agent] - 2026-10-20 · muro de resultados
 
 - **Ver muro:** los lotes de imágenes tienen un botón «Ver muro» que abre todas las imágenes en cuadrícula escalonada, cada una con su proporción real y sin huecos. Tocar una abre su resultado.

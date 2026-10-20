@@ -129,6 +129,9 @@ data class AssistantSettings(
         val ANTIGRAVITY_MODELS = listOf(
             "gemini-3.8-flash" to "Gemini 3.8 Flash",
             "gemini-3.1-pro" to "Gemini 3.1 Pro",
+            "gemini-3.7-flash" to "Gemini 3.7 Flash",
+            "gemini-3.6-flash" to "Gemini 3.6 Flash",
+            "gpt-oss-120b" to "GPT-OSS 120B",
             "claude-sonnet-4-6" to "Claude Sonnet 4.6",
             "claude-opus-4-6-thinking" to "Opus 4.6 Thinking",
             "gemini-fast" to "Auto (Rápido)",
