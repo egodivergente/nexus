@@ -5,6 +5,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -20,10 +22,14 @@ fun NexusSheet(
     subtitle: String? = null,
     icon: ImageVector? = null,
     primaryAction: @Composable (() -> Unit)? = null,
+    dismissEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, shape = NexusTokens.sheet,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    // Swipe, scrim and back all pass through confirmValueChange; while blocked the sheet cannot hide.
+    val canDismiss by rememberUpdatedState(dismissEnabled)
+    ModalBottomSheet(onDismissRequest = { if (canDismiss) onDismiss() }, shape = NexusTokens.sheet,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden || canDismiss })) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin),
@@ -35,14 +41,14 @@ fun NexusSheet(
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cerrar $title") }
+                IconButton(onClick = onDismiss, enabled = dismissEnabled) { Icon(Icons.Default.Close, "Cerrar $title") }
             }
             Column(Modifier.weight(1f).fillMaxWidth(), content = content)
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin,
                     vertical = NexusTokens.space8)) {
                     if (primaryAction != null) primaryAction()
-                    else FilledTonalButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Listo") }
+                    else FilledTonalButton(onClick = onDismiss, enabled = dismissEnabled, modifier = Modifier.fillMaxWidth()) { Text("Listo") }
                 }
             }
         }

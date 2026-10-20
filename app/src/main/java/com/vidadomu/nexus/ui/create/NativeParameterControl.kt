@@ -144,7 +144,7 @@ private fun ParameterChip(param: ModelParameter, option: String, value: String,
             selectedContainerColor = colors.secondaryContainer,
             selectedLabelColor = colors.onSecondaryContainer,
             selectedLeadingIconColor = colors.onSecondaryContainer),
-        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.primary else colors.outlineVariant))
+        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.primary else colors.outline))
 }
 
 @Composable

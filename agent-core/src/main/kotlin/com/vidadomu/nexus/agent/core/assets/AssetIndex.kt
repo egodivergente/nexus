@@ -242,24 +242,33 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         d.copy(projects = d.projects + p) to p
     }
 
+    private fun normalizedMemory(m: ProjectMemory): ProjectMemory = m.copy(
+        synopsis = m.synopsis?.trim()?.take(MAX_FIELD)?.ifBlank { null },
+        tone = m.tone?.trim()?.take(MAX_FIELD)?.ifBlank { null },
+        visualStyle = m.visualStyle?.trim()?.take(MAX_FIELD)?.ifBlank { null },
+        rules = m.rules.map { it.trim().take(MAX_RULE_LENGTH) }.filter { it.isNotEmpty() }.distinctBy { norm(it) }.take(MAX_RULES),
+        preferredModels = m.preferredModels.map { it.trim().take(MAX_MODEL_LENGTH) }.filter { it.isNotEmpty() }.distinct().take(MAX_PREFERRED_MODELS),
+        notes = m.notes.filter { it.text.isNotBlank() }.takeLast(MAX_NOTES),
+        updatedAt = clock(),
+    )
+
     suspend fun updateProjectMemory(projectId: String, change: (ProjectMemory) -> ProjectMemory): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
-        val m = change(cur.memory)
-        val next = cur.copy(memory = m.copy(
-            synopsis = m.synopsis?.trim()?.take(MAX_FIELD)?.ifBlank { null },
-            tone = m.tone?.trim()?.take(MAX_FIELD)?.ifBlank { null },
-            visualStyle = m.visualStyle?.trim()?.take(MAX_FIELD)?.ifBlank { null },
-            rules = m.rules.map { it.trim().take(300) }.filter { it.isNotEmpty() }.distinctBy { norm(it) }.take(MAX_RULES),
-            preferredModels = m.preferredModels.map { it.trim().take(120) }.filter { it.isNotEmpty() }.distinct().take(12),
-            notes = m.notes.filter { it.text.isNotBlank() }.takeLast(MAX_NOTES),
-            updatedAt = clock(),
-        ))
+        val next = cur.copy(memory = normalizedMemory(change(cur.memory)))
+        d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
+    }
+
+    /** One write, with validation against the current project under the same lock as agent/sync edits. */
+    suspend fun updateProjectMemoryAndDescription(projectId: String, description: String?, change: (Project) -> ProjectMemory): Project = edit { d ->
+        val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
+        val memory = normalizedMemory(change(cur))
+        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null }, memory = memory)
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
     suspend fun updateProject(projectId: String, description: String?): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
-        val next = cur.copy(description = description?.trim()?.take(400)?.ifBlank { null })
+        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null })
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
@@ -467,8 +476,12 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     }
 
     companion object {
+        const val MAX_DESCRIPTION = 400
         const val MAX_FIELD = 2_000
         const val MAX_RULES = 40
+        const val MAX_RULE_LENGTH = 300
+        const val MAX_PREFERRED_MODELS = 12
+        const val MAX_MODEL_LENGTH = 120
         const val MAX_NOTES = 80
         val JSON = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = false }
         fun newId(prefix: String) = prefix + "_" + UUID.randomUUID().toString().replace("-", "").take(12)

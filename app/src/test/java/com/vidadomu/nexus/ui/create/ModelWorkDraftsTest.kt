@@ -1,0 +1,63 @@
+package com.vidadomu.nexus.ui.create
+
+import com.vidadomu.nexus.core.model.*
+import org.junit.Assert.*
+import org.junit.Test
+
+class ModelWorkDraftsTest {
+    private fun model(id:String)=NexusModel(id,id,"test",organization="Estudio",
+        modalities=listOf(Modality.IMAGE),capabilities=emptyList(),parameters=emptyList())
+    private fun image(id:String)=AttachedMedia(id,"file:///fixture/$id.png","image/png",MediaSlotType.REFERENCE_IMAGE)
+    private fun video(id:String)=AttachedMedia(id,"file:///fixture/$id.mp4","video/mp4",MediaSlotType.VIDEO_INPUT)
+    private fun draft(id:String,prompt:String="p-$id",media:List<AttachedMedia> = emptyList())=
+        ModelWorkDraft(id,prompt,"neg-$id",mapOf("size" to id),media)
+
+    @Test fun rememberKeepsMostRecentFirstWithoutDuplicates() {
+        val drafts=ModelWorkDrafts.remember(ModelWorkDrafts.remember(listOf(draft("a"),draft("b")),draft("c")),draft("a","nuevo"))
+        assertEquals(listOf("a","c","b"),drafts.map {it.modelId})
+        assertEquals("nuevo",ModelWorkDrafts.find(drafts,"a")!!.prompt)
+    }
+    @Test fun rememberCapsAtThirtyModelsDroppingTheOldest() {
+        var drafts=emptyList<ModelWorkDraft>()
+        repeat(35) {drafts=ModelWorkDrafts.remember(drafts,draft("m$it"))}
+        assertEquals(ModelWorkDrafts.MAX_MODELS,drafts.size)
+        assertEquals("m34",drafts.first().modelId); assertNull(ModelWorkDrafts.find(drafts,"m4"))
+        assertNotNull(ModelWorkDrafts.find(drafts,"m5"))
+    }
+    @Test fun targetWithDraftRestoresItsOwnWork() {
+        val leaving=draft("a",media=listOf(image("one")))
+        val target=draft("b",media=listOf(image("two")))
+        val plan=ModelWorkDrafts.plan(leaving,target) {true}
+        assertTrue(plan.restored)
+        assertEquals("p-b",plan.prompt); assertEquals("neg-b",plan.negativePrompt)
+        assertEquals(mapOf("size" to "b"),plan.parameters); assertEquals(listOf("two"),plan.media.map {it.id})
+        assertEquals(0,plan.missingMedia)
+    }
+    @Test fun restoredDraftSkipsMissingFilesAndCountsThem() {
+        val plan=ModelWorkDrafts.plan(draft("a"),draft("b",media=listOf(image("kept"),image("gone")))) {it.id=="kept"}
+        assertEquals(listOf("kept"),plan.media.map {it.id}); assertEquals(1,plan.missingMedia)
+    }
+    @Test fun targetWithoutDraftCarriesPromptAndEveryReferenceWithDefaultParameters() {
+        val refs=listOf(image("one"),image("two"),video("clip"))
+        val plan=ModelWorkDrafts.plan(draft("a",media=refs),null) {false}
+        assertFalse(plan.restored)
+        assertEquals("p-a",plan.prompt); assertEquals("neg-a",plan.negativePrompt)
+        assertTrue(plan.parameters.isEmpty()); assertEquals(refs,plan.media); assertEquals(0,plan.missingMedia)
+    }
+    @Test fun carriedReferencesStillPassTheExistingCompatibilityRouting() {
+        val plan=ModelWorkDrafts.plan(draft("a",media=listOf(image("one"),image("two"),video("clip"))),null) {true}
+        val kept=compatibleModelMedia(model("refs").copy(imagesArrayField="images",maxImages=4),plan.media)
+        assertEquals(listOf("one","two"),kept.map {it.id})
+        assertTrue(kept.all {it.slotType==MediaSlotType.REFERENCE_IMAGE})
+    }
+    @Test fun serializationRoundTripsAndToleratesCorruptData() {
+        val drafts=listOf(draft("a",media=listOf(image("one").copy(fieldKey="reference_ids"))),draft("b"))
+        assertEquals(drafts,ModelWorkDrafts.decode(ModelWorkDrafts.encode(drafts)))
+        assertTrue(ModelWorkDrafts.decode("{no es json").isEmpty())
+        assertTrue(ModelWorkDrafts.decode(null).isEmpty())
+    }
+    @Test fun encodeNeverStoresMoreThanThirtyModels() {
+        val drafts=(0 until 40).map {draft("m$it")}
+        assertEquals(ModelWorkDrafts.MAX_MODELS,ModelWorkDrafts.decode(ModelWorkDrafts.encode(drafts)).size)
+    }
+}

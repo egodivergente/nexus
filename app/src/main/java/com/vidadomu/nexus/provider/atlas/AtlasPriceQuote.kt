@@ -13,7 +13,9 @@ import java.util.concurrent.TimeUnit
 
 data class PriceQuote(val usd: Double, val configuration: String, val checkedAt: Long,
     val unit: String? = null, val unitUsd: Double? = null, val clipSeconds: Double? = null,
-    val baseTariff: Boolean = false)
+    val baseTariff: Boolean = false,
+    /** Only an amount for this whole request from the calculator, never a published/unit/fallback rate. */
+    val isRequestTotal: Boolean = false)
 
 /** A published tariff remains visible when a source-video total needs private media. */
 object PublishedTariff {
@@ -78,7 +80,7 @@ object AtlasPriceQuote {
         check(root["code"]?.jsonPrimitive?.contentOrNull == "200") { "Cotización rechazada" }
         val amount = root["data"]?.jsonObject?.get("price")?.jsonPrimitive?.doubleOrNull
         check(amount != null && amount.isFinite() && amount >= 0) { "Cotización inválida" }
-        return PriceQuote(amount,configuration,now)
+        return PriceQuote(amount,configuration,now,isRequestTotal = true)
     }
 
     fun configuration(model: NexusModel, values: Map<String,String>): String {
@@ -101,7 +103,7 @@ object AtlasPriceQuote {
             val effective = native.parameters.associate { it.key to it.defaultValue }.filterValues { it.isNotBlank() } + values
             val q = com.vidadomu.nexus.agent.core.cost.TieredTariffs.quote(native.id, effective, videoSeconds) ?: return@withContext null
             val total = q.usd
-            return@withContext if(total != null) PriceQuote(total, q.basis, System.currentTimeMillis(), unitUsd = q.usdPerSecond)
+            return@withContext if(total != null) PriceQuote(total, q.basis, System.currentTimeMillis(), unitUsd = q.usdPerSecond, isRequestTotal = true)
                 else PriceQuote(q.usdPerSecond, q.basis, System.currentTimeMillis(), unit = "s", unitUsd = q.usdPerSecond)
         }
         // Use the supported provider default when five seconds is unavailable; still request a quote.

@@ -10,7 +10,9 @@ import kotlinx.coroutines.delay
 
 data class EstimateUi(val amount: String = "…", val details: String = "", val usd: Double? = null,
     val retry: (() -> Unit)? = null, val hasPrice:Boolean = usd!=null,
-    val availability: PriceAvailability = if(hasPrice) PriceAvailability.KNOWN else PriceAvailability.UNAVAILABLE)
+    val availability: PriceAvailability = if(hasPrice) PriceAvailability.KNOWN else PriceAvailability.UNAVAILABLE,
+    /** True only when the provider or calculator produced a total for this request. */
+    val isRequestTotal: Boolean = false)
 
 @Composable
 fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = null,
@@ -35,10 +37,12 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
     currency.preference // subscribe to instant currency/rate changes
     if(model?.providerId=="runway") {
         val q=com.vidadomu.nexus.provider.runway.RunwayPricing.quote(model,parameters,images ?: 0,videoSeconds,promptLength)
-        return EstimateUi(q.usd?.let { "≈ "+app.currencyManager.formatUsd(it) } ?: "Precio por confirmar",q.detail,q.usd)
+        return EstimateUi(q.usd?.let { "≈ "+app.currencyManager.formatUsd(it) } ?: "Precio por confirmar",q.detail,q.usd,
+            isRequestTotal = q.usd != null)
     }
     if(model?.providerId=="crun") return rememberCrunEstimate(model,parameters,prompt,enabled)
-    val visibleQuote = quote ?: model?.let { AtlasPublishedPrice.cached(it) ?: VideoPricePreview.fallback(it, parameters, videoSeconds) }
+    val published = rememberPublishedPrice(model)
+    val visibleQuote = quote ?: published ?: model?.let { VideoPricePreview.fallback(it, parameters, videoSeconds) }
     return visibleQuote?.let {
         val amount = if(it.unit != null) (if(it.baseTariff) "Desde " else "") + app.currencyManager.formatUnitPrice(it.usd) + " / " + it.unit
             else "≈ " + app.currencyManager.formatUsd(it.usd) + (it.clipSeconds?.let { seconds ->
@@ -52,7 +56,7 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
             val date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(java.util.Date(it.checkedAt))
             "Base publicada · $date · varía según opciones"
         } else listOfNotNull(if(quote == null) "Tarifa guardada" else "Estimación", it.configuration.takeIf { text -> text.isNotBlank() }).joinToString(" · ")
-        EstimateUi(amount, details, it.usd)
+        EstimateUi(amount, details, it.usd, isRequestTotal = quote === it && it.isRequestTotal && it.unit == null)
     } ?: run {
         val availability=priceAvailability(pending,queryFailed)
         EstimateUi(availability.label,
@@ -65,6 +69,12 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
     }
 }
 
+/** Cached published tariff for [model], re-read when [AtlasPublishedPrice.revision] grows. */
+@Composable
+fun rememberPublishedPrice(model: NexusModel?): PriceQuote? {
+    val revision by AtlasPublishedPrice.revision.collectAsState()
+    return remember(model, revision) { model?.let(AtlasPublishedPrice::cached) }
+}
 
 @Composable
 private fun rememberCrunEstimate(model:NexusModel,parameters:Map<String,String>?,prompt:String,enabled:Boolean):EstimateUi {

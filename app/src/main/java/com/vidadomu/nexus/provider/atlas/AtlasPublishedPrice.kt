@@ -3,6 +3,10 @@ package com.vidadomu.nexus.provider.atlas
 import com.vidadomu.nexus.core.network.awaitResponse
 import com.vidadomu.nexus.core.model.NexusModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -14,7 +18,12 @@ import kotlinx.serialization.json.*
 object AtlasPublishedPrice {
     private val client = OkHttpClient.Builder().addInterceptor(com.vidadomu.nexus.core.network.LocalQaInterceptor()).callTimeout(15, TimeUnit.SECONDS).build()
     private val cache = com.vidadomu.nexus.core.util.BoundedCache<String, PriceQuote>(768)
+    private val revisionState = MutableStateFlow(0L)
+    /** Grows each time a quote enters the cache, so readers of [cached] re-read instead of polling. */
+    val revision: StateFlow<Long> = revisionState.asStateFlow()
+
     fun seedSnapshot(raw: String) {
+        var added = false
         Json.parseToJsonElement(raw).jsonArray.forEach { item ->
             val row = item.jsonObject
             val id = row["id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
@@ -25,9 +34,11 @@ object AtlasPublishedPrice {
             }
             val checked = row["checkedAt"]?.jsonPrimitive?.longOrNull ?: return@forEach
             val date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(java.util.Date(checked))
-            cache.putIfAbsent(id, PriceQuote(usd, "Tarifa base publicada · revisada $date · las opciones pueden elevar el coste",
+            val previous = cache.putIfAbsent(id, PriceQuote(usd, "Tarifa base publicada · revisada $date · las opciones pueden elevar el coste",
                 checked, unit = unit, unitUsd = usd, baseTariff = true))
+            if (previous == null) added = true
         }
+        if (added) revisionState.update { it + 1 }
     }
     fun cached(model: NexusModel): PriceQuote? = if(model.providerId in setOf(AtlasCloudProvider.PROVIDER_ID, "atlas", "atlas-cloud")) cache[model.providerModelId ?: model.id] else null
 
@@ -59,7 +70,7 @@ object AtlasPublishedPrice {
             check(it.isSuccessful) { "No se pudo consultar la tarifa publicada" }
             requireNotNull(it.body).string()
         }
-        decode(text, id)?.also { cache[id] = it }
+        decode(text, id)?.also { cache[id] = it; revisionState.update { revision -> revision + 1 } }
     }
 }
 

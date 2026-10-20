@@ -144,7 +144,7 @@ fun StudioFilterChip(selected: Boolean, onClick: () -> Unit, label: @Composable 
         label=label, modifier=modifier, leadingIcon=leadingIcon, shape=shape,
         // Filtros bien visibles: seleccionado = relleno de acento sólido; sin seleccionar = tarjeta con borde propio.
         border=FilterChipDefaults.filterChipBorder(enabled=true, selected=selected,
-            borderColor=MaterialTheme.colorScheme.outline.copy(alpha=.55f), selectedBorderColor=Color.Transparent),
+            borderColor=MaterialTheme.colorScheme.outline, selectedBorderColor=Color.Transparent),
         colors=FilterChipDefaults.filterChipColors(containerColor=MaterialTheme.colorScheme.surface,
             labelColor=MaterialTheme.colorScheme.onSurface,
             selectedContainerColor=MaterialTheme.colorScheme.primary,

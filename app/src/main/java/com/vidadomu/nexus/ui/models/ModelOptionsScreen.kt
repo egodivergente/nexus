@@ -34,6 +34,7 @@ import com.vidadomu.nexus.provider.atlas.NativeModelSchema
 import com.vidadomu.nexus.ui.theme.*
 import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.components.rememberPriceEstimate
+import com.vidadomu.nexus.ui.components.rememberPublishedPrice
 
 /** A quiet model brief with one action, and secondary routes in a separate sheet. */
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalLayoutApi::class)
@@ -50,10 +51,12 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     val routes=workflows.getValue(workflow)
     var savedRoute by rememberSaveable(group.key,workflow) {mutableStateOf(choices.getString("task-route:${group.key}:${workflow.name}",null)
         ?: choices.getString("route:${group.key}:${choices.getString("use:${group.key}",null)}",null))}
-    val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: routes.sortedWith(
+    val priceRevision by AtlasPublishedPrice.revision.collectAsState()
+    val defaultRoute=remember(routes,priceRevision) {routes.sortedWith(
         compareByDescending<NexusModel> {AtlasPublishedPrice.cached(it)!=null || it.priceUnitVerified}
             .thenByDescending {it.providerPriority}.thenByDescending {it.variantRank}.thenBy {it.id}
-    ).first()
+    ).first()}
+    val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: defaultRoute
     var variantsOpen by remember {mutableStateOf(false)}
     var details by rememberSaveable(group.key) {mutableStateOf(false)}
     val estimate=rememberPriceEstimate(selected)
@@ -67,7 +70,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     LaunchedEffect(selected) {
         loadVerifiedContract(selected)?.let {verifiedModels=verifiedModels+(modelBookmark(selected) to it)}
     }
-    val publishedUnit=AtlasPublishedPrice.cached(selected)?.unit
+    val publishedUnit=rememberPublishedPrice(selected)?.unit
     val facts=remember(selected,verifiedSelected,publishedUnit) {modelFactSheet(selected,verifiedSelected,publishedUnit)}
 
     Scaffold(modifier=modifier,containerColor=colors.background,contentWindowInsets=WindowInsets(0,0,0,0),bottomBar={
@@ -169,7 +172,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     LaunchedEffect(routes) {
         routes.forEach {route -> if(modelBookmark(route) !in verifiedModels) loadVerifiedContract(route)?.let {verifiedModels=verifiedModels+(modelBookmark(route) to it)}}
     }
-    val evidence=routes.map {route -> VariantEvidence(route,verifiedModels[modelBookmark(route)] ?: route.takeIf(::hasProviderContract),AtlasPublishedPrice.cached(route))}
+    val evidence=remember(routes,verifiedModels,priceRevision) {routes.map {route -> VariantEvidence(route,verifiedModels[modelBookmark(route)] ?: route.takeIf(::hasProviderContract),AtlasPublishedPrice.cached(route))}}
     val differences=remember(evidence) {variantDifferences(evidence)}
     ModalBottomSheet(onDismissRequest={variantsOpen=false},containerColor=colors.surface,
         sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {

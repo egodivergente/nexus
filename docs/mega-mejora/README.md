@@ -22,19 +22,20 @@ AXELPC aparece desconectado de Desktop Commander al inicio. El portátil local n
 
 ## Checkpoint de desarrollo
 
-Código Android de prueba: vc98 / 1.9.64-mega1-agent. No instalado. Catálogo, marcas, Biblioteca e Historial integrados; no equivalen a la totalidad de las 80 propuestas. Se ha creado el paquete aislado `.megaqa`. No se declara compilación ni ejecución hasta disponer de sus informes.
+Código Android de prueba: vc98 / 1.9.64-mega1-agent. El checkpoint `fc9b698` está compilado e instalado **solo como `.megaqa` + `.megaqa.test` en el Pixel 8 Pro**. Producción conserva vc96 / 1.9.62-background-preview; no se ha sustituido. Catálogo, marcas, Biblioteca e Historial integrados no equivalen a la totalidad de las 80 propuestas. Los parches posteriores de memoria, movimiento D08, Ajustes V19, contraste V20, precio reactivo y el arnés requieren otro build; ninguno está incluido en la APK instalada.
 
 ## Límites y pendientes de este lote
 
-- Núcleo en `f8a5a6f` (ASUS, recuento de XML): 309 tests, 0 failures, 0 errors, 4 skipped, es decir 305 superados. Ese núcleo no cubre los cambios de la app.
-- App Android: sigue compilando y NO está validada. Sus pruebas unitarias y de Compose están escritas pero no se han ejecutado. El CI está bloqueado por facturación (job 118555144973).
+- Build ASUS `fc9b698`: `EXIT=0`, núcleo 305 PASS + 4 omitidos; app 490 PASS. Total: 795 PASS, 4 omitidos, 0 fallos/errores. Informe por clase y hashes: [evidence/fc9b698-unit.json](evidence/fc9b698-unit.json).
+- Compilados APK offlineQa, androidTest y agentPreview (este último sin firma, no instalable como actualización). Instrumentación **no ejecutada**. El Pixel está bloqueado/apagado y se ha pedido desbloquearlo. El CI sigue bloqueado por facturación (job 118555144973).
+- `.megaqa`: ausencia de permiso INTERNET comprobada en APK; firma verificada con apksigner. SHA-256: `e36a366c934df17e8f932e34526a6bbd6deabe6a4bc153f578fbdb203db83f9c`. Paquete de tests solo pide REORDER_TASKS y apunta a `.megaqa`.
 - Aceptación humana no realizada: V02 con 5 usuarios, TalkBack, fuente al 130 % y 200 %, y revisión visual en Pixel. El S25 no se manipula en esta tanda.
-- Parciales dentro de `codigo_pendiente_validacion`: W02 («conservar ambas» no implementado), V14, V15, V16 y D04 (solo accesibilidad del catálogo). V13 está limitado al selector nuevo: una única lista desplazable con insets de Material y pie de 24 dp. Falta verificar teclado/barra gestual y extenderlo a todas las hojas.
+- Parciales dentro de `codigo_pendiente_validacion`: D08 (solo bucles propios; otros indicadores no adaptados), W02 («conservar ambas» no implementado), V14, V15, V16 y D04 (solo accesibilidad del catálogo). V13 está limitado al selector nuevo: una única lista desplazable con insets de Material y pie de 24 dp. Falta verificar teclado/barra gestual y extenderlo a todas las hojas.
 - V18: el saldo y el recuento de archivos están en una línea secundaria bajo la barra de Biblioteca, no en un menú.
 - Riesgos conocidos sin corregir:
-  - la normalización del core puede dejar marcado como pendiente un borrador de memoria ya guardado;
-  - el arnés `UiAuditScreenshotsTest` está adaptado al editor de memoria, al paquete .megaqa y a escalas verificadas hasta 200 %, todavía sin ejecución;
-  - Atrás cierra la hoja de proyecto y conserva el borrador sin preguntar;
+  - `fc9b698` aún tiene el riesgo de borrador fantasma por normalización. El parche posterior valida antes de guardar, conserva notas nuevas y compara cambios por campo para evitar sobrescrituras; pruebas nuevas escritas, sin ejecutar y pendientes de revisión/build;
+  - el arnés `UiAuditScreenshotsTest` está adaptado al editor de memoria, al paquete .megaqa y a escalas solicitadas hasta 200 %, todavía sin ejecución; la escala dentro de cada ventana modal debe medirse, no inferirse de la exterior;
+  - Atrás cierra la hoja de proyecto y conserva el borrador sin preguntar; el parche en revisión protege el guardado en curso, pendiente de pruebas;
   - coste del historial: ahora usa el componente `ConfirmedGenerationCost` sin maxLines ni ellipsis; el nuevo test a 200 % no se ha ejecutado;
   - el Historial calcula las variantes una vez por snapshot O(n log n), pero `GenerationSummaryRow` conserva el cálculo de conflictos locales O(n) por fila;
   - la alternativa a Alexia solo abre copias locales fiables (incluidas rutas absolutas sin esquema); faltan pruebas reales del selector y de rutas admitidas por FileProvider.
@@ -44,3 +45,10 @@ Código Android de prueba: vc98 / 1.9.64-mega1-agent. No instalado. Catálogo, m
 ## Verificación
 
 Revisar diff, ejecutar unitarias y build; ejecutar instrumentadas con fixtures aislados. Registrar SHA y URLs de CI. Nunca sustituir una firma privada por la de CI ni presentar un APK sin firma como actualización instalable.
+
+## Turnos de build y siguiente verificación
+
+- ASUS se cede temporalmente al hilo VidalFinanzas, con checkout aislado. Su build continúa RUNNING y ha anunciado una compilación incremental; no iniciar otro Gradle hasta recibir su aviso de liberación.
+- El parche de fusión por campos y compatibilidad de borradores está escrito; la protección del guardado asíncrono sigue en revisión. No atribuirles los 795 PASS de `fc9b698`.
+- El arnés MegaPresentationMatrixTest registra la escala real del texto sonda y las brechas modales también en modo diagnóstico; aún no compilado ni ejecutado.
+- 28 IDs con código (25 en fc9b698, D08, V19 y V20 solo en fuentes posteriores), 52 pendientes; **0 cerrados por aceptación completa**. D08, V13, V14, V15, V16, V19, D04 y W02 son expresamente parciales.

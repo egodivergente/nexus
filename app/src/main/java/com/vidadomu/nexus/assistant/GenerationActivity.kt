@@ -1,6 +1,5 @@
 package com.vidadomu.nexus.assistant
 
-import android.animation.ValueAnimator
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -21,26 +20,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.vidadomu.nexus.agent.core.orders.Order
 import com.vidadomu.nexus.agent.core.orders.OrderStatus
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -147,16 +139,7 @@ internal fun generationActivityState(order: Order, animationsAllowed: Boolean): 
  */
 @Composable
 internal fun GenerationActivity(order: Order, animated: Boolean, compact: Boolean, modifier: Modifier = Modifier) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var resumed by remember(lifecycleOwner) { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { owner, _ -> resumed = owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    // Ajuste de accesibilidad del sistema: si el usuario desactivó las animaciones, no se anima.
-    val animatorsEnabled = ValueAnimator.areAnimatorsEnabled()
-    val state = generationActivityState(order, animated && animatorsEnabled && resumed)
+    val state = generationActivityState(order, rememberNexusMotionAllowed(animated))
     if (!state.active) return
 
     val colors = MaterialTheme.colorScheme

@@ -1,0 +1,22 @@
+[Unit]
+Description=NEXUS vigilante del puente privado de Flow
+After=network-online.target nexus-flow-recovery.service
+Wants=nexus-flow-recovery.service
+
+[Service]
+Type=simple
+Environment=NEXUS_FLOW_WATCH_URL=http://100.112.57.2:8899/
+Environment=NEXUS_FLOW_TOKEN_FILE=%h/.local/share/nexus-flow-probe/recovery-token
+Environment="NEXUS_FLOW_RESTART=systemctl --user restart nexus-flow-recovery.service"
+Environment=NEXUS_FLOW_WATCH_LOG=%h/.local/state/nexus-flow-watchdog/watchdog.log
+ExecStart=/usr/bin/python3 %h/.local/share/nexus-flow-watchdog/flow_watchdog.py
+Restart=always
+RestartSec=30
+Nice=15
+CPUWeight=20
+IOWeight=20
+MemoryMax=64M
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -400,21 +400,29 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { runCatching { runtime.assets.startProjectSession(id) } }
     }
 
-    /** Guarda la memoria del proyecto editada a mano en el diálogo «Memoria». */
-    fun saveProjectMemory(projectId: String, description: String, synopsis: String, tone: String, style: String, rules: String, models: String, keepNotes: Set<Long>?) {
+    private val projectMemorySaves = ProjectMemorySaveGate()
+    internal val savingProjectMemories: StateFlow<Set<String>> = projectMemorySaves.savingIds
+
+    /**
+     * Guarda la memoria editada a mano. Devuelve false sin escribir si ese proyecto ya tiene un guardado en curso.
+     * [onResult] llega con los proyectos ya refrescados y antes de liberar el proyecto, para que la UI no
+     * reactive la edición con un borrador desfasado.
+     */
+    internal fun saveProjectMemory(draft: ProjectMemoryDraft, onResult: (Result<Project>) -> Unit = {}): Boolean {
+        val id = draft.projectId
+        if (!projectMemorySaves.tryAcquire(id)) return false
         viewModelScope.launch {
-            runCatching {
-                runtime.assets.updateProject(projectId, description)
-                runtime.assets.updateProjectMemory(projectId) { m ->
-                    m.copy(
-                        synopsis = synopsis, tone = tone, visualStyle = style,
-                        rules = rules.lines(), preferredModels = models.split('\n', ',').map { it.trim() },
-                        notes = if (keepNotes == null) m.notes else m.notes.filter { it.at in keepNotes },
-                    )
-                }
-            }.onSuccess { notice("Memoria del proyecto guardada.") }.onFailure { notice("No se pudo guardar: ${it.message?.take(160)}", error = true) }
-            refreshProjects()
+            try {
+                val result = try { Result.success(persistProjectMemoryDraft(runtime.assets, draft)) }
+                    catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (e: Exception) { Result.failure(e) }
+                result.onSuccess { notice("Memoria del proyecto guardada.") }
+                    .onFailure { notice("No se pudo guardar: ${projectMemorySaveFailureMessage(it, draft)}", error = true) }
+                refreshProjects()
+                onResult(result)
+            } finally { projectMemorySaves.release(id) }
         }
+        return true
     }
 
     fun projectCharacters(projectId: String) = runtime.assets.snapshot().characters.filter { it.projectId == projectId }

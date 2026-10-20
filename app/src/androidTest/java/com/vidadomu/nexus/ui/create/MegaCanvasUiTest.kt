@@ -45,9 +45,12 @@ class MegaCanvasUiTest {
         }}
         compose.onNodeWithText("1 modelo · 1 familia").assertIsDisplayed()
         compose.onNodeWithText("Buscar modelo, familia o tarea").performTextInput("zzzz")
-        compose.onNodeWithText("Ver todo el catálogo").performScrollTo().performClick()
-        compose.onNodeWithText("3 modelos · 1 familia").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Vídeo de prueba").performScrollTo().performClick()
+        val catalogList = compose.onNode(hasScrollToNodeAction() and !hasAnyChild(hasText("Imagen")))
+        catalogList.performScrollToNode(hasText("Ver todo el catálogo"))
+        compose.onNodeWithText("Ver todo el catálogo").performClick()
+        compose.onNodeWithText("3 modelos · 2 familias").assertIsDisplayed()
+        catalogList.performScrollToNode(hasText("Vídeo de prueba"))
+        compose.onNodeWithText("Vídeo de prueba").performClick()
         compose.runOnIdle {assertEquals(video.id,chosen)}
         screenshot("selector-contextual")
     }

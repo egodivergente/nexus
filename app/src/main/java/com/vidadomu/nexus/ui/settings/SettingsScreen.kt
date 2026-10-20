@@ -58,13 +58,18 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     var accountBalance by remember { mutableStateOf<AccountBalance?>(app.secureStorage.getCachedBalance()) }
     var syncOpen by remember { mutableStateOf(false) }
     var isRefreshingBalance by remember { mutableStateOf(false) }
+    var atlasCheck by remember { mutableStateOf<ProviderCheck>(ProviderCheck.NotChecked) }
 
     fun refreshBalance() {
         scope.launch {
             isRefreshingBalance = true
             val res = app.atlasProvider.fetchBalance()
+            val at = System.currentTimeMillis()
             if (res.isSuccess) {
                 accountBalance = res.getOrNull()
+                atlasCheck = ProviderCheck.Succeeded(at)
+            } else {
+                atlasCheck = ProviderCheck.Failed(at, noticeMessage(res.exceptionOrNull()?.message, "No se pudo consultar el saldo."))
             }
             isRefreshingBalance = false
         }
@@ -108,9 +113,9 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     item {HubRow(SettingsPage.APPEARANCE,"${selectedTheme.label} · ${currencyState.preference.displayName}") {pageName=SettingsPage.APPEARANCE.name}}
                     item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
                     item {HubRow(SettingsPage.AGENT,"Modelo del asistente, consumo, herramientas y cerebros") {pageName=SettingsPage.AGENT.name}}
-                    item {HubRow(SettingsPage.PROVIDERS,"$keysConfigured de 3 con clave · Google Flow") {pageName=SettingsPage.PROVIDERS.name}}
+                    item {HubRow(SettingsPage.PROVIDERS,providersHubSummary(keysConfigured,3,maskedApiKey!="Not configured",atlasCheck,accountBalance?.lastUpdated,flowLinked,System.currentTimeMillis(),java.time.ZoneId.systemDefault())) {pageName=SettingsPage.PROVIDERS.name}}
                     item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
-                    item {HubRow(SettingsPage.SYSTEM,"Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»" + (if(isMockMode) " · proveedor simulado activo" else "")) {pageName=SettingsPage.SYSTEM.name}}
+                    item {HubRow(SettingsPage.SYSTEM,systemHubSummary(com.vidadomu.nexus.BuildConfig.VERSION_NAME,com.vidadomu.nexus.BuildConfig.CODENAME,isMockMode)) {pageName=SettingsPage.SYSTEM.name}}
                 }
                 SettingsPage.APPEARANCE -> {
             item {SettingsCard {
@@ -130,16 +135,18 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     item {SettingsCard {BrainsSettingsSection()}}
                 }
                 SettingsPage.PROVIDERS -> {
-                    item {ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=maskedApiKey!="Not configured") {
-                        ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null})
-                        ProviderBalance(accountBalance?.let{currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",accountBalance?.let{"${currencyManager.formatUsdDetails(it.availableUsd)} · Efectivo ${currencyManager.formatBalance(it.cashUsd)} · Bonos ${currencyManager.formatBalance(it.bonusUsd)}"},isRefreshingBalance,{refreshBalance()})
+                    item {val atlasPill=providerPill(maskedApiKey!="Not configured",atlasCheck)
+                        ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=atlasPill.healthy,idleLabel=atlasPill.label) {
+                        ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null;atlasCheck=ProviderCheck.NotChecked})
+                        ProviderBalance(accountBalance?.let{currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",accountBalance?.let{"${currencyManager.formatUsdDetails(it.availableUsd)} · Efectivo ${currencyManager.formatBalance(it.cashUsd)} · Bonos ${currencyManager.formatBalance(it.bonusUsd)} · ${readingAge(it.lastUpdated,System.currentTimeMillis(),java.time.ZoneId.systemDefault())}"},isRefreshingBalance,{refreshBalance()})
+                        (atlasCheck as? ProviderCheck.Failed)?.takeIf {connectionStatusMessage==null}?.let {InlineNotice(it.message)}
                         ProviderTest(enabled=maskedApiKey!="Not configured",testing=isTestingConnection,result=connectionStatusMessage?.let{isConnectionSuccess to it},onTest={
                             isTestingConnection=true;connectionStatusMessage=null
                             scope.launch {
                                 val result=settingsRepo.testConnection(settingsRepo.getAtlasApiKey())
                                 isTestingConnection=false
-                                if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud."}
-                                else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión."}
+                                if(result.isSuccess) {isConnectionSuccess=true;connectionStatusMessage="Conexión exitosa con Atlas Cloud.";atlasCheck=ProviderCheck.Succeeded(System.currentTimeMillis())}
+                                else {isConnectionSuccess=false;connectionStatusMessage=result.exceptionOrNull()?.message ?: "Fallo de conexión.";atlasCheck=ProviderCheck.Failed(System.currentTimeMillis(),noticeMessage(connectionStatusMessage,"Fallo de conexión."))}
                             }
                         })
                     }}
@@ -154,7 +161,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                             }
                         }
                     }
-                    item {ProviderCard(name="Google Flow",subtitle="Proyecto activo del puente (AXELPC o ASUS)",icon=Icons.Default.AutoAwesome,tint=ProviderTint,connected=flowLinked,idleLabel="Sin vincular") {
+                    item {val flowState=flowPill(flowLinked)
+                        ProviderCard(name="Google Flow",subtitle="Proyecto activo del puente (AXELPC o ASUS)",icon=Icons.Default.AutoAwesome,tint=ProviderTint,connected=flowState.healthy,idleLabel=flowState.label) {
                         FlowRecoverySettings(onCreateInFlow)
                     }}
                 }
@@ -273,6 +281,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                         }
                         settingsRepo.saveAtlasApiKey(apiKeyInput.trim())
                         maskedApiKey = settingsRepo.getMaskedAtlasApiKey()
+                        atlasCheck = ProviderCheck.NotChecked
                         showEditKeyDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = MaterialTheme.colorScheme.onPrimary)
@@ -342,12 +351,13 @@ private fun ProviderCredentialCard(
     var accountStatus by remember(provider.id, maskedKey) { mutableStateOf<com.vidadomu.nexus.provider.api.ProviderAccountStatus?>(null) }
     var loadingBalance by remember(provider.id, maskedKey) { mutableStateOf(false) }
     var balanceError by remember(provider.id, maskedKey) { mutableStateOf<String?>(null) }
+    var lastCheck by remember(provider.id, maskedKey) { mutableStateOf<ProviderCheck>(ProviderCheck.NotChecked) }
     suspend fun refreshBalance() {
         val key = apiKey()
         if (key.isBlank()) return
         val capability = provider.fetchAccountStatus(key) ?: return
-        capability.onSuccess { accountStatus = it; balanceError = null }
-            .onFailure { balanceError = it.message ?: "No se pudo consultar el saldo." }
+        capability.onSuccess { accountStatus = it; balanceError = null; lastCheck = ProviderCheck.Succeeded(System.currentTimeMillis()) }
+            .onFailure { balanceError = it.message ?: "No se pudo consultar el saldo."; lastCheck = ProviderCheck.Failed(System.currentTimeMillis(), noticeMessage(balanceError, "No se pudo consultar el saldo.")) }
     }
     LaunchedEffect(provider.id, maskedKey) {
         if (apiKey().isNotBlank()) {
@@ -357,8 +367,9 @@ private fun ProviderCredentialCard(
         }
     }
     val hasKey = maskedKey != "Not configured"
+    val pill = providerPill(hasKey, lastCheck)
     ProviderCard(name = provider.displayName, subtitle = provider.description, icon = Icons.Default.CloudQueue,
-        tint = ProviderTint, connected = hasKey) {
+        tint = ProviderTint, connected = pill.healthy, idleLabel = pill.label) {
         ProviderKeyRow(if (hasKey) maskedKey else null, onEdit, if (hasKey) onClear else null)
         if (accountStatus != null || loadingBalance) ProviderBalance(
             value = accountStatus?.balanceLabel?.let { presentBalance(it, app.currencyManager) } ?: "Consultando…",
@@ -374,6 +385,8 @@ private fun ProviderCredentialCard(
                 testing = false
                 success = result.isSuccess
                 resultText = if (result.isSuccess) "Conexión correcta." else result.exceptionOrNull()?.message ?: "Fallo de conexión."
+                lastCheck = if (result.isSuccess) ProviderCheck.Succeeded(System.currentTimeMillis())
+                    else ProviderCheck.Failed(System.currentTimeMillis(), noticeMessage(resultText, "Fallo de conexión."))
                 if (result.isSuccess) refreshBalance()
             }
         })

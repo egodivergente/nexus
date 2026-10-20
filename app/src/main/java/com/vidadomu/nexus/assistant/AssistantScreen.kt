@@ -17,6 +17,8 @@ import com.vidadomu.nexus.ui.components.noticeMessage
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import android.net.Uri
 import android.content.Intent
 import android.widget.Toast
@@ -98,10 +100,12 @@ fun AssistantScreen(
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
-    var wallResult by remember { mutableStateOf<Attachment?>(null) }
+    var stage by remember { mutableStateOf<Pair<List<Attachment>, Int>?>(null) }
     if (ui.resultsWall.isNotEmpty()) ResultsWallSheet(ui.resultsWall,
-        onOpen = { wallResult = it; vm.closeResultsWall() }, onDismiss = vm::closeResultsWall)
-    wallResult?.let { media -> ResultMediaSheet(media) { wallResult = null } }
+        onOpen = { media -> val wall = ui.resultsWall; stage = wall to wall.indexOf(media).coerceAtLeast(0); vm.closeResultsWall() }, onDismiss = vm::closeResultsWall)
+    stage?.let { (results, index) -> ResultStage(results, index) { stage = null } }
+    val motion = rememberNexusMotionAllowed()
+    val seenRows = remember { mutableSetOf<String>().apply { vm.ui.value.items.forEach { add(it.id) } } }
     val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -205,11 +209,27 @@ fun AssistantScreen(
             if(result==SnackbarResult.ActionPerformed) vm.retryTurn()
         }
     }
+    // Lienzo: al desplazar o escribir, la barra superior se reduce a una franja fina.
+    val scrolledAway by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 } }
+    val slimTop = scrolledAway || input.text.isNotEmpty()
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
         Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={
+      Box(if (motion) Modifier.animateContentSize() else Modifier) {
+      if (slimTop) Surface(color = LocalChromeColor.current, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.statusBarsPadding().fillMaxWidth().height(36.dp).clickable { showProject = true }
+            .semantics { contentDescription = "Abrir proyecto"; stateDescription = activeProject?.name ?: "Agente" }
+            .padding(horizontal = NexusTokens.space12), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+            androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_mark),
+                contentDescription = null, modifier = Modifier.size(18.dp), contentScale = ContentScale.Fit)
+            Text(activeProject?.name ?: "Agente", style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            if (ui.thinking) CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
+        }
+      } else
         NexusTopAppBar(
             navigationIcon = {
                 androidx.compose.foundation.Image(
@@ -230,6 +250,7 @@ fun AssistantScreen(
                 Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
             }
         }},settingsEntries=listOf("Asistente: modelo y conexión" to { showSettings=true }))
+      }
     }) {pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
@@ -264,6 +285,7 @@ fun AssistantScreen(
                         return@items
                     }
                     val item = row as ChatItem
+                    EntranceSpring(item.id, seenRows, if (motion) Modifier.animateItem() else Modifier) {
                     when (item) {
                         is ChatItem.User -> Box(Modifier.animateItem()) { UserBubble(item) }
                         is ChatItem.Assistant -> Box(Modifier.animateItem()) {
@@ -285,7 +307,12 @@ fun AssistantScreen(
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
                             val p = ui.plans.getValue(item.planId)
-                            OrderCard(order, p, vm.outputs(p.jobId ?: order.jobId), assistantBusy = ui.thinking, modifier = Modifier.animateItem(), presentation = presentation,
+                            val orderOutputs = vm.outputs(p.jobId ?: order.jobId)
+                            StagedOrder(order, orderOutputs, onOpenStage = { index ->
+                                stage = orderOutputs.mapIndexed { i, uri -> Attachment("${order.id}:$i", uri,
+                                    when (order.modality) { "VIDEO" -> "video/mp4"; "AUDIO" -> "audio/mpeg"; else -> "image/*" }, "Resultado ${i + 1}") } to index
+                            }) {
+                            OrderCard(order, p, orderOutputs, assistantBusy = ui.thinking, modifier = Modifier.animateItem(), presentation = presentation,
                                 onGenerate = { vm.generate(p.plan.id, p.plan.fingerprint()) },
                                 onApplyFix = { vm.applyFix(order.id) },
                                 onAskAgent = { vm.askAgentToFix(order.id) },
@@ -295,6 +322,7 @@ fun AssistantScreen(
                                 onOpenOutput = { (p.jobId ?: order.jobId)?.let(onNavigateToOutput) },
                                 onRendered = { vm.cardRendered(order.id, it) },
                                 onOpenHistory = onOpenHistory)
+                            }
                         } ?: ui.plans[item.planId]?.let { p ->
                             CompactGeneration(p, vm.outputs(p.jobId),
                                 onOpenOutput = { p.jobId?.let(onNavigateToOutput) },
@@ -313,6 +341,7 @@ fun AssistantScreen(
                                 onOpenHistory = onOpenHistory,
                                 onDiagnoseFailure = { vm.diagnoseFailure(p.plan.id) }) })
                         }
+                    }
                     }
                 }
                 if (ui.streamingText.isNotBlank()) {
@@ -344,9 +373,13 @@ fun AssistantScreen(
                 ordersPanel = false; following = false
                 scope.launch { listState.animateScrollToItem(visibleItems.indexOfFirst { it is ChatItem.PlanCard && it.id == id }.coerceAtLeast(0)) }
             }
-            // Dos selectores etiquetados sobre el cuadro de texto; si no caben en una línea pasan a la siguiente sin recortar.
-            FlowRow(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12),
-                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+            // Resultados recientes de la Biblioteca: un toque los adjunta. Se apartan al escribir para dejar sitio al lienzo.
+            if (input.text.isEmpty() && ui.pendingAttachments.isEmpty())
+                LibraryCarousel(onPick = { jobId, outputId -> vm.attachLibraryResult(jobId, outputId) }, enabled = !ui.attaching && !ui.thinking,
+                    modifier = Modifier.padding(top = NexusTokens.space4))
+            // Selectores en una sola fila compacta; si no caben, la fila se desplaza en horizontal en vez de crecer.
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = NexusTokens.space8, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
                 BrainPicker(ui, vm)
                 ReasoningPicker(ui, vm)
             }
@@ -475,34 +508,27 @@ private fun EmptyHint() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = NexusTokens.space24, start = NexusTokens.space8, end = NexusTokens.space8),
+            .padding(top = NexusTokens.space8, start = NexusTokens.space8, end = NexusTokens.space8),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
+        verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
     ) {
         androidx.compose.foundation.Image(
             painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_logo),
             contentDescription = "Logo oficial de NEXUS",
-            modifier = Modifier.sizeIn(maxWidth = 118.dp, maxHeight = 112.dp),
+            modifier = Modifier.sizeIn(maxWidth = 64.dp, maxHeight = 60.dp),
             contentScale = ContentScale.Fit
         )
-        Surface(
-            shape = NexusTokens.pill,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
-        ) {
-            Text(
-                text = "v${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · ${com.vidadomu.nexus.BuildConfig.CODENAME} · build ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-            )
-        }
         Text(
             text = "Las buenas ideas empiezan aquí.",
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = TextPrimary
         )
-        Text("¿Una imagen, un vídeo o una idea por desarrollar?", color = TextMuted)
+        Text("¿Una imagen, un vídeo o una idea por desarrollar?", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        Text(
+            text = "v${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · ${com.vidadomu.nexus.BuildConfig.CODENAME} · build ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted
+        )
     }
 }
 
@@ -516,12 +542,18 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
     var creating by remember {mutableStateOf(false)}
     var name by rememberSaveable {mutableStateOf("")}
     var leaving by remember {mutableStateOf(false)}
+    var saveWarning by remember(editingId) {mutableStateOf<String?>(null)}
+    val savingIds by vm.savingProjectMemories.collectAsState()
+    val currentEditingId by rememberUpdatedState(editingId)
+    var reviewedSnapshot by remember(editingId) {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Project?>(null)}
     val active=ui.projects.firstOrNull {it.id==ui.activeProjectId}
     val editing=editingId?.let {id->ui.projects.firstOrNull {it.id==id}}
     val draft=editing?.let {drafts[it.id]}
     LaunchedEffect(editingId,editing) {if(editingId!=null && editing==null) onEditingChange(null)}
     LaunchedEffect(editing?.id,draft==null) {if(editing!=null && draft==null) drafts[editing.id]=ProjectMemoryDraft.from(editing)}
     val dirty=editing!=null && draft?.isDirty(editing)==true
+    // Read from the ViewModel, not the composition: re-entering the editor still sees a save in flight.
+    val saving=editing!=null && editing.id in savingIds
     val syncRevision by com.vidadomu.nexus.sync.DeviceSync.get(androidx.compose.ui.platform.LocalContext.current).revision.collectAsState()
     val conversations=remember(syncRevision) {vm.conversations()}
     val draftIds=ui.projects.filter {p->drafts[p.id]?.isDirty(p)==true}.map {it.id}.toSet()
@@ -530,41 +562,80 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
         onEditingChange(p.id)
     }
     fun leaveEditor(keep:Boolean) {
+        if(saving) return
         editing?.let {p-> if(!keep) drafts.remove(p.id)}
         leaving=false; onEditingChange(null)
     }
-    fun save() {
+    // exitOnSuccess: only «Guardar» in the leave dialog leaves the editor, and only once the write succeeded.
+    fun save(exitOnSuccess:Boolean) {
+        if(saving) return
         val p=editing ?: return
         val d=drafts[p.id] ?: return
-        drafts[p.id]=d.copy(saveRequested=true)
-        vm.saveProjectMemory(p.id,d.description,d.synopsis,d.tone,d.style,d.rules,d.models,keepNotes=d.keepNotes(p))
-        leaving=false; onEditingChange(null); onClose()
+        val checked=d.prepareSave(p)
+        if(checked is ProjectMemorySaveDecision.Blocked) {
+            drafts[p.id]=checked.draft
+            saveWarning=checked.message
+            leaving=false
+            return
+        }
+        val pending=(checked as ProjectMemorySaveDecision.Ready).draft
+        saveWarning=null
+        drafts[p.id]=pending
+        val started=vm.saveProjectMemory(pending) { result ->
+            // The callback may outlive this editor; pruning settles a draft left behind by a closed or switched editor.
+            if(currentEditingId!=p.id || drafts[p.id]!=pending) return@saveProjectMemory
+            result.onSuccess { saved ->
+                if(exitOnSuccess) { drafts.remove(p.id); leaving=false; onEditingChange(null) }
+                else drafts[p.id]=ProjectMemoryDraft.from(saved)
+            }.onFailure {
+                drafts[p.id]=pending.copy(saveRequested=false)
+                saveWarning=projectMemorySaveFailureMessage(it,pending)
+                leaving=false
+            }
+        }
+        if(!started) { drafts[p.id]=d; leaving=false }
+        else if(!exitOnSuccess) leaving=false
     }
-    // Cerrar la hoja con cambios no guarda nada: conserva el borrador y lo avisa.
-    val dismiss:()->Unit={
+    // Cerrar la hoja con cambios no guarda nada: conserva el borrador y lo avisa. Durante un guardado no se cierra.
+    val dismiss:()->Unit=dismiss@{
+        if(saving) return@dismiss
         if(editing!=null) {
             if(dirty) onDraftKept(editing.id,editing.name) else drafts.remove(editing.id)
             onEditingChange(null)
         }
         onClose()
     }
-    if(leaving && editing!=null) ProjectLeaveDialog(editing.name,onSave=::save,onKeep={leaveEditor(keep=true)},
-        onDiscard={leaveEditor(keep=false)},onStay={leaving=false})
+    if(leaving && editing!=null) ProjectLeaveDialog(editing.name,onSave={save(exitOnSuccess=true)},onKeep={leaveEditor(keep=true)},
+        onDiscard={leaveEditor(keep=false)},onStay={if(!saving) leaving=false},saving=saving)
     if(editing!=null && draft!=null) {
         NexusSheet("Memoria de ${editing.name}", dismiss, subtitle = if(dirty) "Cambios sin guardar" else "Lo que el agente lee en cada mensaje", icon = Icons.Default.EditNote,
-            primaryAction = { Button(onClick=::save, modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)) { Text("Guardar memoria") } }) {
+            dismissEnabled = !saving,
+            primaryAction = { Column {
+                saveWarning?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall,
+                    modifier=Modifier.semantics {liveRegion=LiveRegionMode.Polite}) }
+                Button(onClick={save(exitOnSuccess=false)}, enabled=!saving, modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)) {
+                    Text(if(saving) "Guardando memoria…" else "Guardar memoria")
+                }
+            } }) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin)
                 .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                TextButton(onClick={if(dirty) leaving=true else leaveEditor(keep=false)},modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {
+                TextButton(onClick={if(dirty) leaving=true else leaveEditor(keep=false)},enabled=!saving,modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack,null);Spacer(Modifier.width(NexusTokens.space8));Text("Volver a proyectos")
                 }
-                if(draft.isStale(editing)) InlineNotice("La memoria de este proyecto ha cambiado después de empezar este borrador; puede haberla completado el agente.",
-                    technicalDetails="Al guardar, los campos de este borrador sustituyen a los actuales solo en «${editing.name}».",
-                    actionLabel="Descartar borrador y ver la actual",onAction={drafts[editing.id]=ProjectMemoryDraft.from(editing)})
+                if(draft.isStale(editing)) InlineNotice("La memoria de este proyecto cambió mientras editabas. Tu borrador se conserva.",
+                    actionLabel="Comparar antes de guardar",onAction={if(!saving) reviewedSnapshot=editing})
                 val characters=remember(editing.id) {vm.projectCharacters(editing.id)}
                 val assetCount=remember(editing.id) {vm.projectAssetCount(editing.id)}
-                ProjectMemoryForm(draft,{drafts[editing.id]=it},assetCount,characters,editing.memory.notes)
+                ProjectMemoryForm(draft,{if(!saving) {drafts[editing.id]=it;saveWarning=null}},assetCount,characters,editing.memory.notes,
+                    onValidationError={saveWarning=it},enabled=!saving)
             }
+        }
+        reviewedSnapshot?.let { snapshot ->
+            ProjectMemoryConflictReview(snapshot,draft,onAcceptSnapshot={
+                drafts[editing.id]=draft.afterReview(snapshot)
+                saveWarning=null
+                reviewedSnapshot=null
+            },onDismiss={reviewedSnapshot=null})
         }
         return
     }

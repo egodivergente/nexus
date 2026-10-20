@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -38,8 +39,11 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.model.GenerationStatus
+import com.vidadomu.nexus.ui.theme.NexusMotionPolicy
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.TextSecondary
+import com.vidadomu.nexus.ui.theme.rememberLifecycleResumed
+import com.vidadomu.nexus.ui.theme.rememberSystemAnimatorsEnabled
 import com.vidadomu.nexus.ui.theme.tabularMoney
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -71,7 +75,11 @@ fun LiveRenderPill(
     val activeJobs = snapshot.active
     val recentCompleted = snapshot.completed
 
-    val needsTicker = activeJobs.isNotEmpty() || recentCompleted != null
+    val resumed = rememberLifecycleResumed()
+    val motionAllowed = NexusMotionPolicy.allowsInfiniteMotion(
+        requested = true, animatorsEnabled = rememberSystemAnimatorsEnabled(refreshKey = resumed), visible = resumed)
+    // Hidden screens do not tick; on resume the effect restarts and refreshes the clock at once.
+    val needsTicker = resumed && (activeJobs.isNotEmpty() || recentCompleted != null)
     LaunchedEffect(needsTicker) {
         while (needsTicker) {
             now = System.currentTimeMillis()
@@ -96,13 +104,7 @@ fun LiveRenderPill(
     ) {
         val job = targetJob ?: return@AnimatedVisibility
         val isActive = job.status != GenerationStatus.COMPLETED
-        val pulse = rememberInfiniteTransition(label = "LiveRenderPulse")
-        val alpha by pulse.animateFloat(
-            initialValue = 0.35f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-            label = "PulseAlpha"
-        )
+        val pulsing = isActive && motionAllowed
         val measuredPct = job.progress?.takeIf {
             it.isFinite() && it in 0f..1f && !job.providerId.contains("flow", ignoreCase = true)
         }
@@ -152,12 +154,7 @@ fun LiveRenderPill(
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha))
-                        )
+                        LiveRenderDot(pulsing = pulsing, color = MaterialTheme.colorScheme.primary)
                     }
                 } else {
                     val firstOut = job.outputs.firstOrNull()
@@ -244,5 +241,23 @@ fun LiveRenderPill(
                 }
             }
         }
+    }
+}
+
+/** The infinite transition exists only while [pulsing]; otherwise the dot is static at full strength. */
+@Composable
+private fun LiveRenderDot(pulsing: Boolean, color: Color) {
+    val dot = Modifier.size(10.dp).clip(CircleShape)
+    if (pulsing) {
+        val pulse = rememberInfiniteTransition(label = "LiveRenderPulse")
+        val alpha = pulse.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+            label = "PulseAlpha"
+        )
+        Box(dot.drawBehind { drawRect(color.copy(alpha = alpha.value)) })
+    } else {
+        Box(dot.background(color))
     }
 }

@@ -1,18 +1,18 @@
 # Matriz de pruebas físicas en Pixel · tanda mega-mejora 20-10-2026
 
-Documento de planificación. **Nada de lo que hay aquí está ejecutado.** Todas las filas están en estado `Pendiente`. Esta matriz no se ha ejecutado en ningún dispositivo, no se ha usado adb, no se ha instalado nada y no se ha generado ningún contenido para redactarla. Solo un tester con evidencia (captura, vídeo o registro) puede cambiar el estado de una fila. El código de los tests unitarios e instrumentados no sustituye a estas comprobaciones.
+Documento de planificación y seguimiento. **Las filas funcionales MP siguen pendientes**: aún no hay instrumentación ni validación visual de esta tanda. Actualización 20-10: se instaló el checkpoint `fc9b698` solo como `.megaqa` y su test en Pixel, tras autorización de Vidal. El Pixel está bloqueado/apagado; no se modifica su seguridad. Solo evidencia real (captura, vídeo o registro) permite cambiar una fila a Superado. Escribir o compilar tests no los da por ejecutados.
 
-Base: rama `aki/mega-mejora-20261020`, checkpoint `f8a5a6f` + cambios preparados (staged) del 20-10 sin commit. IDs según `estado.json` (V, U, D, W).
+Base de QA instalada: rama `aki/mega-mejora-20261020`, checkpoint `fc9b698`. El parche de memoria y el arnés añadidos después no están en esa instalación. IDs según `estado.json` (V, U, D, W).
 
 ## 1. Permisos y precondiciones (bloqueantes)
 
 | # | Precondición | Estado |
 |---|---|---|
-| P1 | **Permiso explícito de Vidal para instalar el paquete de QA en el Pixel 8 Pro.** Sin ese permiso escrito no se instala nada y la matriz no empieza. El permiso cubre solo el paquete `com.vidadomu.nexus.megaqa` (build `offlineQa` con `-PnexusMegaQa`) y no autoriza a sustituir, desinstalar ni tocar la Nexus de producción ni otras apps QA (`.qa`, `.uiqa`, `.mediaqa`, `.backgroundqa`, `.agent`). | Pendiente |
+| P1 | **Permiso explícito de Vidal para instalar el paquete de QA en el Pixel 8 Pro.** Sin ese permiso escrito no se instala nada y la matriz no empieza. El permiso cubre solo el paquete `com.vidadomu.nexus.megaqa` (build `offlineQa` con `-PnexusMegaQa`) y no autoriza a sustituir, desinstalar ni tocar la Nexus de producción ni otras apps QA (`.qa`, `.uiqa`, `.mediaqa`, `.backgroundqa`, `.agent`). | Autorizado: Vidal «haz lo q debas» tras pregunta explícita; instalación aislada comprobada. |
 | P2 | **El S25 Ultra queda fuera.** No se instala, no se conecta y no se prueba en él. Todas las filas son para el Pixel 8 Pro. | Pendiente |
 | P3 | Solo se usan fixtures y datos locales del paquete `.megaqa`. No se usan datos de producción, cuentas reales de Drive, proyectos reales ni historial real. | Pendiente |
 | P4 | Ninguna generación de pago. En `OFFLINE_QA`, `GenerationDispatcher` bloquea el envío («NEXUS Lab: envío bloqueado. No se ha consumido saldo.»), `LocalQaInterceptor` corta la red y `NexusDriveSync` no sincroniza. Si alguna pantalla mostrara un saldo real o consiguiera enviar algo, se detiene la prueba y se informa. | Pendiente |
-| P5 | Antes de instalar, el APK `.megaqa` tiene que estar compilado y sus tests registrados (SHA y origen). A 20-10 el README no declara ninguna compilación de esta tanda. | Pendiente |
+| P5 | Antes de instalar, el APK `.megaqa` tiene que estar compilado y sus tests registrados (SHA y origen). `fc9b698`: 795 PASS + 4 omitidos, 0 fallos; APK QA y test generados. | Cumplida para fc9b698; no para el parche posterior. |
 | P6 | Abrir los fixtures de lanzamiento (`qa_fixture`, `qa_motion`, `qa_export`) requiere extras de intent. Solo los lanza el operador autorizado en P1. Este documento no ejecuta adb. | Pendiente |
 | P7 | Los ajustes del Pixel que cambien (tamaño de visualización, tamaño de fuente, tema, escala de grises, TalkBack) se anotan y se devuelven a su valor original al terminar. Para activar las opciones de desarrollador o instalar Accessibility Scanner hace falta un permiso aparte, porque P1 no lo incluye. | Pendiente |
 

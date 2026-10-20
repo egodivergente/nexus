@@ -31,6 +31,10 @@ val TextMuted: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVari
 val BorderSubtle: Color @Composable get() = Color.Transparent
 val BorderHighlight: Color @Composable get() = Color.Transparent
 val BorderActive: Color @Composable get() = MaterialTheme.colorScheme.primary
+// Essential: the edge is the only cue that identifies a control (unfilled chip, text field); opaque and >=3:1.
+// Decorative: separators and card outlines that sit on top of a tonal difference; may stay faint.
+val BorderEssential: Color @Composable get() = MaterialTheme.colorScheme.outline
+val BorderDecorative: Color @Composable get() = MaterialTheme.colorScheme.outlineVariant
 val CyanNeon: Color @Composable get() = MaterialTheme.colorScheme.primary
 val NexusBackground: Color @Composable get() = MaterialTheme.colorScheme.background
 val NexusSurface: Color @Composable get() = MaterialTheme.colorScheme.surface
@@ -74,7 +78,7 @@ internal fun palette(theme: NexusAppearance): ColorScheme {
         val surface = Color(if(rose) 0xFFFFFBF9 else 0xFFFFFCF5)
         val layer = Color(if(rose) 0xFFF1DDD9 else 0xFFF0E2CD)
         val ink = Color(if(rose) 0xFF362225 else 0xFF33291E)
-        val muted = Color(if(rose) 0xFF72565A else 0xFF6B5948)
+        val muted = Color(if(rose) 0xFF70545A else 0xFF6B5948)
         val accent = Color(if(rose) 0xFF814654 else 0xFF8C4B2D)
         return lightColorScheme(primary=accent,onPrimary=Color.White,secondary=accent,onSecondary=Color.White,
             primaryContainer=layer,onPrimaryContainer=ink,secondaryContainer=layer,onSecondaryContainer=ink,
@@ -93,6 +97,14 @@ internal fun palette(theme: NexusAppearance): ColorScheme {
     val variant = if(!light && !quartz) StudioPalette.Interactive else Color(if (light) 0xFFE4E8F1 else if (quartz) 0xFF302820 else 0xFF263346)
     val ink = Color(if (light) 0xFF191C23 else if (quartz) 0xFFF6EDE0 else 0xFFF0F3F8)
     val muted = Color(if (light) 0xFF555C68 else if (quartz) 0xFFC2B5A3 else 0xFFADB7C6)
+    // Opaque so the measured contrast does not depend on what is painted underneath.
+    val essentialBorder = Color(when (theme) {
+        NexusAppearance.QUARTZ -> 0xFF847A6E
+        NexusAppearance.OCEAN -> 0xFF7A8697
+        NexusAppearance.FOREST -> 0xFF79868C
+        NexusAppearance.LIGHT -> 0xFF757B85
+        else -> 0xFF7C8593
+    })
     val base = if (light) lightColorScheme() else darkColorScheme()
     return base.copy(primary=accent, onPrimary=if(light) Color.White else bg,
         primaryContainer=variant, onPrimaryContainer=accent, secondary=accent,
@@ -103,7 +115,7 @@ internal fun palette(theme: NexusAppearance): ColorScheme {
         surfaceDim=bg, surfaceBright=variant, scrim=Color.Black,
         background=bg, onBackground=ink, surface=surface, onSurface=ink,
         surfaceVariant=variant, onSurfaceVariant=muted,
-        outline=muted.copy(alpha=.6f), outlineVariant=muted.copy(alpha=.22f),
+        outline=essentialBorder, outlineVariant=muted.copy(alpha=.22f),
         error=Color(if(light) 0xFF9C3E42 else 0xFFE6A5AA), onError=if(light) Color.White else bg,
         errorContainer=Color(if(light) 0xFFF8E5E5 else 0xFF35262B), onErrorContainer=ink, surfaceTint=accent,
         surfaceContainerLowest=bg, surfaceContainerLow=surface,

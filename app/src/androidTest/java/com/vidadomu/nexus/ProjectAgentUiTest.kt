@@ -119,6 +119,114 @@ class ProjectAgentUiTest {
         }
     }
 
+    @Test fun pastingBeyondTheLimitKeepsTheOriginalDraftAndShowsAnError() {
+        var value by mutableStateOf("Una regla guardada")
+        var warning by mutableStateOf<String?>(null)
+        scaled(1f) {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                ProjectMemoryField("Reglas fijas", value, { value = it }, "Una por línea",
+                    maxLength = ProjectMemoryDraft.RULES_LIMIT, onValidationError = { warning = it })
+            }
+        }
+        compose.onNode(hasSetTextAction() and hasContentDescription("Reglas fijas"))
+            .performScrollTo().performTextInput("x".repeat(ProjectMemoryDraft.RULES_LIMIT + 1))
+        compose.onNodeWithText("El texto supera ${ProjectMemoryDraft.RULES_LIMIT} caracteres; no se ha insertado.").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals("Una regla guardada", value)
+            assertEquals("El texto supera ${ProjectMemoryDraft.RULES_LIMIT} caracteres; no se ha insertado.", warning)
+        }
+    }
+
+    @Test fun invalidRuleStaysVisibleInMemoryFormAndDoesNotRequestSave() {
+        val project = Project("qa-validation", "Memoria de prueba", createdAt = 0)
+        var draft by mutableStateOf(ProjectMemoryDraft.from(project).copy(rules = "r".repeat(301)))
+        var requestedSaves = 0
+        scaled(1f) {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                ProjectMemoryForm(draft, { draft = it }, assetCount = 0,
+                    characters = emptyList(), notes = emptyList())
+                androidx.compose.material3.Button(onClick = {
+                    when (val decision = draft.prepareSave(project)) {
+                        is ProjectMemorySaveDecision.Ready -> requestedSaves++
+                        is ProjectMemorySaveDecision.Blocked -> draft = decision.draft
+                    }
+                }) { androidx.compose.material3.Text("Guardar memoria de prueba") }
+            }
+        }
+        val warning = "Cada regla admite hasta 300 caracteres. Divide o acorta la regla larga antes de guardar."
+        compose.onNodeWithText(warning).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Guardar memoria de prueba").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(0, requestedSaves)
+            assertEquals("r".repeat(301), draft.rules)
+            assertEquals(false, draft.saveRequested)
+        }
+    }
+
+    @Test fun oversizeLegacyTextCanStillBeReducedOneCharacterAtATime() {
+        val original = "x".repeat(ProjectMemoryDraft.RULES_LIMIT + 10)
+        var value by mutableStateOf(original)
+        scaled(1f) {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                ProjectMemoryField("Reglas heredadas", value, { value = it }, "Una por línea",
+                    maxLength = ProjectMemoryDraft.RULES_LIMIT, maxLines = 3)
+            }
+        }
+        compose.onNode(hasSetTextAction() and hasContentDescription("Reglas heredadas"))
+            .performScrollTo().performTextReplacement(original.dropLast(1))
+        compose.runOnIdle { assertEquals(original.dropLast(1), value) }
+        compose.onNodeWithText("no se ha insertado", substring = true).assertDoesNotExist()
+    }
+
+    @Test fun reviewingConcurrentMemoryDoesNotWriteAndKeepsTheWholeDraft() {
+        val initial = Project("qa-conflict", "Proyecto de prueba", createdAt = 0,
+            memory = ProjectMemory(synopsis = "Sinopsis anterior", updatedAt = 1))
+        val newer = initial.copy(memory = initial.memory.copy(synopsis = "Sinopsis actual del agente", updatedAt = 2))
+        var draft = ProjectMemoryDraft.from(initial).copy(synopsis = "Mi borrador sin perder", tone = "Épico")
+        var accepted = 0
+        scaled(1f) {
+            ProjectMemoryConflictReview(newer, draft, onAcceptSnapshot = { draft = draft.afterReview(newer); accepted++ },
+                onDismiss = {})
+        }
+        compose.onNodeWithText("Sinopsis actual del agente").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Mi borrador sin perder").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, accepted); assertTrue(draft.isStale(newer)) }
+        compose.onNodeWithText("Mantener mi borrador sobre esta versión").performClick()
+        compose.runOnIdle {
+            assertEquals(1, accepted)
+            assertEquals("Mi borrador sin perder", draft.synopsis)
+            assertEquals("Épico", draft.tone)
+            assertEquals(false, draft.isStale(newer))
+            assertEquals(false, draft.saveRequested)
+            assertEquals("Sinopsis actual del agente", newer.memory.synopsis)
+        }
+    }
+
+    @Test fun reviewKeepsAgentsUntouchedFieldAndShowsOnlyTheTrueOverwrite() {
+        val base = Project("qa-merge", "Proyecto QA", createdAt = 0,
+            memory = ProjectMemory(synopsis = "Sinopsis inicial", tone = "Anterior", updatedAt = 1))
+        val current = base.copy(memory = base.memory.copy(synopsis = "Sinopsis nueva del agente", updatedAt = 2))
+        var draft = ProjectMemoryDraft.from(base).copy(tone = "Épico")
+        var accepted = 0
+        scaled(1f) {
+            ProjectMemoryConflictReview(current, draft, onAcceptSnapshot = {
+                draft = draft.afterReview(current)
+                accepted++
+            }, onDismiss = {})
+        }
+        compose.onNodeWithText("No tocaste Sinopsis", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Sinopsis nueva del agente", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Épico").assertIsDisplayed()
+        compose.onNodeWithText("Mantener mi borrador sobre esta versión").performClick()
+        compose.runOnIdle {
+            assertEquals(1, accepted)
+            assertEquals("Sinopsis nueva del agente", draft.synopsis)
+            assertEquals("Épico", draft.tone)
+            assertEquals(false, draft.isStale(current))
+            assertEquals(false, draft.saveRequested)
+        }
+    }
+
     @Test fun leavingWithChangesOffersSaveKeepAndDiscard() {
         var choice by mutableStateOf("")
         scaled(1.3f) {

@@ -86,7 +86,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
       Column {
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
         Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
-        border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=0.55f)),
+        border=androidx.compose.foundation.BorderStroke(1.dp,com.vidadomu.nexus.ui.theme.BorderEssential),
         modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
@@ -188,7 +188,10 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
     val picker=rememberProjectMediaPicker(onAttach)
     var wall by remember { mutableStateOf(false) }
-    var selectedResult by remember { mutableStateOf<Attachment?>(null) }
+    var stageIndex by remember { mutableStateOf<Int?>(null) }
+    val results = remember(outputs, p.jobId, p.plan.modality) { outputs.mapIndexed { index, uri ->
+        Attachment("${p.jobId}:$index",uri,if(p.plan.modality=="VIDEO") "video/mp4" else "image/*","Resultado ${index+1}")
+    } }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         details()
         if(p.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)) {
@@ -214,12 +217,10 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
 
         if(p.plan.modality in setOf("IMAGE", "VIDEO") && outputs.size > 1) {
             TextButton(onClick = { wall = true }) { Icon(Icons.Default.GridView, null, Modifier.size(16.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Ver muro · ${outputs.size}") }
-            if (wall) ResultsWallSheet(outputs.mapIndexed { index, uri ->
-                Attachment("${p.jobId}:$index",uri,if(p.plan.modality=="VIDEO") "video/mp4" else "image/*","Resultado ${index+1}")
-            }, onOpen = { selectedResult = it; wall = false }, onDismiss = { wall = false })
+            if (wall) ResultsWallSheet(results, onOpen = { media -> stageIndex = results.indexOf(media).coerceAtLeast(0); wall = false }, onDismiss = { wall = false })
         }
     }
-    selectedResult?.let { media -> ResultMediaSheet(media) { selectedResult = null } }
+    stageIndex?.let { index -> ResultStage(results, index) { stageIndex = null } }
 }
 
 

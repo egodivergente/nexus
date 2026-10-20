@@ -54,7 +54,6 @@ import android.widget.Toast
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
-import com.vidadomu.nexus.core.currency.CurrencyManager
 import com.vidadomu.nexus.core.model.AccountBalance
 import com.vidadomu.nexus.core.model.ContractMediaField
 import com.vidadomu.nexus.core.model.AttachedMedia
@@ -80,7 +79,8 @@ import com.vidadomu.nexus.ui.theme.*
 fun CreateScreen(
     onNavigateToOutput: (String) -> Unit,
     onBrowseModels: () -> Unit,
-    viewModel: CreateViewModel = viewModel()
+    viewModel: CreateViewModel = viewModel(),
+    onOpenFlow: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val comparisonState by viewModel.comparison.state.collectAsState()
@@ -96,7 +96,6 @@ fun CreateScreen(
     val configuration = LocalConfiguration.current
     val horizontalActions = configuration.screenWidthDp >= 600
     val compactTyping = configuration.screenHeightDp < 500 && WindowInsets.isImeVisible
-    val generateAction = { viewModel.submitGeneration(onNavigateToOutput) }
     val canvasScroll = rememberLazyListState()
     val promptFocus = remember { FocusRequester() }
     LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollToItem(0) }
@@ -122,6 +121,17 @@ fun CreateScreen(
         state.attachedMedia.count { it.mimeType.startsWith("image/") }
             .takeIf { it > 0 } ?: state.selectedModel?.takeIf { it.supportsImageInput }?.let { 1 },
         !state.isLoadingSchema, videoSeconds, state.prompt.length, state.prompt)
+    // Captured with this composition's estimate so the ViewModel can detect a quote shown for an older configuration.
+    val costQuote = generationCostQuote(state, estimate)
+    val countParam = nativeCountParameter(state.selectedModel)
+    var batchCount by remember(state.selectedModel?.id) { mutableIntStateOf(1) }
+    var pendingBatch by remember { mutableStateOf<Pair<Int, GenerationFingerprint>?>(null) }
+    val repeatedBatch = countParam == null && batchCount > 1 && state.selectedModality == Modality.IMAGE
+    val generateAction: () -> Unit = {
+        if(repeatedBatch) pendingBatch = batchCount to generationFingerprint(state)
+        else viewModel.requestGeneration(costQuote, onNavigateToOutput)
+    }
+    val pendingCost by viewModel.pendingCostAcceptance.collectAsState()
 
 
     var showPriceDetails by remember { mutableStateOf(false) }
@@ -132,6 +142,14 @@ fun CreateScreen(
     var inlineParametersExpanded by rememberSaveable { mutableStateOf(true) }
     var showToolMenu by remember { mutableStateOf(false) }
     var pendingModel by remember { mutableStateOf<NexusModel?>(null) }
+    val catalogModels by app.modelCatalogRepository.models.collectAsState()
+    // Single selection path for the flagship rail and the picker sheet, media-loss confirmation included.
+    val chooseModel: (NexusModel) -> Unit = { model ->
+        if(model.id != state.selectedModel?.id || model.providerId != state.selectedModel?.providerId) {
+            if(state.attachedMedia.isNotEmpty()) pendingModel=model
+            else viewModel.selectModel(model)
+        }
+    }
     var showMedia by remember { mutableStateOf(false) }
     var showInspiration by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -231,6 +249,15 @@ fun CreateScreen(
                             Icon(Icons.Default.ChevronRight, null)
                         }
                     }
+                    if(state.selectedModality == Modality.IMAGE && state.schemaReady && !busy) {
+                        val shownCount = countParam?.let { param ->
+                            state.parameters[param.key]?.toIntOrNull() ?: param.defaultValue.toIntOrNull() ?: 1
+                        } ?: batchCount
+                        BatchCountChips(shownCount, { count -> countParam?.let { nativeCountAllowed(it, count) } ?: true }) { count ->
+                            if(countParam != null) viewModel.updateParameter(countParam.key, count.toString())
+                            else batchCount = count
+                        }
+                    }
                     StudioGenerateButton(estimate.amount, readiness.canSubmit, busy,
                         if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
                         generateAction)
@@ -263,7 +290,10 @@ fun CreateScreen(
         LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=NexusTokens.space24),
             modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
-            item { CompactModelSelectionCard(state.selectedModel,currencyManager) { showModelPickerSheet=true } }
+            item(key="studio-header") {
+                FlagshipStudioHeader(state.selectedModality, catalogModels, state.selectedModel,
+                    viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
+            }
             item {
                 StudioPromptField(state.prompt, viewModel::updatePrompt,
                     if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
@@ -457,20 +487,49 @@ fun CreateScreen(
     // Modal Bottom Sheet para Seleccionar Modelo
     if (showModelPickerSheet) {
         ModelPickerSheet(
-            availableModels = (LocalContext.current.applicationContext as NexusApplication).modelCatalogRepository.models.collectAsState().value,
+            availableModels = catalogModels,
             selectedModel = state.selectedModel,
             initialModality = state.selectedModality,
             media = state.attachedMedia,
             currencyManager = currencyManager,
             onSelectModel = { model ->
-                if(model.id != state.selectedModel?.id || model.providerId != state.selectedModel?.providerId) {
-                    if(state.attachedMedia.isNotEmpty()) pendingModel=model
-                    else viewModel.selectModel(model)
-                }
+                chooseModel(model)
                 showModelPickerSheet = false
             },
             onDismiss = { showModelPickerSheet = false }
         )
+    }
+
+    pendingCost?.let { quote ->
+        AlertDialog(onDismissRequest=viewModel::dismissCostAcceptance, title={Text("Importe sin confirmar")},
+            text={Text("Importe mostrado: ${quote.amount}.\n"+quote.details.ifBlank {"No hay una tarifa confirmada para esta configuración. No equivale a coste cero."}+
+                "\nSi generas, el proveedor puede cobrar según su tarifa real. Cualquier cambio en el modelo, el prompt, las opciones o los archivos anula esta aceptación.")},
+            confirmButton={TextButton(onClick={viewModel.acceptUnknownCost(onNavigateToOutput)}) {Text("Aceptar y generar")}},
+            dismissButton={TextButton(onClick=viewModel::dismissCostAcceptance) {Text("Cancelar")}})
+    }
+
+    pendingBatch?.let { (count, fingerprint) ->
+        val offline = com.vidadomu.nexus.BuildConfig.OFFLINE_QA
+        val unitKnown = isKnownCost(estimate)
+        AlertDialog(onDismissRequest={pendingBatch=null}, title={Text("Generar $count imágenes")},
+            text={Text(buildString {
+                append("Se enviarán $count generaciones independientes con el mismo prompt, modelo, ajustes y archivos.\n")
+                append("Importe por unidad: ${estimate.amount}")
+                if(!unitKnown) append(" (sin tarifa confirmada; no equivale a coste cero)")
+                append(".\nEl proveedor cobra cada unidad por separado: el total es $count veces ese importe.")
+                if(offline) append("\nNEXUS Lab: el envío está bloqueado.")
+            })},
+            confirmButton={TextButton(enabled=!offline, onClick={
+                pendingBatch=null
+                when {
+                    com.vidadomu.nexus.BuildConfig.OFFLINE_QA -> batchScope.launch { batchSnackbar.showSnackbar(GenerationCostGuard.OFFLINE_MESSAGE) }
+                    fingerprint != generationFingerprint(state) -> batchScope.launch { batchSnackbar.showSnackbar(GenerationCostGuard.CHANGED_AFTER_ACCEPTANCE_MESSAGE) }
+                    else -> viewModel.submitBatch(List(count) { state.prompt }, { _, _ -> }) { sent, firstError ->
+                        batchScope.launch { batchSnackbar.showSnackbar("Enviadas $sent de $count." + (firstError?.let { " $it" } ?: "")) }
+                    }
+                }
+            }) {Text("Generar $count")}},
+            dismissButton={TextButton(onClick={pendingBatch=null}) {Text("Cancelar")}})
     }
 
     pendingModel?.let { target ->
@@ -687,27 +746,6 @@ private fun ModalityTabsRow(
                         .background(if (isSelected) PrimaryNeon else Color.Transparent)
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CompactModelSelectionCard(
-    selectedModel: NexusModel?,
-    currencyManager: CurrencyManager,
-    onClick: () -> Unit
-) {
-    Surface(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription="Elegir modelo"}.clickable(onClick=onClick),
-        color=MaterialTheme.colorScheme.surface, shape=NexusTokens.field) {
-        Row(Modifier.padding(horizontal=12.dp,vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,
-            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            BrandLogo(organization=selectedModel?.organization,family=selectedModel?.family,modelId=selectedModel?.id,size=NexusTokens.space32)
-            Column(Modifier.weight(1f)) {
-                Text(selectedModel?.displayName ?: "Seleccionar modelo",style=MaterialTheme.typography.titleMedium,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
-                Text(selectedModel?.let {com.vidadomu.nexus.ui.models.modelUse(it).label} ?: "Elige qué quieres crear",
-                    style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
-            }
-            Icon(Icons.Default.ExpandMore,null,tint=TextSecondary)
         }
     }
 }

@@ -1,0 +1,1183 @@
+{
+  "source_commit": "fc9b69829278343bffd188e1b6fd8a69e2d6a10b",
+  "status": "EXIT=0",
+  "tests": [
+    {
+      "module": "agent-core",
+      "variant": "test",
+      "tests": 309,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "passed": 305,
+      "classes": [
+        {
+          "class": "com.vidadomu.nexus.agent.core.AdjustableConcurrencyTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:30"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.AndroidRegexCompatibilityTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:31"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.AssetRelocationTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:34"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.BedrockDirectTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:35"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.BytePlusOfficialCacheTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:39"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.BytePlusUsageTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:39"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ChatMarkdownTest",
+          "tests": 18,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:39"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.CodecRedactorTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:39"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ConfigurableLimitsTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ConfirmationSafetyTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.DeviceSyncTest",
+          "tests": 17,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.DirectFlowTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ExternalServicesTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:43"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.FlowAssetOriginTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:43"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.LibraryDeletionTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.LibraryVisionTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.LlmBudgetTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.MateoJulianFlowTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.NativeOperationsTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:45"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.OfflinePlannerTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:45"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.OrchestratorTest",
+          "tests": 14,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:45"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.OrderBookTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:47"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.PlanReferenceRecoveryTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:47"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ProjectMemoryTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.PromptAdapterTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.PromptFidelityTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ReasoningCodecTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ResultsWallTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.RouterGenerationTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SkillCatalogCoverageTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:48"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SkillsRouterAssetsTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:49"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SkillsV2Test",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:49"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SpendGuardTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:50"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SuggestedRepliesTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:50"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SyncDriveRemoteTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:50"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SyncJournalTest",
+          "tests": 20,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:50"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.SyncWorkspaceTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:51"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.TencentUpscaleFlowTest",
+          "tests": 13,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:51"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.ValidatorAndCostTest",
+          "tests": 10,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:52"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.VideoAttachmentsTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:52"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.VisualEvidenceTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:53"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.llm.AntigravityProviderTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:53"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.llm.AntigravityReasoningTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:59"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.llm.BrainProvidersTest",
+          "tests": 26,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:59"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.llm.BytePlusLiveTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 4,
+          "timestamp": "2026-10-20T18:57:59"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.llm.CancellableHttpTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:59"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.llm.OtherLlmProvidersTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:57:59"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.media.MediaEngineTest",
+          "tests": 11,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:58:00"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.media.MediaParamsTextTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:58:00"
+        },
+        {
+          "class": "com.vidadomu.nexus.agent.core.media.ProviderProgressTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T18:58:00"
+        }
+      ]
+    },
+    {
+      "module": "app",
+      "variant": "testOfflineQaUnitTest",
+      "tests": 490,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 490,
+      "classes": [
+        {
+          "class": "com.vidadomu.nexus.AgentDraftContractTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:31"
+        },
+        {
+          "class": "com.vidadomu.nexus.AssistantReferenceInputTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:31"
+        },
+        {
+          "class": "com.vidadomu.nexus.AtlasPredictionFailureTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:33"
+        },
+        {
+          "class": "com.vidadomu.nexus.AtlasPublishedPriceTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:33"
+        },
+        {
+          "class": "com.vidadomu.nexus.BalancePresentationTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:33"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogAndChatTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:33"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogBrowserTest",
+          "tests": 9,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:34"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogCardSummaryTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:34"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogFocusTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:36"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogHierarchyTest",
+          "tests": 9,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:36"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogMediaClaimsTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:38"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogPersonalizationTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:38"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogRecoveryTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:38"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogReleaseOrderTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:38"
+        },
+        {
+          "class": "com.vidadomu.nexus.CatalogWorkflowTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:39"
+        },
+        {
+          "class": "com.vidadomu.nexus.ComparisonPlanTest",
+          "tests": 16,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.CurrencyManagerTest",
+          "tests": 13,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.DesignTokensTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.DynamicFormRegressionTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.FailedRunsTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.FiveSecondPriceTest",
+          "tests": 9,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.GenerationCancellationTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:40"
+        },
+        {
+          "class": "com.vidadomu.nexus.GenerationPresentationTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.InlineNoticeTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.InterfaceRefinementTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.LibraryExportTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.LibraryOriginTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.LibraryTileDetailsTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.MediaSelectionSessionTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.ModelFactSheetTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.ModelReleaseTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.NativeParameterExactnessTest",
+          "tests": 15,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.NativeSchemaTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.NetworkCancellationTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.NetworkMessagesTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.NexusUnitTests",
+          "tests": 19,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:30"
+        },
+        {
+          "class": "com.vidadomu.nexus.NoticePresentationTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.OutputExportSpecTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.OutputFilesTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.ParameterPresentationTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.PremiumContractsTest",
+          "tests": 18,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:41"
+        },
+        {
+          "class": "com.vidadomu.nexus.PriceAndMediaRegressionTest",
+          "tests": 17,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.PrivateMediaStorageTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.ProjectMediaLibraryTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.ProjectMediaZipTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.PromptBatchTest",
+          "tests": 10,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.ProviderBalanceParserTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.PublishedTariffTest",
+          "tests": 9,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.ReferenceBatchTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:42"
+        },
+        {
+          "class": "com.vidadomu.nexus.ScreenInitializationTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:43"
+        },
+        {
+          "class": "com.vidadomu.nexus.ScreenNavigationTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:43"
+        },
+        {
+          "class": "com.vidadomu.nexus.StudioIntegrationTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:43"
+        },
+        {
+          "class": "com.vidadomu.nexus.StudioReliabilityTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AgentChatCompatibilityTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AgentLimitFormTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AgentMediaContractTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AssistantCompletionTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AssistantPresentationTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AssistantProviderPreservationTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AssistantUiLogicTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.AudioMeasurementsTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.BatchReadinessTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.BytePlusPricingTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.CrunPromptLimitTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.CustomBrainSettingsTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.DictationTextTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.GenerationActivityTest",
+          "tests": 13,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.MediaAndReferenceTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.MediaEditSpecTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.OrderCardLogicTest",
+          "tests": 7,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.PeerAuthTest",
+          "tests": 3,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.PeerJobsTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.ProjectAgentFlowTest",
+          "tests": 11,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.assistant.TencentContractTest",
+          "tests": 6,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:44"
+        },
+        {
+          "class": "com.vidadomu.nexus.core.network.NetworkErrorParserTimeoutTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:45"
+        },
+        {
+          "class": "com.vidadomu.nexus.provider.atlas.AtlasReportedProgressTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:45"
+        },
+        {
+          "class": "com.vidadomu.nexus.provider.custom.ConfigurableMediaProviderTest",
+          "tests": 11,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:45"
+        },
+        {
+          "class": "com.vidadomu.nexus.provider.flow.FlowQueueDependencyTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.provider.flow.FlowReferencesTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.provider.flow.FlowRetryPolicyTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.sync.DriveConflictPresentationTest",
+          "tests": 10,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.components.AlexiaBrandAssetsNewLogosTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.components.GenerationRowLabelsTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.components.PriceAvailabilityTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.components.ProviderBrandIdentityTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.create.CreationFixTargetTest",
+          "tests": 9,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.create.ModelSelectionTest",
+          "tests": 8,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.library.FlowImportSizeTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.library.LibraryViewFiltersTest",
+          "tests": 4,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.output.AlexiaFallbackTest",
+          "tests": 1,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.output.LocalCopyTargetTest",
+          "tests": 2,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        },
+        {
+          "class": "com.vidadomu.nexus.ui.theme.ProviderOrderTest",
+          "tests": 5,
+          "failures": [],
+          "errors": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-20T19:18:46"
+        }
+      ]
+    }
+  ],
+  "apks": [
+    {
+      "path": "app/build/outputs/apk/agentPreview/app-agentPreview-unsigned.apk",
+      "bytes": 42832149,
+      "sha256": "bd34251b303768678dd0fa40eb53099d9ce9f2308a3ef4922d00f09b5477b3c3"
+    },
+    {
+      "path": "app/build/outputs/apk/androidTest/offlineQa/app-offlineQa-androidTest.apk",
+      "bytes": 1864408,
+      "sha256": "3730fabe995a4b51fed0d00bc728c73d29a328cf44f67a994d71659e849503fd"
+    },
+    {
+      "path": "app/build/outputs/apk/offlineQa/app-offlineQa.apk",
+      "bytes": 42840509,
+      "sha256": "e36a366c934df17e8f932e34526a6bbd6deabe6a4bc153f578fbdb203db83f9c"
+    }
+  ],
+  "instrumented_tests_run": false,
+  "production_updated": false
+}

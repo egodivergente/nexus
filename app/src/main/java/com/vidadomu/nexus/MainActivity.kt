@@ -177,6 +177,7 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Create.route) {
                             CreateScreen(
                                 onBrowseModels = { navController.navigate(Screen.Models.route) { launchSingleTop = true } },
+                                onOpenFlow = { navController.navigate(Screen.Flow.route) { launchSingleTop = true } },
                                 onNavigateToOutput = { jobId ->
                                     navController.navigate("output/$jobId")
                                 },
