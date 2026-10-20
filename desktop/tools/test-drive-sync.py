@@ -1,4 +1,5 @@
 import json
+import io
 from pathlib import Path
 import sys
 import tempfile
@@ -93,6 +94,25 @@ class DriveSyncTest(unittest.TestCase):
         self.service.command({'op': 'disconnect'})
         self.assertEqual(original.read_bytes(), b'original-test-video')
         self.assertEqual(self.host.read_secret(self.service.secret_file), {'client_secret': 'test-only'})
+
+    def test_effective_connection_checks_account_folder_and_commits_without_exposing_tokens(self):
+        self.service.config['folderId'] = 'folder-one'
+        replies = [io.BytesIO(json.dumps(value).encode()) for value in [
+            {'user': {'emailAddress': 'owner@example.com'}}, {'id': 'folder-one'},
+            {'files': [{'name': 'blob-example.png'}, {'name': 'commit-example.json'}]}]]
+        with patch.object(self.service, 'token', return_value='private-test-token'), patch('drive_sync.urllib.request.urlopen', side_effect=replies) as network:
+            result = self.service.command({'op': 'verifyConnection'})
+        self.assertEqual(result['account'], 'owner@example.com')
+        self.assertTrue(result['folderAccessible']); self.assertEqual(result['commits'], 1)
+        self.assertNotIn('private-test-token', json.dumps(result))
+        self.assertEqual(network.call_count, 3)
+
+    def test_effective_connection_distinguishes_an_inaccessible_folder(self):
+        self.service.config['folderId'] = 'other-account-folder'
+        with patch.object(self.service, 'token', return_value='private-test-token'), patch('drive_sync.urllib.request.urlopen', side_effect=[
+            io.BytesIO(b'{"user":{"emailAddress":"owner@example.com"}}'), urllib.error.HTTPError('https://www.googleapis.com/drive/v3/files/other-account-folder', 404, 'Not Found', {}, None)]):
+            result = self.service.command({'op': 'verifyConnection'})
+        self.assertFalse(result['folderAccessible'])
 
     def test_client_configuration_rejects_traversal(self):
         with self.assertRaises(ValueError):
