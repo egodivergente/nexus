@@ -1,0 +1,2 @@
+# Optional financial fallback for accounts without split-bill capability.
+byteplus-python-sdk-v2==3.0.62

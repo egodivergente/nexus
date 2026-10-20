@@ -1,5 +1,7 @@
 # Continuar NEXUS
 
+Actualización comprobada 2026-10-20 (CODEX): **S25 1.9.58-agent-preview / vc92**, consumo BytePlus nativo integrado y puente ASUS administrativo ampliado. Rama `codex/byteplus-consumption-20261020`, reconciliada desde `a4088da` (1.9.57/vc91 instalada realmente). Véase `docs/BYTEPLUS-CONSUMPTION.md` para fuentes, firma, pruebas, despliegue y límites de validación. Las versiones antiguas que siguen abajo son antecedentes históricos.
+
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.
 Estado actual: Android 1.9.34-agent-preview / vc68 (BytePlus, cerebros y generadores propios, límites del usuario) en el Pixel; el S25 sigue en 1.9.18/vc52 (no estaba alcanzable). Rama eat/byteplus-custom-providers-20261017 (sobre la de Antigravity eat/agy-provider-s25-20261016), sin fusionar en main; Windows 1.9.5-agent-desktop.
 

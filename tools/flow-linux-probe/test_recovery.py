@@ -109,8 +109,16 @@ class RecoveryTests(unittest.TestCase):
         return self.client.post('/unlock', json={'token': 'private-test-token'})
 
     def test_private_routes_require_auth(self):
-        for path in ['/status', '/vnc.html', '/app/ui.js', '/api/flow/status', '/api/flow/jobs']:
+        for path in ['/status', '/vnc.html', '/app/ui.js', '/api/flow/status', '/api/flow/jobs', '/api/byteplus/usage']:
             self.assertEqual(self.client.get(path).status_code, 401)
+
+    def test_byteplus_reuses_private_auth_and_validates_period(self):
+        import byteplus_admin
+        headers = {'Authorization': 'Bearer private-test-token'}
+        with patch.object(byteplus_admin, 'snapshot', return_value={'schema': 1, 'period': 'day'}):
+            self.assertEqual(self.client.get('/api/byteplus/usage', headers=headers).json()['schema'], 1)
+            self.assertEqual(self.client.get('/api/byteplus/usage?period=invalid', headers=headers).status_code, 400)
+            self.assertEqual(self.client.get('/api/byteplus/usage', headers=dict(headers, Origin='https://other.test')).status_code, 403)
 
     def test_origin_and_host_rejected(self):
         self.assertEqual(self.client.get('/', headers={'Origin': 'https://other.test'}).status_code, 403)

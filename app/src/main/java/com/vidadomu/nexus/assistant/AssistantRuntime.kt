@@ -449,10 +449,21 @@ class AssistantRuntime(private val app: NexusApplication) {
                 s.antigravityEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
             )
             // BytePlus y cerebros propios: todo sale del perfil (protocolo, auth, razonamiento, límites propios).
-            s.isCustom -> s.brain!!.let { p -> com.vidadomu.nexus.agent.core.llm.budgeted(
-                BrainFactory.create(p, { settings.brains.apiKey(p.id) }), llmBudget,
-                customRates = { p.inputUsdPerM?.let { i -> p.outputUsdPerM?.let { o -> i to o } } ?: settings.customRates() },
-                limits = { settings.brainLlmLimits(p) }) }
+            s.isCustom -> s.brain!!.let { p ->
+                val profileRates = p.inputUsdPerM?.let { i -> p.outputUsdPerM?.let { o -> i to o } }
+                val host = runCatching { java.net.URI(p.baseUrl).host.orEmpty().lowercase() }.getOrDefault("")
+                val isBytePlus = p.id == com.vidadomu.nexus.agent.core.llm.BrainPresets.BYTEPLUS_ID ||
+                    host == "bytepluses.com" || host.endsWith(".bytepluses.com")
+                val rates = if (isBytePlus) BytePlusConsumption.get(app).ratesFor(p.modelId, profileRates)
+                    else profileRates ?: settings.customRates()
+                val provider = com.vidadomu.nexus.agent.core.llm.budgeted(
+                    BrainFactory.create(p, { settings.brains.apiKey(p.id) }), llmBudget,
+                    customRates = { rates }, limits = { settings.brainLlmLimits(p) })
+                if (isBytePlus) com.vidadomu.nexus.agent.core.llm.trackedBytePlus(
+                    provider, BytePlusConsumption.get(app).ledger, rates,
+                ) { BytePlusConsumption.get(app).checkAlerts() }
+                else provider
+            }
             s.backend == AssistantSettings.BACKEND_ANTHROPIC -> com.vidadomu.nexus.agent.core.llm.BudgetedLlmProvider(
                 com.vidadomu.nexus.agent.core.llm.AnthropicProvider({ settings.apiKey(AssistantSettings.BACKEND_ANTHROPIC) }), llmBudget,
                 customRates = { settings.customRates() }, limits = { settings.llmLimits() })

@@ -938,6 +938,11 @@ async def socket(ws: WebSocket):
             await ws.close()
 
 
+# BytePlus administration shares this bridge's existing authentication guard.
+from byteplus_admin import router as byteplus_usage_router
+app.include_router(byteplus_usage_router)
+
+
 @app.get('/{asset:path}')
 async def assets(asset: str):
     base = Path('/usr/share/novnc').resolve()
