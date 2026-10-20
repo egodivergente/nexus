@@ -118,6 +118,29 @@ class DriveSyncTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.command({'op': 'configure', 'id': '../../credentials.json'})
 
+    def test_long_original_preparation_renews_token_before_the_engine_transfer(self):
+        calls = []
+        exchanged = threading.Event()
+        self.host.lock = threading.Lock()
+        self.host.start = lambda: None
+        self.host.native = SimpleNamespace(asset=lambda *_: (calls.append('original'), self.root / 'original.png'))
+        self.host.corte = SimpleNamespace(lock=threading.Lock(), projects=self.root / 'projects')
+        def exchange(operation, args):
+            if operation == 'snapshot':
+                return {'index': {'assets': [{'id': 'one', 'uri': 'https://example.invalid/old.png'}]}}
+            calls.append(args['accessToken'])
+            exchanged.set()
+            return {'rootId': 'folder-one', 'state': 'synced'}
+        self.host.exchange = exchange
+        with patch.object(self.service, 'token', side_effect=['before-preparation', 'renewed-after-preparation']) as tokens:
+            self.service.run()
+            self.assertTrue(exchanged.wait(5), 'The background transfer did not reach the engine')
+            with self.service.lock:
+                pass
+            self.assertEqual(tokens.call_count, 2)
+        self.assertEqual(calls, ['original', 'renewed-after-preparation'])
+        self.assertNotIn('renewed-after-preparation', json.dumps(self.service.public()))
+
     def test_configuration_removes_the_disposable_plaintext_copy(self):
         media = self.root / 'media'
         media.mkdir()

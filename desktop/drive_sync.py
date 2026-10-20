@@ -251,6 +251,9 @@ class DriveSync:
                             paths[uri] = str(path)
                         except Exception:
                             self.failed_media[uri] = time.time() + 3600
+                    # Resolving historical provider URLs may take longer than the
+                    # token's remaining lifetime. Renew after that preparation.
+                    token = self.token()
                     result = self.host.exchange('driveSync', {'accessToken': token, 'rootId': self.config.get('folderId', ''),
                                                              'paths': paths, 'resolve': resolution,
                                                              'chats': chats, 'montages': self.captured_montages})
