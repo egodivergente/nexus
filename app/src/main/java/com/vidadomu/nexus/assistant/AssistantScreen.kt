@@ -261,7 +261,13 @@ fun AssistantScreen(
                                 answered = if ("nexus-ui" in item.text) answerAfter(visibleItems, item) else null,
                                 onReply = { vm.send(it) })
                         }
-                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory, onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null, onChangeModel = { showSettings = true })
+                        is ChatItem.Notice -> NoticeRow(
+                            item = item,
+                            onOpenHistory = onOpenHistory,
+                            onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null,
+                            onChangeModel = { showSettings = true },
+                            onNewChat = if (item.error && (item.text.contains("conversación nueva", ignoreCase = true) || item.text.contains("razonamiento", ignoreCase = true))) ({ vm.newConversation() }) else null
+                        )
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -746,13 +752,22 @@ private fun formatMediaDuration(seconds:Double):String {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoticeRow(item: ChatItem.Notice, onOpenHistory: () -> Unit = {}, onRetry: (() -> Unit)? = null, onChangeModel: (() -> Unit)? = null) {
+private fun NoticeRow(
+    item: ChatItem.Notice,
+    onOpenHistory: () -> Unit = {},
+    onRetry: (() -> Unit)? = null,
+    onChangeModel: (() -> Unit)? = null,
+    onNewChat: (() -> Unit)? = null,
+) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     if(item.error) {
         var expanded by rememberSaveable(item.id) {mutableStateOf(false)}
         Column(Modifier.animateContentSize()) {
-            // Todo error ofrece una salida directa: repetir, cambiar de modelo o revisar el historial.
+            // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
             FlowRow(verticalArrangement=Arrangement.Center,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                if(onNewChat != null) FilledTonalButton(onClick=onNewChat,shape=NexusTokens.filter) {
+                    Icon(Icons.Default.AddComment,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Continuar en chat nuevo")
+                }
                 if(onRetry != null) FilledTonalButton(onClick=onRetry,shape=NexusTokens.filter) {
                     Icon(Icons.Default.Refresh,null,Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
                 }

@@ -52,6 +52,7 @@ import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.ui.components.GenerationProgressPanel
 import com.vidadomu.nexus.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -95,14 +96,39 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String)->Uni
         if(job==null) {Box(Modifier.fillMaxSize().padding(padding),contentAlignment=Alignment.Center) {Text("Generación no encontrada",color=TextSecondary)};return@Scaffold}
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             val output=chosenOutput
-            if(job.outputs.size>1) androidx.compose.foundation.lazy.LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                items(job.outputs.size) {index->FilterChip(selectedOutput==index,{selection=job.id to index},label={Text("Resultado ${index+1}")},shape=NexusTokens.filter)}
+            var splitCompareMode by remember(job.id) { mutableStateOf(false) }
+            val compareReferenceUri = remember(job, selectedOutput) {
+                job.inputMediaUri?.takeIf { it.isNotBlank() && job.modality == Modality.IMAGE }
+                    ?: job.outputs.getOrNull(if (selectedOutput == 0) 1 else 0)?.let { it.localUri ?: it.url }
+            }
+            if(job.outputs.size>1 || compareReferenceUri != null) androidx.compose.foundation.lazy.LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                items(job.outputs.size) {index->FilterChip(selectedOutput==index && !splitCompareMode,{splitCompareMode=false;selection=job.id to index},label={Text("Resultado ${index+1}")},shape=NexusTokens.filter)}
+                if(job.modality==Modality.IMAGE && compareReferenceUri != null) {
+                    item {
+                        FilterChip(
+                            selected = splitCompareMode,
+                            onClick = { splitCompareMode = !splitCompareMode },
+                            leadingIcon = { Icon(Icons.Default.Compare, null, modifier = Modifier.size(16.dp)) },
+                            label = { Text("Cortinilla A/B") },
+                            shape = NexusTokens.filter
+                        )
+                    }
+                }
             }
             val ratio=output?.let {o->if(o.width!=null && o.height!=null && o.width>0 && o.height>0) o.width.toFloat()/o.height else null}
             Box(Modifier.fillMaxWidth().aspectRatio((ratio ?: if(job.modality==Modality.VIDEO) 16f/9f else 1f).coerceIn(.55f,2f)).background(SurfaceDark),contentAlignment=Alignment.Center) {
-                if(output!=null) key(output.id) {when(job.modality) {
-                    Modality.IMAGE->ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory)
-                    Modality.VIDEO->NativeVideoPlayer(trustedLocal ?: output.url)
+                if(output!=null) key(output.id, splitCompareMode) {when(job.modality) {
+                    Modality.IMAGE-> if (splitCompareMode && compareReferenceUri != null) {
+                        SplitWipeCompare(
+                            leftUri = compareReferenceUri,
+                            rightUri = trustedLocal ?: output.url,
+                            leftLabel = if (job.inputMediaUri != null) "Original" else "Variante A",
+                            rightLabel = "Resultado ${selectedOutput + 1}"
+                        )
+                    } else {
+                        ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory)
+                    }
+                    Modality.VIDEO->NativeVideoPlayer(trustedLocal ?: output.url, onCaptureFrame = { frameUri -> onReuseAsInput(frameUri.toString()) })
                     Modality.AUDIO->NativeAudioPlayer(trustedLocal ?: output.url)
                     Modality.CHAT->TextOutputViewer(output.url)
                 }} else if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) {
@@ -267,8 +293,11 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
 }
 
 @Composable
-private fun NativeVideoPlayer(videoUrl: String) {
+private fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)? = null) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var capturingFrame by remember { mutableStateOf(false) }
     var playbackError by remember(videoUrl) {mutableStateOf<String?>(null)}
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
@@ -301,6 +330,40 @@ private fun NativeVideoPlayer(videoUrl: String) {
         update = { it.player = exoPlayer },
         modifier = Modifier.fillMaxSize()
     )
+    if (onCaptureFrame != null) {
+        Surface(
+            shape = NexusTokens.pill,
+            color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(NexusTokens.space12)
+        ) {
+            TextButton(
+                enabled = !capturingFrame,
+                onClick = {
+                    val posMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    exoPlayer.pause()
+                    capturingFrame = true
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    scope.launch {
+                        val captured = captureVideoFrameToLocalUri(context, videoUrl, posMs)
+                        capturingFrame = false
+                        if (captured != null) {
+                            android.widget.Toast.makeText(context, "Fotograma enviado al Lienzo", android.widget.Toast.LENGTH_SHORT).show()
+                            onCaptureFrame(captured)
+                        } else {
+                            android.widget.Toast.makeText(context, "No se pudo extraer el fotograma", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MediaForeground, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (capturingFrame) "Extrayendo…" else "Fotograma → Lienzo", style = MaterialTheme.typography.labelMedium, color = MediaForeground)
+            }
+        }
+    }
     playbackError?.let {com.vidadomu.nexus.ui.components.InlineNotice("No se puede reproducir el vídeo.",Modifier.align(Alignment.BottomCenter).padding(NexusTokens.screenMargin),it,"Reintentar",{playbackError=null;exoPlayer.prepare()})}
     }
 }

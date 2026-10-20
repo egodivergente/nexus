@@ -214,10 +214,20 @@ internal fun OrderCard(
                 if (outputs.isNotEmpty() && (!compact || outputs.size > 1)) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     items(if (compact) outputs.drop(1) else outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput, presentation.cardSize) }
                 }
+                if (order.status == OrderStatus.AWAITING_CONFIRMATION && !p.busy && !assistantBusy) {
+                    QuickOrderParamStrip(plan = plan, onEdit = onEdit, onCustomEdit = { k, v -> editParam = k to v })
+                }
                 if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
-                    val click = when (shown.action) {
-                        CardAction.GENERATE, CardAction.RETRY -> onGenerate
-                        CardAction.APPLY_FIX -> onApplyFix
+                    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                    val click: () -> Unit = when (shown.action) {
+                        CardAction.GENERATE, CardAction.RETRY -> ({
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onGenerate()
+                        })
+                        CardAction.APPLY_FIX -> ({
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onApplyFix()
+                        })
                         CardAction.ASK_AGENT -> onAskAgent
                         CardAction.VIEW_RESULT -> onOpenOutput
                         CardAction.CHECK_HISTORY -> onOpenHistory
@@ -265,6 +275,62 @@ private fun StatusPill(text: String, error: Boolean) {
     Surface(shape = NexusTokens.filter, color = if (error) colors.errorContainer else colors.secondaryContainer,
         contentColor = if (error) colors.onErrorContainer else colors.onSecondaryContainer) {
         Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * Tira de ajuste rápido in-situ (Nexus Studio 2.0):
+ * Permite cambiar proporción (16:9 / 9:16 / 1:1) o abrir cualquier parámetro clave en 1 toque
+ * directamente desde la tarjeta del chat, recalculando el precio en € al instante antes de aprobar.
+ */
+@Composable
+private fun QuickOrderParamStrip(
+    plan: com.vidadomu.nexus.agent.core.spend.GenerationPlan,
+    onEdit: (PlanEdit) -> Unit,
+    onCustomEdit: (String, String) -> Unit,
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val params = remember(plan) { visibleParams(plan).toMap() }
+    val aspectKey = remember(params) { params.keys.firstOrNull { it in setOf("aspect_ratio", "ratio") } }
+    val currentAspect = aspectKey?.let { params[it] }
+    val otherKeys = remember(params, aspectKey) {
+        params.entries.filter { it.key != aspectKey && it.key in setOf("duration", "resolution", "size", "quality", "num_outputs", "count") }
+    }
+    if (aspectKey == null && otherKeys.isEmpty()) return
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (aspectKey != null && currentAspect in setOf("16:9", "9:16", "1:1")) {
+            items(listOf("16:9", "9:16", "1:1")) { ratio ->
+                val selected = currentAspect == ratio
+                com.vidadomu.nexus.ui.components.StudioFilterChip(
+                    selected = selected,
+                    onClick = {
+                        if (!selected) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onEdit(PlanEdit(params = mapOf(aspectKey to ratio)))
+                        }
+                    },
+                    label = { Text(ratio, style = MaterialTheme.typography.labelSmall) },
+                    shape = NexusTokens.filter,
+                    modifier = Modifier.height(28.dp)
+                )
+            }
+        }
+        items(otherKeys) { (k, v) ->
+            AssistChip(
+                onClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    onCustomEdit(k, v)
+                },
+                label = { Text("$k: $v", style = MaterialTheme.typography.labelSmall) },
+                shape = NexusTokens.filter,
+                modifier = Modifier.height(28.dp)
+            )
+        }
     }
 }
 

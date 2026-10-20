@@ -64,16 +64,13 @@ fun NexusChrome(onSettings: () -> Unit, onNavigateToOutput: (String) -> Unit,
     CompositionLocalProvider(LocalChrome provides ChromeActions(label,{sheet=true},onSettings.takeIf {settingsVisible})) {
         content()
     }
-    if(sheet) ModalBottomSheet(onDismissRequest={sheet=false},shape=NexusTokens.sheet,
-        sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.92f)) {
+    if(sheet) NexusSheet("Saldo y gasto", onDismiss={sheet=false}, subtitle="Saldos en vivo y libro mayor confirmado") {
+        Column(Modifier.fillMaxWidth().fillMaxHeight()) {
             FlowRow(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin),
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                Text("Saldo y gasto",style=MaterialTheme.typography.titleLarge)
-                TextButton(onClick=vm::refresh,enabled=!busy) { Text(if(busy) "Actualizando…" else "Actualizar") }
+                TextButton(onClick=vm::refresh,enabled=!busy) { Text(if(busy) "Actualizando…" else "Actualizar saldos") }
             }
-            Column(Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),
+            Column(Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),
                 verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 if(balances.isEmpty()) {
                     Text(cached?.let { "Atlas · ${app.currencyManager.formatBalance(it.availableUsd)} · último dato" }

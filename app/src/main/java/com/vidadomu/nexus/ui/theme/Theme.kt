@@ -78,17 +78,3 @@ fun NexusSheetSystemBars() {
         }
     }
 }
-
-@Composable
-private fun AuroraAura(accent: Color) {
-    val transition=rememberInfiniteTransition(label="Aurora")
-    val phase=transition.animateFloat(0f,1f,infiniteRepeatable(tween(24000,easing=LinearEasing),RepeatMode.Reverse),label="Aura drift")
-    // Background drawing does not consume gestures. State read is confined to draw.
-    Canvas(Modifier.fillMaxSize()) {
-        val t=phase.value
-        listOf(Offset(size.width*(.1f+.3f*t),size.height*(.14f+.06f*t)),
-            Offset(size.width*(.9f-.25f*t),size.height*(.85f-.1f*t))).forEach { center ->
-            drawCircle(Brush.radialGradient(listOf(accent.copy(alpha=.08f),Color.Transparent),center,size.width*.8f),size.width*.8f,center)
-        }
-    }
-}

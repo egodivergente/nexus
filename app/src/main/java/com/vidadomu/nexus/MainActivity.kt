@@ -130,7 +130,23 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize().imePadding(),
                     containerColor = ScreenBackground,
                     bottomBar = {
-                        if(!WindowInsets.isImeVisible) NexusBottomBar(navController = navController)
+                        if(!WindowInsets.isImeVisible) {
+                            androidx.compose.foundation.layout.Column {
+                                val currentRoute = activeEntry?.destination?.route
+                                if (currentRoute?.startsWith("output") != true) {
+                                    com.vidadomu.nexus.ui.components.LiveRenderPill(
+                                        onOpenOutput = { id -> navController.navigate("output/$id") },
+                                        onSendToAgent = { jobId, outputId ->
+                                            assistantViewModel.attachLibraryResult(jobId, outputId)
+                                            if (!navController.popBackStack(Screen.Assistant.route, false)) {
+                                                navController.navigate(Screen.Assistant.route) { launchSingleTop = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                NexusBottomBar(navController = navController)
+                            }
+                        }
                     }
                 ) { innerPadding ->
                     NavHost(
@@ -141,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate(route) {
                                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                     launchSingleTop = true
-                                    restoreState = route != Screen.Models.route && route != Screen.Assistant.route
+                                    restoreState = true
                                 }
                             }
                         }

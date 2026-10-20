@@ -57,14 +57,16 @@ class NexusApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        runCatching {
-            assets.open("atlas_editorial_evidence.json").bufferedReader().use {
-                com.vidadomu.nexus.ui.models.PublishedModelNotes.seed(it.readText())
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                assets.open("atlas_editorial_evidence.json").bufferedReader().use {
+                    com.vidadomu.nexus.ui.models.PublishedModelNotes.seed(it.readText())
+                }
             }
-        }
-        runCatching {
-            assets.open("atlas_published_prices.json").bufferedReader().use {
-                com.vidadomu.nexus.provider.atlas.AtlasPublishedPrice.seedSnapshot(it.readText())
+            runCatching {
+                assets.open("atlas_published_prices.json").bufferedReader().use {
+                    com.vidadomu.nexus.provider.atlas.AtlasPublishedPrice.seedSnapshot(it.readText())
+                }
             }
         }
 

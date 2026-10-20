@@ -56,8 +56,8 @@ fun NexusBottomBar(navController: NavController) {
                                 val fromTab = currentRoute in Screen.bottomNavItems.map { it.route }
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = fromTab }
                                 launchSingleTop = true
-                                // Only restore saved state when switching between actual tabs.
-                                restoreState = fromTab && screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
+                                // Restore saved state when switching between actual tabs.
+                                restoreState = fromTab
                             }
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,

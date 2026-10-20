@@ -168,7 +168,17 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         } finally {
             db.endTransaction()
         }
-        reloadJobsSync()
+        if (!_loading.value) {
+            val current = _jobsFlow.value
+            val idx = current.indexOfFirst { it.id == job.id }
+            _jobsFlow.value = if (idx >= 0) {
+                current.toMutableList().apply { set(idx, job) }
+            } else {
+                (listOf(job) + current).sortedByDescending { it.startedAt }
+            }
+        } else {
+            reloadJobsSync()
+        }
     } }
 
     suspend fun getJobById(id: String): GenerationJob? = withContext(Dispatchers.IO) {
@@ -194,7 +204,11 @@ class NexusDatabase(context: Context, loadOnOpen: Boolean = true) : SQLiteOpenHe
         } finally {
             db.endTransaction()
         }
-        reloadJobsSync()
+        if (!_loading.value) {
+            _jobsFlow.value = _jobsFlow.value.filterNot { it.id == id }
+        } else {
+            reloadJobsSync()
+        }
     } }
 
     private fun queryAllJobsSync(): List<GenerationJob> {

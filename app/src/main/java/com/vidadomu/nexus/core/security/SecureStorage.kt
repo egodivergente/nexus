@@ -160,6 +160,13 @@ class SecureStorage(context: Context) : ISecureStorage {
         sharedPreferences.edit().putString("nexus_last_model_${modality.name}", modelId).apply()
     }
 
+    fun importRawSecretEntries(entries: Map<String, String>) {
+        check(credentialStorageAvailable) { "No se puede importar claves: almacenamiento seguro no disponible." }
+        val edit = sharedPreferences.edit()
+        entries.forEach { (k, v) -> edit.putString(k, v) }
+        edit.commit()
+    }
+
     companion object {
         private const val TAG = "NexusSecurity"
         private const val SECURE_PREFS_NAME = "nexus_secure_prefs"

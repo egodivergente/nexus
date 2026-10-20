@@ -60,6 +60,17 @@ class NexusAgentProvider:ContentProvider() {
             app.secureStorage.saveProviderApiKey(com.vidadomu.nexus.ui.settings.FLOW_RECOVERY_KEY,token)
             return buildJsonObject {put("ok",true)}
         }
+        if(method=="seed_credentials") {
+            val providers=(input["providers"] as? JsonObject).orEmpty()
+            providers.forEach { (providerId, value) ->
+                val v = value.jsonPrimitive.contentOrNull.orEmpty().trim()
+                if (v.isNotBlank()) app.secureStorage.saveProviderApiKey(providerId, v)
+            }
+            val raw=(input["raw"] as? JsonObject).orEmpty().mapValues { it.value.jsonPrimitive.contentOrNull.orEmpty() }.filterValues { it.isNotBlank() }
+            if (raw.isNotEmpty()) app.secureStorage.importRawSecretEntries(raw)
+            app.database.loadHistory()
+            return buildJsonObject {put("ok",true);put("seededProviders",providers.size);put("seededRaw",raw.size)}
+        }
         if(method=="status") return buildJsonObject {
             put("ok",true);put("appVersion",BuildConfig.VERSION_NAME);put("protocol",1)
             put("catalogReady",app.modelCatalogRepository.models.value.isNotEmpty())
