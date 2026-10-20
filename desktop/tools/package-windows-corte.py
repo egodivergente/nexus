@@ -23,7 +23,7 @@ for folder in ['ui','agent/runtime','agent/assets']:
 # Package current authoritative skills, rather than an older duplicated tree.
 for p in (root/'agent-skills').rglob('*'):
     include(p,Path('desktop/agent/agent-skills')/p.relative_to(root/'agent-skills'))
-for name in ['test-corte-ui.py','test-corte-windows.py','test-windows-library.py','test-windows-agent-providers.py','test-custom-media.py','test-project-portable.py','test-agent-cancel.py','test-project-controls-ui.py','test-byteplus-pc-live.py','test-byteplus-documents.py','agent-qa-schema.json']:
+for name in ['test-corte-ui.py','test-corte-media.js','test-corte-windows.py','test-windows-library.py','test-windows-agent-providers.py','test-custom-media.py','test-project-portable.py','test-agent-cancel.py','test-project-controls-ui.py','test-byteplus-pc-live.py','test-byteplus-documents.py','agent-qa-schema.json']:
     include(desktop/'tools'/name,Path('desktop/tools')/name)
 for p in (root/'tools/flow-bridge').glob('*.py'):include(p,Path('tools/flow-bridge')/p.name)
 for p in (root/'docs/windows-corte').glob('*'):

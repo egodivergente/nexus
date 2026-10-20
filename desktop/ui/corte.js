@@ -108,9 +108,10 @@ function corteDrawAnalysis(){
 }
 function renderCorteAssets(){
  const node=$('#corte-assets');if(!node)return;
- const all=(Agent.snapshot?.index.assets||[]).filter(a=>!a.libraryDeleted&&['VIDEO','IMAGE','AUDIO'].includes(a.type)&&a.projectId===Corte.projectId),assets=all.filter(a=>String(a.displayName||'').toLocaleLowerCase().includes(corteSearch.toLocaleLowerCase()));
+ const all=(Agent.snapshot?.index.assets||[]).filter(a=>Corte.projectId&&!a.libraryDeleted&&['VIDEO','IMAGE','AUDIO'].includes(a.type)&&a.projectId===Corte.projectId),assets=all.filter(a=>String(a.displayName||'').toLocaleLowerCase().includes(corteSearch.toLocaleLowerCase()));
  const count=$('#corte-asset-count');if(count)count.textContent=String(all.length);
- node.innerHTML=assets.map(a=>`<article class="corte-asset"><div class="corte-asset-thumb ${a.type.toLowerCase()}">${a.type==='IMAGE'?`<img src="${escape(a.uri)}" loading="lazy" alt="">`:corteGlyph(a.type==='AUDIO'?'audio':'video')}</div><div class="corte-asset-info"><span title="${escape(a.displayName)}">${escape(a.displayName)}</span><small>${{VIDEO:'Vídeo',IMAGE:'Imagen',AUDIO:'Audio'}[a.type]}</small></div><div class="corte-asset-actions"><button data-corte-place="${escape(a.id)}" title="Añadir al cabezal" aria-label="Añadir al cabezal">${corteGlyph('plus')}</button><button data-corte-after="${escape(a.id)}" title="Después del clip" aria-label="Después del clip" ${!Corte.selected.size?'disabled':''}>↳</button></div></article>`).join('')||`<div class="corte-empty-media">${corteGlyph('media')}<strong>${corteSearch?'Sin coincidencias':'Tu material, aquí'}</strong><p>${corteSearch?'Prueba otro nombre.':'Importa archivos o genera medios con el agente.'}</p></div>`;
+ const markup=assets.map(a=>CorteMedia.markup(a,Agent.snapshot?.index,!!Corte.selected.size,corteGlyph)).join('')||`<div class="corte-empty-media">${corteGlyph('media')}<strong>${corteSearch?'Sin coincidencias':'Tu material, aquí'}</strong><p>${corteSearch?'Prueba otro nombre.':'Importa archivos o genera medios con el agente.'}</p></div>`;
+ if(node.innerHTML!==markup)node.innerHTML=markup;
 }
 async function corteFocus(){
  await corteMutate('focus',{playhead_us:Corte.playhead,selection:[...Corte.selected]});
