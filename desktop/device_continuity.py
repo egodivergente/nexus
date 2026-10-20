@@ -29,6 +29,10 @@ LIMIT_SLOTS = dict(maxToolRounds='lim_rounds', turnTimeoutSeconds='lim_turn_time
                    maxDocumentsPerTurn='lim_documents', maxMessages='lim_messages', maxToolResultChars='lim_tool_chars',
                    maxUiContextChars='lim_ui_chars', jobTrackingMinutes='lim_tracking_min')
 
+
+class AgentBusy(RuntimeError):
+    pass
+
 def encoded(value):
     return json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
 
@@ -150,6 +154,16 @@ def merge(local, remote, base=None, own_base=None, deletions=False):
             else:
                 result[key] = merge(local[key], remote[key], (base or {}).get(key), (own_base or {}).get(key), deletions)
         return result
+    if isinstance(local, list) and isinstance(remote, list):
+        if all(isinstance(row, dict) and isinstance(row.get('id'), str) for row in local + remote):
+            def rows(value):
+                return {row['id']: row for row in value or []} if isinstance(value, list) else {}
+            result = merge(rows(local), rows(remote), rows(base), rows(own_base), deletions)
+            order = list(dict.fromkeys([row['id'] for row in local + remote]))
+            return [result[key] for key in order if key in result]
+        if deletions and local == own_base:
+            return remote
+        return local + [row for row in remote if row not in local]
     if local == own_base or local is None:
         return remote
     return local
@@ -183,6 +197,7 @@ class DeviceContinuity:
         self.private_sources = {}
         self.status = 'Sin vincular'
         self.dirty = False
+        self.last_errors = []
         defaults = dict(enabled=False, peers=[], address='', port=8797, interval=30,
                         timeout=120, maxFileMb=0, skills=True, credentials=True,
                         settings=True, agy=True, deletions=False, device=str(uuid.uuid4()),
@@ -198,7 +213,8 @@ class DeviceContinuity:
         return self.host.read_secret(self.secret_file)
 
     def public(self):
-        return {**self.config, 'configured': bool(self.private().get('key')), 'status': self.status}
+        return {**self.config, 'configured': bool(self.private().get('key')), 'status': self.status,
+                'lastErrors': self.last_errors}
 
     def command(self, args):
         op = args.get('op', 'status')
@@ -266,17 +282,22 @@ class DeviceContinuity:
         provider = self.host.read_secret(self.host.data.parent / 'credentials.dpapi')
         agent = self.host.read_secret(self.host.data / 'credentials.dpapi')
         if self.config['credentials']:
+            native = {}
             for name, value in provider.items():
-                if isinstance(value, str) and re.fullmatch(r'[a-z0-9_-]+', name):
-                    result['keys']['atlas_cloud_api_key' if name == 'atlas_cloud' else 'provider_' + name + '_api_key'] = value
+                if isinstance(value, str) and name != 'nexus_device_sync_pair' and re.fullmatch(r'[a-z0-9_-]+', name):
+                    native['atlas_cloud_api_key' if name == 'atlas_cloud' else 'provider_' + name + '_api_key'] = value
             for name, value in agent.items():
                 if name.startswith('brain:'):
-                    result['keys']['provider_nexus_brain_key_' + name[6:] + '_api_key'] = value
+                    native['provider_nexus_brain_key_' + name[6:] + '_api_key'] = value
                 elif name in AGENT_SLOTS:
-                    result['keys']['provider_' + AGENT_SLOTS[name] + '_api_key'] = value
+                    native['provider_' + AGENT_SLOTS[name] + '_api_key'] = value
             media = self.host.read_secret(self.host.data.parent / 'custom-media-credentials.dpapi')
             for name, value in media.items():
-                result['keys']['provider_nexus_media_key_' + name + '_api_key'] = value
+                native['provider_nexus_media_key_' + name + '_api_key'] = value
+            if self.config['deletions']:
+                result['keys'] = {name: value for name, value in result['keys'].items()
+                                  if name in native or not (name == 'atlas_cloud_api_key' or name.startswith('provider_'))}
+            result['keys'].update(native)
         else:
             result['keys'] = {}
         if not self.config['settings']:
@@ -290,6 +311,10 @@ class DeviceContinuity:
                     fields[android] = {'type': 'boolean' if isinstance(value, bool) else 'int' if isinstance(value, int) else 'string', 'value': value}
             if settings.get('brainProfiles'):
                 result['settings'].setdefault('brain_profiles_v1', {})['profiles'] = {'type': 'string', 'value': list(settings['brainProfiles'].values())}
+            media_file = self.host.data.parent / 'custom-media-providers.json'
+            if media_file.is_file():
+                configs = json.loads(media_file.read_text('utf-8'))
+                result['settings'].setdefault('media_providers_v1', {})['configs'] = {'type': 'string', 'value': list(configs.values())}
             limits = settings.get('limits', {})
             for name, slot in LIMIT_SLOTS.items():
                 if name in limits:
@@ -443,6 +468,14 @@ class DeviceContinuity:
                 profiles = json.loads(profiles)
             if isinstance(profiles, list):
                 settings['brainProfiles'] = {**settings.get('brainProfiles', {}), **{p['id']: p for p in profiles if isinstance(p, dict) and p.get('id')}}
+            media = merged['settings'].get('media_providers_v1', {}).get('configs', {}).get('value')
+            if isinstance(media, str):
+                media = json.loads(media)
+            if isinstance(media, list):
+                media_file = self.host.data.parent / 'custom-media-providers.json'
+                configs = json.loads(media_file.read_text('utf-8')) if media_file.is_file() else {}
+                configs.update({p['id']: p for p in media if isinstance(p, dict) and p.get('id')})
+                atomic(media_file, encoded(configs))
             limits = dict(settings.get('limits', {}))
             for name, slot in LIMIT_SLOTS.items():
                 if slot in prefs:
@@ -499,6 +532,8 @@ class DeviceContinuity:
                 continue
             if doc['kind'] == 'skill' and not self.config['skills']:
                 continue
+            if doc['kind'] == 'credentials' and not any(self.config[name] for name in ('credentials', 'settings', 'agy')):
+                continue
             private = self.private()
             state_key = device + ':' + doc['kind'] + ':' + doc['name']
             state = private.get('peers', {}).get(state_key, {})
@@ -511,7 +546,7 @@ class DeviceContinuity:
             if digest(data) != doc['hash'] or len(data) != doc['bytes']:
                 raise ValueError('Invalid document integrity')
             if not self.host.lock.acquire(False):
-                raise RuntimeError('Agent busy; retry next interval')
+                raise AgentBusy('Agent busy; retry next interval')
             try:
                 if doc['kind'] == 'credentials':
                     state = self.receive_credentials(json.loads(data), state, manifest.get('scopes', []))
@@ -580,9 +615,13 @@ class DeviceContinuity:
                             self.dirty = False
                         finally:
                             self.host.lock.release()
-                    self.status = ('Pendiente de conexion (' + ', '.join(sorted(set(failures))) + ')') if failures else 'Sincronizado - ' + time.strftime('%H:%M:%S')
+                    self.last_errors = sorted(set(failures))
+                    self.status = ('Esperando a que termine el turno' if set(failures) == {'AgentBusy'} or self.dirty else
+                                   'Continuidad pendiente. Reintento automatico.' if failures else
+                                   'Sincronizado - ' + time.strftime('%H:%M:%S'))
                 except Exception as error:
-                    self.status = 'Pendiente de conexion (' + type(error).__name__ + ')'
+                    self.last_errors = [type(error).__name__]
+                    self.status = 'Continuidad pendiente. Reintento automatico.'
                 finally:
                     self.lock.release()
             self.wake.wait(self.config['interval'])

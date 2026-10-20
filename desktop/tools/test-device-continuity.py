@@ -92,6 +92,14 @@ class Tests(unittest.TestCase):
         self.assertEqual({}, merge({'a': 1}, {}, {'a': 1}, {'a': 1}, True))
         self.assertEqual({'a': 1}, merge({'a': 1}, {}, {'a': 1}, {'a': 1}, False))
 
+    def test_profile_edits_merge_per_field_and_removals_are_optional(self):
+        base = [{'id': 'brain', 'modelId': 'first', 'name': 'Original'}]
+        local = [{'id': 'brain', 'modelId': 'local', 'name': 'Original'}]
+        remote = [{'id': 'brain', 'modelId': 'first', 'name': 'Phone'}]
+        self.assertEqual([{'id': 'brain', 'modelId': 'local', 'name': 'Phone'}], merge(local, remote, base, base))
+        self.assertEqual(base, merge(base, [], base, base))
+        self.assertEqual([], merge(base, [], base, base, True))
+
     def test_skill_cannot_escape_or_use_windows_stream(self):
         for name in ('private/../outside', 'private/C:/x', 'private/a:stream', 'private/\\x', 'private//x'):
             with self.assertRaises(ValueError):
@@ -152,9 +160,12 @@ class Tests(unittest.TestCase):
         received['keys']['atlas_cloud_api_key'] = 'synthetic-2'
         a.receive_credentials(received, state, ['credentials'])
         self.assertEqual('synthetic-2', a.host.read_secret(a.host.data.parent / 'credentials.dpapi')['atlas_cloud'])
+        provider_file = a.host.data.parent / 'credentials.dpapi'
+        a.host.write_secret(provider_file, {**a.host.read_secret(provider_file), 'nexus_device_sync_pair': 'synthetic-pair-do-not-export'})
         a.publish()
         self.assertFalse(a.sources)
         self.assertTrue(a.private_sources)
+        self.assertNotIn('provider_nexus_device_sync_pair_api_key', json.loads(next(iter(a.private_sources.values())))['keys'])
         self.assertFalse(any(b'synthetic-' in p.read_bytes() for p in a.root.rglob('*') if p.is_file()))
 
     def test_settings_limits_profiles_and_key_slots_are_usable(self):
@@ -167,11 +178,33 @@ class Tests(unittest.TestCase):
         self.assertIn('custom', a.host.settings()['brainProfiles'])
         self.assertEqual('synthetic', a.host.read_secret(a.host.data / 'credentials.dpapi')['brain:custom'])
 
+    def test_custom_media_provider_config_and_key_use_native_windows_stores(self):
+        a = self.peer('a')
+        config = {'id': 'custom-media', 'name': 'Private media', 'baseUrl': 'https://example.com'}
+        incoming = {'keys': {'provider_nexus_media_key_custom-media_api_key': 'synthetic'},
+                    'settings': {'media_providers_v1': {'configs': {'type': 'string', 'value': [config]}}}, 'agy': None}
+        a.receive_credentials(incoming, {}, ['credentials', 'settings'])
+        self.assertEqual(config, json.loads((a.host.data.parent / 'custom-media-providers.json').read_text('utf-8'))['custom-media'])
+        self.assertEqual('synthetic', a.host.read_secret(a.host.data.parent / 'custom-media-credentials.dpapi')['custom-media'])
+
     def test_category_disabled_does_not_write_peer_keys(self):
         a = self.peer('a')
         a.config['credentials'] = False
         a.receive_credentials({'keys': {'atlas_cloud_api_key': 'synthetic'}, 'settings': {}, 'agy': None}, {}, ['credentials'])
         self.assertFalse(a.host.read_secret(a.host.data.parent / 'credentials.dpapi'))
+
+    def test_all_sensitive_categories_disabled_never_downloads_secrets(self):
+        a, b = self.peer('a'), self.peer('b')
+        a.config.update(credentials=False, settings=False, agy=False)
+        b.publish()
+        calls = []
+        def fetch(_, route):
+            calls.append(route)
+            self.assertEqual('/manifest', route)
+            return encoded(b.manifest)
+        a.fetch = fetch
+        a.cycle('b')
+        self.assertEqual(['/manifest'], calls)
 
     def test_optional_deletion_preserves_local_key_edits(self):
         a = self.peer('a')
@@ -184,6 +217,14 @@ class Tests(unittest.TestCase):
         a.host.write_secret(a.host.data.parent / 'credentials.dpapi', {'atlas_cloud': 'local edit'})
         a.receive_credentials({'keys': {}, 'settings': {}, 'agy': None}, state, ['credentials'])
         self.assertEqual('local edit', a.host.read_secret(a.host.data.parent / 'credentials.dpapi')['atlas_cloud'])
+
+    def test_local_key_removal_exports_only_when_deletions_enabled(self):
+        a = self.peer('a')
+        a.receive_credentials({'keys': {'atlas_cloud_api_key': 'first'}, 'settings': {}, 'agy': None}, {}, ['credentials'])
+        a.host.write_secret(a.host.data.parent / 'credentials.dpapi', {})
+        self.assertIn('atlas_cloud_api_key', a.credential_snapshot()['keys'])
+        a.config['deletions'] = True
+        self.assertNotIn('atlas_cloud_api_key', a.credential_snapshot()['keys'])
 
     def test_agy_revision_is_complete_and_previous_auth_is_dpapi(self):
         a = self.peer('a')

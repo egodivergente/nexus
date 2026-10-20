@@ -33,7 +33,7 @@ estan en la carpeta que el usuario configura.
 Dependencia de Windows: `desktop/requirements-continuity.txt`. El Python firmado
 del PC dispone de cryptography 50; no se instala software dentro de Termux.
 
-Validacion de fuente: 16 pruebas de continuidad PASS (cifrado Node/Android,
+Validacion de fuente: 20 pruebas de continuidad PASS (cifrado Node/Android,
 tramas alteradas/truncadas, HTTP cifrado, claves existentes, limites/perfiles,
 conflictos y retorno de skills), 6 pruebas del host/DPAPI PASS; sintaxis Python/JS
 PASS. La validacion fisica y activacion se registran al cerrar la integracion;
@@ -45,7 +45,7 @@ ese instante. Vinculacion preconfigurada en el perfil real con DPAPI, todavia
 desactivada hasta la activacion coordinada del host. No se han alterado las
 credenciales existentes de proveedores ni el respaldo Drive durante esta prueba.
 
-La entrega Windows se identifica como 2026.10.20-device-continuity.1; su paquete
+La entrega Windows se identifica como 2026.10.20-device-continuity.2; su paquete
 incluye las 15 bibliotecas JVM ya instaladas y verificadas byte a byte, sin
 reconstruir ni sustituir el motor Corte/Drive durante el desarrollo del enlace.
 
@@ -53,3 +53,19 @@ Pixel reconectado: verificados tambien manifiesto cifrado Pixel y retorno TCP
 desde Pixel al puerto8797 del PC. Ambos enlaces de red estan comprobados.
 La integracion conserva la renovacion de token Drive posterior a preparar
 originales del commit32d1595; 11 pruebas Drive PASS.
+
+## Validacion del paquete final Windows .2
+
+Runtime completo compilado con JDK17 y 1 worker, para mantener compatibilidad
+binaria entre DesktopAgent y el nucleo ampliado. JVM: 392 PASS, 4 omitidas;
+Python: 20 continuidad + 6 host/DPAPI + 11 Drive PASS. Incluye edf8d7c+9fda60:
+solo se consideran equivalentes referencias con prueba de bytes SHA; lo
+no demostrado sigue siendo conflicto. Fuente JSON movil corregida en239df6f y
+ad5a6ec: strings y contenedores se codifican como JSON portable estricto.
+
+La activacion .1 detecto que el indice vivo previo tenia4proyectos/917assets/
+524generaciones, mientras el archivo anterior conservaba2/384/282. Se restauro
+el snapshot vivo exacto capturado antes del cambio con ambos sync pausados,
+se comprobo retencion de todos los IDs y persistencia real mediante una escritura
+sin cambios de un asset existente. No se atribuye una causa sin evidencia.
+No se cancelaron ni reenviaron los dos registros PROCESSING importados de Android.
