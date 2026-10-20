@@ -39,13 +39,18 @@ SCHEMA_LOCK = threading.Lock()
 ALLOWED_PROVIDERS = {'atlas_cloud': 'https://api.atlascloud.ai',
                      'runway': 'https://api.dev.runwayml.com',
                      'crun': 'https://api.crun.ai'}
-MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif':'image/gif',
-        '.webp': 'image/webp', '.mp4': 'video/mp4', '.mov': 'video/quicktime',
-        '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
-        '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
-        '.pdf': 'application/pdf', '.txt': 'text/plain', '.md': 'text/markdown',
-        '.json':'text/plain', '.py':'text/plain', '.js':'text/plain', '.sh':'text/plain', '.ps1':'text/plain',
-        '.csv': 'text/csv', '.html': 'text/html', '.srt': 'text/plain', '.zip': 'application/zip'}
+from media_import import MIME, MAX_IMPORT_BYTES, MediaImporter
+_IMPORTERS = {}
+_IMPORTERS_LOCK = threading.Lock()
+
+
+def media_importer():
+    with _IMPORTERS_LOCK:
+        key = str(MEDIA)
+        if key not in _IMPORTERS:
+            _IMPORTERS[key] = MediaImporter(MEDIA)
+        return _IMPORTERS[key]
+
 
 
 class Blob(ctypes.Structure):
@@ -254,20 +259,8 @@ def select_files():
         names = app.tk.splitlist(filedialog.askopenfilenames(parent=app, title='Añadir archivos a Nexus'))
     finally:
         app.destroy()
-    files = []
-    for name in names:
-        source = Path(name)
-        if not source.is_file() or source.stat().st_size > 512 * 1024 * 1024:
-            raise ValueError('El archivo no existe o supera los 512 MB.')
-        ext = source.suffix.lower()
-        if ext not in MIME:
-            raise ValueError('Nexus no admite este formato de archivo.')
-        identifier = uuid.uuid4().hex + ext
-        target = MEDIA / identifier
-        shutil.copy2(source, target)
-        files.append({'id': identifier, 'name': source.name, 'size': target.stat().st_size,
-                      'mime': MIME[ext], 'url': '/media/' + identifier})
-    return files
+    return [media_importer().copy(name) for name in names]
+
 
 
 def media_path(identifier):
@@ -480,7 +473,7 @@ def dispatch(keys, operation, args):
     if operation == 'corte':
         return agent_host().corte.run(args)
     if operation == 'nativeOperation':
-        if OFFLINE_QA and args.get('operation') in {'web_search', 'read_web_page', 'connect_mcp_server', 'call_mcp_tool', 'atlas_get_balance', 'diagnose_flow', 'repair_flow', 'recover_generation'}:
+        if OFFLINE_QA and args.get('operation') in {'web_search', 'read_web_page', 'connect_mcp_server', 'call_mcp_tool', 'atlas_get_balance', 'diagnose_flow', 'repair_flow', 'recover_generation', 'run_windows_command', 'open_windows_item'}:
             raise ValueError('Laboratorio: operación de red bloqueada.')
         return agent_host().native.run(args)
     if operation == 'mediaJobs':
@@ -507,8 +500,8 @@ def dispatch(keys, operation, args):
         flow_models = flow_provider.catalog()
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
-        return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '2026.10.20-sync-preview.4', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+        return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
+                'version': '2026.10.20-desktop-local-4gb.1', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -538,6 +531,14 @@ def dispatch(keys, operation, args):
         write_state(args); return True
     if operation == 'pick':
         return select_files()
+    if operation == 'importBegin':
+        return media_importer().begin(args.get('name', ''), args.get('size'))
+    if operation == 'importChunk':
+        return media_importer().append(args.get('import_id'), args.get('offset'), args.get('content'))
+    if operation == 'importFinish':
+        return media_importer().finish(args.get('import_id'))
+    if operation == 'importAbort':
+        return media_importer().abort(args.get('import_id'))
     if operation == 'importMedia':
         name = Path(str(args.get('name', 'image.png'))).name
         ext = Path(name).suffix.lower()
@@ -867,7 +868,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.20-sync-preview.4'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.20-desktop-local-4gb.1'}),
         encoding='utf-8',
     )
     if options.headless:

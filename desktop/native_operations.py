@@ -206,10 +206,19 @@ class NativeOperations:
                 raise ValueError('Encargo local desconocido.')
             job = json.loads(path.read_text('utf-8'))
             if job['state'] not in {'QUEUED', 'RUNNING'} or time.monotonic() >= deadline:
-                return {**job, '_assets': job['results']}
+                result = {**job, '_assets': job['results']}
+                if job['operation'] == 'detect_video_scenes' and job['state'] == 'COMPLETED':
+                    report = next(a for a in job['results'] if a['type'] == 'OTHER')
+                    result['scene_analysis'] = json.loads(resolve_media(self.data, report['uri']).read_text('utf-8'))
+                    result['_attachments'] = [{'id': a['id'], 'assetId': a['id'], 'uri': a['uri'],
+                        'mimeType': a['mimeType'], 'name': a['displayName']} for a in job['results'] if a['type'] == 'IMAGE']
+                return result
             time.sleep(.25)
 
     def edit(self, operation, args, assets):
+        if operation == 'detect_video_scenes':
+            from scene_analysis import detect
+            return detect(self, args, assets)
         if operation == 'analyze_audio_asset':
             from native_library import analyze_audio
             return analyze_audio(self, args, assets)
@@ -397,6 +406,9 @@ class NativeOperations:
     def run(self, payload):
         operation, args = payload['operation'], payload.get('input', {})
         assets = self.assets(payload)
+        from windows_operations import OPERATIONS as WINDOWS, run as run_windows
+        if operation in WINDOWS:
+            return run_windows(self, operation, args, payload)
         from native_library import OPERATIONS, run as run_library
         if operation in OPERATIONS:
             return run_library(self, operation, args, assets, payload)
@@ -446,7 +458,7 @@ class NativeOperations:
             return self.whisper_status()
         if operation == 'prepare_whisper_model':
             return self.prepare_whisper()
-        if operation in {'edit_video_assets', 'extract_video_frames', 'transcribe_media_asset'}:
+        if operation in {'edit_video_assets', 'extract_video_frames', 'transcribe_media_asset', 'detect_video_scenes'}:
             # Resolve before enqueue, then operate only on this immutable asset snapshot.
             for identifier in args.get('asset_ids', [args.get('asset_id')]):
                 self.asset(identifier, assets)

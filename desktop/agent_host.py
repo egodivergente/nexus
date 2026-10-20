@@ -321,6 +321,8 @@ class AgentHost:
                 elif getattr(self, 'corte', None):
                     self.corte.agent_context=None
             result = self.exchange(op, body)
+            if op == 'send' and isinstance(result, dict) and isinstance(result.get('snapshot'), dict):
+                self.save_settings({'projectId': result['snapshot'].get('projectId') or ''})
             if op == 'createProject':
                 self.save_settings({'projectId': result.get('projectId', '')})
             return {'result': result, 'settings': self.public_settings()}

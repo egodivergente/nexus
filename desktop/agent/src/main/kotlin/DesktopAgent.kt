@@ -71,9 +71,12 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         override suspend fun schema(ref: ModelRef): ModelSchema = turnSchemas[ref] ?: json.decodeFromJsonElement<ModelSchema>(callback("schema", encoded(ref))).also { turnSchemas[ref] = it }
     }
     private var skills = loadSkills()
-    private fun loadSkills() = SkillStore(listOf(
-        DirectorySkillSource(File(root, "agent-skills/skills"), "bundled"),
-        DirectorySkillSource(File(data, "skills"), "personal")))
+    private fun loadSkills(): SkillStore {
+        val source = File(root.parentFile.parentFile, "agent-skills/skills")
+        val bundled = if (source.isDirectory) source else File(root, "agent-skills/skills")
+        return SkillStore(listOf(DirectorySkillSource(bundled, "bundled"),
+            DirectorySkillSource(File(data, "skills"), "personal")))
+    }
     private val published = PublishedRateEstimator.fromJson(File(root, "assets/atlas_published_prices.json").readText())
     private val cost = object : CostEstimator {
         override suspend fun estimate(model: ModelSummary, params: Map<String, String>): CostEstimate =
@@ -93,20 +96,22 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         }), guard, GuardedExecutor(backend, guard), assets,
             GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) }, directFlow = true,
             adaptPrompt = { prompt, schema, target -> promptAdapter.adapt(prompt, schema.textLimits["prompt"], target) },
-            nativeOperations = NativeOperations { operation, arguments, session ->
-                val response = callback("native", obj("operation" to JsonPrimitive(operation), "input" to arguments,
-                    "assets" to encoded(assets.snapshot().assets), "projectId" to (session.activeProjectId?.let(::JsonPrimitive) ?: JsonNull))).jsonObject
-                response["_assets"]?.jsonArray?.forEach { element ->
-                    val asset = json.decodeFromJsonElement<Asset>(element)
-                    if (assets.asset(asset.id) == null) assets.addAsset(asset) else assets.updateAsset(asset.id) { asset }
-                }
-                response["_attachments"]?.jsonArray?.forEach { element ->
-                    val attachment=json.decodeFromJsonElement<Attachment>(element)
-                    session.attachments.removeAll { it.id == attachment.id }; session.attachments.add(attachment)
-                    viewedAssets.removeAll { it.id == attachment.id }; viewedAssets.add(attachment)
-                }
-                JsonObject(response.filterKeys { it !in setOf("_assets", "_attachments") })
-            })
+            nativeOperations = NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) })
+    private suspend fun runNative(operation: String, arguments: JsonObject, session: AgentSession): JsonObject {
+        val response = callback("native", obj("operation" to JsonPrimitive(operation), "input" to arguments,
+            "assets" to encoded(assets.snapshot().assets), "projectId" to (session.activeProjectId?.let(::JsonPrimitive) ?: JsonNull))).jsonObject
+        response["_assets"]?.jsonArray?.forEach { element ->
+            val asset = json.decodeFromJsonElement<Asset>(element)
+            if (assets.asset(asset.id) == null) assets.addAsset(asset) else assets.updateAsset(asset.id) { asset }
+        }
+        response["_attachments"]?.jsonArray?.forEach { element ->
+            val attachment=json.decodeFromJsonElement<Attachment>(element)
+            session.attachments.removeAll { it.id == attachment.id }; session.attachments.add(attachment)
+            viewedAssets.removeAll { it.id == attachment.id }; viewedAssets.add(attachment)
+        }
+        return JsonObject(response.filterKeys { it !in setOf("_assets", "_attachments") })
+    }
+
     private var deps = deps()
     private val viewedAssets = mutableListOf<Attachment>()
     private var activeLimits = AgentLimits()
@@ -144,16 +149,17 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                     perTurnCalls=(profile?.limits?.maxCallsPerTurn ?: settings["perTurnCalls"]?.jsonPrimitive?.intOrNull ?: 8).let { if(it==0) Int.MAX_VALUE else it })
             }) else llm
         llmProvider = effective
-        return AgentOrchestrator(effective, AgentConfig(
+        return AgentOrchestrator(WindowsToolProvider.wrap(effective), AgentConfig(
             provider = llm.id, modelId = profile?.modelId ?: settings.text("modelId", "us.anthropic.claude-sonnet-4-6"),
             region = settings.text("region", "us-east-1"), endpoint = settings.text("endpoint"),
             maxTokens = limits.maxTokens,
             maxToolRounds = limits.rounds, limits = limits,
+            systemPromptOverride = SystemPrompt.BASE + "\n" + WindowsTools.PROMPT,
             temperature = settings["temperature"]?.jsonPrimitive?.doubleOrNull,
             toolUse = profile?.capabilities?.tools ?: true,
             documentsInOnePass = profile?.protocol == BrainProtocol.OPENAI_RESPONSES,
             mode = mode, sendImagesToLlm = settings["sendImages"]?.jsonPrimitive?.booleanOrNull ?: true
-        ), NexusToolkit.all(deps) +
+        ), NexusToolkit.all(deps) + WindowsTools.all(NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) }) +
             ExpertBriefTool(registry, knowledge) { settings.text("excludedFamilies", "veo").split(',', ';').map { it.trim().lowercase() }.toSet() },
             skills, assets, images = AttachmentImageLoader { attachment ->
             val response = callback("thumbnail", encoded(attachment)).jsonObject

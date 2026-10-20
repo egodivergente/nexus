@@ -267,6 +267,12 @@ class CorteHost:
             return self.run({'method':method})
         # The turn captures explicit project/selection/playhead before the model runs.
         context = self.agent_context
+        active_project = payload.get('projectId')
+        if active_project and (not context or context['project_id'] != active_project):
+            # open_project/create_project can change the active Nexus project within this turn.
+            self.run({'method': 'create_project', 'project_id': active_project, 'name': active_project})
+            current = self.run({'method': 'read_project', 'project_id': active_project})
+            self.agent_context = context = {**current, 'agent_transaction_id': None}
         if not context:
             raise ValueError('Abre un proyecto Nexus antes de editar.')
         args['project_id']=args.get('project_id') or context['project_id']
