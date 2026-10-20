@@ -71,9 +71,23 @@ reanudar el puente durante ese arranque. Android puede aplazar actividad durante
 ahorro de batería o detener una aplicación forzada; el siguiente arranque de Nexus
 reanuda el servicio habilitado y los cambios pendientes se reintentan.
 
-## Verificación de esta entrega
+## Verificacion final (2026-10-20)
 
-Se registrarán aquí las pruebas finales, la identidad de la APK y el intercambio
-automático real tras instalar y vincular los teléfonos. Las pruebas no requieren
-conversaciones con proveedores ni generaciones de pago. Los datos de recuperación
-y los informes con estado privado permanecen en `entregas/`, fuera de Git.
+- Build agentPreview PASS; 617 pruebas superadas y 4 omitidas; 2 Node PASS.
+- Firma conservada: `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`.
+- APK vc93 SHA256: `a298c6b5b34c2e15d9db38bf9fce2959f1633f092497f805444a60b254cdb2d5`.
+- Prueba fisica final sobre 1.9.60-sync-preview / vc94 en ambos moviles: integra
+  este mismo codigo de continuidad con Drive. No degradar a vc93.
+- Intercambio automatico bidireccional PASS: chat, adjunto con SHA256, memoria,
+  skill y clave sintetica. Actualizaciones PASS en ambos sentidos: clave
+  existente, memoria y retorno al origen de una skill editada en el receptor.
+- AGY: GET autenticado y POST protegido sin cambios PASS en ambos adaptadores.
+  No se han rotado tokens reales como prueba. Arranque configurado y sintaxis
+  verificada; reinicio fisico no probado.
+- Dos audios ya ausentes en origen siguen inaccesibles. Ambos moviles muestran
+  el mismo aviso. La preparacion inicial de la galeria tarda varios minutos.
+- Fixtures retirados de ambos moviles. Informes y backups privados en entregas/,
+  fuera de Git. No se han enviado generaciones ni conversaciones de pago.
+
+La tarea coordinada de Drive prepara una APK posterior unificada desde
+`codex/nexus-drive-sync-android-20261020`. Coordinar nuevas instalaciones.

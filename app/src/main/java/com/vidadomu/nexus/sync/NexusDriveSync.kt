@@ -3,9 +3,13 @@ package com.vidadomu.nexus.sync
 import android.accounts.Account
 import android.app.Activity
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Bundle
+import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
@@ -14,6 +18,7 @@ import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Tasks
 import com.vidadomu.nexus.BuildConfig
 import com.vidadomu.nexus.NexusApplication
+import com.vidadomu.nexus.R
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.agent.core.sync.*
 import java.io.File
@@ -62,7 +67,14 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
     fun initialize() {
         if(BuildConfig.OFFLINE_QA || !prefs.getBoolean("enabled",false))return
         val work=PeriodicWorkRequestBuilder<NexusDriveSyncWorker>(15,TimeUnit.MINUTES).setConstraints(constraints()).build()
-        WorkManager.getInstance(app).enqueueUniquePeriodicWork("nexus-drive-periodic",ExistingPeriodicWorkPolicy.UPDATE,work)
+        scope.launch {
+            val manager=WorkManager.getInstance(app)
+            val previous=manager.getWorkInfosForUniqueWork("nexus-drive-periodic").get(30,TimeUnit.SECONDS)
+            if(!prefs.getBoolean("enabled",false))return@launch
+            val policy=if(previous.any {it.state==WorkInfo.State.FAILED || it.state==WorkInfo.State.CANCELLED})
+                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE else ExistingPeriodicWorkPolicy.UPDATE
+            manager.enqueueUniquePeriodicWork("nexus-drive-periodic",policy,work)
+        }
         if(watching)return
         watching=true
         app.registerActivityLifecycleCallbacks(object:Application.ActivityLifecycleCallbacks {
@@ -157,5 +169,22 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
 }
 
 class NexusDriveSyncWorker(context:Context,parameters:WorkerParameters):CoroutineWorker(context,parameters) {
-    override suspend fun doWork():Result=withContext(Dispatchers.IO) {if(NexusDriveSync.get(applicationContext).synchronize(inputData.getBoolean("manual",false)))Result.success()else Result.retry()}
+    override suspend fun doWork():Result=withContext(Dispatchers.IO) {
+        val manager=NexusDriveSync.get(applicationContext)
+        val manual=inputData.getBoolean("manual",false)
+        if(manager.prefs.getString("account",null)==null || (!manual && !manager.prefs.getBoolean("enabled",false)))return@withContext Result.success()
+        try {
+            val notifications=applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notifications.createNotificationChannel(NotificationChannel("nexus_drive_sync","Copia en Google Drive",NotificationManager.IMPORTANCE_LOW))
+            val notification=NotificationCompat.Builder(applicationContext,"nexus_drive_sync")
+                .setSmallIcon(R.drawable.ic_launcher_foreground).setContentTitle("Sincronizando Nexus con Drive")
+                .setContentText("Guardando proyectos y archivos originales.").setOngoing(true).build()
+            setForeground(ForegroundInfo(id.hashCode(),notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC))
+            if(manager.synchronize(manual))Result.success()else Result.retry()
+        }catch(e:CancellationException){throw e}
+        catch(e:Exception){
+            manager.setStatus(buildJsonObject {put("state","retry");put("message","La copia se reintentará. Tus archivos locales se conservan.")})
+            Result.retry()
+        }
+    }
 }
