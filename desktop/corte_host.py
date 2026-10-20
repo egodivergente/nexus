@@ -202,7 +202,9 @@ class CorteHost:
                 self.executor.submit(self.render, job, project)
             return job
         if op == 'jobs':
-            return {'jobs': sorted([json.loads(p.read_text('utf-8')) for p in self.jobs_dir.glob('*.json')], key=lambda j:j['createdAt'], reverse=True)[:100]}
+            # Windows readers must release the destination before an atomic rename.
+            with self.lock:
+                return {'jobs': sorted([json.loads(p.read_text('utf-8')) for p in self.jobs_dir.glob('*.json')], key=lambda j:j['createdAt'], reverse=True)[:100]}
         if op == 'cancel_export':
             self.cancelled.add(args['job_id'])
             return {'requested': True}
@@ -241,7 +243,8 @@ class CorteHost:
             if job['id'] in self.cancelled:
                 raise InterruptedError('Exportación cancelada')
             job.update(state='RUNNING', progress=done/total if total else 0)
-            atomic_json(path, job)
+            with self.lock:
+                atomic_json(path, job)
         try:
             output = self.data/'media'/(uuid.uuid4().hex+'.mp4')
             output.parent.mkdir(parents=True, exist_ok=True)
@@ -254,7 +257,8 @@ class CorteHost:
             job.update(state='FAILED', error=str(e)[:1500])
         finally:
             self.cancelled.discard(job['id'])
-            atomic_json(path, job)
+            with self.lock:
+                atomic_json(path, job)
 
     def agent_run(self, operation, payload):
         method=operation.removeprefix('corte_')

@@ -10,7 +10,7 @@ import zipfile
 parser=argparse.ArgumentParser();parser.add_argument('--install',action='store_true');args=parser.parse_args()
 root=Path(__file__).resolve().parents[2];desktop=root/'desktop';out=root/'entregas';out.mkdir(exist_ok=True)
 subprocess.run(['python','-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
-version='2026.10.19-corte-preview.4'
+version='2026.10.20-corte-preview.5'
 files={}
 def include(path,relative):
     if path.is_file():files[str(relative).replace('\\','/')]=path
@@ -56,7 +56,7 @@ if args.install:
         if hashlib.sha256((installed/name).read_bytes()).hexdigest()!=expected:raise ValueError('Installed hash mismatch: '+name)
     report['installed']=str(installed/'desktop')
     # Keep the active production host, tasks and shortcuts untouched.
-    report['activation']='Deferred: production jobs still processing. Existing shortcut remains on the prior build.'
+    report['activation']='Installed; activation is a separate explicit step.'
 evidence=root/'outputs/windows-corte';evidence.mkdir(parents=True,exist_ok=True)
 (evidence/'package.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 print(json.dumps(report,ensure_ascii=False,indent=2))

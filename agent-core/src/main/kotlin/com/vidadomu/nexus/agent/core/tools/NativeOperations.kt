@@ -124,7 +124,7 @@ object NativeOperationTools {
                 integer("pad_ms", "Margen que se respeta a cada lado; por defecto 120.")
             }),
         NativeTool(operations, "corte_apply_ops", ToolCategory.ORGANIZE,
-            "Aplica en Corte una lista de operaciones como UNA sola edición validada por su motor (un único «Deshacer»). Si una falla, no cambia nada y devuelve cuál y por qué. Requiere el proyecto abierto en Corte. Operaciones: split{clip_ids?,at_us}, delete{clip_ids,ripple}, delete_ranges{ranges:[[ini_us,fin_us]],track_ids?,ripple}, trim{clip_id,edge:head|tail,delta_us,ripple}, move{clip_ids,delta_us,track_offset?,mode?}, close_gap{track_id,at_us}, set_speed{clip_id,num,den}, duplicate{clip_ids}, set_transition{track_id,left_clip_id,right_clip_id,kind:CROSS_DISSOLVE|DIP_TO_BLACK|AUDIO_CROSSFADE,duration_us}, remove_transition{transition_id}, add_title{at_us,duration_us,text,size?,bold?,align?}, add_marker{at_us,label}, remove_marker{marker_id}, set_audio{clip_ids,gain_db?,muted?,fade_in_us?,fade_out_us?}, set_video{clip_ids,opacity?,scale?,position_x?,position_y?,fade_in_us?,fade_out_us?}, set_color{clip_ids,exposure?,contrast?,saturation?,temperature?,tint?,fade?}.",
+            "Aplica en Corte una lista de operaciones como UNA sola edición validada por su motor (un único «Deshacer»). Si una falla, no cambia nada y devuelve cuál y por qué. Requiere el proyecto abierto en Corte. Operaciones: split{clip_ids?,at_us}, delete{clip_ids,ripple}, delete_ranges{ranges:[[ini_us,fin_us]],track_ids?,ripple}, trim{clip_id,edge:head|tail,delta_us,ripple}, move{clip_ids,delta_us,track_offset?,mode?}, close_gap{track_id,at_us}, set_speed{clip_id,num,den}, duplicate{clip_ids}, set_transition{track_id,left_clip_id,right_clip_id,kind:CROSS_DISSOLVE|DIP_TO_BLACK|AUDIO_CROSSFADE,duration_us}, remove_transition{transition_id}, add_title{at_us,duration_us,text,size?,bold?,align?}, add_marker{at_us,label}, remove_marker{marker_id}, set_audio{clip_ids,gain_db?,muted?,fade_in_us?,fade_out_us?}, set_video{clip_ids,opacity?,scale?,position_x?,position_y?,fade_in_us?,fade_out_us?}, set_color{clip_ids,exposure?,contrast?,saturation?,temperature?,tint?,fade?}. En Windows también: add_audio_track{name?,role?:DIALOGUE|MUSIC|AMBIENCE|SFX|VOICE_OVER|GENERIC_AUDIO}, set_audio_track{track_id,name?,gain_db?:-60..12,muted?,solo?}.",
             schema {
                 string("ops_json", "Array JSON de operaciones, p. ej. [{\"op\":\"split\",\"at_us\":1200000}].", required = true)
                 string("label", "Nombre corto que verá el usuario en Deshacer, p. ej. «Quitar silencios».")
@@ -136,6 +136,8 @@ object NativeOperationTools {
                 stringArray("asset_ids", "Ids de la biblioteca de Nexus (list_library_assets o search_assets); máximo 10 por llamada.", required = true)
                 boolean("place", "Colocarlos en la línea de tiempo; por defecto true. Con false solo entran en Medios.")
                 integer("at_us", "Posición en microsegundos donde empezar a colocarlos; vacío = al final.")
+                string("audio_track_id", "Windows: pista destino de audio; por defecto a1. Lee los ids reales antes.")
+                string("mode", "Windows: mix para audio simultáneo sin desplazar otras pistas; rechaza solapamientos en la pista elegida. Por defecto insert.")
                 string("project_id", "Proyecto; vacío = el abierto.")
             }),
         NativeTool(operations, "corte_undo", ToolCategory.ORGANIZE,

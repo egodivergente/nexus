@@ -115,4 +115,50 @@ class CorteAcceptance(unittest.TestCase):
             self.host.run({'method':'import_media','project_id':'other','expected_revision':0,'request_id':uuid.uuid4().hex,'asset_ids':['asset-test']},[self.asset])
         self.assertEqual(before,self.host.run({'method':'read_project','project_id':'other'}))
 
+    def test_07_multitrack_audio_and_real_mix(self):
+        import numpy as np
+        project='multiaudio'
+        snap=self.host.run({'method':'create_project','project_id':project,'name':'Mezcla multipista','settings':{'width':320,'height':240}})
+        def edit(method,assets=None,**args):
+            nonlocal snap
+            result=self.host.run({'method':method,'project_id':project,'expected_revision':snap['revision'],'request_id':uuid.uuid4().hex,**args},assets)
+            if result.get('project'):snap=result
+            return result
+        edit('apply_ops',ops=[{'op':'add_audio_track','name':f'Pista {i}'} for i in range(24)])
+        self.assertEqual(25,len(snap['project']['timeline']['audioTracks']))
+        transaction=snap['undo_id'];edit('undo',transaction_id=transaction)
+        self.assertEqual(1,len(snap['project']['timeline']['audioTracks']))
+        edit('redo',transaction_id=transaction);self.assertEqual(25,len(snap['project']['timeline']['audioTracks']))
+        edit('undo',transaction_id=transaction)
+        args={'method':'apply_ops','project_id':project,'expected_revision':snap['revision'],'request_id':uuid.uuid4().hex,'ops':[{'op':'add_audio_track','name':'Música','role':'MUSIC'}]}
+        snap=self.host.run(args);replay=self.host.run(args)
+        self.assertTrue(replay['replayed']);self.assertEqual(2,len(replay['project']['timeline']['audioTracks']))
+        track=snap['project']['timeline']['audioTracks'][-1]['id']
+        before=snap
+        with self.assertRaises(ValueError):edit('apply_ops',ops=[{'op':'add_audio_track','name':'No guardar'},{'op':'set_audio_track','track_id':'missing','muted':True}])
+        after=self.host.run({'method':'read_project','project_id':project});self.assertEqual(before['project'],after['project']);self.assertEqual(before['revision'],after['revision'])
+        with self.assertRaises(ValueError):edit('apply_ops',ops=[{'op':'set_audio_track','track_id':track,'gain_db':90}])
+        edit('import_media',assets=[{**self.asset,'projectId':project}],asset_ids=[self.asset['id']],at_us=0)
+        original_video=snap['project']['timeline']['videoTracks']
+        sound=self.data/'media'/('b'*32+'.wav')
+        self.native.encode(['-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=4','-c:a','pcm_s16le',sound])
+        asset={'id':'music-test','uri':'/media/'+sound.name,'type':'AUDIO','displayName':'Música 880 Hz','projectId':project}
+        edit('import_media',assets=[asset],asset_ids=[asset['id']],audio_track_id=track,at_us=0,mode='mix')
+        self.assertEqual(original_video,snap['project']['timeline']['videoTracks'])
+        self.assertEqual([0,0],[t['clips'][0]['timelineStartUs'] for t in snap['project']['timeline']['audioTracks']])
+        before=snap
+        with self.assertRaises(ValueError):edit('import_media',assets=[asset],asset_ids=[asset['id']],audio_track_id=track,at_us=0,mode='mix')
+        after=self.host.run({'method':'read_project','project_id':project});self.assertEqual(before['project'],after['project']);self.assertEqual(before['revision'],after['revision'])
+        edit('apply_ops',ops=[{'op':'set_audio_track','track_id':track,'name':'Banda sonora','gain_db':-6}])
+        target=self.data/'multitrack.mp4';render_project(self.host,snap,target,lambda *_:None)
+        pcm=self.native.process([self.native.ffmpeg(),'-v','error','-i',str(target),'-f','f32le','-ac','1','-ar','48000','pipe:1'],30)
+        signal=np.frombuffer(pcm,dtype='<f4')[24000:144000];time=np.arange(len(signal))/48000
+        for hz in [440,880]:self.assertGreater(abs(np.dot(signal,np.exp(-2j*np.pi*hz*time)))*2/len(signal),.02)
+        def gains():return [layer['gain'] for layer in self.host.exchange('render_samples',{'project_id':project,'expected_revision':snap['revision'],'times':[1000000]})['samples'][0]['audio']]
+        edit('apply_ops',ops=[{'op':'set_audio_track','track_id':track,'muted':True}]);self.assertEqual(0,gains()[1])
+        edit('apply_ops',ops=[{'op':'set_audio_track','track_id':track,'muted':False,'solo':True}]);self.assertEqual(0,gains()[0]);self.assertAlmostEqual(10**(-6/20),gains()[1],places=5)
+        transaction=snap['undo_id'];edit('undo',transaction_id=transaction);self.assertGreater(gains()[0],0);self.assertEqual(0,gains()[1]);edit('redo',transaction_id=transaction)
+        self.host.close();reopened=self.host.run({'method':'read_project','project_id':project})
+        self.assertEqual(snap['project'],reopened['project']);self.assertEqual(self.original_hash,CorteHost.fingerprint(self.source))
+
 if __name__=='__main__':unittest.main(verbosity=2)

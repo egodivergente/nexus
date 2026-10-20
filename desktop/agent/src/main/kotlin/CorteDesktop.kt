@@ -27,6 +27,46 @@ private fun JsonObject.l(k: String, default: Long = 0) = this[k]?.jsonPrimitive?
 
 /** Windows boundary. All timeline decisions are delegated to Corte's actual Kotlin engine. */
 class CorteDesktop(private val root: File) {
+    private fun audioOps(timeline: Timeline, ctx: EditContext, ops: JsonArray, label: String): EditResult {
+        if (ops.isEmpty()) return EditResult.Rejected("No hay operaciones")
+        var current = timeline
+        val warnings = mutableListOf<String>()
+        val collateral = mutableListOf<Collateral>()
+        val created = mutableListOf<String>()
+        for ((index, value) in ops.withIndex()) {
+            val item = value as? JsonObject ?: return EditResult.Rejected("Operación ${index + 1}: no es un objeto")
+            val edit = try {
+                when (item.s("op")) {
+                    "add_audio_track" -> {
+                        val role = TrackRole.valueOf(item.s("role", "GENERIC_AUDIO"))
+                        require(role.kind == TrackKind.AUDIO) { "La pista debe ser de audio" }
+                        val name = item.s("name", "Audio ${current.audioTracks.size + 1}").trim()
+                        require(name.isNotEmpty() && name.length <= 80) { "Nombre de pista: entre 1 y 80 caracteres" }
+                        TimelineEditor.addTrack(current, ctx, role, name)
+                    }
+                    "set_audio_track" -> {
+                        val track = current.audioTracks.firstOrNull { it.id == item.s("track_id") }
+                            ?: error("Pista de audio inexistente")
+                        val name = item.s("name", track.name).trim()
+                        require(name.isNotEmpty() && name.length <= 80) { "Nombre de pista: entre 1 y 80 caracteres" }
+                        val gain = item["gain_db"]?.jsonPrimitive?.doubleOrNull ?: track.gainDb
+                        require(gain.isFinite() && gain in -60.0..12.0) { "Volumen de pista: entre -60 y +12 dB" }
+                        TimelineEditor.updateTrack(current, ctx, track.id, "Ajustar pista de audio") {
+                            it.copy(name = name, gainDb = gain,
+                                muted = item["muted"]?.jsonPrimitive?.booleanOrNull ?: it.muted,
+                                solo = item["solo"]?.jsonPrimitive?.booleanOrNull ?: it.solo)
+                        }
+                    }
+                    else -> AgentOps.apply(current, ctx, JsonArray(listOf(item)), label)
+                }
+            } catch (e: IllegalArgumentException) { EditResult.Rejected(e.message ?: "Parámetros no válidos") }
+            when (edit) {
+                is EditResult.Rejected -> return EditResult.Rejected("Operación ${index + 1}: ${edit.reason}")
+                is EditResult.Applied -> { current = edit.timeline; warnings += edit.warnings; collateral += edit.collateral; created += edit.createdIds }
+            }
+        }
+        return EditResult.Applied(current, ChangeSet.diff(timeline, current), label, warnings.distinct(), collateral.distinct(), createdIds = created)
+    }
     private fun file(id: String): File {
         require(id.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Identificador de proyecto inválido" }
         return File(root, "$id/edit.json")
@@ -74,7 +114,7 @@ class CorteDesktop(private val root: File) {
         }
         if (op == "status") return buildJsonObject {
             put("ok", true); put("protocol", 3); put("engine", "Corte JVM local")
-            put("operations", cj.encodeToJsonElement(AgentOps.NAMES))
+            put("operations", cj.encodeToJsonElement(AgentOps.NAMES + listOf("add_audio_track", "set_audio_track")))
             put("requires_revision", true); put("persistent_receipts", true)
         }
         if (op == "list_projects") return buildJsonObject {
@@ -164,7 +204,7 @@ class CorteDesktop(private val root: File) {
         var next = d
         var edit: EditResult? = null
         when (op) {
-            "apply_ops" -> edit = AgentOps.apply(d.project.timeline, ctx, a["ops"]!!.jsonArray, a.s("label", "Edición"))
+            "apply_ops" -> edit = audioOps(d.project.timeline, ctx, a["ops"]!!.jsonArray, a.s("label", "Edición"))
             "import_media" -> {
                 val media = cj.decodeFromJsonElement<List<MediaRef>>(a["media"]!!)
                 require(media.isNotEmpty() && media.size <= 100) { "Selecciona de 1 a 100 medios" }
@@ -176,12 +216,23 @@ class CorteDesktop(private val root: File) {
                         val duration = m.durationUs ?: 5_000_000
                         val list = buildList {
                             if (m.hasVideo || m.kind == MediaKind.IMAGE) add(Placement(a.s("track_id", "v1"), if(m.kind == MediaKind.IMAGE) ClipKind.IMAGE else ClipKind.VIDEO, m.id, 0, duration, offset, name=m.displayName, linkKey=m.id))
-                            if (m.hasAudio) add(Placement("a1", ClipKind.AUDIO, m.id, 0, duration, offset, name=m.displayName, linkKey=m.id))
+                            if (m.hasAudio) add(Placement(a.s("audio_track_id", "a1"), ClipKind.AUDIO, m.id, 0, duration, offset, name=m.displayName, linkKey=m.id))
                         }
                         offset += duration; list
                     }
+                    val at = a.l("at_us", d.project.timeline.durationUs)
+                    val mix = a.s("mode") == "mix"
+                    if (mix) {
+                        require(placements.all { it.kind == ClipKind.AUDIO }) { "Mezclar requiere medios de audio" }
+                        for (p in placements) {
+                            val track = d.project.timeline.audioTracks.firstOrNull { it.id == p.trackId } ?: error("Pista de audio inexistente")
+                            require(track.clips.none { it.timelineStartUs < at + p.offsetUs + p.durationUs && it.endUs > at + p.offsetUs }) {
+                                "Ya hay audio en ese tramo de ${track.name}. Elige otra pista o posición."
+                            }
+                        }
+                    }
                     edit = TimelineEditor.place(d.project.timeline, EditContext({ mid -> all.firstOrNull { it.id == mid } }), placements,
-                        a.l("at_us", d.project.timeline.durationUs), if(a.s("mode") == "overwrite") EditMode.OVERWRITE else EditMode.INSERT)
+                        at, if(mix || a.s("mode") == "overwrite") EditMode.OVERWRITE else EditMode.INSERT)
                 }
             }
             "undo", "redo" -> {
