@@ -1,10 +1,10 @@
 # NEXUS: compilación y pruebas
 
-Petición del usuario actualizada: priorizar **AXELPC** (`100.72.111.97`) y el dispositivo móvil físico (**Pixel 8 Pro** / teléfono principal), evitando saturar el HP EliteBook y **dejando el servidor ASUS (`ASUSVIDAL`) únicamente como último recurso**.
+Petición del usuario actualizada: priorizar **AXELPC** (`100.72.111.97`) y el dispositivo móvil físico (**Pixel 8 Pro** / teléfono principal), evitando saturar el HP EliteBook y **reservando ASUSVIDAL exclusivamente para Flow; compilar allí requiere autorización explícita de Vidal para esa ejecución**.
 
 - **Prioridad 1 — AXELPC**: Si la sesión ya corre en `AXELPC`, ejecutar las compilaciones y cargas pesadas localmente en `AXELPC`. Si se trabaja desde el HP EliteBook, priorizar delegar la compilación a `AXELPC` o al Pixel antes de sobrecargar el portátil.
 - **Prioridad 2 — Pruebas y entorno móvil (Pixel 8 Pro)**: Para pruebas Android, priorizar el dispositivo físico conectado por ADB (directamente o por Tailscale). Verificar modelo y transporte actual; no arrancar un emulador local si el teléfono físico cubre la prueba y está disponible.
-- **Último lugar — Servidor ASUS (`ASUSVIDAL`, `vidal@100.112.57.2`)**: El servidor ASUS tiene poca RAM (~3,7 GB). **No utilizarlo por defecto para compilaciones ni procesado pesado.** Usarlo únicamente en último lugar si `AXELPC` y las demás opciones no están disponibles o si el usuario lo pide expresamente (`--max-workers=1 --no-parallel`).
+- **ASUSVIDAL: SOLO Flow.** Prohibido compilar, ejecutar builds, Gradle, Kotlin o sus daemons salvo autorización explícita de Vidal para esa ejecución. Una petición general de desarrollo/pruebas/APK no basta. La indisponibilidad de AXELPC u otros equipos no autoriza usar ASUS como último recurso: esperar o usar otro equipo autorizado. Tras una excepción autorizada, detener los procesos propios y comprobar la RAM sin tocar Flow. Regla actualizada el 2026-10-21; sustituye la autorización anterior de último recurso.
 
 Al terminar, recuperar APK e informes y verificar identidad/integridad de los artefactos. Distinguir acceso comprobado, compilación realizada y pruebas ejecutadas.
 
