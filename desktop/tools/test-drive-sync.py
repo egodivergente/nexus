@@ -123,11 +123,16 @@ class DriveSyncTest(unittest.TestCase):
         exchanged = threading.Event()
         self.host.lock = threading.Lock()
         self.host.start = lambda: None
-        self.host.native = SimpleNamespace(asset=lambda *_: (calls.append('original'), self.root / 'original.png'))
+        def original(*_):
+            self.assertFalse(self.host.lock.locked(), 'Network preparation must leave the agent available')
+            calls.append('original')
+            return ('image/png', self.root / 'original.png')
+        self.host.native = SimpleNamespace(asset=original)
         self.host.corte = SimpleNamespace(lock=threading.Lock(), projects=self.root / 'projects')
         def exchange(operation, args):
             if operation == 'snapshot':
                 return {'index': {'assets': [{'id': 'one', 'uri': 'https://example.invalid/old.png'}]}}
+            self.assertTrue(self.host.lock.locked())
             calls.append(args['accessToken'])
             exchanged.set()
             return {'rootId': 'folder-one', 'state': 'synced'}

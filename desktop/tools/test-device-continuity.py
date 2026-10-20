@@ -14,6 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from device_continuity import (DeviceContinuity, encoded, digest, encrypt, decrypt,
                                authorized, request_token, merge, skill_path, auth_rank)
+from chat_continuity import history_id, visible_history, plain_items
 
 
 class FakeHost:
@@ -60,7 +61,9 @@ class Tests(unittest.TestCase):
         output = io.BytesIO()
         decrypt(io.BytesIO(packet.getvalue()), output, self.key, 'context')
         self.assertEqual(source, output.getvalue())
-        for damaged in (packet.getvalue()[:-1], packet.getvalue() + b'x', packet.getvalue()[:50] + b'x' + packet.getvalue()[51:]):
+        changed = bytearray(packet.getvalue())
+        changed[50] ^= 1
+        for damaged in (packet.getvalue()[:-1], packet.getvalue() + b'x', bytes(changed)):
             with self.assertRaises(Exception):
                 decrypt(io.BytesIO(damaged), io.BytesIO(), self.key, 'context')
         with self.assertRaises(Exception):
@@ -150,6 +153,71 @@ class Tests(unittest.TestCase):
         finally:
             a.server.shutdown()
             a.server.server_close()
+
+    def test_real_encrypted_chat_blobs_preserve_distinct_same_text_contexts(self):
+        a, b = self.peer('a'), self.peer('b')
+        b.publish()
+        def publish_chat(name, data):
+            sha = digest(data)
+            raw = {'items': [{'type': 'com.vidadomu.nexus.assistant.ChatItem.User', 'id': name, 'text': 'Describe',
+                              'html': '<script>ignored</script>', 'attachments': [{'id': name, 'uri': 'nexus-sync-blob:' + sha,
+                               'name': 'photo.png', 'mimeType': 'image/png'}]},
+                             {'type': 'com.vidadomu.nexus.assistant.ChatItem.PlanCard', 'planId': 'never-execute'}],
+                   'plans': {'never-execute': {'authorized': True}}}
+            payload = encoded(raw)
+            b.sources[sha] = data
+            b.sources[digest(payload)] = payload
+            b.manifest['documents'].append({'kind': 'chat', 'name': name + '.json', 'hash': digest(payload), 'bytes': len(payload)})
+            return raw
+        first = publish_chat('context-one', b'\x89PNG\r\n\x1a\n' + bytes(range(256)) * 1500)
+        publish_chat('context-two', b'\x89PNG\r\n\x1a\nother-image')
+        b.start_server()
+        try:
+            address = 'http://127.0.0.1:' + str(b.server.server_port)
+            a.cycle(address)
+            a.cycle(address)
+        finally:
+            b.server.shutdown()
+            b.server.server_close()
+        files = [(p.stem, json.loads(p.read_text('utf-8'))) for p in (a.host.data / 'conversations').glob('*.json')]
+        self.assertEqual(2, len(files))
+        self.assertEqual(2, len(list((a.host.data.parent / 'media').glob('*'))))
+        for _, chat in files:
+            self.assertNotIn('plans', chat)
+            self.assertEqual([], chat['resultPlans'])
+            self.assertEqual(1, len(chat['items']))
+            self.assertNotIn('html', chat['items'][0])
+            url = chat['items'][0]['attachments'][0]['url']
+            path = a.host.data.parent / url.removeprefix('/')
+            self.assertEqual(chat['continuityRaw']['items'][0]['attachments'][0]['uri'].split(':')[1], digest(path.read_bytes()))
+        mirror = ('sync_' + history_id(first['items']), {'desktop': True, 'items': plain_items(first['items'])})
+        visible = visible_history([mirror] + files)
+        self.assertEqual(2, len(visible))
+        self.assertEqual({'context-one.json', 'context-two.json'}, {chat['continuityOrigin']['document'] for _, chat in visible})
+        self.assertFalse((a.host.data / 'index.json').exists())  # Attachments do not create duplicate gallery assets.
+
+    def test_chat_attachment_opt_out_never_downloads_chat_or_media(self):
+        a, b = self.peer('a'), self.peer('b')
+        a.config['chatAttachments'] = False
+        b.publish()
+        b.manifest['documents'].append({'kind': 'chat', 'name': 'private.json', 'hash': '0' * 64, 'bytes': 20})
+        def fetch(_, route):
+            self.assertNotIn('0' * 64, route)
+            return encoded(b.manifest) if route == '/manifest' else b.private_sources[route[6:]]
+        a.fetch = fetch
+        a.cycle('b')
+        self.assertFalse((a.host.data / 'conversations').exists())
+
+    def test_html_attachment_is_preserved_as_inert_bytes(self):
+        a = self.peer('a')
+        data = b'<script>never execute this user document</script>'
+        def fetch(_, route, target=None):
+            self.assertEqual('/blob/' + digest(data), route)
+            target.write(data)
+        a.fetch = fetch
+        uri = a.chat_media('phone', {'uri': 'nexus-sync-blob:' + digest(data), 'name': 'page.html', 'mimeType': 'text/html'})
+        self.assertTrue(uri.endswith('.txt'))
+        self.assertEqual(data, (a.host.data.parent / uri.removeprefix('/')).read_bytes())
 
     def test_keys_are_dpapi_only_and_mapping_updates_existing_keys(self):
         a = self.peer('a')
