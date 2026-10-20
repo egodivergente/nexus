@@ -93,3 +93,18 @@ Drive comprueba que la preparacion HTTP de originales deja libre el bloqueo del
 agente y que el intercambio JVM recupera ese bloqueo. El test de integridad se
 actualiza a la version real .2. El arnes antiguo de reinicio navegador se corrige
 para pedir explicitamente el puerto: no se declara repetida su prueba visual.
+
+
+Windows .2 activado:4proyectos/1029assets/562generaciones al tomar el snapshot;
+todos los IDs previos conservados y acceso directo actualizado. Interfaz real
+verificada con los controles nuevos. El cierre Drive posterior constata1030assets,
+0 grupos de URI visible duplicada y los3PNG recuperados verificados por SHA en
+HTTP y en Google Drive. Prueba ajena coordinada, no se repite la recuperación.
+
+La red real S25 permite LAN pero su ruta Tailscale no responde en este momento.
+El campo de retorno Windows acepta varias direcciones, una por linea: permite
+mantener la direccion Tailscale y agregar LAN con la misma identidad/clave.
+25 pruebas de continuidad PASS; se valida cada direccion y se deduplican entradas.
+La APK96 background conserva un JSON de preferencias incompatible; la entrega
+Android97 unifica su servicio foreground, Studio y la correccion de transporte.
+No se declara comprobado el intercambio de claves con Windows antes de97.

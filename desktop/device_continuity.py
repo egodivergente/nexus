@@ -228,7 +228,7 @@ class DeviceContinuity:
             try:
                 next_config = {**self.config, **{k: v for k, v in args.items() if k in self.config and k != 'device'}}
                 next_config['peers'] = [endpoint(str(v)) for v in next_config['peers']]
-                next_config['address'] = endpoint(next_config['address']) if next_config['address'] else ''
+                next_config['address'] = '\n'.join(dict.fromkeys(endpoint(line.strip()) for line in next_config['address'].splitlines() if line.strip()))
                 for name in ('port', 'interval', 'timeout', 'maxFileMb'):
                     next_config[name] = int(next_config[name])
                 for name in ('enabled', 'skills', 'credentials', 'settings', 'agy', 'deletions', 'chatAttachments'):
@@ -699,7 +699,8 @@ class DeviceContinuity:
                     # Network requests never hold the agent turn lock.
                     for peer in self.config['peers']:
                         try:
-                            self.fetch(peer, '/sync', {'endpoint': self.config['address']})
+                            for address in self.config['address'].splitlines():
+                                self.fetch(peer, '/sync', {'endpoint': address})
                         except Exception as error:
                             failures.append(type(error).__name__)
                     if self.dirty and self.host.lock.acquire(False):
