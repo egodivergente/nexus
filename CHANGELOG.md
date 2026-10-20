@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.54-agent] - 2026-10-20 · deslizar entre secciones
+
+- **Deslizar entre secciones:** arrastrar el dedo a la izquierda pasa a la siguiente pestaña (Asistente → Lienzo → Modelos → Historial → Biblioteca) y a la derecha a la anterior. Los carruseles y controles con desplazamiento horizontal conservan su gesto.
+
 ## [1.9.53-agent] - 2026-10-20 · jerarquía visual y proveedores unificados
 
 - **Separación visual:** las tarjetas de Ajustes usan una superficie elevada distinta del fondo, cada categoría tiene su color (Apariencia, Agente, Proveedores, Generadores y Sistema) en la baldosa del icono.

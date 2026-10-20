@@ -30,6 +30,9 @@ import com.vidadomu.nexus.ui.generations.GenerationsScreen
 import com.vidadomu.nexus.ui.library.LibraryScreen
 import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
+import com.vidadomu.nexus.ui.navigation.adjacentTab
+import com.vidadomu.nexus.ui.navigation.tabSwipe
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.vidadomu.nexus.ui.navigation.Screen
 import com.vidadomu.nexus.ui.navigation.openHistoryTab
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
@@ -133,7 +136,15 @@ class MainActivity : ComponentActivity() {
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Assistant.route,
-                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
+                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).tabSwipe(enabled = activeEntry?.destination?.route in Screen.bottomNavItems.map { it.route }) { direction ->
+                            adjacentTab(activeEntry?.destination?.route, direction, Screen.bottomNavItems.map { it.route })?.let { route ->
+                                navController.navigate(route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = route != Screen.Models.route && route != Screen.Assistant.route
+                                }
+                            }
+                        }
                     ) {
                         composable(Screen.Assistant.route) {
                             com.vidadomu.nexus.assistant.AssistantScreen(
