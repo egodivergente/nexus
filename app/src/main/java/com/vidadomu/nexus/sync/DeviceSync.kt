@@ -250,7 +250,7 @@ class DeviceSync private constructor(private val app: NexusApplication) {
             }
             put(name, JsonObject(values.mapNotNull { (k, v) ->
                 val element: JsonElement = when(v) {
-                    is String -> runCatching { json.parseToJsonElement(v) }.getOrElse { JsonPrimitive(v) }
+                    is String -> syncSettingValue(v)
                     is Boolean -> JsonPrimitive(v)
                     is Number -> JsonPrimitive(v)
                     else -> return@mapNotNull null
