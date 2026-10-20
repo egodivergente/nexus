@@ -110,4 +110,52 @@ class SyncJournalTest {
         assertTrue(cycle(b,mapOf("assets:a" to original("jpg"))).conflicts.isEmpty())
         assertTrue(cycle(a,mapOf("assets:a" to original("jpeg"))).conflicts.isEmpty())
     }
+    private fun generation(references:List<String>,outputs:List<String> = emptyList())=buildJsonObject {
+        put("id","g");put("referenceUris",JsonArray(references.map(::JsonPrimitive)));put("outputAssetIds",JsonArray(outputs.map(::JsonPrimitive)))
+    }
+    @Test fun generationReferencesUseVerifiedCopiesAcrossDevicesAndRestarts() {
+        val cloud=Cloud();val path=file();var a=SyncJournal(path,cloud);val b=SyncJournal(file(),cloud)
+        val local=generation(listOf("content://pixel/reference"));val portable=generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".jpg"))
+        cycle(a,mapOf("generations:g" to local));val received=cycle(b,mapOf("generations:g" to portable))
+        assertTrue(received.conflicts.isEmpty());assertEquals(portable,received.rows["generations:g"])
+        a=SyncJournal(path,cloud);val again=cycle(a,mapOf("generations:g" to local))
+        assertTrue(again.conflicts.isEmpty());assertEquals(portable,again.rows["generations:g"])
+    }
+    @Test fun referenceExtensionsDoNotCreateConflictsButDifferentBytesDo() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud);val c=SyncJournal(file(),cloud)
+        fun refs(hash:String,extension:String)=mapOf("generations:g" to generation(listOf(SyncBlobs.PREFIX+hash.repeat(64)+"."+extension)))
+        cycle(a,refs("a","jpeg"));assertTrue(cycle(b,refs("a","jpg")).conflicts.isEmpty())
+        assertEquals(1,cycle(c,refs("b","jpg")).conflicts.size)
+    }
+    @Test fun generationReferenceCountAndOrderRemainMeaningful() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud);val c=SyncJournal(file(),cloud)
+        val first=SyncBlobs.PREFIX+"a".repeat(64)+".png";val second=SyncBlobs.PREFIX+"b".repeat(64)+".png"
+        cycle(a,mapOf("generations:g" to generation(listOf(first,second))))
+        assertEquals(1,cycle(b,mapOf("generations:g" to generation(listOf(second,first)))).conflicts.size)
+        assertEquals(1,cycle(c,mapOf("generations:g" to generation(listOf(first)))).conflicts.size)
+    }
+    private fun output(id:String,hash:String,project:String="p")=buildJsonObject {put("id",id);put("projectId",project);put("uri",SyncBlobs.PREFIX+hash.repeat(64)+".png")}
+    @Test fun copiedOutputIdsAreEquivalentOnlyWithTheSameVerifiedBytesAndProject() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        cycle(a,mapOf("assets:a" to output("a","a"),"generations:g" to generation(emptyList(),listOf("a"))))
+        val merged=cycle(b,mapOf("assets:b" to output("b","a"),"generations:g" to generation(emptyList(),listOf("b"))))
+        assertTrue(merged.conflicts.isEmpty());assertEquals(listOf("a"),merged.rows.getValue("generations:g")["outputAssetIds"]!!.jsonArray.map {it.jsonPrimitive.content})
+        val c=SyncJournal(file(),cloud)
+        assertEquals(1,cycle(c,mapOf("assets:c" to output("c","b"),"generations:g" to generation(emptyList(),listOf("c")))).conflicts.size)
+    }
+    @Test fun outputIdsFromDifferentProjectsAreNotSilentlyCombined() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        cycle(a,mapOf("assets:a" to output("a","a","first"),"generations:g" to generation(emptyList(),listOf("a"))))
+        assertEquals(1,cycle(b,mapOf("assets:b" to output("b","a","second"),"generations:g" to generation(emptyList(),listOf("b")))).conflicts.size)
+    }
+    @Test fun resolvingARealMetadataConflictKeepsItsVerifiedReference() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        val local=JsonObject(generation(listOf("file:/pixel/original"))+mapOf("prompt" to JsonPrimitive("local edit")))
+        val portable=JsonObject(generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".png"))+mapOf("prompt" to JsonPrimitive("remote edit")))
+        cycle(a,mapOf("generations:g" to local));val received=cycle(b,mapOf("generations:g" to portable));val conflict=received.conflicts.single()
+        b.resolve("generations:g",conflict.versions.first {it.value==local}.id)
+        val resolved=cycle(b,received.rows).rows.getValue("generations:g")
+        assertEquals(JsonPrimitive("local edit"),resolved["prompt"])
+        assertEquals(portable["referenceUris"],resolved["referenceUris"])
+    }
 }
