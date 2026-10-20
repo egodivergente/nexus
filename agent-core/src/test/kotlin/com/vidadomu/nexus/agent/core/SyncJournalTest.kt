@@ -115,7 +115,7 @@ class SyncJournalTest {
     }
     @Test fun generationReferencesUseVerifiedCopiesAcrossDevicesAndRestarts() {
         val cloud=Cloud();val path=file();var a=SyncJournal(path,cloud);val b=SyncJournal(file(),cloud)
-        val local=generation(listOf("content://pixel/reference"));val portable=generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".jpg"))
+        val local=generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".jpeg"));val portable=generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".jpg"))
         cycle(a,mapOf("generations:g" to local));val received=cycle(b,mapOf("generations:g" to portable))
         assertTrue(received.conflicts.isEmpty());assertEquals(portable,received.rows["generations:g"])
         a=SyncJournal(path,cloud);val again=cycle(a,mapOf("generations:g" to local))
@@ -134,6 +134,15 @@ class SyncJournalTest {
         assertEquals(1,cycle(b,mapOf("generations:g" to generation(listOf(second,first)))).conflicts.size)
         assertEquals(1,cycle(c,mapOf("generations:g" to generation(listOf(first)))).conflicts.size)
     }
+    @Test fun anUnverifiedLocalReferenceCannotHideAChangedGenerationInput() {
+        val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
+        val changed=generation(listOf("file:/pixel/different-original.png"))
+        val known=generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".png"))
+        cycle(a,mapOf("generations:g" to changed))
+        val result=cycle(b,mapOf("generations:g" to known))
+        assertEquals(1,result.conflicts.size)
+        assertEquals(setOf(changed,known),result.conflicts.single().versions.map {it.value}.toSet())
+    }
     private fun output(id:String,hash:String,project:String="p")=buildJsonObject {put("id",id);put("projectId",project);put("uri",SyncBlobs.PREFIX+hash.repeat(64)+".png")}
     @Test fun copiedOutputIdsAreEquivalentOnlyWithTheSameVerifiedBytesAndProject() {
         val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
@@ -150,7 +159,7 @@ class SyncJournalTest {
     }
     @Test fun resolvingARealMetadataConflictKeepsItsVerifiedReference() {
         val cloud=Cloud();val a=SyncJournal(file(),cloud);val b=SyncJournal(file(),cloud)
-        val local=JsonObject(generation(listOf("file:/pixel/original"))+mapOf("prompt" to JsonPrimitive("local edit")))
+        val local=JsonObject(generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".jpeg"))+mapOf("prompt" to JsonPrimitive("local edit")))
         val portable=JsonObject(generation(listOf(SyncBlobs.PREFIX+"a".repeat(64)+".png"))+mapOf("prompt" to JsonPrimitive("remote edit")))
         cycle(a,mapOf("generations:g" to local));val received=cycle(b,mapOf("generations:g" to portable));val conflict=received.conflicts.single()
         b.resolve("generations:g",conflict.versions.first {it.value==local}.id)
