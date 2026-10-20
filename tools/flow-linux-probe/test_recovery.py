@@ -188,7 +188,35 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(rejected.json(), {'error': 'confirmation_required'})
         self.assertEqual(accepted.status_code, 201)
         self.assertEqual(accepted.json()['job_id'], job['job_id'])
-        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0)
+        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0, None, None, 'Referencias')
+
+    def test_video_frame_job_preserves_mode_and_start_end_ids(self):
+        valid_id = 'client-request-123456'
+        start, end = 'ref_' + 'a' * 64, 'ref_' + 'b' * 64
+        job = {'job_id': 'server-job-1234567', 'client_request_id': valid_id,
+               'state': 'submitted', 'expected_output': 'video', 'created_at': 1,
+               'updated_at': 1, 'baseline_downloads': [], 'new_downloads': [], 'error': None}
+        with patch.object(recovery, 'frame_paths', return_value=[Path('start.png'), Path('end.png')]), \
+             patch.object(recovery, 'reference_paths', return_value=[]), \
+             patch.object(recovery, 'submit_flow_generation', AsyncMock(return_value=(job, False))) as submit:
+            response = self.client.post('/api/flow/jobs', headers={'Authorization': 'Bearer private-test-token'}, json={
+                'prompt': 'plano cinematográfico', 'expected_output': 'video', 'client_request_id': valid_id,
+                'confirmed': True, 'mode': 'Fotogramas', 'initial_frame_id': start, 'end_frame_id': end})
+        self.assertEqual(response.status_code, 201)
+        submit.assert_awaited_once_with('plano cinematográfico', 'video', valid_id, None, 1, 0, start, end, 'Fotogramas')
+
+    def test_frame_mode_rejects_reference_images_instead_of_ignoring_them(self):
+        valid_id = 'client-request-123456'
+        start, reference = 'ref_' + 'a' * 64, 'ref_' + 'b' * 64
+        with patch.object(recovery, 'frame_paths', return_value=[Path('start.png')]), \
+             patch.object(recovery, 'reference_paths', return_value=[Path('reference.png')]), \
+             patch.object(recovery, 'submit_flow_generation', AsyncMock()) as submit:
+            response = self.client.post('/api/flow/jobs', headers={'Authorization': 'Bearer private-test-token'}, json={
+                'prompt': 'plano cinematográfico', 'expected_output': 'video', 'client_request_id': valid_id,
+                'confirmed': True, 'mode': 'Fotogramas', 'initial_frame_id': start,
+                'reference_ids': [reference]})
+        self.assertEqual((response.status_code, response.json()), (400, {'error': 'frame_mode_has_references'}))
+        submit.assert_not_awaited()
 
     def test_flow_job_poll_uses_mocked_bridge_without_a_browser(self):
         job = {'job_id': 'server-job-1234567', 'client_request_id': 'client-request-123456',
@@ -282,27 +310,32 @@ class FlowJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second['state'], 'uncertain')
         drive.assert_awaited_once()
 
-    async def test_changed_or_duplicate_download_controls_are_ambiguous(self):
-        job = {'baseline_downloads': ['old-control']}
+    async def test_duplicate_results_are_ambiguous_and_hidden_old_ones_are_tolerated(self):
+        job = {'baseline_downloads': ['old-result']}
         additions, error = recovery.new_downloads(job, [
-            {'index': 0, 'signature': 'old-control'},
-            {'index': 1, 'signature': 'old-control'},
+            {'index': 0, 'signature': 'old-result'},
+            {'index': 1, 'signature': 'old-result'},
         ])
         self.assertIsNone(additions)
         self.assertEqual(error, 'download_ambiguous')
-        additions, error = recovery.new_downloads(job, [{'index': 0, 'signature': 'other-control'}])
-        self.assertIsNone(additions)
-        self.assertEqual(error, 'download_controls_changed')
+        # Flow pagina la cuadrícula: que un resultado antiguo deje de verse no invalida el nuevo.
+        additions, error = recovery.new_downloads(job, [{'index': 0, 'signature': 'new-result'}])
+        self.assertEqual((additions, error), ([{'index': 0, 'signature': 'new-result'}], None))
 
-    async def test_visible_download_keeps_its_raw_locator_index(self):
-        expected = {'index': 3, 'signature': 'visible-output'}
-        # Index 1 represents a hidden matching button omitted by download_controls.
-        controls = [{'index': 0, 'signature': 'old-output'},
-                    {'index': 3, 'signature': 'visible-output'}]
-        self.assertTrue(recovery.download_control_matches(expected, controls))
-        self.assertFalse(recovery.download_control_matches(
-            {'index': 1, 'signature': 'visible-output'}, controls))
+    async def test_result_is_found_by_identity_even_if_it_moved(self):
+        expected = {'index': 0, 'signature': 'my-output'}
+        controls = [{'index': 0, 'signature': 'newer-output'}, {'index': 1, 'signature': 'my-output'}]
+        self.assertEqual(recovery.download_control_matches(expected, controls)['index'], 1)
+        self.assertIsNone(recovery.download_control_matches({'index': 0, 'signature': 'gone'}, controls))
 
+    async def test_download_controls_are_project_media(self):
+        page = AsyncMock()
+        page.evaluate.return_value = [
+            {'kind': 'image', 'src': 'https://flow.google.com/asb/a?w=1', 'width': 1376, 'height': 768},
+            {'kind': 'image', 'src': 'https://flow.google.com/asb/a?w=2', 'width': 1376, 'height': 768}]
+        controls = await recovery.download_controls(page)
+        self.assertEqual(len(controls), 1)
+        self.assertRegex(controls[0]['signature'], recovery.FLOW_SIGNATURE)
 
 if __name__ == '__main__':
     unittest.main()

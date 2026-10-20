@@ -24,8 +24,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 92
-        versionName = "1.9.58-agent"
+        versionCode = 100
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -74,6 +74,14 @@ android {
             applicationIdSuffix = ".agent"
             signingConfig = agentSigning // Without the private config, produce unsigned rather than replace the installed identity.
             versionNameSuffix = "-preview"
+            isDebuggable = true
+            matchingFallbacks += listOf("debug")
+        }
+        create("studio") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".studio"
+            signingConfig = agentSigning
+            versionNameSuffix = "-studio"
             isDebuggable = true
             matchingFallbacks += listOf("debug")
         }

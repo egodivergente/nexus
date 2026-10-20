@@ -4,6 +4,7 @@ The bridge deliberately drives only the already-open, authenticated Flow page.
 It never reads/export cookies, stores prompts, or uses an undocumented Google API.
 """
 import asyncio
+import base64
 from collections import Counter
 from contextlib import asynccontextmanager, suppress
 import hashlib
@@ -14,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shutil
 import subprocess
 import time
 from urllib.parse import urlsplit
@@ -24,8 +26,9 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
-from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
+from flow_references import receive_reference, reference_paths, frame_paths, attach_video_frames, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
 import flow_agent
+import flow_import
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -308,6 +311,8 @@ async def with_flow_project_page(action):
         async with async_playwright() as playwright:
             browser = await playwright.chromium.connect_over_cdp('http://127.0.0.1:9229', timeout=10000)
             pages = [page for context in browser.contexts for page in context.pages if is_flow_project(page.url)]
+            # La pestaña de importación muestra otros proyectos; nunca es la que usa el puente para generar.
+            pages = [page for page in pages if not await flow_import.is_import_page(page)]
             if not pages:
                 raise FlowError('flow_project_not_open', 409)
             if len(pages) != 1:
@@ -369,47 +374,18 @@ async def flow_api_status():
 
 
 async def download_controls(page):
-    """Return hashes of visible Flow download controls without reading card text."""
-    buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
-    controls = []
-    for index in range(await buttons.count()):
-        button = buttons.nth(index)
-        if not await button.is_visible():
-            continue
-        # The structural signature intentionally excludes inner text, hrefs and
-        # arbitrary attributes, which can contain user-provided prompt material.
-        shape = await button.evaluate("""button => {
-            const attrs = node => ({
-                tag: node.tagName,
-                aria: node.getAttribute('aria-label') || '',
-                title: node.getAttribute('title') || '',
-                id: node.id || '',
-                testid: node.getAttribute('data-testid') || '',
-                role: node.getAttribute('role') || ''
-            });
-            const path = [];
-            let node = button;
-            for (let depth = 0; node && depth < 5; depth += 1) {
-                const parent = node.parentElement;
-                if (!parent) break;
-                const siblings = [...parent.children].filter(child => child.tagName === node.tagName);
-                path.push(`${node.tagName}:${siblings.indexOf(node)}`);
-                node = parent;
-            }
-            return {control: attrs(button), path};
-        }""")
-        signature = hashlib.sha256(json.dumps(shape, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        controls.append({'index': index, 'signature': signature})
-    return controls
+    """Resultados visibles del proyecto: imágenes y vídeos servidos por Flow, identificados por la ruta de su archivo.
+    La Flow actual ya no pone botones «Descargar» en las tarjetas (están en su menú ⋮), así que se usan los medios,
+    que además identifican cada resultado de forma única sin leer el texto de las tarjetas."""
+    items = flow_import.unique_media(await page.evaluate(flow_import.READ_MEDIA))
+    return [{'index': index, 'signature': flow_import.media_signature(item['src']), 'src': item['src'], 'kind': item['kind']}
+            for index, item in enumerate(items)]
 
 
 def new_downloads(job, current_controls):
     """Identify only additions whose identity remains unambiguous across polls."""
     baseline = list(job.get('baseline_downloads', []))
     baseline_counts = Counter(baseline)
-    current_counts = Counter(item['signature'] for item in current_controls)
-    if any(current_counts[signature] < count for signature, count in baseline_counts.items()):
-        return None, 'download_controls_changed'
     additions = []
     seen = Counter()
     for control in current_controls:
@@ -427,9 +403,8 @@ def new_downloads(job, current_controls):
 
 
 def download_control_matches(expected, current_controls):
-    """`index` is the raw locator index; invisible controls are omitted above."""
-    return any(control['index'] == expected['index'] and control['signature'] == expected['signature']
-               for control in current_controls)
+    """Devuelve el resultado actual con la misma identidad; la posición cambia cuando Flow añade otros."""
+    return next((control for control in current_controls if control['signature'] == expected['signature']), None)
 
 
 async def wait_composer_cleared(page, composer, timeout_ms=15000):
@@ -443,7 +418,7 @@ async def wait_composer_cleared(page, composer, timeout_ms=15000):
     return False
 
 
-async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
+async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, mode='Texto', frames=None):
     """Fill and click `runs` times. Any failure after the first click start becomes uncertain/partial."""
     async with FLOW_UI_LOCK:
         async def submit(page):
@@ -462,7 +437,13 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
             click_started = False
             try:
                 for run in range(runs):
-                    if run == 0:
+                    if mode == 'Fotogramas' and frames:
+                        if run == 0:
+                            await attach_video_frames(page, frames[0], frames[1] if len(frames) > 1 else None)
+                        else:
+                            with suppress(ReferenceError):
+                                await attach_video_frames(page, frames[0], frames[1] if len(frames) > 1 else None)
+                    elif run == 0:
                         await attach_references(page, references or [])
                     elif references:
                         # Flow suele conservar las referencias tras enviar; si las quitó, se vuelven a poner.
@@ -500,9 +481,10 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
         return await with_flow_project_page(submit)
 
 
-async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0):
+async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0,
+                                 initial_frame_id=None, end_frame_id=None, mode='Texto'):
     """Reserve an idempotent job before the UI clicks, never storing prompt."""
-    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or []] + ([runs] if runs > 1 else []),
+    intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, mode, reference_ids or [], initial_frame_id, end_frame_id] + ([runs] if runs > 1 else []),
         ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
     async with FLOW_JOB_LOCK:
         existing = next((job for job in FLOW_JOBS.values()
@@ -538,8 +520,9 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
         else:
             await update_flow_job(job_id, runs_submitted=done)
     try:
-        paths = reference_paths(ROOT, reference_ids or [])
-        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run)
+        frames = frame_paths(ROOT, initial_frame_id, end_frame_id)
+        references = reference_paths(ROOT, reference_ids or [])
+        baseline = await drive_flow_submission(prompt, references or None, runs, on_run, mode, frames or None)
     except ReferenceError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
         raise FlowError(error.code, error.status_code) from error
@@ -630,29 +613,23 @@ async def download_flow_result(job_id, output_index):
     expected = downloads[output_index]
     async with FLOW_UI_LOCK:
         async def download(page):
-            controls = await download_controls(page)
-            index = expected['index']
-            if not download_control_matches(expected, controls):
+            match = download_control_matches(expected, await download_controls(page))
+            if not match:
                 raise FlowError('download_ambiguous', 409)
-            buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
-            button = buttons.nth(index)
-            if not await button.is_visible() or not await button.is_enabled():
-                raise FlowError('download_unavailable', 409)
             try:
-                async with page.expect_download(timeout=30000) as pending:
-                    await button.click(timeout=10000)
-                result = await pending.value
-                filename = safe_download_filename(result.suggested_filename, output_index)
-                path = private_download_path(job_id, output_index, filename)
-                await result.save_as(str(path))
-                path.chmod(0o600)
-                media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-                return FileResponse(path, media_type=media_type, filename=filename,
-                                    background=BackgroundTask(delete_private_download, path))
-            except FlowError:
-                raise
+                result = await page.evaluate(flow_agent.FETCH_MEDIA, match['src'])
             except Exception as error:
                 raise FlowError('download_failed', 503) from error
+            if not result or 'error' in result:
+                raise FlowError('download_unavailable', 409)
+            media_type = result.get('type') or 'application/octet-stream'
+            extension = mimetypes.guess_extension(media_type) or ('.mp4' if match['kind'] == 'video' else '.jpg')
+            filename = safe_download_filename(f'flow-result-{output_index}{extension}', output_index)
+            path = private_download_path(job_id, output_index, filename)
+            path.write_bytes(base64.b64decode(result['data']))
+            path.chmod(0o600)
+            return FileResponse(path, media_type=media_type, filename=filename,
+                                background=BackgroundTask(delete_private_download, path))
         return await with_flow_project_page(download)
 
 
@@ -735,6 +712,10 @@ async def lifespan(app):
         TOKEN_FILE.write_text(secrets.token_urlsafe(32))
     TOKEN_FILE.chmod(0o600)
     load_flow_jobs()
+    # En el ASUS el navegador de Flow arranca con el servicio: tras un reinicio (o del propio equipo) el puente
+    # vuelve a estar listo sin esperar a que alguien abra el portal. En Windows el navegador lo abre su lanzador.
+    if shutil.which('xvfb-run'):
+        asyncio.create_task(start_browser())
     yield
 
 
@@ -815,8 +796,28 @@ async def create_flow_job(request: Request):
         runs, expected_results = validate_flow_batch(data)
         references = data.get('reference_ids', [])
         reference_paths(ROOT, references)
+        initial_frame_id = data.get('initial_frame_id')
+        end_frame_id = data.get('end_frame_id')
+        resolved_frames = frame_paths(ROOT, initial_frame_id, end_frame_id)
+        mode = data.get('mode')
+        if expected_output == 'video':
+            mode = mode or ('Fotogramas' if resolved_frames else 'Referencias' if references else 'Texto')
+            if mode not in {'Texto', 'Fotogramas', 'Referencias'}:
+                raise ReferenceError('invalid_video_mode', 400)
+            if mode == 'Fotogramas' and not resolved_frames:
+                raise ReferenceError('initial_frame_required', 400)
+            if mode == 'Fotogramas' and references:
+                raise ReferenceError('frame_mode_has_references', 400)
+            if mode == 'Texto' and (resolved_frames or references):
+                raise ReferenceError('text_mode_has_media', 400)
+            if mode == 'Referencias' and (resolved_frames or not references):
+                raise ReferenceError('references_mode_requires_images', 400)
+        elif resolved_frames:
+            raise ReferenceError('frames_require_video', 400)
+        else:
+            mode = 'Referencias'
         job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references or None,
-                                                     runs, expected_results)
+                                                     runs, expected_results, initial_frame_id, end_frame_id, mode)
         return JSONResponse(public_flow_job(job, replayed=replayed), status_code=200 if replayed else 201)
     except ReferenceError as error:
         return JSONResponse({'error': error.code}, status_code=error.status_code)
@@ -887,6 +888,72 @@ async def flow_agent_media(job_id: str, row: int, index: int):
         return JSONResponse({'error': 'download_unavailable'}, status_code=409)
     media_type, raw = found
     from fastapi.responses import Response
+    return Response(raw, media_type=media_type)
+
+
+async def with_flow_browser(action):
+    """Conecta al navegador autenticado para la importación, sin tocar el proyecto del puente."""
+    try:
+        async with flow_import.IMPORT_LOCK:
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.connect_over_cdp('http://127.0.0.1:9229', timeout=10000)
+                return await action(browser)
+    except FlowError:
+        raise
+    except Exception as error:
+        raise FlowError('flow_browser_unavailable', 503) from error
+
+
+@app.get('/api/flow/projects')
+async def flow_projects():
+    """Proyectos de la galería de Flow (id y título) para importar lo ya generado."""
+    try:
+        projects = await with_flow_browser(flow_import.list_projects)
+    except FlowError as error:
+        return flow_error_response(error)
+    if projects is None:
+        return JSONResponse({'error': 'auth_required'}, status_code=409)
+    return {'projects': projects}
+
+
+@app.get('/api/flow/projects/{project_id}/media')
+async def flow_project_media(project_id: str):
+    if not flow_import.PROJECT_ID.fullmatch(project_id):
+        return JSONResponse({'error': 'project_not_found'}, status_code=404)
+    try:
+        _, items = await with_flow_browser(lambda browser: flow_import.project_media(browser, project_id))
+    except FlowError as error:
+        return flow_error_response(error)
+    if items is None:
+        return JSONResponse({'error': 'auth_required'}, status_code=409)
+    return {'media': flow_import.public_media(items)}
+
+
+@app.get('/api/flow/projects/{project_id}/media/{key}')
+async def flow_project_media_file(project_id: str, key: str, size: str | None = None):
+    """Sin size: la versión que muestra Flow. Con size (1K, 2K, 4K, 720p, 1080p, GIF): el menú «Descargar» de Flow."""
+    from fastapi.responses import Response
+    if not flow_import.PROJECT_ID.fullmatch(project_id) or not flow_import.MEDIA_KEY.fullmatch(key):
+        return JSONResponse({'error': 'result_not_found'}, status_code=404)
+    if size is not None:
+        if size not in flow_import.SIZES:
+            return JSONResponse({'error': 'option_unavailable'}, status_code=400)
+        try:
+            found = await with_flow_browser(lambda browser: flow_import.download_size(browser, project_id, key, size))
+        except FlowError as error:
+            return flow_error_response(error)
+        if isinstance(found, str):
+            return JSONResponse({'error': found}, status_code=404 if found == 'result_not_found' else 409)
+        filename, raw = found
+        return Response(raw, media_type=mimetypes.guess_type(filename)[0] or 'application/octet-stream',
+                        headers={'Content-Disposition': f'attachment; filename="{safe_download_filename(filename, 0)}"'})
+    try:
+        found = await with_flow_browser(lambda browser: flow_import.fetch_media(browser, project_id, key))
+    except FlowError as error:
+        return flow_error_response(error)
+    if not found:
+        return JSONResponse({'error': 'download_unavailable'}, status_code=409)
+    media_type, raw = found
     return Response(raw, media_type=media_type)
 
 

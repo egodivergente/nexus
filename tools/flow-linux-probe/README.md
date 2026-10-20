@@ -223,3 +223,121 @@ The current source adds an explicit, private Flow generation bridge for the NEXU
 - The bridge accepts only the ASUS Tailscale IP and its MagicDNS host. Tokens, prompts, browser cookies and Google credentials are never committed or emitted by the API.
 
 PASS: mocked recovery/API tests cover authentication, host checks, body validation, idempotency and conservative download detection. The updated bridge was also staged and tested with the ASUS virtual environment, then deployed while preserving Chromium; authenticated live status reported the project open, an editable composer and generation readiness. NO PROBADO: Android delivery and a real paid Flow generation. A real generation must remain an explicit user-confirmed action.
+
+## Vigilante de sesión (2026-10-19)
+
+`flow_keepalive.py` se ejecuta cada 5 minutos con `nexus-flow-keepalive.timer` (unidad de
+usuario). Solo se conecta por CDP de loopback al Chromium que ya está abierto; nunca abre otro
+navegador, nunca escribe credenciales, nunca crea proyectos ni recarga un proyecto abierto.
+
+- Recuerda el último proyecto abierto (`keepalive-state.json`, modo 0600, fuera de Git).
+- Si Flow se queda en la galería o en blanco más de 10 minutos, vuelve a abrir ese proyecto.
+- Si la página se queda en `/about` (sesión cerrada) más de 20 minutos, la deja en
+  `about:blank` y marca `needs_login`. La portada pública satura la CPU del ASUS. Una página
+  de `accounts.google.com` (inicio de sesión en curso) no se toca nunca.
+- `nexus-flow-recovery.service.d/graceful-browser.conf` añade un `ExecStop` que cierra
+  Chromium con `Browser.close` antes de que systemd mate la unidad (`TimeoutStopSec=45`), para
+  que las cookies que Google rota queden guardadas. Antes, el último cierre registraba
+  `exit_type=Crashed`.
+
+**Reinicio de sesión con la contraseña guardada (autorizado por el usuario el 19-10-2026).**
+Si la página sigue en `/about` más de 2 minutos, el vigilante hace **un único intento cada 6 horas**
+con la contraseña que el usuario guardó en este Chromium (autocompletado). Solo pulsa la cuenta
+guardada y «Siguiente»: nunca escribe ni lee la contraseña. Se detiene ante cualquier verificación
+(`/challenge/` salvo `pwd`), consentimiento, rechazo (`/rejected`) o destino inesperado, y guarda el
+motivo en `relogin_result`. El intento se registra antes de actuar, así que un fallo a mitad no
+provoca reintentos en bucle. Tras un fallo, la página se deja en blanco; pasadas 6 horas se reabre
+la portada para el siguiente intento. Si no hay contraseña guardada, el intento termina en
+`needs_user` sin más efecto. Riesgos aceptados por el usuario: Google puede rechazarlo (ya ocurrió
+una vez en 2026-10-06), y el perfil sin llavero del sistema guarda la contraseña con poca
+protección frente a cualquiera que acceda como `vidal`. Conviene mantener activa la verificación en
+dos pasos de la cuenta.
+
+Validación: 12 pruebas unitarias en local y en el ASUS. Comprobación real: estado `project`,
+temporizador activo y puente aún `connected`. **NO PROBADO en real**: reabrir el proyecto, el reinicio de
+sesión, dejar la página en blanco y el cierre limpio. Comprobarlo exigiría tirar la sesión a propósito.
+No reiniciar `nexus-flow-recovery` sin necesidad: reiniciarlo cierra Chromium.
+
+## Importar a Nexus lo ya generado en Flow (2026-10-20)
+
+`flow_import.py` y tres rutas nuevas del puente permiten traer a la Biblioteca de Nexus lo que ya
+existe en los proyectos de Flow:
+
+- `GET /api/flow/projects`: proyectos de la galería (id y título de la tarjeta).
+- `GET /api/flow/projects/{id}/media`: imágenes y vídeos del proyecto (clave, tipo, tamaño), sin URLs.
+- `GET /api/flow/projects/{id}/media/{clave}`: el archivo.
+
+Trabaja en una pestaña propia, marcada con `window.name = "nexus-import"`, que el puente excluye al
+buscar su proyecto y que el vigilante cierra tras 3 minutos sin uso. Así nunca toca el proyecto con el
+que se genera. Recorre la página desplazándose, porque Flow carga los resultados al hacer scroll, y
+descarga con `fetch()` desde la propia página la versión que Flow muestra (p. ej. WebP de 1376×768
+para Nano Banana). No pulsa Generar, Mejorar ni Descargar y no gasta créditos. Las operaciones se
+serializan con `IMPORT_LOCK`.
+
+Validación en el ASUS (20-10-2026, solo lectura): 21 proyectos en la galería; un proyecto con
+7 imágenes recorrido y una imagen descargada (`image/webp`, 244 534 bytes). Pruebas: 7 nuevas en
+`test_flow_import.py`; total del puente: 45. **NO PROBADO**: proyectos con vídeo y proyectos
+muy largos.
+
+### Reinicio del servicio: cierre limpio comprobado, sesión perdida igualmente (2026-10-20, 00:09)
+
+Reinicio para activar la importación, sin trabajos activos. El `ExecStop` funcionó en real:
+`browser_closed_cleanly` y `exit_type=Normal` (antes, `Crashed`). Aun así, **Google cerró la sesión al
+reabrir el navegador**: las cookies de google.com bajaron de 42 a 27 y Flow cayó en `/about`. Por
+tanto, el cierre abrupto no era la causa (o no la única): reiniciar el navegador basta para perder la
+sesión. Hipótesis no demostrada: sesión ligada al proceso del navegador (p. ej. credenciales atadas al
+dispositivo). Conclusión práctica: **no reiniciar el navegador si no es imprescindible**, y dejar que
+el reinicio de sesión con la contraseña guardada lo resuelva.
+
+Encontrado también: tras reiniciar el servicio, **el navegador no arrancaba solo**; solo se abría al
+entrar en el portal (`/unlock`). Ahora `lifespan` lo arranca si existe `xvfb-run` (ASUS; en Windows lo
+abre su lanzador). Copiado al ASUS; entra en vigor en el próximo reinicio del servicio.
+
+### Primer reinicio de sesión automático en real (2026-10-20, 00:17): no funcionó
+
+Tras perderse la sesión con el reinicio, el vigilante hizo su único intento: eligió la cuenta, pero en
+`/v3/signin/challenge/pwd` **Chromium no autocompletó la contraseña guardada** (campo vacío, sin
+`:autofill`, aunque `Login Data` tiene una entrada para `https://accounts.google.com/` añadida a mano).
+Al pulsar «Siguiente», Google respondió «Enter a password» y además mostraba «Too many failed attempts».
+Resultado: `relogin_result=needs_user`, sin más intentos durante 6 horas.
+
+Corrección: el vigilante ya **no pulsa «Siguiente» si el campo no está autocompletado** (espera hasta
+~6 s y devuelve `password_not_autofilled`). Desplegado en el ASUS. Queda por resolver por qué Chromium
+no autocompleta aquí (entrada añadida desde el gestor sin formulario asociado, página bajo CDP o
+cualquier otro motivo); no se insistirá mientras Google muestre el aviso de intentos fallidos.
+
+### Navegador en su propio servicio y detección de resultados por medios (2026-10-20, 01:10)
+
+- **`nexus-flow-browser.service`** (unidad de usuario, `WantedBy=default.target`) arranca Chromium en Xvfb
+  (`login.py --persistent`) con su `ExecStop` de cierre limpio. `nexus-flow-recovery` ya no es su padre:
+  `start_browser()` lo detecta por `SingletonLock` y el puerto 6099 y no abre otro. Se quitó el drop-in
+  `graceful-browser.conf` del puente. **Comprobado:** reiniciar el puente deja el navegador intacto (mismo
+  PID). El cambio en sí costó una última pérdida de sesión.
+- **Resultados por medios, no por botones.** La Flow actual no muestra «Descargar» en las tarjetas (está en
+  el menú ⋮), y ningún trabajo del ASUS se había completado desde el 09-10 (`flow-jobs.json`: todos
+  `failed`, casi siempre `flow_composer_not_empty`). `download_controls()` devuelve ahora las imágenes y
+  vídeos del proyecto, con la firma SHA-256 de la ruta de su archivo; la descarga se hace con `fetch()`
+  sin clics, y un resultado se busca por su identidad, aunque cambie de posición. Que un resultado antiguo
+  deje de verse ya no invalida el trabajo.
+- **Descarga por tamaño** (`?size=1K|2K|4K|720p|1080p`) con el menú «Descargar» de la tarjeta. Comprobado en
+  real: 1K → JPEG de 1376×768 en 6,5 s; 2K → JPEG de 2752×1536 en 15,6 s.
+- **Panel de ajustes de Flow** (leído en un proyecto vacío y restaurado después): Imagen/Vídeo; en Vídeo,
+  modos «Fotogramas» e «Ingredientes», 16:9/9:16, 360p/720p, 4/6/8/10 s, x1–x4, modelos Omni 1.1 Flash y
+  Veo 3.1 Lite/Fast/Quality, y el coste en puntos. En «Fotogramas», el compositor muestra los botones
+  «Inicio», «Fin» e «Intercambiar».
+- Aprendido: el chip «Agente» del compositor es un interruptor; una sonda lo desactivó por error en el
+  proyecto del gato y se restauró al momento. Las sondas guardan ahora su estado inicial y lo restauran.
+
+### Prueba del Pixel 8 Pro como navegador de Flow (2026-10-20, 01:10, solo lectura)
+
+- El Pixel (Android 17, cargando, al 100 %) está conectado al ASUS por ADB inalámbrico (`axel-adb`). Con
+  `adb forward tcp:9333 localabstract:chrome_devtools_remote`, el ASUS controla por CDP el Chrome del
+  teléfono (Chrome 155) **con la pantalla apagada**: abre pestañas, carga Flow y lee el DOM.
+- En el Pixel, Flow ya tenía la sesión iniciada, pero **con otra cuenta de Google** («Vidala Dominga»): el
+  proyecto del ASUS da 404, no aparece la insignia ULTRA y no existe el chip «Agente». La interfaz está en
+  inglés, con los mismos componentes (`Settings trigger`, `Start generation`, `What do you want to create?`).
+- Para usarlo como puente haría falta: iniciar sesión en ese Chrome con la cuenta Ultra; que el puente acepte
+  otro endpoint CDP (el del `adb forward`); selectores en inglés y en español; y que el ADB inalámbrico
+  sobreviva a los reinicios del teléfono. La ventaja esperada, no comprobada, es una sesión de Google más
+  estable, porque va ligada a la cuenta del propio Android.
+- Al terminar se cerró la pestaña de Flow del Pixel y se quitó el `adb forward`.

@@ -1,0 +1,21 @@
+[Unit]
+Description=NEXUS Flow browser (Chromium on Xvfb with the private profile)
+# Independiente del puente: reiniciar nexus-flow-recovery ya no cierra el navegador ni la sesión de Google.
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/nexus-flow-probe
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/python3 %h/.local/share/nexus-flow-probe/login.py --persistent
+# Cierre por CDP antes de la señal, para que Chromium guarde las cookies.
+ExecStop=%h/.local/share/nexus-flow-probe/venv/bin/python %h/.local/share/nexus-flow-probe/flow_keepalive.py --close-browser
+Restart=on-failure
+RestartSec=20
+MemoryMax=1200M
+CPUQuota=100%
+Nice=10
+UMask=0077
+TimeoutStopSec=45
+
+[Install]
+WantedBy=default.target

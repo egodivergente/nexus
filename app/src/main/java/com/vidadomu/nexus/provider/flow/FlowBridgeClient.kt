@@ -61,6 +61,9 @@ internal class FlowBridgeClient(
         expectedOutput: String,
         clientRequestId: String,
         referenceIds: List<String> = emptyList(),
+        mode: String = "Texto",
+        initialFrameId: String? = null,
+        endFrameId: String? = null,
         runs: Int = 1,
         expectedResults: Int = 0
     ): Result<FlowBridgeJob> {
@@ -71,6 +74,18 @@ internal class FlowBridgeClient(
         }
         if (expectedOutput !in EXPECTED_OUTPUTS) {
             return Result.failure(ProviderError("El tipo de resultado esperado no es compatible con el puente de Flow."))
+        }
+        if ((initialFrameId != null && !FlowReferences.ID.matches(initialFrameId)) ||
+            (endFrameId != null && !FlowReferences.ID.matches(endFrameId)) ||
+            (endFrameId != null && initialFrameId == null) ||
+            (expectedOutput != "video" && (initialFrameId != null || endFrameId != null))) {
+            return Result.failure(ProviderError("Los fotogramas de inicio y fin no son válidos para esta solicitud."))
+        }
+        if (mode !in setOf("Texto", "Fotogramas", "Referencias") || (expectedOutput == "video" &&
+            ((mode == "Fotogramas" && (initialFrameId == null || referenceIds.isNotEmpty())) ||
+            (mode == "Texto" && (initialFrameId != null || endFrameId != null || referenceIds.isNotEmpty())) ||
+            (mode == "Referencias" && (referenceIds.isEmpty() || initialFrameId != null || endFrameId != null))))) {
+            return Result.failure(ProviderError("Las entradas no coinciden con el modo de vídeo de Flow."))
         }
         if (!CLIENT_REQUEST_ID.matches(clientRequestId)) {
             return Result.failure(ProviderError("El identificador de la solicitud de Flow no es válido."))
@@ -84,6 +99,9 @@ internal class FlowBridgeClient(
                 clientRequestId = clientRequestId,
                 confirmed = true,
                 referenceIds = referenceIds,
+                mode = mode,
+                initialFrameId = initialFrameId,
+                endFrameId = endFrameId,
                 runs = runs.coerceIn(1, MAX_RUNS),
                 expectedResults = expectedResults.coerceIn(0, MAX_RESULT_COUNT)
             )
@@ -174,6 +192,70 @@ internal class FlowBridgeClient(
         } catch (error: Exception) {
             Result.failure(flowNetworkError(error))
         }
+    }
+
+    @Serializable
+    data class FlowProject(val id: String, val title: String = "")
+
+    @Serializable
+    data class FlowProjectMedia(val key: String, val kind: String = "image", val width: Int = 0, val height: Int = 0)
+
+    @Serializable
+    private data class ProjectsPayload(val projects: List<FlowProject> = emptyList())
+
+    @Serializable
+    private data class ProjectMediaPayload(val media: List<FlowProjectMedia> = emptyList())
+
+    /** Proyectos de la galería de Flow, para traer a la Biblioteca lo que ya se generó allí. */
+    suspend fun projects(): Result<List<FlowProject>> = guarded {
+        requestJson(authorizedRequest("$IMPORT_BASE/projects").get().build(), importClient) { raw ->
+            json.decodeFromString<ProjectsPayload>(raw).projects.filter { PROJECT_ID.matches(it.id) }
+        }
+    }
+
+    /** Imágenes y vídeos ya generados en un proyecto de Flow (sin descargarlos todavía). */
+    suspend fun projectMedia(projectId: String): Result<List<FlowProjectMedia>> {
+        if (!PROJECT_ID.matches(projectId)) return Result.failure(ProviderError("El proyecto de Flow no es válido."))
+        return guarded {
+            requestJson(authorizedRequest("$IMPORT_BASE/projects/$projectId/media").get().build(), importClient) { raw ->
+                json.decodeFromString<ProjectMediaPayload>(raw).media.filter { MEDIA_KEY.matches(it.key) }
+            }
+        }
+    }
+
+    /**
+     * Descarga un archivo ya generado de un proyecto de Flow. Sin [size], la versión que muestra Flow (rápida);
+     * con size (1K, 2K, 4K para imágenes; 720p, 1080p, 4K para vídeo), el menú «Descargar» de Flow, que mejora
+     * la resolución si se pide 2K/4K. No genera contenido nuevo.
+     */
+    suspend fun projectMediaFile(projectId: String, media: FlowProjectMedia, destinationDir: File, size: String? = null): Result<FlowBridgeDownload> =
+        withContext(Dispatchers.IO) {
+            if (!PROJECT_ID.matches(projectId) || !MEDIA_KEY.matches(media.key) || (size != null && size !in DOWNLOAD_SIZES))
+                return@withContext Result.failure(ProviderError("El archivo de Flow no es válido."))
+            try {
+                destinationDir.mkdirs()
+                val query = size?.let { "?size=$it" }.orEmpty()
+                importClient.newCall(authorizedRequest("$IMPORT_BASE/projects/$projectId/media/${media.key}$query").get().build())
+                    .awaitResponse().use { response ->
+                        if (!response.isSuccessful) return@withContext Result.failure(bridgeError(response.code, response.body?.string().orEmpty()))
+                        val body = response.body ?: return@withContext Result.failure(ProviderError("Flow no devolvió el archivo."))
+                        val expected = if (media.kind == "video") "video" else "image"
+                        val mime = body.contentType()?.toString()?.substringBefore(';')?.takeIf { it.matches(MIME_TYPE) } ?: fallbackMimeType(expected)
+                        val target = File(destinationDir, "Flow-${projectId.take(8)}-${media.key}${size?.let { "-$it" }.orEmpty()}.${extensionFor(mime, expected)}")
+                        body.byteStream().use { input -> FileOutputStream(target).use { input.copyTo(it) } }
+                        if (target.length() <= 0L) return@withContext Result.failure(ProviderError("Flow devolvió un archivo vacío."))
+                        Result.success(FlowBridgeDownload(target, mime))
+                    }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(flowNetworkError(error))
+            }
+        }
+
+    // Recorrer un proyecto largo en el navegador del ASUS lleva más que una consulta normal.
+    private val importClient: OkHttpClient by lazy {
+        client.newBuilder().readTimeout(3, java.util.concurrent.TimeUnit.MINUTES).callTimeout(4, java.util.concurrent.TimeUnit.MINUTES).build()
     }
 
     suspend fun job(jobId: String): Result<FlowBridgeJob> {
@@ -285,10 +367,11 @@ internal class FlowBridgeClient(
 
     private suspend fun <T> requestJson(
         request: Request,
+        http: OkHttpClient = client,
         decode: (String) -> T
     ): Result<T> = withContext(Dispatchers.IO) {
         try {
-            client.newCall(request).awaitResponse().use { response ->
+            http.newCall(request).awaitResponse().use { response ->
                 val raw = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     Result.failure(bridgeError(response.code, raw))
@@ -416,6 +499,9 @@ internal class FlowBridgeClient(
     }
 
     private fun referenceErrorMessage(code: String?): String? = when (code) {
+        "auth_required" -> "Flow ha cerrado la sesión en el ASUS. Vuelve a entrar desde Ajustes › Google Flow."
+        "upscale_failed" -> "Flow no pudo mejorar la resolución de este archivo (no cobra en ese caso)."
+        "option_unavailable" -> "Flow no ofrece ese tamaño para este archivo."
         "reference_too_large" -> "La referencia supera 16 MB. Reduce su tamaño y vuelve a adjuntarla."
         "invalid_reference_type", "invalid_reference_image" -> "Adjunta una imagen PNG, JPEG o WebP válida."
         "reference_not_found", "reference_integrity_failed", "invalid_reference_ids" -> "La copia privada de una referencia ya no está disponible. Vuelve a adjuntarla."
@@ -423,6 +509,12 @@ internal class FlowBridgeClient(
         "flow_references_not_empty" -> "Hay ingredientes pendientes en el compositor de Flow. Revísalos antes de enviar."
         "flow_reference_controls_unavailable", "flow_reference_multiple_unavailable" -> "No se pudo usar el selector de ingredientes del proyecto Flow. Revisa el compositor; no se ha generado nada."
         "flow_reference_upload_failed", "flow_references_unconfirmed" -> "Flow no confirmó todas las referencias. Revisa los ingredientes en el proyecto; no se ha generado solo con texto."
+        "flow_frame_mode_unavailable", "flow_frame_controls_unavailable" -> "Flow no muestra los controles de Vídeo > Fotogramas. Revisa el proyecto; no se ha generado nada."
+        "flow_frame_upload_failed" -> "Flow no confirmó la carga de los fotogramas. Revisa Inicio y Fin; no se ha generado nada."
+        "initial_frame_required", "end_frame_requires_initial" -> "Añade primero el fotograma Inicio."
+        "duplicate_frame" -> "Inicio y Fin deben ser imágenes distintas."
+        "invalid_frame_ids" -> "Vuelve a seleccionar los fotogramas Inicio y Fin."
+        "invalid_video_mode", "text_mode_has_media", "references_mode_requires_images", "frame_mode_has_references" -> "Revisa el modo de vídeo y sus imágenes de entrada."
         "client_request_conflict" -> "Este identificador ya pertenece a otro encargo de Flow. Revisa su historial antes de repetir."
         else -> null
     }
@@ -471,6 +563,9 @@ internal class FlowBridgeClient(
         @SerialName("client_request_id") val clientRequestId: String,
         val confirmed: Boolean,
         @SerialName("reference_ids") val referenceIds: List<String> = emptyList(),
+        val mode: String = "Texto",
+        @SerialName("initial_frame_id") val initialFrameId: String? = null,
+        @SerialName("end_frame_id") val endFrameId: String? = null,
         val runs: Int = 1,
         @SerialName("expected_results") val expectedResults: Int = 0
     )
@@ -493,6 +588,11 @@ internal class FlowBridgeClient(
         // Direcciones Tailscale verificadas (independientes del DNS privado de Android): AXELPC primero, ASUS de respaldo.
         val HOSTS = listOf("a" to "http://100.72.111.97:8899/api/flow", "s" to "http://100.112.57.2:8899/api/flow")
         const val BASE_URL = "http://100.112.57.2:8899/api/flow"
+        // La importación desde Flow va siempre al ASUS: está siempre encendido y su puente tiene esta función.
+        private val IMPORT_BASE = HOSTS.last().second
+        private val PROJECT_ID = Regex("[A-Za-z0-9-]{8,64}")
+        private val MEDIA_KEY = Regex("[0-9a-f]{24}")
+        val DOWNLOAD_SIZES = setOf("1K", "2K", "4K", "720p", "1080p")
         private const val PIN_MS = 10 * 60_000L
         @Volatile private var pinned: Pair<String, Long>? = null
         private const val DEFAULT_PROMPT_LIMIT = 4_000
