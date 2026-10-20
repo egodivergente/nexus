@@ -44,6 +44,9 @@ La opción Solo Wi-Fi usa una conexión no medida. El proyecto activo y los
 seleccionados se descargan para uso local. Los demás conservan sus metadatos.
 
 La sincronización manual está disponible aunque se desactive la automática.
+Su cola es independiente de las esperas del reintento automático. No cancela
+una transferencia en curso. Un intento manual fallido permite pulsar de nuevo;
+la cola automática conserva sus reintentos cuando está activada.
 Desconectar conserva los originales y los proyectos del dispositivo. No vaciar
 ni sustituir el perfil para reparar una autorización: volver a conectar Google.
 

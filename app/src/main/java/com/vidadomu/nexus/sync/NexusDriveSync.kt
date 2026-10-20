@@ -93,12 +93,15 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
     private fun constraints()=Constraints.Builder().setRequiredNetworkType(if(prefs.getBoolean("wifi",true))NetworkType.UNMETERED else NetworkType.CONNECTED).setRequiresStorageNotLow(true).build()
     fun enqueue(manual:Boolean=false) {
         if(BuildConfig.OFFLINE_QA || prefs.getString("account",null)==null || (!manual && !prefs.getBoolean("enabled",false)))return
-        WorkManager.getInstance(app).enqueueUniqueWork("nexus-drive-now",ExistingWorkPolicy.KEEP,
+        // A user's request must not sit behind an automatic exponential backoff.
+        // Separate queues still share gate, so an ongoing transfer is never cancelled.
+        WorkManager.getInstance(app).enqueueUniqueWork(if(manual)"nexus-drive-manual" else "nexus-drive-now",ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<NexusDriveSyncWorker>().setInputData(workDataOf("manual" to manual)).setConstraints(constraints()).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
     }
     fun disconnect() {
         prefs.edit().putBoolean("enabled",false).remove("account").remove("folder").apply()
         WorkManager.getInstance(app).cancelUniqueWork("nexus-drive-now")
+        WorkManager.getInstance(app).cancelUniqueWork("nexus-drive-manual")
         WorkManager.getInstance(app).cancelUniqueWork("nexus-drive-periodic")
         setStatus(buildJsonObject {put("state","idle")})
     }
@@ -164,7 +167,12 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
             setStatus(result)
             !prefs.getBoolean("dirty",false)
         }catch(e:CancellationException){throw e}
-        catch(e:Exception){setStatus(buildJsonObject {put("state",if(e.message=="authorization_required")"authorization_required" else "retry");put("message",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "Sincronización pendiente. Tus archivos locales se conservan.")});false}
+        catch(e:Exception){setStatus(buildJsonObject {
+            put("state",if(e.message=="authorization_required")"authorization_required" else "retry")
+            put("message",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "Sincronización pendiente. Tus archivos locales se conservan.")
+            // Support data is private and contains no exception messages, URLs or tokens.
+            put("diagnostic",e.javaClass.simpleName+":"+(e.stackTrace.firstOrNull {it.className.startsWith("com.vidadomu.nexus.")}?.let {it.fileName+":"+it.lineNumber}?:"external"))
+        });false}
     }
 }
 
@@ -180,11 +188,14 @@ class NexusDriveSyncWorker(context:Context,parameters:WorkerParameters):Coroutin
                 .setSmallIcon(R.drawable.ic_launcher_foreground).setContentTitle("Sincronizando Nexus con Drive")
                 .setContentText("Guardando proyectos y archivos originales.").setOngoing(true).build()
             setForeground(ForegroundInfo(id.hashCode(),notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC))
-            if(manager.synchronize(manual))Result.success()else Result.retry()
+            val complete=manager.synchronize(manual)
+            val state=manager.status.value["state"]?.jsonPrimitive?.contentOrNull
+            if(complete || (manual && state in setOf("synced","partial","conflicts")))Result.success()
+            else if(manual)Result.failure()else Result.retry()
         }catch(e:CancellationException){throw e}
         catch(e:Exception){
             manager.setStatus(buildJsonObject {put("state","retry");put("message","La copia se reintentará. Tus archivos locales se conservan.")})
-            Result.retry()
+            if(manual)Result.failure()else Result.retry()
         }
     }
 }
