@@ -413,6 +413,8 @@ def dispatch(keys, operation, args):
         directory.mkdir(parents=True, exist_ok=True)
         def converted(value):
             if value.get('desktop'):
+                if value.get('continuityAttachments'):
+                    return {**value, 'items': value.get('items', []) + [{'role': 'assistant', 'text': 'Adjuntos archivados de esta conversación', 'attachments': value['continuityAttachments']}]}
                 return value
             items = []
             for item in value.get('items', []):
@@ -445,10 +447,11 @@ def dispatch(keys, operation, args):
                 raise ValueError('Conversación no válida.')
             return converted(json.loads((directory / (identifier+'.json')).read_text('utf-8')))
         result = []
-        for file in sorted(directory.glob('*.json'), key=lambda path: path.stat().st_mtime, reverse=True):
-            chat = converted(json.loads(file.read_text('utf-8')))
-            title = next((item['text'][:100] for item in chat['items'] if item['role']=='user'), 'Conversación')
-            result.append({'id': file.stem, 'title': title, 'messages': len(chat['items'])})
+        loaded = [(file.stem, converted(json.loads(file.read_text('utf-8')))) for file in sorted(directory.glob('*.json'), key=lambda path: path.stat().st_mtime, reverse=True)]
+        from chat_continuity import visible_history
+        for identifier, chat in visible_history(loaded):
+            title = next((item['text'][:100] for item in chat['items'] if item['role']=='user' and str(item.get('text', '')).strip()), 'Conversación con adjuntos' if any(item.get('attachments') for item in chat['items']) else 'Conversación')
+            result.append({'id': identifier, 'title': title, 'messages': len(chat['items'])})
         return result
     if operation == 'exchangeRate':
         if OFFLINE_QA:

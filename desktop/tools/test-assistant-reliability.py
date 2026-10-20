@@ -16,12 +16,10 @@ process = None
 
 def start(port=0):
     global process
-    harness = ('import local_host as host\nserver=host.ThreadingHTTPServer\n'
-               f'host.ThreadingHTTPServer=lambda address,handler:server((address[0],{port}),handler)\n'
-               'host.main()')
+    harness = 'import local_host as host\nhost.main()'
     process = subprocess.Popen(
         [sys.executable, '-c', harness, '--headless', '--offline-qa',
-         '--data-dir', str(data)], cwd=root,
+         '--data-dir', str(data), '--port', str(port)], cwd=root,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW)
     for _ in range(150):

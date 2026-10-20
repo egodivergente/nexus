@@ -75,3 +75,21 @@ No se cancelaron ni reenviaron los dos registros PROCESSING importados de Androi
 Cierre de equivalencias incluye16bbcde: mismo puntero URI en el mismo proyecto
 se oculta como copia sin eliminar IDs, historial ni relaciones. Pruebas finales
 JVM394PASS4omitidas; Python21continuidad+6host+11DrivePASS.
+
+
+## Adjuntos de chats y disponibilidad del agente
+
+El contraste fisico encontro20SHA de adjuntos privados de chats del S25 ausentes
+entre todos los originales Windows y Drive. El enlace obtiene automaticamente
+los blobs autenticados, verifica SHA y conserva archivos por bytes sin crear
+assets ni proyectos. El historial conserva la identidad de cada chat fuente y
+sus adjuntos; las proyecciones Drive de solo texto se ocultan visualmente cuando
+hay una representacion completa, conservando ambos archivos. Los planes crudos
+se archivan como datos inertes y nunca se restauran como acciones ejecutables.
+El usuario puede desactivar esta categoria desde Ajustes.
+
+24 pruebas de continuidad,6 host/DPAPI,11 Drive y14 integridad PASS. La prueba
+Drive comprueba que la preparacion HTTP de originales deja libre el bloqueo del
+agente y que el intercambio JVM recupera ese bloqueo. El test de integridad se
+actualiza a la version real .2. El arnes antiguo de reinicio navegador se corrige
+para pedir explicitamente el puerto: no se declara repetida su prueba visual.

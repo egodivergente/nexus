@@ -2,7 +2,7 @@
 (()=>{
  const previous=renderSettings;
  let timer;
- const fields=[['skills','Skills personales y sus archivos'],['credentials','Claves API y puentes'],['settings','Ajustes y perfiles compatibles'],['agy','Sesión AGY'],['deletions','Propagar eliminaciones sin cambios locales']];
+ const fields=[['skills','Skills personales y sus archivos'],['chatAttachments','Adjuntos en el historial de chats'],['credentials','Claves API y puentes'],['settings','Ajustes y perfiles compatibles'],['agy','Sesión AGY'],['deletions','Propagar eliminaciones sin cambios locales']];
  async function refresh(){
   const section=document.querySelector('#device-continuity');if(!section){clearInterval(timer);return;}
   try{const state=await rpc('deviceContinuity',{op:'status'});section.querySelector('[data-continuity-status]').textContent=state.status;

@@ -239,21 +239,27 @@ class DriveSync:
                             chats.append(current)
                     with self.host.corte.lock:
                         self.captured_montages = {p.parent.name: json.loads(p.read_text('utf-8')) for p in self.host.corte.projects.glob('*/edit.json')}
-                    paths = {}
-                    for asset in snapshot['index'].get('assets', []):
-                        uri = asset['uri']
-                        if uri.startswith('nexus-sync:'):
-                            continue
-                        if self.failed_media.get(uri, 0) > time.time():
-                            continue
-                        try:
-                            _, path = self.host.native.asset(asset['id'], [{**asset, 'libraryDeleted': False}])
-                            paths[uri] = str(path)
-                        except Exception:
-                            self.failed_media[uri] = time.time() + 3600
-                    # Resolving historical provider URLs may take longer than the
-                    # token's remaining lifetime. Renew after that preparation.
-                    token = self.token()
+                finally:
+                    self.host.lock.release()
+                paths = {}
+                for asset in snapshot['index'].get('assets', []):
+                    uri = asset['uri']
+                    if uri.startswith('nexus-sync:'):
+                        continue
+                    if self.failed_media.get(uri, 0) > time.time():
+                        continue
+                    try:
+                        _, path = self.host.native.asset(asset['id'], [{**asset, 'libraryDeleted': False}])
+                        paths[uri] = str(path)
+                    except Exception:
+                        self.failed_media[uri] = time.time() + 3600
+                # Resolving historical provider URLs may take longer than the
+                # token's remaining lifetime. Renew after that preparation.
+                token = self.token()
+                if not self.host.lock.acquire(False):
+                    self.status = {"state": "waiting", "message": "Se sincronizará cuando termine el turno."}
+                    return
+                try:
                     result = self.host.exchange('driveSync', {'accessToken': token, 'rootId': self.config.get('folderId', ''),
                                                              'paths': paths, 'resolve': resolution,
                                                              'chats': chats, 'montages': self.captured_montages})

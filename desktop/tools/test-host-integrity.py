@@ -216,7 +216,7 @@ class IntegrityTests(unittest.TestCase):
             self.assertFalse(host.is_same_installation_root({'root': r'C:\Users\User\Documents\ChatGPT\NEXUS\desktop'}, host.ROOT))
             self.assertTrue(host.is_same_installation_root({'root': str(host.ROOT)}, host.ROOT))
             info = host.dispatch({}, 'init', {})
-            self.assertEqual(info.get('version'), '2026.10.19-corte-preview.4')
+            self.assertEqual(info.get('version'), '2026.10.20-device-continuity.2')
 
     def test_startup_onboarding_includes_official_logo_and_version_195(self):
         ui_root = host.ROOT / 'ui'

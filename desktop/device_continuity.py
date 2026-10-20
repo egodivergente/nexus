@@ -18,6 +18,7 @@ import urllib.request
 import urllib.parse
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from chat_continuity import inert_chat
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -195,12 +196,15 @@ class DeviceContinuity:
         self.manifest = None
         self.sources = {}
         self.private_sources = {}
+        self.media_inventory = {}
+        self.media_paths = {}
+        self.media_scanned = False
         self.status = 'Sin vincular'
         self.dirty = False
         self.last_errors = []
         defaults = dict(enabled=False, peers=[], address='', port=8797, interval=30,
                         timeout=120, maxFileMb=0, skills=True, credentials=True,
-                        settings=True, agy=True, deletions=False, device=str(uuid.uuid4()),
+                        settings=True, agy=True, deletions=False, chatAttachments=True, device=str(uuid.uuid4()),
                         agyDirectory=str(Path.home() / '.gemini' / 'antigravity-cli'))
         if self.config_file.exists():
             defaults.update(json.loads(self.config_file.read_text('utf-8')))
@@ -227,7 +231,7 @@ class DeviceContinuity:
                 next_config['address'] = endpoint(next_config['address']) if next_config['address'] else ''
                 for name in ('port', 'interval', 'timeout', 'maxFileMb'):
                     next_config[name] = int(next_config[name])
-                for name in ('enabled', 'skills', 'credentials', 'settings', 'agy', 'deletions'):
+                for name in ('enabled', 'skills', 'credentials', 'settings', 'agy', 'deletions', 'chatAttachments'):
                     if not isinstance(next_config[name], bool):
                         raise ValueError('Opcion de sincronizacion no valida.')
                 next_config['agyDirectory'] = str(Path(next_config['agyDirectory']).expanduser().resolve())
@@ -259,7 +263,7 @@ class DeviceContinuity:
             raise ValueError('Operacion desconocida.')
         return self.public()
 
-    def fetch(self, address, path, body=None):
+    def fetch(self, address, path, body=None, target=None):
         key = self.private()['key']
         token = request_token(path, key)
         packet = None
@@ -271,9 +275,59 @@ class DeviceContinuity:
                                          headers={'X-Nexus-Sync': token})
         # Ignore browser/system HTTP proxies for this explicit private peer transport.
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=self.config['timeout'] or None) as response:
-            output = io.BytesIO()
+            output = target if target is not None else io.BytesIO()
             decrypt(response, output, key, token, self.config['maxFileMb'] * 1048576)
-            return output.getvalue()
+            return output.getvalue() if target is None else None
+
+    def chat_media(self, peer, attachment):
+        sha = attachment.get('uri', attachment.get('url', '')).removeprefix('nexus-sync-blob:')
+        if not re.fullmatch('[a-f0-9]{64}', sha):
+            raise ValueError('Invalid attachment hash')
+        folder = self.host.data.parent / 'media'
+        folder.mkdir(exist_ok=True)
+        def fingerprint(path):
+            stat = path.stat()
+            stamp = (stat.st_size, stat.st_mtime_ns)
+            old = self.media_inventory.get(str(path))
+            if old and old[0] == stamp:
+                return old[1]
+            with path.open('rb') as stream:
+                value = hashlib.file_digest(stream, 'sha256').hexdigest()
+            self.media_inventory[str(path)] = (stamp, value)
+            self.media_paths[value] = path
+            return value
+        if not self.media_scanned:
+            # Once per changed chat batch; unchanged files reuse their verified fingerprint.
+            for path in folder.glob('*'):
+                if path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(folder.resolve()):
+                    fingerprint(path)
+            self.media_scanned = True
+        source = self.media_paths.get(sha)
+        if source and source.is_file() and fingerprint(source) == sha:
+            if source.suffix.lower() not in {'.html', '.htm', '.svg', '.js'}:
+                return '/media/' + source.name
+        name = str(attachment.get('name') or '')
+        suffix = Path(name).suffix.lower().removeprefix('.')
+        mime = attachment.get('mimeType', attachment.get('mime', ''))
+        if suffix not in {'jpg','jpeg','png','webp','gif','avif','bmp','mp4','mov','webm','m4v','mp3','wav','m4a','ogg','flac','opus','pdf','txt','md','csv','json','srt','log'}:
+            suffix = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4','application/pdf':'pdf','text/plain':'txt','text/html':'txt'}.get(mime, 'bin')
+        destination = folder / (sha[:32] + '.' + suffix)
+        if destination.exists() and fingerprint(destination) != sha:
+            destination = folder / (uuid.uuid4().hex + '.' + suffix)
+        if not destination.is_file():
+            temporary = folder / (uuid.uuid4().hex + '.part')
+            try:
+                with temporary.open('wb') as output:
+                    self.fetch(peer, '/blob/' + sha, target=output)
+                    output.flush()
+                    os.fsync(output.fileno())
+                if fingerprint(temporary) != sha:
+                    raise ValueError('Attachment integrity mismatch')
+                os.replace(temporary, destination)
+            finally:
+                temporary.unlink(missing_ok=True)
+        self.media_paths[sha] = destination
+        return '/media/' + destination.name
 
     def credential_snapshot(self):
         private = self.private()
@@ -539,7 +593,9 @@ class DeviceContinuity:
         if manifest['protocol'] != 1 or device == self.config['device']:
             raise ValueError('Invalid peer manifest')
         for doc in manifest['documents']:
-            if doc['kind'] not in {'skill', 'credentials'}:
+            if doc['kind'] not in {'skill', 'credentials', 'chat'}:
+                continue
+            if doc['kind'] == 'chat' and not self.config['chatAttachments']:
                 continue
             if doc['kind'] == 'skill' and not self.config['skills']:
                 continue
@@ -548,7 +604,7 @@ class DeviceContinuity:
             private = self.private()
             state_key = device + ':' + doc['kind'] + ':' + doc['name']
             state = private.get('peers', {}).get(state_key, {})
-            policy = [self.config[name] for name in ('skills', 'credentials', 'settings', 'agy', 'deletions')]
+            policy = [self.config[name] for name in ('skills', 'credentials', 'settings', 'agy', 'deletions', 'chatAttachments')]
             if state.get('hash') == doc['hash'] and state.get('policy') == policy:
                 continue
             if not re.fullmatch(r'[a-f0-9]{64}', doc['hash']):
@@ -556,10 +612,37 @@ class DeviceContinuity:
             data = self.fetch(peer, '/blob/' + doc['hash'])
             if digest(data) != doc['hash'] or len(data) != doc['bytes']:
                 raise ValueError('Invalid document integrity')
+            chat = None
+            if doc['kind'] == 'chat':
+                raw = json.loads(data)
+                # All referenced local bytes, including session references not attached to a message.
+                associated = {}
+                def visit(value):
+                    if isinstance(value, dict):
+                        if isinstance(value.get('uri'), str) and value['uri'].startswith('nexus-sync-blob:'):
+                            url = self.chat_media(peer, value)
+                            associated[url] = {'id': str(value.get('id', '')), 'url': url,
+                                               'name': str(value.get('name') or 'Adjunto archivado'),
+                                               'mime': str(value.get('mimeType') or 'application/octet-stream')}
+                        for child in value.values():
+                            visit(child)
+                    elif isinstance(value, list):
+                        for child in value:
+                            visit(child)
+                visit(raw)
+                chat = inert_chat(raw, lambda attachment: self.chat_media(peer, attachment))
+                represented = {a['url'] for item in chat['items'] for a in item['attachments']}
+                chat['continuityAttachments'] = [a for url, a in associated.items() if url not in represented]
+                chat['continuityOrigin'] = {'device': device, 'document': doc['name']}
+                chat['continuityRaw'] = raw  # Inert preservation; never placed in executable item/plan fields.
             if not self.host.lock.acquire(False):
                 raise AgentBusy('Agent busy; retry next interval')
             try:
-                if doc['kind'] == 'credentials':
+                if doc['kind'] == 'chat':
+                    identifier = 'sync_peer_' + digest(encoded(chat['continuityOrigin']))[:48]
+                    atomic(self.host.data / 'conversations' / (identifier + '.json'), encoded(chat))
+                    state = {'chatId': identifier}
+                elif doc['kind'] == 'credentials':
                     state = self.receive_credentials(json.loads(data), state, manifest.get('scopes', []))
                 else:
                     destination = skill_path(self.skills, doc['name'])
@@ -602,6 +685,7 @@ class DeviceContinuity:
             if self.config['enabled'] and self.lock.acquire(False):
                 try:
                     self.status = 'Sincronizando skills, ajustes y claves...'
+                    self.media_scanned = False
                     self.publish()
                     if self.server is None:
                         self.start_server()
