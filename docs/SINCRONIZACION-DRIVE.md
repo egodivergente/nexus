@@ -5,12 +5,24 @@ Conectar la misma cuenta en los tres dispositivos. Los clientes Desktop y
 Android deben pertenecer al mismo proyecto Google Cloud para compartir los
 archivos visibles con el permiso `drive.file`.
 
-La APK unificada 1.9.61-sync/vc95 conserva también la continuidad directa entre
+La APK unificada 1.9.63-agent-preview/vc97 conserva también la continuidad directa entre
 móviles. Sus controles aparecen separados: **Google Drive** y **Sincronización
 entre móviles**. Drive mantiene la copia compartida con Desktop; la continuidad
 directa conserva sus categorías y su vinculación existente. Ambos transportes
 escriben mediante el bloqueo común del índice; una edición recibida durante una
 transferencia de Drive provoca un reintento, conservando la edición reciente.
+
+## Estado del despliegue — 20 de octubre de 2026
+
+S25: vc97 instalada, firma y todos los IDs conservados. Windows: revisión
+2026.10.20-device-continuity.2 activa, con Drive y continuidad cifrada. Pixel:
+vc96-background conservada; vc97 preparada y pendiente de recuperar ADB. Las
+pruebas de archivos reales en ambos sentidos con los tres dispositivos se
+completaron antes de esa desconexión; no equivalen a certificar vc97 en Pixel.
+
+Windows y S2597 muestran cero grupos de URI visible duplicada por proyecto;
+se conservan los IDs históricos y las versiones concurrentes para revisión.
+La APK97 compilada pasa707 pruebas unitarias y tiene4 omitidas.
 
 ## Qué se comparte
 
