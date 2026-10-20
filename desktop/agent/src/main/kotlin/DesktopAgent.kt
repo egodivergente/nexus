@@ -170,9 +170,9 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             ContentBlock.Document(response.text("format"), response.text("name"), Base64.getDecoder().decode(response.text("bytes")),pages,response.text("coverage").ifBlank { null })
         }, videos = AttachmentVideoLoader { attachment ->
             val response = callback("video", encoded(attachment)).jsonObject
-            response["frames"]!!.jsonArray.flatMap { element ->
+            listOf(ContentBlock.Text("Duración medida del vídeo: ${response["duration_ms"]} ms. Marcas de extracción aproximadas; SIN audio.")) + response["frames"]!!.jsonArray.flatMap { element ->
                 val frame = element.jsonObject
-                listOf(ContentBlock.Text("Fotograma a ${frame["timestamp_ms"]} ms"),
+                listOf(ContentBlock.Text("Fotograma del asset ${attachment.assetId ?: attachment.id}, t≈${frame["timestamp_ms"]} ms"),
                     ContentBlock.Image(frame.text("format"), Base64.getDecoder().decode(frame.text("bytes"))))
             }
         })
