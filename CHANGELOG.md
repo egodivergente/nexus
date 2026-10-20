@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.55-agent] - 2026-10-20 · resultados sin huecos
+
+- **Imágenes del agente sin franjas:** los resultados se muestran con su proporción real (verticales, horizontales o cuadradas) en lugar de encajarlos en un marco 16:9 que dejaba espacios vacíos a los lados.
+
 ## [1.9.54-agent] - 2026-10-20 · deslizar entre secciones
 
 - **Deslizar entre secciones:** arrastrar el dedo a la izquierda pasa a la siguiente pestaña (Asistente → Lienzo → Modelos → Historial → Biblioteca) y a la derecha a la anterior. Los carruseles y controles con desplazamiento horizontal conservan su gesto.

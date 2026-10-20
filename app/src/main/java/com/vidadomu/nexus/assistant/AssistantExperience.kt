@@ -201,8 +201,8 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
         if(outputs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(outputs) { uri ->
                 when(p.plan.modality) {
-                    "IMAGE" -> AsyncImage(uri, "Resultado generado", Modifier.width(240.dp).aspectRatio(16f/9f)
-                        .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.Fit)
+                    "IMAGE" -> AsyncImage(uri, "Resultado generado", Modifier.height(240.dp).widthIn(min = 120.dp, max = 320.dp)
+                        .clip(NexusTokens.field).clickable(onClick = onOpenOutput), contentScale = ContentScale.FillHeight)
                     "AUDIO" -> AssistantMediaPreview(Attachment(uri,uri,"audio/mpeg","Resultado de audio"))
                     else -> AssistantMediaPreview(Attachment(uri,uri,"video/mp4","Resultado de vídeo"))
                 }
