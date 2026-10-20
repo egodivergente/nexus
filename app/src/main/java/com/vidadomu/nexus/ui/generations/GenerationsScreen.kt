@@ -27,10 +27,27 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(GenerationJob)->Unit) {
+fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(GenerationJob)->Unit,onSendResultToAgent:((String,String)->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
+    val outputConflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
+    var attachJob by remember {mutableStateOf<GenerationJob?>(null)}
+    attachJob?.let { job ->
+        NexusSheet("Añadir al chat",{attachJob=null},subtitle="Elige el resultado que quieres adjuntar") {
+            LazyColumn(Modifier.weight(1f)) { items(job.outputs,key={it.id}) { output ->
+                ListItem(headlineContent={Text("Resultado ${job.outputs.indexOf(output)+1}")},
+                    supportingContent={Text(output.type.name)},leadingContent={
+                        if(output.type in setOf(Modality.IMAGE,Modality.VIDEO)) coil.compose.AsyncImage(
+                            model=coil.request.ImageRequest.Builder(context).data(OutputFiles.trustedLocalUri(output,outputConflicts) ?: output.url).apply {
+                                if(output.type==Modality.VIDEO) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}
+                            }.build(),contentDescription="Resultado ${job.outputs.indexOf(output)+1}",modifier=Modifier.size(NexusTokens.minimumTouch))
+                        else Icon(Icons.Default.AttachFile,null)
+                    },
+                    modifier=Modifier.clickable {onSendResultToAgent?.invoke(job.id,output.id);attachJob=null})
+            } }
+        }
+    }
     val historyLoading by app.generationRepository.historyLoading.collectAsState()
     val historyError by app.generationRepository.historyError.collectAsState()
     var searchQuery by rememberSaveable {mutableStateOf("")}
@@ -162,6 +179,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                             onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
                             onRetry={onPrepareAgain(job)},
                             menu={ close ->
+                                if(job.outputs.isNotEmpty() && onSendResultToAgent!=null) DropdownMenuItem(text={Text("Añadir al chat")},onClick={close();attachJob=job})
                                 if(job.parameters["__tracking_paused"]=="true") DropdownMenuItem(text={Text("Recuperar seguimiento")},onClick={close();scope.launch {
                                     val recovered=app.generationRepository.pollJob(job.id,refreshFailed=true)
                                     if(recovered.getOrNull()?.status in setOf(GenerationStatus.QUEUED,GenerationStatus.GENERATING,GenerationStatus.PROCESSING,GenerationStatus.RENDERING))

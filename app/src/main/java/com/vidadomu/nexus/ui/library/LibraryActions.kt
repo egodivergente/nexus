@@ -25,7 +25,7 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LibraryActions(job:GenerationJob,output:GenerationOutput,localUri:String?,favorite:Boolean,hidden:Boolean,
-    onDismiss:()->Unit,onOpen:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onDelete:()->Unit,onError:(String)->Unit) {
+    onDismiss:()->Unit,onOpen:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onDelete:()->Unit,onError:(String)->Unit,onAddToChat:(()->Unit)?=null,onSelect:(()->Unit)?=null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     val exporter:com.vidadomu.nexus.ui.output.OutputExportViewModel=androidx.lifecycle.viewmodel.compose.viewModel()
@@ -37,6 +37,10 @@ internal fun LibraryActions(job:GenerationJob,output:GenerationOutput,localUri:S
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space24)) {
             Text("Opciones del archivo",style=MaterialTheme.typography.titleMedium)
             OutputMetadataDetails(job, output, localUri)
+            onAddToChat?.let { add -> ListItem(headlineContent={Text("Añadir al chat")},leadingContent={Icon(Icons.Default.AttachFile,null)},
+                modifier=Modifier.actionClick {onDismiss();add()}) }
+            onSelect?.let { select -> ListItem(headlineContent={Text("Seleccionar")},leadingContent={Icon(Icons.Default.CheckCircle,null)},
+                modifier=Modifier.actionClick {onDismiss();select()}) }
             ListItem(headlineContent={Text("Abrir")},leadingContent={Icon(Icons.Default.OpenInFull,null)},
                 modifier=Modifier.actionClick {onDismiss();onOpen()})
             ListItem(headlineContent={Text(if(favorite) "Quitar de favoritos" else "Marcar favorito")},leadingContent={Icon(Icons.Default.Star,null)},

@@ -181,7 +181,11 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToOutput = { jobId ->
                                     navController.navigate("output/$jobId")
                                 },
-                                onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}}
+                                onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}},
+                                onSendResultToAgent = { jobId, outputId ->
+                                    assistantViewModel.attachLibraryResult(jobId,outputId)
+                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                }
                             )
                         }
                         composable(Screen.Library.route) {
@@ -196,8 +200,12 @@ class MainActivity : ComponentActivity() {
                                         asset.mimeType ?: if (asset.type == com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO) "video/mp4" else "image/jpeg")
                                     navController.navigate(Screen.Create.route) { launchSingleTop = true }
                                 },
+                                onSendResultToAgent = { jobId, outputId ->
+                                    assistantViewModel.attachLibraryResult(jobId,outputId)
+                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                },
                                 onSendToAgent = { asset ->
-                                    assistantViewModel.attach(listOf(Uri.parse(asset.uri)))
+                                    assistantViewModel.attachLibraryAsset(asset.id)
                                     if (!navController.popBackStack(Screen.Assistant.route, inclusive = false))
                                         navController.navigate(Screen.Assistant.route) { launchSingleTop = true }
                                 }

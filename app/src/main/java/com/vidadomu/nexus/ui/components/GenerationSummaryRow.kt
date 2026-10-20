@@ -1,8 +1,12 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.vidadomu.nexus.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -76,7 +80,7 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
         model.takeIf {job.prompt.isNotBlank()}).joinToString(" · ")
     // Solo un coste real; un trabajo fallido o en curso no muestra «Por confirmar».
     val cost=costText.takeIf {job.status==GenerationStatus.COMPLETED && it!="Por confirmar"}
-    Row(Modifier.fillMaxWidth().heightIn(min=60.dp).clickable(onClick=onOpen)
+    Row(Modifier.fillMaxWidth().heightIn(min=60.dp).combinedClickable(onClick=onOpen,onLongClick={menuOpen=true},onLongClickLabel="Opciones del resultado")
         .padding(start=NexusTokens.screenMargin,end=NexusTokens.space4,top=6.dp,bottom=6.dp),
         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         Box(Modifier.size(NexusTokens.minimumTouch).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer),contentAlignment=Alignment.Center) {

@@ -127,6 +127,7 @@ data class AssistantSettings(
         val ANTHROPIC_MODELS = listOf("claude-sonnet-5-5" to "Sonnet 5.5", "claude-opus-5-5" to "Opus 5.5", "claude-haiku-5-5" to "Haiku 5.5")
         /** Modelos expuestos por el puente de Antigravity CLI (`/root/axel-native-v2/bridge/server.ts`). */
         val ANTIGRAVITY_MODELS = listOf(
+            com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.DEFAULT_MODEL to "Gemini 4 Argon",
             "gemini-3.8-flash" to "Gemini 3.8 Flash",
             "gemini-3.1-pro" to "Gemini 3.1 Pro",
             "gemini-3.7-flash" to "Gemini 3.7 Flash",
@@ -167,32 +168,39 @@ class AssistantSettingsStore(private val app: NexusApplication) {
     /** Cerebros personalizados y BytePlus. */
     val brains = BrainStore(app)
 
-    /** Límites globales del usuario. «Máx. tokens» es el mismo ajuste de siempre (clave `max_tokens`). */
+    private val limitsJson = kotlinx.serialization.json.Json { encodeDefaults=true; ignoreUnknownKeys=true }
+    private val legacyLimitKeys = setOf("maxToolRounds","turnTimeoutSeconds","maxTokens","flowMaxResults","maxImagesPerTurn","maxVideosPerTurn","maxDocumentsPerTurn","maxMessages","maxToolResultChars","maxUiContextChars","jobTrackingMinutes")
+    val limitsState by lazy { kotlinx.coroutines.flow.MutableStateFlow(limits()) }
+
+    /** Existing preferences remain authoritative; new controls share an extensible JSON record. */
     fun limits(): AgentLimits {
-        val d = AgentLimits()
-        return AgentLimits(
-            maxToolRounds = prefs.getInt("lim_rounds", d.maxToolRounds),
-            turnTimeoutSeconds = prefs.getInt("lim_turn_timeout_s", d.turnTimeoutSeconds),
-            maxTokens = prefs.getInt("max_tokens", d.maxTokens).coerceAtLeast(1),
-            flowMaxResults = prefs.getInt("lim_flow_results", d.flowMaxResults).coerceAtLeast(1),
-            maxImagesPerTurn = prefs.getInt("lim_images", d.maxImagesPerTurn),
-            maxVideosPerTurn = prefs.getInt("lim_videos", d.maxVideosPerTurn),
-            maxDocumentsPerTurn = prefs.getInt("lim_documents", d.maxDocumentsPerTurn),
-            maxMessages = prefs.getInt("lim_messages", d.maxMessages),
-            maxToolResultChars = prefs.getInt("lim_tool_chars", d.maxToolResultChars),
-            maxUiContextChars = prefs.getInt("lim_ui_chars", d.maxUiContextChars),
-            jobTrackingMinutes = prefs.getInt("lim_tracking_min", d.jobTrackingMinutes),
-        )
+        val d=AgentLimits()
+        val base=AgentLimits(
+            maxToolRounds=prefs.getInt("lim_rounds",d.maxToolRounds),turnTimeoutSeconds=prefs.getInt("lim_turn_timeout_s",d.turnTimeoutSeconds),
+            maxTokens=prefs.getInt("max_tokens",d.maxTokens).coerceAtLeast(1),flowMaxResults=prefs.getInt("lim_flow_results",d.flowMaxResults),
+            maxImagesPerTurn=prefs.getInt("lim_images",d.maxImagesPerTurn),maxVideosPerTurn=prefs.getInt("lim_videos",d.maxVideosPerTurn),
+            maxDocumentsPerTurn=prefs.getInt("lim_documents",d.maxDocumentsPerTurn),maxMessages=prefs.getInt("lim_messages",d.maxMessages),
+            maxToolResultChars=prefs.getInt("lim_tool_chars",d.maxToolResultChars),maxUiContextChars=prefs.getInt("lim_ui_chars",d.maxUiContextChars),
+            jobTrackingMinutes=prefs.getInt("lim_tracking_min",d.jobTrackingMinutes))
+        return runCatching {
+            val extras=prefs.getString("lim_extra_json",null)?.let {limitsJson.parseToJsonElement(it) as kotlinx.serialization.json.JsonObject}
+            if(extras==null) base else {
+                val original=limitsJson.encodeToJsonElement(AgentLimits.serializer(),base) as kotlinx.serialization.json.JsonObject
+                limitsJson.decodeFromJsonElement(AgentLimits.serializer(),kotlinx.serialization.json.JsonObject(original+extras.filterKeys {it !in legacyLimitKeys}))
+            }
+        }.getOrDefault(base)
     }
 
-    /** Guarda los límites tal cual (solo se rechazan negativos): 0 = sin límite donde aplica. */
     fun saveLimits(l: AgentLimits) {
-        l.problems().firstOrNull()?.let { throw IllegalArgumentException(it) }
-        check(prefs.edit().putInt("lim_rounds", l.maxToolRounds).putInt("lim_turn_timeout_s", l.turnTimeoutSeconds).putInt("max_tokens", l.maxTokens)
-            .putInt("lim_flow_results", l.flowMaxResults).putInt("lim_images", l.maxImagesPerTurn).putInt("lim_videos", l.maxVideosPerTurn)
-            .putInt("lim_documents", l.maxDocumentsPerTurn).putInt("lim_messages", l.maxMessages).putInt("lim_tool_chars", l.maxToolResultChars)
-            .putInt("lim_ui_chars", l.maxUiContextChars).putInt("lim_tracking_min", l.jobTrackingMinutes).commit()) { "No se pudieron guardar los límites." }
-        com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes = l.jobTrackingMinutes
+        l.problems().firstOrNull()?.let {throw IllegalArgumentException(it)}
+        val values=limitsJson.encodeToJsonElement(AgentLimits.serializer(),l) as kotlinx.serialization.json.JsonObject
+        val extras=kotlinx.serialization.json.JsonObject(values.filterKeys {it !in legacyLimitKeys})
+        check(prefs.edit().putInt("lim_rounds",l.maxToolRounds).putInt("lim_turn_timeout_s",l.turnTimeoutSeconds).putInt("max_tokens",l.maxTokens)
+            .putInt("lim_flow_results",l.flowMaxResults).putInt("lim_images",l.maxImagesPerTurn).putInt("lim_videos",l.maxVideosPerTurn)
+            .putInt("lim_documents",l.maxDocumentsPerTurn).putInt("lim_messages",l.maxMessages).putInt("lim_tool_chars",l.maxToolResultChars)
+            .putInt("lim_ui_chars",l.maxUiContextChars).putInt("lim_tracking_min",l.jobTrackingMinutes).putString("lim_extra_json",extras.toString()).commit()) {"No se pudieron guardar los límites."}
+        com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes=l.jobTrackingMinutes
+        limitsState.value=l
     }
 
     fun effectiveLimits(s: AssistantSettings): AgentLimits = s.effectiveLimits
@@ -356,7 +364,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
             )
             edit.putString("model_id", it)
         }
-        tokens?.let { require(it in 256..32000); edit.putInt("max_tokens", it) }
+        tokens?.let { require(it > 0); edit.putInt("max_tokens", it) }
         images?.let { edit.putBoolean("send_images", it) }
         excluded?.let { edit.putString("excluded_families", AssistantSettings.parseFamilies(it).joinToString(", ")) }
         check(edit.commit()) { "No se pudieron guardar los ajustes." }
@@ -426,7 +434,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         registry = registry, skills = skills,
         cost = ChainedCostEstimator(listOf(NexusQuoteEstimator(registry), published)),
         // El router ordena con la tabla publicada (sin llamadas de red por candidato); el plan usa la calculadora.
-        router = ModelRouter(registry, skills, published, excludedFamilies = { settings.excludedFamilies() }),
+        router = ModelRouter(registry, skills, published, excludedFamilies = { settings.excludedFamilies() }, schemaCheckLimit = { settings.limits().let { it.maximum(it.maxRecommendationSchemaChecks) } }),
         guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app), directFlow = true,
         nativeOperations = NexusNativeOperations(app, this),
         orders = orders,

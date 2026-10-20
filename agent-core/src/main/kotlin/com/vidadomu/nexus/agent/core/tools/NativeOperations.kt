@@ -41,13 +41,13 @@ object NativeOperationTools {
             "Habla con el AGENTE de Google Flow (cuenta Ultra del usuario, sin coste por uso) en el proyecto abierto: pídele imágenes o vídeos (muchas variaciones a la vez), que cree o ordene colecciones, que prepare descargas, etc. Escribe en lenguaje natural y concreto (cantidad, estilo, formato). Espera su respuesta (wait_seconds) y devuelve su texto, las opciones que proponga y los archivos generados ya copiados a la Biblioteca de Nexus (asset_ids). Si pregunta o propone opciones, negocia: decide o consulta al usuario y responde con otro flow_agent_send. Para encargos de generación con Flow, prefiere esta vía.",
             schema {
                 string("message", "Lo que quieres decirle o pedirle al agente de Flow.", required = true)
-                integer("wait_seconds", "Segundos máximos de espera a que responda (0-240; por defecto 90).")
+                integer("wait_seconds", "Segundos máximos de espera a que responda (0 = no esperar; máximo configurable en Ajustes).")
             }),
         NativeTool(operations, "flow_agent_read", ToolCategory.READ,
             "Lee (y espera) la respuesta del agente de Google Flow a un flow_agent_send que aún no había terminado. Copia a la Biblioteca lo que haya generado.",
             schema {
                 string("conversation_id", "El conversation_id que devolvió flow_agent_send.", required = true)
-                integer("wait_seconds", "Segundos máximos de espera (0-240; por defecto 90).")
+                integer("wait_seconds", "Segundos máximos de espera (0 = no esperar; máximo configurable en Ajustes).")
             }),
         NativeTool(operations, "diagnose_flow", ToolCategory.READ,
             "Comprueba conexión, sesión y capacidad real del puente Flow y enumera su cola local.",
@@ -62,7 +62,7 @@ object NativeOperationTools {
             "Cambia ajustes reales; el modelo se aplica en el siguiente mensaje. No cambia claves ni conexiones.",
             schema {
                 string("agent_model", "Modelo del agente. La disponibilidad depende de la conexión.", enum = listOf("sol", "sonnet-5.5", "opus-5.5", "sonnet-4.6", "opus-4.6", "haiku-4.5"))
-                integer("max_tokens", "De 256 a 32000.")
+                integer("max_tokens", "Cantidad positiva elegida por el usuario; se aplica el contrato del modelo.")
                 boolean("send_images", "Permitir enviar adjuntos visuales al agente.")
                 string("excluded_families", "Familias que no se recomiendan, separadas por comas.")
                 string("theme", "Tema.", enum = listOf("AURORA", "OLED", "QUARTZ", "OCEAN", "FOREST", "LIGHT", "SAND", "ROSE"))
