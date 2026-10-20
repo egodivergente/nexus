@@ -21,6 +21,12 @@ class DeviceSyncTest {
         assertIs<JsonObject>(syncSettingValue("{\"maxToolRounds\":17}"))
         assertEquals(JsonPrimitive("{broken"), syncSettingValue("{broken"))
     }
+    @Test fun nestedBareValuesAndNonJsonNumbersStayQuotedAsOriginalText() {
+        for (text in listOf("{\"mode\":AGENT}", "[AGENT]", "[+1]", "[NaN]", "[Infinity]", "[01]", "{\"nested\":[{\"model\":custom}]}")) {
+            assertEquals(JsonPrimitive(text), syncSettingValue(text), text)
+        }
+        assertIs<JsonArray>(syncSettingValue("[null,true,false,0,-1,1.2,1e-9]"))
+    }
     private val json = Json
     private fun value(s: String) = json.parseToJsonElement(s)
     private fun encrypt(bytes: ByteArray, key: String, context: String = "response"): ByteArray = ByteArrayOutputStream().let { out ->
