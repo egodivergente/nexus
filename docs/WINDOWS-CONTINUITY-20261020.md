@@ -13,7 +13,9 @@ clave, intervalo, espera de red (0 ilimitado), MB por archivo (0 ilimitado),
 carpeta local AGY y cada categoria. Las eliminaciones son opcionales y no pisan
 una edicion local concurrente. Deben estar abiertos Nexus Windows y la
 continuidad habilitada en los telefonos. La APK permite desactivar el intercambio
-Windows independientemente de la conexion entre moviles.
+Windows independientemente de la conexion entre moviles. Este control de la APK
+se refiere a recibir cambios del PC; el control automatico de Windows pausa su
+intercambio completo, incluidas las lecturas de los telefonos.
 
 El PC solicita una devolucion mediante POST /sync cifrado y autenticado.
 El telefono solo permite volver a la misma IP de quien firma la solicitud;
