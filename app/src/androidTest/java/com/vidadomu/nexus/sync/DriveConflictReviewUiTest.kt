@@ -1,6 +1,9 @@
 package com.vidadomu.nexus.sync
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -42,7 +45,8 @@ class DriveConflictReviewUiTest {
         zone=TimeZone.getTimeZone("UTC"),
     )
     private fun show(summary:DriveConflictSummary,pending:String?=null) {
-        compose.setContent {NexusTheme {DriveConflictReview(summary,pending,onResolve={key,version->calls+=key to version})}}
+        compose.setContent {NexusTheme {DriveConflictReview(summary,pending,onResolve={key,version->calls+=key to version},
+            modifier=Modifier.verticalScroll(rememberScrollState()))}}
     }
 
     @Test fun tappingTheNameOpensDetailAndNeverResolves() {
@@ -60,13 +64,13 @@ class DriveConflictReviewUiTest {
         guard()
         show(summary(assetConflict(1),assetConflict(2)))
         compose.onNodeWithText("Archivo «foto-1.png»").performClick()
-        compose.onAllNodesWithText("Conservar esta versión")[1].performClick()
+        compose.onAllNodesWithText("Conservar esta versión")[1].performScrollTo().performClick()
         compose.onNodeWithText("¿Conservar la versión 2?").assertIsDisplayed()
         compose.runOnIdle {assertTrue(calls.isEmpty())}
         compose.onNodeWithText("Sí, conservar esta").performClick()
         compose.onNodeWithText("Sí, conservar esta").assertDoesNotExist()
         compose.runOnIdle {assertEquals(listOf("assets:$assetId-1" to "b-1"),calls)}
-        compose.onNodeWithText("Archivo «foto-2.png»").performClick()
+        compose.onNodeWithText("Archivo «foto-2.png»").performScrollTo().performClick()
         compose.onAllNodesWithText("Conservar esta versión").assertCountEquals(2).onFirst().assertIsNotEnabled()
         compose.onAllNodesWithText("Conservar esta versión")[1].assertIsNotEnabled()
         compose.runOnIdle {assertEquals(1,calls.size)}
@@ -76,7 +80,7 @@ class DriveConflictReviewUiTest {
         guard()
         show(summary(assetConflict(1)))
         compose.onNodeWithText("Archivo «foto-1.png»").performClick()
-        compose.onAllNodesWithText("Conservar esta versión").onFirst().performClick()
+        compose.onAllNodesWithText("Conservar esta versión").onFirst().performScrollTo().performClick()
         compose.onNodeWithText("Cancelar").performClick()
         compose.onNodeWithText("Cerrar").performClick()
         compose.onNodeWithTag("drive-conflict-detail").assertDoesNotExist()
@@ -88,7 +92,7 @@ class DriveConflictReviewUiTest {
         show(summary(assetConflict(1),assetConflict(2)),pending="assets:$assetId-1")
         compose.onNodeWithText("Elección guardada para Archivo «foto-1.png»",substring=true).assertExists()
         compose.onAllNodesWithTag("drive-conflict-row")[0].assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"Elección pendiente de sincronizar"))
-        compose.onNodeWithText("Archivo «foto-2.png»").performClick()
+        compose.onNodeWithText("Archivo «foto-2.png»").performScrollTo().performClick()
         compose.onNodeWithText("Hay otra elección pendiente",substring=true).assertExists()
         compose.onAllNodesWithText("Conservar esta versión").onFirst().assertIsNotEnabled()
         compose.runOnIdle {assertTrue(calls.isEmpty())}
@@ -100,9 +104,9 @@ class DriveConflictReviewUiTest {
         compose.onNodeWithText("12 elementos con versiones distintas").assertExists()
         compose.onNodeWithText("Archivos (12)").assertExists()
         compose.onAllNodesWithTag("drive-conflict-row").assertCountEquals(5)
-        compose.onNodeWithText("Mostrar más archivos (quedan 7)").performClick()
+        compose.onNodeWithText("Mostrar más archivos (quedan 7)").performScrollTo().performClick()
         compose.onAllNodesWithTag("drive-conflict-row").assertCountEquals(10)
-        compose.onNodeWithText("Mostrar más archivos (quedan 2)").performClick()
+        compose.onNodeWithText("Mostrar más archivos (quedan 2)").performScrollTo().performClick()
         compose.onAllNodesWithTag("drive-conflict-row").assertCountEquals(12)
         compose.onNodeWithText("Mostrar más",substring=true).assertDoesNotExist()
     }
@@ -117,7 +121,7 @@ class DriveConflictReviewUiTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role,Role.Button))
             .performClick()
         compose.onNodeWithText("Esta versión retira el elemento").assertExists()
-        compose.onNodeWithText("Confirmar retirada").assertIsEnabled().performClick()
+        compose.onNodeWithText("Confirmar retirada").performScrollTo().assertIsEnabled().performClick()
         compose.onNodeWithText("¿Retirar este elemento?").assertIsDisplayed()
         compose.onNodeWithText("Sí, retirar").performClick()
         compose.runOnIdle {assertEquals(listOf("assets:$assetId-gone" to "drop"),calls)}

@@ -1,5 +1,8 @@
 package com.vidadomu.nexus.sync
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.vidadomu.nexus.BuildConfig
@@ -28,7 +31,8 @@ class DriveConflictSelectionUiTest {
             })})
         }
         val summary=DriveConflictPresentation.summarize(status)
-        compose.setContent {NexusTheme {DriveConflictReview(summary,null,onResolve={k,v->calls+=k to v})}}
+        compose.setContent {NexusTheme {DriveConflictReview(summary,null,onResolve={k,v->calls+=k to v},
+            modifier=Modifier.verticalScroll(rememberScrollState()))}}
     }
 
     @Test fun selectingTheConflictOnlyOpensDetail() {
@@ -43,7 +47,7 @@ class DriveConflictSelectionUiTest {
     @Test fun choosingAVersionWaitsForExplicitConfirmation() {
         setUp()
         compose.onNodeWithText("Proyecto «Corto»").performClick()
-        compose.onAllNodesWithText("Conservar esta versión").onFirst().performClick()
+        compose.onAllNodesWithText("Conservar esta versión").onFirst().performScrollTo().performClick()
         compose.onNodeWithText("¿Conservar la versión 1?").assertIsDisplayed()
         compose.runOnIdle {assertTrue(calls.isEmpty())}
         compose.onNodeWithText("Sí, conservar esta").performClick()
@@ -54,7 +58,7 @@ class DriveConflictSelectionUiTest {
     @Test fun cancellingTheConfirmationNeverResolves() {
         setUp()
         compose.onNodeWithText("Proyecto «Corto»").performClick()
-        compose.onAllNodesWithText("Conservar esta versión")[1].performClick()
+        compose.onAllNodesWithText("Conservar esta versión")[1].performScrollTo().performClick()
         compose.onNodeWithText("Cancelar").performClick()
         compose.onNodeWithText("¿Conservar la versión 2?").assertDoesNotExist()
         compose.onNodeWithTag("drive-conflict-detail").assertIsDisplayed()

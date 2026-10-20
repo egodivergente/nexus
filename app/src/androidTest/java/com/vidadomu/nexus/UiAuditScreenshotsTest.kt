@@ -39,7 +39,7 @@ class UiAuditScreenshotsTest {
         check(BuildConfig.OFFLINE_QA)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext.applicationContext as NexusApplication
-        check(listOf(".qa",".mediaqa",".uiqa").any(app.packageName::endsWith))
+        check(listOf(".qa",".mediaqa",".uiqa",".megaqa").any(app.packageName::endsWith))
         runBlocking { app.ready.await(); app.database.loading.first { !it } }
         app.providerRegistry.setMockMode(true)
         app.modelCatalogRepository.refreshModels()
@@ -77,20 +77,27 @@ class UiAuditScreenshotsTest {
                 ChatItem.PlanCard("ui-audit-card",plan.id)), plans=mapOf(plan.id to PlanUi(plan,true,PlanState.PREPARED))) }
         val scene = mutableStateOf("lienzo")
         val scale = mutableFloatStateOf(1f)
+        val observedScale = mutableFloatStateOf(Float.NaN)
+        // A new key per capture disposes every sheet/dialog the previous scene left open.
+        val captureEpoch = mutableIntStateOf(0)
         val preferences = AppearancePreferences(app)
         val originalTheme = preferences.theme()
         val args = InstrumentationRegistry.getArguments()
         val phase = args.getString("audit_phase") ?: "before"
         val themes = args.getString("audit_themes")?.split(",")?.map(NexusAppearance::valueOf) ?: if(phase=="after") NexusAppearance.entries
             else listOf(NexusAppearance.LIGHT)
-        val scales = when(phase) { "before" -> listOf(1f,1.3f); "after" -> listOf(1f,1.3f,1.5f); else -> listOf(1.3f) }
+        val scales = when(phase) { "before" -> listOf(1f,1.3f); "after" -> listOf(1f,1.3f,1.5f,2f); else -> listOf(1.3f) }
         val scenes=args.getString("audit_scenes")?.split(",")
             ?: listOf("lienzo","historial","modelos","modelo-opciones","biblioteca","visor","asistente","proyecto","ajustes","flow","comparacion","costes")
         val folder = File(app.getExternalFilesDir(null),"ui-audit/$phase").apply { mkdirs() }
         compose.setContent {
-            val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density,scale.floatValue)) {
-                NexusTheme {
+            // Inside the theme: NexusTheme multiplies by the saved font preference and would skew the audit scale.
+            NexusTheme {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density,scale.floatValue)) {
+                    val applied = LocalDensity.current.fontScale
+                    SideEffect { observedScale.floatValue = applied }
+                    key(scene.value, captureEpoch.intValue) {
                     com.vidadomu.nexus.ui.components.NexusChrome({}, {}, settingsVisible=scene.value!="ajustes") {
                     Box(Modifier.fillMaxSize()) {
                         when(scene.value) {
@@ -108,6 +115,7 @@ class UiAuditScreenshotsTest {
                         }
                     }
                     }
+                    }
                 }
             }
         }
@@ -115,13 +123,19 @@ class UiAuditScreenshotsTest {
             for(theme in themes) for(fontScale in scales) {
                 compose.runOnIdle { preferences.setTheme(theme); scale.floatValue=fontScale }
                 for(name in scenes) {
-                    compose.runOnIdle { scene.value=name }
+                    compose.runOnIdle { scene.value=name; captureEpoch.intValue++ }
                     compose.waitForIdle()
+                    val memoryTitle = "Memoria de ${project.name}"
+                    check(compose.onAllNodesWithText(memoryTitle).fetchSemanticsNodes().isEmpty()) { "Project sheet still open before $name" }
                     if(name=="proyecto") {
-                        val old = compose.onAllNodesWithText("Memoria (vacía)")
-                        if(old.fetchSemanticsNodes().isNotEmpty()) old[0].performClick()
-                        else compose.onNodeWithContentDescription("Abrir proyecto").performClick()
+                        compose.onNodeWithContentDescription("Abrir proyecto").performClick()
                         compose.waitForIdle()
+                        compose.onNodeWithText("Editar memoria").performScrollTo().performClick()
+                        compose.waitForIdle()
+                        compose.onNodeWithText(memoryTitle).assertExists()
+                    }
+                    compose.runOnIdle {
+                        check(observedScale.floatValue==fontScale) { "Applied font scale ${observedScale.floatValue}, expected $fontScale" }
                     }
                     // UiAutomation captures the presented frame, not Compose's next draw.
                     // Give the emulator compositor time to present the settled screen.

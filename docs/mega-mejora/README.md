@@ -33,7 +33,7 @@ Código Android de prueba: vc98 / 1.9.64-mega1-agent. No instalado. Catálogo, m
 - V18: el saldo y el recuento de archivos están en una línea secundaria bajo la barra de Biblioteca, no en un menú.
 - Riesgos conocidos sin corregir:
   - la normalización del core puede dejar marcado como pendiente un borrador de memoria ya guardado;
-  - la escena de proyecto de `UiAuditScreenshotsTest` captura ahora la lista y no el editor;
+  - el arnés `UiAuditScreenshotsTest` está adaptado al editor de memoria, al paquete .megaqa y a escalas verificadas hasta 200 %, todavía sin ejecución;
   - Atrás cierra la hoja de proyecto y conserva el borrador sin preguntar;
   - coste del historial: ahora usa el componente `ConfirmedGenerationCost` sin maxLines ni ellipsis; el nuevo test a 200 % no se ha ejecutado;
   - el Historial calcula las variantes una vez por snapshot O(n log n), pero `GenerationSummaryRow` conserva el cálculo de conflictos locales O(n) por fila;
