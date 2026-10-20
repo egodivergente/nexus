@@ -1,6 +1,7 @@
 'use strict';
 (()=>{
  let timer=null;
+ const visibility=document.createElement('style');visibility.textContent='#nexus-drive-sync [hidden]{display:none!important}';document.head.append(visibility);
  const labels={idle:'Sin conectar',ready:'Conectado',syncing:'Sincronizando…',synced:'Al día',partial:'Faltan originales por recuperar',conflicts:'Hay versiones para revisar',waiting:'Esperando a que termine el turno',retry:'Pendiente de reintento',authorization_required:'Vuelve a conectar Google',unavailable:'No disponible en el laboratorio'};
  const previous=renderSettings;
  async function refresh(){
