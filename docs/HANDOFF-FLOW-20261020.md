@@ -1,6 +1,6 @@
 # Traspaso: Flow, ASUS y APK de pruebas (2026-10-20)
 
-Rama: `claude/asus-pc-health-audit-i023i6` (último commit publicado: `ce28fb0`, más el workflow de firma `fe420e1`).
+Rama: `claude/asus-pc-health-audit-i023i6`. Código de la APK instalada: `4ba9755`.
 Repositorio: `egodivergente/nexus`. Trabaja sobre esta rama; no hagas force-push ni reescribas historial.
 
 ## Qué está hecho y probado
@@ -18,11 +18,15 @@ Repositorio: `egodivergente/nexus`. Trabaja sobre esta rama; no hagas force-push
 
 ## Qué falta
 
-1. **APK de pruebas firmada con la clave del dispositivo**, para instalarla encima de `com.vidadomu.nexus.agent`
-   en el Pixel 8 Pro sin perder datos. Bloqueado por dos cosas:
-   - La compilación en GitHub Actions no arranca: la cuenta tiene el límite de gasto o el pago fallido.
-   - Compilar en la nube falla al descargar whisper.cpp v1.7.6 desde GitHub (la sandbox no tiene acceso).
-   El código de whisper sí existe en el ASUS: `~/audit-nexus-6874e34/app/.cxx/Release/4q712105/arm64-v8a/_deps/whisper-src`.
+1. **Verificación funcional de la APK en el Pixel**: ya está instalada `1.9.52-agent-preview` / vc86
+   sobre vc85, con autorización del usuario. `:app:assembleAgentPreview` (ARM64) terminó en AXELPC;
+   el ASUS solo firmó con su clave existente, sin copiarla. Certificado SHA-256 comprobado contra la APK
+   instalada: `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`.
+   APK SHA-256: `fa8fcc55008ed8405f577763236ffa9da33262f24f7f121e3e9a841af213fc0f`.
+   Actualización mediante `adb install -r -t --user 0`: `Success`, mismo UID 10374 y fecha original de
+   instalación (2026-10-06). `MainActivity` quedó en primer plano y el proceso seguía activo.
+   Falta probar los flujos de importación y fotogramas en la app; no se inició ninguna generación.
+   GitHub Actions sigue sin asignar runner ni ejecutar pasos.
 2. **Fotogramas inicio/fin de Vídeo en Flow**: programados en la app y el puente (modo Vídeo › Fotogramas,
    controles «Inicio», «Fin» e «Intercambiar»). Las 51 pruebas del puente pasan. La API autenticada
    `/api/flow/status` respondió `connected` y `generation_ready`; no se envió ninguna generación. La app tuvo
