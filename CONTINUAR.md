@@ -81,3 +81,7 @@ agent-core 165, núcleo de escritorio 165. Pendiente: probar las claves reales d
 capturar Modelos, la hoja única y el micrófono en el S25 (estaba en uso) y pintar encargos en Windows.
 
 El 17 de octubre se añadió BytePlus ModelArk (Responses API, modelo dola-seed-2-1-turbo-260628), proveedores LLM y multimedia definidos por el usuario y límites configurables en todo el agente (ver CHANGELOG 1.9.23). Pendiente: **activar el modelo en la consola de Ark** (la cuenta devuelve ModelNotOpen) y repetir BytePlusLiveTest con la clave real; instalar en el S25 cuando esté conectado; y comprobar en pantalla que los modelos de un generador propio aparecen en el Lienzo.
+
+Pendiente de compilar y probar en dispositivo (rama `ccr-7eedc821-tq6q3m`, sin versión nueva): jerarquía visual
+y paneles `nexus-ui` en las respuestas del agente. El núcleo y Windows están verificados en JVM; la interfaz de
+Android no se ha compilado. Véase `CHANGELOG.md` («Sin publicar») y la skill `response_craft`.

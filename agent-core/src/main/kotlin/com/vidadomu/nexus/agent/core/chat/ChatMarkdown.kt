@@ -12,6 +12,8 @@ data class MdSpan(
     val code: Boolean = false,
     val strike: Boolean = false,
     val link: String? = null,
+    /** ==texto==: lo único que no debe perderse; la app lo resalta con el acento del tema. */
+    val mark: Boolean = false,
 )
 
 sealed interface MdBlock {
@@ -23,7 +25,13 @@ sealed interface MdBlock {
     data class Code(val language: String?, val code: String) : MdBlock
     data class Table(val header: List<List<MdSpan>>, val rows: List<List<List<MdSpan>>>) : MdBlock
     data object Rule : MdBlock
+    /** Recuadro semántico (:::tldr, :::tip, :::warn, :::decision, :::result); el color lo decide el tema. */
+    data class Callout(val kind: CalloutKind, val blocks: List<MdBlock>) : MdBlock
+    /** Panel interactivo de un bloque ```nexus-ui con JSON válido. */
+    data class Widget(val spec: WidgetSpec) : MdBlock
 }
+
+enum class CalloutKind { TLDR, TIP, WARN, DECISION, RESULT }
 
 /** [number] null = viñeta; [depth] 0 = primer nivel. */
 data class ListItem(val depth: Int, val number: String?, val spans: List<MdSpan>)
@@ -35,9 +43,15 @@ object ChatMarkdown {
     private val fence = Regex("^\\s*(```|~~~)\\s*([\\w+#.-]*)\\s*$")
     private val rule = Regex("^\\s*([-*_])(\\s*\\1){2,}\\s*$")
     private val boldLine = Regex("^\\s*(\\*\\*|__)([^*_].*?)\\1\\s*:?\\s*$")
+    private val calloutOpen = Regex("^\\s*:::\\s*(tldr|tip|warn|decision|result)\\s*$", RegexOption.IGNORE_CASE)
+    private val calloutClose = Regex("^\\s*:::\\s*$")
     private val tableSep = Regex("^\\s*\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?\\s*$")
 
-    fun parse(text: String): List<MdBlock> {
+    /**
+     * [streaming]: el texto aún se está recibiendo; un panel `nexus-ui` sin cerrar se oculta en vez de
+     * enseñar su JSON a medias.
+     */
+    fun parse(text: String, streaming: Boolean = false): List<MdBlock> {
         val lines = text.replace("\r\n", "\n").replace('\r', '\n').split('\n')
         val out = mutableListOf<MdBlock>()
         val para = mutableListOf<String>()
@@ -61,11 +75,35 @@ object ChatMarkdown {
                 val body = mutableListOf<String>()
                 i++
                 while (i < lines.size && !lines[i].trimStart().startsWith(marker)) { body += lines[i]; i++ }
-                out += MdBlock.Code(lang, body.joinToString("\n").trimEnd())
+                val closed = i < lines.size
+                val code = body.joinToString("\n").trimEnd()
+                if (lang.equals(WIDGET_LANG, ignoreCase = true)) {
+                    val spec = ChatWidgets.parse(code)
+                    when {
+                        spec != null -> out += MdBlock.Widget(spec)
+                        !closed && streaming -> Unit
+                        else -> out += MdBlock.Code(lang, code)
+                    }
+                } else out += MdBlock.Code(lang, code)
                 i++ // salta el cierre (o el final si no se cerró)
                 continue
             }
             if (line.isBlank()) { flushAll(); i++; continue }
+            if (calloutClose.matches(line)) { flushAll(); i++; continue } // cierre suelto: se ignora
+            val co = calloutOpen.matchEntire(line)
+            if (co != null) {
+                flushAll()
+                val kind = CalloutKind.valueOf(co.groupValues[1].uppercase())
+                // El cierre es el primer `:::` suelto; si antes aparece otra apertura, este recuadro no se cerró.
+                val end = (i + 1 until lines.size).firstOrNull { calloutClose.matches(lines[it]) || calloutOpen.matches(lines[it]) }
+                    ?.takeIf { calloutClose.matches(lines[it]) }
+                // Sin cierre: el recuadro llega hasta la primera línea en blanco (o el final) para no tragarse la respuesta.
+                val stop = end ?: (i + 1 until lines.size).firstOrNull { lines[it].isBlank() || calloutOpen.matches(lines[it]) } ?: lines.size
+                val inner = lines.subList(i + 1, stop).joinToString("\n")
+                out += MdBlock.Callout(kind, parse(inner, streaming))
+                i = if (end != null) end + 1 else stop
+                continue
+            }
 
             if (line.trimStart().startsWith("|") && i + 1 < lines.size && tableSep.matches(lines[i + 1])) {
                 flushAll()
@@ -124,7 +162,7 @@ object ChatMarkdown {
         var i = 0
         while (i < s.length) {
             val c = s[i]
-            if (c == '\\' && i + 1 < s.length && s[i + 1] in "\\`*_~[]()#>-|") { buf.append(s[i + 1]); i += 2; continue }
+            if (c == '\\' && i + 1 < s.length && s[i + 1] in "\\`*_~=[]()#>-|:") { buf.append(s[i + 1]); i += 2; continue }
             if (c == '`') {
                 val end = s.indexOf('`', i + 1)
                 if (end > i + 1) { flush(); out += style.copy(text = s.substring(i + 1, end), code = true); i = end + 1; continue }
@@ -139,12 +177,14 @@ object ChatMarkdown {
                 }
             }
             val two = if (i + 1 < s.length) s.substring(i, i + 2) else ""
-            if (two == "**" || two == "__" || two == "~~") {
+            if (two == "**" || two == "__" || two == "~~" || two == "==") {
                 val end = findClose(s, two, i + 2)
-                if (end > 0 && (two != "__" || boundary(s, i, end + 2))) {
+                // `==` exige texto pegado a los marcadores y fuera de palabras, para no pillar `a == b` ni `x==y==z`.
+                val tight = two != "==" || (end > 0 && !s[i + 2].isWhitespace() && !s[end - 1].isWhitespace())
+                if (end > 0 && tight && ((two != "__" && two != "==") || boundary(s, i, end + 2))) {
                     flush()
                     val inner = s.substring(i + 2, end)
-                    parseInto(inner, when (two) { "~~" -> style.copy(strike = true); else -> style.copy(bold = true) }, out)
+                    parseInto(inner, when (two) { "~~" -> style.copy(strike = true); "==" -> style.copy(mark = true); else -> style.copy(bold = true) }, out)
                     i = end + 2; continue
                 }
             }
@@ -197,9 +237,15 @@ object ChatMarkdown {
         return out
     }
 
+    private const val WIDGET_LANG = "nexus-ui"
+
     /** Texto plano sin marcas (para copiar o accesibilidad). */
-    fun plain(text: String): String = parse(text).joinToString("\n\n") { b ->
+    fun plain(text: String): String = plain(parse(text))
+
+    private fun plain(blocks: List<MdBlock>): String = blocks.joinToString("\n\n") { b ->
         when (b) {
+            is MdBlock.Callout -> plain(b.blocks)
+            is MdBlock.Widget -> ChatWidgets.plain(b.spec)
             is MdBlock.Heading -> b.spans.joinToString("") { it.text }
             is MdBlock.Paragraph -> b.spans.joinToString("") { it.text }
             is MdBlock.Quote -> b.spans.joinToString("") { it.text }

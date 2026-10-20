@@ -176,6 +176,7 @@ Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Wi
 - Selector de cerebro en la barra del Agente (Bedrock, Claude, Compatible OpenAI, Proxy, Antigravity, BytePlus/Dola y los propios) sin abrir Ajustes.
 - Modo de razonamiento junto al cuadro de texto (Auto, Rápido, Mínimo, Bajo, Medio, Alto) cuando el cerebro lo admite.
 - Tarjetas de encargo: marca del proveedor (logo si existe como recurso `provider_<id>`, si no una inicial), miniaturas más pequeñas y animación al reordenarse.
+- Jerarquía visual en las respuestas del agente: recuadros `:::tldr`, `:::tip`, `:::warn`, `:::decision` y `:::result` con icono y etiqueta, resaltado `==texto==` y paneles interactivos `nexus-ui` (encuesta, pasos y comparación).
 
 ## [1.9.29-agent] - 2026-10-17
 
