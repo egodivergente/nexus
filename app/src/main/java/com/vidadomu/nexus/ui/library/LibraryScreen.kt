@@ -11,7 +11,6 @@ import com.vidadomu.nexus.ui.components.StudioFilterChip
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.*
 import androidx.compose.ui.graphics.graphicsLayer
-import android.content.Intent
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.assistant.LocalMediaEditsSheet
 import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
@@ -114,6 +113,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var originMenu by remember {mutableStateOf(false)}
     // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
     var columns by remember {mutableStateOf(prefs.getInt("grid_cols",3).coerceIn(2,6))}
+    val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden)
+    val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
+    fun applyFilters(next:LibraryViewFilters) {
+        if(!next.hasQuery) focusManager.clearFocus()
+        query=next.query;filter=next.modality;originFilter=next.origin;favoriteOnly=next.favoriteOnly;showHidden=next.showHidden
+    }
     // Editado/Compartido solo se ofrecen si hay algo de ese origen; Nexus e Importado, siempre.
     val origins=remember(index) {
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
@@ -243,12 +248,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
             marked=emptySet()
         }) else TopAppBar(title={
-        Row(verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            val count=completed.sumOf {it.outputs.size}+localAssets.size
-            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.padding(bottom=2.dp))
-        }
-    },actions={
+        Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    },showBalance=false,actions={
         IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,if(searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",tint=if(searchVisible) MaterialTheme.colorScheme.primary else TextSecondary)}
         IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
         Box {
@@ -259,17 +260,19 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
         DropdownMenuItem(text={Text("Importar de Flow")},leadingIcon={Icon(Icons.Default.CloudDownload,null)},onClick={moreVisible=false;showFlowImport=true})
         DropdownMenuItem(text={Text("Imágenes del proyecto")},leadingIcon={Icon(Icons.Default.PhotoLibrary,null)},onClick={moreVisible=false;projectLibrary.launch(arrayOf("image/*"))})
-        DropdownMenuItem(text={Text("Abrir Alexia")},leadingIcon={Icon(Icons.Default.FolderSpecial,null)},onClick={moreVisible=false;try {
-            val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
-                component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity")
-                flags=Intent.FLAG_ACTIVITY_NEW_TASK
-            };context.startActivity(intent)
-        } catch (_:Exception) {scope.launch {snackbar.showSnackbar("No se pudo abrir Alexia")}}})
+        DropdownMenuItem(text={Text("Abrir Alexia")},leadingIcon={Icon(Icons.Default.FolderSpecial,null)},onClick={moreVisible=false
+            if(!com.vidadomu.nexus.ui.output.launchAlexia(context)) scope.launch {snackbar.showSnackbar("No se pudo abrir Alexia. Tus archivos siguen en la Biblioteca de Nexus.")}})
         }
         }
     })}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if(importing) LinearProgressIndicator(Modifier.fillMaxWidth())
+            // Cabecera tranquila: el recuento y el saldo pasan a una línea secundaria y el título queda entero.
+            Row(Modifier.fillMaxWidth().padding(start=NexusTokens.screenMargin,end=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically) {
+                val count=completed.sumOf {it.outputs.size}+localAssets.size
+                Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.weight(1f))
+                com.vidadomu.nexus.ui.components.NexusBalanceChip()
+            }
             if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
@@ -295,9 +298,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     modifier=Modifier.semantics {contentDescription="Solo favoritos"})}
                 if(hidden.isNotEmpty() || showHidden) item {StudioFilterChip(showHidden,{showHidden=!showHidden},label={Text("Ocultos")})}
             }
-            if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
-                val filtered=query.isNotBlank() || filter!=null || originFilter!=LibraryOriginFilter.ALL || favoriteOnly || showHidden
-                Text(if(filtered) "No hay resultados con estos filtros." else "Tus creaciones aparecerán aquí.",style=MaterialTheme.typography.bodyLarge,color=TextSecondary)
+            if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
+                LibraryNoResults(viewFilters,::applyFilters)
             } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()},
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {

@@ -50,6 +50,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
     }
     val historyLoading by app.generationRepository.historyLoading.collectAsState()
     val historyError by app.generationRepository.historyError.collectAsState()
+    val variantLabels=remember(jobs,historyLoading) {generationVariantLabels(jobs,historyComplete=!historyLoading)}
     var searchQuery by rememberSaveable {mutableStateOf("")}
     var searchVisible by rememberSaveable {mutableStateOf(false)}
     var comparisonId by rememberSaveable {mutableStateOf<String?>(null)}
@@ -132,8 +133,13 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                 }
             }
             if(filteredJobs.isEmpty()) Box(Modifier.fillMaxSize().padding(NexusTokens.space32),contentAlignment=Alignment.Center) {
-                Text(if(searchQuery.isNotBlank()) "No hay resultados. Prueba otra descripción." else "Tus creaciones aparecerán aquí.",
-                    style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                val narrowed=searchQuery.isNotBlank() || statusFilter!="VISIBLE"
+                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    Text(if(searchQuery.isNotBlank()) "No hay resultados. Prueba otra descripción." else if(narrowed) "No hay trabajos con este filtro." else "Tus creaciones aparecerán aquí.",
+                        style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                    // Solo restablece la vista de esta sesión; el archivo de trabajos y los ajustes no se tocan.
+                    if(narrowed) TextButton(onClick={searchQuery="";statusFilter="VISIBLE"},Modifier.heightIn(min=NexusTokens.minimumTouch)) {Text("Ver todo el historial")}
+                }
             } else LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=NexusTokens.space24)) {
                 val dayFormat=SimpleDateFormat("EEEE d MMMM",Locale("es","ES"))
                 filteredJobs.groupBy {dayFormat.format(Date(it.startedAt))}.forEach { (day,dayJobs) ->
@@ -155,8 +161,9 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         val name=remember(first.modelId) {app.modelCatalogRepository.getModelById(first.modelId)?.displayName ?: first.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')}
                         val timeFormat=remember {SimpleDateFormat("HH:mm",Locale("es","ES"))}
                         val open=row.runId in expandedRuns
-                        ListItem(headlineContent={Text("$name · ${row.jobs.size} intentos fallidos",maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
-                            supportingContent={Text("${timeFormat.format(Date(last.startedAt))}–${timeFormat.format(Date(first.startedAt))} · ${if(open) "toca para plegar" else "toca para ver los intentos"}",style=MaterialTheme.typography.labelMedium)},
+                        val runTitle=remember(first.prompt,name) {generationRowTitle(first.prompt,name)}
+                        ListItem(headlineContent={Text("${row.jobs.size} intentos fallidos · $runTitle",maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
+                            supportingContent={Text("${name.takeIf {it!=runTitle}?.let {"$it · "}.orEmpty()}${timeFormat.format(Date(last.startedAt))}–${timeFormat.format(Date(first.startedAt))} · ${if(open) "toca para plegar" else "toca para ver los intentos"}",style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
                             leadingContent={Icon(Icons.Default.ErrorOutline,null,tint=MaterialTheme.colorScheme.error)},
                             trailingContent={Icon(if(open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)},
                             colors=ListItemDefaults.colors(containerColor=ScreenBackground),
@@ -178,6 +185,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         } else GenerationSummaryRow(job,currencyManager,
                             onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
                             onRetry={onPrepareAgain(job)},
+                            variantLabels=variantLabels,
                             menu={ close ->
                                 if(job.outputs.isNotEmpty() && onSendResultToAgent!=null) DropdownMenuItem(text={Text("Añadir al chat")},onClick={close();attachJob=job})
                                 if(job.parameters["__tracking_paused"]=="true") DropdownMenuItem(text={Text("Recuperar seguimiento")},onClick={close();scope.launch {
@@ -319,6 +327,9 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                     Text("Modelo: ${job.modelId}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text("Modalidad: ${job.modality.name}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text("Estado: $statusSpanish", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    if(job.prompt.isNotBlank()) androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text("Instrucción completa:\n${job.prompt}", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                    }
                     job.estimatedCostUsd?.let {Text("Estimación previa: ${currencyManager.formatCost(it)}",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
                     job.parameters["__actual_credits"]?.toDoubleOrNull()?.let {Text(currencyManager.formatCredits(it),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)}
                     val cost = job.actualCostUsd

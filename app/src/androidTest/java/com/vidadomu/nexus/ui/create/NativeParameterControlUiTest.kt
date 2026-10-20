@@ -12,6 +12,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.vidadomu.nexus.BuildConfig
 import com.vidadomu.nexus.core.model.ModelParameter
 import com.vidadomu.nexus.core.model.ParameterType
 import com.vidadomu.nexus.ui.theme.NexusTheme
@@ -28,13 +29,17 @@ class NativeParameterControlUiTest {
         isAdvanced = true, nativeType = "integer", minExact = "0", maxExact = "2147483647")
     private val camera = ModelParameter("camera_fixed", "Cámara fija", ParameterType.BOOLEAN, nativeType = "boolean")
 
+    // NexusTheme fija su propia densidad (preferencias de apariencia): la escala de prueba va DENTRO del tema.
     private fun show(parameter: ModelParameter, initial: String, fontScale: Float, onValue: (String) -> Unit = {}) {
+        check(BuildConfig.OFFLINE_QA)
+        var applied = Float.NaN
         compose.setContent {
-            val spanish = Configuration(LocalConfiguration.current).apply { setLocale(Locale("es", "ES")) }
-            val density = LocalDensity.current
-            CompositionLocalProvider(LocalConfiguration provides spanish,
-                LocalDensity provides Density(density.density, fontScale)) {
-                NexusTheme {
+            NexusTheme {
+                val spanish = Configuration(LocalConfiguration.current).apply { setLocale(Locale("es", "ES")) }
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalConfiguration provides spanish,
+                    LocalDensity provides Density(density.density, fontScale)) {
+                    applied = LocalDensity.current.fontScale
                     Column(Modifier.width(360.dp).padding(16.dp)) {
                         var value by remember { mutableStateOf(initial) }
                         NativeParameterControl(parameter, value) { value = it; onValue(it) }
@@ -42,6 +47,7 @@ class NativeParameterControlUiTest {
                 }
             }
         }
+        compose.runOnIdle { assertEquals(fontScale, applied, 0f) }
     }
 
     @Test fun seedRangeShowsExactInt32LimitAtFontScaleTwo() {

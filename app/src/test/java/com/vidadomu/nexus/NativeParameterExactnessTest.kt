@@ -66,9 +66,57 @@ class NativeParameterExactnessTest {
         assertTrue(steps.maxValue!!.isFinite() && steps.maxValue!! >= 1e20f)
         assertEquals("-50 – 100.000.000.000.000.000.000", ParameterPresentation.range(steps))
         val huge = param(model, "huge")
-        assertEquals(Float.MAX_VALUE, huge.maxValue)
+        assertEquals("1" + "0".repeat(60), huge.maxExact)
+        assertNull("Float no representa 1e60: sin límite legacy, nunca por debajo del exacto", huge.maxValue)
+        assertNull(FormContract.invalidValue(model.parameters, mapOf("huge" to "1e50")))
+        assertNull(NativeModelSchema.validate(model, mapOf("huge" to "1e50")))
+        assertNotNull(NativeModelSchema.validate(model, mapOf("huge" to "1e61")))
         assertNull(NativeModelSchema.validate(model, mapOf("steps" to "99999999999999999999")))
         assertNotNull(NativeModelSchema.validate(model, mapOf("steps" to "100000000000000000001")))
+    }
+
+    @Test fun negativeOutOfFloatMinimumIsNullInLegacyButEnforcedExactly() {
+        val model = decode(""""offset":{"type":"number","minimum":-1e60,"maximum":0}""", id = "exactness/negative")
+        val offset = param(model, "offset")
+        assertNull(offset.minValue)
+        assertEquals(0f, offset.maxValue)
+        assertNull(FormContract.invalidValue(model.parameters, mapOf("offset" to "-1e50")))
+        assertNotNull(NativeModelSchema.validate(model, mapOf("offset" to "-1e61")))
+    }
+
+    @Test fun limitsJustBeyondFloatMaxAreNullInLegacyButEnforcedExactly() {
+        assertNull(ParameterBounds.legacyFloat("3.4028235e38", upper = true))
+        assertNull(ParameterBounds.legacyFloat("-3.4028235e38", upper = false))
+        val floatMax = java.math.BigDecimal(Float.MAX_VALUE.toDouble()).toPlainString()
+        assertEquals(Float.MAX_VALUE, ParameterBounds.legacyFloat(floatMax, upper = true))
+        assertEquals(-Float.MAX_VALUE, ParameterBounds.legacyFloat("-$floatMax", upper = false))
+        val model = decode(""""edge":{"type":"number","minimum":-3.4028235e38,"maximum":3.4028235e38}""",
+            id = "exactness/floatmax")
+        val edge = param(model, "edge")
+        assertNull(edge.minValue)
+        assertNull(edge.maxValue)
+        assertEquals("340282350000000000000000000000000000000", edge.maxExact)
+        assertEquals("-340282350000000000000000000000000000000", edge.minExact)
+        assertNull(FormContract.invalidValue(model.parameters, mapOf("edge" to "3.4028235e38")))
+        assertNull(NativeModelSchema.validate(model, mapOf("edge" to "3.4028235e38")))
+        assertNull(NativeModelSchema.validate(model, mapOf("edge" to "-3.4028235e38")))
+        assertNotNull(NativeModelSchema.validate(model, mapOf("edge" to "3.40282351e38")))
+        assertNotNull(NativeModelSchema.validate(model, mapOf("edge" to "-3.40282351e38")))
+    }
+
+    @Test fun maliciousExponentsAndOversizedLiteralsAreNotExpanded() {
+        assertNull(ParameterBounds.exact("1e999999999"))
+        assertNull(ParameterBounds.exact("1e-999999999"))
+        assertNull(ParameterBounds.exact("9".repeat(200)))
+        assertNull(ParameterBounds.legacyFloat("1e999999999", upper = true))
+        val model = decode(""""steps":{"type":"integer","minimum":0,"maximum":1e999999999}""", id = "exactness/malicious")
+        val steps = param(model, "steps")
+        assertNull(steps.maxExact)
+        assertNull(steps.maxValue)
+        assertEquals("0 – —", ParameterPresentation.range(steps))
+        assertNull(NativeModelSchema.validate(model, mapOf("steps" to "1e999999999")))
+        val bounded = decode(""""seed":{"type":"integer","minimum":0,"maximum":10}""", id = "exactness/oversized")
+        assertNotNull(NativeModelSchema.validate(bounded, mapOf("seed" to "9".repeat(200))))
     }
 
     @Test fun parametersWithoutExactFieldsKeepTheirLegacyFloatRange() {

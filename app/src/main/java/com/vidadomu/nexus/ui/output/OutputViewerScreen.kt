@@ -86,9 +86,11 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
     }
     LaunchedEffect(export.message) {export.message?.let {snackbar.showSnackbar(it);exporter.dismissMessage()}}
     var details by remember(jobId) {mutableStateOf(false)}
+    val scope=rememberCoroutineScope()
     val chosenOutput=job?.outputs?.getOrNull(selectedOutput) ?: job?.outputs?.firstOrNull()
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val trustedLocal=chosenOutput?.let {OutputFiles.trustedLocalUri(it,conflicts)}
+    var alexiaFailed by remember(chosenOutput?.id) {mutableStateOf(false)}
     val title=when(job?.modality) {Modality.IMAGE->"Imagen";Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.CHAT->"Texto";else->"Resultado"}
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(
         title={Text(title,style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
@@ -145,12 +147,15 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
                     if(job.modality==Modality.IMAGE) ViewerAction(Icons.Default.MovieFilter,"Animar",Modifier.weight(1f)) {onReuseAsInput(trustedLocal ?: output.url, output.mimeType.takeIf { it.startsWith("image/") } ?: "application/octet-stream")}
                     ViewerAction(Icons.Default.Replay,"Remezclar",Modifier.weight(1f)) {onReuseAsInput(job.prompt, null)}
                     if(output.url.startsWith("https://") || output.url.startsWith("http://")) ViewerAction(Icons.Default.Share,"Compartir",Modifier.weight(1f)) {shareMedia(context,output.url,job.prompt)}
-                    ViewerAction(Icons.Default.FolderSpecial,"Alexia",Modifier.weight(1f),"Abrir Alexia") {
-                        try {val intent=context.packageManager.getLaunchIntentForPackage("com.axel.library") ?: Intent().apply {
-                            component=android.content.ComponentName("com.axel.library","com.axel.library.MainActivity");flags=Intent.FLAG_ACTIVITY_NEW_TASK
-                        };context.startActivity(intent)} catch (_:Exception) {}
-                    }
+                    ViewerAction(Icons.Default.FolderSpecial,"Alexia",Modifier.weight(1f),"Abrir Alexia") {alexiaFailed=!launchAlexia(context)}
                 }
+                // Aviso que no desaparece solo: el botón nunca queda inerte y se ofrece una salida que no descarga ni envía nada.
+                if(alexiaFailed) com.vidadomu.nexus.ui.components.InlineNotice(alexiaUnavailableMessage(trustedLocal!=null),
+                    Modifier.padding(horizontal=NexusTokens.screenMargin),
+                    actionLabel=OPEN_WITH_LABEL.takeIf {trustedLocal!=null},
+                    onAction=if(trustedLocal==null) null else ({
+                        if(!openLocalCopyWithAnotherApp(context,trustedLocal,output.mimeType.ifBlank {when(output.type) {Modality.IMAGE->"image/*";Modality.VIDEO->"video/*";Modality.AUDIO->"audio/*";Modality.CHAT->"text/plain"}})) scope.launch {snackbar.showSnackbar("Ninguna app puede abrir esta copia. Sigue disponible en Nexus.")}
+                    }))
                 Button(enabled=!export.busy,modifier=Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field,
                     onClick={val spec=outputExportSpec(output);exporter.prepare(output,trustedLocal);savePicker.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE);type=spec.mimeType;putExtra(Intent.EXTRA_TITLE,spec.fileName)

@@ -7,29 +7,42 @@ import java.util.Locale
 
 /**
  * Exact numeric limits taken verbatim from a schema. [ModelParameter.minValue]/[ModelParameter.maxValue]
- * stay Float for existing consumers, rounded outwards so they never reject a value the exact limit allows.
+ * stay Float for existing consumers, rounded outwards so they never reject a value the exact limit allows;
+ * a side Float cannot represent is left null there and enforced only through the exact value.
  */
 object ParameterBounds {
     val spanish: Locale = Locale("es", "ES")
 
-    fun exact(literal: String?): String? = literal?.trim()?.toBigDecimalOrNull()?.toPlainString()
+    private const val MAX_LITERAL = 128
+    private const val MAX_DIGITS = 96
+
+    /** Rejects literals whose plain form would need huge allocations (e.g. 1e999999999). */
+    private fun safeDecimal(literal: String?): BigDecimal? {
+        val text = literal?.trim()?.takeIf { it.length <= MAX_LITERAL } ?: return null
+        val decimal = text.toBigDecimalOrNull() ?: return null
+        val integerDigits = decimal.precision().toLong() - decimal.scale()
+        return decimal.takeIf { integerDigits <= MAX_DIGITS && decimal.scale() <= MAX_DIGITS }
+    }
+
+    fun exact(literal: String?): String? = safeDecimal(literal)?.toPlainString()
 
     fun legacyFloat(exact: String?, upper: Boolean): Float? {
-        val decimal = exact?.toBigDecimalOrNull() ?: return null
+        val decimal = safeDecimal(exact) ?: return null
         val rounded = decimal.toFloat()
-        if (!rounded.isFinite()) return if (upper) Float.MAX_VALUE else -Float.MAX_VALUE
+        if (!rounded.isFinite()) return null
         val comparison = BigDecimal(rounded.toDouble()).compareTo(decimal)
+        // Rounding to Float.MAX_VALUE below the exact limit makes nextUp overflow to Infinity.
         return when {
             upper && comparison < 0 -> Math.nextUp(rounded)
             !upper && comparison > 0 -> Math.nextDown(rounded)
             else -> rounded
-        }
+        }.takeIf { it.isFinite() }
     }
 
     fun minimum(parameter: ModelParameter): BigDecimal? =
-        parameter.minExact?.toBigDecimalOrNull() ?: parameter.minValue?.let(::fromFloat)
+        safeDecimal(parameter.minExact) ?: parameter.minValue?.let(::fromFloat)
     fun maximum(parameter: ModelParameter): BigDecimal? =
-        parameter.maxExact?.toBigDecimalOrNull() ?: parameter.maxValue?.let(::fromFloat)
+        safeDecimal(parameter.maxExact) ?: parameter.maxValue?.let(::fromFloat)
 
     private fun fromFloat(value: Float): BigDecimal? = value.takeIf { it.isFinite() }?.toString()?.toBigDecimalOrNull()
 
@@ -48,7 +61,9 @@ object ParameterBounds {
     }
 
     fun outOfRange(value: String, minimum: BigDecimal?, maximum: BigDecimal?): Boolean {
-        val number = value.trim().toBigDecimalOrNull() ?: return false
+        val text = value.trim()
+        if (text.length > MAX_LITERAL) return minimum != null || maximum != null
+        val number = text.toBigDecimalOrNull() ?: return false
         return (minimum != null && number < minimum) || (maximum != null && number > maximum)
     }
 }

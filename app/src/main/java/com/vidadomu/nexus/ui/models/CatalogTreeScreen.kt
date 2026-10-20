@@ -25,6 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,6 +100,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         if(fromKey!=null && toKey!=null) saveOrder(moveCatalogItem(savedOrder,displayedKeys,fromKey,toKey))
     }
     val activeGroup = groups.firstOrNull { it.key == groupKey }
+    val activeFilters = activeCatalogFilterLabels(providerFilter?.let(::providerName), use, favoritesOnly, modality, imageReferences)
+    val canReorder = catalogSort==CatalogSort.PERSONAL
+    fun moveBy(key:String, offset:Int) { saveOrder(moveCatalogItemBy(savedOrder,displayedKeys,key,offset)) }
+    fun reorderActions(key:String): Pair<(()->Unit)?,(()->Unit)?> {
+        val index=displayedKeys.indexOf(key)
+        if(!canReorder || index<0) return null to null
+        return (if(index>0) ({moveBy(key,-1)}) else null) to (if(index<displayedKeys.lastIndex) ({moveBy(key,1)}) else null)
+    }
     fun back() { if(groupKey != null) groupKey = null else family = null }
     BackHandler(family != null || groupKey != null) { back() }
     fun toggleFavorite(model: NexusModel) {
@@ -129,10 +142,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
                 Text(if(family != null) family.orEmpty()
-                    else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+                    else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                    modifier = Modifier.semantics { heading() })
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
-                Text("Arrastra el asa para ordenar o mantén pulsada una tarjeta. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+                Text("Arrastra el asa, mantén pulsada una tarjeta o toca el asa para subirla o bajarla. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
             }
                 if(family == null) item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
@@ -141,6 +155,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                             StudioFilterChip(modality == value, { modality=value; family=null; groupKey=null; use=null; query=""; prefs.edit().putString("browser_modality",value.name).apply() }, label={Text(label)})
                         }
                         item {StudioFilterChip(showSecondary,{showSecondary=!showSecondary},label={Text("Más")})}
+                        item {StudioFilterChip(filters || activeFilters.isNotEmpty(),{filters=!filters},label={Text(filterButtonLabel(activeFilters.size))},
+                            leadingIcon={Icon(Icons.Default.Tune,null)},modifier=Modifier.semantics { contentDescription=filterButtonDescription(activeFilters.size) })}
                     }
                 }
                 item(span={GridItemSpan(maxLineSpan)}) {
@@ -148,16 +164,20 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         placeholder={Text("Buscar modelo o función")}, leadingIcon={Icon(Icons.Default.Search,null)},
                         trailingIcon={Row {
                             if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}
-                            IconButton(onClick={filters=!filters}) {Icon(Icons.Default.Tune,"Filtros y orden",
-                                tint=if(filters || providerFilter!=null || use!=null) MaterialTheme.colorScheme.primary else TextSecondary)}
+                            IconButton(onClick={filters=!filters}) {Icon(Icons.Default.Tune,filterButtonDescription(activeFilters.size),
+                                tint=if(filters || activeFilters.isNotEmpty()) MaterialTheme.colorScheme.primary else TextSecondary)}
                         }}, shape=NexusTokens.filter)
                 }
                 if(modality == Modality.IMAGE) item(span={GridItemSpan(maxLineSpan)}) {
                     StudioFilterChip(imageReferences, {imageReferences=!imageReferences;use=null;groupKey=null},
                         label={Text(if(imageReferences) "Con referencias" else "Todos los usos")})
                 }
-                if(use != null || favoritesOnly || providerFilter!=null) item(span={GridItemSpan(maxLineSpan)}) {
-                    TextButton(onClick={use=null;favoritesOnly=false;providerFilter=null}) {Text("Quitar filtros activos")}
+                if(activeFilters.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text("Filtros activos: "+activeFilters.joinToString(" · "),Modifier.weight(1f),
+                            style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        TextButton(onClick={use=null;favoritesOnly=false;providerFilter=null;imageReferences=false}) {Text("Quitar filtros activos")}
+                    }
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
                 if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
@@ -170,13 +190,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     items(shownSections,key={it.family}) { section ->
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { _ ->
-                        val brief=section.models.firstNotNullOfOrNull(CatalogFocus::forModel)
-                        NavigationCard(section.family,section.family,brief?.let {"${pluralModelos(children.size)} · ${it.good}"} ?: pluralModelos(children.size),section.models,modality,
+                        val (moveUp,moveDown)=reorderActions(section.family)
+                        NavigationCard(section.family,section.family,catalogCardSummary(section.models,"${pluralModelos(children.size)} · "),section.models,modality,
                             onClick={family=section.family;filters=false}, compact=compactCards,grid=useGrid,
                             onLongClick={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
                             cardModifier=if(personalizing) Modifier.longPressDraggableHandle() else Modifier,
-                            onHide=if(personalizing) ({pendingHide=familyVisibilityKey(section.family) to section.family}) else null)
+                            onHide=if(personalizing) ({pendingHide=familyVisibilityKey(section.family) to section.family}) else null,
+                            onMoveUp=moveUp,onMoveDown=moveDown)
                         }
                     }
                     if(modality == Modality.IMAGE && sections.size > prioritySections.size && !personalizing) item(span={GridItemSpan(maxLineSpan)}) {
@@ -186,13 +207,15 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     items(groups,key={it.key}) { group ->
                         ReorderableItem(reorderState,key=group.key) { _ ->
                         val focusAdvice=group.routes.firstNotNullOfOrNull(CatalogFocus::forModel)
-                        NavigationCard(group.title,catalogFamily(group.routes.first()),focusAdvice?.let {"Bueno para: ${it.good}"} ?: groupPurpose(group),group.routes,modality,
+                        val (moveUp,moveDown)=reorderActions(group.key)
+                        NavigationCard(group.title,catalogFamily(group.routes.first()),focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes),group.routes,modality,
                             onClick={groupKey=group.key;filters=false},releaseLabel=groupReleaseLabel(group.routes),compact=compactCards,grid=useGrid,
                             onLongClick={contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
                             cardModifier=if(personalizing) Modifier.longPressDraggableHandle() else Modifier,
                             onHide=if(personalizing) ({pendingHide=groupVisibilityKey(group.routes.first()) to group.title}) else null,
-                            highlight=focusAdvice?.let {"Evítalo si: ${it.avoid}"} ?: modelGroupHighlight(group.routes))
+                            highlight=focusAdvice?.let {"Evítalo si: ${it.avoid}"} ?: modelGroupHighlight(group.routes),
+                            onMoveUp=moveUp,onMoveDown=moveDown)
                         }
                     }
                 }
@@ -213,7 +236,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             .padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Text("Filtros",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
+                Text("Filtros",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f).semantics { heading() })
                 IconButton(onClick={filters=false}) {Icon(Icons.Default.Close,"Cerrar filtros")}
             }
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -230,13 +253,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                     Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
             }
                     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.semantics { heading() })
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                             CatalogSort.entries.forEach {entry -> StudioFilterChip(catalogSort==entry,{
                                 catalogSort=entry;prefs.edit().putString("sort",entry.name).apply()
                             },label={Text(entry.label)},shape=NexusTokens.filter)}
                         }
-                        Text("Proveedor",style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                        Text("Proveedor",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.semantics { heading() })
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                             StudioFilterChip(providerFilter==null,{providerFilter=null},label={Text("Todos")},shape=NexusTokens.filter)
                             models.map {it.providerId}.distinct().forEach {id -> StudioFilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
@@ -251,10 +274,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         }
     }
     contextTarget?.let { (key,label,model) ->
+        val itemKey=if(model==null) label else groups.firstOrNull {groupVisibilityKey(it.routes.first())==key}?.key
+        val (moveUp,moveDown)=itemKey?.let {reorderActions(it)} ?: (null to null)
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(label)},text={Column {
             TextButton(onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;contextTarget=null}) {Text("Mover y ordenar")}
+            moveUp?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Subir un puesto")}}
+            moveDown?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Bajar un puesto")}}
             TextButton(onClick={
-                val itemKey=if(model==null) label else groups.firstOrNull {groupVisibilityKey(it.routes.first())==key}?.key
                 if(itemKey!=null) saveOrder(listOf(itemKey)+(savedOrder+displayedKeys).distinct().filterNot {it==itemKey})
                 contextTarget=null
             }) {Text("Poner al principio")}
@@ -285,30 +311,37 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:()->Unit={},dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null) {
+private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:()->Unit={},dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null,
+    onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
     val price=routes.mapNotNull(::referencePrice).minOrNull()
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
+    // Con fuente grande no se recorta texto esencial; con 100 % el resumen está escrito para dos líneas.
+    val largeFont=androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
+    val reorderActions=listOfNotNull(
+        onMoveUp?.let {action -> CustomAccessibilityAction("Subir $title") {action();true}},
+        onMoveDown?.let {action -> CustomAccessibilityAction("Bajar $title") {action();true}})
     // Altura mínima fija en grid para que las tarjetas no bailen cuando falta releaseLabel/highlight.
     Surface(modifier=cardModifier.fillMaxWidth().then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick=onClick,
-        onLongClickLabel="Opciones de $title",onLongClick=onLongClick),shape=NexusTokens.card,color=SurfaceDark) {
+        onLongClickLabel="Opciones de $title",onLongClick=onLongClick)
+        .then(if(reorderActions.isEmpty()) Modifier else Modifier.semantics { customActions=reorderActions }),shape=NexusTokens.card,color=SurfaceDark) {
         Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(family=family,size=28.dp,containerSize=40.dp,shape=NexusTokens.field)
                 Column(Modifier.weight(1f)) {
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
                         Text(title,style=MaterialTheme.typography.titleMedium,
-                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=if(largeFont) 3 else 1,overflow=TextOverflow.Ellipsis)
                     }
                     Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                        maxLines=if(compact) 1 else 2,overflow=TextOverflow.Ellipsis)
+                        maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
                     releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
                 }
                 if(!grid) Text(displayPrice ?: "Ver coste",
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 // Opciones al mantener pulsado: sin ⋮ en cada fila de la lista.
-                if(dragModifier!=null) IconButton(onClick={},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Arrastrar $title",tint=TextSecondary)}
+                if(dragModifier!=null) IconButton(onClick=onLongClick,modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
             if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.

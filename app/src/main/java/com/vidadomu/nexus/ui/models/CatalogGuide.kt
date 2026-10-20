@@ -73,19 +73,7 @@ private fun buildModelGuide(model: NexusModel): ModelGuide {
         "text-to-image" in id -> "Crea una imagen desde texto: describe la composición, el sujeto y el estilo."
         else -> usefulDescription(model)
     }
-    val strengths = buildList {
-        if (Regex("preserv\\w*.{0,100}(identity|facial)|consisten.{0,60}(identity|subject|character)|identity.{0,40}(preserv|consisten)").containsMatchIn(profile))
-            add("Consistencia facial e identidad con referencias")
-        if (listOf("typograph", "text rendering", "text render", "text in image").any { it in profile })
-            add("Texto y tipografía dentro de la imagen")
-        if ("transparent" in profile) add("Salida con transparencias")
-        if (Modality.VIDEO in model.modalities && ("first" in profile && "last" in profile && "frame" in profile || "start-end frame" in profile || "start-to-end frame" in profile)) add("Control del inicio y del final del plano")
-        if (Modality.VIDEO in model.modalities && listOf("native audio", "synchronized audio", "synchronised audio", "synchronized sound").any { it in profile }) add("Vídeo con audio integrado")
-        if (listOf("low latency", "efficiency-focused", "rapid", "fast generation").any { it in profile }) add("Iteración rápida según la ficha del proveedor")
-        if ("mask" in profile) add("Edición localizada con máscara")
-        if ("multi-image" in profile || "multiple reference" in profile) add("Composición a partir de varias referencias")
-        if ("cfg scale control" in profile) add("Ajuste entre fidelidad al texto y libertad creativa")
-    }
+    val strengths = profileStrengths(model)
     val strength = strengths.take(2).joinToString(" · ").ifBlank {
         when {
             "motion-control" in id -> "Control de actuación, baile y gestos"
@@ -102,4 +90,72 @@ private fun buildModelGuide(model: NexusModel): ModelGuide {
     return ModelGuide(purpose, strength, note, source)
 }
 
+/** Strengths stated in the provider's own profile; heuristic flags never contribute. */
+internal fun profileStrengths(model: NexusModel): List<String> {
+    val profile = (model.description + " " + PublishedModelNotes.get(model.providerModelId ?: model.id)).lowercase()
+    return buildList {
+        if (Regex("preserv\\w*.{0,100}(identity|facial)|consisten.{0,60}(identity|subject|character)|identity.{0,40}(preserv|consisten)").containsMatchIn(profile))
+            add("Consistencia facial e identidad con referencias")
+        if (listOf("typograph", "text rendering", "text render", "text in image").any { it in profile })
+            add("Texto y tipografía dentro de la imagen")
+        if ("transparent" in profile) add("Salida con transparencias")
+        if (Modality.VIDEO in model.modalities && ("first" in profile && "last" in profile && "frame" in profile || "start-end frame" in profile || "start-to-end frame" in profile)) add("Control del inicio y del final del plano")
+        if (Modality.VIDEO in model.modalities && listOf("native audio", "synchronized audio", "synchronised audio", "synchronized sound").any { it in profile }) add("Vídeo con audio integrado")
+        if (listOf("low latency", "efficiency-focused", "rapid", "fast generation").any { it in profile }) add("Iteración rápida según la ficha del proveedor")
+        if ("mask" in profile) add("Edición localizada con máscara")
+        if ("multi-image" in profile || "multiple reference" in profile) add("Composición a partir de varias referencias")
+        if ("cfg scale control" in profile) add("Ajuste entre fidelidad al texto y libertad creativa")
+    }
+}
 
+internal const val CATALOG_CARD_SUMMARY_MAX_CHARS = 60
+
+/** Whole sentence or whole " · " clauses that fit two lines of a 411 dp card; never cut inside a word. */
+internal fun fitCardSummary(text: String, maxChars: Int = CATALOG_CARD_SUMMARY_MAX_CHARS): String? {
+    val clean = text.trim().replace(Regex("\\s+"), " ")
+    if (clean.isEmpty() || maxChars <= 0) return null
+    if (clean.length <= maxChars) return clean
+    val sentence = clean.split(Regex("(?<=[.!?])\\s+")).first()
+    if (sentence.length <= maxChars) return sentence
+    var fitted = ""
+    for (clause in sentence.split(" · ")) {
+        val next = if (fitted.isEmpty()) clause else "$fitted · $clause"
+        if (next.length > maxChars) break
+        fitted = next
+    }
+    return fitted.takeIf { it.isNotEmpty() }
+}
+
+private fun spanishList(items: List<String>): String = when (items.size) {
+    0 -> ""
+    1 -> items.single()
+    else -> items.dropLast(1).joinToString(", ") + " y " + items.last()
+}
+
+/** Task list in plain words: "Desde texto, animar imagen y con referencias", trimmed by whole items. */
+internal fun workflowSummary(workflows: List<CatalogWorkflow>, maxChars: Int = CATALOG_CARD_SUMMARY_MAX_CHARS): String? {
+    val labels = workflows.map { it.label }.distinct()
+    if (labels.isEmpty()) return null
+    if (labels.size == 1) return fitCardSummary(workflows.first().summary, maxChars) ?: fitCardSummary(labels.single(), maxChars)
+    fun phrase(shown: List<String>, rest: Int): String {
+        val words = shown.mapIndexed { i, label -> if (i == 0) label else label.replaceFirstChar { it.lowercase() } }
+        return if (rest > 0) words.joinToString(", ") + " y $rest más" else spanishList(words)
+    }
+    for (count in labels.size downTo 1) {
+        val candidate = phrase(labels.take(count), labels.size - count)
+        if (candidate.length <= maxChars) return candidate
+    }
+    return null
+}
+
+/** One complete function per card: editorial advice first, then the executable tasks, then the use description. */
+internal fun catalogCardSummary(routes: List<NexusModel>, prefix: String = "", maxChars: Int = CATALOG_CARD_SUMMARY_MAX_CHARS): String {
+    val room = maxChars - prefix.length
+    val body = routes.firstNotNullOfOrNull(CatalogFocus::forModel)?.good?.let { fitCardSummary(it, room) }
+        ?: workflowSummary(routes.flatMap(::catalogWorkflows).distinct(), room)
+        ?: routes.firstOrNull()?.let { fitCardSummary(usefulDescription(it), room) }
+    return when {
+        body == null -> prefix.removeSuffix(" · ").trim()
+        else -> prefix + body
+    }
+}

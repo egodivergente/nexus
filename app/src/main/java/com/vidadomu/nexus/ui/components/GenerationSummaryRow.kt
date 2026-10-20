@@ -54,14 +54,22 @@ internal fun confirmedJobCost(job:GenerationJob,currency:CurrencyManager):String
         ?: credits?.let(currency::formatCredits) ?: "Por confirmar"
 }
 
+/** Importe sin límite de líneas: con texto grande la fila crece en vez de ocultar cifras. */
+@Composable
+internal fun ConfirmedGenerationCost(text:String,modifier:Modifier=Modifier) {
+    Text(text,modifier=modifier.widthIn(max=96.dp).semantics {contentDescription="Coste: $text"},
+        style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
+}
+
 @Composable
 fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->Unit,onRetry:()->Unit={},
-    menu:@Composable (close:()->Unit)->Unit) {
+    variantLabels:Map<String,String>?=null,menu:@Composable (close:()->Unit)->Unit) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
     val currencyState by currency.state.collectAsState()
     val costText=remember(job,currencyState) {confirmedJobCost(job,currency)}
     val jobs by app.generationRepository.allJobs.collectAsState()
+    val historyLoading by app.generationRepository.historyLoading.collectAsState()
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val model=remember(job.modelId,models) {app.modelCatalogRepository.getModelById(job.modelId)?.displayName
         ?: job.modelId.substringAfterLast('/').replace('-',' ').replace('_',' ')}
@@ -70,14 +78,18 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
     val finished=job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)
     var menuOpen by remember {mutableStateOf(false)}
     val context=LocalContext.current
-    // Título útil: el texto del encargo o, si no tiene (upscalers, herramientas), el modelo.
-    val title=job.prompt.trim().ifBlank {model}
+    // Título útil: la primera línea real del encargo (sin rótulos de plantilla) o, si no hay texto, el modelo.
+    val title=remember(job.prompt,model) {generationRowTitle(job.prompt,model)}
+    // Con el mapa del snapshot (Historial) no se recorre la lista por fila; sin él, cálculo puntual de esta fila.
+    val variant=remember(job,jobs,historyLoading,variantLabels) {
+        if(variantLabels!=null) variantLabels[job.id] else generationVariantLabel(job,jobs,historyComplete=!historyLoading)
+    }
     // Estado y hora primero: un nombre de modelo largo no puede empujarlos fuera de la línea.
     // Un fallo muestra su motivo (una línea) en vez de la ficha habitual; el detalle técnico sigue en Diagnóstico.
     val failureReason=job.error?.trim()?.takeIf {it.isNotBlank()}
-    val detail=if(job.status==GenerationStatus.FAILED && failureReason!=null) failureReason
-        else listOfNotNull(generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time,type,
-        model.takeIf {job.prompt.isNotBlank()}).joinToString(" · ")
+    val detail=if(job.status==GenerationStatus.FAILED && failureReason!=null) listOfNotNull(variant,failureReason).joinToString(" · ")
+        else listOfNotNull(generationStatusLabel(job).takeIf {!finished || job.status!=GenerationStatus.COMPLETED},time,variant,
+        model.takeIf {title!=model},type).joinToString(" · ")
     // Solo un coste real; un trabajo fallido o en curso no muestra «Por confirmar».
     val cost=costText.takeIf {job.status==GenerationStatus.COMPLETED && it!="Por confirmar"}
     Row(Modifier.fillMaxWidth().heightIn(min=60.dp).combinedClickable(onClick=onOpen,onLongClick={menuOpen=true},onLongClickLabel="Opciones del resultado")
@@ -104,10 +116,9 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
         if(job.status==GenerationStatus.FAILED) TextButton(onClick=onRetry,contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {
             Text("Reintentar",style=MaterialTheme.typography.labelMedium)
         }
-        cost?.let {Text(it,modifier=Modifier.widthIn(max=96.dp),style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,
-            maxLines=1,overflow=TextOverflow.Ellipsis)}
+        cost?.let {ConfirmedGenerationCost(it)}
         Box {
-            IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de «${title.take(40)}», $time",tint=TextSecondary)}
+            IconButton(onClick={menuOpen=true}) {Icon(Icons.Default.MoreVert,"Opciones de «${title.take(40)}», $time${variant?.let {", $it"}.orEmpty()}",tint=TextSecondary)}
             DropdownMenu(menuOpen,{menuOpen=false}) { menu {menuOpen=false} }
         }
     }

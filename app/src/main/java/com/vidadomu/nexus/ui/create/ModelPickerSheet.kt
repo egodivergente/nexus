@@ -46,6 +46,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
         availableModels.filter { modality == null || modality in it.modalities }.map { it.organization }.distinct().sorted()
     }
     ModalBottomSheet(onDismissRequest=onDismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
         LazyColumn(Modifier.fillMaxWidth(), contentPadding=PaddingValues(start=16.dp,end=16.dp,bottom=24.dp),
             verticalArrangement=Arrangement.spacedBy(8.dp)) {
             item {
@@ -71,8 +72,10 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                 }
             }
             if(media.isNotEmpty()) item {
-                FilterChip(compatibleOnly,{compatibleOnly=!compatibleOnly},label={Text("Admite mis ${media.size} referencias")})
-                Text("Según las entradas declaradas. Revisarás la configuración final antes de generar.",style=MaterialTheme.typography.bodySmall)
+                Column {
+                    FilterChip(compatibleOnly,{compatibleOnly=!compatibleOnly},label={Text("Admite mis ${media.size} referencias")})
+                    Text("Según las entradas declaradas. Si falta un modelo, prueba Todo el catálogo. Revisarás la configuración final antes de generar.",style=MaterialTheme.typography.bodySmall)
+                }
             }
             if(orgs.size>1) item {
                 LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -98,7 +101,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                 items(models,key={"model:${it.providerId}:${it.id}"}) {model ->
                     val isSelected=model.id==selectedModel?.id && model.providerId==selectedModel?.providerId
                     val tariff=remember(model) {AtlasPublishedPrice.cached(model) ?: PublishedTariff.quote(model)}
-                    val price=tariff?.takeIf {it.unit!=null && it.usd.isFinite() && it.usd>=0}?.let {"Desde ${currencyManager.formatUnitPrice(it.usd)} / ${it.unit}"} ?: "Por confirmar"
+                    val price=tariff?.takeIf {it.unit!=null && it.usd.isFinite() && it.usd>=0}?.let {"${if(it.baseTariff) "Desde " else ""}${currencyManager.formatUnitPrice(it.unitUsd ?: it.usd)} / ${it.unit}"} ?: "Por confirmar"
                     Surface(color=if(isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
                         shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
                             .semantics(mergeDescendants=true) {selected=isSelected}
@@ -109,7 +112,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                                 Text(model.displayName,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.SemiBold,
                                     maxLines=2,overflow=TextOverflow.Ellipsis)
-                                Text(modelUse(model).label,style=MaterialTheme.typography.bodySmall)
+                                Text(listOfNotNull(modelUse(model).label,model.badge?.takeUnless {it.equals("HOT",true)}).joinToString(" · "),style=MaterialTheme.typography.bodySmall)
                                 Text("${model.organization} · $price",style=MaterialTheme.typography.bodySmall,
                                     color=MaterialTheme.colorScheme.onSurfaceVariant)
                             }

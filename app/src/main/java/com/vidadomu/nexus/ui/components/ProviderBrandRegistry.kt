@@ -22,6 +22,17 @@ sealed class BrandAsset {
 
 object ProviderBrandRegistry {
 
+    /**
+     * Most specific identity first: the model name segment, then its namespace, then the family
+     * description and finally the organization. Gateway namespaces (`openai/…`) and marketing
+     * family titles ("OpenAI-Compatible Endpoint") must not override the model's own brand.
+     */
+    internal fun brandIdentityCandidates(organization: String?, family: String?, modelId: String?): List<String> {
+        val segments = (modelId ?: "").trim().lowercase().split('/').map(String::trim).filter(String::isNotEmpty).asReversed()
+        return (segments + listOf(family, organization).map { (it ?: "").trim().lowercase() })
+            .filter(String::isNotEmpty)
+    }
+
     fun resolve(
         organization: String? = null,
         family: String? = null,
@@ -31,8 +42,8 @@ object ProviderBrandRegistry {
         val fam = (family ?: "").trim().lowercase()
         val id = (modelId ?: "").trim().lowercase()
         val combined = "$org $fam $id"
-        AlexiaBrandAssets.resolve("$id $fam")?.let { return it }
-        AlexiaBrandAssets.resolve(org)?.let { return it }
+        brandIdentityCandidates(organization, family, modelId)
+            .firstNotNullOfOrNull(AlexiaBrandAssets::resolve)?.let { return it }
 
         // 1. Google / Gemini / Imagen / Veo / Nano Banana
         if (combined.contains("google") || combined.contains("gemini") || combined.contains("imagen") ||

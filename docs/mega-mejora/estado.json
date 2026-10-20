@@ -11,7 +11,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "agente",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/assistant/AgentErrorNotice.kt (nuevo): aviso con causa legible vía noticeMessage, estado de reintento solo cuando se conoce, acciones con área ≥48 dp y detalle técnico plegado.",
+        "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt: NoticeRow usa AgentErrorNotice."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -24,7 +25,9 @@
       "status": "codigo_pendiente_validacion",
       "owner": "agente",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/assistant/AgentComposerControls.kt (nuevo): AgentControlButton «Proveedor» y «Razonamiento» con valor completo, ≥48 dp y stateDescription; razonamiento no soportado se muestra desactivado como «No disponible».",
+        "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt: controles en FlowRow.",
+        "Parcial frente a la aceptación: prueba con 5 usuarios no realizada."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -37,7 +40,7 @@
       "status": "codigo_pendiente_validacion",
       "owner": "agente",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/assistant/ProjectPicker.kt (nuevo): ProjectPickerList con filas de radio a ancho completo y nombre sin maxLines; sustituye el LazyRow de chips de ProjectSheet en AssistantScreen.kt."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -50,7 +53,7 @@
       "status": "codigo_pendiente_validacion",
       "owner": "agente",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/assistant/ProjectPicker.kt: ProjectSection sin Surface sustituye NexusSheetGroup/ProjectGroup; ProjectMemoryField con etiqueta encima del campo; se conservan los mismos 6 campos, personajes y notas."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -63,7 +66,7 @@
       "status": "codigo_pendiente_validacion",
       "owner": "integracion",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt: cabecera «Ajustes del modelo» como Row entera pulsable (heightIn 48 dp) con stateDescription Expandido/Contraído sobre inlineParametersExpanded; enlace «Todas las opciones»."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -76,7 +79,10 @@
       "status": "codigo_pendiente_validacion",
       "owner": "integracion",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt: readiness.message pasa a TextButton con ChevronRight que lleva al selector de modelo, al foco del prompt, a medios o a parámetros.",
+        "app/src/main/java/com/vidadomu/nexus/ui/create/StudioCanvasComponents.kt: FocusRequester promptFocus.",
+        "app/src/main/java/com/vidadomu/nexus/ui/create/CreationReadiness.kt: destino de corrección (cambio en el área de preparación, fuera del commit f8a5a6f).",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ui/create/CreationFixTargetTest.kt (no ejecutada)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -89,7 +95,9 @@
       "status": "codigo_pendiente_validacion",
       "owner": "integracion",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/ui/create/CreateScreen.kt: barra con chips «Parámetros», «Coste» y «Más» (DropdownMenu con «Varios modelos» y «Mis ajustes»).",
+        "app/src/main/java/com/vidadomu/nexus/ui/create/StudioCanvasComponents.kt: FlowRow en lugar de scroll horizontal.",
+        "app/src/main/java/com/vidadomu/nexus/ui/components/StudioComponents.kt: StudioToolChip con heightIn(min=36.dp) en vez de altura fija."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -102,7 +110,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "parametros",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/core/model/ParameterBounds.kt (nuevo), core/model/CoreModels.kt, provider/atlas/NativeModelSchema.kt y provider/atlas/AtlasModelMapper.kt: límites exactos de parámetros nativos.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/NativeParameterExactnessTest.kt (no ejecutada)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -115,7 +124,7 @@
       "status": "codigo_pendiente_validacion",
       "owner": "parametros",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/core/model/ParameterLabels.kt (nuevo) y app/src/main/java/com/vidadomu/nexus/ui/create/ParameterPresentation.kt: etiquetas de parámetros legibles."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -128,7 +137,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "parametros",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/ui/create/NativeParameterControl.kt: control de parámetro nativo rehecho.",
+        "Prueba escrita: app/src/androidTest/java/com/vidadomu/nexus/ui/create/NativeParameterControlUiTest.kt (no ejecutada)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -141,7 +151,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "integracion",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/ui/components/PriceAvailability.kt y app/src/main/java/com/vidadomu/nexus/ui/components/PriceEstimate.kt: disponibilidad y unidad de precio; en el área de preparación ModelPickerSheet.kt solo antepone «Desde» si la tarifa es base.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ui/components/PriceAvailabilityTest.kt (no ejecutada)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -151,9 +162,12 @@
       "title": "Marca correcta, insignias con significado",
       "priority": "P1",
       "acceptance": "Prueba con el ID real reproduce y corrige su logo; ningún distintivo se basa solo en publicidad del proveedor sin explicación.",
-      "status": "en_desarrollo",
+      "status": "codigo_pendiente_validacion",
       "owner": "catalogo",
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        "app/src/main/java/com/vidadomu/nexus/ui/components/ProviderBrandRegistry.kt: brandIdentityCandidates prioriza segmento del ID de modelo, luego namespace, familia y organización; los namespaces de pasarela y los títulos comerciales de familia no sustituyen la marca del modelo.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ui/components/ProviderBrandIdentityTest.kt (no ejecutada). Insignias: sin cambio concreto identificado."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -165,7 +179,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "integracion",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "PARCIAL. app/src/main/java/com/vidadomu/nexus/ui/create/ModelPickerSheet.kt: una única LazyColumn contiene cabecera, búsqueda, filtros y resultados, con contentPadding bottom=24.dp y los insets por defecto de ModalBottomSheet. No hay padding manual de navegación duplicado.",
+        "Falta comprobar última fila con IME abierto/cerrado al 130 % y el resto de hojas. Tests del selector escritos, no ejecutados."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -175,9 +190,12 @@
       "title": "Catálogo con descripciones útiles",
       "priority": "P2",
       "acceptance": "Con 411 dp se lee una función completa por familia; la búsqueda conserva espacio.",
-      "status": "en_desarrollo",
+      "status": "codigo_pendiente_validacion",
       "owner": "catalogo",
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        "PARCIAL. app/src/main/java/com/vidadomu/nexus/ui/models/CatalogGuide.kt: catalogCardSummary, fitCardSummary, workflowSummary y modelGuide con caché; app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt: resumen por familia en NavigationCard y línea «Filtros activos» con «Quitar filtros activos»; app/src/main/java/com/vidadomu/nexus/ui/models/CatalogFilterHint.kt (nuevo): «Filtros (n)».",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/CatalogCardSummaryTest.kt (no ejecutada). Sin medir a 411 dp."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -186,9 +204,12 @@
       "title": "Ficha de modelo mejor compuesta",
       "priority": "P2",
       "acceptance": "En la primera pantalla se entienden entrada admitida, salida y unidad de coste; campos desconocidos se rotulan sin dato.",
-      "status": "en_desarrollo",
+      "status": "codigo_pendiente_validacion",
       "owner": "catalogo",
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        "PARCIAL. app/src/main/java/com/vidadomu/nexus/ui/models/ModelFactSheet.kt (nuevo): modelFactSheet con entrada, salida, audio, límites, duración y unidad de coste (ModelFact con valor nulo para dato desconocido); app/src/main/java/com/vidadomu/nexus/ui/models/ModelOptionsScreen.kt la muestra.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ModelFactSheetTest.kt (no ejecutada). Composición de la primera pantalla sin revisión visual."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -197,9 +218,12 @@
       "title": "Variantes comparables",
       "priority": "P1",
       "acceptance": "Cada variante tiene diferencia respaldada o No documentada; ejemplo de 5 s incluye unidad y carácter estimado.",
-      "status": "en_desarrollo",
+      "status": "codigo_pendiente_validacion",
       "owner": "catalogo",
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        "PARCIAL. app/src/main/java/com/vidadomu/nexus/ui/models/ModelFactSheet.kt: variantDifferences/VariantEvidence y exampleCost (ExampleCost con nota) para comparar variantes; app/src/main/java/com/vidadomu/nexus/ui/models/ModelOptionsScreen.kt.",
+        "Cobertura en ModelFactSheetTest.kt (no ejecutada). Rótulo «No documentada» y ejemplo de 5 s sin comprobar en pantalla."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -208,9 +232,12 @@
       "title": "Historial que distingue intentos",
       "priority": "P1",
       "acceptance": "10 intentos del mismo prompt se distinguen por nombre/fecha/variante sin abrirlos; ninguna fila se titula solo puntos suspensivos.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "biblioteca",
+      "implementation_evidence": [
+        "app/src/main/java/com/vidadomu/nexus/ui/components/GenerationRowLabels.kt (nuevo): generationRowTitle, comparisonVariantLabel y attemptPosition («Intento N de M» solo con historial completo); app/src/main/java/com/vidadomu/nexus/ui/components/GenerationSummaryRow.kt; app/src/main/java/com/vidadomu/nexus/ui/generations/GenerationsScreen.kt: fila agrupada con título e instrucción completa seleccionable.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ui/components/GenerationRowLabelsTest.kt (no ejecutada)."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -219,9 +246,12 @@
       "title": "Cabecera de biblioteca más tranquila",
       "priority": "P2",
       "acceptance": "Título completo a 411 dp; buscar/importar a un toque; densidad elegida por el usuario intacta.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "biblioteca",
+      "implementation_evidence": [
+        "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryScreen.kt: título «Biblioteca» solo en TopAppBar con showBalance=false; buscar e importar quedan como acciones de la barra.",
+        "El recuento de archivos y NexusBalanceChip (saldo) pasan a una línea secundaria bajo la barra, no a un menú."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -255,7 +285,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "integracion",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/ui/create/ModelPickerSheet.kt (nuevo, extraído de CreateScreen.kt) con initialModality y medios; app/src/main/java/com/vidadomu/nexus/ui/create/ModelSelection.kt (nuevo); CreateScreen.kt: diálogo pendingModel «Cambiar de modelo» que avisa de las referencias afectadas.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ui/create/ModelSelectionTest.kt (no ejecutada)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -353,9 +384,12 @@
       "title": "Búsqueda vacía que permite recuperarse",
       "priority": "P1",
       "acceptance": "Desde búsqueda sin coincidencias se recupera la biblioteca en un toque sin borrar archivos ni preferencias permanentes.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "biblioteca",
+      "implementation_evidence": [
+        "app/src/main/java/com/vidadomu/nexus/ui/library/LibraryNoResults.kt (nuevo): LibraryViewFilters, «Ver toda la biblioteca» y «Quitar filtros y mantener la búsqueda»; LibraryScreen.kt aplica applyFilters; app/src/main/java/com/vidadomu/nexus/ui/generations/GenerationsScreen.kt: «Ver todo el historial».",
+        "Pruebas escritas: LibraryViewFiltersTest.kt y LibraryHistoryRecoveryUiTest.kt (no ejecutadas)."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -455,7 +489,9 @@
       "status": "codigo_pendiente_validacion",
       "owner": "agente",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/assistant/AssistantScreen.kt: ProjectSheet separa elegir proyecto y «Editar memoria»; ProjectLeaveDialog Guardar/Conservar/Descartar; snackbar «Seguir editando» al cerrar con cambios.",
+        "app/src/main/java/com/vidadomu/nexus/assistant/ProjectMemoryDraft.kt (nuevo): borrador por projectId con rememberSaveable, ProjectMemoryDraftsSaver y pruneProjectDrafts; saveConfirmed exige guardado solicitado, updatedAt distinto y borrador limpio.",
+        "Pruebas escritas: ProjectAgentFlowTest.kt y ProjectAgentUiTest.kt (no ejecutadas)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -465,9 +501,12 @@
       "title": "Fallo externo con recuperación visible",
       "priority": "P1",
       "acceptance": "Con Alexia ausente aparece aviso accionable; no se descarga, envía o elimina nada automáticamente.",
-      "status": "pendiente",
-      "owner": null,
-      "implementation_evidence": [],
+      "status": "codigo_pendiente_validacion",
+      "owner": "biblioteca",
+      "implementation_evidence": [
+        "app/src/main/java/com/vidadomu/nexus/ui/output/ExternalAppFallback.kt (nuevo): launchAlexia, alexiaUnavailableMessage y openLocalCopyWithAnotherApp solo con copia local fiable; app/src/main/java/com/vidadomu/nexus/ui/output/OutputViewerScreen.kt: InlineNotice persistente; LibraryScreen.kt: snackbar si Alexia no abre.",
+        "Prueba escrita: app/src/test/java/com/vidadomu/nexus/ui/output/AlexiaFallbackTest.kt (no ejecutada). La URL remota nunca se lanza como alternativa."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -509,9 +548,12 @@
       "title": "Accesibilidad comprobada con contexto real",
       "priority": "P1",
       "acceptance": "20 tareas críticas completables sin visión; sin texto esencial cortado a 200 %; tamaño táctil medido ≥48 dp.",
-      "status": "pendiente",
+      "status": "codigo_pendiente_validacion",
       "owner": null,
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        "PARCIAL, solo catálogo. app/src/main/java/com/vidadomu/nexus/ui/models/CatalogTreeScreen.kt: encabezados semánticos (heading), CustomAccessibilityAction «Subir/Bajar» para reordenar sin arrastre, contentDescription del botón de filtros y resumen sin recorte con fontScale ≥1,3.",
+        "Las 20 tareas sin visión, el 200 % y la medición de ≥48 dp no se han realizado."
+      ],
       "test_evidence": [],
       "device_verified": false
     },
@@ -831,7 +873,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "conflictos",
       "implementation_evidence": [
-        "Checkpoint Android: implementación o parte implementada. Véase README y diff; no equivale a aceptación completa."
+        "app/src/main/java/com/vidadomu/nexus/sync/DriveConflictPresentation.kt (nuevo), app/src/main/java/com/vidadomu/nexus/sync/DriveConflictReview.kt (nuevo) y app/src/main/java/com/vidadomu/nexus/sync/DriveSyncSettings.kt: revisión segura de conflictos de Drive.",
+        "Pruebas escritas: DriveConflictPresentationTest.kt, DriveConflictFixtures.kt, DriveConflictReviewUiTest.kt y DriveConflictSelectionUiTest.kt (no ejecutadas)."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -844,7 +887,8 @@
       "status": "codigo_pendiente_validacion",
       "owner": "conflictos",
       "implementation_evidence": [
-        "Comparación y elección explícita; conservar ambas NO implementado."
+        "PARCIAL. app/src/main/java/com/vidadomu/nexus/sync/DriveConflictPresentation.kt y app/src/main/java/com/vidadomu/nexus/sync/DriveConflictReview.kt: comparación de versiones con contexto.",
+        "«Conservar ambas» no está implementado."
       ],
       "test_evidence": [],
       "device_verified": false
@@ -917,8 +961,11 @@
     }
   ],
   "validation": {
-    "build": "pendiente",
-    "tests": "creados_no_ejecutados",
-    "ci_blocker": "GitHub Actions job 118555144973: account payments/spending limit"
+    "build": "ASUS checkpoint f8a5a6f en curso; integración final pendiente",
+    "tests": "núcleo ejecutado: 305 PASS, 4 omitidos; app e instrumentadas aún no verificadas",
+    "ci_blocker": "GitHub Actions job 118555144973: account payments/spending limit",
+    "core_tests": "f8a5a6f núcleo en ASUS (XML contado): 309 tests, 0 failures, 0 errors, 4 skipped = 305 PASS; no cubre cambios de app",
+    "android_app": "compilando; NO validada",
+    "pixel_matrix": "docs/mega-mejora/MATRIZ-PIXEL.md (pendiente)"
   }
 }

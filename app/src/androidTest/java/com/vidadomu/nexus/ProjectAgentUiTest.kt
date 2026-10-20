@@ -25,10 +25,14 @@ import org.junit.Test
 class ProjectAgentUiTest {
     @get:Rule val compose = createComposeRule()
 
+    // NexusTheme fija su propia densidad (preferencias de apariencia): la escala de prueba va DENTRO del tema.
     private fun scaled(scale: Float, content: @Composable () -> Unit) {
+        check(BuildConfig.OFFLINE_QA)
         compose.setContent {
-            val d = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(d.density, scale)) { NexusTheme { content() } }
+            NexusTheme {
+                val d = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(d.density, scale)) { content() }
+            }
         }
     }
 

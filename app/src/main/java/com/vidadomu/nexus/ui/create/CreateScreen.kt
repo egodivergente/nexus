@@ -214,13 +214,16 @@ fun CreateScreen(
                     verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
                     if(!busy) readiness.message?.let { reason ->
-                        TextButton(onClick={
-                            when {
-                                readiness.phase == CreationPhase.CHOOSE_MODEL -> showModelPickerSheet=true
-                                state.missingRequiredFields.firstOrNull() in listOf("Prompt", "Instrucciones") ->
-                                    batchScope.launch { canvasScroll.animateScrollToItem(1); promptFocus.requestFocus() }
-                                state.missingRequiredFields.isNotEmpty() -> showMedia=true
-                                else -> showParameters=true
+                        if(readiness.fixTarget==null) Text(reason, color=MaterialTheme.colorScheme.onSurface,
+                            style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(horizontal=12.dp))
+                        else TextButton(onClick={
+                            when(readiness.fixTarget) {
+                                CreationFixTarget.MODEL -> showModelPickerSheet=true
+                                CreationFixTarget.PROMPT -> batchScope.launch {canvasScroll.animateScrollToItem(1);promptFocus.requestFocus()}
+                                CreationFixTarget.MEDIA -> showMedia=true
+                                CreationFixTarget.PARAMETERS -> showParameters=true
+                                CreationFixTarget.RETRY_CONFIGURATION -> viewModel.retryConfiguration()
+                                null -> Unit
                             }
                         }, modifier=Modifier.fillMaxWidth()) {
                             Text(reason, color=MaterialTheme.colorScheme.onSurface,
@@ -472,9 +475,9 @@ fun CreateScreen(
 
     pendingModel?.let { target ->
         AlertDialog(onDismissRequest={pendingModel=null}, title={Text("Cambiar de modelo")},
-            text={Text("Tienes ${state.attachedMedia.size} referencias preparadas. Al cambiar a ${target.displayName}, solo se mantendrán las que admita su configuración. Las demás saldrán del borrador, no de la Biblioteca ni del archivo original. El prompt se conserva y las opciones pasan a las del nuevo modelo. No se enviará ninguna generación.")},
+            text={Text("Tienes ${state.attachedMedia.size} referencias preparadas. Al cambiar a ${target.displayName}, solo se mantendrán las que admita su configuración. Las demás saldrán del borrador, no de la Biblioteca ni del archivo original. El tipo de creación puede cambiar. El prompt se conserva y las opciones pasan a las del nuevo modelo. No se enviará ninguna generación.")},
             confirmButton={TextButton(onClick={pendingModel=null;viewModel.selectModel(target)}) {Text("Cambiar y revisar")}},
-            dismissButton={TextButton(onClick={pendingModel=null;showModelPickerSheet=true}) {Text("Conservar modelo")}})
+            dismissButton={TextButton(onClick={pendingModel=null}) {Text("Conservar modelo")}})
     }
 
     // Modal Bottom Sheet para Inspector de Solicitud (DEBUG)

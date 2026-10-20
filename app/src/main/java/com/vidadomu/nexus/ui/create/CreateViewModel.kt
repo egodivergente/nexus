@@ -46,6 +46,7 @@ data class CreateUiState(
     val isLoadingSchema: Boolean = false,
     val schemaReady: Boolean = false,
     val schemaMessage: String? = null,
+    val schemaUnsupported: Boolean = false,
     val uploadProgress: Float? = null,      // 0..1 upload progress (null = indeterminate)
     val errorMessage: String? = null
 ) {
@@ -125,13 +126,14 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     attachedMedia = compatibleModelMedia(model, it.attachedMedia),
                     isLoadingSchema = false,
                     schemaReady = true,
+                    schemaUnsupported = false,
                     schemaMessage = null
                 )
             }
             restoreDraftIfMatching(model)
             return
         }
-        _uiState.update { it.copy(isLoadingSchema = true, schemaReady = false, schemaMessage = null) }
+        _uiState.update { it.copy(isLoadingSchema = true, schemaReady = false, schemaMessage = null, schemaUnsupported=false) }
         schemaJob = viewModelScope.launch {
             try {
                 val config = com.vidadomu.nexus.provider.atlas.NativeModelSchema.load(model)
@@ -140,13 +142,14 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                         parameters = creationPreferences.values(config.model),
                         attachedMedia = compatibleModelMedia(config.model, it.attachedMedia),
                         schemaReady = config.unsupportedRequired.isEmpty(),
+                        schemaUnsupported = config.unsupportedRequired.isNotEmpty(),
                         schemaMessage = if(config.unsupportedRequired.isEmpty()) config.notices.takeIf { notes -> notes.isNotEmpty() }?.joinToString("\n") else
                             "Este modelo requiere entradas aún no compatibles: " + config.unsupportedRequired.joinToString()) }
                     restoreDraftIfMatching(config.model)
                 }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
-                if(schemaRequest == request) _uiState.update { it.copy(schemaReady = false, schemaMessage = e.message ?: "No se pudo consultar el esquema.") }
+                if(schemaRequest == request) _uiState.update { it.copy(schemaReady = false, schemaUnsupported=false, schemaMessage = e.message ?: "No se pudo consultar el esquema.") }
             } finally { if(schemaRequest == request) _uiState.update { it.copy(isLoadingSchema = false) } }
         }
     }

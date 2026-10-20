@@ -9,6 +9,8 @@ Encargo: implementar progresivamente V01–V20, U01–U20, D01–D10, H01–H10,
 - Catálogo/marcas: V12, V14–V16.
 - Lienzo/selector: V05–V07, V11, V13, U01.
 - Conflictos Android: W01 y parte disponible de W02.
+- Biblioteca/Historial: V17–V18, U10 y U20.
+- Accesibilidad puntual en catálogo: D04 parcial.
 
 `estado.json` es el registro por ID. En desarrollo NO significa implementado ni probado. Pruebas humanas de tiempos, TalkBack, háptica y ergonomía no se marcarán como realizadas desde código o CI.
 
@@ -20,7 +22,24 @@ AXELPC aparece desconectado de Desktop Commander al inicio. El portátil local n
 
 ## Checkpoint de desarrollo
 
-Código Android de prueba: vc98 / 1.9.64-mega1-agent. No instalado. El catálogo/marcas sigue en trabajo paralelo y se incorporará en el siguiente checkpoint. Se ha creado el paquete aislado `.megaqa`. No se declara compilación ni ejecución hasta disponer de sus informes.
+Código Android de prueba: vc98 / 1.9.64-mega1-agent. No instalado. Catálogo, marcas, Biblioteca e Historial integrados; no equivalen a la totalidad de las 80 propuestas. Se ha creado el paquete aislado `.megaqa`. No se declara compilación ni ejecución hasta disponer de sus informes.
+
+## Límites y pendientes de este lote
+
+- Núcleo en `f8a5a6f` (ASUS, recuento de XML): 309 tests, 0 failures, 0 errors, 4 skipped, es decir 305 superados. Ese núcleo no cubre los cambios de la app.
+- App Android: sigue compilando y NO está validada. Sus pruebas unitarias y de Compose están escritas pero no se han ejecutado. El CI está bloqueado por facturación (job 118555144973).
+- Aceptación humana no realizada: V02 con 5 usuarios, TalkBack, fuente al 130 % y 200 %, y revisión visual en Pixel. El S25 no se manipula en esta tanda.
+- Parciales dentro de `codigo_pendiente_validacion`: W02 («conservar ambas» no implementado), V14, V15, V16 y D04 (solo accesibilidad del catálogo). V13 está limitado al selector nuevo: una única lista desplazable con insets de Material y pie de 24 dp. Falta verificar teclado/barra gestual y extenderlo a todas las hojas.
+- V18: el saldo y el recuento de archivos están en una línea secundaria bajo la barra de Biblioteca, no en un menú.
+- Riesgos conocidos sin corregir:
+  - la normalización del core puede dejar marcado como pendiente un borrador de memoria ya guardado;
+  - la escena de proyecto de `UiAuditScreenshotsTest` captura ahora la lista y no el editor;
+  - Atrás cierra la hoja de proyecto y conserva el borrador sin preguntar;
+  - coste del historial: ahora usa el componente `ConfirmedGenerationCost` sin maxLines ni ellipsis; el nuevo test a 200 % no se ha ejecutado;
+  - el Historial calcula las variantes una vez por snapshot O(n log n), pero `GenerationSummaryRow` conserva el cálculo de conflictos locales O(n) por fila;
+  - la alternativa a Alexia solo abre copias locales fiables (incluidas rutas absolutas sin esquema); faltan pruebas reales del selector y de rutas admitidas por FileProvider.
+- Pruebas físicas planificadas en Pixel: [MATRIZ-PIXEL.md](MATRIZ-PIXEL.md) (todas pendientes).
+- El cambio de estado a completado exige evidencia de pruebas ejecutadas y de dispositivo; no se ha registrado ninguna.
 
 ## Verificación
 
