@@ -114,3 +114,34 @@ su comprobacion: el hostname anunciado debe coincidir con la IP del llamante.
 Por eso la ruta Tailscale rechazada desde LAN permite probar la siguiente ruta
 LAN, sin debilitar autenticacion ni comprobacion de direccion.26tests PASS,
 incluyendo rechazo de primera ruta, exito de segunda y fallo de todas.
+
+
+## Cierre fisico Windows y S25
+
+Paquete activo .2 SHA256
+9799e6e0b6fec337c6141da2bd49a2d169f39ef42d34211b272d4c890533c26b,
+294 archivos verificados; acceso directo actualizado. Conservados4proyectos,
+1030assets y todos los IDs del snapshot anterior al ultimo reinicio.
+
+Pruebas reales PASS:20/20originales de chats ausentes recuperados automaticamente
+por SHA; muestra servida por HTTP con el mismo SHA;15historiales con15identidades
+fuente distintas y0planes restaurados como acciones. La clave sintetica nueva de
+Windows y la modificacion posterior de esa clave existente se comprobaron con
+credentialMatches del proveedor nativo en S25; la skill Windows llego al S25 y su
+edicion en S25 retorno a Windows con bytes coincidentes. Callback cifrado POST
+LAN /sync devolvio queued=true. Los2archivos AGY Windows/S25 coinciden byte a
+byte; no se imprime ni publica el material de autenticacion.
+
+Fixtures retirados: clave nativa y archivo SKILL; ambos registros de skills se
+recargaron con archivo auxiliar temporal, tambien retirado. Ruta S25 original
+restaurada; continuidad Windows y Drive habilitados al cerrar. Timeout Windows
+10segundos, editable en Ajustes y con opcion0sinlimite. Direcciones de retorno
+LAN y Tailscale configurables y con la misma identidad cifrada.
+
+S25 instalado97/1.9.63-agent-preview, APK
+49874ff7c95649df809882e21edf0b98418f0b72be980d48bac490df867f8244.
+La entrega Android coordinada comunica707unitarias PASS y4omitidas. Pixel sigue96:
+falta reactivar depuracion WiFi o conectarUSB; SSH Termux esta disponible, pero no
+se encontro rish ni privilegio shell previo para habilitar ADB. La validacion de
+actualizacion97 y retorno Windows/Pixel queda PENDIENTE, no se declara PASS.
+No se altero la pantalla del S25 durante su llamada Jitsi.
