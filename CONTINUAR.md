@@ -1,3 +1,14 @@
+# Continuidad entre dispositivos - 2026-10-20
+
+Rama `feat/device-continuity-20261020`, checkout `C:/Users/User/Documents/nexus-audit/agent-ux`.
+Codigo vc93; validacion fisica bidireccional sobre la integracion vc94 instalada
+ en S25 y Pixel. Pruebas: 617 PASS, 4 omitidas, 2 Node PASS.
+Ver `docs/DEVICE-CONTINUITY-1959-20261020.md`.
+Drive usa `codex/nexus-drive-sync-android-20261020` y prepara una APK posterior.
+No instalar vc93 sobre esa integracion. Credenciales y backups fuera de Git.
+`gradlew.bat` contiene trabajo ajeno y no se incluye en esta entrega.
+Los estados siguientes se conservan como historial, no como estado actual.
+
 # Continuar NEXUS
 
 Fuente canónica: https://github.com/egodivergente/nexus, rama `main`.

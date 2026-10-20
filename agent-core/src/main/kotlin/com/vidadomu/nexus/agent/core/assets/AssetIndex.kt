@@ -132,6 +132,8 @@ data class IndexData(
     val projectSessions: List<ProjectSession> = emptyList(),
 )
 
+data class PeerIndexMerge(val snapshot: IndexData, val conflicts: List<String>)
+
 @Serializable
 data class AssetQuery(
     val text: String? = null,
@@ -158,6 +160,36 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     val changes = mutableChanges.asStateFlow()
 
     fun snapshot(): IndexData = data
+
+    /** Applies a peer snapshot under the same lock as agent/editor writes, and notifies the UI. */
+    suspend fun mergeFromPeer(remote: IndexData, base: IndexData?, deletions: Boolean,
+        memory: Boolean = true, gallery: Boolean = true, localBase: IndexData? = base,
+        usableUri: (String) -> Boolean = { true }): PeerIndexMerge = edit { local ->
+        // Identical asset ids may still contain a path from the previous phone. A verified local
+        // peer copy repairs an unavailable path without replacing a usable local file.
+        val peerAssets = remote.assets.associateBy { it.id }
+        val replacements = local.assets.mapNotNull { asset ->
+            val candidate = peerAssets[asset.id]?.uri
+            if (candidate != null && candidate != asset.uri && !usableUri(asset.uri) && usableUri(candidate)) asset.uri to candidate else null
+        }.toMap()
+        fun normalized(d: IndexData) = d.copy(projectSessions = emptyList(),
+            assets = d.assets.map { it.copy(uri = replacements[it.uri] ?: it.uri) },
+            generations = d.generations.map { it.copy(referenceUris = it.referenceUris.map { uri -> replacements[uri] ?: uri }) })
+        val result = com.vidadomu.nexus.agent.core.sync.SyncMerge.merge(
+            JSON.encodeToJsonElement(IndexData.serializer(), normalized(local)),
+            JSON.encodeToJsonElement(IndexData.serializer(), remote.copy(projectSessions = emptyList())),
+            base?.let { JSON.encodeToJsonElement(IndexData.serializer(), normalized(it)) }, deletions,
+            localBase?.let { JSON.encodeToJsonElement(IndexData.serializer(), normalized(it)) })
+        val merged = JSON.decodeFromJsonElement(IndexData.serializer(), result.value)
+        val next = merged.copy(projectSessions = local.projectSessions,
+            projects = if (memory) merged.projects else local.projects,
+            scenes = if (memory) merged.scenes else local.scenes,
+            shots = if (memory) merged.shots else local.shots,
+            characters = if (memory) merged.characters else local.characters,
+            assets = if (gallery) merged.assets else local.assets,
+            generations = if (gallery) merged.generations else local.generations)
+        next to PeerIndexMerge(next, result.conflicts)
+    }
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)

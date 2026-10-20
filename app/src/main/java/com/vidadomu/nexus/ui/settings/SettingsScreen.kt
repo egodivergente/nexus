@@ -56,6 +56,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     val currencyState by currencyManager.state.collectAsState()
 
     var accountBalance by remember { mutableStateOf<AccountBalance?>(app.secureStorage.getCachedBalance()) }
+    var syncOpen by remember { mutableStateOf(false) }
     var isRefreshingBalance by remember { mutableStateOf(false) }
 
     fun refreshBalance() {
@@ -119,6 +120,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             }}
                 }
                 SettingsPage.AGENT -> {
+                    item {SettingsCard {SettingRow("Sincronización entre móviles","Chats, memoria, skills, galería y adjuntos",{syncOpen=true})}}
                     if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Modelo, respuesta, consumo, herramientas y skills",{assistantSettingsOpen=true})}}
                     item {SettingsHeader("Cerebros adicionales",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
                     item {SettingsCard {BrainsSettingsSection()}}
@@ -168,6 +170,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             }
         }
     }
+    if(syncOpen) DeviceSyncSettings {syncOpen=false}
     if(assistantSettingsOpen && assistantViewModel != null) com.vidadomu.nexus.assistant.AssistantSettingsSheetHost(assistantViewModel) {assistantSettingsOpen=false}
     if(appearanceOpen) NexusSheet("Apariencia", {appearanceOpen=false}, icon=Icons.Default.Palette) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {

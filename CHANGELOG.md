@@ -1,5 +1,12 @@
 # Changelog — NEXUS
 
+## 1.9.59-agent (vc93) - 2026-10-20
+
+- Continuidad automática entre móviles para chats, memoria/proyectos, skills, galería y adjuntos, con intercambio cifrado e integridad SHA-256.
+- Sincronización opcional de claves, perfiles, ajustes y autenticación AGY mediante un adaptador privado en Termux. Las rutas locales de los puentes se conservan.
+- Activación, categorías, intervalo, espera, tamaño por archivo, eliminaciones y arranque configurables en la APK. Chats recibidos en el historial y revisiones incompatibles conservadas.
+- Véase `docs/DEVICE-CONTINUITY-1959-20261020.md` para el comportamiento y la evidencia de validación.
+
 ## 1.9.58-agent (vc92) - 2026-10-20
 
 - Hojas comunes con cabecera, cierre accesible y acción fija; borrado de credenciales con confirmación antes de guardar.
