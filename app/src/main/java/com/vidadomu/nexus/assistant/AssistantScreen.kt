@@ -385,10 +385,11 @@ fun AssistantScreen(
                 LibraryCarousel(onPick = { jobId, outputId -> vm.attachLibraryResult(jobId, outputId) }, enabled = !ui.attaching && !ui.thinking,
                     modifier = Modifier.padding(top = NexusTokens.space4))
             // Selectores en una sola fila compacta; si no caben, la fila se desplaza en horizontal en vez de crecer.
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = NexusTokens.space8, vertical = 2.dp),
+            // Ancho acotado: dentro de un scroll horizontal el texto con weight colapsaba y las píldoras crecían en vertical.
+            Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
-                BrainPicker(ui, vm)
-                ReasoningPicker(ui, vm)
+                Box(Modifier.weight(1f)) { BrainPicker(ui, vm) }
+                Box(Modifier.weight(1f)) { ReasoningPicker(ui, vm) }
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {

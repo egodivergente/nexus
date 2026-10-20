@@ -14,7 +14,7 @@ object MediaSniffer {
         return m in genericTypes || m.endsWith("/*")
     }
 
-    /** Primer MIME declarado concreto; si no hay, la firma; si no coincide, la familia comodín declarada (p. ej. image/*); si no, desconocido. */
+    /** Primer MIME declarado concreto; si no hay, la firma; si no coincide, la familia comodín declarada (p. ej. image con comodín); si no, desconocido. */
     fun resolve(header: ByteArray?, vararg declared: String?): String {
         declared.firstOrNull { !isGeneric(it) }?.let { return it.trim() }
         header?.let(::sniff)?.let { return it }
