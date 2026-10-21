@@ -22,7 +22,18 @@ import java.util.concurrent.ConcurrentHashMap
  * Lo que genere se copia a la Biblioteca de Nexus y se devuelve como asset_ids. Con la cuenta Ultra no cuesta dinero.
  */
 internal class FlowAgentOperations(private val app: NexusApplication) {
-    private val bridge = FlowBridgeClient(com.vidadomu.nexus.core.network.OkHttpClientFactory.create(app.secureStorage), app.secureStorage)
+    private val bridge = FlowBridgeClient(com.vidadomu.nexus.core.network.OkHttpClientFactory.create(app.secureStorage).newBuilder()
+        .retryOnConnectionFailure(true).build(), app.secureStorage)
+
+    /** Leer el estado no cambia nada en Flow: si una conexión reutilizada se corta, se reintenta. */
+    private suspend fun status(id: String): FlowBridgeClient.AgentTurn {
+        var last: Throwable? = null
+        repeat(3) { attempt ->
+            bridge.agentStatus(id).onSuccess { return it }.onFailure { last = it }
+            delay(1_000L * (attempt + 1))
+        }
+        throw ToolInputException(last?.message ?: "Se perdió la conexión con Flow.")
+    }
 
     suspend fun run(operation: String, input: JsonObject): JsonObject {
         val limits=AssistantRuntime.get(app).settings.limits()
@@ -38,7 +49,7 @@ internal class FlowAgentOperations(private val app: NexusApplication) {
             "flow_agent_read" -> {
                 val id = (input["conversation_id"] as? JsonPrimitive)?.contentOrNull
                     ?: throw ToolInputException("Indica conversation_id (lo devolvió flow_agent_send).")
-                bridge.agentStatus(id).getOrElse { throw ToolInputException(it.message ?: "No se pudo leer la respuesta de Flow.") }
+                status(id)
             }
             else -> throw ToolInputException("Operación de Flow desconocida.")
         }
@@ -46,8 +57,8 @@ internal class FlowAgentOperations(private val app: NexusApplication) {
         val now=System.currentTimeMillis()
         val deadline=now+minOf(wait,(Long.MAX_VALUE-now)/1000)*1000
         while (current.state != "completed" && System.currentTimeMillis() < deadline) {
-            delay(5_000)
-            current = bridge.agentStatus(current.id).getOrElse { throw ToolInputException(it.message ?: "Se perdió la conexión con Flow.") }
+            delay(4_000)
+            current = status(current.id)
         }
         val saved = if (current.state == "completed") saveMedia(current) else emptyList()
         return buildJsonObject {

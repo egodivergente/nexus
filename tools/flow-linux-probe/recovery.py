@@ -954,4 +954,5 @@ async def assets(asset: str):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host=HOST, port=PORT, access_log=False, log_level='warning')
+    # Nexus consulta cada pocos segundos reutilizando la conexión: con el keep-alive por defecto (5 s) la cerraba justo antes.
+    uvicorn.run(app, host=HOST, port=PORT, access_log=False, log_level='warning', timeout_keep_alive=75)
