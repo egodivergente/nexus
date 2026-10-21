@@ -32,6 +32,8 @@ import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
 import com.vidadomu.nexus.ui.navigation.adjacentTab
 import com.vidadomu.nexus.ui.navigation.tabSwipe
+import com.vidadomu.nexus.ui.navigation.tabEnter
+import com.vidadomu.nexus.ui.navigation.tabExit
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.vidadomu.nexus.ui.navigation.Screen
 import com.vidadomu.nexus.ui.navigation.openHistoryTab
@@ -149,10 +151,16 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
+                    val tabRoutes = remember { Screen.bottomNavItems.map { it.route } }
+                    val tabDrag = com.vidadomu.nexus.ui.navigation.rememberTabDragState()
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Assistant.route,
-                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).tabSwipe(enabled = activeEntry?.destination?.route in Screen.bottomNavItems.map { it.route }) { direction ->
+                        enterTransition = { tabEnter(tabRoutes) },
+                        exitTransition = { tabExit(tabRoutes) },
+                        popEnterTransition = { tabEnter(tabRoutes) },
+                        popExitTransition = { tabExit(tabRoutes) },
+                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).tabSwipe(enabled = activeEntry?.destination?.route in tabRoutes, state = tabDrag) { direction ->
                             adjacentTab(activeEntry?.destination?.route, direction, Screen.bottomNavItems.map { it.route })?.let { route ->
                                 navController.navigate(route) {
                                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
