@@ -287,11 +287,17 @@ fun FlowStudioScreen(
         scope.launch {
             isSubmitting = true
             try {
-                if (app.flowBridgeProvider.bridgeStatus().getOrNull()?.isReady != true) {
+                // Los prompts van a la cola local, que ya espera a que Flow esté listo (p. ej. mientras termina
+                // el encargo anterior). Solo se detiene el envío si no se puede hablar con el puente.
+                val bridgeNow = app.flowBridgeProvider.bridgeStatus()
+                val reachable = bridgeNow.getOrNull()
+                if (reachable == null) {
                     refreshConnection()
-                    snackbarHost.showSnackbar("Flow ya no está listo. Revisa el puente y vuelve a intentarlo.")
+                    snackbarHost.showSnackbar(bridgeNow.exceptionOrNull()?.message?.takeIf { it.isNotBlank() }
+                        ?: "No se pudo contactar con el puente de Flow. Los prompts se conservan.")
                     return@launch
                 }
+                val waitsForFlow = !reachable.isReady
                 if (references.isNotEmpty() && !uploadReferences()) return@launch
                 val inputs = FlowStudioPlan.mediaInputs(references)
                 var sent = 0
@@ -310,7 +316,8 @@ fun FlowStudioScreen(
                     }
                 }
                 if (drafts.isEmpty()) drafts += FlowStudioDraft()
-                if (sent > 0) snackbarHost.showSnackbar("$sent de ${batch.size} prompts en la cola de Flow.")
+                if (sent > 0) snackbarHost.showSnackbar("$sent de ${batch.size} prompts en la cola de Flow." +
+                    if (waitsForFlow) " Se enviarán en cuanto Flow esté listo." else "")
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -327,7 +334,7 @@ fun FlowStudioScreen(
         containerColor = ScreenBackground,
         snackbarHost = {
             SnackbarHost(snackbarHost) { data ->
-                InlineNotice(noticeMessage(data.visuals.message, "No se pudo completar la acción en Flow."),
+                InlineNotice(noticeMessage(data.visuals.message, data.visuals.message.ifBlank { "No se pudo completar la acción en Flow." }),
                     technicalDetails = data.visuals.message, actionLabel = "Cerrar", onAction = { data.dismiss() })
             }
         },
