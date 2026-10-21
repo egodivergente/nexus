@@ -2,6 +2,10 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [1.9.52-agent] - 2026-10-21 · «Índigo»
+
+- Agente de Flow: Nexus ya no pierde la respuesta por una conexión cerrada (el puente mantiene la conexión 75 s y Nexus reintenta la lectura).
+
 ## [1.9.51-agent] - 2026-10-19 · «Índigo»
 
 - Flow: Nexus espera hasta 15 s a que AXELPC confirme que está listo (antes 4 s y a veces se iba al ASUS sin sesión). El diagnóstico dice qué puente usa.
