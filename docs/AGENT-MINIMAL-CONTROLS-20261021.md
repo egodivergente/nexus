@@ -16,3 +16,5 @@ Continuación en AXELPC mediante Desktop Commander, en `C:/Users/User/.codex/wor
 
 GitHub: publicación desbloqueada mediante el gestor de credenciales Git de AXELPC. Rama `codex/agent-minimal-controls-20261021` publicada y SHA remoto `cb5abb9fe4a5099c3cf540d2e5bf196ff020bbf7` verificado. La integración del chat y gh CLI no tenían acceso de escritura/autenticación; Git Credential Manager sí.
 
+
+Entrega final: compilacion exclusiva assembleAgentPreview completada en AXEL (BUILD SUCCESSFUL, 6m28s). Tras autorizacion expresa de Vidal, instalada sobre S25 con adb install -r -t: Success. Version confirmada por Android: 1.9.65-agent-preview / vc99. No se ejecutaron pruebas en el movil ni se borraron datos. El flag -t permite instalar esta APK marcada testOnly por android.injected.build.abi; no ejecuta pruebas. SHA256 APK: E4A877377A6328FE1DCCBD0AADC6F897CC7C1E008F883121BFE41A2D0DA71ABC
