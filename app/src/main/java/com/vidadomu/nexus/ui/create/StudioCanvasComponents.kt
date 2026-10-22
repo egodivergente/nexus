@@ -15,6 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Undo
+import androidx.compose.ui.platform.LocalClipboardManager
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,6 +58,22 @@ internal fun CanvasWorkspaceSwitch(flow: Boolean, onModels: () -> Unit, onFlow: 
     }
 }
 
+@Composable
+internal fun GenerationQuantityControl(count: Int, enabled: Boolean, onCount: (Int) -> Unit, onModels: () -> Unit, allowed: (Int) -> Boolean = {true}, choices: List<Int> = listOf(1,2,4,8)) {
+    var menu by remember {mutableStateOf(false)}
+    val feedback=rememberNexusHaptics()
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+        Box {
+            TextButton(onClick={menu=true},enabled=enabled) {Text("×$count · Resultados ▾")}
+            DropdownMenu(menu,{menu=false}) {choices.forEach {value ->
+                DropdownMenuItem(text={Text("×$value")},enabled=allowed(value),onClick={menu=false;feedback.perform(NexusHapticEvent.SELECTION,changed=value!=count);onCount(value)})
+            }}
+        }
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick=onModels,enabled=enabled) {Text("Varios modelos")}
+    }
+}
+
 /** Keep the Studio strip compact normally; enlarged text exposes all actions in wrapping rows. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -62,10 +84,14 @@ internal fun StudioToolRow(content: @Composable () -> Unit) {
 
 @Composable
 internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
-    placeholder: String, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null) {
+    placeholder: String, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null,
+    enabled: Boolean = true, maximum: Int? = null, attachments: @Composable ColumnScope.() -> Unit = {}) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val feedback = rememberNexusHaptics()
+    val clipboard = LocalClipboardManager.current
+    var cleared by rememberSaveable { mutableStateOf<String?>(null) }
     val tone by animateColorAsState(
         if(focused) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
         tween(NexusTokens.contentDuration), label = "Prompt focus")
@@ -79,7 +105,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             .padding(start = 16.dp, end = 16.dp, top = 12.dp),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             // Crece con el texto: vacío ocupa 2 líneas, no un bloque fijo de 4.
-            minLines = 2, maxLines = if(expanded) 18 else 8,
+            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 5,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,
@@ -87,19 +113,29 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
                     field()
                 }
             })
-        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        attachments()
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(modifier=Modifier.size(48.dp),enabled=enabled,onClick={
+                val pasted=clipboard.getText()?.text
+                if(!pasted.isNullOrEmpty() && pasted!=value) {onValueChange(pasted);feedback.perform(NexusHapticEvent.SELECTION)}
+            }) {Icon(Icons.Default.ContentPaste,"Pegar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+            IconButton(modifier=Modifier.size(48.dp),enabled=enabled && value.isNotEmpty(),onClick={
+                cleared=value;onValueChange("");feedback.perform(NexusHapticEvent.SELECTION)
+            }) {Icon(Icons.Default.Close,"Borrar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+            if(value.isEmpty() && cleared!=null) IconButton(modifier=Modifier.size(48.dp),enabled=enabled,onClick={
+                onValueChange(cleared.orEmpty());cleared=null;feedback.perform(NexusHapticEvent.SELECTION)
+            }) {Icon(Icons.Default.Undo,"Restaurar prompt",Modifier.size(16.dp))}
+            Spacer(Modifier.weight(1f))
+            if(maximum!=null) Text("${value.length}/$maximum",style=MaterialTheme.typography.labelSmall,
+                color=if(value.length>maximum) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            else if(focused || expanded) Text("≈ ${(value.length+3)/4} tokens",style=MaterialTheme.typography.labelSmall.tabularMoney(),color=MaterialTheme.colorScheme.onSurfaceVariant)
             IconButton(onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); expanded = !expanded
-            }) {
+                feedback.perform(NexusHapticEvent.SELECTION); expanded = !expanded
+            },enabled=enabled) {
                 Icon(if(expanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
                     if(expanded) "Reducir prompt" else "Expandir prompt", Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(Modifier.weight(1f))
-            // Deliberately labelled approximate: model tokenizers differ; no network work while typing.
-            Text("≈ ${(value.length + 3) / 4} tokens", style = MaterialTheme.typography.labelSmall.tabularMoney(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.semantics { contentDescription = "Recuento aproximado de tokens" })
         }
     }
 }

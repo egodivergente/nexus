@@ -68,8 +68,12 @@ class ModelCatalogRepository(
             try {
                 val providers = providerRegistry.getCatalogProviders()
                 val activeIds = providers.map { it.id }.toSet()
+                // Configured models are local data: expose them before waiting for remote catalogs.
+                val configured = providers.filterIsInstance<com.vidadomu.nexus.provider.custom.ConfigurableMediaProvider>()
+                val configuredIds = configured.map {it.id}.toSet()
+                val local = configured.flatMap {it.getModels()}
                 val previous = (_allModels.value.ifEmpty { cache?.getCachedModels().orEmpty() })
-                    .filter { it.providerId in activeIds }
+                    .filter { it.providerId in activeIds && it.providerId !in configuredIds } + local
                 publishCatalog(previous)
                 val errors = mutableListOf<String>()
                 val fresh = providers.flatMap { provider ->

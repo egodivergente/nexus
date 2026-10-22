@@ -57,7 +57,8 @@ fun CreateScreen(
     onNavigateToOutput: (String) -> Unit,
     onBrowseModels: () -> Unit,
     viewModel: CreateViewModel = viewModel(),
-    onOpenFlow: () -> Unit = {}
+    onOpenFlow: () -> Unit = {},
+    onBytePlusSettings: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val comparisonState by viewModel.comparison.state.collectAsState()
@@ -100,10 +101,12 @@ fun CreateScreen(
         !state.isLoadingSchema, videoSeconds, state.prompt.length, state.prompt)
     // Captured with this composition's estimate so the ViewModel can detect a quote shown for an older configuration.
     val costQuote = generationCostQuote(state, estimate)
-    val countParam = nativeCountParameter(state.selectedModel)
-    var batchCount by remember(state.selectedModel?.id) { mutableIntStateOf(1) }
+    val countParam = if(state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && state.selectedModel?.promptAccepted == true)
+        nativeCountParameter(state.selectedModel) else null
+    var batchCount by rememberSaveable(state.selectedModel?.providerId,state.selectedModel?.id) { mutableIntStateOf(1) }
     var pendingBatch by remember { mutableStateOf<Pair<Int, GenerationFingerprint>?>(null) }
-    val repeatedBatch = countParam == null && batchCount > 1 && state.selectedModality == Modality.IMAGE
+    val quantity=canvasQuantity(countParam,state.parameters,batchCount)
+    val repeatedBatch = quantity.repeated && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO)
     val generateAction: () -> Unit = {
         if(repeatedBatch) pendingBatch = batchCount to generationFingerprint(state)
         else viewModel.requestGeneration(costQuote, onNavigateToOutput)
@@ -113,10 +116,13 @@ fun CreateScreen(
 
     var showPriceDetails by remember { mutableStateOf(false) }
     var showModelPickerSheet by remember { mutableStateOf(false) }
+    var showBytePlus by remember {mutableStateOf(false)}
+    var bytePlusOnly by remember {mutableStateOf(false)}
+    var pickerModality by remember {mutableStateOf<Modality?>(null)}
     var showRequestInspector by remember { mutableStateOf(false) }
     var showPersonalPresets by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
-    var inlineParametersExpanded by rememberSaveable { mutableStateOf(true) }
+    var inlineParametersExpanded by rememberSaveable { mutableStateOf(false) }
     var showToolMenu by remember { mutableStateOf(false) }
     var pendingModel by remember { mutableStateOf<NexusModel?>(null) }
     val catalogModels by app.modelCatalogRepository.models.collectAsState()
@@ -179,24 +185,25 @@ fun CreateScreen(
                             Icon(Icons.Default.ChevronRight, null)
                         }
                     }
-                    if(state.selectedModality == Modality.IMAGE && state.selectedModel?.promptAccepted != false && state.schemaReady && !busy && !compactTyping) {
-                        val shownCount = countParam?.let { param ->
-                            state.parameters[param.key]?.toIntOrNull() ?: param.defaultValue.toIntOrNull() ?: 1
-                        } ?: batchCount
-                        BatchCountChips(shownCount, { count -> countParam?.let { nativeCountAllowed(it, count) } ?: true }) { count ->
-                            if(countParam != null) viewModel.updateParameter(countParam.key, count.toString())
-                            else batchCount = count
-                        }
+                    if(state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && state.selectedModel?.promptAccepted != false && state.schemaReady && !busy && !compactTyping) {
+                        val shownCount=quantity.count
+                        GenerationQuantityControl(shownCount,true,onCount={count ->
+                            batchCount=count
+                            if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")
+                        },onModels={viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},
+                            allowed={count -> countParam==null || nativeCountAllowed(countParam,count) || nativeCountAllowed(countParam,1)},
+                            choices=(BATCH_COUNTS + listOf(shownCount) + countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0}.distinct().sorted())
                     }
-                    StudioGenerateButton(estimate.amount, readiness.canSubmit, busy,
+                    val totalCost=canvasQuantityCost(estimate,quantity,currencyManager::formatUsd)
+                    StudioGenerateButton(totalCost, readiness.canSubmit, busy,
                         if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
-                        generateAction, actionLabel=if(state.selectedModel?.promptAccepted == false) "Procesar" else "Generar")
+                        generateAction, actionLabel=if(state.selectedModel?.promptAccepted == false) "Procesar" else if(quantity.count>1 && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO)) "Generar ${quantity.count}" else "Generar")
                 }
             }
         },
         containerColor=ScreenBackground,
         topBar={
-            if(!compactTyping) TopAppBar(title={Text("Lienzo", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
+            if(!compactTyping) TopAppBar(showBalance=state.selectedModel?.providerId in setOf("atlas","atlas_cloud","atlas-cloud"),title={Text("Lienzo", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
                 actions={
                     Box {
                         IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
@@ -226,24 +233,21 @@ fun CreateScreen(
             }
             item(key="composer") {
                 Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    state.selectedModel?.let { model ->
-                        Text(if(model.promptAccepted) "Prepara las entradas y describe el resultado" else "Transforma tu archivo con los ajustes de este modelo",
-                            style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if(state.selectedModel?.promptAccepted != false) StudioPromptField(state.prompt, viewModel::updatePrompt,
-                        if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
-                        focusRequester=promptFocus)
-                    inputFields.forEach { field ->
-                        val modelKey = state.selectedModel?.let { it.providerId + "/" + it.id }.orEmpty()
-                        key(state.selectedModel?.providerId, state.selectedModel?.id, field.key) {
-                            CanvasAttachmentEditor(field, state.attachedMedia,
-                                enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
-                                onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)}, onRemove=viewModel::removeMedia)
+                    val mediaContent: @Composable ColumnScope.() -> Unit = {
+                        inputFields.forEach { field ->
+                            val modelKey = state.selectedModel?.let { it.providerId + "/" + it.id }.orEmpty()
+                            key(modelKey,field.key) {
+                                CanvasAttachmentEditor(field,state.attachedMedia,
+                                    enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
+                                    onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)},onRemove=viewModel::removeMedia,compact=true)
+                            }
                         }
                     }
+                    if(state.selectedModel?.promptAccepted != false) StudioPromptField(state.prompt,viewModel::updatePrompt,
+                        if(state.selectedModality==Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
+                        focusRequester=promptFocus,enabled=!state.isSubmitting,attachments=mediaContent)
+                    else Column(content=mediaContent)
                     if(state.schemaReady && inputFields.isEmpty() && state.selectedModel?.promptAccepted == true) {
-                        Text("Este modelo crea desde texto.", style=MaterialTheme.typography.bodySmall,
-                            color=MaterialTheme.colorScheme.onSurfaceVariant)
                         if(state.selectedModel?.pairedEditModelId != null) TextButton(onClick=viewModel::switchToEditModel) {
                             Text("Cambiar al modelo de edición con imágenes")
                         }
@@ -286,15 +290,13 @@ fun CreateScreen(
 
             item {
                 StudioToolRow {
+                    if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
                     if(state.selectedModel?.promptAccepted != false) StudioToolChip("Inspirar") {showInspiration=true}
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
+                    StudioToolChip("BytePlus", "Usar mi cuenta BytePlus") {showBytePlus=true}
                     Box {
                         StudioToolChip("Más", "Más herramientas del Lienzo") {showToolMenu=true}
                         DropdownMenu(expanded=showToolMenu,onDismissRequest={showToolMenu=false}) {
-                            if(state.selectedModality == Modality.IMAGE) DropdownMenuItem(
-                                text={Text(if(comparisonState.phase == ComparisonPhase.SENDING) "Ver lote" else "Varios modelos")},
-                                enabled=!state.isSubmitting && !state.isPreparingMedia,
-                                onClick={showToolMenu=false;viewModel.comparison.open(state);showComparison=true})
                             DropdownMenuItem(text={Text("Mis ajustes")},enabled=state.schemaReady && !state.isSubmitting,
                                 onClick={showToolMenu=false;showPersonalPresets=true})
                         }
@@ -304,7 +306,7 @@ fun CreateScreen(
 
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
-                val inline=state.selectedModel?.let(CanvasInputPlan::primaryParameters).orEmpty()
+                val inline=state.selectedModel?.let(CanvasInputPlan::primaryParameters).orEmpty().filter {it.key!=countParam?.key}
                 if(inline.isNotEmpty() || state.selectedModel?.parameters?.any {it.isAdvanced} == true) item(key="inline-params") {
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
@@ -314,8 +316,9 @@ fun CreateScreen(
                                 .clickable(role=androidx.compose.ui.semantics.Role.Button) {inlineParametersExpanded=!inlineParametersExpanded},
                                 verticalAlignment=Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("Ajustes de ${state.selectedModel?.displayName.orEmpty()}",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
-                                    Text("${inline.size} opciones propias del modelo",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Ajustes de ${state.selectedModel?.let(::canvasModelIdentity)?.title.orEmpty()}",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
+                                    Text(inline.take(3).joinToString(" · ") {param -> ParameterPresentation.describe(param,state.parameters[param.key] ?: param.defaultValue)}.ifBlank {"Opciones avanzadas"},
+                                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 }
                                 Icon(if(inlineParametersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
                             }
@@ -358,7 +361,7 @@ fun CreateScreen(
                 actionLabel=if(state.schemaReady) null else "Reintentar",onAction=if(!state.schemaReady && !state.isLoadingSchema) viewModel::retryConfiguration else null)
         }
         if(state.schemaReady) {
-            val params=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty()
+            val params=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty().filter {it.key!=countParam?.key}
             params.filter { !it.isAdvanced }.forEach { param ->
                 key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
             }
@@ -377,19 +380,23 @@ fun CreateScreen(
         estimate.retry?.let { retry -> TextButton(onClick=retry) {Text("Reintentar precio",color=TextSecondary)} }
     }
 
+    if(showBytePlus) BytePlusCanvasSheet(app,catalogModels,onDismiss={showBytePlus=false},onChoose={modality ->
+        showBytePlus=false;bytePlusOnly=true;pickerModality=modality;showModelPickerSheet=true
+    },onSettings={page -> showBytePlus=false;onBytePlusSettings(page)})
+
     // Modal Bottom Sheet para Seleccionar Modelo
     if (showModelPickerSheet) {
         ModelPickerSheet(
-            availableModels = catalogModels,
+            availableModels = if(bytePlusOnly) catalogModels.filter {it.providerId==BYTEPLUS_MEDIA_PROVIDER} else catalogModels,
             selectedModel = state.selectedModel,
-            initialModality = state.selectedModality,
+            initialModality = pickerModality ?: state.selectedModality,
             media = state.attachedMedia,
             currencyManager = currencyManager,
             onSelectModel = { model ->
                 chooseModel(model)
-                showModelPickerSheet = false
+                showModelPickerSheet = false;bytePlusOnly=false;pickerModality=null
             },
-            onDismiss = { showModelPickerSheet = false }
+            onDismiss = { showModelPickerSheet = false;bytePlusOnly=false;pickerModality=null }
         )
     }
 
@@ -404,7 +411,7 @@ fun CreateScreen(
     pendingBatch?.let { (count, fingerprint) ->
         val offline = com.vidadomu.nexus.BuildConfig.OFFLINE_QA
         val unitKnown = isKnownCost(estimate)
-        AlertDialog(onDismissRequest={pendingBatch=null}, title={Text("Generar $count imágenes")},
+        AlertDialog(onDismissRequest={pendingBatch=null}, title={Text("Generar $count ${if(state.selectedModality==Modality.VIDEO) "vídeos" else "imágenes"}")},
             text={Text(buildString {
                 append("Se enviarán $count generaciones independientes con el mismo prompt, modelo, ajustes y archivos.\n")
                 append("Importe por unidad: ${estimate.amount}")

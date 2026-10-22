@@ -45,7 +45,8 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel? = null) {
+fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel? = null,
+    initialPage: String? = null, onCloseInitialPage: (() -> Unit)? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val settingsRepo = app.settingsRepository
@@ -96,17 +97,18 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     var appearanceOpen by remember {mutableStateOf(false)}
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
-    var pageName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pageName by rememberSaveable(initialPage) { mutableStateOf(initialPage) }
+    val closePage: () -> Unit = {if(initialPage!=null && onCloseInitialPage!=null) onCloseInitialPage() else pageName=null}
     val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
     var assistantSettingsOpen by remember { mutableStateOf(false) }
-    androidx.activity.compose.BackHandler(enabled = page != null) { pageName = null }
+    androidx.activity.compose.BackHandler(enabled = page != null) { closePage() }
     val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured").count { it }
     }
     val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         showBalance=page != SettingsPage.BYTEPLUS,
-        navigationIcon={ if(page != null) IconButton(onClick={pageName=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a Ajustes")} })}) {padding ->
+        navigationIcon={ if(page != null) IconButton(onClick=closePage) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             when(page) {
                 null -> {

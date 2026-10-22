@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -165,7 +167,15 @@ internal fun FlagshipStudioHeader(
             haptics.perform(NexusHapticEvent.SELECTION)
         }, onDismiss = { editingFavorites = false })
     var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    var showIdentity by remember {mutableStateOf(false)}
+    val identity=selectedModel?.let(::canvasModelIdentity)
+    if(showIdentity && selectedModel!=null && identity!=null) AlertDialog(onDismissRequest={showIdentity=false},
+        title={Text(identity.title)},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text(identity.detail)
+            Text(selectedModel.displayName)
+            androidx.compose.foundation.text.selection.SelectionContainer {Text(identity.exactId,style=MaterialTheme.typography.bodySmall)}
+        }},confirmButton={TextButton(onClick={showIdentity=false}) {Text("Cerrar")}})
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CanvasWorkspaceSwitch(false, {}, onOpenFlow)
         StudioModalitySegments(modality, animate, onModality)
         Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
@@ -173,10 +183,11 @@ internal fun FlagshipStudioHeader(
                 horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 BrandLogo(organization=selectedModel?.organization, modelId=selectedModel?.id, size=28.dp)
                 Column(Modifier.weight(1f)) {
-                    Text("Modelo seleccionado",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(selectedModel?.displayName ?: "Elegir modelo", style=MaterialTheme.typography.titleSmall)
+                    Text(identity?.detail ?: "Elegir modelo",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(identity?.title ?: "Elegir modelo", style=MaterialTheme.typography.titleSmall)
                 }
-                Icon(Icons.Default.SwapHoriz,"Cambiar modelo")
+                if(selectedModel!=null) IconButton(onClick={showIdentity=true}) {Icon(Icons.Default.Info,"Identidad exacta del modelo",Modifier.size(18.dp))}
+                Icon(Icons.Default.SwapHoriz,"Cambiar modelo",Modifier.size(20.dp))
             }
         }
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -239,7 +250,7 @@ private fun FlagshipCard(match: FlagshipMatch, active: Boolean, animate: Boolean
         if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Flagship border")
     val container by animateColorAsState(if (active) scheme.primary.copy(alpha = .10f) else scheme.surface,
         if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Flagship container")
-    Surface(Modifier.width(128.dp).height(96.dp)
+    Surface(Modifier.width(128.dp).height(112.dp)
         .semantics(mergeDescendants = true) {
             contentDescription = "Modelo ${match.model.displayName}" + if (active) ", activo" else ""
             selected = active
@@ -254,8 +265,8 @@ private fun FlagshipCard(match: FlagshipMatch, active: Boolean, animate: Boolean
                 if (active) Icon(Icons.Default.Check, null, tint = scheme.primary, modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.weight(1f))
-            Text(match.model.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(canvasModelIdentity(match.model).title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(match.model.organization, style = MaterialTheme.typography.labelSmall,
                 color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -313,7 +324,7 @@ internal val BATCH_COUNTS = listOf(1, 2, 4, 8)
 
 /** Provider-native count field ("num_images" or "n"), when the model exposes one. */
 internal fun nativeCountParameter(model: NexusModel?) =
-    model?.parameters?.firstOrNull { it.key.equals("num_images", true) || it.key.equals("n", true) }
+    model?.parameters?.firstOrNull { it.key.lowercase() in setOf("num_images","num_videos","num_outputs","output_count","outputcount","number_of_images","batch_size","n","count") }
 
 internal fun nativeCountAllowed(param: com.vidadomu.nexus.core.model.ModelParameter, count: Int): Boolean {
     if (param.options.isNotEmpty()) return param.options.any { it.trim() == count.toString() }

@@ -92,7 +92,7 @@ class CanvasModelPickerUiTest {
         catalogList.performScrollToNode(hasAnyChild(hasText("Imagen")))
         modalityChips.performScrollToNode(hasText("Todo el catálogo"))
         compose.onNodeWithText("Todo el catálogo").assertIsDisplayed().performClick()
-        val price="Estudio · ${currency.formatUnitPrice(0.05)} / imagen"
+        val price="${canvasModelIdentity(still).detail} · ${currency.formatUnitPrice(0.05)} / imagen"
         reveal(price).assertExists()
         reveal("Travelling lento").assertIsDisplayed().performClick()
         compose.runOnIdle {assertEquals(listOf(motion.id),chosen)}

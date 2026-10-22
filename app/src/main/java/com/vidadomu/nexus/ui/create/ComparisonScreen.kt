@@ -51,8 +51,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
         com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
         Scaffold(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
             topBar = {
-                TopAppBar(title = { Column {
-                    Text("Encargos a varios modelos", style = MaterialTheme.typography.titleLarge)
+                TopAppBar(showBalance=false,title = { Column {
+                    Text("Varios modelos", style = MaterialTheme.typography.titleLarge)
                     Text(when(state.phase) {
                         ComparisonPhase.CHOOSE -> "1 · Elige modelos y cantidades"
                         ComparisonPhase.PREPARING -> "Comprobando compatibilidad y costes"
@@ -116,24 +116,24 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                             FilterChip(state.withReferences, { controller.setReferenceMode(true) }, label = { Text("Con referencias") })
                             FilterChip(!state.withReferences, { controller.setReferenceMode(false) }, label = { Text("Desde texto") })
                         }
-                        Text(if(state.withReferences) "Con tus referencias · Seedream, GPT, FLUX y tus otras familias prioritarias." else "Desde texto · familias prioritarias.", style = MaterialTheme.typography.bodySmall)
+                        Text(if(state.withReferences) "Se comprobarán tus imágenes con cada modelo." else "Mismo prompt, con los ajustes válidos de cada modelo.", style = MaterialTheme.typography.bodySmall)
                     }
                     item { Text("De 1 a ${ComparisonPlan.MAX_GENERATIONS_PER_MODEL} generaciones por modelo. Puedes usar un solo modelo o combinar hasta ${ComparisonPlan.MAX_MODELS}.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     item {
                         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
-                            placeholder = { Text("Seedream, GPT, Flux…") }, leadingIcon = { Icon(Icons.Default.Search, null) },
+                            placeholder = { Text(if(state.source.selectedModality==Modality.VIDEO) "Hailuo, Kling, Seedance…" else "Seedream, GPT, Flux…") }, leadingIcon = { Icon(Icons.Default.Search, null) },
                             trailingIcon = { if(query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Borrar búsqueda") } })
                     }
                     if(state.selected.isNotEmpty()) item {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(state.catalog.filter { ComparisonPlan.key(it) in state.selected }, key = ComparisonPlan::key) { model ->
-                                InputChip(selected = true, onClick = { controller.toggle(model) }, label = { Text(model.displayName.substringBefore(" · "), maxLines = 1) },
+                                InputChip(selected = true, onClick = { controller.toggle(model) }, label = { Text(canvasModelIdentity(model).title, maxLines = 2) },
                                     trailingIcon = { Icon(Icons.Default.Close, "Quitar ${model.displayName}", Modifier.size(16.dp)) })
                             }
                         }
                     }
-                    val shortlist = ImageModelChoices.shortlist(state.catalog)
+                    val shortlist = if(state.source.selectedModality==Modality.VIDEO) state.catalog.take(12) else ImageModelChoices.shortlist(state.catalog)
                     val visible = (if(showAll || query.isNotBlank()) state.catalog else
                         (shortlist + state.catalog.filter { ComparisonPlan.key(it) in state.selected }).distinctBy(ComparisonPlan::key))
                         .filter { query.isBlank() || (it.displayName+" "+it.organization+" "+providerName(it.providerId)).contains(query, true) }
@@ -148,8 +148,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { controller.toggle(model) }.heightIn(min = 64.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             com.vidadomu.nexus.ui.components.VendorLogo(model.organization, size = 28.dp)
                             Column(Modifier.weight(1f)) {
-                                Text(model.displayName, style = MaterialTheme.typography.titleSmall)
-                                Text(providerName(model.providerId) + if(catalogFamily(model) == "Midjourney") " · Midjourney / Youchuan" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(canvasModelIdentity(model).title, style = MaterialTheme.typography.titleSmall)
+                                Text(canvasModelIdentity(model).detail + if(catalogFamily(model) == "Midjourney") " · Midjourney / Youchuan" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 val limit = ComparisonPlan.referenceLimit(model)
                                 Text(when {
                                     checking -> "Comprobando referencias…"
@@ -190,7 +190,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(entry.model.displayName, style = MaterialTheme.typography.titleSmall)
+                                    Text(canvasModelIdentity(entry.model).title, style = MaterialTheme.typography.titleSmall)
                                     Text(providerName(entry.model.providerId), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 entry.subtotal?.let { Text("≈ "+cost(it.amount, it.currency), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
@@ -244,7 +244,9 @@ fun ComparisonResultsDialog(batchId: String, onDismiss: () -> Unit, onOpenOutput
                         val output = job.outputs.firstOrNull()
                         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable(enabled = output != null) { onDismiss(); onOpenOutput(job.id) }) {
-                            if(output != null) AsyncImage(model = ImageRequest.Builder(context).data(output.localUri ?: output.url).size(512).crossfade(true).build(),
+                            if(output != null) AsyncImage(model = ImageRequest.Builder(context).data(output.localUri ?: output.url).size(512).crossfade(true).apply {
+                                if(output.type==Modality.VIDEO) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}
+                            }.build(),
                                 contentDescription = "Resultado de ${job.parameters[ComparisonPlan.NAME] ?: job.modelId}", contentScale = ContentScale.Fit)
                             else Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                                 val active = job.status !in setOf(GenerationStatus.FAILED, GenerationStatus.CANCELLED, GenerationStatus.COMPLETED)

@@ -110,10 +110,9 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                             horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                             BrandLogo(model.organization,model.family,model.id,size=24.dp,containerSize=40.dp)
                             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                                Text(model.displayName,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.SemiBold,
+                                Text(canvasModelIdentity(model).title,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.SemiBold,
                                     maxLines=2,overflow=TextOverflow.Ellipsis)
-                                Text(listOfNotNull(modelUse(model).label,model.badge?.takeUnless {it.equals("HOT",true)}).joinToString(" · "),style=MaterialTheme.typography.bodySmall)
-                                Text("${model.organization} · $price",style=MaterialTheme.typography.bodySmall,
+                                Text("${canvasModelIdentity(model).detail} · $price",style=MaterialTheme.typography.bodySmall,
                                     color=MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if(isSelected) Icon(Icons.Default.Check,null,tint=MaterialTheme.colorScheme.primary)

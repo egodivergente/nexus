@@ -23,11 +23,17 @@ object ComparisonPlan {
     const val NAME = "__comparison_model"
 
     fun key(model: NexusModel) = model.providerId + ":" + model.id
-    fun eligible(model: NexusModel): Boolean = Modality.IMAGE in model.modalities &&
-        (model.contractEndpoint != null && model.promptRequired ||
-            model.capabilities.any { it in setOf(ModelCapability.TEXT_TO_IMAGE, ModelCapability.IMAGE_TO_IMAGE, ModelCapability.IMAGE_EDITING) })
+    fun eligible(model: NexusModel): Boolean = eligible(model,Modality.IMAGE)
+    fun eligible(model: NexusModel, modality: Modality): Boolean = modality in model.modalities && model.promptAccepted &&
+        when(modality) {
+            Modality.IMAGE -> model.contractEndpoint != null && model.promptRequired ||
+                model.capabilities.any {it in setOf(ModelCapability.TEXT_TO_IMAGE,ModelCapability.IMAGE_TO_IMAGE,ModelCapability.IMAGE_EDITING)}
+            Modality.VIDEO -> model.contractEndpoint != null && model.promptRequired ||
+                model.capabilities.any {it in setOf(ModelCapability.TEXT_TO_VIDEO,ModelCapability.IMAGE_TO_VIDEO,ModelCapability.REFERENCE_TO_VIDEO)}
+            else -> false
+        }
 
-    private val counts = setOf("num_images", "num_outputs", "output_count", "outputCount", "n", "number_of_images", "batch_size")
+    private val counts = setOf("num_images", "num_outputs", "output_count", "outputCount", "n", "number_of_images", "batch_size", "count", "num_videos")
     private val ratios = setOf("aspect_ratio", "aspectRatio", "ratio", "size", "image_size")
     private fun sameRatio(a: String, b: String): Boolean {
         fun ratio(s: String): Double? {
@@ -43,7 +49,7 @@ object ComparisonPlan {
     }
 
     fun adapt(source: CreateUiState, target: NexusModel): PreparedComparison {
-        require(eligible(target)) { "Este modelo no admite encargos de imágenes con prompt." }
+        require(eligible(target,source.selectedModality)) { "Este modelo no admite encargos de esta modalidad con prompt." }
         require(source.prompt.isNotBlank()) { "Escribe un prompt en el lienzo." }
         val model = target.copy(parameters = FormContract.normalize(target.parameters))
         val notes = mutableListOf<String>()
@@ -79,14 +85,14 @@ object ComparisonPlan {
         source.parameters.filter { (key,value) -> value.isNotBlank() && !key.startsWith("__") && key !in used && key !in counts }
             .keys.forEach { key -> notes += "Sin ${source.selectedModel?.parameters?.find { it.key == key }?.displayName ?: key}." }
 
-        require(source.attachedMedia.all { it.mimeType.startsWith("image/") }) { "Este lote admite referencias de imagen; hay otro tipo de archivo en el lienzo." }
+        require(source.attachedMedia.all { it.mimeType.startsWith("image/") }) { "Para comparar modelos, utiliza un prompt con imágenes; las otras entradas requieren su formulario específico." }
         val media = mapImages(model, source.attachedMedia)
-        val state = CreateUiState(selectedModel = model, selectedModality = Modality.IMAGE,
+        val state = CreateUiState(selectedModel = model, selectedModality = source.selectedModality,
             prompt = source.prompt, parameters = values, attachedMedia = media, schemaReady = true)
         val readiness = creationReadiness(state)
         require(readiness.canSubmit) { readiness.message ?: "Revisa los requisitos del modelo." }
         if(model.contractEndpoint != null) com.vidadomu.nexus.provider.runway.ContractPayload.validate(model,
-            GenerationRequest("comparison-validation", model.providerId, model.id, Modality.IMAGE, source.prompt, parameters = values))
+            GenerationRequest("comparison-validation", model.providerId, model.id, source.selectedModality, source.prompt, parameters = values))
         return PreparedComparison(state, notes.distinct())
     }
 

@@ -55,10 +55,12 @@ class ComparisonController(private val app: NexusApplication, private val scope:
         if(sending) return
         preparation?.cancel()
         checks.values.toList().forEach { it.cancel() }; checks.clear(); selectionEpoch++
-        val candidates = if(BuildConfig.OFFLINE_QA) localModels() else app.modelCatalogRepository.models.value
+        val candidates = if(BuildConfig.OFFLINE_QA) localModels() + listOfNotNull(source.selectedModel) else app.modelCatalogRepository.models.value
         val references = withReferences || source.attachedMedia.isNotEmpty()
-        val catalog = candidates.filter(ComparisonPlan::eligible).filter {
-            if(references) ImageModelChoices.acceptsReferences(it) else ImageModelChoices.acceptsText(it)
+        val catalog = candidates.filter {ComparisonPlan.eligible(it,source.selectedModality)}.filter {
+            if(source.selectedModality==Modality.IMAGE) {
+                if(references) ImageModelChoices.acceptsReferences(it) else ImageModelChoices.acceptsText(it)
+            } else if(references) ComparisonPlan.referenceLimit(it)>0 else !it.isMediaRequired && it.contractMedia.none {field->field.required}
         }.distinctBy(ComparisonPlan::key).sortedWith(ImageModelChoices.comparator)
         val keys = catalog.map(ComparisonPlan::key).toSet()
         val previous = preferences.getStringSet("models", emptySet()).orEmpty()

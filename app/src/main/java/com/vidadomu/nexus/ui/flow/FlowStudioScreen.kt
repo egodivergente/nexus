@@ -26,6 +26,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.vidadomu.nexus.ui.create.StudioPromptField
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,6 +57,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -413,6 +420,7 @@ fun FlowStudioScreen(
         },
         topBar = {
             NexusTopAppBar(
+                showBalance=false,
                 title = { Text("Flow Studio", style = com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") }
@@ -454,19 +462,6 @@ fun FlowStudioScreen(
             item(key = "connection") {
                 StudioConnectionCard(connection) { scope.launch { refreshConnection() } }
             }
-            item(key = "references") {
-                ReferencesSection(
-                    references = references,
-                    enabled = !isSubmitting && !importingReferences,
-                    onAdd = {
-                        if(remainingReferences == 1) pickReference.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        else pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    },
-                    onLibrary = { libraryReferences.launch(arrayOf("image/*"), remainingReferences) },
-                    onRemove = { ref -> references.remove(ref) }
-                )
-                if(importingReferences) Text("Preparando imágenes…", style=MaterialTheme.typography.bodySmall)
-            }
             items(drafts, key = { it.id }) { draft ->
                 DraftCard(
                     draft = draft,
@@ -479,7 +474,16 @@ fun FlowStudioScreen(
                         val index = drafts.indexOfFirst { it.id == draft.id }
                         if (index >= 0) drafts[index] = updated
                     },
-                    onRemove = { drafts.removeAll { it.id == draft.id } }
+                    onRemove = { drafts.removeAll { it.id == draft.id } },
+                    attachments = {
+                        if(draft.id == drafts.firstOrNull()?.id) {
+                            ReferencesSection(references,!isSubmitting && !importingReferences,onAdd={
+                                if(remainingReferences == 1) pickReference.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                else pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },onLibrary={libraryReferences.launch(arrayOf("image/*"),remainingReferences)},onRemove={references.remove(it)})
+                            if(importingReferences) Text("Preparando imágenes…",Modifier.padding(horizontal=12.dp),style=MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 )
             }
             item(key = "add") {
@@ -655,9 +659,14 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
         }
         FlowStudioConnection.OfflineQa -> InlineNotice("QA sin conexión: no se envía nada a Flow.",
             technicalDetails = "BuildConfig.OFFLINE_QA", actionLabel = "Actualizar", onAction = onRefresh, isError = false)
-        is FlowStudioConnection.Ready -> InlineNotice(
-            (if (connection.status.recovering) "Recuperando acceso a Flow…" else "Flow listo") + (connection.status.projectName?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
-            technicalDetails = connection.status.detail, actionLabel = "Actualizar", onAction = onRefresh, isError = false)
+        is FlowStudioConnection.Ready -> Row(Modifier.fillMaxWidth().heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(if(connection.status.recovering) "Recuperando acceso…" else "Flow listo",style=MaterialTheme.typography.labelLarge,
+                    color=if(connection.status.recovering) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
+                connection.status.projectName?.takeIf {it.isNotBlank()}?.let {Text(it,style=MaterialTheme.typography.bodySmall,maxLines=2,overflow=TextOverflow.Ellipsis)}
+            }
+            IconButton(onClick=onRefresh) {Icon(Icons.Default.Refresh,"Actualizar conexión Flow",Modifier.size(18.dp))}
+        }
         is FlowStudioConnection.Unavailable -> InlineNotice(
             noticeMessage(connection.message, "Flow no está listo. Abre el proyecto desde Ajustes y comprueba la conexión."),
             technicalDetails = connection.message, actionLabel = "Actualizar", onAction = onRefresh)
@@ -666,49 +675,38 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
 
 @Composable
 private fun DraftCard(
-    draft: FlowStudioDraft,
-    number: Int,
-    promptLimit: Int,
-    accepted: Set<Modality>,
-    canRemove: Boolean,
-    enabled: Boolean,
-    onChange: (FlowStudioDraft) -> Unit,
-    onRemove: () -> Unit
+    draft: FlowStudioDraft, number: Int, promptLimit: Int, accepted: Set<Modality>,
+    canRemove: Boolean, enabled: Boolean, onChange: (FlowStudioDraft) -> Unit, onRemove: () -> Unit,
+    attachments: @Composable ColumnScope.() -> Unit = {}
 ) {
-    Surface(color = SurfaceDark, border = BorderStroke(1.dp, BorderSubtle), shape = NexusTokens.field) {
-        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Prompt $number", style = MaterialTheme.typography.titleSmall, color = TextPrimary, modifier = Modifier.weight(1f))
-                if (canRemove) IconButton(onClick = onRemove, enabled = enabled) {
-                    Icon(Icons.Default.Delete, contentDescription = "Quitar prompt $number")
-                }
-            }
-            OutlinedTextField(
-                value = draft.prompt,
-                onValueChange = { onChange(draft.copy(prompt = it)) },
-                enabled = enabled,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Describe lo que quieres crear") },
-                placeholder = { Text("Una escena, estilo, luz, movimiento…") },
-                minLines = 3,
-                maxLines = 8,
-                isError = draft.prompt.trim().length > promptLimit,
-                supportingText = { Text("${draft.prompt.length}/$promptLimit") },
-                shape = NexusTokens.field
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
-                FilterChip(selected = draft.modality == Modality.IMAGE, enabled = enabled && Modality.IMAGE in accepted,
-                    onClick = { onChange(draft.copy(modality = Modality.IMAGE)) }, label = { Text("Imagen") },
-                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp)) })
-                FilterChip(selected = draft.modality == Modality.VIDEO, enabled = enabled && Modality.VIDEO in accepted,
-                    onClick = { onChange(draft.copy(modality = Modality.VIDEO)) }, label = { Text("Vídeo") },
-                    leadingIcon = { Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(18.dp)) })
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
-                Text("Cantidad", style = MaterialTheme.typography.bodyMedium, color = TextMuted)
-                (FlowStudioPlan.MIN_COUNT..FlowStudioPlan.MAX_COUNT).forEach { value ->
-                    FilterChip(selected = draft.count == value, enabled = enabled,
-                        onClick = { onChange(draft.copy(count = value)) }, label = { Text("×$value") })
+    var countMenu by remember {mutableStateOf(false)}
+    val feedback=rememberNexusHaptics()
+    Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+        if(canRemove) Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("Prompt $number",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+            IconButton(onClick=onRemove,enabled=enabled) {Icon(Icons.Default.Close,"Quitar prompt $number",Modifier.size(16.dp))}
+        }
+        StudioPromptField(draft.prompt,{onChange(draft.copy(prompt=it))},"Una escena, estilo, luz, movimiento…",
+            enabled=enabled,maximum=promptLimit,attachments=attachments)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+            FilterChip(draft.modality==Modality.IMAGE,onClick={
+                feedback.perform(NexusHapticEvent.SELECTION,changed=draft.modality!=Modality.IMAGE)
+                onChange(draft.copy(modality=Modality.IMAGE))
+            },enabled=enabled && Modality.IMAGE in accepted,label={Text("Imagen")})
+            FilterChip(draft.modality==Modality.VIDEO,onClick={
+                feedback.perform(NexusHapticEvent.SELECTION,changed=draft.modality!=Modality.VIDEO)
+                onChange(draft.copy(modality=Modality.VIDEO))
+            },enabled=enabled && Modality.VIDEO in accepted,label={Text("Vídeo")})
+            Spacer(Modifier.weight(1f))
+            Box {
+                TextButton(onClick={countMenu=true},enabled=enabled) {Text("×${draft.count} ▾")}
+                DropdownMenu(countMenu,{countMenu=false}) {
+                    (FlowStudioPlan.MIN_COUNT..FlowStudioPlan.MAX_COUNT).forEach {value ->
+                        DropdownMenuItem(text={Text("×$value")},onClick={
+                            countMenu=false;feedback.perform(NexusHapticEvent.SELECTION,changed=value!=draft.count)
+                            onChange(draft.copy(count=value))
+                        })
+                    }
                 }
             }
         }
@@ -723,19 +721,16 @@ private fun ReferencesSection(
     onLibrary: () -> Unit,
     onRemove: (FlowStudioReference) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+    Column(Modifier.padding(horizontal=12.dp),verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Referencias (${references.size}/${FlowStudioPlan.MAX_REFERENCES})", style = MaterialTheme.typography.titleMedium,
+            Text("Compartidas · ${references.size}/${FlowStudioPlan.MAX_REFERENCES}", style = MaterialTheme.typography.labelSmall,
                 color = TextPrimary, modifier = Modifier.weight(1f))
             TextButton(onClick = onAdd, enabled = enabled && references.size < FlowStudioPlan.MAX_REFERENCES) {
-                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
-                Spacer(Modifier.width(NexusTokens.space4))
                 Text("Galería")
             }
+            TextButton(onClick=onLibrary,enabled=enabled && references.size<FlowStudioPlan.MAX_REFERENCES) {Text("Biblioteca")}
         }
-        TextButton(onClick=onLibrary, enabled=enabled && references.size < FlowStudioPlan.MAX_REFERENCES) {Text("Biblioteca de Nexus")}
-        Text("Se aplican a todos los prompts del envío. En vídeo activan el modo Referencias.",
-            style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        if(references.isNotEmpty()) Text("Todos los prompts · vídeo en modo Referencias",style=MaterialTheme.typography.labelSmall,color=TextMuted)
         LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(references, key={it.uri}) { ref ->
                 com.vidadomu.nexus.ui.create.CanvasAttachmentTile(

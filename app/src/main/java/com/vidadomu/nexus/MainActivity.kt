@@ -186,6 +186,7 @@ class MainActivity : ComponentActivity() {
                             CreateScreen(
                                 onBrowseModels = { navController.navigate(Screen.Models.route) { launchSingleTop = true } },
                                 onOpenFlow = { navController.navigate(Screen.Flow.route) { launchSingleTop = true } },
+                                onBytePlusSettings = {page -> navController.navigate("byteplus/$page") {launchSingleTop=true}},
                                 onNavigateToOutput = { jobId ->
                                     navController.navigate("output/$jobId")
                                 },
@@ -240,6 +241,9 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {
                                 navController.navigate(Screen.Flow.route) { launchSingleTop = true }
                             })
+                        }
+                        composable("byteplus/{page}",arguments=listOf(navArgument("page") {type=NavType.StringType})) {entry ->
+                            SettingsScreen(initialPage=entry.arguments?.getString("page"),onCloseInitialPage={navController.popBackStack()},assistantViewModel=assistantViewModel)
                         }
                         composable(Screen.Flow.route) {
                             FlowCreateScreen(

@@ -20,13 +20,14 @@ class CustomMediaStore(private val app: NexusApplication, private val client: Ok
     private val serializer = ListSerializer(MediaProviderConfig.serializer())
 
     fun all(): List<MediaProviderConfig> =
-        runCatching { json.decodeFromString(serializer, prefs.getString(KEY, "[]").orEmpty()) }.getOrDefault(emptyList()).sortedBy { it.name.lowercase() }
+        runCatching { json.decodeFromString(serializer, prefs.getString(KEY, "[]").orEmpty()) }.getOrDefault(emptyList())
+            .map(::normalizeMediaParameters).sortedBy { it.name.lowercase() }
 
     fun get(id: String): MediaProviderConfig? = all().firstOrNull { it.id == id }
 
     /** [newKey]: null = no tocar la clave; "" = borrarla. Lanza IllegalArgumentException con el primer problema. */
     fun save(config: MediaProviderConfig, newKey: String?) {
-        val clean = config.copy(name = config.name.trim(), baseUrl = config.baseUrl.trim().trimEnd('/'))
+        val clean = normalizeMediaParameters(config.copy(name = config.name.trim(), baseUrl = config.baseUrl.trim().trimEnd('/')))
         clean.problems().firstOrNull()?.let { throw IllegalArgumentException(it) }
         val next = all().filter { it.id != clean.id } + clean
         check(prefs.edit().putString(KEY, json.encodeToString(serializer, next)).commit()) { "No se pudo guardar el proveedor." }
@@ -99,3 +100,7 @@ class CustomMediaStore(private val app: NexusApplication, private val client: Ok
         fun keyId(id: String) = "nexus_media_key_$id"
     }
 }
+
+/** Legacy imports sometimes repeated identical parameters. Conflicting definitions remain invalid and visible. */
+internal fun normalizeMediaParameters(config: MediaProviderConfig): MediaProviderConfig =
+    config.copy(models=config.models.map {it.copy(params=it.params.distinct())})

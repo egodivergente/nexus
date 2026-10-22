@@ -31,7 +31,7 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 @Composable
 internal fun CanvasAttachmentEditor(
     field: CanvasInputField, media: List<AttachedMedia>, enabled: Boolean,
-    onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit
+    onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit, compact: Boolean = false
 ) {
     val context = LocalContext.current
     val selected = media.filter(field::contains)
@@ -56,11 +56,11 @@ internal fun CanvasAttachmentEditor(
         else if (remaining > 1) multiple.launch(PickVisualMediaRequest(type))
         else single.launch(PickVisualMediaRequest(type))
     }
-    Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = if(compact) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.padding(if(compact) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(field.label, style = MaterialTheme.typography.titleSmall)
+                    Text(field.label, style = if(compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall)
                     Text(if (field.maximum == 1) {
                         if (field.required) "Un archivo · obligatorio" else "Un archivo · opcional"
                     } else "${selected.size} seleccionados" +
@@ -84,7 +84,7 @@ internal fun CanvasAttachmentEditor(
                 OutlinedButton(onClick = { library.launch(arrayOf(field.mime), remaining) }, enabled = enabled,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Biblioteca") }
             }
-            if (selected.isNotEmpty()) Text("Preparado en el dispositivo · toca la miniatura para revisar",
+            if (selected.isNotEmpty() && !compact) Text("Preparado en el dispositivo · toca la miniatura para revisar",
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
