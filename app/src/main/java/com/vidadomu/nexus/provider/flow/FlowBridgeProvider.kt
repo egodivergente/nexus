@@ -109,7 +109,7 @@ class FlowBridgeProvider(
                         mode = job.parameters[FlowReferences.MODE] ?: "Texto",
                         initialFrameId = job.parameters[FlowReferences.INITIAL_FRAME]?.takeIf { it.isNotBlank()},
                         endFrameId = job.parameters[FlowReferences.END_FRAME]?.takeIf { it.isNotBlank()},
-                        runs = runs, expectedResults = if (goal > 1) missing else 0)
+                        runs = runs, expectedResults = missing)
                 }
             val submissionError = remote.exceptionOrNull() as? ProviderError
             if (submissionError?.errorCode == "flow_busy") {

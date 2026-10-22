@@ -28,6 +28,7 @@ from flow_references import receive_reference, reference_paths, attach_reference
 import flow_agent
 import flow_gallery
 import flow_session
+import flow_settings
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -61,6 +62,7 @@ FLOW_BODY_LIMIT = 24 * 1024
 FLOW_REQUEST_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$')
 FLOW_JOB_ID = re.compile(r'^[A-Za-z0-9_-]{16,96}$')
 FLOW_OUTPUTS = {'image', 'video'}
+NATIVE_COMPOSER = 'flow-creative-agent-prompt-box,flow-base-prompt-box'
 FLOW_DOWNLOAD_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$')
 FLOW_SIGNATURE = re.compile(r'^[0-9a-f]{64}$')
 
@@ -181,6 +183,7 @@ def persisted_flow_job(job):
         'phase': job.get('phase', job['state']),
         'phase_at': job.get('phase_at', job['updated_at']),
         'click_started': bool(job.get('click_started', False)),
+        'baseline_complete': bool(job.get('baseline_complete', False)),
     }
 
 
@@ -354,6 +357,8 @@ async def flow_controls(page):
 async def flow_capability():
     async def inspect(page):
         composer, submit = await flow_controls(page)
+        if await composer.is_editable():
+            flow_session.remember_project(ROOT, page.url)
         return {
             'project_open': True,
             'composer_editable': await composer.is_editable(),
@@ -361,6 +366,16 @@ async def flow_capability():
             'submit_enabled_without_prompt': await submit.is_enabled(),
         }
     return await with_flow_project_page(inspect)
+
+
+def flow_job_in_flight(job):
+    if job['state'] in {'completed', 'failed'}:
+        return False
+    if job['state'] == 'uncertain' and job.get('error') == 'download_controls_changed':
+        # A day-old result tied to another gallery remains recoverable by its id;
+        # it cannot hold the current project forever. Never replay its intention.
+        return time.time() - job['created_at'] < 24 * 60 * 60
+    return True
 
 
 async def flow_api_status():
@@ -378,7 +393,7 @@ async def flow_api_status():
         'batch_results_max': FLOW_MAX_RESULTS,
     }
     if current.get('status') != 'connected':
-        active = any(j['state'] not in {'completed', 'failed'} for j in FLOW_JOBS.values())
+        active = any(flow_job_in_flight(j) for j in FLOW_JOBS.values())
         if not active and not FLOW_UI_LOCK.locked() and (SESSION_TASK is None or SESSION_TASK.done()):
             # Recovery is bounded and its outcome remains visible; no endless status-triggered loop.
             if SESSION_RESULT not in flow_session.HUMAN and (SESSION_RESULT in (None, 'ready') or time.time() - SESSION_RECOVERY_AT >= 30):
@@ -390,6 +405,12 @@ async def flow_api_status():
         capability = await flow_capability()
     except FlowError as error:
         response['reason'] = error.code
+        if (error.code == 'flow_project_not_open' and flow_session.saved_project(ROOT)
+                and not any(flow_job_in_flight(j) for j in FLOW_JOBS.values())
+                and not FLOW_UI_LOCK.locked() and (SESSION_TASK is None or SESSION_TASK.done())
+                and (SESSION_RESULT in (None, 'ready') or time.time() - SESSION_RECOVERY_AT >= 30)):
+            SESSION_TASK = asyncio.create_task(recover_flow_session())
+            response.update(recovering=True, reason='recovering_session')
         return response
     response.update(capability)
     response['generation_ready'] = capability['composer_editable']
@@ -400,7 +421,7 @@ async def flow_api_status():
 
 async def download_controls(page):
     """Return hashes of visible Flow download controls without reading card text."""
-    if await page.locator('flow-creative-agent-prompt-box').count():
+    if await page.locator(NATIVE_COMPOSER).count():
         return await flow_gallery.read_controls(page)
     buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
     controls = []
@@ -442,7 +463,8 @@ def new_downloads(job, current_controls):
     current_counts = Counter(item['signature'] for item in current_controls)
     if any(item.get('kind') == 'project' and item['signature'] not in baseline_counts for item in current_controls):
         return None, 'download_controls_changed'
-    if any(current_counts[signature] < count for signature, count in baseline_counts.items()):
+    native = any(item.get('kind') == 'project' and item['signature'] in baseline_counts for item in current_controls)
+    if not (native and job.get('baseline_complete')) and any(current_counts[signature] < count for signature, count in baseline_counts.items()):
         return None, 'download_controls_changed'
     additions = []
     seen = Counter()
@@ -480,7 +502,7 @@ async def wait_composer_cleared(page, composer, timeout_ms=15000):
     return False
 
 
-async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on_phase=None):
+async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on_phase=None, expected_output=None, expected_results=0):
     """Fill and click `runs` times. Any failure after the first click start becomes uncertain/partial."""
     async with FLOW_UI_LOCK:
         async def submit(page):
@@ -496,13 +518,21 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on
             click_started = False
             try:
                 for run in range(runs):
+                    if expected_output and await page.locator(NATIVE_COMPOSER).count():
+                        await flow_settings.prepare_generation(page, expected_output,
+                            flow_settings.quantity_for_run(expected_results, runs, run))
+                        # Changing the native mode can replace the composer element.
+                        composer, submit_button = await flow_controls(page)
                     if run == 0:
                         if on_phase:
                             await on_phase('attaching_references' if references else 'preparing')
                         await attach_references(page, references or [])
                         # Uploaded ingredients can also appear in the gallery.
                         # Snapshot them before Generate so they are never results.
-                        baseline = await download_controls(page)
+                        baseline = (await flow_gallery.capture_baseline(page) if await page.locator(NATIVE_COMPOSER).count()
+                                    else await download_controls(page))
+                        if on_phase and await page.locator(NATIVE_COMPOSER).count():
+                            await on_phase('inventory_complete')
                         if on_run:
                             await on_run(0, [item['signature'] for item in baseline])
                     elif references:
@@ -511,6 +541,10 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on
                             await attach_references(page, references)
                     await composer.fill(prompt, timeout=10000)
                     filled = True
+                    for _ in range(40):
+                        if await submit_button.is_enabled():
+                            break
+                        await page.wait_for_timeout(250)
                     if not await submit_button.is_enabled():
                         if run == 0:
                             raise FlowError('flow_submit_unavailable', 409)
@@ -521,11 +555,20 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on
                     await submit_button.click(timeout=10000)
                     if on_run:
                         await on_run(run + 1, None)
+                    await page.wait_for_timeout(250)
+                    if await composer.evaluate('e=>((e.value??e.innerText)||"").trim()') == prompt.strip():
+                        # Current Flow keeps its submitted text. Clear only this
+                        # automation-owned prompt, never a manually changed draft.
+                        await composer.fill('', timeout=5000)
                     if run + 1 < runs and not await wait_composer_cleared(page, composer):
                         break
                     filled = False
                 await page.wait_for_timeout(250)
                 return [item['signature'] for item in baseline]
+            except flow_settings.SettingsError as error:
+                if click_started:
+                    raise FlowClickUncertain() from error
+                raise FlowError(str(error), 409) from error
             except ReferenceError as error:
                 if click_started:
                     raise FlowClickUncertain() from error
@@ -558,7 +601,7 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
             if existing.get('intent_hash') and existing['intent_hash'] != intent_hash:
                 raise FlowError('client_request_conflict', 409)
             return dict(existing), True
-        if defer and any(j['state'] not in {'completed', 'failed'} for j in FLOW_JOBS.values()):
+        if defer and any(flow_job_in_flight(j) for j in FLOW_JOBS.values()):
             raise FlowError('flow_busy', 409)
         now = time.time()
         job_id = secrets.token_urlsafe(18)
@@ -629,7 +672,8 @@ async def execute_flow_submission(job_id, prompt, reference_ids, runs, recover):
         else:
             await update_flow_job(job_id, runs_submitted=done, phase='submitting')
     async def on_phase(phase):
-        await update_flow_job(job_id, phase=phase, **({'click_started': True} if phase == 'clicking' else {}))
+        flags = {'click_started': True} if phase == 'clicking' else {'baseline_complete': True} if phase == 'inventory_complete' else {}
+        await update_flow_job(job_id, phase=phase, **flags)
     try:
         if recover:
             await on_phase('recovering_session')
@@ -638,7 +682,9 @@ async def execute_flow_submission(job_id, prompt, reference_ids, runs, recover):
                 raise FlowError(outcome, 409)
         await on_phase('preparing')
         paths = reference_paths(ROOT, reference_ids or [])
-        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run, on_phase)
+        job = await flow_job(job_id)
+        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run, on_phase,
+            job['expected_output'], job.get('expected_results', 0))
     except ReferenceError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
         raise FlowError(error.code, error.status_code) from error

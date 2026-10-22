@@ -24,6 +24,7 @@ class GenerationPollingWorker(
     override suspend fun doWork(): Result {
         val jobId = inputData.getString(KEY_JOB_ID) ?: return Result.failure()
         val app = applicationContext as? NexusApplication ?: return Result.failure()
+        app.ready.await()
         val repository = app.generationRepository
 
         var attempts = 0

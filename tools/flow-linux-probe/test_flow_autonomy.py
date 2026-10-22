@@ -68,7 +68,7 @@ class AsyncSubmissionTests(unittest.IsolatedAsyncioTestCase):
             driver.assert_not_awaited()
 
     async def test_timeout_after_click_is_uncertain_and_replayed_without_another_click(self):
-        async def drive(prompt, paths, runs, on_run, on_phase):
+        async def drive(prompt, paths, runs, on_run, on_phase, expected_output, expected_results):
             await on_phase('clicking')
             await asyncio.sleep(60)
 

@@ -4,10 +4,11 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+import subprocess
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from auto_auth import authenticate, google_login, load_credential
+from auto_auth import authenticate, google_login, load_credential, CredentialExpiredError
 
 
 class AuthTests(unittest.IsolatedAsyncioTestCase):
@@ -29,6 +30,17 @@ class AuthTests(unittest.IsolatedAsyncioTestCase):
     async def test_no_credential_never_touches_browser(self):
         with patch.dict(os.environ, {}, clear=True), patch('auto_auth.Path.home', return_value=Path('fixture-home')), patch('auto_auth.Path.exists', return_value=False):
             self.assertEqual(await authenticate(None, None), {'status': 'credential_required'})
+
+    def test_expired_encrypted_login_is_reported_without_renewing_or_exposing_it(self):
+        expired = subprocess.CalledProcessError(1, ['systemd-creds'], stderr=b'Outside of credential validity time window.')
+        with patch.dict(os.environ, {}, clear=True), patch('auto_auth.Path.home', return_value=Path('fixture-home')), \
+                patch('auto_auth.Path.exists', return_value=True), \
+                patch('auto_auth.Path.stat', return_value=SimpleNamespace(st_mode=0o600)), \
+                patch('auto_auth.subprocess.run', side_effect=expired) as decrypt:
+            with self.assertRaises(CredentialExpiredError):
+                load_credential()
+            decrypt.assert_called_once()
+            self.assertNotIn('--timestamp', decrypt.call_args.args[0])
 
     async def test_cooldown_never_touches_browser(self):
         with tempfile.TemporaryDirectory() as folder:

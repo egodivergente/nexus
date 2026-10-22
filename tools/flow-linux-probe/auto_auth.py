@@ -8,6 +8,10 @@ import time
 from urllib.parse import urlsplit
 
 
+class CredentialExpiredError(ValueError):
+    """The existing encrypted login is outside its authorized validity window."""
+
+
 def google_login(url):
     parts = urlsplit(url)
     return parts.scheme == 'https' and parts.hostname == 'accounts.google.com'
@@ -25,8 +29,13 @@ def load_credential():
             raise ValueError('Credential permissions must be private')
         # User manager cannot load host-key credentials on this Debian setup;
         # systemd-creds uses the supported user-scoped decrypt service instead.
-        result = subprocess.run(['systemd-creds', 'decrypt', '--user', '--name=flow-login',
-                                 str(encrypted), '-'], capture_output=True, check=True, timeout=10)
+        try:
+            result = subprocess.run(['systemd-creds', 'decrypt', '--user', '--name=flow-login',
+                                     str(encrypted), '-'], capture_output=True, check=True, timeout=10)
+        except subprocess.CalledProcessError as error:
+            if b'Outside of credential validity time window' in (error.stderr or b''):
+                raise CredentialExpiredError('Stored login has expired') from None
+            raise
         raw = result.stdout.decode('utf-8-sig')
     value = json.loads(raw)
     if not isinstance(value, dict) or not all(isinstance(value.get(k), str) and value[k] for k in ('email', 'password')):

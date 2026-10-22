@@ -7,17 +7,36 @@ import re
 import time
 from urllib.parse import urlsplit
 
-from auto_auth import load_credential
+from auto_auth import CredentialExpiredError, load_credential
 from flow_references import COMPOSER
 
 CDP = 'http://127.0.0.1:9229'
-SIGN_IN = re.compile(r'(Sign in|Log in|Iniciar sesi[oó]n|Acceder|Create with Flow|Crear con Flow)', re.I)
-HUMAN = {'verification_required', 'consent_required', 'browser_rejected', 'invalid_credentials'}
+SIGN_IN = re.compile(r'(Sign in|Log in|Iniciar sesi[oó]n|Acceder|Create with (?:Google )?Flow|Crear con (?:Google )?Flow)', re.I)
+HUMAN = {'verification_required', 'consent_required', 'browser_rejected', 'invalid_credentials',
+         'credential_expired', 'credential_required', 'credential_unavailable', 'account_selection_required'}
 
 
 def project_url(url):
     p = urlsplit(url)
     return p.scheme == 'https' and p.hostname == 'flow.google.com' and bool(re.fullmatch(r'/project/[A-Za-z0-9-]+/?', p.path))
+
+
+def saved_project(root):
+    for filename in ('active-project.json', 'keepalive-state.json'):
+        try:
+            url = json.loads((root / filename).read_text()).get('last_project', '')
+        except (OSError, ValueError):
+            continue
+        if project_url(url):
+            return url
+    return None
+
+
+def remember_project(root, url):
+    if project_url(url):
+        path = root / 'active-project.json'
+        path.write_text(json.dumps({'last_project': url}))
+        path.chmod(0o600)
 
 
 def login_block(url):
@@ -53,16 +72,33 @@ async def sign_in(page, root):
             control = await first_visible(page.get_by_role('link', name=SIGN_IN))
             control = control or await first_visible(page.get_by_role('button', name=SIGN_IN))
             if control is None:
-                return 'sign_in_control_missing'
+                # The marketing page hydrates after DOMContentLoaded. A submitted
+                # entry click can also hide the control before navigation completes.
+                if 'entry' not in sent and time.monotonic() - started > 12:
+                    return 'sign_in_control_missing'
+                await page.wait_for_timeout(300)
+                continue
             if 'entry' in sent:
                 await page.wait_for_timeout(500)
                 continue
             sent.add('entry')
-            await control.click(timeout=6000)
+            await control.click(timeout=6000, no_wait_after=True)
         elif p.scheme == 'https' and p.hostname == 'accounts.google.com':
             blocked = login_block(page.url)
             if blocked:
                 return blocked
+            if p.path == '/info/sessionexpired':
+                try:
+                    credential = credential or await asyncio.to_thread(load_credential)
+                except CredentialExpiredError:
+                    return 'credential_expired'
+                except Exception:
+                    return 'credential_unavailable'
+                if not credential or 'expired_session' in sent:
+                    return 'credential_required'
+                sent.add('expired_session')
+                await page.goto('https://flow.google.com/', wait_until='domcontentloaded', timeout=15000)
+                continue
             # Only a boolean leaves the DOM. Neither autofilled value is read.
             field = await first_visible(page.locator('input[type="password"]'))
             kind = 'password'
@@ -77,6 +113,8 @@ async def sign_in(page, root):
                 if not await field.evaluate('e => e.value.length > 0'):
                     try:
                         credential = credential or await asyncio.to_thread(load_credential)
+                    except CredentialExpiredError:
+                        return 'credential_expired'
                     except Exception:
                         return 'credential_unavailable'
                     if not credential:
@@ -94,7 +132,7 @@ async def sign_in(page, root):
                     attempt.write_text(json.dumps({'time': time.time()}))
                     attempt.chmod(0o600)
                 sent.add(kind)
-                await field.press('Enter', timeout=6000)
+                await field.press('Enter', timeout=6000, no_wait_after=True)
             elif field is not None and kind in sent:
                 invalid = await field.get_attribute('aria-invalid')
                 if invalid == 'true':
@@ -102,17 +140,19 @@ async def sign_in(page, root):
             elif 'account' not in sent:
                 accounts = page.locator('[data-identifier]')
                 if await accounts.count() == 1:
-                    await accounts.first.click(timeout=6000)
+                    await accounts.first.click(timeout=6000, no_wait_after=True)
                     sent.add('account')
                 elif await accounts.count() > 1:
                     try:
                         credential = credential or await asyncio.to_thread(load_credential)
+                    except CredentialExpiredError:
+                        return 'credential_expired'
                     except Exception:
                         return 'account_selection_required'
                     match = page.get_by_text(credential['email'], exact=True) if credential else None
                     if match is None or await match.count() != 1:
                         return 'account_selection_required'
-                    await match.click(timeout=6000)
+                    await match.click(timeout=6000, no_wait_after=True)
                     sent.add('account')
         else:
             return 'unexpected_destination'
@@ -184,11 +224,7 @@ async def ensure_ready(root):
         target = target or next((p for p in pages if p.url == 'about:blank'), None)
         if target is None:
             target = await browser.contexts[0].new_page()
-        try:
-            state = json.loads((root / 'keepalive-state.json').read_text())
-        except (OSError, ValueError):
-            state = {}
-        last_project = state.get('last_project', '')
+        last_project = saved_project(root) or ''
         if target.url == 'about:blank':
             await target.goto(last_project if project_url(last_project) else 'https://flow.google.com/',
                               wait_until='domcontentloaded', timeout=20000)

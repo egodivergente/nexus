@@ -5,10 +5,21 @@ import unittest
 from unittest.mock import patch
 
 from playwright.async_api import async_playwright
-from flow_session import sign_in, repair_project_page
+from flow_session import sign_in, repair_project_page, saved_project, remember_project
+from auto_auth import CredentialExpiredError
 
 
 class SavedLoginTests(unittest.IsolatedAsyncioTestCase):
+    def test_remembers_only_valid_existing_project_and_keeps_legacy_fallback(self):
+        root=Path(self.tmp.name)
+        self.assertIsNone(saved_project(root))
+        remember_project(root,'https://accounts.google.com/signin')
+        self.assertIsNone(saved_project(root))
+        project='https://flow.google.com/project/known-project'
+        remember_project(root,project)
+        self.assertEqual(saved_project(root),project)
+        self.assertFalse((root/'keepalive-state.json').exists())
+
     async def asyncSetUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.pw = await async_playwright().start()
@@ -44,6 +55,32 @@ class SavedLoginTests(unittest.IsolatedAsyncioTestCase):
         credential.assert_not_called()
         self.assertTrue(any('/challenge/pwd' in u for u in self.visited))
 
+    async def test_current_google_flow_entry_label_completes_saved_login(self):
+        async def current(route):
+            if '/about' in route.request.url:
+                await route.fulfill(content_type='text/html; charset=utf-8', body='''<button onclick="location.href='https://accounts.google.com/signin/identifier'">Create with Google Flow</button>''')
+            else:
+                await self.fixture(route)
+        await self.page.route('**/*', current)
+        await self.page.goto('https://flow.google.com/about')
+        with patch('flow_session.load_credential') as credential:
+            result = await sign_in(self.page, Path(self.tmp.name))
+        self.assertEqual(result, 'signed_in')
+        credential.assert_not_called()
+
+    async def test_late_rendered_entry_is_waited_for_before_declaring_missing_control(self):
+        async def delayed(route):
+            if '/about' in route.request.url:
+                await route.fulfill(content_type='text/html; charset=utf-8', body='''<script>setTimeout(()=>{const b=document.createElement('button');b.textContent='Iniciar sesión';b.onclick=()=>location.href='https://accounts.google.com/signin/identifier';document.body.append(b)},700)</script>''')
+            else:
+                await self.fixture(route)
+        await self.page.route('**/*', delayed)
+        await self.page.goto('https://flow.google.com/about')
+        with patch('flow_session.load_credential') as credential:
+            result = await sign_in(self.page, Path(self.tmp.name))
+        self.assertEqual(result, 'signed_in')
+        credential.assert_not_called()
+
     async def test_empty_autofill_uses_existing_encrypted_login(self):
         async def empty(route):
             if '/challenge/pwd' in route.request.url:
@@ -65,6 +102,22 @@ class SavedLoginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, 'verification_required')
         credential.assert_not_called()
         self.assertEqual(len(self.visited), 1)
+
+    async def test_expired_credential_stops_before_submitting_password(self):
+        async def empty(route):
+            await route.fulfill(content_type='text/html', body='<form><input type="password"><button>Siguiente</button></form>')
+        await self.page.route('**/*', empty)
+        await self.page.goto('https://accounts.google.com/signin/challenge/pwd')
+        with patch('flow_session.load_credential', side_effect=CredentialExpiredError):
+            self.assertEqual(await sign_in(self.page, Path(self.tmp.name)), 'credential_expired')
+        self.assertFalse((Path(self.tmp.name) / 'session-login-attempt.json').exists())
+
+    async def test_google_expired_session_page_preserves_expired_credential_boundary(self):
+        await self.page.route('**/*',self.fixture)
+        await self.page.goto('https://accounts.google.com/info/sessionexpired')
+        with patch('flow_session.load_credential',side_effect=CredentialExpiredError):
+            self.assertEqual(await sign_in(self.page,Path(self.tmp.name)),'credential_expired')
+        self.assertEqual(len(self.visited),1)
 
     async def test_lookalike_domain_never_uses_saved_login(self):
         await self.page.route('**/*', self.fixture)

@@ -36,6 +36,33 @@ async def read_controls(page):
     return controls(page.url, await page.evaluate(READ_TILES))
 
 
+async def capture_baseline(page):
+    """Inventory the virtual gallery before Generate, including off-screen assets."""
+    viewport = await page.evaluate('({width:innerWidth,height:innerHeight})')
+    if viewport['width'] < 1100 or viewport['height'] < 650:
+        await page.set_viewport_size({'width':1280,'height':900})
+    scroll = page.locator('.cdk-virtual-scrollable.page-container')
+    if await scroll.count() != 1:
+        return await read_controls(page)
+    media = {}
+    await scroll.evaluate('e=>e.scrollTop=0')
+    try:
+        for _ in range(160):
+            await page.wait_for_timeout(150)
+            for item in await page.evaluate(READ_TILES):
+                media[item['media_id']] = item
+            ended = await scroll.evaluate('e=>{if(e.scrollTop+e.clientHeight>=e.scrollHeight-2)return true;e.scrollTop+=Math.max(100,e.clientHeight*.7);return false}')
+            if ended:
+                await page.wait_for_timeout(300)
+                for item in await page.evaluate(READ_TILES):
+                    media[item['media_id']] = item
+                return controls(page.url, list(media.values()))
+        raise ValueError('gallery_inventory_incomplete')
+    finally:
+        await scroll.evaluate('e=>e.scrollTop=0')
+        await page.wait_for_timeout(200)
+
+
 async def close_menus(page):
     backdrop = page.locator('.cdk-overlay-backdrop')
     for _ in range(3):
@@ -56,6 +83,9 @@ async def download_original(page, expected):
         raise ValueError('download_ambiguous')
     try:
         await close_menus(page)
+        viewport = await page.evaluate('({width:innerWidth,height:innerHeight})')
+        if viewport['width'] < 1100 or viewport['height'] < 650:
+            await page.set_viewport_size({'width':1280,'height':900})
         await tile.hover(timeout=10000)
         await tile.get_by_role('button', name=re.compile(r'^(Más opciones|More options)$')).click(timeout=10000)
         download = page.get_by_role('menuitem', name=re.compile(r'(Descargar|Download)'))

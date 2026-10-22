@@ -262,6 +262,7 @@ class MainActivity : ComponentActivity() {
                                 initialOutputIndex = backStackEntry.arguments?.getInt("index") ?: 0,
                                 onBack = { navController.popBackStack() },
                                 onOpenHistory = { navController.openHistoryTab() },
+                                onOpenFlow = {navController.navigate(Screen.Flow.route) {launchSingleTop=true}},
                                 onReuseAsInput = { content, mimeType ->
                                     if (mimeType != null) {
                                         // Media and prompt reuse are explicit, including prompts that happen to be URLs.

@@ -19,6 +19,7 @@ import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.ui.create.*
 import com.vidadomu.nexus.ui.flow.*
+import com.vidadomu.nexus.ui.output.OutputViewerScreen
 import com.vidadomu.nexus.ui.theme.NexusTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -46,6 +47,21 @@ class CanvasComposerDeviceTest {
         val bitmap=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         File(dir,name).outputStream().use {bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
         bitmap.recycle()
+    }
+    @Test fun failedFlowShowsItsCauseAndConnectionActionWithoutOpeningDetails() {
+        val id="qa-flow-expired-credential"
+        val message="El acceso temporal guardado ha caducado. Abre la conexión de Flow e inicia sesión en Google; este pedido no se ha enviado."
+        runBlocking {app.database.insertOrUpdateJob(GenerationJob(id,providerId="google_flow",modelId="current_project",
+            modality=Modality.IMAGE,prompt="Prueba local sin envío",status=GenerationStatus.FAILED,
+            error=message,technicalDetails="credential_expired"))}
+        compose.waitUntil(10_000) {app.generationRepository.allJobs.value.any {it.id==id}}
+        var opened=false
+        compose.setContent {NexusTheme {OutputViewerScreen(id,{}, {_,_->},onOpenFlow={opened=true})}}
+        compose.onNodeWithText(message).assertIsDisplayed()
+        compose.onNodeWithText("No hay un resultado disponible.").assertDoesNotExist()
+        compose.onNodeWithText("Conexión de Flow").performClick()
+        compose.runOnIdle {assertTrue(opened)}
+        capture("flow-error-visible.png")
     }
     @Test fun clearUndoAndPasteKeepVisualAttachmentsAndComfortableTouchTargets() {
         val images=media()

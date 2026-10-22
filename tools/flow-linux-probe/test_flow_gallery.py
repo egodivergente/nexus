@@ -37,6 +37,15 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(1, len(additions))
         self.assertEqual(self.new['media_id'], additions[0]['media_id'])
 
+    def test_complete_inventory_allows_old_tiles_to_unmount_without_counting_them_as_new(self):
+        baseline=flow_gallery.controls(self.url,[self.old])
+        job={'baseline_downloads':[c['signature'] for c in baseline],'baseline_complete':True}
+        added,error=recovery.new_downloads(job,flow_gallery.controls(self.url,[self.new]))
+        self.assertIsNone(error)
+        self.assertEqual([self.new['media_id']],[c['media_id'] for c in added])
+        self.assertEqual((None,'download_controls_changed'),recovery.new_downloads(job,
+            flow_gallery.controls(self.url+'-different',[self.new])))
+
     def test_duplicate_tiles_and_unsafe_ids_are_not_downloaded_twice(self):
         items = flow_gallery.controls(self.url, [self.old, self.old, {'media_id': '"] evil'}])
         self.assertEqual(2, len(items))  # Project scope plus one result.

@@ -24,4 +24,14 @@ class FlowProgressTest {
         assertFalse(FlowRetryPolicy.shouldRetry("flow_composer_not_empty", 0))
         assertFalse(FlowRetryPolicy.shouldRetry("verification_required", 0))
     }
+
+    @Test fun loginFailuresExposeTheSpecificCauseAndKeepPreSubmitStateClear() {
+        assertTrue(FlowProgress.problem("credential_expired")!!.contains("ha caducado"))
+        assertTrue(FlowProgress.problem("sign_in_control_missing")!!.contains("botón"))
+        assertTrue(FlowProgress.problem("unexpected_destination")!!.contains("no reconocida"))
+        for(code in listOf("credential_expired", "sign_in_control_missing", "unexpected_destination")) {
+            assertTrue(FlowProgress.problem(code)!!.contains("no se ha enviado"))
+            assertFalse(FlowRetryPolicy.shouldRetry(code, 0))
+        }
+    }
 }

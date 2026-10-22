@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -40,6 +41,17 @@ class Page:
 
 
 class SessionReuseTests(unittest.IsolatedAsyncioTestCase):
+    def test_old_uncertain_intention_is_retained_without_blocking_new_work_forever(self):
+        job={'state':'uncertain','expected_output':'image','created_at':time.time(),'error':'download_controls_changed'}
+        self.assertTrue(recovery.flow_job_in_flight(job))
+        job['created_at']-=24*60*60+1
+        self.assertFalse(recovery.flow_job_in_flight(job))
+        self.assertEqual(job['state'],'uncertain')
+        job['error']='submit_uncertain'
+        self.assertTrue(recovery.flow_job_in_flight(job))
+        job['state']='generating'
+        self.assertTrue(recovery.flow_job_in_flight(job))
+
     def context(self, pages, account_url='https://myaccount.google.com/', code=200):
         return SimpleNamespace(pages=pages, request=SimpleNamespace(get=AsyncMock(
             return_value=SimpleNamespace(status=code, url=account_url))))
