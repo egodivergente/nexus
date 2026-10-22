@@ -6,11 +6,11 @@ package com.vidadomu.nexus.provider.flow
  */
 internal object FlowRetryPolicy {
     const val MAX_RETRIES = 2
-    const val DELAY_MS = 90_000L
+    const val DELAY_MS = 15_000L
 
     val PRE_CLICK = setOf(
-        "flow_browser_unavailable", "flow_project_not_open", "flow_project_ambiguous", "flow_controls_unavailable",
-        "flow_composer_not_editable", "flow_composer_not_empty", "flow_submit_unavailable",
+        "flow_browser_unavailable", "flow_project_not_open", "flow_controls_unavailable",
+        "flow_composer_not_editable", "flow_submit_unavailable",
         "flow_not_ready", "flow_not_connected"
     )
 

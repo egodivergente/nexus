@@ -27,6 +27,7 @@ import websockets
 from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
 import flow_agent
 import flow_gallery
+import flow_session
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -49,6 +50,12 @@ CACHE = {'status': 'not_checked', 'checked_at': 0}
 FLOW_UI_LOCK = asyncio.Lock()
 FLOW_JOB_LOCK = asyncio.Lock()
 FLOW_JOBS = {}
+FLOW_TASKS = {}
+SESSION_TASK = None
+SESSION_RESULT = None
+SESSION_RECOVERY_AT = 0
+FLOW_PREPARE_SECONDS = 150
+FLOW_RESULT_SECONDS = {"image": 300, "video": 900}
 FLOW_PROMPT_LIMIT = 4000
 FLOW_BODY_LIMIT = 24 * 1024
 FLOW_REQUEST_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$')
@@ -143,6 +150,9 @@ def public_flow_job(job, replayed=False):
         'runs': job.get('runs', 1),
         'runs_submitted': job.get('runs_submitted', job.get('runs', 1)),
         'expected_results': job.get('expected_results', 0),
+        'phase': job.get('phase', job['state']),
+        'elapsed_seconds': max(0, int(time.time() - job['created_at'])),
+        'phase_elapsed_seconds': max(0, int(time.time() - job.get('phase_at', job['updated_at']))),
     }
     if job.get('error'):
         result['error'] = job['error']
@@ -168,6 +178,9 @@ def persisted_flow_job(job):
         'runs_submitted': int(job.get('runs_submitted', job.get('runs', 1))),
         'expected_results': int(job.get('expected_results', 0)),
         'last_growth_at': float(job.get('last_growth_at', job.get('updated_at', 0))),
+        'phase': job.get('phase', job['state']),
+        'phase_at': job.get('phase_at', job['updated_at']),
+        'click_started': bool(job.get('click_started', False)),
     }
 
 
@@ -224,6 +237,11 @@ def load_flow_jobs():
         if valid_persisted_flow_job(job):
             # Drop unexpected fields even if the file was edited manually.
             clean = persisted_flow_job(job)
+            if clean['state'] == 'submitting':
+                # Prompts are intentionally not persisted. A restart never resubmits a click.
+                uncertain = job.get('click_started', True)  # Older journals cannot prove that no click occurred.
+                clean['state'] = 'uncertain' if uncertain else 'failed'
+                clean['error'] = 'submit_uncertain' if uncertain else 'bridge_restarted_before_submit'
             FLOW_JOBS[clean['job_id']] = clean
 
 
@@ -232,6 +250,8 @@ async def update_flow_job(job_id, **changes):
         job = FLOW_JOBS.get(job_id)
         if not job:
             raise FlowError('job_not_found', 404)
+        if changes.get('phase') and changes['phase'] != job.get('phase'):
+            changes['phase_at'] = time.time()
         job.update(changes)
         job['updated_at'] = time.time()
         save_flow_jobs()
@@ -344,6 +364,7 @@ async def flow_capability():
 
 
 async def flow_api_status():
+    global SESSION_TASK, SESSION_RESULT
     current = await status()
     response = {
         'bridge_status': current.get('status', 'unverified'),
@@ -357,7 +378,13 @@ async def flow_api_status():
         'batch_results_max': FLOW_MAX_RESULTS,
     }
     if current.get('status') != 'connected':
-        response['reason'] = 'flow_not_connected'
+        active = any(j['state'] not in {'completed', 'failed'} for j in FLOW_JOBS.values())
+        if not active and not FLOW_UI_LOCK.locked() and (SESSION_TASK is None or SESSION_TASK.done()):
+            # Recovery is bounded and its outcome remains visible; no endless status-triggered loop.
+            if SESSION_RESULT not in flow_session.HUMAN and (SESSION_RESULT in (None, 'ready') or time.time() - SESSION_RECOVERY_AT >= 30):
+                SESSION_TASK = asyncio.create_task(recover_flow_session())
+        response['recovering'] = bool(SESSION_TASK and not SESSION_TASK.done())
+        response['reason'] = 'recovering_session' if response['recovering'] else (SESSION_RESULT or 'flow_not_connected')
         return response
     try:
         capability = await flow_capability()
@@ -366,6 +393,8 @@ async def flow_api_status():
         return response
     response.update(capability)
     response['generation_ready'] = capability['composer_editable']
+    if response['generation_ready']:
+        SESSION_RESULT = None
     return response
 
 
@@ -451,7 +480,7 @@ async def wait_composer_cleared(page, composer, timeout_ms=15000):
     return False
 
 
-async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
+async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on_phase=None):
     """Fill and click `runs` times. Any failure after the first click start becomes uncertain/partial."""
     async with FLOW_UI_LOCK:
         async def submit(page):
@@ -468,6 +497,8 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
             try:
                 for run in range(runs):
                     if run == 0:
+                        if on_phase:
+                            await on_phase('attaching_references' if references else 'preparing')
                         await attach_references(page, references or [])
                         # Uploaded ingredients can also appear in the gallery.
                         # Snapshot them before Generate so they are never results.
@@ -485,6 +516,8 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
                             raise FlowError('flow_submit_unavailable', 409)
                         break
                     click_started = True
+                    if on_phase:
+                        await on_phase('clicking')
                     await submit_button.click(timeout=10000)
                     if on_run:
                         await on_run(run + 1, None)
@@ -494,8 +527,12 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
                 await page.wait_for_timeout(250)
                 return [item['signature'] for item in baseline]
             except ReferenceError as error:
+                if click_started:
+                    raise FlowClickUncertain() from error
                 raise FlowError(error.code, error.status_code) from error
             except FlowError:
+                if click_started:
+                    raise FlowClickUncertain()
                 if filled and not click_started:
                     with suppress(Exception):
                         await composer.fill('', timeout=5000)
@@ -510,7 +547,7 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
         return await with_flow_project_page(submit)
 
 
-async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0):
+async def submit_flow_generation(prompt, expected_output, client_request_id, reference_ids=None, runs=1, expected_results=0, defer=False):
     """Reserve an idempotent job before the UI clicks, never storing prompt."""
     intent_hash = hashlib.sha256(json.dumps([prompt, expected_output, reference_ids or []] + ([runs] if runs > 1 else []),
         ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
@@ -521,6 +558,8 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
             if existing.get('intent_hash') and existing['intent_hash'] != intent_hash:
                 raise FlowError('client_request_conflict', 409)
             return dict(existing), True
+        if defer and any(j['state'] not in {'completed', 'failed'} for j in FLOW_JOBS.values()):
+            raise FlowError('flow_busy', 409)
         now = time.time()
         job_id = secrets.token_urlsafe(18)
         job = {
@@ -538,18 +577,68 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
             'runs_submitted': 0,
             'expected_results': expected_results,
             'last_growth_at': now,
+            'phase': 'accepted',
+            'phase_at': now,
+            'click_started': False,
         }
         FLOW_JOBS[job_id] = job
         save_flow_jobs()
 
+    if defer:
+        task = asyncio.create_task(run_flow_submission(job_id, prompt, reference_ids, runs))
+        FLOW_TASKS[job_id] = task
+        task.add_done_callback(lambda done: FLOW_TASKS.pop(job_id, None))
+        return dict(job), False
+    return await execute_flow_submission(job_id, prompt, reference_ids, runs, recover=False)
+
+
+async def recover_flow_session():
+    global CACHE, SESSION_RESULT, SESSION_RECOVERY_AT
+    async with FLOW_UI_LOCK:
+        try:
+            if (await status()).get('status') == 'browser_closed' and not await asyncio.wait_for(start_browser(), timeout=30):
+                outcome = 'flow_browser_unavailable'
+            else:
+                outcome = await asyncio.wait_for(flow_session.ensure_ready(ROOT), timeout=75)
+        except Exception:
+            outcome = 'session_recovery_timeout'
+        SESSION_RESULT = outcome
+        SESSION_RECOVERY_AT = time.time()
+        CACHE = {'status': 'not_checked', 'checked_at': 0}
+        return outcome
+
+
+async def run_flow_submission(job_id, prompt, reference_ids, runs):
+    try:
+        await asyncio.wait_for(execute_flow_submission(job_id, prompt, reference_ids, runs, recover=True),
+                               timeout=FLOW_PREPARE_SECONDS)
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        job = await flow_job(job_id)
+        uncertain = job.get('click_started', False)
+        await update_flow_job(job_id, state='uncertain' if uncertain else 'failed',
+                              error='submit_uncertain' if uncertain else 'preparation_timeout')
+    except Exception:
+        # execute_flow_submission has already journaled the concrete failure.
+        pass
+
+
+async def execute_flow_submission(job_id, prompt, reference_ids, runs, recover):
     async def on_run(done, baseline):
         if baseline is not None:
             await update_flow_job(job_id, baseline_downloads=baseline)
         else:
-            await update_flow_job(job_id, runs_submitted=done)
+            await update_flow_job(job_id, runs_submitted=done, phase='submitting')
+    async def on_phase(phase):
+        await update_flow_job(job_id, phase=phase, **({'click_started': True} if phase == 'clicking' else {}))
     try:
+        if recover:
+            await on_phase('recovering_session')
+            outcome = await recover_flow_session()
+            if outcome != 'ready':
+                raise FlowError(outcome, 409)
+        await on_phase('preparing')
         paths = reference_paths(ROOT, reference_ids or [])
-        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run)
+        baseline = await drive_flow_submission(prompt, paths or None, runs, on_run, on_phase)
     except ReferenceError as error:
         await update_flow_job(job_id, state='failed', error=error.code)
         raise FlowError(error.code, error.status_code) from error
@@ -566,12 +655,12 @@ async def submit_flow_generation(prompt, expected_output, client_request_id, ref
     except Exception as error:
         await update_flow_job(job_id, state='failed', error='flow_submit_failed')
         raise FlowError('flow_submit_failed', 503) from error
-    return await update_flow_job(job_id, state='submitted', baseline_downloads=baseline, error=None,
+    return await update_flow_job(job_id, state='submitted', phase='generating', baseline_downloads=baseline, error=None,
                                  last_growth_at=time.time()), False
 
 
 async def refresh_flow_job(job):
-    if job['state'] in {'completed', 'failed'}:
+    if job['state'] in {'completed', 'failed', 'submitting'}:
         return job
     try:
         async with FLOW_UI_LOCK:
@@ -581,7 +670,7 @@ async def refresh_flow_job(job):
         return await update_flow_job(job['job_id'], error=error.code)
     additions, error = new_downloads(job, controls)
     if error:
-        return await update_flow_job(job['job_id'], state='uncertain', error=error)
+        return await update_flow_job(job['job_id'], state='uncertain', phase='needs_review', error=error)
     additions = [item for item in additions if not item.get('media_id') or item.get('kind') == job['expected_output']]
     if job['state'] == 'uncertain':
         # A click with an indeterminate outcome is never promoted automatically.
@@ -596,11 +685,15 @@ async def refresh_flow_job(job):
         stalled = additions and now - last > FLOW_STALL_SECONDS.get(job['expected_output'], 180)
         if (expected and len(additions) >= expected) or stalled:
             return await update_flow_job(job['job_id'], state='completed', new_downloads=additions, error=None)
-        return await update_flow_job(job['job_id'], state='generating', new_downloads=additions,
-                                     last_growth_at=last, error=job.get('error') if job.get('error') == 'batch_partial' else None)
+        delayed = not additions and now - job['created_at'] > FLOW_RESULT_SECONDS.get(job['expected_output'], 900)
+        return await update_flow_job(job['job_id'], state='generating', phase='waiting_results', new_downloads=additions,
+                                     last_growth_at=last, error='generation_delayed' if delayed else (job.get('error') if job.get('error') == 'batch_partial' else None))
     if additions:
         return await update_flow_job(job['job_id'], state='completed', new_downloads=additions, error=None)
-    return await update_flow_job(job['job_id'], state='generating', error=None)
+    elapsed = time.time() - job['created_at']
+    timed_out = elapsed > FLOW_RESULT_SECONDS.get(job['expected_output'], 900)
+    return await update_flow_job(job['job_id'], state='generating', phase='waiting_results',
+                                 error='generation_delayed' if timed_out else None)
 
 
 async def get_flow_job_status(job_id):
@@ -750,6 +843,11 @@ async def lifespan(app):
     TOKEN_FILE.chmod(0o600)
     load_flow_jobs()
     yield
+    tasks = list(FLOW_TASKS.values()) + ([SESSION_TASK] if SESSION_TASK and not SESSION_TASK.done() else [])
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -830,7 +928,7 @@ async def create_flow_job(request: Request):
         references = data.get('reference_ids', [])
         reference_paths(ROOT, references)
         job, replayed = await submit_flow_generation(prompt, expected_output, client_request_id, references or None,
-                                                     runs, expected_results)
+                                                     runs, expected_results, defer=True)
         return JSONResponse(public_flow_job(job, replayed=replayed), status_code=200 if replayed else 201)
     except ReferenceError as error:
         return JSONResponse({'error': error.code}, status_code=error.status_code)

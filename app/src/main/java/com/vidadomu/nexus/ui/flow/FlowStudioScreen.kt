@@ -146,15 +146,15 @@ fun FlowStudioScreen(
     val exportMime = remember { mutableStateOf("application/octet-stream") }
     var costDetails by rememberSaveable { mutableStateOf(false) }
 
-    suspend fun refreshConnection() {
+    suspend fun refreshConnection(showChecking: Boolean = true) {
         if (BuildConfig.OFFLINE_QA) {
             connection = FlowStudioConnection.OfflineQa
             return
         }
-        connection = FlowStudioConnection.Checking
+        if (showChecking) connection = FlowStudioConnection.Checking
         connection = app.flowBridgeProvider.bridgeStatus().fold(
             onSuccess = { status ->
-                if (status.isReady) FlowStudioConnection.Ready(status)
+                if (status.isReady || status.recovering) FlowStudioConnection.Ready(status)
                 else FlowStudioConnection.Unavailable(status.detail?.takeIf { it.isNotBlank() }
                     ?: "El proyecto Flow no está listo. Ábrelo desde Ajustes y vuelve a intentarlo.")
             },
@@ -165,6 +165,12 @@ fun FlowStudioScreen(
         )
     }
     LaunchedEffect(Unit) { refreshConnection() }
+    LaunchedEffect((connection as? FlowStudioConnection.Ready)?.status?.recovering) {
+        while ((connection as? FlowStudioConnection.Ready)?.status?.recovering == true) {
+            kotlinx.coroutines.delay(3_000)
+            refreshConnection(showChecking = false)
+        }
+    }
 
     val status = (connection as? FlowStudioConnection.Ready)?.status
     val promptLimit = (status?.promptLimit ?: 4000).coerceIn(1, 4000)
@@ -574,7 +580,7 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
         FlowStudioConnection.OfflineQa -> InlineNotice("QA sin conexión: no se envía nada a Flow.",
             technicalDetails = "BuildConfig.OFFLINE_QA", actionLabel = "Actualizar", onAction = onRefresh, isError = false)
         is FlowStudioConnection.Ready -> InlineNotice(
-            "Flow listo" + (connection.status.projectName?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+            (if (connection.status.recovering) "Recuperando acceso a Flow…" else "Flow listo") + (connection.status.projectName?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
             technicalDetails = connection.status.detail, actionLabel = "Actualizar", onAction = onRefresh, isError = false)
         is FlowStudioConnection.Unavailable -> InlineNotice(
             noticeMessage(connection.message, "Flow no está listo. Abre el proyecto desde Ajustes y comprueba la conexión."),
@@ -671,6 +677,14 @@ private fun ReferencesSection(
 
 @Composable
 private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (GenerationOutput) -> Unit) {
+    var now by remember(job.id) { mutableStateOf(System.currentTimeMillis()) }
+    val active = FlowStudioPlan.isActive(job.status)
+    LaunchedEffect(job.id, active) {
+        while (active) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
     Surface(color = SurfaceDark, border = BorderStroke(1.dp, BorderSubtle), shape = NexusTokens.field) {
         Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -684,6 +698,11 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
                         GenerationStatus.FAILED -> AccentCoral
                         else -> TextMuted
                     })
+            }
+            if (active) {
+                Text("Tiempo transcurrido: ${com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)}",
+                    style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                TextButton(onClick = onOpen) { Text("Ver estado y opciones") }
             }
             job.error?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (job.status == GenerationStatus.FAILED) AccentCoral else TextMuted)

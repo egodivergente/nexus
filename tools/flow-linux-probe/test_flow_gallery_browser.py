@@ -10,6 +10,26 @@ import flow_gallery
 
 
 class GalleryBrowserTests(unittest.IsolatedAsyncioTestCase):
+    async def test_direct_download_without_resolution_menu(self):
+        async with async_playwright() as p:
+            kwargs = {'channel': 'msedge'} if sys.platform == 'win32' else {'executable_path': '/usr/bin/chromium'}
+            browser = await p.chromium.launch(headless=True, **kwargs)
+            try:
+                page = await browser.new_page(accept_downloads=True)
+                await page.set_content('''<flow-grid-tile-container>
+                    <img data-media-id="fixture-image-1234">
+                    <button aria-label="More options" onclick="document.querySelector('#menu').hidden=false">Menu</button>
+                    </flow-grid-tile-container>
+                    <div id="menu" hidden><a role="menuitem" download="original.txt"
+                    href="data:text/plain,original-fixture">Download</a></div>''')
+                download = await flow_gallery.download_original(page, {'media_id': 'fixture-image-1234'})
+                with tempfile.TemporaryDirectory() as folder:
+                    target = Path(folder) / 'original'
+                    await download.save_as(str(target))
+                    self.assertEqual(target.read_text(), 'original-fixture')
+            finally:
+                await browser.close()
+
     async def test_current_gallery_downloads_original_and_never_selects_upscale(self):
         payload = b'original-file-from-test-fixture'
         requests = []

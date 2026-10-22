@@ -1,6 +1,7 @@
 """Stable identities and original downloads for Flow's current tile gallery."""
 import hashlib
 import re
+from playwright.async_api import TimeoutError as BrowserTimeout
 from urllib.parse import urlsplit
 
 MEDIA_ID = re.compile(r'^[A-Za-z0-9_-]{8,96}$')
@@ -57,9 +58,22 @@ async def download_original(page, expected):
         await close_menus(page)
         await tile.hover(timeout=10000)
         await tile.get_by_role('button', name=re.compile(r'^(Más opciones|More options)$')).click(timeout=10000)
-        await page.get_by_role('menuitem', name=re.compile(r'(Descargar|Download)')).hover(timeout=10000)
+        download = page.get_by_role('menuitem', name=re.compile(r'(Descargar|Download)'))
+        await download.hover(timeout=10000)
         # Select only the original. Enhanced resolutions may start a paid upscale.
         original = page.get_by_role('menuitem', name=re.compile(r'(Tamaño original|Original size|Original)', re.I))
+        try:
+            await original.first.wait_for(state='visible', timeout=1200)
+        except BrowserTimeout:
+            # Some tiles (including uploaded images) expose a direct original download,
+            # while generated media offer the resolution submenu. Never select an upscale.
+            if await download.get_attribute('aria-haspopup') == 'menu':
+                await download.click(timeout=10000)
+                await original.first.wait_for(state='visible', timeout=5000)
+            else:
+                async with page.expect_download(timeout=30000) as pending:
+                    await download.click(timeout=10000)
+                return await pending.value
         if await original.count() != 1:
             raise ValueError('original_download_unavailable')
         async with page.expect_download(timeout=30000) as pending:

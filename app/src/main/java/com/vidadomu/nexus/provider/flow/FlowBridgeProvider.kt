@@ -112,6 +112,10 @@ class FlowBridgeProvider(
                         runs = runs, expectedResults = if (goal > 1) missing else 0)
                 }
             val submissionError = remote.exceptionOrNull() as? ProviderError
+            if (submissionError?.errorCode == "flow_busy") {
+                return@withLock Result.success(job.copy(error = FlowProgress.problem("flow_busy"),
+                    parameters = job.parameters + ("__flow_retry_at" to (System.currentTimeMillis() + 8_000L).toString())))
+            }
             if (submissionError?.errorCode in setOf("invalid_reference_ids", "invalid_reference_image",
                 "reference_not_found", "reference_integrity_failed", "duplicate_reference",
                 "flow_references_not_empty", "flow_reference_controls_unavailable",
@@ -146,8 +150,10 @@ class FlowBridgeProvider(
         try {
             when (remote.state) {
                 "completed" -> {
-                    // Retrieval failures must not hold the generation queue hostage.
-                    queue?.edit()?.putString("state_${job.id}", "released")?.commit()
+                    // Keep the gallery reserved until original files have been copied.
+                    (appContext as? com.vidadomu.nexus.NexusApplication)?.generationRepository?.updateJob(
+                        job.copy(status = GenerationStatus.PROCESSING,
+                            error = "Descargando ${remote.resultCount} archivos de Flow a Nexus…"))
                     copyCompletedResult(job, remote).map { copied ->
                     val goal = job.parameters["count"]?.toIntOrNull() ?: 1
                     if(copied.status == GenerationStatus.COMPLETED && copied.outputs.size < goal) {
@@ -239,6 +245,9 @@ class FlowBridgeProvider(
             val existing = outputs.firstOrNull { it.id == outputId }
             if (existing?.localUri?.let(::hasUsableLocalFile) == true) continue
 
+            (appContext as? com.vidadomu.nexus.NexusApplication)?.generationRepository?.updateJob(
+                job.copy(status = GenerationStatus.PROCESSING, outputs = outputs.toList(),
+                    error = "Descargando archivo ${index + 1} de ${remote.resultCount}…"))
             bridge.download(
                 jobId = remote.id,
                 index = index,
@@ -261,12 +270,14 @@ class FlowBridgeProvider(
         }
 
         if (copyError != null) {
+            val failures = (job.parameters["__flow_copy_failures"]?.toIntOrNull() ?: 0) + 1
             return Result.success(
                 job.copy(
                     status = GenerationStatus.PROCESSING,
                     progress = job.progress?.coerceAtLeast(0.94f) ?: 0.94f,
                     outputs = outputs,
-                    error = "Flow ya tiene un resultado, pero Nexus no ha podido copiarlo todavía. No se ha vuelto a enviar la generación.",
+                    parameters = job.parameters + ("__flow_copy_failures" to failures.toString()),
+                    error = "No se pudo copiar el resultado (intento $failures): ${copyError.message.orEmpty()} Se volverá a consultar sin generar otra vez.",
                     technicalDetails = flowDetails(remote)
                 )
             )
@@ -335,7 +346,8 @@ class FlowBridgeProvider(
         error = "Reintento automático ${attempt + 1} de ${FlowRetryPolicy.MAX_RETRIES}: ${flowFailureMessage(error)}")
 
     private fun flowDetails(remote: FlowBridgeJob): String = buildString {
-        append("Flow bridge state: ").append(remote.state)
+        append(FlowProgress.stage(remote.phase, remote.state))
+        append(" · ").append(FlowProgress.elapsed(remote.elapsedSeconds))
         append("\nAjustes y coste: proyecto activo de Flow")
         if (remote.idempotentReplay) append("\nLa solicitud se recuperó sin volver a enviarla.")
         remote.error?.takeIf { it.isNotBlank() }?.let { append("\nPuente: ").append(flowStateMessage(it)) }
@@ -344,13 +356,14 @@ class FlowBridgeProvider(
     private fun pendingMessage(remote: FlowBridgeJob): String? = when (remote.state) {
         "uncertain" -> "Flow no confirmó el envío. No se reenviará automáticamente; comprueba el proyecto antes de repetir."
         else -> remote.error?.takeIf { it.isNotBlank() }?.let(::flowStateMessage)
+            ?: "${FlowProgress.stage(remote.phase, remote.state)} · ${FlowProgress.elapsed(remote.elapsedSeconds)}"
     }
 
     private fun flowFailureMessage(error: String?): String =
         error?.takeIf { it.isNotBlank() }?.let(::flowStateMessage)
             ?: "Flow no pudo iniciar esta generación. Comprueba el proyecto antes de repetir."
 
-    private fun flowStateMessage(error: String): String = when (error) {
+    private fun flowStateMessage(error: String): String = FlowProgress.problem(error) ?: when (error) {
         "flow_project_not_open" -> "El proyecto de Flow no está abierto. Ábrelo y vuelve a consultar."
         "flow_project_ambiguous" -> "Hay más de un proyecto de Flow abierto. Deja abierto solo el proyecto que quieres usar."
         "flow_not_connected" -> "El puente (AXELPC o ASUS) no tiene una sesión de Flow disponible. Vuelve a conectar Flow."

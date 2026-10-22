@@ -43,6 +43,7 @@ internal class FlowBridgeClient(
                 FlowBridgeStatus(
                     connected = payload.bridgeStatus.equals("connected", ignoreCase = true),
                     generationEnabled = payload.generationReady,
+                    recovering = payload.recovering,
                     promptLimit = payload.promptLimit.coerceIn(1, MAX_PROMPT_LIMIT),
                     expectedOutputs = payload.expectedOutputs
                         .map { it.lowercase() }
@@ -437,7 +438,8 @@ internal class FlowBridgeClient(
         val ready = withContext(Dispatchers.IO) {
             runCatching {
                 // AXELPC tarda 1-3 s en comprobar Flow (abre la página por CDP); con poco margen se caía al ASUS sin motivo.
-                val probe = client.newBuilder().callTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build()
+                val probe = client.newBuilder().connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                    .callTimeout(5, java.util.concurrent.TimeUnit.SECONDS).build()
                 probe.newCall(authorizedRequest("$primary/status").get().build()).execute().use { response ->
                     response.isSuccessful && json.decodeFromString<StatusPayload>(response.body?.string().orEmpty()).generationReady
                 }
@@ -473,7 +475,10 @@ internal class FlowBridgeClient(
             resultCount = payload.resultCount,
             downloadAvailable = payload.downloadAvailable,
             error = payload.error,
-            idempotentReplay = payload.idempotentReplay
+            idempotentReplay = payload.idempotentReplay,
+            phase = payload.phase,
+            elapsedSeconds = payload.elapsedSeconds.coerceAtLeast(0),
+            phaseElapsedSeconds = payload.phaseElapsedSeconds.coerceAtLeast(0)
         )
     }
 
@@ -498,7 +503,7 @@ internal class FlowBridgeClient(
         )
     }
 
-    private fun referenceErrorMessage(code: String?): String? = when (code) {
+    private fun referenceErrorMessage(code: String?): String? = FlowProgress.problem(code) ?: when (code) {
         "auth_required" -> "Flow ha cerrado la sesión en el ASUS. Vuelve a entrar desde Ajustes › Google Flow."
         "upscale_failed" -> "Flow no pudo mejorar la resolución de este archivo (no cobra en ese caso)."
         "option_unavailable" -> "Flow no ofrece ese tamaño para este archivo."
@@ -532,7 +537,7 @@ internal class FlowBridgeClient(
         else -> if (expectedOutput == "video") "mp4" else "png"
     }
 
-    private fun statusDetail(reason: String?): String? = when (reason) {
+    private fun statusDetail(reason: String?): String? = FlowProgress.problem(reason) ?: when (reason) {
         null, "" -> null
         "flow_not_connected" -> "El puente (AXELPC o ASUS) no tiene una sesión de Flow disponible. Ábrela o vuelve a conectar Flow."
         "flow_project_not_open" -> "El proyecto de Flow no está abierto. Ábrelo y vuelve a comprobar el puente."
@@ -551,6 +556,7 @@ internal class FlowBridgeClient(
     private data class StatusPayload(
         @SerialName("bridge_status") val bridgeStatus: String = "",
         @SerialName("generation_ready") val generationReady: Boolean = false,
+        val recovering: Boolean = false,
         @SerialName("prompt_limit") val promptLimit: Int = DEFAULT_PROMPT_LIMIT,
         @SerialName("expected_outputs") val expectedOutputs: List<String> = emptyList(),
         @SerialName("reason") val reason: String? = null
@@ -578,7 +584,10 @@ internal class FlowBridgeClient(
         @SerialName("result_count") val resultCount: Int = 0,
         @SerialName("download_available") val downloadAvailable: Boolean = false,
         val error: String? = null,
-        @SerialName("idempotent_replay") val idempotentReplay: Boolean = false
+        @SerialName("idempotent_replay") val idempotentReplay: Boolean = false,
+        val phase: String? = null,
+        @SerialName("elapsed_seconds") val elapsedSeconds: Long = 0,
+        @SerialName("phase_elapsed_seconds") val phaseElapsedSeconds: Long = 0
     )
 
     @Serializable
@@ -618,7 +627,8 @@ data class FlowBridgeStatus(
     val checkedAt: Long? = null,
     /** The bridge deliberately does not expose the account or project title. */
     val projectName: String? = null,
-    val detail: String? = null
+    val detail: String? = null,
+    val recovering: Boolean = false
 ) {
     val isReady: Boolean get() = connected && generationEnabled
 }
@@ -630,7 +640,10 @@ data class FlowBridgeJob(
     val resultCount: Int,
     val downloadAvailable: Boolean,
     val error: String? = null,
-    val idempotentReplay: Boolean = false
+    val idempotentReplay: Boolean = false,
+    val phase: String? = null,
+    val elapsedSeconds: Long = 0,
+    val phaseElapsedSeconds: Long = 0
 )
 
 data class FlowBridgeDownload(

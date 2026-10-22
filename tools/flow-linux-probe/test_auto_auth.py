@@ -27,7 +27,7 @@ class AuthTests(unittest.IsolatedAsyncioTestCase):
                 load_credential()
 
     async def test_no_credential_never_touches_browser(self):
-        with patch.dict(os.environ, {}, clear=True), patch('auto_auth.Path.exists', return_value=False):
+        with patch.dict(os.environ, {}, clear=True), patch('auto_auth.Path.home', return_value=Path('fixture-home')), patch('auto_auth.Path.exists', return_value=False):
             self.assertEqual(await authenticate(None, None), {'status': 'credential_required'})
 
     async def test_cooldown_never_touches_browser(self):

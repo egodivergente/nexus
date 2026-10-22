@@ -188,7 +188,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(rejected.json(), {'error': 'confirmation_required'})
         self.assertEqual(accepted.status_code, 201)
         self.assertEqual(accepted.json()['job_id'], job['job_id'])
-        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0)
+        submit.assert_awaited_once_with('hola', 'image', valid_id, None, 1, 0, defer=True)
 
     def test_flow_job_poll_uses_mocked_bridge_without_a_browser(self):
         job = {'job_id': 'server-job-1234567', 'client_request_id': 'client-request-123456',
