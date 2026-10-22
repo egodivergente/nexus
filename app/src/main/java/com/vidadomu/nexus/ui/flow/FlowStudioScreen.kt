@@ -303,14 +303,19 @@ fun FlowStudioScreen(
                 var sent = 0
                 batch.forEachIndexed { index, draft ->
                     progressLabel = "Enviando prompt ${index + 1} de ${batch.size}…"
-                    val result = app.generationRepository.submitGeneration(FlowStudioPlan.request(draft, inputs))
-                    val job = result.getOrNull()
+                    val request = FlowStudioPlan.request(draft, inputs)
+                    val result = app.generationRepository.submitGeneration(request)
+                    val job = result.getOrNull() ?: app.generationRepository.getJob(request.id)
+                    // Failed submissions are also saved by the repository. Keep
+                    // their error visible in Studio after the snackbar disappears.
+                    if (job != null) {
+                        submittedIds = FlowStudioPlan.encodeIds(FlowStudioPlan.decodeIds(submittedIds) + job.id)
+                    }
                     if (job == null || job.status == GenerationStatus.FAILED) {
                         snackbarHost.showSnackbar(job?.error ?: result.exceptionOrNull()?.message
                             ?: "Flow no aceptó el prompt ${index + 1}. Los demás siguen su curso.")
                     } else {
                         sent++
-                        submittedIds = FlowStudioPlan.encodeIds(FlowStudioPlan.decodeIds(submittedIds) + job.id)
                         drafts.removeAll { it.id == draft.id }
                         if (job.status != GenerationStatus.COMPLETED) GenerationPollingWorker.enqueue(context.applicationContext, job.id)
                     }

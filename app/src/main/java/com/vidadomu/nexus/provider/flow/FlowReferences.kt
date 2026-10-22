@@ -34,12 +34,14 @@ internal object FlowReferences {
                     require(item.slotType in setOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE)) {
                         "Flow admite referencias de imagen o los fotogramas Inicio y Fin."
                     }
-                    references += id
+                    // Upload IDs identify the file bytes. Different picker URIs can
+                    // therefore refer to the same image; send that ingredient once.
+                    if (id !in references) references += id
                 }
             }
         }
         require(references.size <= MAX_IMAGES) { "El puente de Nexus permite hasta $MAX_IMAGES referencias por encargo." }
-        require(inputs.mapNotNull { it.remoteUrl }.distinct().size == inputs.size) { "No se pueden repetir referencias de Flow." }
+        require(initial == null || end == null || initial != end) { "No se pueden repetir los fotogramas Inicio y Fin de Flow." }
         require(end == null || initial != null) { "Añade primero el fotograma Inicio antes de Fin." }
         val effectiveMode = mode ?: when {
             initial != null || end != null -> "Fotogramas"
@@ -58,7 +60,7 @@ internal object FlowReferences {
     fun ids(inputs: List<MediaInput>): List<String> = inputs(inputs).references
 
     fun savedIds(parameters: Map<String, String>): List<String> =
-        parameters[PARAMETER]?.takeIf { it.isNotBlank() }?.split(',').orEmpty().also { ids ->
+        parameters[PARAMETER]?.takeIf { it.isNotBlank() }?.split(',').orEmpty().distinct().also { ids ->
             require(ids.size <= MAX_IMAGES && ids.all { ID.matches(it) }) { "Referencias de Flow no válidas." }
         }
 

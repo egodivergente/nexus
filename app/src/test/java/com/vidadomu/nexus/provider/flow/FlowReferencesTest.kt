@@ -37,9 +37,26 @@ class FlowReferencesTest {
         }
     }
     @Test fun tooManyReferencesAreRejectedRatherThanTruncated() {
-        assertThrows(IllegalArgumentException::class.java) { FlowReferences.ids(List(13) { input() }) }
+        val ids = (0..12).map { "ref_" + it.toString(16).padStart(64, '0') }
+        assertThrows(IllegalArgumentException::class.java) { FlowReferences.ids(ids.map { input(it) }) }
         assertThrows(IllegalArgumentException::class.java) {
-            FlowReferences.savedIds(mapOf(FlowReferences.PARAMETER to List(13) { id }.joinToString(",")))
+            FlowReferences.savedIds(mapOf(FlowReferences.PARAMETER to ids.joinToString(",")))
+        }
+    }
+
+    @Test fun sameImagePickedThroughDifferentUrisIsSentOnceInFirstOccurrenceOrder() {
+        val next = "ref_" + "b".repeat(64)
+        val repeated = input().copy(uriString = "content://picker/another-copy", fileName = "copy.png")
+        val references = FlowReferences.inputs(listOf(input(), input(next), repeated), "Referencias")
+        assertEquals(listOf(id, next), references.references)
+        assertEquals(references.references, FlowReferences.savedIds(mapOf(
+            FlowReferences.PARAMETER to listOf(id, next, id).joinToString(","))))
+    }
+
+    @Test fun duplicateCopiesDoNotConsumeAdditionalIngredientSlots() {
+        assertEquals(listOf(id), FlowReferences.ids(List(13) { input() }))
+        assertThrows(IllegalArgumentException::class.java) {
+            FlowReferences.inputs(listOf(input(), input().copy(mimeType = "image/gif")))
         }
     }
 
@@ -56,6 +73,9 @@ class FlowReferencesTest {
         assertEquals(FlowReferences.Inputs(emptyList(), id, end.remoteUrl), FlowReferences.inputs(listOf(start, end)))
         assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(end)) }
         assertThrows(IllegalArgumentException::class.java) { FlowReferences.inputs(listOf(start, start)) }
+        assertThrows(IllegalArgumentException::class.java) {
+            FlowReferences.inputs(listOf(start, end.copy(remoteUrl = id)))
+        }
     }
 
     @Test fun interchangeMovesBothFilesAndTheirRolesTogether() {

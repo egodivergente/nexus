@@ -303,6 +303,19 @@ class FlowJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(recovery.download_control_matches(
             {'index': 1, 'signature': 'visible-output'}, controls))
 
+    async def test_gallery_video_job_does_not_return_an_image(self):
+        from flow_gallery import controls
+        url = 'https://flow.google.com/project/test-project'
+        baseline = controls(url, [])
+        with patch.object(recovery, 'drive_flow_submission', AsyncMock(return_value=[c['signature'] for c in baseline])):
+            job, _ = await recovery.submit_flow_generation('video', 'video', 'video-request-123456')
+        current = controls(url, [{'media_id': 'image-output-1234', 'kind': 'image'},
+                                 {'media_id': 'video-output-5678', 'kind': 'video'}])
+        with patch.object(recovery, 'with_flow_project_page', AsyncMock(return_value=current)):
+            result = await recovery.refresh_flow_job(job)
+        self.assertEqual('completed', result['state'])
+        self.assertEqual(['video-output-5678'], [item['media_id'] for item in result['new_downloads']])
+
 
 if __name__ == '__main__':
     unittest.main()

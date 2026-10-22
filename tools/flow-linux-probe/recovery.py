@@ -26,6 +26,7 @@ from playwright.async_api import async_playwright
 import websockets
 from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
 import flow_agent
+import flow_gallery
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -370,6 +371,8 @@ async def flow_api_status():
 
 async def download_controls(page):
     """Return hashes of visible Flow download controls without reading card text."""
+    if await page.locator('flow-creative-agent-prompt-box').count():
+        return await flow_gallery.read_controls(page)
     buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
     controls = []
     for index in range(await buttons.count()):
@@ -408,6 +411,8 @@ def new_downloads(job, current_controls):
     baseline = list(job.get('baseline_downloads', []))
     baseline_counts = Counter(baseline)
     current_counts = Counter(item['signature'] for item in current_controls)
+    if any(item.get('kind') == 'project' and item['signature'] not in baseline_counts for item in current_controls):
+        return None, 'download_controls_changed'
     if any(current_counts[signature] < count for signature, count in baseline_counts.items()):
         return None, 'download_controls_changed'
     additions = []
@@ -415,7 +420,7 @@ def new_downloads(job, current_controls):
     for control in current_controls:
         signature = control['signature']
         seen[signature] += 1
-        if seen[signature] > baseline_counts[signature]:
+        if control.get('kind') != 'project' and seen[signature] > baseline_counts[signature]:
             additions.append(control)
     if not additions:
         return [], None
@@ -428,6 +433,9 @@ def new_downloads(job, current_controls):
 
 def download_control_matches(expected, current_controls):
     """`index` is the raw locator index; invisible controls are omitted above."""
+    if expected.get('media_id'):
+        return any(control.get('media_id') == expected['media_id'] and control['signature'] == expected['signature']
+                   for control in current_controls)
     return any(control['index'] == expected['index'] and control['signature'] == expected['signature']
                for control in current_controls)
 
@@ -454,16 +462,18 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None):
             if current_length:
                 # Do not overwrite a manual draft in the existing Flow tab.
                 raise FlowError('flow_composer_not_empty', 409)
-            baseline = await download_controls(page)
-            if on_run:
-                # Guardar la referencia antes del primer clic: si el lote se corta, los resultados siguen siendo atribuibles.
-                await on_run(0, [item['signature'] for item in baseline])
+            baseline = []
             filled = False
             click_started = False
             try:
                 for run in range(runs):
                     if run == 0:
                         await attach_references(page, references or [])
+                        # Uploaded ingredients can also appear in the gallery.
+                        # Snapshot them before Generate so they are never results.
+                        baseline = await download_controls(page)
+                        if on_run:
+                            await on_run(0, [item['signature'] for item in baseline])
                     elif references:
                         # Flow suele conservar las referencias tras enviar; si las quitó, se vuelven a poner.
                         with suppress(ReferenceError):
@@ -572,6 +582,7 @@ async def refresh_flow_job(job):
     additions, error = new_downloads(job, controls)
     if error:
         return await update_flow_job(job['job_id'], state='uncertain', error=error)
+    additions = [item for item in additions if not item.get('media_id') or item.get('kind') == job['expected_output']]
     if job['state'] == 'uncertain':
         # A click with an indeterminate outcome is never promoted automatically.
         return await update_flow_job(job['job_id'], new_downloads=additions,
@@ -634,14 +645,17 @@ async def download_flow_result(job_id, output_index):
             index = expected['index']
             if not download_control_matches(expected, controls):
                 raise FlowError('download_ambiguous', 409)
-            buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
-            button = buttons.nth(index)
-            if not await button.is_visible() or not await button.is_enabled():
-                raise FlowError('download_unavailable', 409)
             try:
-                async with page.expect_download(timeout=30000) as pending:
-                    await button.click(timeout=10000)
-                result = await pending.value
+                if expected.get('media_id'):
+                    result = await flow_gallery.download_original(page, expected)
+                else:
+                    buttons = page.get_by_role('button', name=re.compile(r'^(Descargar|Download)$'))
+                    button = buttons.nth(index)
+                    if not await button.is_visible() or not await button.is_enabled():
+                        raise FlowError('download_unavailable', 409)
+                    async with page.expect_download(timeout=30000) as pending:
+                        await button.click(timeout=10000)
+                    result = await pending.value
                 filename = safe_download_filename(result.suggested_filename, output_index)
                 path = private_download_path(job_id, output_index, filename)
                 await result.save_as(str(path))
