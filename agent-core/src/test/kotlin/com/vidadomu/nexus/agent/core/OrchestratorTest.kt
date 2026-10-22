@@ -149,6 +149,33 @@ class OrchestratorTest {
         assertEquals("ok", o.send(conv, "sigue").text)
     }
 
+    @Test fun `mensaje fusionado tras un turno cortado marca cual es la peticion actual`() = runTest {
+        val h = Harness()
+        val loop = { _: com.vidadomu.nexus.agent.core.llm.LlmRequest -> tools(use("l${System.nanoTime()}", "list_projects")) }
+        val llm = ScriptedLlmProvider(List(5) { loop } + listOf({ r ->
+            val last = r.messages.last().text()
+            assertTrue(last.indexOf(AgentOrchestrator.SUPERSEDED_TURN_NOTE) in 0 until last.indexOf("mejora estas imágenes"))
+            text("ok")
+        }))
+        val o = orchestrator(h, llm)
+        val conv = o.newConversation()
+        assertEquals("MAX_ROUNDS", o.send(conv, "vídeo antiguo").stop)
+        assertEquals("ok", o.send(conv, "mejora estas imágenes").text)
+    }
+
+    @Test fun `tiempo agotado antes de responder no deja el mensaje colgado`() = runTest {
+        val h = Harness()
+        val llm = ScriptedLlmProvider(listOf({ throw kotlinx.coroutines.CancellationException("tiempo agotado") }, { r ->
+            assertFalse(r.messages.any { it.text().contains("vídeo antiguo") })
+            text("hola")
+        }))
+        val o = orchestrator(h, llm)
+        val conv = o.newConversation()
+        assertFailsWith<kotlinx.coroutines.CancellationException> { o.send(conv, "vídeo antiguo") }
+        assertTrue(conv.history().isEmpty())
+        assertEquals("hola", o.send(conv, "mejora estas imágenes").text)
+    }
+
     @Test fun `error del LLM deshace el mensaje`() = runTest {
         val h = Harness()
         val llm = ScriptedLlmProvider(listOf({ throw LlmException(LlmException.Kind.AUTH, "token") }, { text("hola") }))

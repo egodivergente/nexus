@@ -738,12 +738,12 @@ internal fun AssistantMediaPreview(media: Attachment) {
                 player.addListener(listener)
                 onDispose { player.removeListener(listener); player.release() }
             }
-            Column(Modifier.widthIn(max = 280.dp)) {
+            Column(Modifier.width(280.dp)) {
                 AndroidView(
-                    factory={viewContext -> PlayerView(viewContext).apply {
-                        this.player=player; useController=true
-                        resizeMode=androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    }},
+                    factory={viewContext ->
+                        (android.view.LayoutInflater.from(viewContext).inflate(com.vidadomu.nexus.R.layout.nexus_inline_player,null) as PlayerView)
+                            .apply { this.player=player }
+                    },
                     update={it.player=player},
                     modifier=Modifier.fillMaxWidth().aspectRatio(ratio ?: 1f).clip(NexusTokens.card),
                 )

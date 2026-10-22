@@ -237,6 +237,11 @@ class AgentOrchestrator(
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
                 if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)
                 throw e
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Tiempo agotado o «Detener» antes de la primera respuesta: el mensaje no se queda colgado
+                // en el historial, o el siguiente se fusionaría con él y el modelo respondería al viejo.
+                if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)
+                throw e
             }
             input += response.usage.inputTokens; output += response.usage.outputTokens
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
@@ -413,7 +418,9 @@ class AgentOrchestrator(
         val last = conv.messages.lastOrNull()
         if (last != null && last.role == Role.USER) {
             val existingDocuments=last.content.filterIsInstance<ContentBlock.Document>().map {it.name}.toSet()
-            val merged=last.content + blocks.filterNot {it is ContentBlock.Document && it.name in existingDocuments}
+            // Lo anterior quedó sin respuesta (turno cortado): que el modelo sepa cuál es la petición actual.
+            val marker=ContentBlock.Text(SUPERSEDED_TURN_NOTE)
+            val merged=last.content + marker + blocks.filterNot {it is ContentBlock.Document && it.name in existingDocuments}
             val docLimit = config.limits.documents
             require(merged.count {it is ContentBlock.Document} <= docLimit) {"Este mensaje ya contiene $docLimit documentos. Completa el turno antes de añadir más."}
             conv.messages[conv.messages.lastIndex] = last.copy(content = merged)
@@ -469,6 +476,8 @@ class AgentOrchestrator(
 
     companion object {
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
+        internal const val SUPERSEDED_TURN_NOTE = "[NUEVO MENSAJE DEL USUARIO. El turno anterior quedó sin terminar; lo de arriba es solo contexto. " +
+            "Responde a ESTE mensaje y a sus adjuntos; no retomes la petición anterior salvo que el usuario lo pida aquí.]"
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }
