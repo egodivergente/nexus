@@ -244,6 +244,7 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Flow.route) {
                             FlowCreateScreen(
                                 onBack = { navController.popBackStack() },
+                                onOpenModels = { navController.navigate(Screen.Create.route) { launchSingleTop = true; popUpTo(Screen.Create.route) } },
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") }
                             )
                         }

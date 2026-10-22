@@ -519,6 +519,52 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** Batch import uses the very same schema slot as the visible form. No implicit edit-model switch. */
+    internal fun addCanvasMedia(fieldKey: String, expectedModelKey: String, selection: List<Pair<Uri, String>>) {
+        forgetModelSwitch()
+        val snapshot = _uiState.value
+        val model = snapshot.selectedModel ?: return
+        if (model.providerId + "/" + model.id != expectedModelKey) return
+        if (!snapshot.schemaReady) return
+        val field = CanvasInputPlan.fields(model, snapshot.parameters).find { it.key == fieldKey } ?: return
+        if (selection.isEmpty()) return
+        val token = mediaSession.begin(field.slot, append = field.maximum > 1, fieldKey = field.contract?.key)
+        beginMediaCopy()
+        viewModelScope.launch {
+            try {
+                val saved = selection.distinctBy { it.first.toString() }.take(minOf(field.remaining(snapshot.attachedMedia), CanvasInputPlan.PICKER_BATCH))
+                    .mapNotNull { (uri, mime) ->
+                        val local = persistMediaUri(uri, mime).getOrNull() ?: return@mapNotNull null
+                        if (!field.acceptsMime(local.second)) return@mapNotNull null
+                        if (local.first.scheme == "file" && withContext(Dispatchers.IO) {
+                            runCatching { LocalMediaInspector.inspect(app, local.first, local.second) }.isFailure
+                        }) return@mapNotNull null
+                        local
+                    }
+                if (!mediaSession.accepts(token)) return@launch
+                _uiState.update { current ->
+                    val active = current.selectedModel
+                    if (!mediaSession.accepts(token) || active?.id != model.id || active.providerId != model.providerId ||
+                        CanvasInputPlan.fields(active, current.parameters).none { it == field }) return@update current
+                    val retained = if (field.maximum == 1 && saved.isNotEmpty()) current.attachedMedia.filterNot(field::contains) else current.attachedMedia
+                    val known = retained.filter(field::contains).map { it.uriString }.toSet()
+                    val added = saved.filter { it.first.toString() !in known }.take(field.remaining(retained)).map { (uri, mime) ->
+                        AttachedMedia(uriString = uri.toString(), mimeType = mime, slotType = field.slot,
+                            fieldKey = field.contract?.key, fileName = extractFileName(uri, mime))
+                    }
+                    current.copy(attachedMedia = retained + added, errorMessage = when {
+                        saved.isEmpty() -> "No se pudo preparar la selección para ${field.label}."
+                        saved.size < selection.distinctBy { it.first.toString() }.size -> "Algunos archivos no se añadieron. Revisa el formato y el límite de ${field.label}."
+                        else -> null
+                    })
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (mediaSession.accepts(token)) _uiState.update { it.copy(errorMessage = "No se pudieron preparar los archivos. Vuelve a seleccionarlos.") }
+            } finally { endMediaCopy() }
+        }
+    }
+
     fun setContractMedia(field:ContractMediaField, uri:Uri, mime:String) { forgetModelSwitch();
         val selectedId=_uiState.value.selectedModel?.id
         if(!mime.startsWith(field.mime.substringBefore('/'))) {
@@ -543,6 +589,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updateParameter(key: String, value: String) { forgetModelSwitch();
+        val old = _uiState.value
+        if (old.selectedModel?.providerId == "google_flow" && key == "mode" && old.parameters[key] != value) {
+            mediaSession.reset()
+            val fields = CanvasInputPlan.fields(old.selectedModel, old.parameters + (key to value))
+            _uiState.update { state -> state.copy(attachedMedia = state.attachedMedia.filter { media -> fields.any { it.contains(media) } }) }
+        }
         _uiState.update {
             val updated = it.parameters.toMutableMap()
             updated[key] = value

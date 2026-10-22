@@ -24,8 +24,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 103
-        versionName = "1.9.69-agent"
+        versionCode = 104
+        versionName = "1.9.70-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -62,7 +62,7 @@ android {
         create("offlineQa") {
             initWith(getByName("debug"))
             // UI audit runs in its own sandbox, preserving earlier QA installations.
-            applicationIdSuffix = when {project.hasProperty("nexusMinimalQa") -> ".minimalqa";project.hasProperty("nexusMegaQa") -> ".megaqa";project.hasProperty("nexusBackgroundQa") -> ".backgroundqa";project.hasProperty("nexusMediaQa") -> ".mediaqa";project.hasProperty("nexusUiQa") -> ".uiqa";else -> ".qa"}
+            applicationIdSuffix = when {project.hasProperty("nexusCanvasQa") -> ".canvasqa";project.hasProperty("nexusMinimalQa") -> ".minimalqa";project.hasProperty("nexusMegaQa") -> ".megaqa";project.hasProperty("nexusBackgroundQa") -> ".backgroundqa";project.hasProperty("nexusMediaQa") -> ".mediaqa";project.hasProperty("nexusUiQa") -> ".uiqa";else -> ".qa"}
             isDebuggable = true
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "OFFLINE_QA", "true")

@@ -116,6 +116,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.vidadomu.nexus.ui.create.CanvasWorkspaceSwitch
+import com.vidadomu.nexus.assistant.AgentMediaStore
+import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
 private sealed interface FlowStudioConnection {
     data object Checking : FlowStudioConnection
     data object OfflineQa : FlowStudioConnection
@@ -127,17 +142,29 @@ private sealed interface FlowStudioConnection {
 @Composable
 fun FlowStudioScreen(
     onBack: () -> Unit,
-    onNavigateToOutput: (String) -> Unit
+    onNavigateToOutput: (String) -> Unit,
+    onOpenModels: () -> Unit = onBack
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val snackbarHost = remember { SnackbarHostState() }
+    val workspace = remember(app) { FlowWorkspaceStore(app, AssistantRuntime.get(app).settings.activeProjectId()) }
+    val savedWorkspace = remember(workspace) { workspace.read() }
 
-    val drafts = remember { mutableStateListOf(FlowStudioDraft()) }
-    val references = remember { mutableStateListOf<FlowStudioReference>() }
-    var submittedIds by rememberSaveable { mutableStateOf("") }
+    val drafts = rememberSaveable(saver = listSaver(
+        save = { values: androidx.compose.runtime.snapshots.SnapshotStateList<FlowStudioDraft> -> values.map { Json.encodeToString(it) } },
+        restore = { values -> values.map { Json.decodeFromString<FlowStudioDraft>(it) }.toMutableStateList() }
+    )) { savedWorkspace.drafts.toMutableStateList() }
+    val references = rememberSaveable(saver = listSaver(
+        save = { values: androidx.compose.runtime.snapshots.SnapshotStateList<FlowStudioReference> -> values.map { Json.encodeToString(it) } },
+        restore = { values -> values.map { Json.decodeFromString<FlowStudioReference>(it) }.toMutableStateList() }
+    )) { savedWorkspace.references.toMutableStateList() }
+    androidx.compose.runtime.SideEffect { workspace.write(drafts.toList(), references.toList()) }
+    var importingReferences by remember { mutableStateOf(false) }
+    var connectionSheet by rememberSaveable { mutableStateOf(false) }
+    var resultsFilter by rememberSaveable { mutableStateOf("Todos") }
     var connection by remember { mutableStateOf<FlowStudioConnection>(FlowStudioConnection.Checking) }
     var isSubmitting by remember { mutableStateOf(false) }
     var progressLabel by remember { mutableStateOf<String?>(null) }
@@ -164,7 +191,27 @@ fun FlowStudioScreen(
             }
         )
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        var left = false
+        val observer = LifecycleEventObserver { _, event ->
+            if(event == Lifecycle.Event.ON_PAUSE) left = true
+            if(event == Lifecycle.Event.ON_RESUME && left) {
+                left = false
+                scope.launch { refreshConnection(false) }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(Unit) { refreshConnection() }
+    if(connectionSheet) ModalBottomSheet(onDismissRequest={connectionSheet=false}) {
+        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            com.vidadomu.nexus.ui.settings.FlowRecoverySettings(onCreateInFlow={connectionSheet=false}, inStudio=true)
+            OutlinedButton(onClick={scope.launch {refreshConnection()}}) {Text("Comprobar conexión")}
+            TextButton(onClick={connectionSheet=false}) {Text("Volver al lienzo de Flow")}
+        }
+    }
     LaunchedEffect((connection as? FlowStudioConnection.Ready)?.status?.recovering) {
         while ((connection as? FlowStudioConnection.Ready)?.status?.recovering == true) {
             kotlinx.coroutines.delay(3_000)
@@ -180,25 +227,45 @@ fun FlowStudioScreen(
         if (accepted.isEmpty() || "video" in accepted) add(Modality.VIDEO)
     }
     val sendable = FlowStudioPlan.sendable(drafts, promptLimit, acceptedModalities)
-    val canSend = sendable.isNotEmpty() && !isSubmitting && connection is FlowStudioConnection.Ready
+    val canSend = sendable.isNotEmpty() && !isSubmitting && !importingReferences && connection is FlowStudioConnection.Ready
 
     val allJobs by app.generationRepository.allJobs.collectAsState()
-    val trackedIds = FlowStudioPlan.decodeIds(submittedIds)
-    val trackedJobs = trackedIds.mapNotNull { id -> allJobs.firstOrNull { it.id == id } }
+    val flowJobs = allJobs.filter { it.providerId == "google_flow" }.sortedByDescending { it.startedAt }
+    val trackedJobs = flowJobs.filter { job -> when(resultsFilter) {
+        "En curso" -> FlowStudioPlan.isActive(job.status)
+        "Listos" -> job.outputs.isNotEmpty()
+        "Errores" -> job.status == GenerationStatus.FAILED
+        else -> true
+    } }.take(30)
 
-    val pickReferences = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(FlowStudioPlan.MAX_REFERENCES)
-    ) { uris: List<Uri> ->
-        uris.forEach { uri ->
-            if (references.size >= FlowStudioPlan.MAX_REFERENCES || references.any { it.uri == uri.toString() }) return@forEach
-            val mime = context.contentResolver.getType(uri)?.lowercase()
-            if (mime != null && mime in FlowStudioPlan.REFERENCE_MIME_TYPES) {
-                references += FlowStudioReference(uri.toString(), mime, uri.lastPathSegment)
-            } else {
-                scope.launch { snackbarHost.showSnackbar("Flow solo admite referencias PNG, JPEG o WebP.") }
-            }
+    fun acceptReferences(uris: List<Uri>) {
+        if(importingReferences || isSubmitting || uris.isEmpty()) return
+        importingReferences = true
+        scope.launch {
+            try {
+                for(uri in uris.distinct()) {
+                    if(references.size >= FlowStudioPlan.MAX_REFERENCES) break
+                    val mime = com.vidadomu.nexus.assistant.projectMediaMimeType(context,uri)?.lowercase()
+                    if(mime !in FlowStudioPlan.REFERENCE_MIME_TYPES) {
+                        snackbarHost.showSnackbar("Flow admite referencias PNG, JPEG o WebP.")
+                        continue
+                    }
+                    val local = AgentMediaStore.persist(app,uri,mime,AssistantRuntime.get(app).settings.activeProjectId())
+                    if(references.none {it.uri == local.uri}) references += FlowStudioReference(local.uri, requireNotNull(mime), local.name)
+                }
+            } catch(cancelled: CancellationException) {throw cancelled}
+            catch(_: Exception) {snackbarHost.showSnackbar("No se pudo preparar la imagen. Vuelve a seleccionarla.")}
+            finally {importingReferences=false}
         }
     }
+    val remainingReferences = (FlowStudioPlan.MAX_REFERENCES - references.size).coerceAtLeast(1)
+    val pickReference = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if(uri!=null) acceptReferences(listOf(uri))
+    }
+    val pickReferences = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(remainingReferences.coerceAtLeast(2))
+    ) { uris: List<Uri> -> acceptReferences(uris) }
+    val libraryReferences = rememberProjectMediaPicker { uris -> acceptReferences(uris) }
 
     val saveDocument = rememberLauncherForActivityResult(
         remember {
@@ -312,11 +379,6 @@ fun FlowStudioScreen(
                     val request = FlowStudioPlan.request(draft, inputs)
                     val result = app.generationRepository.submitGeneration(request)
                     val job = result.getOrNull() ?: app.generationRepository.getJob(request.id)
-                    // Failed submissions are also saved by the repository. Keep
-                    // their error visible in Studio after the snackbar disappears.
-                    if (job != null) {
-                        submittedIds = FlowStudioPlan.encodeIds(FlowStudioPlan.decodeIds(submittedIds) + job.id)
-                    }
                     if (job == null || job.status == GenerationStatus.FAILED) {
                         snackbarHost.showSnackbar(job?.error ?: result.exceptionOrNull()?.message
                             ?: "Flow no aceptó el prompt ${index + 1}. Los demás siguen su curso.")
@@ -355,6 +417,7 @@ fun FlowStudioScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") }
                 },
+                actions = { IconButton(onClick={connectionSheet=true}) { Icon(Icons.Default.Tune,"Conexión y mantenimiento de Flow") } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
             )
         },
@@ -387,8 +450,22 @@ fun FlowStudioScreen(
             contentPadding = PaddingValues(NexusTokens.space16),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
+            item(key = "workspace") { CanvasWorkspaceSwitch(true, onOpenModels, {}) }
             item(key = "connection") {
                 StudioConnectionCard(connection) { scope.launch { refreshConnection() } }
+            }
+            item(key = "references") {
+                ReferencesSection(
+                    references = references,
+                    enabled = !isSubmitting && !importingReferences,
+                    onAdd = {
+                        if(remainingReferences == 1) pickReference.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        else pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    onLibrary = { libraryReferences.launch(arrayOf("image/*"), remainingReferences) },
+                    onRemove = { ref -> references.remove(ref) }
+                )
+                if(importingReferences) Text("Preparando imágenes…", style=MaterialTheme.typography.bodySmall)
             }
             items(drafts, key = { it.id }) { draft ->
                 DraftCard(
@@ -416,14 +493,6 @@ fun FlowStudioScreen(
                     Text("Añadir prompt (${drafts.size}/${FlowStudioPlan.MAX_DRAFTS})")
                 }
             }
-            item(key = "references") {
-                ReferencesSection(
-                    references = references,
-                    enabled = !isSubmitting,
-                    onAdd = { pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                    onRemove = { ref -> references.remove(ref) }
-                )
-            }
             item(key = "cost") {
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     TextButton(onClick = { costDetails = !costDetails }) {
@@ -435,11 +504,18 @@ fun FlowStudioScreen(
                         style = MaterialTheme.typography.bodySmall, color = TextMuted)
                 }
             }
-            if (trackedJobs.isNotEmpty()) {
+            if (flowJobs.isNotEmpty()) {
                 item(key = "grid_title") {
-                    Text("Resultados en vivo", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("Trabajos de Flow", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            listOf("Todos", "En curso", "Listos", "Errores").forEach { filter ->
+                                FilterChip(selected=resultsFilter==filter,onClick={resultsFilter=filter},label={Text(filter)})
+                            }
+                        }
+                    }
                 }
-                items(trackedJobs.asReversed(), key = { "job_${it.id}" }) { job ->
+                items(trackedJobs, key = { "job_${it.id}" }) { job ->
                     JobResultGroup(
                         job = job,
                         onOpen = { onNavigateToOutput(job.id) },
@@ -644,6 +720,7 @@ private fun ReferencesSection(
     references: List<FlowStudioReference>,
     enabled: Boolean,
     onAdd: () -> Unit,
+    onLibrary: () -> Unit,
     onRemove: (FlowStudioReference) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
@@ -653,23 +730,18 @@ private fun ReferencesSection(
             TextButton(onClick = onAdd, enabled = enabled && references.size < FlowStudioPlan.MAX_REFERENCES) {
                 Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
                 Spacer(Modifier.width(NexusTokens.space4))
-                Text("Añadir")
+                Text("Galería")
             }
         }
+        TextButton(onClick=onLibrary, enabled=enabled && references.size < FlowStudioPlan.MAX_REFERENCES) {Text("Biblioteca de Nexus")}
         Text("Se aplican a todos los prompts del envío. En vídeo activan el modo Referencias.",
             style = MaterialTheme.typography.bodySmall, color = TextMuted)
-        references.chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                row.forEach { ref ->
-                    Box(Modifier.weight(1f).aspectRatio(1f).clip(NexusTokens.field)) {
-                        AsyncImage(model = ref.uri, contentDescription = "Referencia", contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize())
-                        IconButton(onClick = { onRemove(ref) }, enabled = enabled, modifier = Modifier.align(Alignment.TopEnd)) {
-                            Icon(Icons.Default.Close, contentDescription = "Quitar referencia", tint = TextPrimary)
-                        }
-                    }
-                }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+        LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            items(references, key={it.uri}) { ref ->
+                com.vidadomu.nexus.ui.create.CanvasAttachmentTile(
+                    com.vidadomu.nexus.core.model.AttachedMedia(id=ref.uri,uriString=ref.uri,mimeType=ref.mimeType,fileName=ref.fileName,
+                        slotType=com.vidadomu.nexus.core.model.MediaSlotType.REFERENCE_IMAGE),
+                    "Referencia ${references.indexOf(ref)+1}",enabled) {onRemove(ref)}
             }
         }
     }
@@ -707,7 +779,8 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
             job.error?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (job.status == GenerationStatus.FAILED) AccentCoral else TextMuted)
             }
-            val cells = FlowStudioPlan.expectedCells(job)
+            if(job.status == GenerationStatus.FAILED) TextButton(onClick=onOpen) {Text("Revisar trabajo")}
+            val cells = if(active) FlowStudioPlan.expectedCells(job) else job.outputs.size
             (0 until cells).chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     row.forEach { index ->
@@ -720,10 +793,7 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            if (job.modality == Modality.VIDEO) {
-                OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Extender vídeo") }
-                Text(FlowStudioPlan.EXTEND_VIDEO_REASON, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-            }
+
         }
     }
 }

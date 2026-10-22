@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -163,82 +164,33 @@ internal fun FlagshipStudioHeader(
             editingFavorites = false
             haptics.perform(NexusHapticEvent.SELECTION)
         }, onDismiss = { editingFavorites = false })
-    val imeVisible = WindowInsets.isImeVisible
-    var expanded by rememberSaveable { mutableStateOf(true) }
-    var collapsedByIme by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(imeVisible) {
-        if (imeVisible && expanded) { expanded = false; collapsedByIme = true }
-        else if (!imeVisible && collapsedByIme) { expanded = true; collapsedByIme = false }
-    }
-    val toggle = {
-        haptics.perform(NexusHapticEvent.SELECTION)
-        collapsedByIme = false
-        expanded = !expanded
-    }
-    val enter = if (animate) expandVertically(tween(NexusTokens.contentDuration)) + fadeIn(tween(NexusTokens.contentDuration)) else EnterTransition.None
-    val exit = if (animate) shrinkVertically(tween(NexusTokens.contentDuration)) + fadeOut(tween(NexusTokens.contentDuration)) else ExitTransition.None
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Estudio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-            TextButton(onClick = onOpenFlow, modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
-                .semantics { contentDescription = "Abrir Google Flow" }) {
-                BrandLogo(organization = "Google", size = 18.dp)
-                Spacer(Modifier.width(NexusTokens.space8))
-                Text("Google Flow", style = MaterialTheme.typography.labelLarge)
-            }
-            IconButton(onClick = { editingFavorites = true }, modifier = Modifier.size(NexusTokens.minimumTouch)) {
-                Icon(Icons.Default.Tune, "Personalizar modelos destacados", Modifier.size(20.dp))
-            }
-            if (expanded) {
-                IconButton(onClick = toggle, modifier = Modifier.size(NexusTokens.minimumTouch)
-                    .semantics { contentDescription = "Ocultar modelos insignia" }) {
-                    Icon(Icons.Default.KeyboardArrowUp, null)
-                }
-            }
-        }
-        AnimatedVisibility(visible = !expanded, enter = enter, exit = exit) {
-            Row(Modifier.fillMaxWidth().height(NexusTokens.minimumTouch), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Row(Modifier.weight(1f).height(NexusTokens.minimumTouch)
-                    .semantics(mergeDescendants = true) { contentDescription = "Mostrar modelos insignia" }
-                    .clickable(role = Role.Button, onClick = toggle),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    BrandLogo(organization = selectedModel?.organization, family = selectedModel?.family,
-                        modelId = selectedModel?.id, size = 20.dp, containerSize = 28.dp)
-                    Spacer(Modifier.width(NexusTokens.space8))
-                    Text(selectedModel?.displayName ?: "Elige modelo", style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                StudioModalitySegments(modality, animate, onModality, Modifier.width(168.dp), segmentHeight = 36.dp)
-            }
-        }
-        AnimatedVisibility(visible = expanded, enter = enter, exit = exit) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        CanvasWorkspaceSwitch(false, {}, onOpenFlow)
         StudioModalitySegments(modality, animate, onModality)
-        if (selectedModel != null && matches.none { it.model.id == selectedModel.id && it.model.providerId == selectedModel.providerId }) {
-            Text("Activo: ${selectedModel.displayName}", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                BrandLogo(organization=selectedModel?.organization, modelId=selectedModel?.id, size=28.dp)
+                Column(Modifier.weight(1f)) {
+                    Text("Modelo seleccionado",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(selectedModel?.displayName ?: "Elegir modelo", style=MaterialTheme.typography.titleSmall)
+                }
+                Icon(Icons.Default.SwapHoriz,"Cambiar modelo")
+            }
         }
-        val rail = rememberLazyListState()
-        val activeIndex = matches.indexOfFirst { it.model.id == selectedModel?.id && it.model.providerId == selectedModel?.providerId }
-        LaunchedEffect(modality, activeIndex, matches.map { it.model.studioKey() }) {
-            if (activeIndex >= 0) { if (animate) rail.animateScrollToItem(activeIndex) else rail.scrollToItem(activeIndex) }
-            else rail.scrollToItem(0)
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            TextButton(onClick={expanded=!expanded}) { Text(if(expanded) "Ocultar favoritos" else "Modelos favoritos") }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick={editingFavorites=true}) { Icon(Icons.Default.Tune,"Personalizar modelos destacados",Modifier.size(20.dp)) }
         }
-        LazyRow(state = rail, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-            items(matches, key = { it.model.providerId + "/" + it.model.id }) { match ->
-                val active = match.model.id == selectedModel?.id && match.model.providerId == selectedModel?.providerId
-                FlagshipCard(match, active, animate) {
-                    haptics.perform(NexusHapticEvent.SELECTION, changed = !active)
+        if(expanded) LazyRow(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            items(matches,key={it.model.providerId+"/"+it.model.id}) { match ->
+                FlagshipCard(match, match.model.id==selectedModel?.id && match.model.providerId==selectedModel?.providerId, animate) {
                     onChoose(match.model)
                 }
             }
-            item(key = "all-models") { AllModelsCard(onAllModels) }
-        }
-        }
+            item(key="all-models") { AllModelsCard(onAllModels) }
         }
     }
 }

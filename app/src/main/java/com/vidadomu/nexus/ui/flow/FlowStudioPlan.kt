@@ -9,6 +9,7 @@ import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.provider.flow.FlowBridgeProvider
 import java.util.UUID
 
+@kotlinx.serialization.Serializable
 data class FlowStudioDraft(
     val id: String = UUID.randomUUID().toString(),
     val prompt: String = "",
@@ -16,6 +17,7 @@ data class FlowStudioDraft(
     val modality: Modality = Modality.IMAGE
 )
 
+@kotlinx.serialization.Serializable
 data class FlowStudioReference(val uri: String, val mimeType: String, val fileName: String?, val remoteId: String? = null)
 
 object FlowStudioPlan {

@@ -4,12 +4,6 @@ import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.runtime.saveable.rememberSaveable
 
 import android.net.Uri
-import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
-import com.vidadomu.nexus.assistant.projectMediaMimeType
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,8 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import com.vidadomu.nexus.ui.components.rememberPriceEstimate
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -38,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,31 +38,17 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
-import com.vidadomu.nexus.core.model.AccountBalance
-import com.vidadomu.nexus.core.model.ContractMediaField
-import com.vidadomu.nexus.core.model.AttachedMedia
-import com.vidadomu.nexus.core.model.MediaSlotType
-import com.vidadomu.nexus.core.model.ModelCapability
-import com.vidadomu.nexus.core.model.ModelInputMode
 import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import com.vidadomu.nexus.core.model.ParameterType
 import com.vidadomu.nexus.ui.components.StudioChrome
-import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.components.StudioToolChip
-import com.vidadomu.nexus.ui.components.StudioRemoveMediaButton
-import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -150,7 +127,6 @@ fun CreateScreen(
             else viewModel.selectModel(model)
         }
     }
-    var showMedia by remember { mutableStateOf(false) }
     var showInspiration by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showBatch by remember { mutableStateOf(false) }
@@ -172,63 +148,9 @@ fun CreateScreen(
     val readiness=creationReadiness(if(comparisonState.phase == ComparisonPhase.SENDING) state.copy(isSubmitting = true) else state)
     val screenMargin = if(horizontalActions) NexusTokens.tabletMargin else NexusTokens.screenMargin
 
-    val primaryImageLauncher = rememberProjectMediaPicker { uris ->
-        val uri = uris.firstOrNull()
-        if (uri != null) {
-            val mime = projectMediaMimeType(context, uri) ?: "image/jpeg"
-            viewModel.setPrimaryImage(uri, mime)
-        }
-    }
-
-    val lastFrameLauncher = rememberProjectMediaPicker { uris ->
-        val uri = uris.firstOrNull()
-        if (uri != null) {
-            val mime = projectMediaMimeType(context, uri) ?: "image/jpeg"
-            viewModel.setLastFrameImage(uri, mime)
-        }
-    }
-
-    val multiImageLauncher = rememberProjectMediaPicker { uris ->
-        if (uris.isNotEmpty()) {
-            val items = uris.map { uri ->
-                val mime = projectMediaMimeType(context, uri) ?: "image/jpeg"
-                uri to mime
-            }
-            viewModel.addReferenceImages(items)
-        }
-    }
-
-    val videoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val mime = projectMediaMimeType(context, uri) ?: "video/mp4"
-            viewModel.setVideoInput(uri, mime)
-        }
-    }
-
-    var contractField by remember { mutableStateOf<ContractMediaField?>(null) }
-    val contractPicker=rememberProjectMediaPicker { uris ->
-        val uri = uris.firstOrNull()
-        val field=contractField
-        if(uri!=null && field!=null) viewModel.setContractMedia(field,uri,projectMediaMimeType(context, uri) ?: field.mime)
-        contractField=null
-    }
-
-    var activeFileSlotType by remember { mutableStateOf(MediaSlotType.PRIMARY_IMAGE) }
-    val universalFileLauncher = rememberProjectMediaPicker { uris ->
-        val uri = uris.firstOrNull()
-        if (uri != null) {
-            val mime = projectMediaMimeType(context, uri) ?: "application/octet-stream"
-            when (activeFileSlotType) {
-                MediaSlotType.PRIMARY_IMAGE -> viewModel.setPrimaryImage(uri, mime)
-                MediaSlotType.LAST_FRAME -> viewModel.setLastFrameImage(uri, mime)
-                MediaSlotType.REFERENCE_IMAGE -> viewModel.addReferenceImages(listOf(uri to mime))
-                MediaSlotType.VIDEO_INPUT -> viewModel.setVideoInput(uri, mime)
-                MediaSlotType.VIDEO_REFERENCE -> viewModel.setVideoInput(uri, mime)
-            }
-        }
-    }
+    val inputFields = state.selectedModel?.takeIf { state.schemaReady }?.let {
+        CanvasInputPlan.fields(it, state.parameters)
+    }.orEmpty()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -246,7 +168,7 @@ fun CreateScreen(
                             when(readiness.fixTarget) {
                                 CreationFixTarget.MODEL -> showModelPickerSheet=true
                                 CreationFixTarget.PROMPT -> batchScope.launch {canvasScroll.animateScrollToItem(1);promptFocus.requestFocus()}
-                                CreationFixTarget.MEDIA -> showMedia=true
+                                CreationFixTarget.MEDIA -> batchScope.launch { canvasScroll.animateScrollToItem(1) }
                                 CreationFixTarget.PARAMETERS -> showParameters=true
                                 CreationFixTarget.RETRY_CONFIGURATION -> viewModel.retryConfiguration()
                                 null -> Unit
@@ -257,7 +179,7 @@ fun CreateScreen(
                             Icon(Icons.Default.ChevronRight, null)
                         }
                     }
-                    if(state.selectedModality == Modality.IMAGE && state.schemaReady && !busy && !compactTyping) {
+                    if(state.selectedModality == Modality.IMAGE && state.selectedModel?.promptAccepted != false && state.schemaReady && !busy && !compactTyping) {
                         val shownCount = countParam?.let { param ->
                             state.parameters[param.key]?.toIntOrNull() ?: param.defaultValue.toIntOrNull() ?: 1
                         } ?: batchCount
@@ -268,7 +190,7 @@ fun CreateScreen(
                     }
                     StudioGenerateButton(estimate.amount, readiness.canSubmit, busy,
                         if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
-                        generateAction)
+                        generateAction, actionLabel=if(state.selectedModel?.promptAccepted == false) "Procesar" else "Generar")
                 }
             }
         },
@@ -302,11 +224,31 @@ fun CreateScreen(
                 FlagshipStudioHeader(state.selectedModality, catalogModels, state.selectedModel,
                     viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
             }
-            item {
-                StudioPromptField(state.prompt, viewModel::updatePrompt,
-                    if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
-                    focusRequester=promptFocus)
-                // Sin altura fija: con una caja del 32 % de la pantalla la 8.ª línea, «Expandir» y el contador quedaban recortados.
+            item(key="composer") {
+                Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    state.selectedModel?.let { model ->
+                        Text(if(model.promptAccepted) "Prepara las entradas y describe el resultado" else "Transforma tu archivo con los ajustes de este modelo",
+                            style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if(state.selectedModel?.promptAccepted != false) StudioPromptField(state.prompt, viewModel::updatePrompt,
+                        if(state.selectedModality == Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
+                        focusRequester=promptFocus)
+                    inputFields.forEach { field ->
+                        val modelKey = state.selectedModel?.let { it.providerId + "/" + it.id }.orEmpty()
+                        key(state.selectedModel?.providerId, state.selectedModel?.id, field.key) {
+                            CanvasAttachmentEditor(field, state.attachedMedia,
+                                enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
+                                onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)}, onRemove=viewModel::removeMedia)
+                        }
+                    }
+                    if(state.schemaReady && inputFields.isEmpty() && state.selectedModel?.promptAccepted == true) {
+                        Text("Este modelo crea desde texto.", style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(state.selectedModel?.pairedEditModelId != null) TextButton(onClick=viewModel::switchToEditModel) {
+                            Text("Cambiar al modelo de edición con imágenes")
+                        }
+                    }
+                }
             }
 
             // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
@@ -342,29 +284,9 @@ fun CreateScreen(
             }
 
 
-            state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
-                if(model.contractMedia.isNotEmpty() || model.supportsImageInput || model.supportsVideoInput ||
-                    model.inputMode != ModelInputMode.TEXT_ONLY || model.pairedEditModelId != null || state.attachedMedia.isNotEmpty()) {
-                    item {
-                        LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8), verticalAlignment=Alignment.CenterVertically) {
-                            items(state.attachedMedia, key={it.id}) { media ->
-                                CanvasMediaThumbnail(media) { viewModel.removeMedia(media.id) }
-                            }
-                            item {
-                                FilledTonalButton(onClick={showMedia=true}, modifier=Modifier.heightIn(min=NexusTokens.minimumTouch), shape=NexusTokens.field,
-                                    colors=ButtonDefaults.filledTonalButtonColors(contentColor=TextSecondary)) {
-                                    Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.space24))
-                                    Text(if(state.attachedMedia.isEmpty()) "Medios" else "Añadir")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             item {
                 StudioToolRow {
-                    StudioToolChip("Inspirar") {showInspiration=true}
-                    StudioToolChip("Parámetros", "Parámetros del modelo") {showParameters=true}
+                    if(state.selectedModel?.promptAccepted != false) StudioToolChip("Inspirar") {showInspiration=true}
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
                     Box {
                         StudioToolChip("Más", "Más herramientas del Lienzo") {showToolMenu=true}
@@ -382,8 +304,8 @@ fun CreateScreen(
 
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
-                val inline=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty().filter {!it.isAdvanced}
-                if(inline.isNotEmpty()) item(key="inline-params") {
+                val inline=state.selectedModel?.let(CanvasInputPlan::primaryParameters).orEmpty()
+                if(inline.isNotEmpty() || state.selectedModel?.parameters?.any {it.isAdvanced} == true) item(key="inline-params") {
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
                         Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -392,17 +314,17 @@ fun CreateScreen(
                                 .clickable(role=androidx.compose.ui.semantics.Role.Button) {inlineParametersExpanded=!inlineParametersExpanded},
                                 verticalAlignment=Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("Ajustes del modelo",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
-                                    Text(parameterSummary(state),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Ajustes de ${state.selectedModel?.displayName.orEmpty()}",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
+                                    Text("${inline.size} opciones propias del modelo",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Icon(if(inlineParametersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
                             }
                             if(inlineParametersExpanded) {
-                                inline.take(6).forEach { param ->
+                                inline.forEach { param ->
                                     key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
                                 }
-                                if(inline.size>6 || state.selectedModel?.parameters?.any {it.isAdvanced} == true)
-                                    TextButton(onClick={showParameters=true}) {Text("Todas las opciones")}
+                                if(state.selectedModel?.parameters?.any {it.isAdvanced} == true)
+                                    TextButton(onClick={showParameters=true}) {Text("Ajustes avanzados")}
                             }
                         }
                     }
@@ -427,48 +349,6 @@ fun CreateScreen(
                 } else InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa sus detalles antes de volver a generar."),technicalDetails=raw)
             } }
         }
-    }
-    if(showMedia) CanvasSheet("Medios de entrada",{showMedia=false}) {
-                state.selectedModel?.takeIf { state.schemaReady }?.let { model ->
-                    if(model.contractEndpoint==null && model.contractMedia.isNotEmpty()) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia,viewModel::swapFlowFrames)
-                    }
-                    if(model.contractEndpoint!=null) {
-                        ContractMediaEditor(model,state.attachedMedia,{field -> contractField=field;contractPicker.launch(arrayOf(field.mime), maxSelection = 1)},viewModel::removeMedia,viewModel::swapFlowFrames)
-                    } else AdaptiveModelMediaInput(
-                        model = model,
-                        attachedMedia = state.attachedMedia.filter { it.fieldKey==null },
-                        isMediaRequired = viewModel.isMediaInputRequired(),
-                        onPickPrimary = {
-                            primaryImageLauncher.launch(
-                                arrayOf("image/*"), maxSelection = 1
-                            )
-                        },
-                        onPickLastFrame = {
-                            lastFrameLauncher.launch(
-                                arrayOf("image/*"), maxSelection = 1
-                            )
-                        },
-                        onPickMultipleImages = {
-                            multiImageLauncher.launch(arrayOf("image/*"))
-                        },
-                        onPickVideo = {
-                            videoLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
-                            )
-                        },
-                        onPickFile = { slot, mime ->
-                            activeFileSlotType = slot
-                            universalFileLauncher.launch(arrayOf(mime), maxSelection = 1)
-                        },
-                        onSwitchToEdit = {
-                            viewModel.switchToEditModel()
-                        },
-                        onRemoveMedia = { id -> viewModel.removeMedia(id) },
-                        onClearSlot = { slot -> viewModel.clearSlot(slot) }
-                    )
-                }
-
     }
     if(showParameters) CanvasSheet("Parámetros",{showParameters=false}) {
         if(state.isLoadingSchema) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -764,637 +644,6 @@ private fun ModalityTabsRow(
 }
 
 @Composable
-private fun AdaptiveModelMediaInput(
-    model: NexusModel,
-    attachedMedia: List<AttachedMedia>,
-    isMediaRequired: Boolean,
-    onPickPrimary: () -> Unit,
-    onPickLastFrame: () -> Unit,
-    onPickMultipleImages: () -> Unit,
-    onPickVideo: () -> Unit,
-    onPickFile: (MediaSlotType, String) -> Unit,
-    onSwitchToEdit: () -> Unit,
-    onRemoveMedia: (String) -> Unit,
-    onClearSlot: (MediaSlotType) -> Unit
-) {
-    if (model.supportsImageInput || model.supportsVideoInput) {
-        Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            fun required(field: String?) = field in model.nativeRequiredFields
-            if (model.firstFrameField != null) {
-                val media = attachedMedia.find { it.slotType == MediaSlotType.PRIMARY_IMAGE }
-                SingleMediaSlotCard("Imagen de entrada", null, media, "Añadir imagen",
-                    required(model.firstFrameField), Icons.Default.Image, onPickPrimary,
-                    { onPickFile(MediaSlotType.PRIMARY_IMAGE, "image/*") }, { media?.let { onRemoveMedia(it.id) } })
-            }
-            if (model.lastFrameField != null) {
-                val media = attachedMedia.find { it.slotType == MediaSlotType.LAST_FRAME }
-                SingleMediaSlotCard("Último fotograma", null, media, "Añadir imagen",
-                    required(model.lastFrameField), Icons.Default.Image, onPickLastFrame,
-                    { onPickFile(MediaSlotType.LAST_FRAME, "image/*") }, { media?.let { onRemoveMedia(it.id) } })
-            }
-            if (model.imagesArrayField != null) {
-                val refs = attachedMedia.filter { it.slotType == MediaSlotType.REFERENCE_IMAGE }
-                Text("Imágenes de referencia", color = TextSecondary)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    items(refs, key = { it.id }) { media -> ReferenceImageThumbnail(media) { onRemoveMedia(media.id) } }
-                    if (refs.size < model.maxImages) item {
-                        AddReferenceButton(model.maxImages - refs.size, required(model.imagesArrayField), onPickMultipleImages)
-                    }
-                }
-            }
-            if (model.videoField != null || model.videosArrayField != null) {
-                val videos = attachedMedia.filter { it.slotType in listOf(MediaSlotType.VIDEO_INPUT, MediaSlotType.VIDEO_REFERENCE) }
-                videos.forEach { media ->
-                    SingleMediaSlotCard("Vídeo de entrada", null, media, "Añadir vídeo", false,
-                        Icons.Default.Videocam, onPickVideo, null, { onRemoveMedia(media.id) })
-                }
-                if (videos.isEmpty() || model.videosArrayField != null && videos.size < model.maxVideos) {
-                    SingleMediaSlotCard("Vídeo de entrada", null, null, "Añadir vídeo",
-                        required(model.videoField) || required(model.videosArrayField), Icons.Default.Videocam,
-                        onPickVideo, { onPickFile(MediaSlotType.VIDEO_INPUT, "video/*") }, {})
-                }
-            }
-        }
-        return
-    }
-    when (model.inputMode) {
-        ModelInputMode.TEXT_ONLY -> {
-            // Strictly respect model's native configuration: TEXT_ONLY accepts no attachments.
-            // If paired edit variant exists, provide an explicit option to switch models.
-            if (model.pairedEditModelId != null) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(NexusTokens.field)
-                        .clickable { onSwitchToEdit() },
-                    color = SurfaceDark.copy(alpha = 0.5f),
-                    border = null
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = PrimaryNeon.copy(alpha = 0.8f),
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "Este modelo crea desde texto",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = TextMuted,
-                                    fontSize = MaterialTheme.typography.labelMedium.fontSize
-                                )
-                            )
-                        }
-                        Text(
-                            text = "Usar una imagen",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = PrimaryNeon,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = MaterialTheme.typography.labelMedium.fontSize
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        ModelInputMode.SINGLE_IMAGE -> {
-            val primary = attachedMedia.find { it.slotType == MediaSlotType.PRIMARY_IMAGE } ?: attachedMedia.firstOrNull()
-            val isI2V = model.capabilities.contains(ModelCapability.IMAGE_TO_VIDEO)
-            val title = if (isI2V) "Imagen inicial" else "Imagen de entrada"
-            val placeholder = if (isI2V) "Añadir imagen para animar" else "Añadir imagen"
-
-            SingleMediaSlotCard(
-                title = title,
-                badge = null,
-                media = primary,
-                placeholder = placeholder,
-                isRequired = isMediaRequired && primary == null,
-                icon = Icons.Default.AddPhotoAlternate,
-                onClick = onPickPrimary,
-                onPickFile = { onPickFile(MediaSlotType.PRIMARY_IMAGE, "image/*") },
-                onRemove = { primary?.let { onRemoveMedia(it.id) } }
-            )
-        }
-
-        ModelInputMode.DUAL_FRAME -> {
-            val firstFrame = attachedMedia.find { it.slotType == MediaSlotType.PRIMARY_IMAGE } ?: attachedMedia.firstOrNull()
-            val lastFrame = attachedMedia.find { it.slotType == MediaSlotType.LAST_FRAME } ?: attachedMedia.drop(1).firstOrNull()
-
-            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Imágenes del clip",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = TextMuted,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                    )
-                    Text(
-                        text = "Final opcional",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = PrimaryNeon,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        DualFrameSlotCard(
-                            label = "Imagen inicial",
-                            subLabel = if (firstFrame != null) "Listo" else "Necesaria",
-                            badge = if (firstFrame == null) "Obligatorio" else null,
-                            media = firstFrame,
-                            isRequired = firstFrame == null,
-                            onClick = onPickPrimary,
-                            onRemove = { firstFrame?.let { onRemoveMedia(it.id) } }
-                        )
-                    }
-                    Box(modifier = Modifier.weight(1f)) {
-                        DualFrameSlotCard(
-                            label = "Imagen final",
-                            subLabel = if (lastFrame != null) "Listo" else "Opcional",
-                            badge = if (lastFrame != null) "Interpolado" else "Opcional",
-                            media = lastFrame,
-                            isRequired = false,
-                            onClick = onPickLastFrame,
-                            onRemove = { lastFrame?.let { onRemoveMedia(it.id) } }
-                        )
-                    }
-                }
-            }
-        }
-
-        ModelInputMode.MULTI_IMAGE -> {
-            val refImages = attachedMedia.filter { it.slotType in listOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE) }
-            val maxAllowed = model.maxImages
-
-            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Imágenes de referencia",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = TextMuted,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                    )
-                    Surface(
-                        shape = NexusTokens.thumbnail,
-                        color = if (refImages.isNotEmpty()) AccentEmerald.copy(alpha = 0.15f) else SurfaceVariantDark,
-                        border = null
-                    ) {
-                        Text(
-                            text = if(maxAllowed==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size} / $maxAllowed imágenes",
-                            modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (refImages.isNotEmpty()) AccentEmerald else TextSecondary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = MaterialTheme.typography.labelMedium.fontSize
-                            )
-                        )
-                    }
-                }
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(refImages,key={it.id}) { img ->
-                        ReferenceImageThumbnail(
-                            media = img,
-                            onRemove = { onRemoveMedia(img.id) }
-                        )
-                    }
-
-                    if (refImages.size < maxAllowed) {
-                        item {
-                            AddReferenceButton(
-                                remaining = maxAllowed - refImages.size,
-                                isRequired = isMediaRequired && refImages.isEmpty(),
-                                onClick = onPickMultipleImages
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        ModelInputMode.VIDEO_INPUT -> {
-            val video = attachedMedia.find { it.slotType == MediaSlotType.VIDEO_INPUT } ?: attachedMedia.firstOrNull()
-            SingleMediaSlotCard(
-                title = "Vídeo de entrada",
-                badge = null,
-                media = video,
-                placeholder = "Añadir vídeo",
-                isRequired = video == null,
-                icon = Icons.Default.Videocam,
-                onClick = onPickVideo,
-                onPickFile = { onPickFile(MediaSlotType.VIDEO_INPUT, "video/*") },
-                onRemove = { video?.let { onRemoveMedia(it.id) } }
-            )
-        }
-
-        ModelInputMode.MULTI_MODAL -> {
-            val refImages = attachedMedia.filter { it.slotType in listOf(MediaSlotType.REFERENCE_IMAGE, MediaSlotType.PRIMARY_IMAGE) }
-            val refVideos = attachedMedia.filter { it.slotType in listOf(MediaSlotType.VIDEO_REFERENCE, MediaSlotType.VIDEO_INPUT) }
-
-            Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Archivos de referencia",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = TextMuted,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                    )
-                    Text(
-                        text = if(model.maxImages==Int.MAX_VALUE) "${refImages.size} imágenes" else "${refImages.size}/${model.maxImages} imágenes",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = PrimaryNeon,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                }
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(refImages,key={it.id}) { img ->
-                        ReferenceImageThumbnail(
-                            media = img,
-                            onRemove = { onRemoveMedia(img.id) }
-                        )
-                    }
-
-                    if (refImages.size < model.maxImages) {
-                        item {
-                            AddReferenceButton(
-                                remaining = model.maxImages - refImages.size,
-                                isRequired = false,
-                                onClick = onPickMultipleImages
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SingleMediaSlotCard(
-    title: String,
-    badge: String?,
-    media: AttachedMedia?,
-    placeholder: String,
-    isRequired: Boolean,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    onPickFile: (() -> Unit)? = null,
-    onRemove: () -> Unit
-) {
-    val borderColor = when {
-        media != null -> AccentEmerald.copy(alpha = 0.7f)
-        isRequired -> BorderSubtle
-        else -> BorderSubtle
-    }
-    val bgColor = when {
-        media != null -> SurfaceDark
-        isRequired -> SurfaceDark
-        else -> SurfaceDark
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(NexusTokens.field)
-            .clickable { onClick() },
-        color = bgColor,
-        border = null,
-        shape = NexusTokens.field
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(NexusTokens.space8),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (media != null) {
-                if(media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")) AsyncImage(
-                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(Uri.parse(media.uriString))
-                        .apply {if(media.mimeType.startsWith("video/")) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}}.build(),
-                    contentDescription = title,
-                    modifier = Modifier.size(54.dp).clip(NexusTokens.thumbnail),contentScale = ContentScale.Crop)
-                else Box(Modifier.size(54.dp).clip(NexusTokens.thumbnail).background(SurfaceVariantDark),contentAlignment=Alignment.Center) {
-                    Icon(if(media.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Movie,title,tint=TextSecondary)
-                }
-                Spacer(modifier = Modifier.width(NexusTokens.space12))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
-                    ) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = AccentEmerald,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                                letterSpacing = 0.8.sp
-                            )
-                        )
-                    }
-                    Text(
-                        text = media.fileName ?: "Archivo adjunto cargado",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    MediaFactsLabel(media)
-                    Text(
-                        text = "Toca para reemplazar",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = TextMuted,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize
-                        )
-                    )
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Quitar",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(NexusTokens.thumbnail)
-                        .background(SurfaceVariantDark),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = TextSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(NexusTokens.space12))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
-                    ) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (isRequired) TextSecondary else TextSecondary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                                letterSpacing = 0.8.sp
-                            )
-                        )
-                        if (badge != null) {
-                            Surface(
-                                shape = NexusTokens.thumbnail,
-                                color = SurfaceVariantDark
-                            ) {
-                                Text(
-                                    text = badge,
-                                    modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = TextSecondary,
-                                        fontSize = MaterialTheme.typography.labelMedium.fontSize,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        text = if(isRequired) placeholder + "\nNecesaria para este modelo" else placeholder,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = if (isRequired) TextSecondary.copy(alpha = 0.85f) else TextMuted
-                        )
-                    )
-                }
-                if (onPickFile != null) {
-                    IconButton(
-                        onClick = onPickFile,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.FolderOpen,
-                            contentDescription = "Elegir archivo",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                } else {
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = if (isRequired) TextSecondary else TextMuted,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DualFrameSlotCard(
-    label: String,
-    subLabel: String,
-    badge: String?,
-    media: AttachedMedia?,
-    isRequired: Boolean,
-    onClick: () -> Unit,
-    onRemove: () -> Unit
-) {
-    val borderColor = when {
-        media != null -> AccentEmerald.copy(alpha = 0.7f)
-        isRequired -> BorderSubtle
-        else -> BorderSubtle
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .clip(NexusTokens.field)
-            .clickable { onClick() },
-        color = SurfaceDark,
-        border = null,
-        shape = NexusTokens.field
-    ) {
-        if (media != null) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AsyncImage(
-                    model = Uri.parse(media.uriString),
-                    contentDescription = label,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MediaScrim.copy(alpha = 0.35f))
-                )
-                Surface(
-                    shape = RoundedCornerShape(bottomEnd = 6.dp),
-                    color = SurfaceDark.copy(alpha = 0.85f),
-                    modifier = Modifier.align(Alignment.TopStart)
-                ) {
-                    Text(
-                        text = label,
-                        modifier = Modifier.padding(horizontal = NexusTokens.space4, vertical = NexusTokens.space4),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = AccentEmerald,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = MaterialTheme.typography.labelMedium.fontSize
-                        )
-                    )
-                }
-        StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(NexusTokens.space8),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    Icons.Default.AddPhotoAlternate,
-                    contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.height(NexusTokens.space4))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = MaterialTheme.typography.labelMedium.fontSize
-                    )
-                )
-                Text(
-                    text = subLabel,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (isRequired) TextSecondary.copy(alpha = 0.7f) else TextMuted,
-                        fontSize = MaterialTheme.typography.labelMedium.fontSize
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReferenceImageThumbnail(
-    media: AttachedMedia,
-    onRemove: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .clip(NexusTokens.field)
-
-    ) {
-        AsyncImage(
-            model = Uri.parse(media.uriString),
-            contentDescription = "Referencia",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
-    }
-}
-
-@Composable
-private fun AddReferenceButton(
-    remaining: Int,
-    isRequired: Boolean = false,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .size(72.dp)
-            .clip(NexusTokens.field)
-            .clickable { onClick() },
-        color = SurfaceDark,
-        border = null,
-        shape = NexusTokens.field
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Añadir",
-                tint = TextSecondary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.height(NexusTokens.space4))
-            Text(
-                text = "Añadir",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = TextSecondary,
-                    fontSize = MaterialTheme.typography.labelMedium.fontSize
-                )
-            )
-        }
-    }
-}
-
-@Composable
 private fun CompactChipSelector(
     title: String,
     options: List<String>,
@@ -1572,44 +821,6 @@ private fun CreativePresetsRow(
 }
 
 
-@Composable
-private fun ContractMediaEditor(model:NexusModel,media:List<AttachedMedia>,onPick:(ContractMediaField)->Unit,onRemove:(String)->Unit,onSwapFrames:()->Unit) {
-    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-        model.contractMedia.forEach { field ->
-            val selected=media.filter { it.fieldKey==field.key }
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    Text(field.label+(if(field.required) " · obligatorio" else " · opcional"),style=MaterialTheme.typography.titleSmall)
-                    selected.forEachIndexed { index,item ->
-                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                            Text("Archivo ${index+1} preparado",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
-                            IconButton(onClick={onRemove(item.id)}) {Icon(Icons.Default.Close,"Quitar ${field.label} ${index+1}")}
-                        }
-                    }
-                    if(selected.size<field.maximum || field.maximum==1) FilledTonalButton(onClick={onPick(field)},modifier=Modifier.heightIn(min=48.dp)) {
-                        Text(if(selected.isNotEmpty() && field.maximum==1) "Cambiar archivo" else "Añadir archivo")
-                    }
-                    if(field.maximum>1) Text("${selected.size} de ${field.maximum} archivos",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-                }
-            }
-        }
-        if(model.providerId=="google_flow" && model.modalities.contains(com.vidadomu.nexus.core.model.Modality.VIDEO) &&
-            media.any { it.fieldKey=="initial_frame" } && media.any { it.fieldKey=="end_frame" }) {
-            TextButton(onClick=onSwapFrames,modifier=Modifier.fillMaxWidth()) {Text("Intercambiar")}
-        }
-    }
-}
-
-@Composable
-private fun MediaFactsLabel(media:AttachedMedia) {
-    val context=LocalContext.current
-    var facts by remember(media.uriString) {mutableStateOf<String?>(null)}
-    LaunchedEffect(media.uriString) {facts=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        runCatching {LocalMediaInspector.inspect(context,Uri.parse(media.uriString),media.mimeType).summary}.getOrNull()
-    }}
-    facts?.let {Text(it,color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable ColumnScope.()->Unit) {
@@ -1624,29 +835,5 @@ private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable Colu
             }
             content()
         }
-    }
-}
-
-private fun parameterSummary(state:CreateUiState):String {
-    val values=listOf("duration","resolution","aspect_ratio").mapNotNull { key ->
-        state.parameters[key]?.takeIf {it.isNotBlank()}?.let {if(key=="duration") "$it s" else it}
-    }
-    return values.joinToString(" · ").ifBlank {"Parámetros"}
-}
-
-@Composable
-private fun CanvasMediaThumbnail(media:AttachedMedia,onRemove:()->Unit) {
-    val context=androidx.compose.ui.platform.LocalContext.current
-    Box(Modifier.size(88.dp).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainer)) {
-        if(media.mimeType.startsWith("image/")) AsyncImage(Uri.parse(media.uriString),media.fileName ?: "Referencia",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-        // Fotograma real del vídeo adjunto en vez de un icono genérico.
-        else if(media.mimeType.startsWith("video/")) {
-            AsyncImage(coil.request.ImageRequest.Builder(context).data(Uri.parse(media.uriString)).crossfade(120)
-                .decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}.build(),
-                media.fileName ?: "Vídeo adjunto",Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-            Icon(Icons.Default.PlayArrow,null,Modifier.align(Alignment.BottomStart).padding(4.dp).size(18.dp),tint=com.vidadomu.nexus.ui.theme.MediaForeground)
-        }
-        else Icon(Icons.Default.GraphicEq,"Medio adjunto",Modifier.align(Alignment.Center),tint=TextSecondary)
-        StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
     }
 }

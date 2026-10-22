@@ -20,7 +20,7 @@ import com.vidadomu.nexus.NexusApplication
 internal const val FLOW_RECOVERY_KEY = "nexus_flow_recovery"
 
 @Composable
-internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
+internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit, inStudio: Boolean = false) {
     val context = LocalContext.current
     val storage = (context.applicationContext as NexusApplication).secureStorage
     var pair by remember { mutableStateOf(false) }
@@ -45,11 +45,11 @@ internal fun FlowRecoverySettings(onCreateInFlow: () -> Unit) {
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        Text("Google Flow", style = MaterialTheme.typography.titleLarge)
+        Text(if(inStudio) "Conexión de Flow" else "Google Flow", style = MaterialTheme.typography.titleLarge)
         Text("Proyecto activo del puente (AXELPC o ASUS)", style = MaterialTheme.typography.bodyMedium)
         Text("La creación usa los ajustes y el coste que muestre Google Flow.",
             style = MaterialTheme.typography.bodySmall)
-        FilledTonalButton(onClick = {
+        if(!inStudio || !isLinked) FilledTonalButton(onClick = {
             if (isLinked) onCreateInFlow() else pair = true
         }) {
             Icon(Icons.Default.AutoAwesome, contentDescription = null)
