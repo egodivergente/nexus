@@ -1,3 +1,28 @@
+# Nexus / ArtBox y chat compacto - 2026-10-23
+
+Rama `codex/nexus-master-artbox-20261023`, código Android `b588f7c`.
+**Pixel 8 Pro: 1.9.73-agent-preview / vc107 instalada**, misma firma, actualización
+en sitio y datos previos comprobados: 379 trabajos, 418 resultados, 1.132 archivos,
+4 proyectos y 50 mensajes conservados. S25 no utilizado en este encargo.
+
+Cinco destinos nativos: Agente, ArtBox, Lanzadera, Flow, Biblioteca. El chat oculta
+pestañas y nombre del proyecto por defecto; el menú del compositor permite abrir
+conversaciones y cerrar pestañas con X sin borrar historial/borradores. Biblioteca
+filtra por uno o varios proyectos, incluidos archivos sin proyecto.
+
+955 pruebas unitarias PASS, 4 omitidas; Pixel: 8 casos de workspace/multimedia y
+6 de galería/contratos PASS. Puente Flow: 92 pruebas y 4 casos nuevos de borradores
+PASS. Hay descarga real de un resultado existente, pero **no está validada una
+generación nueva de Flow desde el Pixel**: la VPN de Google impide la ruta privada.
+Pendiente respuesta a la autorización para usar Tailscale temporalmente y restaurar
+la VPN. No cambiarla por silencio ni reenviar los registros inciertos.
+
+702 destinos con datos de contrato/metadatos y evaluación de controles. No confundir
+ese índice con un benchmark propio de calidad visual; las notas personales son aparte.
+Ver `docs/NEXUS-MASTER-20261023.md` para APK, hash, fuentes, pruebas y pendientes.
+Preview, no aceptación completa del paquete maestro. Estados inferiores históricos.
+`gradlew.bat` conserva cambios anteriores ajenos; no incluirlos en esta entrega.
+
 # Integración Studio + segundo plano + Drive - 2026-10-20
 
 Fuente unificada `401c5ac`, rama `codex/agent-studio-integration-20261020`.

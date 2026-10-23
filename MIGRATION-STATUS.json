@@ -1,4 +1,47 @@
 ﻿{
+    "masterArtBox20261023": {
+        "branch": "codex/nexus-master-artbox-20261023",
+        "sourceCommit": "b588f7c43a109a629586dca071c251b7457fcd31",
+        "versionName": "1.9.73-agent-preview",
+        "versionCode": 107,
+        "status": "PREVIEW_INSTALLED_PIXEL_FLOW_GENERATION_PENDING",
+        "apkSha256": "ac2a59f31d373cb97aae82aed46c0e73cf90dd8152eedfdf3434ba381723bc0a",
+        "signingCertificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "installedDevices": [
+            "Pixel 8 Pro"
+        ],
+        "s25Operated": false,
+        "unitTestsPassed": 955,
+        "unitTestsSkipped": 4,
+        "pixelWorkspaceTestsPassed": 8,
+        "pixelCanvasTestsPassed": 6,
+        "flowTestsPassed": 92,
+        "additionalFlowDraftTestsPassed": 4,
+        "pixelOriginalIdsPreserved": {
+            "jobs": 379,
+            "outputs": 418,
+            "assets": 1132,
+            "projects": 4,
+            "chatItems": 50
+        },
+        "credentialStorageAvailable": true,
+        "flowLinked": true,
+        "catalogEvidence": {
+            "atlasContracts": 400,
+            "atlasMetadata": 122,
+            "crunDestinations": 180,
+            "totalDestinations": 702,
+            "ratingType": "Published controls and documented capabilities; personal result ratings separate; no fabricated quality benchmarks"
+        },
+        "flowExistingDownload": {
+            "bytes": 1005076,
+            "sha256": "9fa08c4ad3d34f1c796a9ddaf6393bbec899bc316ea2bd60bba035ca7d331b89"
+        },
+        "flowPixelStatus": "Google VPN active; private bridge unreachable; permission requested for temporary Tailscale replacement and Google VPN restoration; no change without response",
+        "flowOldRequestsResubmitted": false,
+        "documentation": "docs/NEXUS-MASTER-20261023.md",
+        "note": "Fields below are historical. Full master acceptance remains pending, especially new Flow generation on Pixel and external-app sharing journeys."
+    },
     "agentStudioIntegration20261020": {
         "branch": "codex/agent-studio-integration-20261020",
         "sourceCommit": "401c5ac94fc43c171d5193867f9a33d62364def3",
