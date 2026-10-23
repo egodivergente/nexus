@@ -5,7 +5,7 @@ $source = Split-Path -Parent $PSScriptRoot
 $runtime = Join-Path $env:LOCALAPPDATA 'NexusFlow\bridge'
 $root = Join-Path $env:USERPROFILE '.local\share\nexus-flow-probe'
 $modules = @('recovery.py','recovery.html','auto_auth.py','byteplus_admin.py','flow_agent.py',
-    'flow_gallery.py','flow_references.py','flow_session.py','flow_settings.py','login.py')
+    'flow_gallery.py','flow_references.py','flow_session.py','flow_settings.py','flow_drafts.py','login.py')
 foreach ($name in $modules) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $name))) {throw "Missing bridge module: $name"}
 }

@@ -34,8 +34,8 @@ class ReferenceTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(refs.ReferenceError):
                 await refs.receive_reference(request, root)
             self.assertFalse(list((root / 'flow-references').iterdir()))
-            request.headers = {'content-type': 'image/png', 'content-length': str(refs.MAX_BYTES + 1)}
-            with self.assertRaisesRegex(refs.ReferenceError, 'too_large'):
+            request.headers = {'content-type': 'image/png', 'content-length': '33'}
+            with patch.object(refs, 'MAX_BYTES', 32), self.assertRaisesRegex(refs.ReferenceError, 'too_large'):
                 await refs.receive_reference(request, root)
     async def test_invalid_ids_paths_urls_duplicates_and_count_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

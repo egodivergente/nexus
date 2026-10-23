@@ -1,4 +1,4 @@
-"""Bounded private reference upload and visible Flow ingredient verification."""
+"""Private streaming reference upload and visible Flow ingredient verification."""
 import asyncio
 import base64
 import hashlib
@@ -7,8 +7,8 @@ from pathlib import Path
 import re
 import secrets
 
-MAX_IMAGES = 12  # Nexus transport cap; not a claim about Google's model limits.
-MAX_BYTES = 16 * 1024 * 1024
+MAX_IMAGES = None  # Unknown Google maximum; local preferences live in the Android editor.
+MAX_BYTES = None
 REFERENCE_ID = re.compile(r'^ref_[0-9a-f]{64}$')
 EXTENSIONS = {'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp'}
 
@@ -30,7 +30,7 @@ def image_type(header):
 
 
 def reference_paths(root, ids):
-    if not isinstance(ids, list) or len(ids) > MAX_IMAGES or not all(
+    if not isinstance(ids, list) or MAX_IMAGES is not None and len(ids) > MAX_IMAGES or not all(
             isinstance(value, str) and REFERENCE_ID.fullmatch(value) for value in ids):
         raise ReferenceError('invalid_reference_ids')
     if len(ids) != len(set(ids)):
@@ -43,10 +43,14 @@ def reference_paths(root, ids):
         if len(matches) != 1 or matches[0].is_symlink():
             raise ReferenceError('reference_not_found', 404)
         path = matches[0]
-        if not 0 < path.stat().st_size <= MAX_BYTES:
+        if path.stat().st_size <= 0 or MAX_BYTES is not None and path.stat().st_size > MAX_BYTES:
             raise ReferenceError('invalid_reference_image')
         # Verify bytes again: never accept an arbitrary server path or remote URL.
-        if hashlib.sha256(path.read_bytes()).hexdigest() != value[4:]:
+        digest = hashlib.sha256()
+        with path.open('rb') as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                digest.update(chunk)
+        if digest.hexdigest() != value[4:]:
             raise ReferenceError('reference_integrity_failed', 409)
         paths.append(path)
     return paths
@@ -57,7 +61,7 @@ async def receive_reference(request, root):
     if declared not in EXTENSIONS:
         raise ReferenceError('invalid_reference_type', 415)
     length = request.headers.get('content-length')
-    if length and length.isdigit() and int(length) > MAX_BYTES:
+    if MAX_BYTES is not None and length and length.isdigit() and int(length) > MAX_BYTES:
         raise ReferenceError('reference_too_large', 413)
     directory = root / 'flow-references'
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -68,7 +72,7 @@ async def receive_reference(request, root):
             os.chmod(temporary, 0o600)
             async for chunk in request.stream():
                 size += len(chunk)
-                if size > MAX_BYTES:
+                if MAX_BYTES is not None and size > MAX_BYTES:
                     raise ReferenceError('reference_too_large', 413)
                 if len(header) < 16:
                     header.extend(chunk[:16 - len(header)])

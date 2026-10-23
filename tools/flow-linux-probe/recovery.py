@@ -1,7 +1,8 @@
 """Private Tailscale recovery portal and explicit Flow UI bridge.
 
 The bridge deliberately drives only the already-open, authenticated Flow page.
-It never reads/export cookies, stores prompts, or uses an undocumented Google API.
+It never exports cookies or uses an undocumented Google API. Job journals omit prompts;
+pre-existing manual text drafts are preserved privately before borrowing the composer.
 """
 import asyncio
 from collections import Counter
@@ -25,6 +26,8 @@ from starlette.websockets import WebSocketDisconnect
 from playwright.async_api import async_playwright
 import websockets
 from flow_references import receive_reference, reference_paths, attach_references, ReferenceError, MAX_IMAGES, COMPOSER
+from flow_references import composer_reference_count
+import flow_drafts
 import flow_agent
 import flow_gallery
 import flow_session
@@ -57,8 +60,8 @@ SESSION_RESULT = None
 SESSION_RECOVERY_AT = 0
 FLOW_PREPARE_SECONDS = 150
 FLOW_RESULT_SECONDS = {"image": 300, "video": 900}
-FLOW_PROMPT_LIMIT = 4000
-FLOW_BODY_LIMIT = 24 * 1024
+FLOW_PROMPT_LIMIT = None  # Google maximum unknown; never substitute a local ceiling.
+FLOW_BODY_LIMIT = None  # Authenticated bridge; no invented prompt/body ceiling.
 FLOW_REQUEST_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$')
 FLOW_JOB_ID = re.compile(r'^[A-Za-z0-9_-]{16,96}$')
 FLOW_OUTPUTS = {'image', 'video'}
@@ -273,12 +276,12 @@ async def flow_job(job_id):
 
 async def read_limited_json(request, limit=FLOW_BODY_LIMIT):
     content_length = request.headers.get('content-length')
-    if content_length and content_length.isdigit() and int(content_length) > limit:
+    if limit is not None and content_length and content_length.isdigit() and int(content_length) > limit:
         raise FlowError('too_large', 413)
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
-        if len(body) > limit:
+        if limit is not None and len(body) > limit:
             raise FlowError('too_large', 413)
     try:
         data = json.loads(body)
@@ -297,11 +300,8 @@ def validate_flow_submission(data):
         raise FlowError('confirmation_required', 400)
     if not isinstance(prompt, str):
         raise FlowError('invalid_prompt', 400)
-    prompt = prompt.strip()
-    if not prompt:
+    if not prompt.strip():
         raise FlowError('empty_prompt', 400)
-    if len(prompt) > FLOW_PROMPT_LIMIT:
-        raise FlowError('prompt_too_long', 413)
     if expected_output not in FLOW_OUTPUTS:
         raise FlowError('invalid_expected_output', 400)
     if not isinstance(client_request_id, str) or not FLOW_REQUEST_ID.fullmatch(client_request_id):
@@ -510,9 +510,14 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on
             if not await composer.is_editable():
                 raise FlowError('flow_composer_not_editable', 409)
             current_length = await composer.evaluate(COMPOSER_LENGTH)
+            previous_draft = None
             if current_length:
-                # Do not overwrite a manual draft in the existing Flow tab.
-                raise FlowError('flow_composer_not_empty', 409)
+                # Preserve text exactly. Unknown/manual references must never leak into a new request.
+                if await composer_reference_count(page) != 0:
+                    raise FlowError('flow_composer_not_empty', 409)
+                previous_draft = await composer.evaluate('e => (e.value ?? e.innerText) || ""')
+                await asyncio.to_thread(flow_drafts.preserve, ROOT, page.url, previous_draft)
+                await composer.fill('', timeout=5000)
             baseline = []
             filled = False
             click_started = False
@@ -587,6 +592,10 @@ async def drive_flow_submission(prompt, references=None, runs=1, on_run=None, on
                     with suppress(Exception):
                         await composer.fill('', timeout=5000)
                 raise FlowError('flow_submit_failed', 503) from error
+            finally:
+                if previous_draft is not None:
+                    with suppress(Exception):
+                        await flow_drafts.restore_if_untouched(composer, previous_draft, prompt)
         return await with_flow_project_page(submit)
 
 
@@ -1014,8 +1023,6 @@ async def flow_agent_send(request: Request):
         message = data.get('message')
         if not isinstance(message, str) or not message.strip():
             raise FlowError('empty_prompt', 400)
-        if len(message) > FLOW_PROMPT_LIMIT:
-            raise FlowError('prompt_too_long', 413)
         before = await with_flow_project_page(lambda page: flow_agent.send_agent_message(page, message.strip(), FLOW_UI_LOCK, FlowError))
         return JSONResponse(flow_agent.public_agent_job(flow_agent.new_agent_job(before)), status_code=201)
     except FlowError as error:

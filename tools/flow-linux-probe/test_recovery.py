@@ -95,6 +95,17 @@ class SessionReuseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await recovery.context_status(context), 'connected')
 
 
+class PromptMaximumTests(unittest.TestCase):
+    def test_unknown_prompt_maximum_keeps_long_unicode_and_original_whitespace(self):
+        prompt = '  ' + '😀'.__mul__(12000) + '\n'
+        actual, output, request_id = recovery.validate_flow_submission({
+            'confirmed': True, 'prompt': prompt, 'expected_output': 'image',
+            'client_request_id': 'nexus-master-long-00000001'})
+        self.assertEqual(prompt, actual)
+        self.assertIsNone(recovery.FLOW_PROMPT_LIMIT)
+        self.assertIsNone(recovery.FLOW_BODY_LIMIT)
+
+
 class RecoveryTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -175,7 +186,7 @@ class RecoveryTests(unittest.TestCase):
 
     def test_flow_status_is_private_and_uses_the_capability_adapter(self):
         response_body = {'bridge_status': 'connected', 'generation_ready': True,
-                         'prompt_limit': 4000, 'expected_outputs': ['image', 'video'],
+                         'prompt_limit': None, 'expected_outputs': ['image', 'video'],
                          'cost_source': 'flow_current_project'}
         with patch.object(recovery, 'flow_api_status', AsyncMock(return_value=response_body)) as status:
             response = self.client.get('/api/flow/status', headers={'Authorization': 'Bearer private-test-token'})

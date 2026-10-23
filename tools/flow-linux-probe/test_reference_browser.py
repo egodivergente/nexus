@@ -1,5 +1,6 @@
 """Actual Chromium DOM transport test; not a Google account/generation test."""
 import asyncio
+import os
 from pathlib import Path
 import struct
 import tempfile
@@ -21,16 +22,16 @@ class BrowserReferenceTests(unittest.IsolatedAsyncioTestCase):
             for path in paths:
                 path.write_bytes(png())
             async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True,
+                browser = await playwright.chromium.launch(executable_path=os.environ.get('NEXUS_TEST_CHROMIUM') or ('/usr/bin/chromium' if Path('/usr/bin/chromium').is_file() else None), headless=True,
                     args=['--disable-dev-shm-usage'])
                 try:
                     page = await browser.new_page()
                     await page.set_content("""<aside><img id="gallery"></aside>
-                        <section><div id="ingredients"></div><input aria-label="Texto editable">
+                        <section><div id="ingredients"></div><div contenteditable="true" aria-label="¿Qué quieres crear?">Texto editable</div>
                         <button aria-label="Iniciar generación">Generate</button>
                         <button aria-label="Añadir ingredientes a ventana para peticiones">Add</button></section>
                         <script>
-                        document.querySelector('input').addEventListener('drop', event => {
+                        document.querySelector('[contenteditable]').addEventListener('drop', event => {
                             event.preventDefault();
                             for (const file of event.dataTransfer.files) {
                                 const img = document.createElement('img');
