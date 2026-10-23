@@ -25,6 +25,6 @@ class OutputExportSpecTest {
     @Test fun studioNavigationHasFiveDestinationsAndKeepsSettingsOffTheBar() {
         assertEquals(5, com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems.size)
         assertFalse(com.vidadomu.nexus.ui.navigation.Screen.Settings in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
-        assertTrue(com.vidadomu.nexus.ui.navigation.Screen.Generations in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
+        assertTrue(com.vidadomu.nexus.ui.navigation.Screen.Flow in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
     }
 }

@@ -109,8 +109,9 @@ object NetworkErrorParser {
 }
 
 object OkHttpClientFactory {
-    fun create(secureStorage: SecureStorage): OkHttpClient {
+    fun create(secureStorage: SecureStorage, context: android.content.Context? = null): OkHttpClient {
         return OkHttpClient.Builder().addInterceptor(com.vidadomu.nexus.core.network.LocalQaInterceptor())
+            .apply {if(context!=null) addInterceptor(RuntimeNetworkInterceptor(context))}
             .addInterceptor(AuthInterceptor(secureStorage))
             .addInterceptor(RedactingLoggingInterceptor())
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -119,7 +120,7 @@ object OkHttpClientFactory {
             // se cortaba a media transferencia y se veía como «conexión interrumpida».
             .writeTimeout(5, TimeUnit.MINUTES)
             .retryOnConnectionFailure(false)
-            .callTimeout(10, TimeUnit.MINUTES)
+            .callTimeout(0, TimeUnit.MILLISECONDS)
             .build()
     }
 }

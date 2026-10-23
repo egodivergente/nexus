@@ -6,6 +6,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -72,7 +73,8 @@ fun rememberSystemAnimatorsEnabled(refreshKey: Any? = Unit): Boolean {
 fun rememberNexusMotionAllowed(requested: Boolean = true): Boolean {
     val resumed = rememberLifecycleResumed()
     val animatorsEnabled = rememberSystemAnimatorsEnabled(refreshKey = resumed)
-    return NexusMotionPolicy.allowsInfiniteMotion(requested, animatorsEnabled, resumed)
+    val config by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
+    return NexusMotionPolicy.allowsInfiniteMotion(requested && config.value("ui.motion").toBoolean(), animatorsEnabled, resumed)
 }
 
 private fun readAnimatorsEnabled(resolver: ContentResolver): Boolean = NexusMotionPolicy.animatorsEnabled(

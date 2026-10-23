@@ -79,9 +79,9 @@ internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldVal
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
-    onReply: (String) -> Unit = {}, onCamera: (() -> Unit)? = null,
+    onReply: (String) -> Unit = {}, onAudio: ((android.net.Uri)->Unit)? = null, onReorder: ((String,Int)->Unit)? = null, onCamera: (() -> Unit)? = null,
     onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
-    reasoningControl: @Composable () -> Unit = {}) {
+    reasoningControl: @Composable () -> Unit = {}, workspaceControl: @Composable () -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
@@ -111,7 +111,13 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             }
             if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8)) {
-                items(ui.pendingAttachments, key = { it.id }) { att -> AttachmentTile(att) { onRemove(att.id) } }
+                items(ui.pendingAttachments, key = { it.id }) { att -> Column {
+                    AttachmentTile(att) { onRemove(att.id) }
+                    if(onReorder!=null && ui.pendingAttachments.size>1) Row {
+                        IconButton(onClick={onReorder(att.id,-1)},enabled=ui.pendingAttachments.first().id!=att.id) {Icon(Icons.Default.ChevronLeft,"Mover adjunto antes")}
+                        IconButton(onClick={onReorder(att.id,1)},enabled=ui.pendingAttachments.last().id!=att.id) {Icon(Icons.Default.ChevronRight,"Mover adjunto después")}
+                    }
+                }}
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
@@ -135,6 +141,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         }
                     })
                 reasoningControl()
+                  workspaceControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else if(!canSend && !ui.attaching) {
                     // Nada que enviar: el botón es el micrófono. El dictado se inserta en el campo SIN enviarlo.
@@ -143,7 +150,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         val spoken = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
                         if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrBlank()) onInput(dictatedText(text, spoken))
                     }
-                    IconButton(onClick = {
+                    val dictateAction: ()->Unit = {
                         try {
                             dictate.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -154,7 +161,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         } catch (_: android.content.ActivityNotFoundException) {
                             android.widget.Toast.makeText(context, "Este móvil no tiene reconocimiento de voz disponible", android.widget.Toast.LENGTH_LONG).show()
                         }
-                    }) { Icon(Icons.Default.Mic, "Dictar mensaje", tint = MaterialTheme.colorScheme.primary) }
+                    }
+                    if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
+                    else IconButton(onClick=dictateAction) {Icon(Icons.Default.Mic,"Dictar mensaje")}
                 }
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }

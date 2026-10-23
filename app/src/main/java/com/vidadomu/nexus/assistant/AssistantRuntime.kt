@@ -444,11 +444,8 @@ class AssistantRuntime(private val app: NexusApplication) {
         orders = orders,
         probeFrameRate = { uri -> AgentMediaStore.frameRate(app, uri) },
         limits = { settings.limits() },
-        adaptPrompt = { text, schema, target ->
-            val current = settings.load()
-            com.vidadomu.nexus.agent.core.llm.PromptAdapter({ llm(current) }, { current.modelId })
-                .adapt(text, schema.textLimits["prompt"], target)
-        },
+        adaptPrompt = { text, _, _ -> text }, // Prompt adaptation requires an explicit user edit/approval.
+
     )
 
     /** Relee skills (assets + files/skills + Documents/ALEXIA/Nexus/Skills) sin recompilar. */
@@ -511,7 +508,7 @@ class AssistantRuntime(private val app: NexusApplication) {
             val rec = assets.upsertGeneration(GenerationRecord(
                 id = AssetIndex.newId("gen"), nexusJobId = job.id, providerJobId = job.providerJobId, providerId = job.providerId,
                 modelId = job.modelId, modality = job.modality.name, prompt = job.prompt, negativePrompt = job.negativePrompt.ifBlank { null },
-                projectId = assets.projectAt(job.startedAt),
+                projectId = job.parameters["__project_id"]?.takeIf {assets.findProject(it)!=null} ?: assets.projectAt(job.startedAt),
                 params = job.parameters.filterKeys { !it.startsWith("__") }, seed = job.parameters["seed"],
                 referenceUris = listOfNotNull(job.inputMediaUri), estimatedCostUsd = job.estimatedCostUsd, actualCostUsd = job.actualCostUsd,
                 status = "COMPLETED", createdAt = job.startedAt, completedAt = job.completedAt,

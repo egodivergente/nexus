@@ -34,6 +34,7 @@ import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -154,6 +155,10 @@ fun FlowStudioScreen(
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
+    val runtimeRules=com.vidadomu.nexus.settings.RuntimePreferences.get(context)
+    val configuration by runtimeRules.state.collectAsState()
+    val maximumDrafts=runtimeRules.int("flow.drafts")
+    val maximumReferences=runtimeRules.int("flow.references").takeIf {it>0} ?: Int.MAX_VALUE
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val snackbarHost = remember { SnackbarHostState() }
@@ -227,7 +232,7 @@ fun FlowStudioScreen(
     }
 
     val status = (connection as? FlowStudioConnection.Ready)?.status
-    val promptLimit = (status?.promptLimit ?: 4000).coerceIn(1, 4000)
+    val promptLimit: Int? = null // No verified Google limit for the active model/workflow.
     val accepted = status?.expectedOutputs.orEmpty().map { it.lowercase() }.toSet()
     val acceptedModalities = buildSet {
         if (accepted.isEmpty() || "image" in accepted) add(Modality.IMAGE)
@@ -251,7 +256,7 @@ fun FlowStudioScreen(
         scope.launch {
             try {
                 for(uri in uris.distinct()) {
-                    if(references.size >= FlowStudioPlan.MAX_REFERENCES) break
+                    if(references.size >= maximumReferences) break
                     val mime = com.vidadomu.nexus.assistant.projectMediaMimeType(context,uri)?.lowercase()
                     if(mime !in FlowStudioPlan.REFERENCE_MIME_TYPES) {
                         snackbarHost.showSnackbar("Flow admite referencias PNG, JPEG o WebP.")
@@ -265,7 +270,7 @@ fun FlowStudioScreen(
             finally {importingReferences=false}
         }
     }
-    val remainingReferences = (FlowStudioPlan.MAX_REFERENCES - references.size).coerceAtLeast(1)
+    val remainingReferences = (maximumReferences - references.size).coerceAtLeast(1).coerceAtMost(if(android.os.Build.VERSION.SDK_INT>=33) android.provider.MediaStore.getPickImagesMaxLimit() else Int.MAX_VALUE)
     val pickReference = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if(uri!=null) acceptReferences(listOf(uri))
     }
@@ -418,17 +423,7 @@ fun FlowStudioScreen(
                     technicalDetails = data.visuals.message, actionLabel = "Cerrar", onAction = { data.dismiss() })
             }
         },
-        topBar = {
-            NexusTopAppBar(
-                showBalance=false,
-                title = { Text("Flow Studio", style = com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") }
-                },
-                actions = { IconButton(onClick={connectionSheet=true}) { Icon(Icons.Default.Tune,"Conexión y mantenimiento de Flow") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
-        },
+        topBar = {},
         bottomBar = {
             Surface(color = BackgroundDark, border = BorderStroke(1.dp, BorderSubtle)) {
                 Button(
@@ -458,7 +453,13 @@ fun FlowStudioScreen(
             contentPadding = PaddingValues(NexusTokens.space16),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
-            item(key = "workspace") { CanvasWorkspaceSwitch(true, onOpenModels, {}) }
+            item(key="flow-title") {
+                Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
+                    Text("Flow",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
+                    IconButton(onClick={connectionSheet=true}) {Icon(Icons.Default.Tune,"Conexión y mantenimiento de Flow")}
+                    com.vidadomu.nexus.ui.components.NexusSettingsButton()
+                }
+            }
             item(key = "connection") {
                 StudioConnectionCard(connection) { scope.launch { refreshConnection() } }
             }
@@ -489,12 +490,12 @@ fun FlowStudioScreen(
             item(key = "add") {
                 OutlinedButton(
                     onClick = { drafts += FlowStudioDraft(modality = drafts.lastOrNull()?.modality ?: Modality.IMAGE) },
-                    enabled = drafts.size < FlowStudioPlan.MAX_DRAFTS && !isSubmitting,
+                    enabled = drafts.size < maximumDrafts && !isSubmitting,
                     modifier = Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(NexusTokens.space8))
-                    Text("Añadir prompt (${drafts.size}/${FlowStudioPlan.MAX_DRAFTS})")
+                    Text("Añadir prompt (${drafts.size}/${maximumDrafts})")
                 }
             }
             item(key = "cost") {
@@ -675,7 +676,7 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
 
 @Composable
 private fun DraftCard(
-    draft: FlowStudioDraft, number: Int, promptLimit: Int, accepted: Set<Modality>,
+    draft: FlowStudioDraft, number: Int, promptLimit: Int?, accepted: Set<Modality>,
     canRemove: Boolean, enabled: Boolean, onChange: (FlowStudioDraft) -> Unit, onRemove: () -> Unit,
     attachments: @Composable ColumnScope.() -> Unit = {}
 ) {
@@ -721,14 +722,16 @@ private fun ReferencesSection(
     onLibrary: () -> Unit,
     onRemove: (FlowStudioReference) -> Unit
 ) {
+    val config by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
+    val maximumReferences=config.value("flow.references").toIntOrNull()?.takeIf {it>0} ?: Int.MAX_VALUE
     Column(Modifier.padding(horizontal=12.dp),verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Compartidas · ${references.size}/${FlowStudioPlan.MAX_REFERENCES}", style = MaterialTheme.typography.labelSmall,
+            Text("Adjuntos · ${references.size}" + if(maximumReferences<Int.MAX_VALUE) "/$maximumReferences" else "", style = MaterialTheme.typography.labelSmall,
                 color = TextPrimary, modifier = Modifier.weight(1f))
-            TextButton(onClick = onAdd, enabled = enabled && references.size < FlowStudioPlan.MAX_REFERENCES) {
+            TextButton(onClick = onAdd, enabled = enabled && references.size < maximumReferences) {
                 Text("Galería")
             }
-            TextButton(onClick=onLibrary,enabled=enabled && references.size<FlowStudioPlan.MAX_REFERENCES) {Text("Biblioteca")}
+            TextButton(onClick=onLibrary,enabled=enabled && references.size<maximumReferences) {Text("Biblioteca")}
         }
         if(references.isNotEmpty()) Text("Todos los prompts · vídeo en modo Referencias",style=MaterialTheme.typography.labelSmall,color=TextMuted)
         LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {

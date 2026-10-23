@@ -19,7 +19,7 @@ class FlowReferencesTest {
             assertFalse(m.isMediaRequired)
             val schema = NexusModelRegistry.toSchema(ModelRef(m.providerId, m.id), m, emptyList(), "test")
             assertEquals("reference_ids", schema.media.imagesArrayField)
-            assertEquals(12, schema.media.maxImages)
+            assertEquals(Int.MAX_VALUE, schema.media.maxImages)
             assertFalse(schema.media.mediaRequired)
         }
     }
@@ -36,12 +36,10 @@ class FlowReferencesTest {
             assertThrows(IllegalArgumentException::class.java) { FlowReferences.ids(listOf(item)) }
         }
     }
-    @Test fun tooManyReferencesAreRejectedRatherThanTruncated() {
+    @Test fun unknownGoogleReferenceMaximumDoesNotInventATwelveImageCeiling() {
         val ids = (0..12).map { "ref_" + it.toString(16).padStart(64, '0') }
-        assertThrows(IllegalArgumentException::class.java) { FlowReferences.ids(ids.map { input(it) }) }
-        assertThrows(IllegalArgumentException::class.java) {
-            FlowReferences.savedIds(mapOf(FlowReferences.PARAMETER to ids.joinToString(",")))
-        }
+        assertEquals(ids,FlowReferences.ids(ids.map { input(it) }))
+        assertEquals(ids,FlowReferences.savedIds(mapOf(FlowReferences.PARAMETER to ids.joinToString(","))))
     }
 
     @Test fun sameImagePickedThroughDifferentUrisIsSentOnceInFirstOccurrenceOrder() {

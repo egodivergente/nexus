@@ -24,6 +24,9 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
         return result(CreationPhase.INVALID,message,target)
     }
     FormContract.invalidValue(model.parameters,state.parameters)?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
+    com.vidadomu.nexus.settings.ModelCapabilities.prompt(model)?.takeIf {it.exceeds(state.prompt)}?.let {
+        return result(CreationPhase.INVALID,"${model.displayName}: máximo ${it.maximum} ${it.unitLabel}. El prompt original se conserva.",CreationFixTarget.PROMPT)
+    }
     val media=state.attachedMedia
     if(media.count {it.slotType==MediaSlotType.REFERENCE_IMAGE && it.fieldKey==null}>model.maxImages ||
        media.count {it.slotType==MediaSlotType.VIDEO_REFERENCE && it.fieldKey==null}>model.maxVideos)

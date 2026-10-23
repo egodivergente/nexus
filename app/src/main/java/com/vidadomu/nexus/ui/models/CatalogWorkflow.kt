@@ -67,12 +67,23 @@ internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
     return listOf(CatalogWorkflow.OTHER)
 }
 
-internal fun workflowRoutes(group:CatalogModelGroup):Map<CatalogWorkflow,List<NexusModel>> =
-    group.routes.flatMap {model -> catalogWorkflows(model).map {it to model}}
-        .groupBy({it.first},{it.second}).toSortedMap(compareBy { if(it == CatalogWorkflow.EDIT_IMAGE) -1 else it.ordinal })
+private fun workflowOrderKey(workflow: CatalogWorkflow) = when(workflow) {
+    CatalogWorkflow.REFERENCES -> "reference_to_video"
+    CatalogWorkflow.ANIMATE -> "image_to_video"
+    CatalogWorkflow.FRAMES -> "start_end_frame_video"
+    CatalogWorkflow.CREATE_VIDEO -> "text_to_video"
+    CatalogWorkflow.EDIT_IMAGE -> "reference_edit"
+    CatalogWorkflow.CREATE_IMAGE -> "text_to_image"
+    else -> workflow.name.lowercase()
+}
+internal val defaultWorkflowOrder = listOf("reference_to_video","image_to_video","start_end_frame_video","text_to_video","reference_edit","compose_multi_reference","image_to_image","text_to_image")
 
-internal fun restoredWorkflow(group:CatalogModelGroup,savedKey:String?,legacyLabel:String?):CatalogWorkflow {
-    val available=workflowRoutes(group).keys
+internal fun workflowRoutes(group:CatalogModelGroup, order: List<String> = defaultWorkflowOrder):Map<CatalogWorkflow,List<NexusModel>> =
+    group.routes.flatMap {model -> catalogWorkflows(model).map {it to model}}
+        .groupBy({it.first},{it.second}).toSortedMap(compareBy<CatalogWorkflow> {order.indexOf(workflowOrderKey(it)).takeIf {i->i>=0} ?: Int.MAX_VALUE}.thenBy {it.ordinal})
+
+internal fun restoredWorkflow(group:CatalogModelGroup,savedKey:String?,legacyLabel:String?,order:List<String> = defaultWorkflowOrder):CatalogWorkflow {
+    val available=workflowRoutes(group,order).keys
     available.firstOrNull {it.name==savedKey}?.let {return it}
     val image=com.vidadomu.nexus.core.model.Modality.IMAGE in group.routes.first().modalities
     val migrated=when(legacyLabel) {

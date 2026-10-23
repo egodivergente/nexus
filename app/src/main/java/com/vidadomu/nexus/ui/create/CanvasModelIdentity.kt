@@ -20,6 +20,12 @@ internal fun canvasModelIdentity(model: NexusModel): CanvasModelIdentity {
                 .joinToString(" ") {if(it=="standard") "Standard" else it.replaceFirstChar(Char::uppercase)}
             "Hailuo $version"+suffix.takeIf {it.isNotBlank()}?.let {" $it"}.orEmpty()
         }
+    } else if("grok-imagine" in id) {
+        val match=Regex("grok-imagine-(image|video)(?:-v?([0-9.]+))?([a-z-]*)").find(id)
+        val kind=if(match?.groupValues?.get(1)=="video") "Vídeo" else "Imagen"
+        val version=match?.groupValues?.get(2).orEmpty().trimEnd('.')
+        val variant=match?.groupValues?.get(3).orEmpty().trim('-').replace("developer","Developer").replace("quality","Quality")
+        listOf("Grok",kind,version,variant).filter {it.isNotBlank()}.joinToString(" ")
     } else model.displayName.substringBefore(" · proyecto activo")
     val provider=if(model.providerId=="usr_byteplus-media") "BytePlus" else providerName(model.providerId)
     return CanvasModelIdentity(title, listOf(modelUse(model).label,provider).filter {it.isNotBlank()}.distinct().joinToString(" · "),model.providerModelId ?: model.id)

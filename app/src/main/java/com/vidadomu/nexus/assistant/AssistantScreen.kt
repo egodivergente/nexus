@@ -119,7 +119,9 @@ fun AssistantScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val draftPrefs = LocalContext.current.getSharedPreferences("assistant_draft_v1", android.content.Context.MODE_PRIVATE)
-    var input by rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString("text", "").orEmpty())) }
+    val draftKey="conversation:${ui.conversationId}"
+    var input by rememberSaveable(ui.conversationId, stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey, draftPrefs.getString("text", "")).orEmpty())) }
+    LaunchedEffect(ui.draftRevision) {if(ui.draftRevision>0) input=androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey,"").orEmpty())}
     var showSettings by remember { mutableStateOf(false) }
     var showProject by remember {mutableStateOf(false)}
     val projectDrafts = rememberSaveable(saver = ProjectMemoryDraftsSaver) { mutableStateMapOf<String, ProjectMemoryDraft>() }
@@ -129,7 +131,14 @@ fun AssistantScreen(
     val included=ui.plans.values.count {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION)}
     val primaryPlanId=ui.items.filterIsInstance<ChatItem.PlanCard>().lastOrNull {ui.plans[it.planId]?.let {p->p.executable && p.state !in setOf(PlanState.SUBMITTED,PlanState.DISCARDED,PlanState.UNCERTAIN)}==true}?.planId
     val activeProject=ui.projects.firstOrNull {it.id==ui.activeProjectId}
-    val listState = rememberLazyListState()
+    val listState = rememberSaveable(ui.conversationId,saver=androidx.compose.foundation.lazy.LazyListState.Saver) {
+        androidx.compose.foundation.lazy.LazyListState(draftPrefs.getInt("scroll:${ui.conversationId}",0),draftPrefs.getInt("offset:${ui.conversationId}",0))
+    }
+    LaunchedEffect(ui.conversationId,listState) {
+        snapshotFlow {listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset}.collect {(index,offset)->
+            draftPrefs.edit().putInt("scroll:${ui.conversationId}",index).putInt("offset:${ui.conversationId}",offset).apply()
+        }
+    }
     val picker = rememberProjectMediaPicker { uris -> vm.attach(uris) }
     // Cámara: la foto va a la caché (FileProvider) y se adjunta como cualquier referencia.
     val context = LocalContext.current
@@ -145,7 +154,8 @@ fun AssistantScreen(
         }.onFailure { Toast.makeText(context, "No se pudo abrir la cámara", Toast.LENGTH_SHORT).show() }
     }
 
-    var following by rememberSaveable { mutableStateOf(true) }
+    var following by rememberSaveable(ui.conversationId) { mutableStateOf(draftPrefs.getInt("scroll:${ui.conversationId}",0)==0) }
+    val initialScrollRequest=remember(ui.conversationId) {ui.scrollRequest}
     var automaticScroll by remember { mutableStateOf(false) }
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
@@ -202,7 +212,7 @@ fun AssistantScreen(
         if (composerFocused) { following = true; followLast() }
     }
     LaunchedEffect(ui.scrollRequest) {
-        if (ui.scrollRequest > 0) { following = true; followLast() }
+        if (ui.scrollRequest != initialScrollRequest) { following = true; followLast() }
     }
     LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
 
@@ -231,43 +241,9 @@ fun AssistantScreen(
         Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
-    }},topBar={
-      Box(if (motion) Modifier.animateContentSize() else Modifier) {
-      if (slimTop) Surface(color = LocalChromeColor.current, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.statusBarsPadding().fillMaxWidth().height(36.dp).clickable { showProject = true }
-            .semantics { contentDescription = "Abrir proyecto"; stateDescription = activeProject?.name ?: "Agente" }
-            .padding(horizontal = NexusTokens.space12), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_mark),
-                contentDescription = null, modifier = Modifier.size(18.dp), contentScale = ContentScale.Fit)
-            Text(activeProject?.name ?: "Agente", style = MaterialTheme.typography.labelLarge, maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            if (ui.thinking) CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
-        }
-      } else
-        NexusTopAppBar(
-            navigationIcon = {
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_mark),
-                    contentDescription = "Logo de NEXUS",
-                    modifier = Modifier.padding(start = 12.dp, end = 4.dp).size(26.dp),
-                    contentScale = ContentScale.Fit
-                )
-            },
-            title={Column(Modifier.heightIn(min=NexusTokens.minimumTouch).clickable {showProject=true}.semantics {
-            contentDescription="Abrir proyecto"
-            stateDescription=listOfNotNull(activeProject?.name ?: "Agente","v${com.vidadomu.nexus.BuildConfig.VERSION_NAME}",ui.plans.values.lastOrNull()?.plan?.sceneCode?.let {"Escena $it"},"${ui.projectAssets.size} referencias",
-                projectDrafts.size.takeIf { it > 0 }?.let { if (it == 1) "1 borrador de memoria sin guardar" else "$it borradores de memoria sin guardar" }).joinToString(" · ")
-        },verticalArrangement=Arrangement.Center) {
-            // Una sola línea: el proyecto. El proveedor se configura en Ajustes y el razonamiento en el cuadro de texto; escena y referencias, en la hoja del proyecto.
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                Text(activeProject?.name ?: "Agente",style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f,fill=false))
-                Icon(Icons.Default.KeyboardArrowDown,contentDescription=null,modifier=Modifier.size(16.dp),tint=TextSecondary)
-            }
-        }},settingsEntries=listOf("Asistente: modelo y conexión" to { showSettings=true }))
-      }
-    }) {pad ->
-        Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
+    }},topBar={}) {pad ->
+        Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).statusBarsPadding().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
+            ConversationTabStrip(ui,vm)
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             // Al bajar por el chat se esconde la barra inferior para ganar espacio; al subir vuelve (Ajustes → Apariencia).
@@ -396,10 +372,10 @@ fun AssistantScreen(
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
-            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString("text", it.text).apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = 20) },
-                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto,
+            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
+                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
-                reasoningControl = { ReasoningPicker(ui, vm) })
+                reasoningControl = { ReasoningPicker(ui, vm) },workspaceControl={ConversationMenu(ui,vm,{showProject=true},onOpenSettings)})
             }
         }
     }
@@ -680,7 +656,7 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
         if(item.text.isNotBlank()) {
             // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
             // Casi sin fondo: tus mensajes llevan el acento y las respuestas quedan limpias, a todo el ancho.
-            Surface(color=MaterialTheme.colorScheme.surfaceContainer.copy(alpha=.35f),shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
+            Surface(color=androidx.compose.ui.graphics.Color.Transparent,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
                 .pointerInput(Unit) {detectTapGestures(onLongPress={actionsExpanded=true})}
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {

@@ -20,11 +20,12 @@ internal data class LibraryViewFilters(
     val origin: LibraryOriginFilter = LibraryOriginFilter.ALL,
     val favoriteOnly: Boolean = false,
     val showHidden: Boolean = false,
+    val projects: Set<String> = emptySet(),
 ) {
     val hasQuery: Boolean get() = query.isNotBlank()
-    val hasFilters: Boolean get() = modality != null || origin != LibraryOriginFilter.ALL || favoriteOnly || showHidden
+    val hasFilters: Boolean get() = modality != null || origin != LibraryOriginFilter.ALL || favoriteOnly || showHidden || projects.isNotEmpty()
     val narrowed: Boolean get() = hasQuery || hasFilters
-    fun withoutFilters() = copy(modality = null, origin = LibraryOriginFilter.ALL, favoriteOnly = false, showHidden = false)
+    fun withoutFilters() = copy(modality = null, origin = LibraryOriginFilter.ALL, favoriteOnly = false, showHidden = false,projects=emptySet())
     fun cleared() = LibraryViewFilters()
 }
 

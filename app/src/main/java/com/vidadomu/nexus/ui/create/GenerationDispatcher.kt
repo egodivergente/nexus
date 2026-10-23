@@ -44,7 +44,13 @@ class GenerationDispatcher(private val app: NexusApplication) {
         }
         onProgress(false, null)
         val request = NativeGenerationRequest.build(model, state.selectedModality, state.prompt, state.parameters, inputs, jobId)
-        val job = app.generationRepository.submitGeneration(request, localMetadata).getOrThrow()
+        val job = app.generationRepository.submitGeneration(request, localMetadata + buildMap {
+            val runtime=com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            runtime.settings.activeProjectId()?.let {project->
+                put("__project_id",project)
+                app.getSharedPreferences("nexus_project_conversations",0).getString(project,null)?.let {put("__conversation_id",it)}
+            }
+        }).getOrThrow()
         if(job.status != GenerationStatus.COMPLETED) GenerationPollingWorker.enqueue(app, jobId)
         return jobId
     }

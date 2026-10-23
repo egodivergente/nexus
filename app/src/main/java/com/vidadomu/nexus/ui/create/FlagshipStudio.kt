@@ -176,7 +176,6 @@ internal fun FlagshipStudioHeader(
             androidx.compose.foundation.text.selection.SelectionContainer {Text(identity.exactId,style=MaterialTheme.typography.bodySmall)}
         }},confirmButton={TextButton(onClick={showIdentity=false}) {Text("Cerrar")}})
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        CanvasWorkspaceSwitch(false, {}, onOpenFlow)
         StudioModalitySegments(modality, animate, onModality)
         Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment=Alignment.CenterVertically,

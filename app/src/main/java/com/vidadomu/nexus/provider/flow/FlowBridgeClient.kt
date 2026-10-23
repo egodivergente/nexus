@@ -44,7 +44,7 @@ internal class FlowBridgeClient(
                     connected = payload.bridgeStatus.equals("connected", ignoreCase = true),
                     generationEnabled = payload.generationReady,
                     recovering = payload.recovering,
-                    promptLimit = payload.promptLimit.coerceIn(1, MAX_PROMPT_LIMIT),
+                    promptLimit = null, // Legacy bridge ceilings are not verified Google capabilities.
                     expectedOutputs = payload.expectedOutputs
                         .map { it.lowercase() }
                         .filter { it in EXPECTED_OUTPUTS }
@@ -68,11 +68,8 @@ internal class FlowBridgeClient(
         runs: Int = 1,
         expectedResults: Int = 0
     ): Result<FlowBridgeJob> {
-        val cleanPrompt = prompt.trim()
+        val cleanPrompt = prompt
         if (cleanPrompt.isBlank()) return Result.failure(ProviderError("Escribe una instrucción para Flow."))
-        if (cleanPrompt.length > MAX_PROMPT_LIMIT) {
-            return Result.failure(ProviderError("La instrucción supera el límite local de $MAX_PROMPT_LIMIT caracteres."))
-        }
         if (expectedOutput !in EXPECTED_OUTPUTS) {
             return Result.failure(ProviderError("El tipo de resultado esperado no es compatible con el puente de Flow."))
         }
@@ -118,7 +115,7 @@ internal class FlowBridgeClient(
 
     suspend fun uploadReference(file: File, mimeType: String): Result<String> {
         if (mimeType !in FlowReferences.MIME_TYPES || !file.isFile || file.length() !in 1..FlowReferences.MAX_BYTES)
-            return Result.failure(ProviderError("Adjunta PNG, JPEG o WebP de hasta 16 MB.", httpStatusCode = 400))
+            return Result.failure(ProviderError("Adjunta un archivo PNG, JPEG o WebP válido.", httpStatusCode = 400))
         return guarded {
             requestJson(authorizedRequest("${base()}/references")
                 .post(file.asRequestBody(mimeType.toMediaType())).build()) { raw ->
@@ -153,7 +150,6 @@ internal class FlowBridgeClient(
     suspend fun agentSend(message: String): Result<AgentTurn> {
         val clean = message.trim()
         if (clean.isBlank()) return Result.failure(ProviderError("Escribe el mensaje para el agente de Flow."))
-        if (clean.length > MAX_PROMPT_LIMIT) return Result.failure(ProviderError("El mensaje supera $MAX_PROMPT_LIMIT caracteres."))
         val body = json.encodeToString(AgentMessagePayload.serializer(), AgentMessagePayload(clean)).toRequestBody(JSON_MEDIA_TYPE)
         return guarded {
             val chosen = base()
@@ -557,7 +553,7 @@ internal class FlowBridgeClient(
         @SerialName("bridge_status") val bridgeStatus: String = "",
         @SerialName("generation_ready") val generationReady: Boolean = false,
         val recovering: Boolean = false,
-        @SerialName("prompt_limit") val promptLimit: Int = DEFAULT_PROMPT_LIMIT,
+        @SerialName("prompt_limit") val promptLimit: Int? = null,
         @SerialName("expected_outputs") val expectedOutputs: List<String> = emptyList(),
         @SerialName("reason") val reason: String? = null
     )
@@ -604,8 +600,6 @@ internal class FlowBridgeClient(
         val DOWNLOAD_SIZES = setOf("1K", "2K", "4K", "720p", "1080p")
         private const val PIN_MS = 10 * 60_000L
         @Volatile private var pinned: Pair<String, Long>? = null
-        private const val DEFAULT_PROMPT_LIMIT = 4_000
-        private const val MAX_PROMPT_LIMIT = 4_000
         const val MAX_RUNS = 10
         const val MAX_RESULT_COUNT = 40
         private const val MAX_DOWNLOAD_BYTES = 1_024L * 1_024L * 1_024L
@@ -622,7 +616,7 @@ internal class FlowBridgeClient(
 data class FlowBridgeStatus(
     val connected: Boolean,
     val generationEnabled: Boolean,
-    val promptLimit: Int = 4_000,
+    val promptLimit: Int? = null,
     val expectedOutputs: Set<String> = setOf("image", "video"),
     val checkedAt: Long? = null,
     /** The bridge deliberately does not expose the account or project title. */

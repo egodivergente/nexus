@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Undo
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 import com.vidadomu.nexus.ui.theme.NexusHapticEvent
@@ -85,7 +86,7 @@ internal fun StudioToolRow(content: @Composable () -> Unit) {
 @Composable
 internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     placeholder: String, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null,
-    enabled: Boolean = true, maximum: Int? = null, attachments: @Composable ColumnScope.() -> Unit = {}) {
+    enabled: Boolean = true, maximum: Int? = null, capability: com.vidadomu.nexus.agent.core.registry.PromptCapability? = null, ruleScope: com.vidadomu.nexus.agent.core.config.RuleScope = com.vidadomu.nexus.agent.core.config.RuleScope(), attachments: @Composable ColumnScope.() -> Unit = {}) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -113,6 +114,10 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
                     field()
                 }
             })
+        val rules by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
+        val warning=rules.value("prompt.softWarning",ruleScope).toLongOrNull() ?: 0
+        if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary)
+        rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
         attachments()
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(modifier=Modifier.size(48.dp),enabled=enabled,onClick={
@@ -126,9 +131,12 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
                 onValueChange(cleared.orEmpty());cleared=null;feedback.perform(NexusHapticEvent.SELECTION)
             }) {Icon(Icons.Default.Undo,"Restaurar prompt",Modifier.size(16.dp))}
             Spacer(Modifier.weight(1f))
-            if(maximum!=null) Text("${value.length}/$maximum",style=MaterialTheme.typography.labelSmall,
-                color=if(value.length>maximum) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            else if(focused || expanded) Text("≈ ${(value.length+3)/4} tokens",style=MaterialTheme.typography.labelSmall.tabularMoney(),color=MaterialTheme.colorScheme.onSurfaceVariant)
+            val measured=capability?.measured(value)
+            Text(if(capability!=null) "${measured ?: "≈ ?"} / ${capability.maximum} ${capability.unitLabel}"
+                else "${value.codePointCount(0,value.length)} · Máximo no verificado",
+                style=MaterialTheme.typography.labelSmall,
+                modifier=Modifier.weight(1f,fill=false),
+                color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             IconButton(onClick = {
                 feedback.perform(NexusHapticEvent.SELECTION); expanded = !expanded
             },enabled=enabled) {

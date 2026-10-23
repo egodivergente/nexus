@@ -152,6 +152,7 @@ class ComparisonPlanTest {
         assertNull(state.copy(entries = entries.map { it.copy(cost = null) }).total)
         assertFalse(state.copy(entries = listOf(entries.first().copy(quantity = 0))).canSend)
         assertFalse(state.copy(entries = listOf(entries.first().copy(quantity = 21))).canSend)
+        assertTrue(state.copy(maximumPerModel=30,entries = listOf(entries.first().copy(quantity = 21))).canSend)
     }
     @Test fun expandedBatchIsFairAndSupportsSingleModelAndMaximumSize() {
         assertEquals(listOf(ComparisonTask(0,1),ComparisonTask(1,1),ComparisonTask(0,2),ComparisonTask(0,3)), ComparisonPlan.requests(listOf(3,1)))

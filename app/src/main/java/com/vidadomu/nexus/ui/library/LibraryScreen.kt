@@ -62,7 +62,7 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
     onSendToAgent:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
-    onSendResultToAgent:((String,String)->Unit)?=null) {
+    onSendResultToAgent:((String,String)->Unit)?=null, onOpenHistory:(()->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -111,31 +111,37 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
     var originMenu by remember {mutableStateOf(false)}
+    var projectMenu by remember {mutableStateOf(false)}
+    var selectedProjects by remember {mutableStateOf(prefs.getStringSet("project_filter",emptySet()).orEmpty().toSet())}
+    fun setProjects(next:Set<String>) {selectedProjects=next;prefs.edit().putStringSet("project_filter",next).apply()}
+    val projectIndex=remember(index) {LibraryProjectIndex(index)}
     // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
     var columns by remember {mutableStateOf(prefs.getInt("grid_cols",3).coerceIn(2,6))}
-    val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden)
+    val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden,selectedProjects)
     val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
     fun applyFilters(next:LibraryViewFilters) {
         if(!next.hasQuery) focusManager.clearFocus()
         query=next.query;filter=next.modality;originFilter=next.origin;favoriteOnly=next.favoriteOnly;showHidden=next.showHidden
+        setProjects(next.projects)
     }
     // Editado/Compartido solo se ofrecen si hay algo de ese origen; Nexus e Importado, siempre.
     val origins=remember(index) {
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
         LibraryOriginFilter.values().filter {it in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED,LibraryOriginFilter.IMPORTED) || it in present}
     }
-    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter) {
+    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter,selectedProjects,projectIndex) {
         if(originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList()
-        else jobs.map {job -> job.copy(outputs=job.outputs.filter {it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
+        else jobs.map {job -> job.copy(outputs=job.outputs.filter {projectIndex.matches(selectedProjects,job,it) && it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
             .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}
     }
-    val pending=remember(jobs,filter,query,showHidden,favoriteOnly,originFilter) {if(showHidden || favoriteOnly || originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList() else jobs.filter {
+    val pending=remember(jobs,filter,query,showHidden,favoriteOnly,originFilter,selectedProjects,projectIndex) {if(showHidden || favoriteOnly || originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList() else jobs.filter {
+        projectIndex.matches(selectedProjects,it) &&
         it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.CANCELLED,GenerationStatus.FAILED) &&
         (filter==null || it.modality==filter) && matchesCreationSearch(it,query)
     }.sortedByDescending {it.startedAt}}
-    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs,originFilter) {
+    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs,originFilter,selectedProjects,projectIndex) {
         val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
-        index.assets.filter { a -> !a.libraryDeleted && a.uri !in generatedUris &&
+        index.assets.filter { a -> !a.libraryDeleted && a.uri !in generatedUris && projectIndex.matches(selectedProjects,a) &&
             a.matchesLibraryOrigin(originFilter) &&
             (filter==null || a.type.name==filter?.name) && a.displayName.contains(query,true) &&
             ("asset:"+a.id in hidden)==showHidden && (!favoriteOnly || "asset:"+a.id in favorites) }.sortedByDescending {it.createdAt}
@@ -247,9 +253,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             if(token.startsWith("asset:")) localTarget=localAssets.firstOrNull {"asset:"+it.id==token}
             else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
             marked=emptySet()
-        }) else TopAppBar(title={
-        Text("Biblioteca",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-    },showBalance=false,actions={
+        }) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=16.dp),verticalAlignment=Alignment.CenterVertically) {
+
+        Text("Biblioteca",modifier=Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall)
+
+        onOpenHistory?.let {go->IconButton(onClick=go) {Icon(Icons.Default.History,"Historial de trabajos")}}
+
         IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,if(searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",tint=if(searchVisible) MaterialTheme.colorScheme.primary else TextSecondary)}
         IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
         Box {
@@ -264,7 +273,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             if(!com.vidadomu.nexus.ui.output.launchAlexia(context)) scope.launch {snackbar.showSnackbar("No se pudo abrir Alexia. Tus archivos siguen en la Biblioteca de Nexus.")}})
         }
         }
-    })}) {padding ->
+    }}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if(importing) LinearProgressIndicator(Modifier.fillMaxWidth())
             // Cabecera tranquila: el recuento y el saldo pasan a una línea secundaria y el título queda entero.
@@ -277,6 +286,16 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
             LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+                item {Box {
+                    StudioFilterChip(selectedProjects.isNotEmpty(),{projectMenu=true},label={Text(if(selectedProjects.isEmpty()) "Proyectos" else "Proyectos · ${selectedProjects.size}")},
+                        leadingIcon={Icon(Icons.Default.FolderOpen,null)},modifier=Modifier.semantics {contentDescription="Filtrar por proyectos"})
+                    DropdownMenu(projectMenu,{projectMenu=false}) {
+                        DropdownMenuItem(text={Text("Todos los proyectos")},leadingIcon={Icon(if(selectedProjects.isEmpty()) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,null)},onClick={setProjects(emptySet())})
+                        (index.projects.map {it.id to it.name}+listOf(LIBRARY_UNASSIGNED_PROJECT to "Sin proyecto")).forEach {(id,name)->
+                            DropdownMenuItem(text={Text(name)},leadingIcon={Icon(if(id in selectedProjects) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,null)},onClick={setProjects(if(id in selectedProjects) selectedProjects-id else selectedProjects+id)})
+                        }
+                    }
+                }}
                 item {StudioFilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)

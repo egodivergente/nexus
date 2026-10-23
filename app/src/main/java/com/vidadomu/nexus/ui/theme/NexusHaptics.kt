@@ -36,6 +36,7 @@ object NexusHapticPolicy {
 class NexusHaptics internal constructor(private val view: View) {
     /** Uses no flags, so the system "touch feedback" setting is honoured. Returns whether a tick was requested. */
     fun perform(event: NexusHapticEvent, changed: Boolean = true, accepted: Boolean = true): Boolean {
+        if (!com.vidadomu.nexus.settings.RuntimePreferences.get(view.context).bool("ui.haptics")) return false
         if (!NexusHapticPolicy.shouldEmit(event, changed, accepted)) return false
         return view.performHapticFeedback(NexusHapticPolicy.feedbackConstant(event, Build.VERSION.SDK_INT))
     }

@@ -26,11 +26,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.vidadomu.nexus.ui.theme.*
 
 @Composable
-fun NexusBottomBar(navController: NavController) {
+fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, onSelect: ((Screen)->Unit)? = null) {
     val entry by navController.currentBackStackEntryAsState()
-    val currentRoute=entry?.destination?.route
+    val currentRoute=selectedRoute ?: entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
     val haptic = LocalHapticFeedback.current
+    val context=androidx.compose.ui.platform.LocalContext.current
     // En el chat se esconde al bajar (si está activado en Ajustes) y vuelve al subir; en el resto de pestañas siempre se ve.
     val visible = ChromeVisibility.bottomBar.value || currentRoute != Screen.Assistant.route
     androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
@@ -42,14 +43,15 @@ fun NexusBottomBar(navController: NavController) {
                 Screen.bottomNavItems.forEach { screen ->
                     val selected=currentRoute==screen.route
                     val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
-                    Column(Modifier.weight(1f).heightIn(min=42.dp)
+                    Column(Modifier.weight(1f).heightIn(min=48.dp)
                         .semantics { contentDescription=screen.title }
                         .selectable(selected=selected,role=Role.Tab,onClick={
                             if(currentRoute!=screen.route) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if(com.vidadomu.nexus.settings.RuntimePreferences.get(context).bool("ui.haptics")) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             // Settings/Flow are pushed over the current tab. Return to that exact
                             // tab when possible; restoring a saved tab stack here could put Settings
                             // back on top and make the tab appear not to respond.
+                            if(onSelect!=null) onSelect(screen) else {
                             val poppedToExistingTab = currentRoute !in Screen.bottomNavItems.map { it.route } &&
                                 navController.popBackStack(screen.route, inclusive = false)
                             if (!poppedToExistingTab) navController.navigate(screen.route) {
@@ -58,6 +60,7 @@ fun NexusBottomBar(navController: NavController) {
                                 launchSingleTop = true
                                 // Only restore saved state when switching between actual tabs.
                                 restoreState = fromTab && screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
+                            }
                             }
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,

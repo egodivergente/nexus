@@ -15,7 +15,7 @@ class FlowStudioPlanTest {
         assertEquals(FlowBridgeProvider.CURRENT_PROJECT_MODEL, request.modelId)
         assertEquals("image", request.parameters[FlowBridgeProvider.EXPECTED_OUTPUT_KEY])
         assertEquals("4", request.parameters["count"])
-        assertEquals("luz", request.prompt)
+        assertEquals("  luz  ", request.prompt)
         assertNull(request.parameters["mode"])
     }
 
@@ -33,6 +33,13 @@ class FlowStudioPlanTest {
         val drafts = listOf(FlowStudioDraft(prompt = ""), FlowStudioDraft(prompt = "ok"),
             FlowStudioDraft(prompt = "largo".repeat(10)), FlowStudioDraft(prompt = "v", modality = Modality.VIDEO))
         assertEquals(listOf("ok"), FlowStudioPlan.sendable(drafts, 10, setOf(Modality.IMAGE)).map { it.prompt })
+    }
+
+    @Test fun unknownMaximumKeepsLongUnicodePrompt() {
+        val text="😀".repeat(12000)
+        val draft=FlowStudioDraft(prompt=text)
+        assertEquals(text,FlowStudioPlan.sendable(listOf(draft),null,setOf(Modality.IMAGE)).single().prompt)
+        assertEquals(text,FlowStudioPlan.request(draft,emptyList()).prompt)
     }
 
     @Test fun gridShowsRequestedCellsAndRealStatus() {

@@ -33,11 +33,11 @@ private fun inputFact(model: NexusModel): String? {
     fun addField(field: String?, label: String) { if (field != null && seen.add(field)) parts += mark(field, label) }
     addField(model.firstFrameField ?: model.inputImageField, "fotograma o imagen inicial")
     addField(model.lastFrameField, "fotograma final")
-    model.imagesArrayField?.let { addField(it, if (model.maxImages > 1) "hasta ${model.maxImages} imágenes" else "imágenes de referencia") }
+    model.imagesArrayField?.let { addField(it, if (model.maxImages in 2 until Int.MAX_VALUE) "hasta ${model.maxImages} imágenes" else "imágenes de referencia") }
     addField(model.videoField, "vídeo")
     model.videosArrayField?.let { addField(it, if (model.maxVideos > 1) "hasta ${model.maxVideos} vídeos" else "vídeos de referencia") }
     model.contractMedia.forEach { media ->
-        val limit = if (media.maximum > 1) " (hasta ${media.maximum})" else ""
+        val limit = if (media.maximum in 2 until Int.MAX_VALUE) " (hasta ${media.maximum})" else ""
         addField(media.key, media.label.lowercase() + limit)
     }
     return parts.joinToString(", ").replaceFirstChar { it.uppercase() }.takeIf { it.isNotBlank() }

@@ -15,10 +15,10 @@ fun generationFingerprint(state: CreateUiState) = GenerationFingerprint(state.se
 
 /** The cost the user saw for [fingerprint]. [amount] is display text only and is never parsed back into a number. */
 data class GenerationCostQuote(val fingerprint: GenerationFingerprint, val known: Boolean,
-    val amount: String, val details: String)
+    val amount: String, val details: String, val usd: Double? = null)
 
 fun generationCostQuote(state: CreateUiState, estimate: EstimateUi) =
-    GenerationCostQuote(generationFingerprint(state), isKnownCost(estimate), estimate.amount, estimate.details)
+    GenerationCostQuote(generationFingerprint(state), isKnownCost(estimate), estimate.amount, estimate.details, estimate.usd)
 
 /**
  * Loading, failed, published/unit rates and missing tariffs are unknown, never zero.

@@ -17,7 +17,7 @@ data class ComparisonEntry(val model: NexusModel, val prepared: PreparedComparis
     val cost: ComparisonCost? = null, val error: String? = null, val jobId: String? = null,
     val status: String = "Pendiente", val progress: Float? = null,
     val quantity: Int = 1, val sentCount: Int = 0) {
-    val subtotal get() = cost?.takeIf { quantity in 1..ComparisonPlan.MAX_GENERATIONS_PER_MODEL }
+    val subtotal get() = cost?.takeIf { quantity>=1 }
         ?.let { it.copy(amount = it.amount * quantity) }
 }
 data class ComparisonState(val source: CreateUiState = CreateUiState(), val catalog: List<NexusModel> = emptyList(),
@@ -26,7 +26,7 @@ data class ComparisonState(val source: CreateUiState = CreateUiState(), val cata
     val batchId: String? = null, val quotedAt: Long = 0, val stopped: Boolean = false,
     val quantities: Map<String,Int> = emptyMap(), val withReferences: Boolean = true,
     val checking: Set<String> = emptySet(), val checked: Set<String> = emptySet(),
-    val selectionProblems: Map<String,String> = emptyMap()) {
+    val selectionProblems: Map<String,String> = emptyMap(), val promptVariants: Map<String,String> = emptyMap(), val maximumModels: Int = 6, val maximumPerModel: Int = 20) {
     val canReview get() = phase == ComparisonPhase.CHOOSE && selected.isNotEmpty() &&
         selected.all { it in checked && it !in checking && it !in selectionProblems } &&
         source.prompt.isNotBlank() && (!withReferences || source.attachedMedia.isNotEmpty())
@@ -34,9 +34,10 @@ data class ComparisonState(val source: CreateUiState = CreateUiState(), val cata
     val selectedRequests get() = selected.sumOf { quantities[it] ?: 1 }
     val requestCount get() = entries.sumOf { it.quantity }
     val total get() = comparisonTotal(entries.map { it.subtotal })
-    val canSend get() = phase == ComparisonPhase.REVIEW && entries.size in 1..ComparisonPlan.MAX_MODELS &&
+    val canSend get() = phase == ComparisonPhase.REVIEW && entries.size in 1..maximumModels &&
         entries.map { ComparisonPlan.key(it.model) }.distinct().size == entries.size &&
-        entries.any { it.prepared != null && it.error == null && it.quantity in 1..ComparisonPlan.MAX_GENERATIONS_PER_MODEL }
+        entries.all { it.quantity in 1..maximumPerModel } &&
+        entries.any { it.prepared != null && it.error == null }
 }
 
 class ComparisonController(private val app: NexusApplication, private val scope: CoroutineScope) {
@@ -55,6 +56,10 @@ class ComparisonController(private val app: NexusApplication, private val scope:
         if(sending) return
         preparation?.cancel()
         checks.values.toList().forEach { it.cancel() }; checks.clear(); selectionEpoch++
+        val rules=com.vidadomu.nexus.settings.RuntimePreferences.get(app)
+        val maxModels=rules.int("generation.modelCount").takeIf {it>0} ?: Int.MAX_VALUE
+        val maxPerModel=rules.int("generation.perModelCount").takeIf {it>0} ?: Int.MAX_VALUE
+        mutable.update {it.copy(maximumModels=maxModels,maximumPerModel=maxPerModel)}
         val candidates = if(BuildConfig.OFFLINE_QA) localModels() + listOfNotNull(source.selectedModel) else app.modelCatalogRepository.models.value
         val references = withReferences || source.attachedMedia.isNotEmpty()
         val catalog = candidates.filter {ComparisonPlan.eligible(it,source.selectedModality)}.filter {
@@ -64,11 +69,11 @@ class ComparisonController(private val app: NexusApplication, private val scope:
         }.distinctBy(ComparisonPlan::key).sortedWith(ImageModelChoices.comparator)
         val keys = catalog.map(ComparisonPlan::key).toSet()
         val previous = preferences.getStringSet("models", emptySet()).orEmpty()
-        val saved = previous.intersect(keys).take(ComparisonPlan.MAX_MODELS).toSet()
+        val saved = previous.intersect(keys).take(state.value.maximumModels).toSet()
         val wanted = saved.ifEmpty { source.selectedModel?.let(ComparisonPlan::key)?.takeIf { it in keys }?.let(::setOf).orEmpty() }
         val quantities = catalog.associate { model -> val key = ComparisonPlan.key(model)
-            key to preferences.getInt("quantity:$key", 1).coerceIn(1, ComparisonPlan.MAX_GENERATIONS_PER_MODEL) }
-        mutable.value = ComparisonState(source = source, catalog = catalog, quantities = quantities, withReferences = references,
+            key to preferences.getInt("quantity:$key", 1).coerceIn(1, state.value.maximumPerModel) }
+        mutable.value = ComparisonState(maximumModels=maxModels,maximumPerModel=maxPerModel,source = source, catalog = catalog, quantities = quantities, withReferences = references,
             message = if(previous.any { it !in keys }) "Se han apartado de este lote las variantes que no corresponden a estas entradas." else null)
         catalog.filter { ComparisonPlan.key(it) in wanted }.forEach { checkModel(it, select = true) }
         ImageModelChoices.shortlist(catalog).filter { ComparisonPlan.key(it) !in wanted }.forEach { checkModel(it) }
@@ -101,7 +106,7 @@ class ComparisonController(private val app: NexusApplication, private val scope:
                 mutable.update { s -> s.copy(catalog = s.catalog.map { if(ComparisonPlan.key(it) == key) model else it },
                     checking = s.checking - key, checked = s.checked + key,
                     selectionProblems = if(problem == null) s.selectionProblems - key else s.selectionProblems + (key to problem),
-                    selected = if(select && problem == null && s.phase == ComparisonPhase.CHOOSE && s.selected.size < ComparisonPlan.MAX_MODELS) s.selected + key else if(problem != null) s.selected - key else s.selected) }
+                    selected = if(select && problem == null && s.phase == ComparisonPhase.CHOOSE && s.selected.size < state.value.maximumModels) s.selected + key else if(problem != null) s.selected - key else s.selected) }
             } catch(cancelled: CancellationException) { throw cancelled }
             catch(_: Exception) {
                 if(epoch == selectionEpoch) mutable.update { it.copy(checking = it.checking - key,
@@ -117,8 +122,8 @@ class ComparisonController(private val app: NexusApplication, private val scope:
         val key = ComparisonPlan.key(model)
         if(s.catalog.none { ComparisonPlan.key(it) == key } || key in s.checking) return
         if(key in s.selected) { mutable.update { it.copy(selected = it.selected-key, message = null) }; return }
-        if(s.selected.size >= ComparisonPlan.MAX_MODELS) {
-            mutable.update { it.copy(message = "Hasta ${ComparisonPlan.MAX_MODELS} modelos por lote.") }; return
+        if(s.selected.size >= state.value.maximumModels) {
+            mutable.update { it.copy(message = "Hasta ${state.value.maximumModels} modelos por lote.") }; return
         }
         if(key !in s.checked) { checkModel(model, select = true); return }
         s.selectionProblems[key]?.let { problem -> mutable.update { it.copy(message = problem) }; return }
@@ -128,7 +133,7 @@ class ComparisonController(private val app: NexusApplication, private val scope:
     fun setQuantity(model: NexusModel, quantity: Int) {
         val s = state.value
         val key = ComparisonPlan.key(model)
-        if(s.phase != ComparisonPhase.CHOOSE || key !in s.selected || quantity !in 1..ComparisonPlan.MAX_GENERATIONS_PER_MODEL) return
+        if(s.phase != ComparisonPhase.CHOOSE || key !in s.selected || quantity !in 1..state.value.maximumPerModel) return
         mutable.update { it.copy(quantities = it.quantities + (key to quantity), message = null) }
     }
 
@@ -150,7 +155,7 @@ class ComparisonController(private val app: NexusApplication, private val scope:
             mutable.update { it.copy(message = "Espera a que el lienzo termine de preparar los archivos.") }; return
         }
         val chosen = current.catalog.filter { ComparisonPlan.key(it) in current.selected }
-        if(chosen.size !in 1..ComparisonPlan.MAX_MODELS) return
+        if(chosen.size !in 1..state.value.maximumModels) return
         preferences.edit().putStringSet("models", current.selected).also { editor ->
             chosen.forEach { editor.putInt("quantity:${ComparisonPlan.key(it)}", current.quantity(it)) }
         }.apply()
@@ -165,11 +170,11 @@ class ComparisonController(private val app: NexusApplication, private val scope:
                         require(native.unsupportedRequired.isEmpty()) { "El esquema requiere entradas que todavía no admite Nexus." }
                         native.model
                     } else target
-                    val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
-                    val settings = runtime.settings.load()
-                    val fitted = com.vidadomu.nexus.agent.core.llm.PromptAdapter({ runtime.llm(settings) }, { settings.modelId })
-                        .adapt(current.source.prompt, com.vidadomu.nexus.assistant.ProviderPromptLimits.forModel(model), model.displayName)
-                    val plan = ComparisonPlan.adapt(current.source.copy(prompt = fitted), model).copy(originalPrompt = current.source.prompt)
+                    val prompt=current.promptVariants[ComparisonPlan.key(model)] ?: current.source.prompt
+                    com.vidadomu.nexus.settings.ModelCapabilities.prompt(model)?.let {cap->
+                        require(!cap.exceeds(prompt)) {"Máximo verificado: ${cap.maximum} ${cap.unitLabel}. Edita solo esta variante o exclúyela; el original se conserva."}
+                    }
+                    val plan = ComparisonPlan.adapt(current.source.copy(prompt=prompt), model).copy(originalPrompt=current.source.prompt)
                     update(index) { it.copy(prepared = plan, status = "Calculando coste…") }
                     val cost = runCatching { quote(plan) }.getOrNull()
                     update(index) { it.copy(model = model, cost = cost, status = if(cost == null) "Listo · coste sin estimación" else "Listo") }
@@ -204,6 +209,27 @@ class ComparisonController(private val app: NexusApplication, private val scope:
         }
     }
 
+    fun variantPrompt(model: NexusModel, text: String) {
+        if(state.value.phase!=ComparisonPhase.REVIEW) return
+        mutable.update {it.copy(promptVariants=it.promptVariants+(ComparisonPlan.key(model) to text))}
+        prepare()
+    }
+    fun exclude(model: NexusModel) {
+        if(state.value.phase!=ComparisonPhase.REVIEW) return
+        mutable.update {it.copy(entries=it.entries.filterNot {e->e.model.id==model.id && e.model.providerId==model.providerId},selected=it.selected-ComparisonPlan.key(model))}
+    }
+    fun savedGroups(): List<String> = preferences.getStringSet("groups",emptySet()).orEmpty().sorted()
+    fun saveGroup(name: String) {
+        if(name.isBlank()) return
+        preferences.edit().putStringSet("groups",savedGroups().toSet()+name).putStringSet("group:$name",state.value.selected).apply()
+    }
+    fun loadGroup(name: String) {
+        if(state.value.phase!=ComparisonPhase.CHOOSE) return
+        val ids=preferences.getStringSet("group:$name",emptySet()).orEmpty()
+        mutable.update {it.copy(selected=emptySet())}
+        state.value.catalog.filter {ComparisonPlan.key(it) in ids}.forEach {checkModel(it,true)}
+    }
+
     fun send() {
         val s = state.value
         if(!s.canSend) return
@@ -211,11 +237,11 @@ class ComparisonController(private val app: NexusApplication, private val scope:
             mutable.update { it.copy(message = "Validación correcta. NEXUS Lab bloquea todos los envíos: 0 generaciones, 0 saldo consumido.") }; return
         }
         val batchId = UUID.randomUUID().toString()
-        val run = ComparisonQueue().also { queue = it }
+        val run = ComparisonQueue(com.vidadomu.nexus.settings.RuntimePreferences.get(app).int("generation.parallel")).also { queue = it }
         mutable.update { it.copy(phase = ComparisonPhase.SENDING, batchId = batchId, message = null) }
         scope.launch {
             try {
-                run.run(ComparisonPlan.requests(s.entries.map { it.quantity })) { _, task ->
+                run.run(ComparisonPlan.requests(s.entries.map { it.quantity },s.maximumModels,s.maximumPerModel)) { _, task ->
                     val index = task.entryIndex
                     val entry = s.entries[index]
                     if(entry.prepared == null || state.value.entries[index].error != null) return@run

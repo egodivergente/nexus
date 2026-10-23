@@ -6,6 +6,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import com.vidadomu.nexus.assistant.PendingShares
+import com.vidadomu.nexus.assistant.PendingShare
+import com.vidadomu.nexus.assistant.ContinueProjectChooser
+import com.vidadomu.nexus.settings.RuntimePreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -52,6 +62,10 @@ class MainActivity : ComponentActivity() {
     private var initialSharedText by mutableStateOf<String?>(null)
     private var initialDeepLinkJobId by mutableStateOf<String?>(null)
     private var agentDraft by mutableStateOf<com.vidadomu.nexus.agent.AgentDraft?>(null)
+    private var pendingShares by mutableStateOf<List<PendingShare>>(emptyList())
+    private var shareImporting by mutableStateOf(false)
+    private var shareError by mutableStateOf<String?>(null)
+    private var projectChooser by mutableStateOf(false)
     private var startupPreviewEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,12 +78,22 @@ class MainActivity : ComponentActivity() {
             setTurnScreenOn(false)
         }
 
-        handleIntent(intent)
+        pendingShares=PendingShares(this).pending()
+        val rules=RuntimePreferences.get(this)
+        projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && rules.bool("startup.cold")
+        if(savedInstanceState==null || intent?.action !in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)) handleIntent(intent)
 
         setContent {
             NexusTheme {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
+                val tabs=remember {Screen.bottomNavItems}
+                val tabPrefs=remember {getSharedPreferences("nexus_workspace",0)}
+                val pager=rememberPagerState(initialPage=tabPrefs.getInt("page",0).coerceIn(0,tabs.lastIndex),pageCount={tabs.size})
+                val holder=rememberSaveableStateHolder()
+                var tabRequest by remember {mutableStateOf<Int?>(null)}
+                val rules by RuntimePreferences.get(this).state.collectAsState()
+                LaunchedEffect(pager.settledPage) {tabPrefs.edit().putInt("page",pager.settledPage).apply()}
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
                 agentDraft?.let {draft ->
@@ -146,31 +170,20 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
-                                NexusBottomBar(navController = navController)
+                                NexusBottomBar(navController = navController, selectedRoute=if(activeEntry?.destination?.route=="workspace") tabs[pager.currentPage].route else null,
+                                    onSelect={screen->tabRequest=tabs.indexOf(screen);navController.popBackStack("workspace",false)})
                             }
                         }
                     }
                 ) { innerPadding ->
-                    val tabRoutes = remember { Screen.bottomNavItems.map { it.route } }
-                    val tabDrag = com.vidadomu.nexus.ui.navigation.rememberTabDragState()
-                    NavHost(
-                        navController = navController,
-                        startDestination = Screen.Assistant.route,
-                        enterTransition = { tabEnter(tabRoutes) },
-                        exitTransition = { tabExit(tabRoutes) },
-                        popEnterTransition = { tabEnter(tabRoutes) },
-                        popExitTransition = { tabExit(tabRoutes) },
-                        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).tabSwipe(enabled = activeEntry?.destination?.route in tabRoutes, state = tabDrag) { direction ->
-                            adjacentTab(activeEntry?.destination?.route, direction, Screen.bottomNavItems.map { it.route })?.let { route ->
-                                navController.navigate(route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = route != Screen.Models.route && route != Screen.Assistant.route
-                                }
-                            }
-                        }
-                    ) {
-                        composable(Screen.Assistant.route) {
+                    NavHost(navController=navController,startDestination="workspace",
+                        modifier=Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
+                        composable("workspace") {
+                            LaunchedEffect(tabRequest) {tabRequest?.let {pager.scrollToPage(it);tabRequest=null}}
+                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,modifier=Modifier.fillMaxSize()) {index ->
+                                holder.SaveableStateProvider(tabs[index].route) {
+                                when(tabs[index]) {
+                            Screen.Assistant -> {
                             com.vidadomu.nexus.assistant.AssistantScreen(
                                 onOpenInCanvas = { state ->
                                     createViewModel.openAssistantPlan(state)
@@ -182,7 +195,7 @@ class MainActivity : ComponentActivity() {
                                 vm = assistantViewModel
                             )
                         }
-                        composable(Screen.Create.route) {
+                            Screen.Create -> {
                             CreateScreen(
                                 onBrowseModels = { navController.navigate(Screen.Models.route) { launchSingleTop = true } },
                                 onOpenFlow = { navController.navigate(Screen.Flow.route) { launchSingleTop = true } },
@@ -193,7 +206,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel = createViewModel
                             )
                         }
-                        composable(Screen.Models.route) {
+                            Screen.Models -> {
                             ModelsScreen(
                                 onSelectModelAndCreate = { model ->
                                     createViewModel.selectModality(model.modalities.first())
@@ -202,20 +215,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable(Screen.Generations.route) {
-                            GenerationsScreen(
-                                onNavigateToOutput = { jobId ->
-                                    navController.navigate("output/$jobId")
-                                },
-                                onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}},
-                                onSendResultToAgent = { jobId, outputId ->
-                                    assistantViewModel.attachLibraryResult(jobId,outputId)
-                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
-                                }
-                            )
-                        }
-                        composable(Screen.Library.route) {
+                            Screen.Library -> {
                             LibraryScreen(
+                                onOpenHistory={navController.navigate(Screen.Generations.route)},
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onNavigateToResult = { jobId, index -> navController.navigate("output/$jobId?index=$index") },
                                 onUseInCanvas = { asset ->
@@ -237,6 +239,33 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                            Screen.Flow -> {
+                            FlowCreateScreen(
+                                onBack = {tabRequest=0},
+                                onOpenModels = { tabRequest=2 },
+                                onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") }
+                            )
+                        }
+                                    else -> Unit
+                                }
+                                }
+                            }
+                        }
+                        tabs.forEach {tab ->composable(tab.route) {
+                            LaunchedEffect(tab.route) {tabRequest=tabs.indexOf(tab);navController.popBackStack("workspace",false)}
+                        }}
+                        composable(Screen.Generations.route) {
+                            GenerationsScreen(
+                                onNavigateToOutput = { jobId ->
+                                    navController.navigate("output/$jobId")
+                                },
+                                onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}},
+                                onSendResultToAgent = { jobId, outputId ->
+                                    assistantViewModel.attachLibraryResult(jobId,outputId)
+                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                }
+                            )
+                        }
                         composable(Screen.Settings.route) {
                             SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {
                                 navController.navigate(Screen.Flow.route) { launchSingleTop = true }
@@ -244,13 +273,6 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("byteplus/{page}",arguments=listOf(navArgument("page") {type=NavType.StringType})) {entry ->
                             SettingsScreen(initialPage=entry.arguments?.getString("page"),onCloseInitialPage={navController.popBackStack()},assistantViewModel=assistantViewModel)
-                        }
-                        composable(Screen.Flow.route) {
-                            FlowCreateScreen(
-                                onBack = { navController.popBackStack() },
-                                onOpenModels = { navController.navigate(Screen.Create.route) { launchSingleTop = true; popUpTo(Screen.Create.route) } },
-                                onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") }
-                            )
                         }
                         composable(
                             route = "output/{jobId}?index={index}",
@@ -279,12 +301,38 @@ class MainActivity : ComponentActivity() {
                 }
                 }
                 NexusStartupOnboardingOverlay(epoch = startupPreviewEpoch)
+                val shared=pendingShares.firstOrNull()
+                LaunchedEffect(shared?.id,rules.value("share.choose")) {
+                    if(shared?.ready==true && !rules.value("share.choose").toBoolean()) {
+                        try {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending();projectChooser=false;tabRequest=0}
+                        catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                        catch(e:Exception) {shareError="No se pudo añadir el lote al chat. Tus archivos se conservan para reintentarlo."}
+                    }
+                }
+                if(projectChooser || shared!=null && (rules.value("share.choose").toBoolean() || !shared.ready)) ContinueProjectChooser(assistantViewModel,shared,
+                    onRetryShare={lifecycleScope.launch {if(shared!=null) {PendingShares(this@MainActivity).retry(shared);pendingShares=PendingShares(this@MainActivity).pending()}}},
+                    onChoose={id->lifecycleScope.launch {
+                        try {
+                            assistantViewModel.selectProject(id)
+                            check(assistantViewModel.ui.first {!it.thinking}.activeProjectId==id)
+                            if(shared!=null && shared.ready) {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending()}
+                            projectChooser=false;tabRequest=0;navController.popBackStack("workspace",false)
+                        } catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                        catch(e:Exception) {shareError="No se pudo abrir el destino. El historial y los archivos compartidos se conservan."}
+                    }}, onDismiss={projectChooser=false;if(shared!=null) {lifecycleScope.launch {
+                        if(shared.ready) {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending()}
+                    }}})
+                if(shareImporting) androidx.compose.material3.Surface(Modifier.fillMaxSize(),color=androidx.compose.material3.MaterialTheme.colorScheme.background) {
+                    androidx.compose.foundation.layout.Box(contentAlignment=androidx.compose.ui.Alignment.Center) {androidx.compose.material3.Text("Conservando archivos compartidos…")}
+                }
+                shareError?.let {message->androidx.compose.material3.AlertDialog(onDismissRequest={shareError=null},title={androidx.compose.material3.Text("Archivos compartidos")},text={androidx.compose.material3.Text(message)},confirmButton={androidx.compose.material3.TextButton(onClick={shareError=null}) {androidx.compose.material3.Text("Entendido")}})}
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
@@ -302,25 +350,35 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // 2. Share Intent handling
-        if (intent.action == Intent.ACTION_SEND) {
-            val type = intent.type
-            if (type != null) {
-                if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) {
-                    val streamUri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-                    if (streamUri != null) {
-                        initialSharedUri = streamUri
-                        initialSharedMime = type
-                    }
-                } else if (type == "text/plain") {
-                    val text = intent.getStringExtra(Intent.EXTRA_TEXT)
-                    if (text != null) {
-                        initialSharedText = text
-                    }
+        if(intent.action in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE) && !intent.getBooleanExtra("nexus_share_processed",false)) {
+            shareImporting=true
+            lifecycleScope.launch {
+                try {
+                    PendingShares(this@MainActivity).receive(intent);pendingShares=PendingShares(this@MainActivity).pending()
+                    // Keep the Activity's identity stable while retiring transient URI grants/extras.
+                    intent.putExtra("nexus_share_processed",true)
+                    intent.removeExtra(Intent.EXTRA_STREAM);intent.removeExtra(Intent.EXTRA_TEXT);intent.clipData=null
+                    setIntent(intent)
                 }
+                catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                catch(e:Exception) {pendingShares=PendingShares(this@MainActivity).pending();shareError="No se pudo terminar la copia. El lote disponible se conserva; revisa el almacenamiento y vuelve a compartir los archivos que falten."}
+                finally {shareImporting=false}
             }
         }
     }
+
+    override fun onStop() {
+        getSharedPreferences("nexus_workspace",0).edit().putLong("leftAt",System.currentTimeMillis()).apply()
+        super.onStop()
+    }
+    override fun onStart() {
+        super.onStart()
+        val rules=RuntimePreferences.get(this)
+        val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
+        val minutes=rules.int("startup.idleMinutes")
+        if(left>0 && minutes>0 && rules.bool("startup.enabled") && System.currentTimeMillis()-left>=minutes*60_000L) projectChooser=true
+    }
+
 }
 
 @Composable

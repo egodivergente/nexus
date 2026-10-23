@@ -97,6 +97,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     var appearanceOpen by remember {mutableStateOf(false)}
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
+    var settingsSearch by rememberSaveable {mutableStateOf("")}
     var pageName by rememberSaveable(initialPage) { mutableStateOf(initialPage) }
     val closePage: () -> Unit = {if(initialPage!=null && onCloseInitialPage!=null) onCloseInitialPage() else pageName=null}
     val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
@@ -109,17 +110,44 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         showBalance=page != SettingsPage.BYTEPLUS,
         navigationIcon={ if(page != null) IconButton(onClick=closePage) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        if(page in setOf(SettingsPage.RULES,SettingsPage.PROJECTS,SettingsPage.CATALOG,SettingsPage.AUTOMATION,SettingsPage.VISUAL)) {
+            Box(Modifier.padding(padding)) {com.vidadomu.nexus.settings.RuntimeSettingsEditor(when(page) {SettingsPage.PROJECTS->"Proyectos y conversaciones";SettingsPage.CATALOG->"Catálogo y workflows";SettingsPage.AUTOMATION->"Automatización";SettingsPage.VISUAL->"Personalización";else->null})}
+        } else LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             when(page) {
+                SettingsPage.RULES, SettingsPage.PROJECTS, SettingsPage.CATALOG, SettingsPage.AUTOMATION, SettingsPage.VISUAL -> Unit
                 null -> {
-                    item {HubRow(SettingsPage.APPEARANCE,"${selectedTheme.label} · ${currencyState.preference.displayName}") {pageName=SettingsPage.APPEARANCE.name}}
-                    item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
-                    item {HubRow(SettingsPage.AGENT,"Modelo del asistente, consumo, herramientas y cerebros") {pageName=SettingsPage.AGENT.name}}
-                    item {HubRow(SettingsPage.PROVIDERS,providersHubSummary(keysConfigured,3,maskedApiKey!="Not configured",atlasCheck,accountBalance?.lastUpdated,flowLinked,System.currentTimeMillis(),java.time.ZoneId.systemDefault())) {pageName=SettingsPage.PROVIDERS.name}}
-                    item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
-                    item {HubRow(SettingsPage.SYSTEM,systemHubSummary(com.vidadomu.nexus.BuildConfig.VERSION_NAME,com.vidadomu.nexus.BuildConfig.CODENAME,isMockMode)) {pageName=SettingsPage.SYSTEM.name}}
+                    item {com.vidadomu.nexus.ui.components.StudioTextField(settingsSearch,{settingsSearch=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Buscar en Ajustes")},leadingIcon={Icon(Icons.Default.Search,null)})}
+                    val sections=listOf(
+                        SettingsPage.APPEARANCE to "Tema, tipografía, fondo, movimiento y háptica",
+                        SettingsPage.PROJECTS to "Inicio, conversaciones y destino al compartir",
+                        SettingsPage.AGENT to "Modelo, memoria, herramientas y consumo",
+                        SettingsPage.CATALOG to "Densidad, antigüedad y orden de workflows",
+                        SettingsPage.PROVIDERS to "Cuentas, BytePlus y generadores propios",
+                        SettingsPage.CONNECTIONS to "Flow, dispositivos y sincronización",
+                        SettingsPage.AUTOMATION to "Concurrencia y ejecución",
+                        SettingsPage.RULES to "Preferencias por ámbito, exportar e importar",
+                        SettingsPage.SECURITY to "Permisos y almacenamiento privado",
+                        SettingsPage.SYSTEM to "Diagnóstico y administración")
+                    sections.filter {settingsSearch.isBlank() || "${it.first.title} ${it.second}".contains(settingsSearch,true)}.forEach {(target,summary)->
+                        item {HubRow(target,summary) {pageName=target.name}}
+                    }
+                    if(settingsSearch.isNotBlank()) item {TextButton(onClick={pageName=SettingsPage.RULES.name}) {Text("Buscar también en todas las reglas")}}
+                }
+                SettingsPage.CONNECTIONS -> {
+                    item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
+                    item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
+                    item {SettingsCard {SettingRow("Sincronización entre dispositivos","Chats, memoria y archivos",{syncOpen=true})}}
+                }
+                SettingsPage.SECURITY -> {
+                    item {SettingsCard {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Text("Permisos de Android",style=MaterialTheme.typography.titleMedium)
+                        Text("Micrófono, notificaciones y acceso a archivos se gestionan desde el sistema.",style=MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick={context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")))}) {Text("Abrir permisos de Nexus")}
+                        Text("Las credenciales se conservan en el almacén privado y no se incluyen en la exportación de ajustes.",style=MaterialTheme.typography.bodySmall)
+                    }}}
                 }
                 SettingsPage.APPEARANCE -> {
+                    item {HubRow(SettingsPage.VISUAL,"Fondo, foto propia, movimiento y háptica") {pageName=SettingsPage.VISUAL.name}}
             item {SettingsCard {
                 SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true})
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
@@ -137,6 +165,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     item {SettingsCard {BrainsSettingsSection()}}
                 }
                 SettingsPage.PROVIDERS -> {
+                    item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
+                    item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
                     item {val atlasPill=providerPill(maskedApiKey!="Not configured",atlasCheck)
                         ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=atlasPill.healthy,idleLabel=atlasPill.label) {
                         ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null;atlasCheck=ProviderCheck.NotChecked})
@@ -395,9 +425,16 @@ private fun ProviderCredentialCard(
     }
 }
 private enum class SettingsPage(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tint: androidx.compose.ui.graphics.Color) {
-    APPEARANCE("Apariencia y moneda", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
+    CATALOG("Catálogo y workflows", Icons.Default.GridView, androidx.compose.ui.graphics.Color(0xFF68DFE0)),
+    CONNECTIONS("Conexiones", Icons.Default.Cable, androidx.compose.ui.graphics.Color(0xFF34D399)),
+    AUTOMATION("Automatización", Icons.Default.PlayCircleOutline, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
+    SECURITY("Seguridad", Icons.Default.Security, androidx.compose.ui.graphics.Color(0xFFFBBF24)),
+    VISUAL("Fondo, movimiento y háptica", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
+    RULES("Reglas y límites", Icons.Default.Tune, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
+    PROJECTS("Proyectos y conversaciones", Icons.Default.FolderOpen, androidx.compose.ui.graphics.Color(0xFF34D399)),
+    APPEARANCE("Personalización", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
     BYTEPLUS("Consumo BytePlus", Icons.Default.AccountBalanceWallet, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
-    AGENT("Agente y modelos", Icons.Default.AutoAwesome, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
+    AGENT("Agentes y memoria", Icons.Default.AutoAwesome, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
     PROVIDERS("Proveedores de generación", Icons.Default.CloudQueue, androidx.compose.ui.graphics.Color(0xFF34D399)),
     CUSTOM("Generadores propios", Icons.Default.Extension, androidx.compose.ui.graphics.Color(0xFFFBBF24)),
     SYSTEM("Sistema y diagnóstico", Icons.Default.Settings, androidx.compose.ui.graphics.Color(0xFF94A3B8)),

@@ -84,7 +84,7 @@ class NexusApplication : Application() {
         com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes = getSharedPreferences("assistant_config_v1", MODE_PRIVATE).getInt("lim_tracking_min", com.vidadomu.nexus.core.model.TrackingPolicy.DEFAULT_MINUTES)
         database = NexusDatabase(this)
 
-        val okHttpClient = OkHttpClientFactory.create(secureStorage)
+        val okHttpClient = OkHttpClientFactory.create(secureStorage,this)
         currencyManager = CurrencyManager(okHttpClient, secureStorage)
 
         atlasProvider = AtlasCloudProvider(okHttpClient, secureStorage)

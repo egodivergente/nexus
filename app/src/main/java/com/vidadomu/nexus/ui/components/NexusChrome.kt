@@ -176,3 +176,5 @@ internal fun StudioBalanceChip(balance:String,onClick:()->Unit) {
 @Composable
 fun nexusScreenTitleStyle():TextStyle = if(LocalDensity.current.fontScale>=1.3f)
     MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleMedium
+
+@Composable fun NexusSettingsButton() {LocalChrome.current?.openSettings?.let {go->IconButton(onClick=go) {Icon(Icons.Outlined.Settings,"Ajustes de Nexus",Modifier.size(20.dp))}}}

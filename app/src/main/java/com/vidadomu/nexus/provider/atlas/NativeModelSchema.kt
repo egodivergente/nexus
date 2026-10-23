@@ -267,7 +267,7 @@ object NativeModelSchema {
                 if(enum != null && value !in enum) return "Opción no permitida para " + key
                 val max = (p["maxLength"] as? JsonPrimitive)?.intOrNull
                 val min = (p["minLength"] as? JsonPrimitive)?.intOrNull
-                if(max != null && value.length > max || min != null && value.length < min) return "Revisa la longitud de " + key
+                if(max != null && value.codePointCount(0,value.length) > max || min != null && value.codePointCount(0,value.length) < min) return "Revisa la longitud de " + key
                 val numericType = (p["type"] as? JsonPrimitive)?.contentOrNull ?: model.parameters.firstOrNull { it.key == key }?.nativeType
                 if(numericType in setOf("integer", "number")) {
                     val minimum = ParameterBounds.exact(bound(p, "minimum"))?.toBigDecimal()

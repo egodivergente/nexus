@@ -2,10 +2,10 @@ package com.vidadomu.nexus.provider.flow
 
 import com.vidadomu.nexus.core.model.*
 
-/** Transport limits belong to Nexus, not to the model selected in Flow. */
+/** Unknown Google limits stay open; local attachment preferences are applied by the editor. */
 internal object FlowReferences {
-    const val MAX_IMAGES = 12
-    const val MAX_BYTES = 16L * 1024 * 1024
+    const val MAX_IMAGES = Int.MAX_VALUE
+    const val MAX_BYTES = Long.MAX_VALUE
     const val PARAMETER = "__flow_reference_ids"
     const val INITIAL_FRAME = "__flow_initial_frame_id"
     const val END_FRAME = "__flow_end_frame_id"

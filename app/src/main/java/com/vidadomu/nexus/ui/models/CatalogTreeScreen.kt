@@ -49,6 +49,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
     val loading by app.modelCatalogRepository.isLoading.collectAsState()
     val error by app.modelCatalogRepository.errorMessage.collectAsState()
     val hiddenEntries by app.modelCatalogRepository.hiddenEntries.collectAsState()
+    val runtime=remember {com.vidadomu.nexus.settings.RuntimePreferences.get(app)}
+    val rules by runtime.state.collectAsState()
+    var toolsView by rememberSaveable {mutableStateOf(false)}
+    var showLegacy by rememberSaveable {mutableStateOf(false)}
     var personalizing by rememberSaveable { mutableStateOf(false) }
     var manageHidden by rememberSaveable { mutableStateOf(false) }
     var pendingHide by remember { mutableStateOf<Pair<String,String>?>(null) }
@@ -75,19 +79,24 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
     var imageReferences by rememberSaveable { mutableStateOf(true) }
     var allImageFamilies by rememberSaveable { mutableStateOf(false) }
     var use by rememberSaveable { mutableStateOf<CreationUse?>(null) }
-    val visible = remember(models, modality, query, use, favorites, favoritesOnly,providerFilter,imageReferences) {
-        browseCatalog(models.filter {(providerFilter==null || it.providerId==providerFilter) && (modality != Modality.IMAGE || !imageReferences || ImageModelChoices.acceptsReferences(it))}, modality, use, query, null, favoritesOnly, favorites, CatalogOrder.PRIORITY)
+    val visible = remember(models, modality, query, use, favorites, favoritesOnly,providerFilter,imageReferences,toolsView,rules,showLegacy) {
+        val months=runtime.int("catalog.ageMonths")
+        val available=models.filter {model->showLegacy || months==0 || modelRelease(model)?.month?.let {
+            java.time.YearMonth.parse(it)>=java.time.YearMonth.now().minusMonths(months.toLong())
+        }!=false}
+        if(toolsView) available.filter {toolCategory(it)!=null && (query.isBlank() || modelSearchText(it).contains(query.lowercase())) && (!favoritesOnly || modelBookmark(it) in favorites)} else
+        browseCatalog(available.filter {(providerFilter==null || it.providerId==providerFilter) && (modality != Modality.IMAGE || !imageReferences || ImageModelChoices.acceptsReferences(it))}, modality, use, query, null, favoritesOnly, favorites, CatalogOrder.PRIORITY)
     }
     val orderScope = "order:${modality.name}:${family ?: if(query.isBlank() && !favoritesOnly) "families" else "search-models"}"
     var savedOrder by remember(orderScope) { mutableStateOf(prefs.getString(orderScope, "").orEmpty().split("\n").filter {it.isNotBlank()}) }
     var contextTarget by remember { mutableStateOf<Triple<String,String,NexusModel?>?>(null) }
-    val sections = remember(visible, favorites,savedOrder,modality) { catalogSections(visible, favorites).sortedWith(
+    val sections = remember(visible, favorites,savedOrder,modality,toolsView) { (if(toolsView) visible.groupBy {toolCategory(it)!!}.map {(name,rows)->CatalogSection(name,rows)} else catalogSections(visible, favorites)).sortedWith(
         compareBy<CatalogSection> {savedOrder.indexOf(it.family).let {index -> if(index<0) Int.MAX_VALUE else index}}
             .thenByDescending { section -> section.models.any { modelBookmark(it) in favorites } }
             .thenBy { section -> if(modality == Modality.IMAGE) ImageModelChoices.priority(section.family) else 0 }
             .thenByDescending { section -> section.models.any { CatalogFocus.forModel(it)!=null } }
     ) }
-    val groups = remember(visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || catalogFamily(it) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs),catalogSort==CatalogSort.RELEASE && onlyDated) }
+    val groups = remember(visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated) }
     val rootLevel = family==null && query.isBlank() && !favoritesOnly && catalogSort==CatalogSort.PERSONAL
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
@@ -115,10 +124,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         favorites = if(key in favorites) favorites - key else favorites + key
         prefs.edit().putStringSet("model_favorites", favorites).apply()
     }
-    Scaffold(containerColor = BackgroundDark, topBar = {
-        TopAppBar(title = { Text("Modelos",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),fontWeight=FontWeight.SemiBold) },
-            navigationIcon = { if(family != null || groupKey != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
-            actions = {
+    val catalogMenu: @Composable () -> Unit = {
                 Box {
                     IconButton(onClick={moreMenu=true}) {Icon(Icons.Default.MoreVert,"Opciones del catálogo")}
                     DropdownMenu(expanded=moreMenu,onDismissRequest={moreMenu=false}) {
@@ -131,6 +137,12 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         DropdownMenuItem(text={Text("Actualizar catálogo")},enabled=!loading,onClick={app.modelCatalogRepository.refreshModels(true);moreMenu=false})
                     }
                 }
+    }
+    Scaffold(containerColor = ScreenBackground, topBar = {
+        if(family!=null || groupKey!=null) TopAppBar(title = { Text("ArtBox",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle(),fontWeight=FontWeight.SemiBold) },
+            navigationIcon = { if(family != null || groupKey != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
+            actions = {
+                catalogMenu()
             })
     }) { padding ->
         if(activeGroup!=null) {
@@ -139,7 +151,15 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 modifier=Modifier.fillMaxSize().padding(padding))
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) minOf(runtime.int("catalog.columns"),if(androidx.compose.ui.platform.LocalDensity.current.fontScale>1.3f) 2 else 6) else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+            if(family==null) item(span={GridItemSpan(maxLineSpan)}) {
+                Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
+                    Icon(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.artbox_mark),null,tint=androidx.compose.ui.graphics.Color.Unspecified,modifier=Modifier.size(28.dp))
+                    Text("ArtBox",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(start=8.dp).weight(1f))
+                    catalogMenu()
+                    NexusSettingsButton()
+                }
+            }
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
                 Text(if(family != null) family.orEmpty()
                     else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
@@ -150,10 +170,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             }
                 if(family == null) item(span={GridItemSpan(maxLineSpan)}) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                        item {StudioFilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly;family=null},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.StarBorder,null)})}
-                        items(listOf(Modality.VIDEO to "Vídeo", Modality.IMAGE to "Imagen") + if(showSecondary || modality in listOf(Modality.AUDIO,Modality.CHAT)) listOf(Modality.AUDIO to "Audio",Modality.CHAT to "Texto") else emptyList()) { (value,label) ->
-                            StudioFilterChip(modality == value, { modality=value; family=null; groupKey=null; use=null; query=""; prefs.edit().putString("browser_modality",value.name).apply() }, label={Text(label)})
+                        items(listOf(Modality.VIDEO to "Vídeos", Modality.IMAGE to "Imágenes") + if(showSecondary || modality in listOf(Modality.AUDIO,Modality.CHAT)) listOf(Modality.AUDIO to "Audio",Modality.CHAT to "Texto") else emptyList()) { (value,label) ->
+                            StudioFilterChip(!toolsView && modality == value, { toolsView=false;modality=value; family=null; groupKey=null; use=null; query=""; prefs.edit().putString("browser_modality",value.name).apply() }, label={Text(label)})
                         }
+                        item {StudioFilterChip(toolsView,{toolsView=true;family=null;groupKey=null;use=null;query=""},label={Text("Herramientas")})}
+                        item {StudioFilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly;family=null},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.StarBorder,null)})}
                         item {StudioFilterChip(showSecondary,{showSecondary=!showSecondary},label={Text("Más")})}
                         item {StudioFilterChip(filters || activeFilters.isNotEmpty(),{filters=!filters},label={Text(filterButtonLabel(activeFilters.size))},
                             leadingIcon={Icon(Icons.Default.Tune,null)},modifier=Modifier.semantics { contentDescription=filterButtonDescription(activeFilters.size) })}
@@ -168,7 +189,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                                 tint=if(filters || activeFilters.isNotEmpty()) MaterialTheme.colorScheme.primary else TextSecondary)}
                         }}, shape=NexusTokens.filter)
                 }
-                if(modality == Modality.IMAGE) item(span={GridItemSpan(maxLineSpan)}) {
+                if(!toolsView && modality == Modality.IMAGE) item(span={GridItemSpan(maxLineSpan)}) {
                     StudioFilterChip(imageReferences, {imageReferences=!imageReferences;use=null;groupKey=null},
                         label={Text(if(imageReferences) "Con referencias" else "Todos los usos")})
                 }
@@ -186,21 +207,15 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 }
                 if(rootLevel) {
                     val prioritySections = sections.filter { it.family in ImageModelChoices.families || it.models.any { m -> modelBookmark(m) in favorites } || it.family in savedOrder }
-                    val shownSections = if(modality != Modality.IMAGE || allImageFamilies || personalizing || prioritySections.isEmpty()) sections else prioritySections
+                    val shownSections = sections
                     items(shownSections,key={it.family}) { section ->
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { _ ->
                         val (moveUp,moveDown)=reorderActions(section.family)
-                        NavigationCard(section.family,section.family,catalogCardSummary(section.models,"${pluralModelos(children.size)} · "),section.models,modality,
-                            onClick={family=section.family;filters=false}, compact=compactCards,grid=useGrid,
-                            onLongClick={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},
-                            dragModifier=if(personalizing) Modifier.draggableHandle() else null,
-                            cardModifier=if(personalizing) Modifier.longPressDraggableHandle() else Modifier,
-                            onHide=if(personalizing) ({pendingHide=familyVisibilityKey(section.family) to section.family}) else null,
-                            onMoveUp=moveUp,onMoveDown=moveDown)
+                        ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)})
                         }
                     }
-                    if(modality == Modality.IMAGE && sections.size > prioritySections.size && !personalizing) item(span={GridItemSpan(maxLineSpan)}) {
+                    if(false) item(span={GridItemSpan(maxLineSpan)}) {
                         TextButton(onClick={allImageFamilies=!allImageFamilies}, modifier=Modifier.fillMaxWidth()) {Text(if(allImageFamilies) "Ver solo mis familias" else "Otras familias")}
                     }
                 } else {
@@ -252,6 +267,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             if(catalogSort==CatalogSort.RELEASE) {
                     Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
             }
+                    Row(verticalAlignment=Alignment.CenterVertically) {Text("Mostrar modelos antiguos",Modifier.weight(1f));Switch(showLegacy,{showLegacy=it})}
                     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                         Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.semantics { heading() })
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -332,7 +348,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 Column(Modifier.weight(1f)) {
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
                         Text(title,style=MaterialTheme.typography.titleMedium,
-                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=if(largeFont) 3 else 1,overflow=TextOverflow.Ellipsis)
+                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
                     }
                     Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)

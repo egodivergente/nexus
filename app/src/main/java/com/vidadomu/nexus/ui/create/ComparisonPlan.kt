@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.*
+import kotlinx.coroutines.launch
 
 /** Only declared contracts are adapted. Never infer an endpoint or capability from a brand. */
 object ComparisonPlan {
@@ -11,9 +12,9 @@ object ComparisonPlan {
     const val MODEL_SIZE = "__comparison_model_size"
 
     /** Round-robin gives each model a first result before starting its next generation. */
-    fun requests(quantities: List<Int>): List<ComparisonTask> {
-        require(quantities.size in 1..MAX_MODELS)
-        require(quantities.all { it in 1..MAX_GENERATIONS_PER_MODEL })
+    fun requests(quantities: List<Int>, maxModels: Int = MAX_MODELS, maxGenerations: Int = MAX_GENERATIONS_PER_MODEL): List<ComparisonTask> {
+        require(quantities.size in 1..maxModels)
+        require(quantities.all { it in 1..maxGenerations })
         return (1..quantities.max()).flatMap { number ->
             quantities.indices.filter { quantities[it] >= number }.map { ComparisonTask(it, number) }
         }
@@ -151,19 +152,22 @@ fun comparisonTotal(costs: List<ComparisonCost?>): Map<ComparisonCurrency, Doubl
 }
 
 /** Dispatch once, then poll using the existing per-job workers. A stop never cancels an accepted job. */
-class ComparisonQueue {
+class ComparisonQueue(private val parallelism: Int = 1) {
     var stopRequested = false
         private set
     private var started = false
     fun stop() { stopRequested = true }
     suspend fun <T> run(items: List<T>, dispatch: suspend (Int,T) -> Unit) {
         check(!started) { "Este lote ya se ha enviado." }
-        require(items.size in 1..ComparisonPlan.MAX_REQUESTS)
+        require(items.isNotEmpty())
         started = true
-        for((index,item) in items.withIndex()) {
-            if(stopRequested) break
-            // Each accepted request keeps its own identity; controller isolates errors by model.
-            dispatch(index,item)
+        val slots=kotlinx.coroutines.sync.Semaphore(parallelism.coerceAtLeast(1))
+        kotlinx.coroutines.coroutineScope {
+            items.forEachIndexed {index,item->
+                slots.acquire()
+                if(stopRequested) {slots.release();return@forEachIndexed}
+                launch {try {dispatch(index,item)} finally {slots.release()}}
+            }
         }
     }
 }

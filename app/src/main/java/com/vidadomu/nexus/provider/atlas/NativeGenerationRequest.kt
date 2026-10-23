@@ -36,7 +36,7 @@ object NativeGenerationRequest {
             providerId = model.providerId,
             modelId = model.id,
             modality = modality,
-            prompt = prompt.trim(),
+            prompt = prompt,
             negativePrompt = "",
             parameters = parametersWithMeta,
             mediaInputs = media

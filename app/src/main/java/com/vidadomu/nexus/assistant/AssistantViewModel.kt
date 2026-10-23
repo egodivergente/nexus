@@ -90,6 +90,8 @@ data class AssistantUiState(
     val mode: AgentMode = AgentMode.AGENT,
     val projects: List<Project> = emptyList(),
     val activeProjectId: String? = null,
+    val conversationId: String = java.util.UUID.randomUUID().toString(),
+    val draftRevision: Long = 0,
     val pendingAttachments: List<Attachment> = emptyList(),
     val resultsWall: List<Attachment> = emptyList(),
     val attaching: Boolean = false,
@@ -114,6 +116,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var conversation: AgentConversation
     private var turnJob: Job? = null
     private val chatStore = AssistantChatStore(app)
+    private val chatsReady=kotlinx.coroutines.CompletableDeferred<Unit>()
     private val submitSlots = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentGenerations)
     private val flowLane = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentFlowGenerations)
     // StateFlow can emit synchronously in init; callbacks need initialized state.
@@ -134,7 +137,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val savedProject = runtime.settings.activeProjectId()?.takeIf { id -> runtime.assets.findProject(id)?.id == id }
         conversation = orchestrator.newConversation(mode = s.mode, activeProjectId = savedProject)
         _ui.update { it.copy(settings = s, mode = s.mode, skillsCount = runtime.skills.all().size, skillErrors = runtime.skills.errors, projects = runtime.assets.projects(), activeProjectId = savedProject) }
-        viewModelScope.launch { runCatching { runtime.assets.startProjectSession(savedProject); runtime.importHistory() }; refreshProjects() }
+        viewModelScope.launch {
+            val project=savedProject ?: runtime.assets.findProject("General")?.id ?: runtime.assets.createProject("General").id
+            chatStore.migrate(project)
+            chatsReady.complete(Unit)
+            if(_ui.value.activeProjectId==null) { _ui.update {it.copy(activeProjectId=project)};runtime.settings.setActiveProject(project);conversation.session.activeProjectId=project }
+            runCatching { runtime.assets.startProjectSession(project); runtime.importHistory() }; refreshProjects()
+        }
         restoreChat()
         viewModelScope.launch { runtime.assets.changes.collect { refreshProjects() } }
         viewModelScope.launch { runtime.skillsRevision.collect {
@@ -147,7 +156,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         } }
         removeOrderListener = runtime.orders.onChange { publishOrders() }
         publishOrders()
-        viewModelScope.launch { ui.collect { state -> chatStore.save(state, runtime.orders.snapshot()) } }
+        viewModelScope.launch { chatsReady.await(); ui.collect { state -> chatStore.save(state, runtime.orders.snapshot()) } }
         viewModelScope.launch { app.generationRepository.allJobs.collect { jobs -> onJobs(jobs) } }
     }
 
@@ -281,10 +290,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         switchConversation(null, request)
     }
 
-    internal fun conversations(): List<AssistantChatEntry> = chatStore.conversations()
-    internal fun openConversation(id: String) = switchConversation(id)
+    internal fun conversations(): List<AssistantChatEntry> = chatStore.conversations(_ui.value.activeProjectId)
+    internal fun openConversation(id: String) {ConversationTabs(app).open(id);if(id!=_ui.value.conversationId) switchConversation(id)}
 
-    private fun switchConversation(id: String?, retry: Pair<String, List<Attachment>>? = null) {
+    private fun switchConversation(id: String?, retry: Pair<String, List<Attachment>>? = null, targetProject: String? = _ui.value.activeProjectId) {
         val current = _ui.value
         if(current.thinking || current.plans.values.any { it.busy }) return
         failedTurn = null
@@ -292,12 +301,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             try {
                 chatStore.archive(current, runtime.orders.snapshot())
-                current.plans.filterValues { it.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED) }.keys.forEach { runtime.guard.discard(it) }
+
                 val saved = if(id == null) null else chatStore.conversation(id) ?: error("No se pudo abrir la conversación.")
-                conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = current.activeProjectId)
+                require(saved?.projectId==null || saved.projectId==targetProject) {"La conversación pertenece a otro proyecto"}
+                conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = targetProject)
+                runtime.settings.setActiveProject(targetProject)
+                runCatching {runtime.assets.startProjectSession(targetProject)}
                 // Los encargos pertenecen a su conversación: el agente no ve los de otro chat.
+                synced.clear()
                 runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
                 if(retry != null) send(retry.first, retry.second)
             } catch(error: Exception) {
@@ -323,17 +336,23 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ---- adjuntos y proyectos -----------------------------------------------------------------
 
-    fun attach(uris: List<Uri>) {
+    fun attach(uris: List<Uri>) = attachMedia(uris,null)
+    fun attachAudio(uri: Uri) = attachMedia(listOf(uri),"audio/mp4")
+
+    private fun attachMedia(uris: List<Uri>, declaredMime: String?) {
         if (uris.isEmpty()) return
+        val max=com.vidadomu.nexus.settings.RuntimePreferences.get(app).int("chat.attachmentCount",com.vidadomu.nexus.agent.core.config.RuleScope(provider=_ui.value.settings.backend,model=_ui.value.settings.modelId,workflow="chat"))
+        if(max>0 && _ui.value.pendingAttachments.size.toLong()+uris.size>max) {notice("El lote supera tu preferencia de $max adjuntos. Cámbiala en Ajustes para importarlo entero.");return}
         _ui.update { it.copy(attaching = true) }
         viewModelScope.launch {
             val added = mutableListOf<Attachment>()
             for (u in uris) {
-                runCatching { AgentMediaStore.persist(app, u, null) }
+                runCatching { AgentMediaStore.persist(app, u, declaredMime) }
                     .onSuccess { added += it }
                     .onFailure { notice("No se pudo adjuntar: ${it.message?.take(160)}", error = true) }
             }
             _ui.update { it.copy(pendingAttachments = (it.pendingAttachments + added).distinctBy { attachment -> attachment.id }, attaching = false) }
+            warnAttachmentSize(added)
             refreshProjects()
         }
     }
@@ -390,14 +409,37 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun reorderAttachment(id: String, offset: Int) = _ui.update {state->
+        val next=state.pendingAttachments.toMutableList();val from=next.indexOfFirst {it.id==id};val to=from+offset
+        if(from<0 || to !in next.indices) state else {val item=next.removeAt(from);next.add(to,item);state.copy(pendingAttachments=next)}
+    }
+
     fun removeAttachment(id: String) = _ui.update { it.copy(pendingAttachments = it.pendingAttachments.filterNot { a -> a.id == id }) }
 
+    internal fun projectActivity(id: String): Long = chatStore.conversations(id).maxOfOrNull {it.updatedAt} ?: 0L
+
+    internal suspend fun acceptShared(batch: PendingShare) {
+        require(batch.ready) {"Quedan archivos por importar"}
+        chatsReady.await()
+        val key="conversation:${_ui.value.conversationId}"
+        val prefs=app.getSharedPreferences("assistant_draft_v1",0)
+        if(batch.text.isNotEmpty() && !prefs.getStringSet("shares:$key",emptySet()).orEmpty().contains(batch.id)) {
+            val before=prefs.getString(key, "").orEmpty()
+            check(prefs.edit().putString(key,listOf(before,batch.text).filter {it.isNotEmpty()}.joinToString("\n")).putStringSet("shares:$key",prefs.getStringSet("shares:$key",emptySet()).orEmpty()+batch.id).commit())
+        }
+        _ui.update {it.copy(draftRevision=it.draftRevision+1,pendingAttachments=(it.pendingAttachments+batch.files.mapNotNull {f->f.attachment}).distinctBy {a->a.id})}
+        warnAttachmentSize(batch.files.mapNotNull {it.attachment})
+        chatStore.save(_ui.value,runtime.orders.snapshot())
+    }
+
+    private fun warnAttachmentSize(attachments: List<Attachment>) {
+        val maximum=com.vidadomu.nexus.settings.RuntimePreferences.get(app).int("chat.attachmentMB",com.vidadomu.nexus.agent.core.config.RuleScope(provider=_ui.value.settings.backend,model=_ui.value.settings.modelId,workflow="chat"))
+        if(maximum>0 && attachments.any {a->runCatching {java.io.File(Uri.parse(a.uri).path.orEmpty()).length()>maximum.toLong()*1024*1024}.getOrDefault(false)}) notice("Hay un archivo mayor que tu aviso de $maximum MB. Se conserva completo; el envío comprobará el contrato del proveedor.")
+    }
+
     fun selectProject(id: String?) {
-        failedTurn = null
-        conversation.session.activeProjectId = id
-        _ui.update { it.copy(activeProjectId = id, projectAssets = runtime.assets.snapshot().assets.filter { asset -> asset.projectId == id && id != null && !asset.libraryDeleted }) }
-        runtime.settings.setActiveProject(id)
-        viewModelScope.launch { runCatching { runtime.assets.startProjectSession(id) } }
+        if(id==null || id==_ui.value.activeProjectId) return
+        switchConversation(chatStore.lastConversation(id),targetProject=id)
     }
 
     private val projectMemorySaves = ProjectMemorySaveGate()
@@ -429,7 +471,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun projectAssetCount(projectId: String) = runtime.assets.snapshot().assets.count { it.projectId == projectId && !it.libraryDeleted }
 
     fun createProject(name: String) {
-        val clean = name.trim().take(80)
+        val clean = name.trim()
         if (clean.isEmpty()) return
         viewModelScope.launch {
             val p = runtime.assets.findProject(clean) ?: runtime.assets.createProject(clean)
@@ -478,6 +520,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun restoreChat() {
         val saved = chatStore.load() ?: return
+        _ui.update {it.copy(conversationId=saved.conversationId ?: saved.items.firstOrNull()?.id?.replace(Regex("[^A-Za-z0-9_-]"),"_") ?: it.conversationId,
+            activeProjectId=saved.projectId ?: it.activeProjectId)}
         restoreSavedChat(saved)
     }
 

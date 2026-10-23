@@ -34,8 +34,8 @@ object FlowStudioPlan {
 
     fun clampCount(value: Int): Int = value.coerceIn(MIN_COUNT, MAX_COUNT)
 
-    fun sendable(drafts: List<FlowStudioDraft>, promptLimit: Int, accepted: Set<Modality>): List<FlowStudioDraft> =
-        drafts.filter { it.prompt.isNotBlank() && it.prompt.trim().length <= promptLimit && it.modality in accepted }
+    fun sendable(drafts: List<FlowStudioDraft>, promptLimit: Int?, accepted: Set<Modality>): List<FlowStudioDraft> =
+        drafts.filter { it.prompt.isNotBlank() && (promptLimit == null || it.prompt.length <= promptLimit) && it.modality in accepted }
 
     fun mediaInputs(references: List<FlowStudioReference>): List<MediaInput> = references.mapNotNull { ref ->
         ref.remoteId?.let {
@@ -55,7 +55,7 @@ object FlowStudioPlan {
             providerId = FlowBridgeProvider.PROVIDER_ID,
             modelId = FlowBridgeProvider.CURRENT_PROJECT_MODEL,
             modality = draft.modality,
-            prompt = draft.prompt.trim(),
+            prompt = draft.prompt,
             parameters = parameters,
             mediaInputs = references
         )

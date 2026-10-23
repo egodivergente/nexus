@@ -46,6 +46,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
     val dismiss = { controller.dismiss(); onDismiss() }
     if(results && state.batchId != null) ComparisonResultsDialog(state.batchId!!, { results = false }, onOpenOutput)
 
+    var groupName by rememberSaveable {mutableStateOf("")}
+    var groups by remember {mutableStateOf(controller.savedGroups())}
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         dragHandle = null, shape = androidx.compose.ui.graphics.RectangleShape, contentWindowInsets = { WindowInsets(0) }) {
         com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
@@ -112,13 +114,20 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                 if(BuildConfig.OFFLINE_QA) item { Text("LABORATORIO · tarifas simuladas · envíos bloqueados", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                 if(state.phase == ComparisonPhase.CHOOSE) {
                     item {
+                        if(groups.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(groups) {name->AssistChip(onClick={controller.loadGroup(name)},label={Text(name)})}}
+                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(groupName,{groupName=it},Modifier.weight(1f),singleLine=true,placeholder={Text("Guardar selección como grupo")})
+                            TextButton(onClick={controller.saveGroup(groupName.trim());groups=controller.savedGroups();groupName=""},enabled=groupName.isNotBlank() && state.selected.isNotEmpty()) {Text("Guardar")}
+                        }
+                    }
+                    item {
                         if(state.source.attachedMedia.isEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(state.withReferences, { controller.setReferenceMode(true) }, label = { Text("Con referencias") })
                             FilterChip(!state.withReferences, { controller.setReferenceMode(false) }, label = { Text("Desde texto") })
                         }
                         Text(if(state.withReferences) "Se comprobarán tus imágenes con cada modelo." else "Mismo prompt, con los ajustes válidos de cada modelo.", style = MaterialTheme.typography.bodySmall)
                     }
-                    item { Text("De 1 a ${ComparisonPlan.MAX_GENERATIONS_PER_MODEL} generaciones por modelo. Puedes usar un solo modelo o combinar hasta ${ComparisonPlan.MAX_MODELS}.",
+                    item { Text("De 1 a ${state.maximumPerModel} generaciones por modelo. Puedes usar un solo modelo o combinar hasta ${state.maximumModels}.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     item {
                         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
@@ -169,7 +178,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                 Icon(Icons.Default.Remove, "Menos generaciones de ${model.displayName}")
                             }
                             Text(state.quantity(model).toString(), style = MaterialTheme.typography.titleMedium)
-                            IconButton(onClick = { controller.setQuantity(model, state.quantity(model)+1) }, enabled = state.quantity(model) < ComparisonPlan.MAX_GENERATIONS_PER_MODEL) {
+                            IconButton(onClick = { controller.setQuantity(model, state.quantity(model)+1) }, enabled = state.quantity(model) < state.maximumPerModel) {
                                 Icon(Icons.Default.Add, "Más generaciones de ${model.displayName}")
                             }
                         }
@@ -194,6 +203,15 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                     Text(providerName(entry.model.providerId), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 entry.subtotal?.let { Text("≈ "+cost(it.amount, it.currency), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
+                            }
+                            val cap=com.vidadomu.nexus.settings.ModelCapabilities.prompt(entry.model)
+                            val currentPrompt=state.promptVariants[ComparisonPlan.key(entry.model)] ?: state.source.prompt
+                            Text(cap?.let {"${it.measured(currentPrompt) ?: "?"}/${it.maximum} ${it.unitLabel}"} ?: "Máximo no verificado",style=MaterialTheme.typography.labelSmall)
+                            if(state.phase==ComparisonPhase.REVIEW) {
+                                var editPrompt by rememberSaveable(ComparisonPlan.key(entry.model),currentPrompt) {mutableStateOf(currentPrompt)}
+                                var editing by rememberSaveable(ComparisonPlan.key(entry.model)) {mutableStateOf(false)}
+                                Row {TextButton(onClick={editing=!editing}) {Text("Editar prompt de este modelo")};TextButton(onClick={controller.exclude(entry.model)}) {Text("Excluir")}}
+                                if(editing) {OutlinedTextField(editPrompt,{editPrompt=it},Modifier.fillMaxWidth(),label={Text("Variante específica · original conservado")});TextButton(onClick={controller.variantPrompt(entry.model,editPrompt);editing=false}) {Text("Aplicar solo aquí")}}
                             }
                             entry.cost?.let { Text("${entry.quantity} generaciones × ≈ ${cost(it.amount, it.currency)}", style = MaterialTheme.typography.labelSmall) }
                             Text(entry.error ?: entry.status, style = MaterialTheme.typography.bodySmall,

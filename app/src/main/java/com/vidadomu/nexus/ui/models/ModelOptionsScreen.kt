@@ -44,9 +44,11 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val choices=remember {context.getSharedPreferences("catalog_choices_v1",0)}
-    val workflows=remember(group) {workflowRoutes(group)}
+    val rules by com.vidadomu.nexus.settings.RuntimePreferences.get(context).state.collectAsState()
+    val workflowOrder=rules.value(if(com.vidadomu.nexus.core.model.Modality.VIDEO in group.routes.first().modalities) "catalog.videoOrder" else "catalog.imageOrder").split(',').map {it.trim()}
+    val workflows=remember(group,workflowOrder) {workflowRoutes(group,workflowOrder)}
     var taskKey by rememberSaveable(group.key) {mutableStateOf(restoredWorkflow(group,
-        choices.getString("task:${group.key}",null),choices.getString("use:${group.key}",null)).name)}
+        choices.getString("task:${group.key}",null),choices.getString("use:${group.key}",null),workflowOrder).name)}
     val workflow=workflows.keys.firstOrNull {it.name==taskKey} ?: workflows.keys.first()
     val routes=workflows.getValue(workflow)
     var savedRoute by rememberSaveable(group.key,workflow) {mutableStateOf(choices.getString("task-route:${group.key}:${workflow.name}",null)
@@ -81,12 +83,12 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     Column(Modifier.weight(1f)) {
                         Text(estimate.amount,style=MaterialTheme.typography.titleMedium,
                             fontWeight=FontWeight.SemiBold,color=if(estimate.hasPrice) colors.onSurface else colors.onSurfaceVariant)
-                        Text(if(estimate.hasPrice) "Confirma el total con tus ajustes en el lienzo" else estimate.details.ifBlank {"Precio por confirmar: no equivale a coste cero"},style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                        Text(if(estimate.hasPrice) "Confirma el total con tus ajustes en Lanzadera" else estimate.details.ifBlank {"Precio por confirmar: no equivale a coste cero"},style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     }
                     if(!estimate.hasPrice) estimate.retry?.let {retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Volver a consultar el precio")}}
                 }
                 Button(onClick={onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
-                    Text("Usar ${group.title}",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+                    Text("Configurar en Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
                 }
             }
@@ -97,7 +99,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=NexusTokens.space32,containerSize=NexusTokens.space32)
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                    Text(group.title,style=MaterialTheme.typography.titleMedium,color=colors.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Text(group.title,style=MaterialTheme.typography.titleMedium,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
                     release?.let {Text(it.label,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)}
                 }
                 IconToggleButton(checked=modelBookmark(selected) in favorites,onCheckedChange={toggleFavorite(selected)}) {
@@ -125,6 +127,15 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     Text("Evítalo si: ${advice.avoid}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
             }
+            ModelEvaluation(selected,group.routes)
+            val promptCapability=verifiedSelected?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt)
+            if(selected.promptAccepted) Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text(promptCapability?.let {"Prompt: ${it.maximum} ${it.unitLabel}"} ?: "Prompt: Máximo no verificado",style=MaterialTheme.typography.bodyMedium)
+                promptCapability?.let {cap->
+                    Text("Contrato del proveedor · "+java.text.DateFormat.getDateInstance().format(java.util.Date(cap.verifiedAt)),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                    if(cap.source.startsWith("https://")) TextButton(onClick={uriHandler.openUri(cap.source)},contentPadding=PaddingValues(0.dp)) {Text("Consultar origen del máximo")}
+                }
+            }
             Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 Text("Qué admite y cómo se cobra",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })
                 facts.forEach {fact ->
@@ -143,7 +154,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     .clickable(enabled=routes.size>1,role=Role.Button,onClickLabel="Cambiar variante y proveedor") {variantsOpen=true}) {
                     Row(Modifier.padding(NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                            Text(optionVariantLabel(selected,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(optionVariantLabel(selected,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=3,overflow=TextOverflow.Clip)
                             Text(providerName(selected.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                         }
                         if(routes.size>1) Icon(Icons.Default.UnfoldMore,"${routes.size} opciones disponibles",tint=colors.onSurfaceVariant)
@@ -190,7 +201,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                         savedRoute=modelBookmark(route);choices.edit().putString("task-route:${group.key}:${workflow.name}",savedRoute).apply();variantsOpen=false
                     }).padding(vertical=NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                            Text(optionVariantLabel(route,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(optionVariantLabel(route,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Medium,maxLines=3,overflow=TextOverflow.Clip)
                             Text(providerName(route.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                             val routeEvidence=evidence.first {modelBookmark(it.model)==modelBookmark(route)}
                             routeEvidence.tariff?.takeIf {it.unit!=null && it.usd.isFinite() && it.usd>=0}?.let {price ->

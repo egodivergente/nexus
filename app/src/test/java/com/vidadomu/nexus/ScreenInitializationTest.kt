@@ -29,7 +29,7 @@ class ScreenInitializationTest {
             val items = companion.javaClass.getMethod("getBottomNavItems").invoke(companion) as List<*>
             assertEquals(5, items.size)
             assertTrue("Opening $first must not retain a partially initialized destination", items.all { it != null })
-            assertEquals(listOf("assistant", "create", "models", "generations", "library"),
+            assertEquals(listOf("assistant", "models", "create", "flow", "library"),
                 items.map { base.getMethod("getRoute").invoke(it) })
         }
     }

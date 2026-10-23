@@ -202,9 +202,16 @@ fun CreateScreen(
             }
         },
         containerColor=ScreenBackground,
-        topBar={
-            if(!compactTyping) TopAppBar(showBalance=state.selectedModel?.providerId in setOf("atlas","atlas_cloud","atlas-cloud"),title={Text("Lienzo", style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},
-                actions={
+        topBar={}
+    ) { innerPadding ->
+        LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=NexusTokens.space24),
+            modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+            item(key="launcher-title") {
+                Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
+                    Text("Lanzadera",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
+                    com.vidadomu.nexus.ui.components.NexusSettingsButton()
+
                     Box {
                         IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
                         DropdownMenu(expanded=showMenu,onDismissRequest={showMenu=false}) {
@@ -221,12 +228,9 @@ fun CreateScreen(
                             }
                         }
                     }
-                }, colors=TopAppBarDefaults.topAppBarColors(containerColor=BackgroundDark))
-        }
-    ) { innerPadding ->
-        LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=NexusTokens.space24),
-            modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
-            verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+
+                }
+            }
             item(key="studio-header") {
                 FlagshipStudioHeader(state.selectedModality, catalogModels, state.selectedModel,
                     viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
@@ -245,7 +249,7 @@ fun CreateScreen(
                     }
                     if(state.selectedModel?.promptAccepted != false) StudioPromptField(state.prompt,viewModel::updatePrompt,
                         if(state.selectedModality==Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
-                        focusRequester=promptFocus,enabled=!state.isSubmitting,attachments=mediaContent)
+                        focusRequester=promptFocus,enabled=!state.isSubmitting,capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),attachments=mediaContent)
                     else Column(content=mediaContent)
                     if(state.schemaReady && inputFields.isEmpty() && state.selectedModel?.promptAccepted == true) {
                         if(state.selectedModel?.pairedEditModelId != null) TextButton(onClick=viewModel::switchToEditModel) {
@@ -401,7 +405,7 @@ fun CreateScreen(
     }
 
     pendingCost?.let { quote ->
-        AlertDialog(onDismissRequest=viewModel::dismissCostAcceptance, title={Text("Importe sin confirmar")},
+        AlertDialog(onDismissRequest=viewModel::dismissCostAcceptance, title={Text(if(quote.known) "Confirmar gasto" else "Importe sin confirmar")},
             text={Text("Importe mostrado: ${quote.amount}.\n"+quote.details.ifBlank {"No hay una tarifa confirmada para esta configuración. No equivale a coste cero."}+
                 "\nSi generas, el proveedor puede cobrar según su tarifa real. Cualquier cambio en el modelo, el prompt, las opciones o los archivos anula esta aceptación.")},
             confirmButton={TextButton(onClick={viewModel.acceptUnknownCost(onNavigateToOutput)}) {Text("Aceptar y generar")}},

@@ -43,22 +43,29 @@ fun NexusTheme(content: @Composable () -> Unit) {
     val view=LocalView.current
     SideEffect {
         (view.context as? Activity)?.window?.let { window ->
-            window.statusBarColor=chromeFor(theme).toArgb()
-            window.navigationBarColor=chromeFor(theme).toArgb()
+            window.statusBarColor=Color.Transparent.toArgb()
+            window.navigationBarColor=Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window,view).apply {
                 isAppearanceLightStatusBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
                 isAppearanceLightNavigationBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
             }
         }
     }
+    val runtime by com.vidadomu.nexus.settings.RuntimePreferences.get(androidx.compose.ui.platform.LocalContext.current).state.collectAsState()
+    val platformHaptics=androidx.compose.ui.platform.LocalHapticFeedback.current
+    val filteredHaptics=remember(platformHaptics,runtime.value("ui.haptics")) {object: androidx.compose.ui.hapticfeedback.HapticFeedback {
+        override fun performHapticFeedback(hapticFeedbackType: androidx.compose.ui.hapticfeedback.HapticFeedbackType) {
+            if(runtime.value("ui.haptics").toBoolean()) platformHaptics.performHapticFeedback(hapticFeedbackType)
+        }
+    }}
     val fontScale by preferences.fontScaleState()
     val base = LocalDensity.current
     val density = remember(base, fontScale) { Density(base.density, base.fontScale * fontScale) }
-    CompositionLocalProvider(LocalChromeColor provides chromeFor(theme), LocalDensity provides density) {
+    CompositionLocalProvider(LocalChromeColor provides chromeFor(theme), LocalDensity provides density, androidx.compose.ui.platform.LocalHapticFeedback provides filteredHaptics) {
         MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
             Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
                 // Static background avoids motion distraction and continuous rendering.
-                content()
+                NexusBackdrop {content()}
             }
         }
     }

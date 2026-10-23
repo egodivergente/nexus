@@ -836,6 +836,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         if(comparison.sending) return
         val state = _uiState.value
         generationBlocker(state)?.let { message -> _uiState.update { it.copy(errorMessage = message) }; return }
+        val model=state.selectedModel
+        val rules=com.vidadomu.nexus.settings.RuntimePreferences.get(app)
+        val threshold=rules.value("generation.costWarning",com.vidadomu.nexus.agent.core.config.RuleScope(provider=model?.providerId,model=model?.providerModelId ?: model?.id,workflow=model?.inputMode?.name)).toDouble()
+        if(threshold>0 && quote.known && quote.usd?.let {it*app.currencyManager.state.value.rate>=threshold}==true) {
+            _pendingCostAcceptance.value=quote.copy(details="Tu umbral de gasto requiere confirmación. "+quote.details);return
+        }
         when(val gate = GenerationCostGuard.onGenerate(quote, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
             CostGate.Proceed -> launchGeneration(state, onSuccess)
             is CostGate.AskAcceptance -> _pendingCostAcceptance.value = gate.quote

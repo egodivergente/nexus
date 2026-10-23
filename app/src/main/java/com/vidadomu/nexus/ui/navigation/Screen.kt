@@ -11,14 +11,14 @@ enum class Screen(
     val icon: ImageVector
 ) {
     Assistant("assistant", "Agente", Icons.Default.Assistant),
-    Create("create", "Lienzo", Icons.Default.AutoAwesome),
-    Models("models", "Modelos", Icons.Default.GridView),
+    Create("create", "Lanzadera", Icons.Default.AutoAwesome),
+    Models("models", "ArtBox", Icons.Default.GridView),
     Generations("generations", "Historial", Icons.Default.Timelapse),
     Library("library", "Biblioteca", Icons.Default.Collections),
     Settings("settings", "Ajustes", Icons.Default.Tune),
-    Flow("flow", "Crear en Flow", Icons.Default.AutoAwesome);
+    Flow("flow", "Flow", Icons.Default.Waves);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Create, Models, Generations, Library)
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Create, Flow, Library)
     }
 }

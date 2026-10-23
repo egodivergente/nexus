@@ -306,7 +306,6 @@ class AssetSkillSource(private val assets: AssetManager, private val root: Strin
 
 /** Copia privada de los adjuntos del asistente (los URIs del selector caducan). */
 object AgentMediaStore {
-    private const val MAX_BYTES = 4L * 1024 * 1024 * 1024
 
     suspend fun persist(context: Context, uri: Uri, mime: String?, projectId: String? = null): Attachment = withContext(Dispatchers.IO) {
         val runtime = AssistantRuntime.get(context.applicationContext as com.vidadomu.nexus.NexusApplication)
@@ -324,7 +323,9 @@ object AgentMediaStore {
         val documentFormat=AgentDocuments.format(resolved,name)
         if(documentFormat!=null && resolved !in AgentDocuments.types) resolved=AgentDocuments.mimeType(documentFormat)
         require(resolved.startsWith("image/") || resolved.startsWith("video/") || resolved.startsWith("audio/") || documentFormat!=null) { "Formato no compatible. Usa PDF, Word, TXT o Markdown." }
-        val byteLimit=if(documentFormat!=null) AgentDocuments.MAX_BYTES else MAX_BYTES
+        val settings=runtime.settings.load()
+        val importMB=com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.importMB",com.vidadomu.nexus.agent.core.config.RuleScope(provider=settings.backend,model=settings.modelId,workflow="chat"))
+        val byteLimit=if(importMB==0) Long.MAX_VALUE else importMB.toLong()*1024*1024
         val ext = when {
             documentFormat!=null -> documentFormat
             "png" in resolved -> "png"; "webp" in resolved -> "webp"; "jpeg" in resolved || "jpg" in resolved -> "jpg"
@@ -338,7 +339,7 @@ object AgentMediaStore {
                     val buf = ByteArray(65536); var total = 0L
                     while (true) {
                         val n = input.read(buf); if (n < 0) break
-                        total += n; require(total <= byteLimit) { if(documentFormat!=null) "Bedrock admite documentos de hasta 4,5 MB; divide el archivo en capítulos." else "El archivo supera 4 GB." }
+                        total += n; require(total <= byteLimit) { "El archivo supera tu límite local de $importMB MB. Puedes cambiarlo en Ajustes." }
                         out.write(buf, 0, n)
                     }
                 }

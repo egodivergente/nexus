@@ -11,7 +11,7 @@ import kotlinx.serialization.json.Json
 @Serializable data class CreationPreset(val name:String,val values:Map<String,String>)
 
 /** Private, bounded settings. Presets never include keys, prompts or source media. */
-class CreationPreferences(context:Context) {
+class CreationPreferences(private val context:Context) {
     private val prefs=context.getSharedPreferences("nexus_creation_v1",0)
     private val json=Json {ignoreUnknownKeys=true}
     fun rememberParameters()=prefs.getBoolean("remember_parameters",true)
@@ -28,9 +28,9 @@ class CreationPreferences(context:Context) {
     private fun key(model:NexusModel)="presets:${model.providerId}:${model.id}"
     fun presets(model:NexusModel):List<CreationPreset> = runCatching {json.decodeFromString<List<CreationPreset>>(prefs.getString(key(model),"[]")!!)}.getOrDefault(emptyList())
     fun savePreset(model:NexusModel,name:String,values:Map<String,String>) {
-        val cleanName=name.trim().take(48); if(cleanName.isEmpty()) return
+        val cleanName=name.trim(); if(cleanName.isEmpty()) return
         val entry=CreationPreset(cleanName,FormContract.restoredValues(model,values))
-        prefs.edit().putString(key(model),json.encodeToString((listOf(entry)+presets(model).filterNot {it.name==cleanName}).take(12))).apply()
+        prefs.edit().putString(key(model),json.encodeToString((listOf(entry)+presets(model).filterNot {it.name==cleanName}).let {entries->val max=com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("generation.presetCount");if(max>0) entries.take(max) else entries})).apply()
     }
     fun removePreset(model:NexusModel,name:String) {prefs.edit().putString(key(model),json.encodeToString(presets(model).filterNot {it.name==name})).apply()}
 }
