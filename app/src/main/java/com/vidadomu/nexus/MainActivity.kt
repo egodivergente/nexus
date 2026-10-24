@@ -81,7 +81,8 @@ class MainActivity : ComponentActivity() {
 
         pendingShares=PendingShares(this).pending()
         val rules=RuntimePreferences.get(this)
-        projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && rules.bool("startup.cold")
+        // Al arrancar solo si llevabas fuera el tiempo de ausencia (4 h por defecto) o es la primera vez, no cada vez que Android reinicia la app.
+        projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && (rules.bool("startup.cold") || awayLongEnough(rules))
         if(savedInstanceState==null || intent?.action !in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)) handleIntent(intent)
 
         setContent {
@@ -392,8 +393,14 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         val rules=RuntimePreferences.get(this)
         val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
+        if(left>0 && rules.bool("startup.enabled") && awayLongEnough(rules)) projectChooser=true
+    }
+
+    /** First launch, or away at least «startup.idleMinutes» (0 = never by absence). */
+    private fun awayLongEnough(rules: RuntimePreferences): Boolean {
+        val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
         val minutes=rules.int("startup.idleMinutes")
-        if(left>0 && minutes>0 && rules.bool("startup.enabled") && System.currentTimeMillis()-left>=minutes*60_000L) projectChooser=true
+        return left==0L || (minutes>0 && System.currentTimeMillis()-left>=minutes*60_000L)
     }
 
 }
