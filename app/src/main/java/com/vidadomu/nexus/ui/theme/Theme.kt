@@ -37,6 +37,7 @@ private fun brandFont(resource: Int): FontFamily = FontFamily(
 )
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NexusTheme(content: @Composable () -> Unit) {
     val preferences = rememberAppearancePreferences()
@@ -48,6 +49,10 @@ fun NexusTheme(content: @Composable () -> Unit) {
         nexusTypography(heading, body)
     }
     val view=LocalView.current
+    val imeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(imeVisible) {
+        if(!imeVisible) (view.context as? Activity)?.window?.let(::applyNexusFullscreen)
+    }
     SideEffect {
         (view.context as? Activity)?.window?.let { window ->
             applyNexusFullscreen(window)
@@ -80,9 +85,14 @@ fun NexusTheme(content: @Composable () -> Unit) {
 }
 
 /** Modal windows must follow Nexus's chosen palette, not the device's light/dark setting. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NexusSheetSystemBars() {
     val view = LocalView.current
+    val imeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(imeVisible) {
+        if(!imeVisible) (view.parent as? DialogWindowProvider)?.window?.let(::applyNexusFullscreen)
+    }
     val darkIcons = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     SideEffect {
         (view.parent as? DialogWindowProvider)?.window?.let { window ->

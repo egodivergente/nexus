@@ -56,7 +56,10 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
             val date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(java.util.Date(it.checkedAt))
             "Base publicada · $date · varía según opciones"
         } else listOfNotNull(if(quote == null) "Tarifa guardada" else "Estimación", it.configuration.takeIf { text -> text.isNotBlank() }).joinToString(" · ")
-        EstimateUi(amount, details, it.usd, isRequestTotal = quote === it && it.isRequestTotal && it.unit == null)
+        val provenance = it.source?.let { source -> " · $source · " + java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.US).format(java.util.Date(it.checkedAt)) }
+            ?: " · fuente/fecha de la tarifa guardada sin verificar"
+        val qualification = if(it.isRequestTotal && it.estimated) " · estimación del proveedor, no importe final" + (it.estimatedTokens?.let { count -> " · $count tokens estimados" } ?: "") else ""
+        EstimateUi(amount, details + qualification + provenance, it.usd, isRequestTotal = quote === it && it.isRequestTotal && it.unit == null)
     } ?: run {
         val availability=priceAvailability(pending,queryFailed)
         EstimateUi(availability.label,

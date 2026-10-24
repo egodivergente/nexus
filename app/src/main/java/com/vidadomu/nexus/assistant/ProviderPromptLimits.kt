@@ -7,7 +7,9 @@ import com.vidadomu.nexus.provider.atlas.NativeModelSchema
 /** Same reviewed contract snapshot as the desktop. Unknown limits remain unknown. */
 internal object ProviderPromptLimits {
     fun forModel(model: NexusModel): TextLimit? {
-        if(model.providerId == "atlas_cloud") return NativeModelSchema.promptLimit(model.id)
+        if(model.providerId == "atlas_cloud") return NativeModelSchema.promptLimit(model.id) ?: model.promptMaxLength?.let {
+            TextLimit("unicode_code_points", maximum=it, source=model.contractSource ?: "Atlas Input schema")
+        }
         if(model.providerId == "crun") return model.promptMaxLength?.let {TextLimit("unicode_code_points",minimum=if(model.promptRequired) 1 else 0,maximum=it,source="Contrato OpenAPI de Crun")}
         if(model.providerId == "google_flow") return null
         if(model.providerId != "runway") return null

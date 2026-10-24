@@ -9,6 +9,11 @@ import com.vidadomu.nexus.core.security.SecureStorage
 import com.vidadomu.nexus.provider.api.NexusProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -83,6 +88,25 @@ class AtlasCloudProvider(
         private set
     private var lastLive:List<NexusModel> = emptyList()
 
+    suspend fun synchronizeContracts(models: List<NexusModel>, onProgress: (Int, Int) -> Unit = { _, _ -> }): List<NexusModel> = coroutineScope {
+        val gate = Semaphore(3)
+        val failures = java.util.concurrent.atomic.AtomicInteger()
+        val completed = java.util.concurrent.atomic.AtomicInteger()
+        val synced = models.map { model -> async {
+            gate.withPermit {
+                val result = if(model.schemaUrl == null || Modality.CHAT in model.modalities) model else try {
+                    NativeModelSchema.load(model).model
+                } catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
+                } catch(_: Exception) { failures.incrementAndGet(); model }
+                onProgress(completed.incrementAndGet(), models.size)
+                result
+            }
+        } }.awaitAll()
+        if(failures.get() > 0) catalogNotice = listOfNotNull(catalogNotice, "Atlas: ${failures.get()} contratos no verificados; se revisarán al abrir sus opciones.").joinToString(" · ")
+        lastLive = synced
+        synced
+    }
+
     override suspend fun getModels(): List<NexusModel> = withContext(Dispatchers.IO) {
         val liveResult = fetchLiveCatalog()
         if (liveResult.isSuccess && liveResult.getOrThrow().isNotEmpty()) {
@@ -114,7 +138,8 @@ class AtlasCloudProvider(
                         NetworkErrorParser.parseHttpError(response.code, body)
                     )
                 }
-                val models = AtlasModelMapper.parseModelsResponse(body)
+                val checkedAt = System.currentTimeMillis()
+                val models = AtlasModelMapper.parseModelsResponse(body).map { it.copy(catalogCheckedAt=checkedAt) }
                 if (models.isNotEmpty()) {
                     Result.success(models)
                 } else {
@@ -163,7 +188,12 @@ class AtlasCloudProvider(
             )
         }
 
-        val endpoint = when (request.modality) {
+        val documentedEndpoint = lastLive.firstOrNull { it.id == request.modelId }?.takeIf { it.schemaUrl != null && request.modality != Modality.CHAT }?.let { model ->
+            try { NativeModelSchema.load(model).model.atlasEndpoint ?: return@withContext Result.failure(ProviderError("El contrato no publica un endpoint de generación compatible.")) }
+            catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch(_: Exception) { return@withContext Result.failure(ProviderError("No se pudo verificar el endpoint oficial. Actualiza el catálogo antes de generar.")) }
+        }
+        val endpoint = documentedEndpoint?.let { BASE_URL + it } ?: when (request.modality) {
             Modality.IMAGE -> "$BASE_URL/api/v1/model/generateImage"
             Modality.VIDEO -> "$BASE_URL/api/v1/model/generateVideo"
             Modality.AUDIO -> "$BASE_URL/api/v1/model/generateAudio"

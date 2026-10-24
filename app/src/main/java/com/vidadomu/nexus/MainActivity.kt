@@ -209,6 +209,7 @@ class MainActivity : ComponentActivity() {
                         }
                             Screen.Models -> {
                             ModelsScreen(
+                                onLocalInpaint = { navController.navigate("local-inpaint") { launchSingleTop=true } },
                                 onSelectModelAndCreate = { model ->
                                     createViewModel.selectModality(model.modalities.first())
                                     createViewModel.selectModel(model)
@@ -266,6 +267,9 @@ class MainActivity : ComponentActivity() {
                                     if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
                                 }
                             )
+                        }
+                        composable("local-inpaint") {
+                            com.vidadomu.nexus.inpaint.LocalInpaintScreen(onBack={navController.popBackStack()})
                         }
                         composable(Screen.Settings.route) {
                             SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {

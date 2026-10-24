@@ -119,6 +119,26 @@ android {
     }
 }
 
+val inpaintRuntimeDirectory = layout.buildDirectory.dir("generated/inpaint-runtime")
+val inpaintRuntime = tasks.register<Copy>("prepareInpaintRuntime") {
+    val host = when {
+        System.getProperty("os.name").startsWith("Windows") -> "windows-x86_64"
+        System.getProperty("os.name").startsWith("Mac") -> "darwin-x86_64"
+        else -> "linux-x86_64"
+    }
+    val libraries = androidComponents.sdkComponents.sdkDirectory.map {
+        it.dir("ndk/${android.ndkVersion}/toolchains/llvm/prebuilt/$host/sysroot/usr/lib")
+    }
+    val targets = mapOf("arm64-v8a" to "aarch64-linux-android", "x86_64" to "x86_64-linux-android")
+    targets.forEach { (abi, triple) ->
+        from(libraries.map { it.file("$triple/libc++_shared.so") }) { into(abi) }
+    }
+    into(inpaintRuntimeDirectory)
+    doFirst { targets.values.forEach { triple -> check(libraries.get().file("$triple/libc++_shared.so").asFile.isFile) { "Falta libc++ del NDK configurado para $triple" } } }
+}
+android.sourceSets["main"].jniLibs.srcDir(inpaintRuntimeDirectory)
+tasks.named("preBuild") { dependsOn(inpaintRuntime) }
+
 dependencies {
     implementation("com.google.android.gms:play-services-auth:22.0.0")
     // NÃºcleo del asistente (Kotlin puro, probado en JVM).

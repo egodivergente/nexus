@@ -20,6 +20,18 @@ object NativeModelSchema {
     private val cached = com.vidadomu.nexus.core.util.BoundedCache<String, NativeConfiguration>(96)
     private val schemas = com.vidadomu.nexus.core.util.BoundedCache<String, JsonObject>(128)
 
+    fun invalidate() { cached.clear(); schemas.clear(); conditionsByModel.clear() }
+
+    fun endpoint(root: JsonObject): String? {
+        val servers = (root["servers"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.get("url")?.jsonPrimitive?.contentOrNull }
+        if(servers.none { it.trimEnd('/') == "https://api.atlascloud.ai" }) return null
+        val paths = (root["paths"] as? JsonObject).orEmpty().filter { (path, value) ->
+            path in setOf("/api/v1/model/generateImage", "/api/v1/model/generateVideo", "/api/v1/model/generateAudio", "/v1/chat/completions") &&
+                (value as? JsonObject)?.containsKey("post") == true
+        }.keys
+        return paths.singleOrNull()
+    }
+
     fun promptLimit(modelId: String): com.vidadomu.nexus.agent.core.registry.TextLimit? {
         val prompt = schemas[modelId]?.get("properties")?.jsonObject?.get("prompt")?.jsonObject ?: return null
         val minimum = prompt["minLength"]?.jsonPrimitive?.intOrNull
@@ -41,7 +53,7 @@ object NativeModelSchema {
             firstFrameField=null,lastFrameField=null,imagesArrayField=null,videoField=null,videosArrayField=null,
             inputImageField=null,supportsImageInput=false,supportsVideoInput=false,supportsReferenceImages=false,
             nativeRequiredFields=listOf("prompt")),emptyList())
-        cached[model.id+":"+model.schemaUrl]?.takeIf {schemas[model.id]!=null}?.let { return@withContext it }
+        cached[model.id+":"+model.schemaUrl]?.takeIf {schemas[model.id]!=null && System.currentTimeMillis() - (it.model.contractCheckedAt ?: 0) < 3_600_000}?.let { return@withContext it }
         val url = requireNotNull(model.schemaUrl) { "Este modelo no publica un esquema de configuración." }
         val parsed = java.net.URI(url)
         require(parsed.scheme == "https" && parsed.host == "static.atlascloud.ai") { "El esquema no procede del dominio oficial de Atlas." }
@@ -177,6 +189,9 @@ object NativeModelSchema {
         // El prompt solo existe si el schema lo declara; solo es obligatorio si está en required.
         val promptDeclared = props["prompt"] is JsonObject
         return NativeConfiguration(model.copy(capabilities=nativeCapabilities,parameters = AtlasContractOverrides.adjustParameters(model.id, FormContract.normalize(parameters)), contractMedia=extraMedia, inputMode = mode, nativeRequiredFields = effectiveRequired,
+            atlasEndpoint = endpoint(root), contractSource = model.schemaUrl, contractCheckedAt = System.currentTimeMillis(),
+            promptMaxLength = (props["prompt"] as? JsonObject)?.get("maxLength")?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 },
+            contractPromptField = "prompt",
             promptAccepted = promptDeclared, promptRequired = promptDeclared && "prompt" in effectiveRequired,
             firstFrameField = first, inputImageField = first, lastFrameField = last,
             imagesArrayField = images, structuredImageReferences = structuredImages, videoField = video, videosArrayField = videos,

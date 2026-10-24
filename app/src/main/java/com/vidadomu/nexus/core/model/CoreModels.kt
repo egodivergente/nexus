@@ -167,6 +167,10 @@ data class NexusModel(
     val isPrimaryGeneration: Boolean = true, // Text-to-Image / Text-to-Video generation before auxiliary edits
     val providerPriority: Int = 50,
     val contractEndpoint: String? = null,
+    val atlasEndpoint: String? = null,
+    val contractSource: String? = null,
+    val contractCheckedAt: Long? = null,
+    val catalogCheckedAt: Long? = null,
     val contractMedia: List<ContractMediaField> = emptyList(),
     val contractDefaults: Map<String,String> = emptyMap(),
     val promptRequired: Boolean = true,

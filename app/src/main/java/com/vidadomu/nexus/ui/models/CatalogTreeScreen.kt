@@ -43,7 +43,7 @@ import com.vidadomu.nexus.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
+fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit, onLocalInpaint: () -> Unit = {}) {
     val app = LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
     val loading by app.modelCatalogRepository.isLoading.collectAsState()
@@ -101,7 +101,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
     val listState=rememberLazyGridState()
-    val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.3f
+    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    val rootColumns = catalogColumnCount(runtime.int("catalog.columns"), screenWidth, fontScale)
+    val useGrid=gridCards && groupKey==null && fontScale<1.3f && screenWidth>=600
     LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
     val reorderState=rememberReorderableLazyGridState(listState) {from,to ->
         val fromKey=from.key as? String
@@ -128,6 +131,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 Box {
                     IconButton(onClick={moreMenu=true}) {Icon(Icons.Default.MoreVert,"Opciones del catálogo")}
                     DropdownMenu(expanded=moreMenu,onDismissRequest={moreMenu=false}) {
+                        DropdownMenuItem(text={Text("Editar región · local")},onClick={moreMenu=false;onLocalInpaint()})
                         if(personalizing) DropdownMenuItem(text={Text("Terminar personalización")},onClick={personalizing=false;moreMenu=false})
                         DropdownMenuItem(text={Text("Personalizar y ordenar")},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
                         DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},onClick={manageHidden=true;moreMenu=false})
@@ -151,7 +155,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 modifier=Modifier.fillMaxSize().padding(padding))
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) minOf(runtime.int("catalog.columns"),if(androidx.compose.ui.platform.LocalDensity.current.fontScale>1.3f) 2 else 6) else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) rootColumns else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(family==null) item(span={GridItemSpan(maxLineSpan)}) {
                 Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
                     Icon(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.artbox_mark),null,tint=androidx.compose.ui.graphics.Color.Unspecified,modifier=Modifier.size(28.dp))
@@ -164,6 +168,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                 Text(if(family != null) family.orEmpty()
                     else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                     modifier = Modifier.semantics { heading() })
+            }
+            if(toolsView && family==null) item(span={GridItemSpan(maxLineSpan)}) {
+                OutlinedButton(onClick=onLocalInpaint,modifier=Modifier.fillMaxWidth()) { Text("Editar región con máscara · local") }
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
                 Text("Arrastra el asa, mantén pulsada una tarjeta o toca el asa para subirla o bajarla. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
@@ -335,6 +342,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
     // Con fuente grande no se recorta texto esencial; con 100 % el resumen está escrito para dos líneas.
     val largeFont=androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
+    val stackedPrice = grid || largeFont || androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 400
     val reorderActions=listOfNotNull(
         onMoveUp?.let {action -> CustomAccessibilityAction("Subir $title") {action();true}},
         onMoveDown?.let {action -> CustomAccessibilityAction("Bajar $title") {action();true}})
@@ -354,12 +362,12 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                         minLines=when {largeFont -> 1; grid || !compact -> 3; else -> 2},maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
                     Text(releaseLabel.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=if(largeFont) Int.MAX_VALUE else 1,overflow=TextOverflow.Ellipsis)
                 }
-                if(!grid) Text(displayPrice ?: "Ver coste",
+                if(!stackedPrice) Text(displayPrice ?: "Ver coste",
                     Modifier.width(92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 // Opciones al mantener pulsado: sin ⋮ en cada fila de la lista.
                 if(dragModifier!=null) IconButton(onClick=onLongClick,modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
-            if(grid) Row(Modifier.heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+            if(stackedPrice) Row(Modifier.heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.
                 if(displayPrice!=null) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
                     Text("Desde $displayPrice",Modifier.padding(horizontal=10.dp,vertical=5.dp),

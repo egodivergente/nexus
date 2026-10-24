@@ -80,6 +80,7 @@ class NexusApplication : Application() {
         }
 
         secureStorage = SecureStorage(this)
+        com.vidadomu.nexus.provider.atlas.AtlasPriceQuote.configure { secureStorage.getAtlasApiKey() }
         // Ventana de seguimiento de trabajos: ajuste del usuario (Ajustes → Límites), 30 min por defecto, 0 = sin límite.
         com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes = getSharedPreferences("assistant_config_v1", MODE_PRIVATE).getInt("lim_tracking_min", com.vidadomu.nexus.core.model.TrackingPolicy.DEFAULT_MINUTES)
         database = NexusDatabase(this)

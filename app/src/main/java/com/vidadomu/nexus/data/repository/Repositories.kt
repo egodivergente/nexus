@@ -74,6 +74,11 @@ class ModelCatalogRepository(
             _isLoading.value = true
             _errorMessage.value = null
             try {
+                if(forceNetwork) {
+                    com.vidadomu.nexus.provider.atlas.NativeModelSchema.invalidate()
+                    com.vidadomu.nexus.provider.atlas.AtlasPriceQuote.invalidate()
+                    com.vidadomu.nexus.provider.atlas.AtlasPublishedPrice.invalidate()
+                }
                 val providers = providerRegistry.getCatalogProviders()
                 val activeIds = providers.map { it.id }.toSet()
                 // Configured models are local data: expose them before waiting for remote catalogs.
@@ -86,7 +91,9 @@ class ModelCatalogRepository(
                 val errors = mutableListOf<String>()
                 val fresh = providers.flatMap { provider ->
                     try {
-                        val fetched=provider.getModels().also { require(it.isNotEmpty()) { "Catálogo vacío" } }
+                        val catalog=provider.getModels().also { require(it.isNotEmpty()) { "Catálogo vacío" } }
+                        val fetched=if(forceNetwork && provider is com.vidadomu.nexus.provider.atlas.AtlasCloudProvider && provider.catalogNotice==null)
+                            provider.synchronizeContracts(catalog) { completed, total -> _errorMessage.value = "Atlas: verificando contratos $completed/$total" } else catalog
                         provider.catalogNotice?.let(errors::add)
                         val prior=previous.filter { it.providerId==provider.id }
                         if(provider.catalogNotice!=null && prior.size>fetched.size) prior else fetched

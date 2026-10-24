@@ -48,6 +48,6 @@ object VideoPricePreview {
             if(supported.isNotEmpty()) "Equivalente a 5 s; duraciones disponibles: " + supported.joinToString() + " s"
             else "Equivalente a 5 s; duración pendiente de confirmar"
         } else "Estimación según tarifa base; opciones pueden variar el coste"
-        return PriceQuote(total,note,System.currentTimeMillis(),unitUsd=rate.usd,clipSeconds=seconds)
+        return rate.copy(usd=total,configuration=note,unit=null,unitUsd=rate.usd,clipSeconds=seconds)
     }
 }

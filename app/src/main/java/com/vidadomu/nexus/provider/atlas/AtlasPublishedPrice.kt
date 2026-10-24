@@ -21,6 +21,7 @@ object AtlasPublishedPrice {
     private val revisionState = MutableStateFlow(0L)
     /** Grows each time a quote enters the cache, so readers of [cached] re-read instead of polling. */
     val revision: StateFlow<Long> = revisionState.asStateFlow()
+    fun invalidate() { cache.clear(); revisionState.update { it + 1 } }
 
     fun seedSnapshot(raw: String) {
         var added = false
@@ -35,7 +36,7 @@ object AtlasPublishedPrice {
             val checked = row["checkedAt"]?.jsonPrimitive?.longOrNull ?: return@forEach
             val date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(java.util.Date(checked))
             val previous = cache.putIfAbsent(id, PriceQuote(usd, "Tarifa base publicada · revisada $date · las opciones pueden elevar el coste",
-                checked, unit = unit, unitUsd = usd, baseTariff = true))
+                checked, unit = unit, unitUsd = usd, baseTariff = true, source="https://www.atlascloud.ai/models/$id"))
             if (previous == null) added = true
         }
         if (added) revisionState.update { it + 1 }
@@ -58,7 +59,7 @@ object AtlasPublishedPrice {
             else -> "generación"
         }
         return PriceQuote(rate, "Tarifa base de la ficha oficial de Atlas; las opciones pueden elevar el coste",
-            now, unit = unit, unitUsd = rate, baseTariff = true)
+            now, unit = unit, unitUsd = rate, baseTariff = true, source="https://www.atlascloud.ai/models/$modelId")
     }
 
     suspend fun fetch(model: NexusModel): PriceQuote? = withContext(Dispatchers.IO) {

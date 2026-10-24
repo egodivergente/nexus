@@ -1,3 +1,22 @@
+# ArtBox: editor local y servicio Atlas - 2026-10-24
+
+Continuación en rama aislada `codex/artbox-local-inpaint-atlas-20261024`,
+sobre `a9a91ec`; base remota ArtBox `d21cfe1`, no el main antiguo.
+Editor real de máscara/S Pen, descarga con hashes y puente nativo SD 1.5 Inpainting;
+servicio Atlas oficial para contratos/endpoints/cotización con fuente y fecha;
+límites de prompt contractuales, tarjetas estrechas y fullscreen tras teclado.
+Ver `docs/ARTBOX-LOCAL-INPAINT-ATLAS-20261024.md`: distingue código implementado,
+pruebas ejecutadas y aceptación generativa/visual pendiente en S25.
+672 pruebas unitarias PASS. APK final compilada e inspeccionada, SHA-256
+`B5471C3680E84607660509A4E5F2CFA05B9B57DDED2C676363E30DA61E76B885`.
+Motor/JNI/Whisper cargan en S25; inferencia NO EJECUTADA: 1,8–2,1 GiB libres
+frente a la reserva de seguridad de 3 GiB. No afirmar incompatibilidad del hardware.
+Se terminó primero la APK anterior.
+El S25 tiene `com.vidadomu.nexus.agent` 1.9.75 / vc109, actualizado a las 11:34:59;
+no equiparar esa instalación con la procedencia de esta rama ni sobrescribirla.
+No se instalan APK ni se publica/pushea nada por orden expresa.
+Mantener fuera del commit los cambios ajenos de `gradlew.bat`.
+
 # ArtBox: correcciones locales de catálogo - 2026-10-24
 
 Rama aislada `codex/artbox-catalog-fixes-20261024`, base `d21cfe1` de la rama
