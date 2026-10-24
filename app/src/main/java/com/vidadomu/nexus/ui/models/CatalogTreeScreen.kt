@@ -106,8 +106,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
     val listState=rememberLazyGridState()
-    // Two narrow columns squeeze the text: they are only offered where the cards still read well.
-    val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp>=600
+    // Two columns on any screen; in the grid the logo sits above the text so names keep their width. Very large fonts stay in a list.
+    val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f
     LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
     val dragView=androidx.compose.ui.platform.LocalView.current
     val labels=rememberCatalogLabels()
@@ -391,17 +391,20 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
         color=if(dragging) MaterialTheme.colorScheme.surfaceContainerHigh else SurfaceDark,shadowElevation=if(dragging) 18.dp else 0.dp,
         border=if(dragging) BorderStroke(1.5.dp,MaterialTheme.colorScheme.primary) else null) {
         Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                CatalogGlyph(glyphKey,44.dp,rememberCatalogLabels()) {size -> BrandLogo(family=family,modelId=routes.firstOrNull()?.id,size=size,bare=true)}
-                Column(Modifier.weight(1f)) {
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        Text(title,style=MaterialTheme.typography.titleMedium,
-                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
-                    }
-                    Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                        maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
-                    releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+            val glyph:@Composable ()->Unit = {CatalogGlyph(glyphKey,if(grid) 36.dp else 44.dp,rememberCatalogLabels()) {size -> BrandLogo(family=family,modelId=routes.firstOrNull()?.id,size=size,bare=true)}}
+            val texts:@Composable ColumnScope.()->Unit = {
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    Text(title,style=MaterialTheme.typography.titleMedium,
+                        fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
                 }
+                Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                    maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
+                releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+            }
+            if(grid) {glyph();Column(Modifier.fillMaxWidth(),content=texts)}
+            else Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                glyph()
+                Column(Modifier.weight(1f),content=texts)
                 if(!grid) Text(displayPrice ?: "Sin tarifa",
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 // Mantener pulsado levanta y arrastra la tarjeta; las opciones (renombrar, ocultar…) viven en este ⋮.
@@ -418,7 +421,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 } else Spacer(Modifier.weight(1f))
                 if(dragModifier==null) IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)
-                }
+                } else IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
             highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
             onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
