@@ -79,6 +79,32 @@ object FlowStudioPlan {
         GenerationStatus.CANCELLED -> "Detenido"
     }
 
+    data class JobCounts(val active: Int, val ready: Int, val failed: Int) {
+        val total get() = active + ready + failed
+    }
+
+    fun counts(jobs: List<GenerationJob>): JobCounts = JobCounts(
+        active = jobs.count { isActive(it.status) },
+        ready = jobs.count { it.status == GenerationStatus.COMPLETED || it.outputs.isNotEmpty() && !isActive(it.status) && it.status != GenerationStatus.FAILED },
+        failed = jobs.count { it.status == GenerationStatus.FAILED })
+
+    /** Only a percentage reported by the provider is shown; otherwise the line says plainly that none exists. */
+    fun progressLine(job: GenerationJob, elapsed: String): String? {
+        if (!isActive(job.status)) return null
+        val reported = job.progress?.takeIf { it.isFinite() && it > 0f && it <= 1f }
+        return if (reported != null) "${statusLabel(job.status)} · ${(reported * 100).toInt()} % · $elapsed"
+        else "${statusLabel(job.status)} — progreso porcentual no disponible · $elapsed"
+    }
+
+    /** The bridge refused to send because Flow's own text box already holds something. Nothing was sent. */
+    fun isDraftConflict(job: GenerationJob): Boolean =
+        job.status == GenerationStatus.FAILED && job.error?.contains("borrador escrito en Flow", ignoreCase = true) == true
+
+    /** A new, unsent draft with the same text: the user decides when to send it, so nothing is charged twice. */
+    fun reuseDraft(job: GenerationJob): FlowStudioDraft = FlowStudioDraft(
+        prompt = job.prompt, count = clampCount(job.parameters["count"]?.toIntOrNull() ?: 1),
+        modality = if (job.modality == Modality.VIDEO) Modality.VIDEO else Modality.IMAGE)
+
     fun encodeIds(ids: List<String>): String = ids.joinToString(",")
     fun decodeIds(value: String): List<String> = value.split(',').filter { it.isNotBlank() }
 }

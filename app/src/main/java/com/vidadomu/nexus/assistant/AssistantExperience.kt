@@ -81,12 +81,12 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
     onReply: (String) -> Unit = {}, onAudio: ((android.net.Uri)->Unit)? = null, onReorder: ((String,Int)->Unit)? = null, onCamera: (() -> Unit)? = null,
     onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
-    reasoningControl: @Composable () -> Unit = {}, workspaceControl: @Composable () -> Unit = {}) {
+    reasoningControl: @Composable () -> Unit = {}, onLive: (() -> Unit)? = null) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
-    Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
+    // Flotante, como el campo de búsqueda de Ajustes de Android: una píldora con sombra pegada abajo, sin franjas ni filetes.
+    Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
       Column {
-        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
         if (onShowLibrary != null) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             IconButton(onClick = { if (libraryExpanded) onHideLibrary() else onShowLibrary() },
                 modifier = Modifier.size(48.dp).semantics {
@@ -96,10 +96,11 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     .background(MaterialTheme.colorScheme.onSurfaceVariant, androidx.compose.foundation.shape.CircleShape))
             }
         }
-        Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
-        border=androidx.compose.foundation.BorderStroke(1.dp,com.vidadomu.nexus.ui.theme.BorderEssential),
-        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
+        Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=ComposerShape,shadowElevation=10.dp,
+            border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
+            Text(agentLabel(ui.settings), Modifier.padding(start = 12.dp, top = 6.dp, end = 12.dp),
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
@@ -142,12 +143,13 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
                         Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
-                            if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            // Quién contestará: proveedor y modelo activos (AGY, Bedrock, un cerebro propio…).
+                            if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             inner()
                         }
                     })
                 reasoningControl()
-                  workspaceControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else if(!canSend && !ui.attaching) {
                     // Nada que enviar: el botón es el micrófono. El dictado se inserta en el campo SIN enviarlo.
@@ -170,12 +172,13 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                     if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
                     else IconButton(onClick=dictateAction) {Icon(Icons.Default.Mic,"Dictar mensaje")}
+                    // Conversación por voz en directo (manos libres), como en ChatGPT o Gemini Live.
+                    onLive?.let {live -> FilledIconButton(onClick=live,modifier=Modifier.padding(end=4.dp).size(40.dp)) {Icon(Icons.Default.GraphicEq,"Hablar en directo")}}
                 }
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }
         }
         }
-        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
       }
     }
 }
@@ -284,7 +287,7 @@ internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
 }
 
 /** Forma única del cuadro de texto: no cambia con el contenido, así los adjuntos y los iconos nunca chocan con una esquina. */
-internal val ComposerShape = RoundedCornerShape(24.dp)
+internal val ComposerShape = RoundedCornerShape(28.dp)
 
 /** Miniatura del adjunto pendiente: imagen o primer fotograma del vídeo; audio y documentos, icono y nombre. */
 @Composable

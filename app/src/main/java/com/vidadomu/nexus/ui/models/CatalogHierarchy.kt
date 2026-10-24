@@ -18,10 +18,18 @@ internal fun modelGroupTitle(model: NexusModel): String {
         "Nano Banana" -> "nano[- ]banana"
         else -> Regex.escape(family.lowercase(java.util.Locale.ROOT)).replace(" ", "[- ]")
     }
-    val version = Regex("$token[- .]*(?:video[- ]*)?v?([oh]?\\d+(?:[._-]\\d+)?)(?=[^0-9]|$)").find(text)?.groupValues?.get(1)
-    if (version != null) {
+    val versionMatch = Regex("$token[- .]*(?:video[- ]*)?v?([oh]?\\d+(?:[._-]\\d+)?)(?=[^0-9]|$)").find(text)
+    val version = versionMatch?.groupValues?.get(1)
+    if (versionMatch != null && version != null) {
         val normalized = version.replace('_', '.').replace('-', '.').removeSuffix(".0")
-        return "$family ${normalized.uppercase(java.util.Locale.ROOT)}"
+        // A speed/size tier right after the version (Seedance 2.0 Fast, Mini…) is its own model, not a variant of the base one.
+        // Limited to families where those tiers are separate products with their own price and limits.
+        // The tier can sit right after the version (kling-v3.0-pro) or after the workflow (seedance-v1.5-pro/image-to-video-fast).
+        val tiers = Regex("(?<![a-z])(fast|mini|lite|flash|turbo|pro|std|standard|master|max|prime|ultra)(?![a-z])")
+            .findAll(text.substring(versionMatch.range.last + 1)).map { it.groupValues[1] }.distinct().toList()
+        val product=if(family=="GPT Image") listOf("sunburst","flare","developer").filter {Regex("(?<![a-z])$it(?![a-z])").containsMatchIn(text)}
+            .joinToString("") {" "+it.replaceFirstChar(Char::uppercase)} else ""
+        return "$family ${normalized.uppercase(java.util.Locale.ROOT)}" + product + tiers.joinToString("") { " " + (if(it == "std" || it == "standard") "Std" else it.replaceFirstChar { c -> c.uppercase(java.util.Locale.ROOT) }) }
     }
     // Strip only explicit workflow names. Unknown product identities remain separate.
     return model.displayName

@@ -22,7 +22,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +59,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
@@ -146,7 +150,7 @@ private sealed interface FlowStudioConnection {
     data class Unavailable(val message: String) : FlowStudioConnection
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun FlowStudioScreen(
     onBack: () -> Unit,
@@ -177,6 +181,8 @@ fun FlowStudioScreen(
     var importingReferences by remember { mutableStateOf(false) }
     var connectionSheet by rememberSaveable { mutableStateOf(false) }
     var resultsFilter by rememberSaveable { mutableStateOf("Todos") }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var composerExpanded by rememberSaveable { mutableStateOf(false) }
     var connection by remember { mutableStateOf<FlowStudioConnection>(FlowStudioConnection.Checking) }
     var isSubmitting by remember { mutableStateOf(false) }
     var progressLabel by remember { mutableStateOf<String?>(null) }
@@ -191,7 +197,7 @@ fun FlowStudioScreen(
             return
         }
         if (showChecking) connection = FlowStudioConnection.Checking
-        connection = app.flowBridgeProvider.bridgeStatus().fold(
+        connection = (if(showChecking) app.flowBridgeProvider.workspaceStatus() else app.flowBridgeProvider.bridgeStatus()).fold(
             onSuccess = { status ->
                 if (status.isReady || status.recovering) FlowStudioConnection.Ready(status)
                 else FlowStudioConnection.Unavailable(status.detail?.takeIf { it.isNotBlank() }
@@ -239,7 +245,7 @@ fun FlowStudioScreen(
         if (accepted.isEmpty() || "video" in accepted) add(Modality.VIDEO)
     }
     val sendable = FlowStudioPlan.sendable(drafts, promptLimit, acceptedModalities)
-    val canSend = sendable.isNotEmpty() && !isSubmitting && !importingReferences && connection is FlowStudioConnection.Ready
+    val canSend = sendable.isNotEmpty() && !isSubmitting && !importingReferences && status?.isReady == true && !status.recovering
 
     val allJobs by app.generationRepository.allJobs.collectAsState()
     val flowJobs = allJobs.filter { it.providerId == "google_flow" }.sortedByDescending { it.startedAt }
@@ -249,6 +255,8 @@ fun FlowStudioScreen(
         "Errores" -> job.status == GenerationStatus.FAILED
         else -> true
     } }.take(30)
+    // title, connection, summary and composer header, plus the drafts, «add» and «cost» rows while unfolded.
+    val jobsListIndex = 3
 
     fun acceptReferences(uris: List<Uri>) {
         if(importingReferences || isSubmitting || uris.isEmpty()) return
@@ -401,6 +409,11 @@ fun FlowStudioScreen(
                     }
                 }
                 if (drafts.isEmpty()) drafts += FlowStudioDraft()
+                if (sent > 0) {
+                    // Sent: fold the composer so the new job's progress is the first thing on screen.
+                    composerExpanded = false
+                    listState.scrollToItem(0)
+                }
                 if (sent > 0) snackbarHost.showSnackbar("$sent de ${batch.size} prompts en la cola de Flow." +
                     if (waitsForFlow) " Se enviarán en cuanto Flow esté listo." else "")
             } catch (error: CancellationException) {
@@ -411,6 +424,41 @@ fun FlowStudioScreen(
                 isSubmitting = false
                 progressLabel = null
             }
+        }
+    }
+
+    val draftEditor: @Composable (FlowStudioDraft) -> Unit = { draft ->
+        DraftCard(
+                    draft = draft,
+                    number = drafts.indexOf(draft) + 1,
+                    promptLimit = promptLimit,
+                    accepted = acceptedModalities,
+                    canRemove = drafts.size > 1,
+                    enabled = !isSubmitting,
+                    onChange = { updated ->
+                        val index = drafts.indexOfFirst { it.id == draft.id }
+                        if (index >= 0) drafts[index] = updated
+                    },
+                    onRemove = { drafts.removeAll { it.id == draft.id } },
+                    attachments = {
+                        if(draft.id == drafts.firstOrNull()?.id) {
+                            ReferencesSection(references,!isSubmitting && !importingReferences,onAdd={
+                                if(remainingReferences == 1) pickReference.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                else pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },onLibrary={libraryReferences.launch(arrayOf("image/*"),remainingReferences)},onRemove={references.remove(it)})
+                            if(importingReferences) Text("Preparando imágenes…",Modifier.padding(horizontal=12.dp),style=MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                )
+    }
+    if(composerExpanded) ModalBottomSheet(onDismissRequest={composerExpanded=false},sheetState=androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("Prompts de Flow",style=MaterialTheme.typography.titleLarge)
+            LazyColumn(Modifier.weight(1f,false),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                items(drafts,key={it.id}) {draft -> draftEditor(draft)}
+                item {OutlinedButton(onClick={drafts+=FlowStudioDraft(modality=drafts.lastOrNull()?.modality ?: Modality.IMAGE)},enabled=drafts.size<maximumDrafts && !isSubmitting,modifier=Modifier.fillMaxWidth()) {Text("Añadir prompt")}}
+            }
+            Button(onClick={composerExpanded=false},modifier=Modifier.fillMaxWidth()) {Text("Listo · ${drafts.size} ${if(drafts.size==1) "prompt" else "prompts"}")}
         }
     }
 
@@ -425,7 +473,16 @@ fun FlowStudioScreen(
         },
         topBar = {},
         bottomBar = {
-            Surface(color = BackgroundDark, border = BorderStroke(1.dp, BorderSubtle)) {
+            com.vidadomu.nexus.ui.components.FloatingActionDock {
+                Column(Modifier.fillMaxWidth().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.fillMaxWidth().heightIn(max=if(WindowInsets.isImeVisible) 220.dp else 340.dp)
+                        .verticalScroll(rememberScrollState())) { drafts.firstOrNull()?.let {draftEditor(it)} }
+                    if(!WindowInsets.isImeVisible) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        TextButton(onClick={composerExpanded=true}) {Text(if(drafts.size==1) "Más prompts" else "${drafts.size} prompts preparados")}
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick={connectionSheet=true}) {Text("Proyecto y ajustes")}
+                    }
+                }
                 Button(
                     onClick = ::sendAll,
                     enabled = canSend,
@@ -449,8 +506,11 @@ fun FlowStudioScreen(
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding),
-            contentPadding = PaddingValues(NexusTokens.space16),
+            state = listState,
+            // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
+            modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()).consumeWindowInsets(innerPadding),
+            contentPadding = PaddingValues(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space16,
+                bottom = innerPadding.calculateBottomPadding() + NexusTokens.space8),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
             item(key="flow-title") {
@@ -463,68 +523,44 @@ fun FlowStudioScreen(
             item(key = "connection") {
                 StudioConnectionCard(connection) { scope.launch { refreshConnection() } }
             }
-            items(drafts, key = { it.id }) { draft ->
-                DraftCard(
-                    draft = draft,
-                    number = drafts.indexOf(draft) + 1,
-                    promptLimit = promptLimit,
-                    accepted = acceptedModalities,
-                    canRemove = drafts.size > 1,
-                    enabled = !isSubmitting,
-                    onChange = { updated ->
-                        val index = drafts.indexOfFirst { it.id == draft.id }
-                        if (index >= 0) drafts[index] = updated
-                    },
-                    onRemove = { drafts.removeAll { it.id == draft.id } },
-                    attachments = {
-                        if(draft.id == drafts.firstOrNull()?.id) {
-                            ReferencesSection(references,!isSubmitting && !importingReferences,onAdd={
-                                if(remainingReferences == 1) pickReference.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                else pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            },onLibrary={libraryReferences.launch(arrayOf("image/*"),remainingReferences)},onRemove={references.remove(it)})
-                            if(importingReferences) Text("Preparando imágenes…",Modifier.padding(horizontal=12.dp),style=MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                )
-            }
-            item(key = "add") {
-                OutlinedButton(
-                    onClick = { drafts += FlowStudioDraft(modality = drafts.lastOrNull()?.modality ?: Modality.IMAGE) },
-                    enabled = drafts.size < maximumDrafts && !isSubmitting,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(NexusTokens.space8))
-                    Text("Añadir prompt (${drafts.size}/${maximumDrafts})")
-                }
-            }
-            item(key = "cost") {
-                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    TextButton(onClick = { costDetails = !costDetails }) {
-                        Text(if (costDetails) "Ocultar detalles" else "Ajustes y coste · Detalles")
-                    }
-                    if (costDetails) Text(
-                        "NEXUS envía cada prompt con su cantidad. Flow usa el modelo, los ajustes y los créditos de su proyecto activo. " +
-                            "Aquí no hay una estimación de coste verificable.",
-                        style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            // Progress lives at the top, where it is found without scrolling past the composer.
+            if (flowJobs.isNotEmpty()) item(key = "jobs-summary") {
+                val counts = FlowStudioPlan.counts(flowJobs)
+                val latest = flowJobs.firstOrNull { FlowStudioPlan.isActive(it.status) }
+                FlowJobsSummary(counts, latest, resultsFilter) { filter ->
+                    resultsFilter = filter
+                    scope.launch { listState.animateScrollToItem(jobsListIndex) }
                 }
             }
             if (flowJobs.isNotEmpty()) {
                 item(key = "grid_title") {
                     Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         Text("Trabajos de Flow", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            listOf("Todos", "En curso", "Listos", "Errores").forEach { filter ->
-                                FilterChip(selected=resultsFilter==filter,onClick={resultsFilter=filter},label={Text(filter)})
-                            }
-                        }
+
                     }
+                }
+                if (trackedJobs.isEmpty()) item(key = "jobs-empty") {
+                    Text("No hay trabajos en «$resultsFilter».", style = MaterialTheme.typography.bodyMedium, color = TextMuted)
                 }
                 items(trackedJobs, key = { "job_${it.id}" }) { job ->
                     JobResultGroup(
                         job = job,
-                        onOpen = { onNavigateToOutput(job.id) },
-                        onDownload = { output -> exportTarget = output }
+                        onOpen = { com.vidadomu.nexus.ui.output.OutputViewerScope.prepare(job.id,trackedJobs.flatMap {j -> j.outputs.indices.map {j.id to it}});onNavigateToOutput(job.id) },
+                        onDownload = { output -> exportTarget = output },
+                        onReuse = {
+                            val blank = drafts.indexOfFirst { it.prompt.isBlank() }
+                            if (blank >= 0 || drafts.size < maximumDrafts) {
+                                // An empty prompt box is filled in place instead of leaving it empty above the copy.
+                                if (blank >= 0) drafts[blank] = FlowStudioPlan.reuseDraft(job).copy(id = drafts[blank].id)
+                                else drafts += FlowStudioPlan.reuseDraft(job)
+                                composerExpanded = true
+                                scope.launch {
+                                    listState.animateScrollToItem(3)
+                                    snackbarHost.showSnackbar("Prompt preparado abajo. No se ha enviado nada.")
+                                }
+                            } else scope.launch { snackbarHost.showSnackbar("Ya tienes $maximumDrafts prompts preparados.") }
+                        },
+                        onOpenFlow = { connectionSheet = true }
                     )
                 }
             }
@@ -664,7 +700,8 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
             Column(Modifier.weight(1f)) {
                 Text(if(connection.status.recovering) "Recuperando acceso…" else "Flow listo",style=MaterialTheme.typography.labelLarge,
                     color=if(connection.status.recovering) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
-                connection.status.projectName?.takeIf {it.isNotBlank()}?.let {Text(it,style=MaterialTheme.typography.bodySmall,maxLines=2,overflow=TextOverflow.Ellipsis)}
+                Text(connection.status.projectName ?: "Proyecto de Flow abierto",style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                Text(listOfNotNull(connection.status.modelName,connection.status.aspectRatio).joinToString(" · ").ifBlank {"Modelo y formato: consultar en Flow"},style=MaterialTheme.typography.labelSmall,color=TextMuted)
             }
             IconButton(onClick=onRefresh) {Icon(Icons.Default.Refresh,"Actualizar conexión Flow",Modifier.size(18.dp))}
         }
@@ -674,6 +711,7 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun DraftCard(
     draft: FlowStudioDraft, number: Int, promptLimit: Int?, accepted: Set<Modality>,
@@ -689,7 +727,7 @@ private fun DraftCard(
         }
         StudioPromptField(draft.prompt,{onChange(draft.copy(prompt=it))},"Una escena, estilo, luz, movimiento…",
             enabled=enabled,maximum=promptLimit,attachments=attachments)
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+        if(!WindowInsets.isImeVisible) Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
             FilterChip(draft.modality==Modality.IMAGE,onClick={
                 feedback.perform(NexusHapticEvent.SELECTION,changed=draft.modality!=Modality.IMAGE)
                 onChange(draft.copy(modality=Modality.IMAGE))
@@ -714,6 +752,7 @@ private fun DraftCard(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ReferencesSection(
     references: List<FlowStudioReference>,
@@ -733,20 +772,51 @@ private fun ReferencesSection(
             }
             TextButton(onClick=onLibrary,enabled=enabled && references.size<maximumReferences) {Text("Biblioteca")}
         }
-        if(references.isNotEmpty()) Text("Todos los prompts · vídeo en modo Referencias",style=MaterialTheme.typography.labelSmall,color=TextMuted)
+        if(references.isNotEmpty() && !WindowInsets.isImeVisible) Text("Para todos los prompts",style=MaterialTheme.typography.labelSmall,color=TextMuted)
         LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(references, key={it.uri}) { ref ->
                 com.vidadomu.nexus.ui.create.CanvasAttachmentTile(
                     com.vidadomu.nexus.core.model.AttachedMedia(id=ref.uri,uriString=ref.uri,mimeType=ref.mimeType,fileName=ref.fileName,
                         slotType=com.vidadomu.nexus.core.model.MediaSlotType.REFERENCE_IMAGE),
-                    "Referencia ${references.indexOf(ref)+1}",enabled) {onRemove(ref)}
+                    "Referencia ${references.indexOf(ref)+1}",enabled,thumbnailSize=if(WindowInsets.isImeVisible) 48.dp else 72.dp) {onRemove(ref)}
+            }
+        }
+    }
+}
+
+/** Counts and the live line of the newest active job; a tap filters the list below. */
+@Composable
+private fun FlowJobsSummary(counts: FlowStudioPlan.JobCounts, latest: GenerationJob?, selected: String, onShow: (String) -> Unit) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(latest?.id) {
+        while (latest != null) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+    Surface(color = SurfaceDark, border = BorderStroke(1.dp, BorderSubtle), shape = NexusTokens.field, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+            Text("Progreso", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+            // Wraps instead of squeezing a count onto two lines when the system text is large.
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+                FilterChip(selected = selected == "Todos",onClick={onShow("Todos")},label={Text("Todos")})
+                FilterChip(selected = selected == "En curso", onClick = { onShow("En curso") }, label = { Text("En curso · ${counts.active}", maxLines = 1) })
+                FilterChip(selected = selected == "Listos", onClick = { onShow("Listos") }, label = { Text("Listos · ${counts.ready}", maxLines = 1) })
+                FilterChip(selected = selected == "Errores", onClick = { onShow("Errores") }, label = { Text("Errores · ${counts.failed}", maxLines = 1) })
+            }
+            latest?.let { job ->
+                Text(FlowStudioPlan.progressLine(job, com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)).orEmpty(),
+                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
             }
         }
     }
 }
 
 @Composable
-private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (GenerationOutput) -> Unit) {
+private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (GenerationOutput) -> Unit,
+    onReuse: () -> Unit = {}, onOpenFlow: () -> Unit = {}) {
     var now by remember(job.id) { mutableStateOf(System.currentTimeMillis()) }
     val active = FlowStudioPlan.isActive(job.status)
     LaunchedEffect(job.id, active) {
@@ -755,6 +825,7 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
             kotlinx.coroutines.delay(1_000)
         }
     }
+    val time = remember(job.startedAt) { java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(job.startedAt)) }
     Surface(color = SurfaceDark, border = BorderStroke(1.dp, BorderSubtle), shape = NexusTokens.field) {
         Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -769,15 +840,31 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
                         else -> TextMuted
                     })
             }
+            Text("$time · ${if (job.modality == Modality.VIDEO) "Vídeo" else "Imagen"} · ID ${job.providerJobId?.takeLast(8) ?: job.id.takeLast(8)}",
+                style = MaterialTheme.typography.labelSmall, color = TextMuted)
             if (active) {
-                Text("Tiempo transcurrido: ${com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)}",
-                    style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text(FlowStudioPlan.progressLine(job, com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)).orEmpty(),
+                    style = MaterialTheme.typography.labelMedium, color = TextPrimary)
                 TextButton(onClick = onOpen) { Text("Ver estado y opciones") }
             }
             job.error?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (job.status == GenerationStatus.FAILED) AccentCoral else TextMuted)
             }
-            if(job.status == GenerationStatus.FAILED) TextButton(onClick=onOpen) {Text("Revisar trabajo")}
+            if (job.status == GenerationStatus.FAILED) {
+                if (FlowStudioPlan.isDraftConflict(job)) {
+                    Text("No se ha enviado nada. Borra el texto de Flow (o envíalo desde allí) y vuelve a preparar este prompt.",
+                        style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        OutlinedButton(onClick = onOpenFlow) { Text("Abrir Flow") }
+                        OutlinedButton(onClick = onReuse) { Text("Preparar de nuevo") }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        TextButton(onClick = onOpen) { Text("Revisar trabajo") }
+                        TextButton(onClick = onReuse) { Text("Preparar de nuevo") }
+                    }
+                }
+            }
             val cells = if(active) FlowStudioPlan.expectedCells(job) else job.outputs.size
             (0 until cells).chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {

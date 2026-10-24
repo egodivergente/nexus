@@ -4,6 +4,8 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,6 +51,7 @@ private data class MdStyles(
     val line: Color,
     val heading: TextStyle,
     val label: TextStyle,
+    val onLink: (String) -> Unit = {},
 )
 
 @Composable
@@ -93,8 +96,8 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
                 else -> null
             },
         )
-        if (sp.link != null && sp.link!!.startsWith("http")) {
-            withLink(LinkAnnotation.Url(sp.link!!, TextLinkStyles(style))) { append(sp.text) }
+        if (sp.link != null) {
+            withLink(LinkAnnotation.Clickable(sp.link!!, TextLinkStyles(style)) { st.onLink(sp.link!!) }) { append(sp.text) }
         } else withStyle(style) { append(sp.text) }
     }
 }
@@ -114,11 +117,13 @@ fun ChatMarkdownView(
     onReply: ((String) -> Boolean)? = null,
     selectable: Boolean = true,
 ) {
-    val st = mdStyles()
+    var selectedLink by remember {mutableStateOf<String?>(null)}
+    val st = mdStyles().copy(onLink={selectedLink=it})
     val blocks = remember(text, streaming) { ChatMarkdown.parse(text, streaming) }
     val ctx = remember(answered, onReply) { WidgetCtx(answered, onReply) }
     if (selectable) SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
     else Box(modifier) { MdBlockList(blocks, st, ctx) }
+    selectedLink?.let {ChatLinkSheet(it,onDismiss={selectedLink=null})}
 }
 
 @Composable
@@ -155,6 +160,7 @@ private fun MdBlockView(b: MdBlock, st: MdStyles, ctx: WidgetCtx) {
             Text(annotated(b.spans, st), style = st.body.copy(fontStyle = FontStyle.Italic), color = st.muted)
         }
         is MdBlock.Code -> MdCodeBlock(b, st)
+        is MdBlock.Visual -> ChatVisualArtifact(b.language,b.code)
         is MdBlock.Table -> MdTable(b, st)
         is MdBlock.Callout -> if (b.blocks.isNotEmpty()) MdCallout(b, st, ctx)
         is MdBlock.Widget -> MdWidget(b.spec, ctx)
@@ -235,14 +241,14 @@ private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
 private fun MdTable(t: MdBlock.Table, st: MdStyles) {
     val cols = maxOf(t.header.size, t.rows.maxOfOrNull { it.size } ?: 0).coerceAtLeast(1)
     Surface(color = Color.Transparent, shape = NexusTokens.field, border = BorderStroke(1.dp, st.line), modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Row(Modifier.fillMaxWidth().background(st.accent.copy(alpha = 0.08f)).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
+        Column(Modifier.horizontalScroll(rememberScrollState())) {
+            Row(Modifier.width((cols*160).dp).background(st.accent.copy(alpha = 0.08f)).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
                 for (c in 0 until cols) Text(annotated(t.header.getOrElse(c) { emptyList() }, st),
                     style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent, modifier = Modifier.weight(1f))
             }
             t.rows.forEachIndexed { r, row ->
                 if (r > 0) HorizontalDivider(thickness = 1.dp, color = st.line)
-                Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
+                Row(Modifier.width((cols*160).dp).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
                     for (c in 0 until cols) Text(annotated(row.getOrElse(c) { emptyList() }, st), style = st.body.copy(fontSize = MaterialTheme.typography.bodyMedium.fontSize),
                         color = if (c == 0) st.ink else st.soft, modifier = Modifier.weight(1f).padding(end = NexusTokens.space8))
                 }

@@ -42,6 +42,18 @@ class FlowBridgeClientConnectionTest {
         }}
     }
 
+    @Test fun workspaceKeepsTheExactObservedLabelsAndDoesNotSubmit() = runBlocking {
+        MockWebServer().use {primary->MockWebServer().use {backup->
+            primary.enqueue(status(true))
+            primary.enqueue(MockResponse().setBody("""{"project_name":"Escena 4","model_name":"Veo 3.1 Fast","aspect_ratio":"16:9"}"""))
+            val state=bridge(primary,backup,8).workspaceStatus().getOrThrow()
+            assertEquals("Escena 4",state.projectName);assertEquals("Veo 3.1 Fast",state.modelName);assertEquals("16:9",state.aspectRatio)
+            assertEquals("GET",primary.takeRequest().method)
+            val workspace=primary.takeRequest();assertEquals("GET",workspace.method);assertEquals("/api/flow/workspace",workspace.path)
+            assertEquals(0,backup.requestCount)
+        }}
+    }
+
     @Test fun configuredProbeTimeoutStillAllowsFallback() = runBlocking {
         MockWebServer().use {primary->MockWebServer().use {backup->
             primary.enqueue(status(true).setHeadersDelay(1600,TimeUnit.MILLISECONDS));backup.enqueue(status(true))

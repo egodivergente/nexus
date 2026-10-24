@@ -45,6 +45,7 @@ import com.vidadomu.nexus.ui.generations.GenerationsScreen
 import com.vidadomu.nexus.ui.library.LibraryScreen
 import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
+import com.vidadomu.nexus.ui.navigation.revealBarOnSwipeUp
 import com.vidadomu.nexus.ui.navigation.adjacentTab
 import com.vidadomu.nexus.ui.navigation.tabSwipe
 import com.vidadomu.nexus.ui.navigation.tabEnter
@@ -86,7 +87,8 @@ class MainActivity : ComponentActivity() {
 
         pendingShares=PendingShares(this).pending()
         val rules=RuntimePreferences.get(this)
-        projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && rules.bool("startup.cold")
+        // Al arrancar solo si llevabas fuera el tiempo de ausencia (4 h por defecto) o es la primera vez, no cada vez que Android reinicia la app.
+        projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && (rules.bool("startup.cold") || awayLongEnough(rules))
         if(savedInstanceState==null || intent?.action !in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)) handleIntent(intent)
 
         setContent {
@@ -94,6 +96,10 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
                 val tabs=remember {Screen.bottomNavItems}
+                LaunchedEffect(Unit) {com.vidadomu.nexus.ui.theme.ChromeVisibility.load(this@MainActivity)}
+                // The bar leaves by itself a few seconds after it was brought in, unless the user pinned it.
+                val barShown by com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar
+                LaunchedEffect(barShown) {if(barShown) {kotlinx.coroutines.delay(5_000);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false}}
                 val tabPrefs=remember {getSharedPreferences("nexus_workspace",0)}
                 val pager=rememberPagerState(initialPage=tabPrefs.getInt("page",0).coerceIn(0,tabs.lastIndex),pageCount={tabs.size})
                 val holder=rememberSaveableStateHolder()
@@ -102,6 +108,17 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(pager.settledPage) {tabPrefs.edit().putInt("page",pager.settledPage).apply()}
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
+                // One path for «Continuar en…» whether it is drawn inside the Agent tab or as the full sheet used for shared files.
+                val chooseProject: (String, com.vidadomu.nexus.assistant.PendingShare?) -> Unit = {id,sharedNow -> lifecycleScope.launch {
+                    try {
+                        assistantViewModel.selectProject(id)
+                        check(assistantViewModel.ui.first {!it.thinking}.activeProjectId==id)
+                        if(sharedNow!=null && sharedNow.ready) {assistantViewModel.acceptShared(sharedNow);PendingShares(this@MainActivity).consumed(sharedNow.id);pendingShares=PendingShares(this@MainActivity).pending()}
+                        projectChooser=false;tabRequest=0;navController.popBackStack("workspace",false)
+                    } catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                    catch(e:Exception) {shareError="No se pudo abrir el destino. El historial y los archivos compartidos se conservan."}
+                }; Unit}
+                LaunchedEffect(projectChooser) {if(projectChooser) {tabRequest=0;navController.popBackStack("workspace",false)}}
                 agentDraft?.let {draft ->
                     androidx.compose.material3.AlertDialog(onDismissRequest={agentDraft=null},
                         title={androidx.compose.material3.Text("Borrador de ChatGPT")},
@@ -159,7 +176,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    modifier = Modifier.fillMaxSize().imePadding(),
+                    modifier = Modifier.fillMaxSize().imePadding().revealBarOnSwipeUp(),
                     containerColor = ScreenBackground,
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) {
@@ -177,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 NexusBottomBar(navController = navController, selectedRoute=if(activeEntry?.destination?.route=="workspace") tabs[pager.currentPage].route else null,
-                                    onSelect={screen->tabRequest=tabs.indexOf(screen);navController.popBackStack("workspace",false)})
+                                    onSelect={screen->tabRequest=tabs.indexOf(screen);navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
                             }
                         }
                     }
@@ -186,7 +203,7 @@ class MainActivity : ComponentActivity() {
                         modifier=Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
                         composable("workspace") {
                             LaunchedEffect(tabRequest) {tabRequest?.let {pager.scrollToPage(it);tabRequest=null}}
-                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,
+                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value,
                                 modifier=Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Horizontal))) {index ->
                                 holder.SaveableStateProvider(tabs[index].route) {
                                 when(tabs[index]) {
@@ -199,6 +216,10 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onOpenSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
                                 onOpenHistory = { navController.openHistoryTab() },
+                                projectPicker = if(projectChooser && pendingShares.firstOrNull()==null) ({
+                                    ContinueProjectChooser(assistantViewModel,null,onChoose={id -> chooseProject(id,null)},onDismiss={projectChooser=false},embedded=true)
+                                }) else null,
+                                onPickerDismiss = { projectChooser = false },
                                 vm = assistantViewModel
                             )
                         }
@@ -220,12 +241,17 @@ class MainActivity : ComponentActivity() {
                                     createViewModel.selectModality(model.modalities.first())
                                     createViewModel.selectModel(model)
                                     navController.navigate(Screen.Create.route) {launchSingleTop=true}
+                                },
+                                onSelectModelWithMedia = { model, media ->
+                                    createViewModel.prepareWithMedia(model, media)
+                                    navController.navigate(Screen.Create.route) {launchSingleTop=true}
                                 }
                             )
                         }
                             Screen.Library -> {
                             LibraryScreen(
                                 onOpenHistory={navController.navigate(Screen.Generations.route)},
+                                onOpenArtBox={tabRequest=tabs.indexOf(Screen.Models)},
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onNavigateToResult = { jobId, index -> navController.navigate("output/$jobId?index=$index") },
                                 onUseInCanvas = { asset ->
@@ -320,17 +346,9 @@ class MainActivity : ComponentActivity() {
                         catch(e:Exception) {shareError="No se pudo añadir el lote al chat. Tus archivos se conservan para reintentarlo."}
                     }
                 }
-                if(projectChooser || shared!=null && (rules.value("share.choose").toBoolean() || !shared.ready)) ContinueProjectChooser(assistantViewModel,shared,
-                    onRetryShare={lifecycleScope.launch {if(shared!=null) {PendingShares(this@MainActivity).retry(shared);pendingShares=PendingShares(this@MainActivity).pending()}}},
-                    onChoose={id->lifecycleScope.launch {
-                        try {
-                            assistantViewModel.selectProject(id)
-                            check(assistantViewModel.ui.first {!it.thinking}.activeProjectId==id)
-                            if(shared!=null && shared.ready) {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending()}
-                            projectChooser=false;tabRequest=0;navController.popBackStack("workspace",false)
-                        } catch(e:kotlinx.coroutines.CancellationException) {throw e}
-                        catch(e:Exception) {shareError="No se pudo abrir el destino. El historial y los archivos compartidos se conservan."}
-                    }}, onDismiss={projectChooser=false;if(shared!=null) {lifecycleScope.launch {
+                if(shared!=null && (projectChooser || rules.value("share.choose").toBoolean() || !shared.ready)) ContinueProjectChooser(assistantViewModel,shared,
+                    onRetryShare={lifecycleScope.launch {PendingShares(this@MainActivity).retry(shared);pendingShares=PendingShares(this@MainActivity).pending()}},
+                    onChoose={id->chooseProject(id,shared)}, onDismiss={projectChooser=false;if(shared!=null) {lifecycleScope.launch {
                         if(shared.ready) {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending()}
                     }}})
                 if(shareImporting) androidx.compose.material3.Surface(Modifier.fillMaxSize(),color=androidx.compose.material3.MaterialTheme.colorScheme.background) {
@@ -396,8 +414,14 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         val rules=RuntimePreferences.get(this)
         val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
+        if(left>0 && rules.bool("startup.enabled") && awayLongEnough(rules)) projectChooser=true
+    }
+
+    /** First launch, or away at least «startup.idleMinutes» (0 = never by absence). */
+    private fun awayLongEnough(rules: RuntimePreferences): Boolean {
+        val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
         val minutes=rules.int("startup.idleMinutes")
-        if(left>0 && minutes>0 && rules.bool("startup.enabled") && System.currentTimeMillis()-left>=minutes*60_000L) projectChooser=true
+        return left==0L || (minutes>0 && System.currentTimeMillis()-left>=minutes*60_000L)
     }
 
 }

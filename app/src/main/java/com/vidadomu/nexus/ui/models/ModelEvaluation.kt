@@ -1,7 +1,11 @@
 package com.vidadomu.nexus.ui.models
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,15 +40,51 @@ private val evaluationCriteria=listOf("Calidad","Fotorealismo","Identidad","Fís
     val values=remember(key,revision) {evaluationCriteria.associateWith {prefs.getString("$key:$it",null)}}
     val known=values.values.mapNotNull {it?.toDoubleOrNull()}
     var open by remember {mutableStateOf(false)}
-    Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-        Text("Evaluación del modelo",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("%.1f / 10 · controles de este endpoint".format(evaluation.score),style=MaterialTheme.typography.titleMedium)
-        evaluation.facts.take(if(factsOpen) Int.MAX_VALUE else 4).forEach {(label,value)->
-            Text("$label · $value",style=MaterialTheme.typography.bodySmall)
+    val colors=MaterialTheme.colorScheme
+    Surface(shape=com.vidadomu.nexus.ui.theme.NexusTokens.card,color=colors.surfaceContainerLow,
+        border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                Text("Evaluación técnica",style=MaterialTheme.typography.titleSmall)
+                Text("Controles que expone este endpoint. No mide la calidad visual.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+            }
+            Box(Modifier.size(56.dp).clip(androidx.compose.foundation.shape.CircleShape).background(colors.primary.copy(alpha=.14f))
+                .semantics(mergeDescendants=true) {contentDescription="Puntuación técnica %.1f de 10".format(evaluation.score)},contentAlignment=androidx.compose.ui.Alignment.Center) {
+                Text("%.1f".format(evaluation.score).replace('.',','),style=MaterialTheme.typography.titleMedium,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold,color=colors.primary)
+            }
+        }
+        HorizontalDivider(color=colors.outlineVariant.copy(alpha=.5f))
+        val inputs=com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(model)
+        val routeAdvice=when {
+            !model.promptAccepted -> "Esta operación no usa prompt. Prepara ${inputs.joinToString {it.label.lowercase()}.ifBlank {"sus entradas"}} y ajusta ${model.parameters.filterNot {it.isAdvanced}.take(3).joinToString {it.displayName.lowercase()}.ifBlank {"las opciones del archivo"}}."
+            inputs.isEmpty() && model.pairedEditModelId!=null -> "Esta ruta crea desde texto, sin imágenes. Para conservar una foto o combinar referencias, cambia a la ruta de edición de esta misma variante."
+            inputs.any {it.required} -> "Requiere ${inputs.filter {it.required}.joinToString {it.label.lowercase()}}. ${if(model.promptRequired) "El texto también es obligatorio." else "El texto es opcional."}"
+            inputs.isNotEmpty() -> "Puedes crear sin adjuntos. Admite ${inputs.joinToString {it.label.lowercase() + if(it.maximum<Int.MAX_VALUE) " (hasta ${it.maximum})" else ""}} como guía opcional."
+            else -> "Esta ruta recibe texto sin adjuntos. Los controles disponibles se muestran en su contrato."
+        }
+        Text(routeAdvice,style=MaterialTheme.typography.bodyMedium)
+        if(researchedModelNote(model)==null && model.description.isNotBlank()) {
+            Text("Descripción del proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+            Text(model.description,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+        }
+        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            evaluation.facts.take(if(factsOpen) Int.MAX_VALUE else 0).forEach {(label,value)->
+                Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Text(label,Modifier.weight(.42f),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    Text(value,Modifier.weight(.58f),style=MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
         ModelResearchNotes(model)
-        differences.take(2).forEach {Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)}
-        TextButton(onClick={factsOpen=!factsOpen},contentPadding=PaddingValues(0.dp)) {Text(if(factsOpen) "Menos detalle" else "Evaluación completa y fuentes")}
+        if(differences.isNotEmpty()) Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Text("En esta variante",style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)
+            differences.take(2).forEach {Text(it.removePrefix("Diferencia de esta variante · "),style=MaterialTheme.typography.bodySmall,color=colors.primary)}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick={factsOpen=!factsOpen},contentPadding=PaddingValues(horizontal=8.dp)) {Text(if(factsOpen) "Menos detalle" else "Ver detalle y fuentes")}
+            TextButton(onClick={open=true},contentPadding=PaddingValues(horizontal=8.dp)) {Text(if(known.isEmpty()) "Mi evaluación" else "Editar mi evaluación")}
+        }
         if(factsOpen) {
             evaluation.axes.forEach {axis->Text("${axis.title}: ${"%.1f".format(axis.score)}/10 · ${axis.reason}",style=MaterialTheme.typography.bodySmall)}
             differences.drop(2).forEach {Text(it,style=MaterialTheme.typography.bodySmall)}
@@ -55,7 +95,7 @@ private val evaluationCriteria=listOf("Calidad","Fotorealismo","Identidad","Fís
         }
         if(known.isNotEmpty()) Text("%.1f / 10 · tu evaluación de resultados".format(known.average()),style=MaterialTheme.typography.bodyMedium)
         if(known.isNotEmpty()) Text("${known.size} de ${evaluationCriteria.size} criterios · "+DateFormat.getDateInstance().format(Date(prefs.getLong("$key:at",0))),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick={open=true},contentPadding=PaddingValues(0.dp)) {Text(if(known.isEmpty()) "Añadir evaluación de mis resultados" else "Ver y editar criterios")}
+    }
     }
     if(open) {
         val draft=remember(key) {mutableStateMapOf<String,String>().apply {evaluationCriteria.forEach {put(it,values[it].orEmpty())}}}

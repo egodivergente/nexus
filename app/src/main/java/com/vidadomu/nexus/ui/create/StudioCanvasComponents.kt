@@ -60,7 +60,7 @@ internal fun CanvasWorkspaceSwitch(flow: Boolean, onModels: () -> Unit, onFlow: 
 }
 
 @Composable
-internal fun GenerationQuantityControl(count: Int, enabled: Boolean, onCount: (Int) -> Unit, onModels: () -> Unit, allowed: (Int) -> Boolean = {true}, choices: List<Int> = listOf(1,2,4,8)) {
+internal fun GenerationQuantityControl(count: Int, enabled: Boolean, onCount: (Int) -> Unit, onModels: () -> Unit, allowed: (Int) -> Boolean = {true}, choices: List<Int> = BATCH_COUNTS) {
     var menu by remember {mutableStateOf(false)}
     val feedback=rememberNexusHaptics()
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -93,12 +93,13 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     val feedback = rememberNexusHaptics()
     val clipboard = LocalClipboardManager.current
     var cleared by rememberSaveable { mutableStateOf<String?>(null) }
+    val motion=rememberNexusMotionAllowed()
     val tone by animateColorAsState(
         if(focused) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
-        tween(NexusTokens.contentDuration), label = "Prompt focus")
+        tween(if(motion) NexusTokens.contentDuration else 0), label = "Prompt focus")
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
     Column(modifier.fillMaxWidth().clip(NexusTokens.prompt).background(tone)
-        .animateContentSize(tween(NexusTokens.contentDuration))) {
+        .animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0))) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
@@ -133,7 +134,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             Spacer(Modifier.weight(1f))
             val measured=capability?.measured(value)
             Text(if(capability!=null) "${measured ?: "≈ ?"} / ${capability.maximum} ${capability.unitLabel}"
-                else "${value.codePointCount(0,value.length)} · Máximo no verificado",
+                else "${value.codePointCount(0,value.length)}",
                 style=MaterialTheme.typography.labelSmall,
                 modifier=Modifier.weight(1f,fill=false),
                 color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -150,15 +151,17 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
 
 @Composable
 internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
-    busyLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier, actionLabel: String = "Generar") {
+    busyLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier, actionLabel: String = "Generar",
+    /** What is still missing, shown on the disabled button itself so no separate strip competes with it. */
+    disabledLabel: String? = null) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if(pressed) .985f else 1f, tween(NexusTokens.pressDuration), label = "Generate press")
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberNexusHaptics()
     val scheme = MaterialTheme.colorScheme
     val motionAllowed = rememberNexusMotionAllowed(requested = busy)
     Box(modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }) {
-        Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() },
+        Button(onClick = { haptic.perform(NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled && !busy, interactionSource = interactions,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = NexusTokens.action,
             colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary,
@@ -169,7 +172,7 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
                     // The indeterminate spinner loops forever; with reduced motion or hidden, a static glyph keeps the busy label honest.
                     if(working && motionAllowed) CircularProgressIndicator(Modifier.size(16.dp), color = scheme.onPrimary, strokeWidth = 2.dp)
                     else if(working) Icon(Icons.Filled.Timelapse, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(16.dp))
-                    Text(if(working) busyLabel else "$actionLabel · $cost", style = MaterialTheme.typography.titleSmall.tabularMoney(),
+                    Text(if(working) busyLabel else if(!enabled && disabledLabel != null) disabledLabel else "$actionLabel · $cost", style = MaterialTheme.typography.titleSmall.tabularMoney(),
                         modifier=Modifier.weight(1f,fill=false),maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }

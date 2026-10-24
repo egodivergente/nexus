@@ -46,6 +46,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
     val dismiss = { controller.dismiss(); onDismiss() }
     if(results && state.batchId != null) ComparisonResultsDialog(state.batchId!!, { results = false }, onOpenOutput)
 
+    var saveGroup by rememberSaveable {mutableStateOf(false)}
     var groupName by rememberSaveable {mutableStateOf("")}
     var groups by remember {mutableStateOf(controller.savedGroups())}
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -54,18 +55,18 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
         Scaffold(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
             topBar = {
                 TopAppBar(showBalance=false,title = { Column {
-                    Text("Varios modelos", style = MaterialTheme.typography.titleLarge)
+                    Text("Varios modelos", style = MaterialTheme.typography.titleMedium)
                     Text(when(state.phase) {
                         ComparisonPhase.CHOOSE -> "1 · Elige modelos y cantidades"
                         ComparisonPhase.PREPARING -> "Comprobando compatibilidad y costes"
                         ComparisonPhase.REVIEW -> "2 · Revisa antes de generar"
                         else -> "Una idea · distintas interpretaciones"
                     }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } }, navigationIcon = { IconButton(onClick = dismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver al lienzo") } })
+                } }, modifier=Modifier.heightIn(min=76.dp), navigationIcon = { IconButton(onClick = dismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver al lienzo") } })
             },
             bottomBar = {
-                Surface(tonalElevation = 2.dp) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.vidadomu.nexus.ui.components.FloatingActionDock {
+                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if(state.phase in setOf(ComparisonPhase.REVIEW, ComparisonPhase.PREPARING)) {
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -78,7 +79,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                 if(state.withReferences && state.source.attachedMedia.isEmpty()) Text("Añade tus imágenes de referencia en el lienzo.", style = MaterialTheme.typography.bodySmall)
                                 Button(onClick = controller::prepare,
                                 enabled = state.canReview,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Revisar lote · ${state.selectedRequests} generaciones") }
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Revisar lote · ${state.selectedRequests} ${if(state.selectedRequests==1) "generación" else "generaciones"}") }
                             }
                             ComparisonPhase.PREPARING -> {
                                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -87,7 +88,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                             ComparisonPhase.REVIEW -> {
                                 if(!state.canSend || state.quotedAt == 0L) Text("Se enviarán los modelos listos; los que tengan errores quedan pendientes.", style = MaterialTheme.typography.bodySmall)
                                 Button(onClick = controller::send, enabled = state.canSend && state.quotedAt != 0L,
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if(BuildConfig.OFFLINE_QA) "Validar sin enviar" else "Generar lote · ${state.requestCount} generaciones") }
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if(BuildConfig.OFFLINE_QA) "Validar sin enviar" else "Generar lote · ${state.requestCount} ${if(state.requestCount==1) "generación" else "generaciones"}") }
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     TextButton(onClick = controller::edit) { Text("Cambiar modelos") }
                                     TextButton(onClick = controller::prepare) { Text("Actualizar costes") }
@@ -104,7 +105,9 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                 }
             }
         ) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
+            LazyColumn(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = padding.calculateBottomPadding() + 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text(state.source.prompt.ifBlank { "Vuelve al lienzo y escribe un prompt para comparar sus interpretaciones." },
                         style = MaterialTheme.typography.bodyLarge, maxLines = 4, overflow = TextOverflow.Ellipsis)
@@ -115,7 +118,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                 if(state.phase == ComparisonPhase.CHOOSE) {
                     item {
                         if(groups.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(groups) {name->AssistChip(onClick={controller.loadGroup(name)},label={Text(name)})}}
-                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick={saveGroup=!saveGroup}) {Text("Mis grupos")}
+                        if(saveGroup) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(groupName,{groupName=it},Modifier.weight(1f),singleLine=true,placeholder={Text("Guardar selección como grupo")})
                             TextButton(onClick={controller.saveGroup(groupName.trim());groups=controller.savedGroups();groupName=""},enabled=groupName.isNotBlank() && state.selected.isNotEmpty()) {Text("Guardar")}
                         }
@@ -155,7 +159,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         val problem = state.selectionProblems[key]
                         val enabled = !checking && (problem == null || key !in state.checked)
                         Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { controller.toggle(model) }.heightIn(min = 64.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            com.vidadomu.nexus.ui.components.VendorLogo(model.organization, size = 28.dp)
+                            com.vidadomu.nexus.ui.components.BrandLogo(organization=model.organization,modelId=model.id,size=28.dp,bare=true)
                             Column(Modifier.weight(1f)) {
                                 Text(canvasModelIdentity(model).title, style = MaterialTheme.typography.titleSmall)
                                 Text(canvasModelIdentity(model).detail + if(catalogFamily(model) == "Midjourney") " · Midjourney / Youchuan" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -261,7 +265,10 @@ fun ComparisonResultsDialog(batchId: String, onDismiss: () -> Unit, onOpenOutput
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         val output = job.outputs.firstOrNull()
                         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable(enabled = output != null) { onDismiss(); onOpenOutput(job.id) }) {
+                            modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable(enabled = output != null) {
+                                com.vidadomu.nexus.ui.output.OutputViewerScope.prepare(job.id,jobs.flatMap {j -> j.outputs.indices.map {j.id to it}})
+                                onDismiss(); onOpenOutput(job.id)
+                            }) {
                             if(output != null) AsyncImage(model = ImageRequest.Builder(context).data(output.localUri ?: output.url).size(512).crossfade(true).apply {
                                 if(output.type==Modality.VIDEO) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}
                             }.build(),

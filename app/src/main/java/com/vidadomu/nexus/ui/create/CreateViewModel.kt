@@ -715,6 +715,20 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun reorderMedia(id: String, direction: Int) {
+        forgetModelSwitch()
+        _uiState.update { current ->
+            val media=current.attachedMedia.toMutableList()
+            val from=media.indexOfFirst {it.id==id}
+            if(from<0) return@update current
+            val selected=media[from]
+            val peers=media.indices.filter {media[it].slotType==selected.slotType && media[it].fieldKey==selected.fieldKey}
+            val target=peers.getOrNull(peers.indexOf(from)+direction.coerceIn(-1,1)) ?: return@update current
+            java.util.Collections.swap(media,from,target)
+            current.copy(attachedMedia=media)
+        }
+    }
+
     fun removeMedia(id: String) { forgetModelSwitch();
         _uiState.value.attachedMedia.find { it.id == id }?.let { mediaSession.invalidate(it.slotType,it.fieldKey) }
         _uiState.update { current ->
@@ -736,6 +750,20 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Wait for the real media contract before attaching a frame or animating an image. */
     private var reuseImageJob: kotlinx.coroutines.Job? = null
+    /** From the ArtBox sheet: pick the model, wait for its real contract, then attach the chosen images to its image field. Nothing is sent. */
+    fun prepareWithMedia(model: NexusModel, selection: List<Pair<Uri, String>>) {
+        selectModality(model.modalities.first())
+        selectModel(model)
+        viewModelScope.launch {
+            schemaJob?.join()
+            val state = _uiState.value
+            val active = state.selectedModel ?: return@launch
+            if (active.id != model.id || !state.schemaReady) return@launch
+            val field = CanvasInputPlan.fields(active, state.parameters).firstOrNull { it.mime.startsWith("image/") || it.mime == "*/*" } ?: return@launch
+            addCanvasMedia(field.key, active.providerId + "/" + active.id, selection.take(field.maximum.coerceAtLeast(1)))
+        }
+    }
+
     fun reuseImageInput(uri: Uri, mimeType: String?) { forgetModelSwitch();
         reuseImageJob?.cancel()
         reuseImageJob = viewModelScope.launch {

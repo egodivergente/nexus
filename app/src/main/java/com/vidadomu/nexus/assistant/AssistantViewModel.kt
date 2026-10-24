@@ -37,10 +37,12 @@ import kotlinx.coroutines.sync.withLock
 sealed interface ChatItem {
     val id: String
     @kotlinx.serialization.Serializable
-    data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
+    data class User(override val id: String, val text: String, val attachments: List<Attachment>, val at: Long = 0L) : ChatItem
     @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
-        val media: List<Attachment> = emptyList()) : ChatItem
+        val media: List<Attachment> = emptyList(), val at: Long = 0L, val tookMs: Long = 0L,
+        /** Who answered («AGY · Gemini 3.8 Flash», «Bedrock · …»): the agent can change between messages. */
+        val by: String = "") : ChatItem
     /** Una tarjeta por encargo: [orderId] es persistente y [planId] apunta al plan vigente. */
     @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String, val orderId: String? = null) : ChatItem
@@ -51,9 +53,23 @@ sealed interface ChatItem {
     /** Persisted by 1.8.2; opening history never changes the current mode. */
     @kotlinx.serialization.Serializable
     data class ModeSwitch(override val id: String, val text: String, val resolved: Boolean = false) : ChatItem
+    /** A board of imported images the user can arrange and draw on; its content lives in [ChatBoardStore]. */
+    @kotlinx.serialization.Serializable
+    data class Board(override val id: String, val boardId: String) : ChatItem
+    /** Summary carried from another conversation; it reaches the agent with the first message ([sent] after that). */
+    @kotlinx.serialization.Serializable
+    data class Context(override val id: String, val from: String, val summary: String, val sent: Boolean = false) : ChatItem
 }
 
 enum class ProposalState { PENDING, APPLYING, APPLIED, REJECTED, FAILED }
+
+/** Consecutive turns of the same role become one (a carried context followed by the first message, a reply that failed…). */
+internal fun mergeTurns(turns: List<Pair<String, String>>): List<Pair<String, String>> =
+    turns.fold(mutableListOf()) { acc, turn ->
+        val last = acc.lastOrNull()
+        if (last != null && last.first == turn.first) acc[acc.lastIndex] = last.first to (last.second + "\n\n" + turn.second) else acc += turn
+        acc
+    }
 
 /** Estado de una tarjeta de plan. [plan] es siempre la versión registrada en el SpendGuard. */
 @kotlinx.serialization.Serializable
@@ -91,6 +107,10 @@ data class AssistantUiState(
     val projects: List<Project> = emptyList(),
     val activeProjectId: String? = null,
     val conversationId: String = java.util.UUID.randomUUID().toString(),
+    /** Conversation where the agent keeps working while another one is on screen (null = none). */
+    val workingIn: String? = null,
+    /** Preparing the summary for «Nueva con este contexto». */
+    val carrying: Boolean = false,
     val draftRevision: Long = 0,
     val pendingAttachments: List<Attachment> = emptyList(),
     val resultsWall: List<Attachment> = emptyList(),
@@ -115,6 +135,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var orchestrator: AgentOrchestrator
     private var conversation: AgentConversation
     private var turnJob: Job? = null
+    /** Conversation whose message [turnJob] is answering (null for other work, e.g. a diagnosis). */
+    private var turnChat: String? = null
+    // A conversation left while the agent was answering keeps working here: its state, and its agent conversation.
+    // While it works it owns runtime.orders; the conversation on screen keeps its own orders in [parkedOrders].
+    private var background: AssistantUiState? = null
+    private var backgroundConversation: AgentConversation? = null
+    private var parkedOrders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null
     private val chatStore = AssistantChatStore(app)
     private val chatsReady=kotlinx.coroutines.CompletableDeferred<Unit>()
     private val submitSlots = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentGenerations)
@@ -156,13 +183,56 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         } }
         removeOrderListener = runtime.orders.onChange { publishOrders() }
         publishOrders()
-        viewModelScope.launch { chatsReady.await(); ui.collect { state -> chatStore.save(state, runtime.orders.snapshot()) } }
+        viewModelScope.launch { chatsReady.await(); ui.collect { state -> chatStore.save(state, if (background != null) parkedOrders else runtime.orders.snapshot()) } }
         viewModelScope.launch { app.generationRepository.allJobs.collect { jobs -> onJobs(jobs) } }
     }
 
     override fun onCleared() { removeOrderListener(); super.onCleared() }
 
-    private fun publishOrders() = _ui.update { it.copy(orders = runtime.orders.all().associateBy { o -> o.id }) }
+    private fun publishOrders() = _ui.update { it.copy(orders = (if (background != null) parkedOrders?.orders.orEmpty() else runtime.orders.all()).associateBy { o -> o.id }) }
+
+    /** Applies [f] to conversation [chatId] wherever it is: on screen, or working in the background (saved as it goes). */
+    private fun updateChat(chatId: String, f: (AssistantUiState) -> AssistantUiState) {
+        if (_ui.value.conversationId == chatId) { _ui.update(f); return }
+        val bg = background?.takeIf { it.conversationId == chatId } ?: return
+        val next = f(bg)
+        background = next
+        if (next.items != bg.items || next.plans != bg.plans) viewModelScope.launch { runCatching { chatStore.archive(next, runtime.orders.snapshot()) } }
+    }
+
+    /** The per-conversation part of [chat] put on screen, keeping what is global (catalog, settings, projects…). */
+    private fun AssistantUiState.showing(chat: AssistantUiState) = copy(items = chat.items, plans = chat.plans, pendingAttachments = chat.pendingAttachments,
+        thinking = chat.thinking, streamingText = chat.streamingText, replies = chat.replies, conversationId = chat.conversationId,
+        activeProjectId = chat.activeProjectId, workingIn = null, scrollRequest = scrollRequest + 1)
+
+    private fun chatTitle(chat: AssistantUiState) = chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(40) ?: "Nueva conversación"
+
+    /** The background answer finished: save it and give the conversation on screen its own orders back. */
+    private fun finishBackground() {
+        val bg = background ?: return
+        background = null; backgroundConversation = null
+        val parked = parkedOrders; parkedOrders = null
+        viewModelScope.launch {
+            runCatching { chatStore.archive(bg, runtime.orders.snapshot()) }
+            runtime.orders.restore(parked ?: com.vidadomu.nexus.agent.core.orders.OrderBookState(), _ui.value.plans.values.map { it.plan })
+            _ui.update { it.copy(workingIn = null, message = msg("Nexus ha terminado en «${chatTitle(bg)}». Ábrela en Conversaciones.")) }
+            publishOrders()
+        }
+    }
+
+    /** Back to the conversation that is still working: it comes on screen as it is, with its orders (it owns them). */
+    private fun resumeBackground() {
+        val bg = background ?: return
+        val leaving = _ui.value
+        viewModelScope.launch {
+            runCatching { chatStore.archive(leaving, parkedOrders) }
+            background = null; parkedOrders = null
+            backgroundConversation?.let { conversation = it }; backgroundConversation = null
+            runtime.settings.setActiveProject(bg.activeProjectId)
+            _ui.update { it.showing(bg) }
+            publishOrders()
+        }
+    }
 
     // ---- conversación -------------------------------------------------------------------------
 
@@ -173,10 +243,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if(_ui.value.thinking) return
         send(request.first,request.second)
     }
-    fun send(text: String, retryAttachments: List<Attachment>? = null): Boolean {
+    /** [note] reaches the agent with the message but is not shown in the user's bubble (e.g. what changed on a board). */
+    fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = ""): Boolean {
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
+        // One answer at a time: while the agent finishes another conversation, this one waits (the draft stays).
+        background?.let { bg ->
+            _ui.update { it.copy(message = msg("Nexus sigue trabajando en «${chatTitle(bg)}». Cuando termine podrás enviar aquí; tu borrador se conserva.")) }
+            return false
+        }
         // Límites del usuario (Ajustes → Límites), con los propios del cerebro activo si los tiene.
         val limits = runtime.settings.let { it.effectiveLimits(it.load()) }
         if(atts.count {AgentDocuments.format(it.mimeType,it.name)!=null}>limits.documents) {
@@ -193,41 +269,50 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+        // A summary carried from another conversation goes to the agent with the first message (not shown in the bubble).
+        val carried = _ui.value.items.filterIsInstance<ChatItem.Context>().filter { !it.sent }
+        val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
+        _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
         val started = android.os.SystemClock.elapsedRealtime()
+        // Everything this answer produces goes to its own conversation, even if the user has moved to another one.
+        val chatId = _ui.value.conversationId
+        turnChat = chatId
         turnJob = viewModelScope.launch {
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
-                    orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
+                    orchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
                 }
                 // Tiempo máximo por mensaje = ajuste del usuario; 0 = sin límite.
                 val r = AssistantTurnService.runTurn(app) {
                     limits.turnTimeoutMillis?.let { ms -> kotlinx.coroutines.withTimeout(ms) { run() } } ?: run()
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
-                    _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
-                        conv.session.renderedMedia.values.toList()), streamingText = "") }
+                    updateChat(chatId) { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
+                        conv.session.renderedMedia.values.toList(), System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime() - started,
+                        agentLabel(_ui.value.settings)), streamingText = "") }
                 }
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
-                r.verifiedNotes.forEach { notice(it, error = false) }
-                if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false)
+                r.verifiedNotes.forEach { notice(it, error = false, chatId = chatId) }
+                if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false, chatId = chatId)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 failedTurn = clean to atts
-                notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true)
+                notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true, chatId = chatId)
             } catch (e: CancellationException) {
-                notice("Cancelado.")
+                notice("Cancelado.", chatId = chatId)
                 throw e
             } catch (e: LlmException) {
                 failedTurn = clean to atts
-                notice(Redactor.redact(e.message ?: "El asistente no respondió."), error = true)
+                notice(Redactor.redact(e.message ?: "El asistente no respondió."), error = true, chatId = chatId)
             } catch (e: Exception) {
                 failedTurn = clean to atts
-                notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true)
+                notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true, chatId = chatId)
             } finally {
-                _ui.update { state ->
+                turnChat = null
+                updateChat(chatId) { state ->
                     // Solo las tarjetas NUEVAS de este turno van tras la respuesta; las existentes
                     // se actualizan en su sitio y no saltan de posición.
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
@@ -237,8 +322,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
+                if (background?.conversationId == chatId) finishBackground()
                 // El asistente puede haber entrado en otro proyecto (open_project / create_project).
-                conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }?.let { selectProject(it) }
+                else if (_ui.value.conversationId == chatId) conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }?.let { selectProject(it) }
             }
         }
         return true
@@ -250,7 +336,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
      * Muestra [plan] en la tarjeta de su encargo. Si la tarjeta existe se actualiza EN SU SITIO
      * (mismo item, misma posición); solo un encargo nuevo añade una tarjeta.
      */
-    private fun showPlan(plan: GenerationPlan, orderId: String?, executable: Boolean = true) = _ui.update { s ->
+    private fun showPlan(plan: GenerationPlan, orderId: String?, executable: Boolean = true, chatId: String = _ui.value.conversationId) = updateChat(chatId) { s ->
         val state = runtime.guard.state(plan.id) ?: PlanState.PREPARED
         val previous = s.items.firstOrNull { it is ChatItem.PlanCard && ((orderId != null && it.orderId == orderId) || it.planId == plan.id) } as ChatItem.PlanCard?
         val carried = s.plans[plan.id] ?: previous?.let { s.plans[it.planId] }
@@ -263,23 +349,25 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         s.copy(plans = (if (stale != null) s.plans - stale else s.plans) + (plan.id to ui), items = items)
     }
 
-    private fun onEvent(ev: UiEvent) {
+    /** [chatId]: the conversation the event belongs to, which may be working in the background. */
+    private fun onEvent(ev: UiEvent, chatId: String = _ui.value.conversationId) {
         when (ev) {
-            is UiEvent.PlanReady -> showPlan(ev.plan, ev.orderId, ev.executable)
-            is UiEvent.AwaitingConfirmation -> _ui.update { s ->
-                val p = s.plans[ev.planId] ?: return@update s
+            is UiEvent.PlanReady -> showPlan(ev.plan, ev.orderId, ev.executable, chatId)
+            is UiEvent.AwaitingConfirmation -> updateChat(chatId) { s ->
+                val p = s.plans[ev.planId] ?: return@updateChat s
                 s.copy(plans = s.plans + (ev.planId to p.copy(state = runtime.guard.state(ev.planId) ?: p.state)))
             }
-            is UiEvent.ProposedAction -> _ui.update { it.copy(items = it.items + ChatItem.Proposal(newId(), ev.id, ev.description)) }
+            is UiEvent.ProposedAction -> updateChat(chatId) { it.copy(items = it.items + ChatItem.Proposal(newId(), ev.id, ev.description)) }
             is UiEvent.GenerationSubmitted -> {
                 // Antes añadía SIEMPRE otra tarjeta: ahora actualiza la del encargo.
-                showPlan(ev.plan, ev.orderId, executable = false)
-                setPlan(ev.plan.id) { it.copy(state = PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING") }
+                showPlan(ev.plan, ev.orderId, executable = false, chatId = chatId)
+                setPlan(ev.plan.id, chatId) { it.copy(state = PlanState.SUBMITTED, jobId = ev.jobId, jobStatus = "PENDING") }
             }
-            is UiEvent.ResultsWall -> _ui.update { it.copy(resultsWall = ev.media) }
-            is UiEvent.Info -> notice(ev.text)
-            is UiEvent.StreamingText -> _ui.update { it.copy(streamingText = ev.text) }
-            is UiEvent.Replies -> _ui.update { it.copy(replies = ev.replies) }
+            // A wall opens over whatever is on screen: only for the conversation being looked at.
+            is UiEvent.ResultsWall -> if (_ui.value.conversationId == chatId) _ui.update { it.copy(resultsWall = ev.media) }
+            is UiEvent.Info -> notice(ev.text, chatId = chatId)
+            is UiEvent.StreamingText -> updateChat(chatId) { it.copy(streamingText = ev.text) }
+            is UiEvent.Replies -> updateChat(chatId) { it.copy(replies = ev.replies) }
         }
     }
 
@@ -293,14 +381,28 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     internal fun conversations(): List<AssistantChatEntry> = chatStore.conversations(_ui.value.activeProjectId)
     internal fun openConversation(id: String) {ConversationTabs(app).open(id);if(id!=_ui.value.conversationId) switchConversation(id)}
 
-    private fun switchConversation(id: String?, retry: Pair<String, List<Attachment>>? = null, targetProject: String? = _ui.value.activeProjectId) {
+    /**
+     * Leaving a conversation while the agent answers does not stop it: it keeps working in the background and its
+     * answer lands in its own conversation. [carry] starts the new conversation with a summary of another one.
+     */
+    private fun switchConversation(id: String?, retry: Pair<String, List<Attachment>>? = null, targetProject: String? = _ui.value.activeProjectId,
+        carry: ChatItem.Context? = null) {
         val current = _ui.value
-        if(current.thinking || current.plans.values.any { it.busy }) return
+        if(current.plans.values.any { it.busy } || current.carrying) return
+        // Back to the conversation that is still working.
+        if(id != null && id == background?.conversationId) { resumeBackground(); return }
+        val answering = current.thinking && turnChat == current.conversationId && turnJob?.isActive == true
+        if(current.thinking && !answering) return
+        if(answering && background != null) return
         failedTurn = null
-        _ui.update { it.copy(thinking = true) }
+        if(!answering) _ui.update { it.copy(thinking = true) }
         viewModelScope.launch {
             try {
-                chatStore.archive(current, runtime.orders.snapshot())
+                if(answering) {
+                    // It owns runtime.orders until it finishes; the conversations shown meanwhile park theirs.
+                    background = current; backgroundConversation = conversation
+                    chatStore.archive(current, runtime.orders.snapshot())
+                } else chatStore.archive(current, if(background != null) parkedOrders else runtime.orders.snapshot())
 
                 val saved = if(id == null) null else chatStore.conversation(id) ?: error("No se pudo abrir la conversación.")
                 require(saved?.projectId==null || saved.projectId==targetProject) {"La conversación pertenece a otro proyecto"}
@@ -309,14 +411,56 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 runCatching {runtime.assets.startProjectSession(targetProject)}
                 // Los encargos pertenecen a su conversación: el agente no ve los de otro chat.
                 synced.clear()
-                runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = emptyList(), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+                if(background != null) parkedOrders = com.vidadomu.nexus.agent.core.orders.OrderBookState()
+                else runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
+                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(),
+                    workingIn = background?.conversationId, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
+                publishOrders()
                 if(retry != null) send(retry.first, retry.second)
             } catch(error: Exception) {
                 _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
             }
         }
+    }
+
+    /** «Nueva con este contexto»: the agent summarises this conversation and the new one starts from that summary. */
+    fun newConversationWithContext() {
+        val current = _ui.value
+        if(current.thinking || current.carrying || background != null || current.items.none { it is ChatItem.User }) return
+        _ui.update { it.copy(carrying = true) }
+        viewModelScope.launch {
+            val summary = try { summarize(current) }
+                catch(e: CancellationException) { throw e }
+                catch(e: Exception) {
+                    _ui.update { it.copy(carrying = false, message = msg("No se pudo preparar el resumen: ${Redactor.redact(e.message?.take(160).orEmpty())}")) }
+                    return@launch
+                }
+            _ui.update { it.copy(carrying = false) }
+            switchConversation(null, carry = ChatItem.Context(newId(), chatTitle(current), summary))
+        }
+    }
+
+    /** One plain request to the active model (no tools): what was decided, files and commissions, and what is pending. */
+    private suspend fun summarize(chat: AssistantUiState): String {
+        val transcript = chat.items.takeLast(60).mapNotNull { item -> when(item) {
+            is ChatItem.User -> "Usuario: " + item.text + item.attachments.takeIf { it.isNotEmpty() }?.joinToString(", ", " [adjuntos: ", "]") { it.name ?: it.id }.orEmpty()
+            is ChatItem.Assistant -> "Nexus: " + item.text
+            is ChatItem.Context -> "Contexto previo: " + item.summary
+            is ChatItem.PlanCard -> chat.plans[item.planId]?.let { "Encargo: ${it.plan.ref.modelId} · ${it.state}" }
+            else -> null
+        } }.joinToString("\n\n")
+        val settings = runtime.settings.load()
+        val request = com.vidadomu.nexus.agent.core.llm.LlmRequest(settings.toConfig().modelId,
+            listOf("Resume esta conversación para continuarla en otra nueva. En español y conciso: objetivo, decisiones tomadas, " +
+                "archivos y encargos relevantes (con sus nombres o ids) y lo que queda pendiente. No inventes nada que no esté en la conversación."),
+            listOf(com.vidadomu.nexus.agent.core.llm.LlmMessage(com.vidadomu.nexus.agent.core.llm.Role.USER, listOf(com.vidadomu.nexus.agent.core.llm.ContentBlock.Text(transcript)))),
+            emptyList(), maxTokens = 1500)
+        val response = kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(com.vidadomu.nexus.agent.core.assets.AssetIndex.newId("ctx"))) {
+            runtime.llm(settings).complete(request)
+        }
+        return response.message.content.filterIsInstance<com.vidadomu.nexus.agent.core.llm.ContentBlock.Text>().joinToString("\n") { it.text }.trim()
+            .ifBlank { error("el modelo no devolvió texto") }
     }
 
     fun setMode(mode: AgentMode) {
@@ -337,6 +481,64 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     // ---- adjuntos y proyectos -----------------------------------------------------------------
 
     fun attach(uris: List<Uri>) = attachMedia(uris,null)
+
+    private val boardStore by lazy { ChatBoardStore(app) }
+
+    /** Places the picked images on a new board at the end of the chat. The images are already private copies in the library. */
+    fun addBoard(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            val entries = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    val asset = runtime.assets.assetByUri(uri.toString())
+                    var w = asset?.width; var h = asset?.height
+                    if (w == null || h == null || w <= 0 || h <= 0) {
+                        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        runCatching { android.graphics.BitmapFactory.decodeFile(uri.path, bounds) }
+                        w = bounds.outWidth; h = bounds.outHeight
+                    }
+                    if (w == null || h == null || w <= 0 || h <= 0) null
+                    else Triple(uri.toString(), asset?.displayName ?: uri.lastPathSegment ?: "imagen", w.toFloat() / h)
+                }
+            }
+            if (entries.isEmpty()) { notice("No se pudieron leer las imágenes.", error = true); return@launch }
+            val board = ChatBoard.arrange("board_" + java.util.UUID.randomUUID().toString().replace("-", "").take(12), entries)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { boardStore.save(board) }
+            _ui.update { it.copy(items = it.items + ChatItem.Board(newId(), board.id), scrollRequest = it.scrollRequest + 1) }
+            if (entries.size < uris.size) notice("${uris.size - entries.size} archivos no eran imágenes legibles y no se han puesto en el tablero.")
+        }
+    }
+
+    /**
+     * Sends the message; boards edited since their last send travel with it: the board as seen, each marked image,
+     * and a note of what changed. Returns false when a message cannot be sent right now.
+     */
+    fun sendWithBoards(text: String): Boolean {
+        if (_ui.value.thinking || _ui.value.attaching || _ui.value.plans.values.any { it.busy }) return false
+        val boards = _ui.value.items.filterIsInstance<ChatItem.Board>().mapNotNull { boardStore.load(it.boardId) }.filter { it.dirty }
+        if (boards.isEmpty()) return send(text)
+        val numbers = _ui.value.items.filterIsInstance<ChatItem.Board>().map { it.boardId }
+        _ui.update { it.copy(attaching = true) }
+        viewModelScope.launch {
+            val exported = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    boards.map { board -> ChatBoardExport.export(app, board, numbers.indexOf(board.id) + 1) }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                _ui.update { it.copy(attaching = false) }
+                notice("No se pudo preparar el tablero: ${e.message?.take(160)}", error = true); return@launch
+            }
+            val added = exported.flatMap { it.files }.mapNotNull { uri ->
+                runCatching { AgentMediaStore.persist(app, uri, "image/jpeg", _ui.value.activeProjectId) }
+                    .onFailure { notice("No se pudo adjuntar el tablero: ${it.message?.take(160)}", error = true) }.getOrNull()
+            }
+            _ui.update { it.copy(pendingAttachments = (it.pendingAttachments + added).distinctBy { a -> a.id }, attaching = false) }
+            if (send(text, note = exported.joinToString("\n\n") { it.note }))
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { boards.forEach { boardStore.save(it.markSent()) } }
+        }
+        return true
+    }
     fun attachAudio(uri: Uri) = attachMedia(listOf(uri),"audio/mp4")
 
     private fun attachMedia(uris: List<Uri>, declaredMime: String?) {
@@ -534,9 +736,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 runtime.guard.register(p.plan); p.copy(state = PlanState.PREPARED, busy = false, includeInBatch = false)
             } else p.copy(busy = false, includeInBatch = false)
         }
-        runtime.orders.restore(cleaned.orders, plans.values.map { it.plan })
+        // While another conversation works in the background it owns runtime.orders: this one's wait parked.
+        if (background != null) { parkedOrders = cleaned.orders; publishOrders() }
+        else runtime.orders.restore(cleaned.orders, plans.values.map { it.plan })
         // Errores guardados por versiones anteriores: causa y corrección con el schema real (lectura pública, sin gasto).
-        viewModelScope.launch {
+        if (background == null) viewModelScope.launch {
             for (o in runtime.orders.all().filter { it.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED && it.lastFailure?.explanation == null }) {
                 val plan = plans[o.planId]?.plan ?: continue
                 val schema = runCatching { runtime.registry.schema(plan.ref) }.getOrNull() ?: continue
@@ -558,11 +762,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         conversation.session.attachments += (saved.sessionAttachments + saved.items.filterIsInstance<ChatItem.User>().flatMap { it.attachments } + saved.attachments).distinctBy { it.id }
-        conversation.restoreTextHistory(saved.items.mapNotNull { item -> when(item) {
+        conversation.restoreTextHistory(mergeTurns(saved.items.mapNotNull { item -> when(item) {
             is ChatItem.User -> "user" to item.text
             is ChatItem.Assistant -> "assistant" to item.text
+            is ChatItem.Context -> if (item.sent) "user" to "Contexto traído de la conversación «${item.from}» (resumen):\n${item.summary}" else null
             else -> null
-        } })
+        } }))
     }
 
     // ---- propuestas (Copiloto) ----------------------------------------------------------------
@@ -620,7 +825,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val previousMode = conversation.session.mode
         val conv = conversation
         conv.session.mode = AgentMode.ASSISTANT
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList()), thinking = true, scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList(), System.currentTimeMillis()), thinking = true, scrollRequest = it.scrollRequest + 1) }
         val started = android.os.SystemClock.elapsedRealtime()
         turnJob = viewModelScope.launch {
             try {
@@ -630,7 +835,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
                 val response = result.text.trim().ifBlank { "No he podido explicar la causa con los datos disponibles. El trabajo conserva su diagnóstico en Historial." }
-                _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop), scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop, at = System.currentTimeMillis(), by = agentLabel(it.settings)), scrollRequest = it.scrollRequest + 1) }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 notice("El diagnóstico ha tardado demasiado. El detalle original sigue disponible en Historial.", error = true)
             } catch (e: CancellationException) {
@@ -856,8 +1061,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             .getOrNull()
     }
 
-    private fun setPlan(planId: String, f: (PlanUi) -> PlanUi) = _ui.update { s ->
-        val p = s.plans[planId] ?: return@update s
+    private fun setPlan(planId: String, chatId: String = _ui.value.conversationId, f: (PlanUi) -> PlanUi) = updateChat(chatId) { s ->
+        val p = s.plans[planId] ?: return@updateChat s
         s.copy(plans = s.plans + (planId to f(p)))
     }
 
@@ -985,7 +1190,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun consumeMessage() = _ui.update { it.copy(message = null) }
 
-    private fun notice(text: String, error: Boolean = false) = _ui.update { it.copy(items = it.items + ChatItem.Notice(newId(), text, error)) }
+    private fun notice(text: String, error: Boolean = false, chatId: String = _ui.value.conversationId) =
+        updateChat(chatId) { it.copy(items = it.items + ChatItem.Notice(newId(), text, error)) }
 
     private fun msg(text: String) = (++msgSeq) to text
 

@@ -119,7 +119,12 @@ class ModelCatalogRepository(
 
 /** Claves locales que se guardan con el trabajo pero nunca viajan al proveedor. */
 object LocalJobMetadata {
-    fun allowed(key: String): Boolean = key.startsWith("__comparison_") || key.startsWith("__assistant_")
+    fun allowed(key: String): Boolean = key in setOf("__project_id", "__conversation_id") ||
+        key.startsWith("__comparison_") || key.startsWith("__assistant_")
+
+    fun validate(metadata: Map<String, String>) {
+        require(metadata.keys.all(::allowed)) { "Metadatos locales no admitidos." }
+    }
 }
 
 class GenerationRepository(
@@ -147,7 +152,8 @@ class GenerationRepository(
 
     suspend fun submitGeneration(request: GenerationRequest, localMetadata: Map<String,String> = emptyMap()): Result<GenerationJob> {
         comparisonRecovery.await()
-        require(localMetadata.keys.all(LocalJobMetadata::allowed)) { "Metadatos locales no admitidos." }
+        try { LocalJobMetadata.validate(localMetadata) }
+        catch (e: IllegalArgumentException) { return Result.failure(e) }
         val provider = providerRegistry.getProviderById(request.providerId)
             ?: return Result.failure(ProviderError("No existe un adaptador ejecutable para ${request.providerId}."))
         if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) return Result.failure(ProviderError("Laboratorio local: envío bloqueado."))

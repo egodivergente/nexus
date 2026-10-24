@@ -23,6 +23,7 @@ sealed interface MdBlock {
     data class ListBlock(val items: List<ListItem>) : MdBlock
     data class Quote(val spans: List<MdSpan>) : MdBlock
     data class Code(val language: String?, val code: String) : MdBlock
+    data class Visual(val language: String, val code: String) : MdBlock
     data class Table(val header: List<List<MdSpan>>, val rows: List<List<List<MdSpan>>>) : MdBlock
     data object Rule : MdBlock
     /** Recuadro semántico (:::tldr, :::tip, :::warn, :::decision, :::result); el color lo decide el tema. */
@@ -84,6 +85,9 @@ object ChatMarkdown {
                         !closed && streaming -> Unit
                         else -> out += MdBlock.Code(lang, code)
                     }
+                } else if(lang?.lowercase() in setOf("mermaid","html","svg")) {
+                    if(closed) out += MdBlock.Visual(lang!!.lowercase(),code)
+                    else if(!streaming) out += MdBlock.Code(lang,code)
                 } else out += MdBlock.Code(lang, code)
                 i++ // salta el cierre (o el final si no se cerró)
                 continue
@@ -105,12 +109,12 @@ object ChatMarkdown {
                 continue
             }
 
-            if (line.trimStart().startsWith("|") && i + 1 < lines.size && tableSep.matches(lines[i + 1])) {
+            if ('|' in line && i + 1 < lines.size && tableSep.matches(lines[i + 1])) {
                 flushAll()
                 val header = cells(line)
                 i += 2
                 val rows = mutableListOf<List<List<MdSpan>>>()
-                while (i < lines.size && lines[i].trimStart().startsWith("|")) { rows += cells(lines[i]); i++ }
+                while (i < lines.size && '|' in lines[i] && lines[i].isNotBlank()) { rows += cells(lines[i]); i++ }
                 out += MdBlock.Table(header, rows)
                 continue
             }
@@ -146,8 +150,21 @@ object ChatMarkdown {
         return out
     }
 
-    private fun cells(line: String): List<List<MdSpan>> =
-        line.trim().removePrefix("|").removeSuffix("|").split('|').map { inline(it.trim()) }
+    private fun cells(line: String): List<List<MdSpan>> {
+        val text=line.trim().removePrefix("|").removeSuffix("|")
+        val result=mutableListOf<String>();val cell=StringBuilder();var code=false;var escaped=false
+        for(char in text) {
+            when {
+                escaped -> {cell.append(char);escaped=false}
+                char=='\\' -> {cell.append(char);escaped=true}
+                char=='`' -> {code=!code;cell.append(char)}
+                char=='|' && !code -> {result+=cell.toString();cell.clear()}
+                else -> cell.append(char)
+            }
+        }
+        result+=cell.toString()
+        return result.map {inline(it.trim())}
+    }
 
     /** Inline: `código`, **negrita**, __negrita__, *cursiva*, _cursiva_, ~~tachado~~, [texto](url). */
     fun inline(text: String): List<MdSpan> {
@@ -176,6 +193,9 @@ object ChatMarkdown {
                     i = paren + 1; continue
                 }
             }
+            val url=if(s.startsWith("https://",i) || s.startsWith("http://",i) || s.startsWith("file:///",i) || s.startsWith("content://",i))
+                s.substring(i).takeWhile {!it.isWhitespace() && it !in "<>\""}.trimEnd('.',',',';',')',']') else ""
+            if(url.isNotEmpty()) {flush();out+=style.copy(text=url,link=url);i+=url.length;continue}
             val two = if (i + 1 < s.length) s.substring(i, i + 2) else ""
             if (two == "**" || two == "__" || two == "~~" || two == "==") {
                 val end = findClose(s, two, i + 2)
@@ -250,6 +270,7 @@ object ChatMarkdown {
             is MdBlock.Paragraph -> b.spans.joinToString("") { it.text }
             is MdBlock.Quote -> b.spans.joinToString("") { it.text }
             is MdBlock.Code -> b.code
+            is MdBlock.Visual -> b.code
             is MdBlock.ListBlock -> b.items.joinToString("\n") { "  ".repeat(it.depth) + (it.number?.let { n -> "$n. " } ?: "• ") + it.spans.joinToString("") { s -> s.text } }
             is MdBlock.Table -> (listOf(b.header) + b.rows).joinToString("\n") { r -> r.joinToString(" | ") { c -> c.joinToString("") { it.text } } }
             MdBlock.Rule -> "—"

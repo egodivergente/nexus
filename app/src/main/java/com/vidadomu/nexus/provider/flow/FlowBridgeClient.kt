@@ -56,8 +56,24 @@ internal class FlowBridgeClient(
                         .toSet()
                         .ifEmpty { EXPECTED_OUTPUTS },
                     checkedAt = System.currentTimeMillis(),
+                    projectName = payload.projectName,
+                    modelName = payload.modelName,
+                    aspectRatio = payload.aspectRatio,
                     detail = listOfNotNull("Puente: $where.", statusDetail(payload.reason)).joinToString(" ")
         )
+    }
+
+    suspend fun workspaceStatus(): Result<FlowBridgeStatus> {
+        val current=status().getOrElse {return Result.failure(it)}
+        if(!current.isReady || current.recovering) return Result.success(current)
+        // Backward-compatible: an older bridge may not expose contextual labels yet.
+        return guarded {
+            requestJson(authorizedRequest("${base()}/workspace").get().build()) {raw ->
+                val labels=json.decodeFromString<StatusPayload>(raw)
+                current.copy(projectName=labels.projectName ?: current.projectName,
+                    modelName=labels.modelName ?: current.modelName,aspectRatio=labels.aspectRatio ?: current.aspectRatio)
+            }
+        }.recover {current}
     }
 
     suspend fun submit(
@@ -564,6 +580,9 @@ internal class FlowBridgeClient(
         val recovering: Boolean = false,
         @SerialName("prompt_limit") val promptLimit: Int? = null,
         @SerialName("expected_outputs") val expectedOutputs: List<String> = emptyList(),
+        @SerialName("project_name") val projectName: String? = null,
+        @SerialName("model_name") val modelName: String? = null,
+        @SerialName("aspect_ratio") val aspectRatio: String? = null,
         @SerialName("reason") val reason: String? = null
     )
 
@@ -628,8 +647,10 @@ data class FlowBridgeStatus(
     val promptLimit: Int? = null,
     val expectedOutputs: Set<String> = setOf("image", "video"),
     val checkedAt: Long? = null,
-    /** The bridge deliberately does not expose the account or project title. */
+    /** Only labels observed in the open editor; no account or credentials. */
     val projectName: String? = null,
+    val modelName: String? = null,
+    val aspectRatio: String? = null,
     val detail: String? = null,
     val recovering: Boolean = false
 ) {

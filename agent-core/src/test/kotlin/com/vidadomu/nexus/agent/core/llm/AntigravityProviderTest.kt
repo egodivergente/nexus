@@ -29,6 +29,19 @@ import okhttp3.mockwebserver.RecordedRequest
 class AntigravityProviderTest {
     private val schema = buildJsonObject { put("type", "object") }
 
+    @Test fun `empty completed turns report a protocol error instead of a fake ellipsis response`() = runTest {
+        MockWebServer().use {server ->
+            server.enqueue(MockResponse().setHeader("Content-Type","text/event-stream").setBody(
+                "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"\"}\n\n"))
+            val error=assertFailsWith<LlmException> {
+                AntigravityProvider(server.url("/").toString()).complete(LlmRequest(modelId="fixture",
+                    system=emptyList(),messages=listOf(LlmMessage(Role.USER,listOf(ContentBlock.Text("Prueba")))),tools=emptyList(),maxTokens=1024))
+            }
+            assertTrue(error.message.orEmpty().contains("sin devolver texto"))
+            assertEquals(1,server.requestCount)
+        }
+    }
+
     @Test fun `stream sobre v1 chat emite deltas limpios y extrae NEXUS_TOOL_CALL`() = runTest {
         MockWebServer().use { server ->
             val sseBody = buildString {

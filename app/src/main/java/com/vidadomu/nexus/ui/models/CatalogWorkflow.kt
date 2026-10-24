@@ -40,11 +40,14 @@ internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
         }
         if(special!=null) return listOf(special)
         val generates=ModelCapability.TEXT_TO_IMAGE in capabilities
-        val edits=ModelCapability.IMAGE_TO_IMAGE in capabilities || ModelCapability.IMAGE_EDITING in capabilities
+        // A route named as an edit (…/edit, image-to-image, reference…) needs images even when the provider also tags it
+        // text-to-image: it never goes under «Desde texto», or Lanzadera would ask for images on a text task.
+        val editRoute=Regex("(^|[/_.-])(edit|editing|i2i|image-to-image|img2img|reference|references|remix)([/_.-]|$)").containsMatchIn(id)
+        val edits=ModelCapability.IMAGE_TO_IMAGE in capabilities || ModelCapability.IMAGE_EDITING in capabilities || editRoute
         // Explicit capabilities win over old or speculative input-mode flags.
         if(generates && !edits) return listOf(CatalogWorkflow.CREATE_IMAGE)
         if(edits) return buildList {
-            if(generates && !model.isMediaRequired) add(CatalogWorkflow.CREATE_IMAGE)
+            if(generates && !model.isMediaRequired && !editRoute) add(CatalogWorkflow.CREATE_IMAGE)
             add(CatalogWorkflow.EDIT_IMAGE)
         }
         return listOf(when {
@@ -58,9 +61,12 @@ internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
         "lip-sync" in id || "lipsync" in id -> CatalogWorkflow.LIPSYNC
         ModelCapability.VIDEO_EXTEND in capabilities || "extend" in id -> CatalogWorkflow.EXTEND
         ModelCapability.REFERENCE_TO_VIDEO in capabilities -> CatalogWorkflow.REFERENCES
-        ModelCapability.VIDEO_EDIT in capabilities || ModelCapability.VIDEO_TO_VIDEO in capabilities || model.inputMode==ModelInputMode.VIDEO_INPUT -> CatalogWorkflow.EDIT_VIDEO
+        // The route's own name (v2v, i2v) wins over a generic text-to-video tag: those need a video or an image.
+        ModelCapability.VIDEO_EDIT in capabilities || ModelCapability.VIDEO_TO_VIDEO in capabilities || model.inputMode==ModelInputMode.VIDEO_INPUT ||
+            Regex("(^|[/_.-])(v2v|video-to-video)([/_.-]|$)").containsMatchIn(id) -> CatalogWorkflow.EDIT_VIDEO
         model.lastFrameField!=null && model.supportsLastFrame -> CatalogWorkflow.FRAMES
-        ModelCapability.IMAGE_TO_VIDEO in capabilities || model.supportsImageInput -> CatalogWorkflow.ANIMATE
+        ModelCapability.IMAGE_TO_VIDEO in capabilities || model.supportsImageInput ||
+            Regex("(^|[/_.-])(i2v|image-to-video)([/_.-]|$)").containsMatchIn(id) -> CatalogWorkflow.ANIMATE
         ModelCapability.TEXT_TO_VIDEO in capabilities || model.inputMode==ModelInputMode.TEXT_ONLY -> CatalogWorkflow.CREATE_VIDEO
         else -> CatalogWorkflow.REFERENCES
     })

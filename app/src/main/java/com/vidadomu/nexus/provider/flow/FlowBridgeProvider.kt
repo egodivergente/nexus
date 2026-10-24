@@ -41,6 +41,7 @@ class FlowBridgeProvider(
     override val description: String = "Proyecto Flow activo mediante un puente privado; el modelo y el coste se deciden allí."
 
     suspend fun bridgeStatus(): Result<FlowBridgeStatus> = bridge.status()
+    suspend fun workspaceStatus(): Result<FlowBridgeStatus> = bridge.workspaceStatus()
 
     override suspend fun getModels(): List<NexusModel> = listOf(Modality.IMAGE, Modality.VIDEO).map(FlowReferences::model)
 

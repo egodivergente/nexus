@@ -30,6 +30,13 @@ object ParameterLabels {
         alias("Guardar último fotograma", "Devuelve también la última imagen del vídeo.", "return_last_frame")
         alias("Cámara fija", "Mantiene la cámara sin movimiento.", "camera_fixed")
         alias("Fotogramas por segundo", "Fluidez del vídeo resultante.", "fps")
+        alias("Ancho (px)", "Ancho del resultado en píxeles.", "width")
+        alias("Alto (px)", "Alto del resultado en píxeles.", "height")
+        alias("Lado largo (px)", "Medida en píxeles del lado más largo. Alternativa a indicar ancho y alto.", "long_side")
+        alias("Lado corto (px)", "Medida en píxeles del lado más corto. Alternativa a indicar ancho y alto.", "short_side")
+        alias("Factor de escala", "1 conserva la resolución y solo mejora la calidad; 2 la duplica.", "percent")
+        alias("Formato de salida", "Tipo de archivo del resultado.", "encode_format")
+        alias("Calidad de salida", "Compresión del archivo; solo cuenta en formatos con pérdida (JPEG y WebP).", "encode_quality")
     }
 
     fun entry(key: String): Entry? = entries[key] ?: entries[key.lowercase()]

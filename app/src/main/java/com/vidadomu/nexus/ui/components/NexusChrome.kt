@@ -148,17 +148,17 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
 }
 
 @Composable
-fun NexusBalanceChip() {
+fun NexusBalanceChip(compact:Boolean=false) {
     LocalChrome.current?.let { chrome ->
-        StudioBalanceChip(chrome.balance,chrome.openBalance)
+        StudioBalanceChip(chrome.balance,chrome.openBalance,compact)
     }
 }
 
 @Composable
-internal fun StudioBalanceChip(balance:String,onClick:()->Unit) {
+internal fun StudioBalanceChip(balance:String,onClick:()->Unit,compact:Boolean=false) {
     Box(
         contentAlignment=androidx.compose.ui.Alignment.Center,
-        modifier=Modifier.widthIn(max=148.dp).heightIn(min=NexusTokens.minimumTouch)
+        modifier=Modifier.widthIn(max=148.dp).heightIn(min=if(compact) 32.dp else NexusTokens.minimumTouch)
             .semantics(mergeDescendants=true) { contentDescription="Saldo y gasto"; stateDescription=balance }
             .clickable(role=androidx.compose.ui.semantics.Role.Button,onClick=onClick)
     ) {

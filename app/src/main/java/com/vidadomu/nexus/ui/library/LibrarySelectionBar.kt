@@ -24,17 +24,25 @@ import com.vidadomu.nexus.ui.components.nexusScreenTitleStyle
 @Composable
 internal fun LibrarySelectionBar(count: Int, single: Boolean, favoritesOn: Boolean,
     onClose: () -> Unit, onSelectAll: () -> Unit, onExport: () -> Unit,
-    onFavorite: () -> Unit, onHide: () -> Unit, onOptions: () -> Unit) {
+    onFavorite: () -> Unit, onHide: () -> Unit, onOptions: () -> Unit,
+    onMove: () -> Unit, onRename: () -> Unit, onCrop: (() -> Unit)?, onArtBox: (() -> Unit)?) {
     var menu by remember { mutableStateOf(false) }
     NexusTopAppBar(title = {
         Text(if (count == 1) "1 marcado" else "$count marcados", style = nexusScreenTitleStyle(), maxLines = 1)
     }, actions = {
         IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Salir de la selección") }
         IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Marcar todo lo visible") }
+        IconButton(onClick = onMove) { Icon(Icons.Default.DriveFileMove, "Cambiar de proyecto") }
         IconButton(onClick = onExport) { Icon(Icons.Default.Download, "Exportar en ZIP") }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más acciones sobre lo marcado") }
             DropdownMenu(menu, { menu = false }) {
+                DropdownMenuItem(text = { Text("Cambiar el nombre") },
+                    leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onRename() })
+                onCrop?.let { crop -> DropdownMenuItem(text = { Text("Recortar") },
+                    leadingIcon = { Icon(Icons.Default.Crop, null) }, onClick = { menu = false; crop() }) }
+                onArtBox?.let { send -> DropdownMenuItem(text = { Text("Enviar a ArtBox") },
+                    leadingIcon = { Icon(Icons.Default.AutoAwesome, null) }, onClick = { menu = false; send() }) }
                 DropdownMenuItem(text = { Text(if (favoritesOn) "Quitar de favoritos" else "Marcar como favorito") },
                     leadingIcon = { Icon(Icons.Default.Star, null) }, onClick = { menu = false; onFavorite() })
                 DropdownMenuItem(text = { Text("Ocultar / mostrar") },

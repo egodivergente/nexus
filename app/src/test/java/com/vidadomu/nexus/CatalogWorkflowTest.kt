@@ -10,7 +10,7 @@ class CatalogWorkflowTest {
     private val seedream=AtlasModelMapper.parseModelsResponse(javaClass.getResource("/native/catalog-public.json")!!.readText())
         .filter {it.id.startsWith("bytedance/seedream-v5.0")}
     @Test fun seedreamHasThreeDistinctTasksAndRetainsEveryNativeRoute() {
-        val group=catalogModelGroups(seedream).single()
+        val group=CatalogModelGroup("seedream-5","Seedream 5",seedream)
         val workflows=workflowRoutes(group)
         assertEquals(setOf(CatalogWorkflow.CREATE_IMAGE,CatalogWorkflow.EDIT_IMAGE,CatalogWorkflow.LAYERS),workflows.keys)
         assertEquals(seedream.map(::modelBookmark).toSet(),workflows.values.flatten().map(::modelBookmark).toSet())
@@ -47,7 +47,7 @@ class CatalogWorkflowTest {
         assertEquals("Lite · Serie de imágenes",optionVariantLabel(batch,"Seedream 5"))
     }
     @Test fun oldEditingChoiceMigratesAndNewStableChoiceWins() {
-        val group=catalogModelGroups(seedream).single()
+        val group=CatalogModelGroup("seedream-5","Seedream 5",seedream)
         assertEquals(CatalogWorkflow.EDIT_IMAGE,restoredWorkflow(group,null,"Con referencias"))
         assertEquals(CatalogWorkflow.CREATE_IMAGE,restoredWorkflow(group,null,"Imagen desde texto"))
         assertEquals(CatalogWorkflow.LAYERS,restoredWorkflow(group,"LAYERS","Con referencias"))

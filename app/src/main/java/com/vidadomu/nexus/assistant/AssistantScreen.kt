@@ -98,6 +98,9 @@ fun AssistantScreen(
     onOpenSettings: () -> Unit = {},
     /** Abre la pestaña Historial: los avisos que la mencionan llevan aquí en un toque. */
     onOpenHistory: () -> Unit = {},
+    /** «Continuar en…» drawn over the chat area only, so the composer and the bottom bar stay in place. */
+    projectPicker: (@Composable () -> Unit)? = null,
+    onPickerDismiss: () -> Unit = {},
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
@@ -140,6 +143,7 @@ fun AssistantScreen(
         }
     }
     val picker = rememberProjectMediaPicker { uris -> vm.attach(uris) }
+    val boardPicker = rememberProjectMediaPicker { uris -> vm.addBoard(uris) }
     // Cámara: la foto va a la caché (FileProvider) y se adjunta como cualquier referencia.
     val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -207,6 +211,8 @@ fun AssistantScreen(
     }
     // Al enfocar el compositor (IME o teclado físico) el último mensaje queda justo encima del campo.
     var composerFocused by remember { mutableStateOf(false) }
+    // Typing in the composer means «continue in the current project»: the chooser steps aside.
+    LaunchedEffect(composerFocused, projectPicker != null) { if (composerFocused && projectPicker != null) onPickerDismiss() }
     val imeVisible = WindowInsets.isImeVisible
     LaunchedEffect(composerFocused, imeVisible) {
         if (composerFocused) { following = true; followLast() }
@@ -237,28 +243,32 @@ fun AssistantScreen(
     // Lienzo: al desplazar o escribir, la barra superior se reduce a una franja fina.
     val scrolledAway by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 } }
     val slimTop = scrolledAway || input.text.isNotEmpty()
+    // Conversaciones a la izquierda: se abre arrastrando el dedo de izquierda a derecha sobre el chat.
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    var liveVoice by rememberSaveable { mutableStateOf(false) }
+    ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
+        gesturesEnabled = drawer.isOpen) {
     Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
         Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={}) {pad ->
         Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).statusBarsPadding().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
-            ConversationTabStrip(ui,vm)
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
-            // Al bajar por el chat se esconde la barra inferior para ganar espacio; al subir vuelve (Ajustes → Apariencia).
-            val appearance = com.vidadomu.nexus.ui.theme.rememberAppearancePreferences()
-            val autoHide = remember(appearance) { appearance.autoHideBars() }
-            DisposableEffect(Unit) { onDispose { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = true } }
-            val hideOnScroll = remember(autoHide) { object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                    if (autoHide && kotlin.math.abs(available.y) > 6f) com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = available.y > 0
-                    return androidx.compose.ui.geometry.Offset.Zero
-                }
-            } }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(Modifier.fillMaxSize().nestedScroll(hideOnScroll), state = listState,
-                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val chatContext = LocalContext.current
+            val clipboard = LocalClipboardManager.current
+            var menuOpen by remember { mutableStateOf(false) }
+            var menuAt by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
+            var showAppearance by remember { mutableStateOf(false) }
+            val barPinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned
+            Box(Modifier.weight(1f).fillMaxWidth()
+                // Mantener pulsado un hueco del chat abre el menú de acciones rápidas, justo donde está el dedo.
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }
+                .dragRightToOpen { scope.launch { drawer.open() } }) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState,
+                contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8, top = 52.dp, bottom = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is CardGroup) {
@@ -295,6 +305,8 @@ fun AssistantScreen(
                                 if (!item.resolved) TextButton(onClick = { vm.resolveModeSwitch(item.id) }, enabled = !ui.thinking) { Text("Activar Agente") }
                             }
                         }
+                        is ChatItem.Board -> ChatBoardCard(item.boardId)
+                        is ChatItem.Context -> CarriedContextCard(item)
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
                             val p = ui.plans.getValue(item.planId)
@@ -361,6 +373,28 @@ fun AssistantScreen(
                     }
                 }
             }
+            projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
+            // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
+            IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
+                Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Abrir ajustes", onClick = onOpenSettings)
+                    .semantics { contentDescription = "Ajustes" }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Settings, null, Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
+                onSettings = onOpenSettings, barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
+                onCopyChat = {
+                    clipboard.setText(AnnotatedString(chatTranscript(ui)))
+                    Toast.makeText(chatContext, "Chat copiado", Toast.LENGTH_SHORT).show()
+                },
+                onShareChat = { shareChat(chatContext, ui) },
+                onImportImages = { boardPicker.launch(arrayOf("image/*"), Int.MAX_VALUE) })
+            if (showAppearance) QuickAppearanceSheet({ showAppearance = false }, onOpenSettings)
             }
             if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
                 ordersPanel = false; following = false
@@ -375,10 +409,29 @@ fun AssistantScreen(
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
-                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
+                onSend = { if(vm.sendWithBoards(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
-                reasoningControl = { ReasoningPicker(ui, vm) },workspaceControl={ConversationMenu(ui,vm,{showProject=true},onOpenSettings)})
+                reasoningControl = { ReasoningPicker(ui, vm) }, onLive = { liveVoice = true })
+            if (liveVoice) LiveVoiceDialog(ui, onSend = { vm.send(it) }, onClose = { liveVoice = false })
             }
+        }
+    }
+    }
+}
+
+/** Summary brought from another conversation: a short card, tap to read it whole. */
+@Composable
+private fun CarriedContextCard(item: ChatItem.Context) {
+    var open by rememberSaveable(item.id) { mutableStateOf(false) }
+    Surface(onClick = { open = !open }, shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                Icon(Icons.Default.Forum, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Text("Contexto de «${item.from}»", style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            }
+            Text(item.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (open) Int.MAX_VALUE else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
     }
 }
@@ -656,6 +709,7 @@ internal fun UserBubble(item:ChatItem.User) {
                 })
             }
         }
+        MessageMeta(item.at,0L,Modifier.padding(end=NexusTokens.space8))
     }
 }
 
@@ -667,6 +721,40 @@ private fun MessageSelectionDialog(text: String, onDismiss: () -> Unit) {
                 Text(text, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()))
             }
         }, confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
+}
+
+/** Who answers, short: provider then model («AGY · Gemini 3.8 Flash», «Bedrock · Claude Sonnet 4 6»), or the custom brain's name. */
+internal fun agentLabel(s: AssistantSettings): String {
+    val provider = when {
+        s.backend == AssistantSettings.BACKEND_ANTIGRAVITY -> "AGY"
+        s.isCustom -> s.brain?.name?.ifBlank { null } ?: "Cerebro propio"
+        s.backend == AssistantSettings.BACKEND_ANTHROPIC -> "Claude API"
+        s.backend == AssistantSettings.BACKEND_OPENAI -> "OpenAI"
+        else -> "Bedrock"
+    }
+    // «us.anthropic.claude-sonnet-4-6-v1:0» → «Claude Sonnet 4 6»; «gemini-3.8-flash» → «Gemini 3.8 Flash».
+    val model = (if (s.isCustom) s.brain?.modelId else s.modelId).orEmpty()
+        .substringAfterLast('/').substringBefore(':').let { id -> if (id.count { it == '.' } >= 2 && id.substringAfterLast('.').any(Char::isLetter)) id.substringAfterLast('.') else id }
+        .removeSuffix("-v1").removeSuffix("-v2").split('-', '_').filter { it.isNotBlank() }
+        .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+    return listOf(provider, model).filter { it.isNotBlank() }.joinToString(" · ")
+}
+
+/** Time of the message and, for replies, who answered and how long it took: tiny and secondary so it never competes with the text. */
+@Composable
+internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier, by: String = "") {
+    if(at<=0L) return
+    val time=remember(at) {java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at))}
+    val label=listOfNotNull(by.ifBlank {null},time,formatTook(tookMs).takeIf {tookMs>0}).joinToString(" · ")
+    Text(label,modifier,style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,lineHeight=12.sp),
+        color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.62f),maxLines=1)
+}
+
+internal fun formatTook(ms: Long): String = when {
+    ms<1_000 -> "${ms} ms"
+    ms<10_000 -> String.format(java.util.Locale("es","ES"),"%.1f s",ms/1000.0)
+    ms<60_000 -> "${ms/1000} s"
+    else -> "${ms/60_000} min ${(ms%60_000)/1000} s"
 }
 
 /** Lo que el usuario contestó justo después de este mensaje (para bloquear sus paneles y marcar la opción elegida). */
@@ -693,7 +781,12 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 val streaming = item.stop == "STREAMING"
-                ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) }, streaming = streaming,
+                val responseText = remember(item.text, streaming) {
+                    if(item.text.trim() in setOf("…", "...")) {
+                        if(streaming) "Recibiendo respuesta…" else "La respuesta guardada no contiene texto. Revisa los pasos de este turno."
+                    } else hideOrderIds(item.text)
+                }
+                ChatMarkdownView(responseText, streaming = streaming,
                     answered = answered, onReply = if (streaming) null else onReply, selectable = false)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text = { Text("Seleccionar fragmento") }, onClick = { actionsExpanded = false; selection = true })
@@ -714,6 +807,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
               }
             }
         }
+        if(item.text.isNotBlank() && item.stop!="STREAMING") MessageMeta(item.at,item.tookMs,Modifier.padding(horizontal=NexusTokens.space12),item.by)
         if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -726,6 +820,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
 internal fun AssistantMediaPreview(media: Attachment) {
     val context=LocalContext.current
     when {
+        media.mimeType in setOf("text/html","application/pdf","text/csv","application/json","text/plain","text/markdown") -> AssistantDocumentPreview(media)
         media.mimeType.startsWith("image/") -> AssistantImagePreview(media)
         media.mimeType.startsWith("video/") -> {
             val player=remember(media.uri) {

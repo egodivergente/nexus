@@ -14,6 +14,8 @@ class GenerationDispatcher(private val app: NexusApplication) {
     suspend fun submit(state: CreateUiState, localMetadata: Map<String,String> = emptyMap(),
         jobId: String = "job_${UUID.randomUUID()}", onProgress: (Boolean,Float?) -> Unit = {_,_ ->}): String {
         check(!BuildConfig.OFFLINE_QA) { "NEXUS Lab: envío bloqueado. No se ha consumido saldo." }
+        // Reject caller metadata before uploading any local attachment.
+        com.vidadomu.nexus.data.repository.LocalJobMetadata.validate(localMetadata)
         val readiness = creationReadiness(state)
         require(readiness.canSubmit) { readiness.message ?: "Revisa la configuración." }
         val model = requireNotNull(state.selectedModel)
@@ -43,7 +45,9 @@ class GenerationDispatcher(private val app: NexusApplication) {
                 remoteUrl = remote, slotType = media.slotType, fieldKey = media.fieldKey)
         }
         onProgress(false, null)
-        val request = NativeGenerationRequest.build(model, state.selectedModality, state.prompt, state.parameters, inputs, jobId)
+        // Fields that do not apply to the chosen mode stay in the draft but never reach the provider.
+        val request = NativeGenerationRequest.build(model, state.selectedModality, state.prompt,
+            ParameterDependencies.effective(model, state.parameters), inputs, jobId)
         val job = app.generationRepository.submitGeneration(request, localMetadata + buildMap {
             val runtime=com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
             runtime.settings.activeProjectId()?.let {project->

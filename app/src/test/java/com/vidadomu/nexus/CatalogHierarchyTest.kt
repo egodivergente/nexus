@@ -9,18 +9,20 @@ import org.junit.Test
 class CatalogHierarchyTest {
     private val models = AtlasModelMapper.parseModelsResponse(javaClass.getResource("/native/catalog-public.json")!!.readText())
     private val media = models.filter { Modality.IMAGE in it.modalities || Modality.VIDEO in it.modalities }
-    @Test fun hierarchyHasOneKling3CardAcrossWorkflowsTiersAndProviders() {
+    @Test fun klingTiersAreSeparateCardsAndKeepEveryRoute() {
         val kling = media.filter { it.id.startsWith("kwaivgi/kling-v3.0-") }
         assertTrue(kling.size > 4)
         val crun = kling.first().copy(id="crun/kling-v3-std",providerModelId="kling-v3-std",providerId="crun")
         val groups = catalogModelGroups(kling + crun)
-        assertEquals(1, groups.size)
-        assertEquals("Kling 3", groups.single().title)
-        assertEquals(kling.size+1, groups.single().routes.size)
+        val titles = groups.map { it.title }
+        assertTrue(titles.toString(), "Kling 3 Pro" in titles && "Kling 3 Std" in titles)
+        // The same tier on another provider joins its card instead of making a duplicate.
+        assertTrue(groups.first { it.title == "Kling 3 Std" }.routes.any { it.providerId == "crun" })
+        assertEquals((kling + crun).map(::modelBookmark).toSet(), groups.flatMap { it.routes }.map(::modelBookmark).toSet())
     }
     @Test fun hierarchyKeepsO3SeparateFromKling3AndKeepsAllRoutes() {
         val groups = catalogModelGroups(media)
-        assertTrue(groups.any {it.title == "Kling O3"})
+        assertTrue(groups.any {it.title.startsWith("Kling O3")})
         assertTrue(groups.any {it.title == "Kling 3"})
         assertEquals(media.map(::modelBookmark).toSet(), groups.flatMap {it.routes}.map(::modelBookmark).toSet())
         assertEquals(groups.size, groups.map {it.key}.distinct().size)
@@ -28,8 +30,9 @@ class CatalogHierarchyTest {
     @Test fun qwenGenerationAndEditingHaveOneModelCard() {
         val qwen = media.filter {it.id.startsWith("qwen-image-3.0")}
         assertEquals(4, qwen.size)
-        assertEquals(1, catalogModelGroups(qwen).size)
-        assertEquals("Qwen Image 3", catalogModelGroups(qwen).single().title)
+        // Base and Pro are two products; each keeps its own generation and editing routes together.
+        assertEquals(setOf("Qwen Image 3","Qwen Image 3 Pro"), catalogModelGroups(qwen).map { it.title }.toSet())
+        assertTrue(catalogModelGroups(qwen).all { it.routes.size == 2 })
     }
     @Test fun fullLiveCatalogRetainsEveryMediaRouteInHierarchy() {
         assertEquals(384, media.size)

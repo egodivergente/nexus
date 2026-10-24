@@ -43,7 +43,7 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
         if(uri.scheme=="file") {
             val file=File(uri.path ?: throw ToolInputException("Archivo no válido.")).canonicalFile
             val privateRoot=app.filesDir.canonicalPath+File.separator
-            val mediaRoots=listOf("agent_media","agent_exports").map {File(app.filesDir,it).canonicalPath+File.separator}
+            val mediaRoots=listOf("agent_media","agent_exports","assistant/sync/workspaces").map {File(app.filesDir,it).canonicalPath+File.separator}
             if(file.path.startsWith(privateRoot) && mediaRoots.none(file.path::startsWith))
                 throw ToolInputException("Solo se pueden editar medios importados o resultados de Nexus.")
             if(!file.isFile) throw ToolInputException("El archivo ya no está disponible.")

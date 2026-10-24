@@ -5,6 +5,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.scrollBy
+import com.vidadomu.nexus.ui.models.DragHaptics
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.components.StudioFilterChip
@@ -28,6 +30,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,7 +65,7 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
     onSendToAgent:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
-    onSendResultToAgent:((String,String)->Unit)?=null, onOpenHistory:(()->Unit)?=null) {
+    onSendResultToAgent:((String,String)->Unit)?=null, onOpenHistory:(()->Unit)?=null, onOpenArtBox:(()->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -74,12 +77,21 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var favoriteOnly by rememberSaveable {mutableStateOf(false)}
     // Resolución, tamaño y fecha al pie de cada miniatura; se puede ocultar desde ⋮.
     var showDetails by remember {mutableStateOf(prefs.getBoolean("tile_details",true))}
-    var actionTarget by remember {mutableStateOf<Pair<GenerationJob,GenerationOutput>?>(null)}
-    // Marcado rápido: mantener pulsado marca; con algo marcado, tocar suma o quita. Vaciar la selección la cierra.
+    // Nombres que el usuario da a lo generado; lo importado guarda el suyo en su propio registro.
+    var names by remember {mutableStateOf(prefs.all.mapNotNull {(k,v) -> if(k.startsWith("name:") && v is String) k.removePrefix("name:") to v else null}.toMap())}
+    // Todo archivo se abre igual: visor a pantalla completa (por clave de la entrada) con sus opciones en ⋮.
+    var viewerAt by remember {mutableStateOf<String?>(null)}
+    // Carpeta (proyecto) abierta; null = vista principal. Lo importado aquí entra en ella.
+    var openFolder by rememberSaveable {mutableStateOf<String?>(null)}
+    var optionsFor by remember {mutableStateOf<LibraryEntry?>(null)}
+    var renaming by remember {mutableStateOf<LibraryEntry?>(null)}
+    // Marcado rápido: mantener pulsado marca y, sin soltar, arrastrar marca el tramo; con algo marcado, tocar suma o quita.
     var marked by remember {mutableStateOf(emptySet<String>())}
     val selecting=marked.isNotEmpty()
     fun toggleMark(token:String) {marked=if(token in marked) marked-token else marked+token}
     BackHandler(enabled=selecting) {marked=emptySet()}
+    // Atrás dentro de una carpeta vuelve a la vista principal (la selección, si la hay, se cierra antes).
+    BackHandler(enabled=openFolder!=null && !selecting) {openFolder=null}
     val scope=rememberCoroutineScope()
     val snackbar=remember {SnackbarHostState()}
     val haptic=LocalHapticFeedback.current
@@ -97,7 +109,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         if(uris.isNotEmpty()) { importing=true; scope.launch {
             var imported=0;var lastError:String?=null
             try { for(uri in uris) {
-                try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,context.contentResolver.getType(uri),runtime.settings.activeProjectId()); imported++ }
+                try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,context.contentResolver.getType(uri),openFolder); imported++ }
                 catch(e:kotlinx.coroutines.CancellationException) {throw e}
                 catch(e:Exception) {lastError=e.message}
             }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos"+(lastError?.takeIf {imported<uris.size}?.let {". $it"} ?: "")) }
@@ -111,46 +123,72 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var filter by rememberSaveable {mutableStateOf<Modality?>(null)}
     var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
     var originMenu by remember {mutableStateOf(false)}
-    var projectMenu by remember {mutableStateOf(false)}
-    var selectedProjects by remember {mutableStateOf(prefs.getStringSet("project_filter",emptySet()).orEmpty().toSet())}
-    fun setProjects(next:Set<String>) {selectedProjects=next;prefs.edit().putStringSet("project_filter",next).apply()}
     val projectIndex=remember(index) {LibraryProjectIndex(index)}
+    // Cada proyecto es una carpeta. La vista principal muestra las carpetas y solo lo que no tiene proyecto;
+    // dentro de una carpeta, solo lo suyo. Buscar desde la vista principal busca en todo.
+    val folderIds=remember(index) {index.projects.map {it.id}.toSet()}
+    fun inScope(projects:Set<String>):Boolean {
+        val known=projects.filter {it in folderIds}
+        return openFolder?.let {it in known} ?: (query.isNotBlank() || known.isEmpty())
+    }
     // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
-    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",3).coerceIn(2,6))}
-    val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden,selectedProjects)
+    // Sin preferencia guardada, las columnas se adaptan al ancho (miniaturas de ~120 dp); el zoom las fija luego.
+    val widthDp=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",(widthDp/120).coerceIn(3,6)).coerceIn(2,6))}
+    val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden,emptySet())
     val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
     fun applyFilters(next:LibraryViewFilters) {
         if(!next.hasQuery) focusManager.clearFocus()
         query=next.query;filter=next.modality;originFilter=next.origin;favoriteOnly=next.favoriteOnly;showHidden=next.showHidden
-        setProjects(next.projects)
     }
     // Editado/Compartido solo se ofrecen si hay algo de ese origen; Nexus e Importado, siempre.
     val origins=remember(index) {
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
         LibraryOriginFilter.values().filter {it in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED,LibraryOriginFilter.IMPORTED) || it in present}
     }
-    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter,selectedProjects,projectIndex) {
+    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter,openFolder,folderIds,projectIndex,names) {
         if(originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList()
-        else jobs.map {job -> job.copy(outputs=job.outputs.filter {projectIndex.matches(selectedProjects,job,it) && it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
-            .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}
+        else jobs.map {job -> job.copy(outputs=job.outputs.filter {inScope(projectIndex.projects(job,it)) && it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
+            .filter {filter==null || it.modality==filter}
+            .filter {job -> matchesCreationSearch(job,query) || job.outputs.any {names[OutputFiles.token(it)]?.contains(query,true)==true}}.sortedByDescending {it.startedAt}
     }
-    val pending=remember(jobs,filter,query,showHidden,favoriteOnly,originFilter,selectedProjects,projectIndex) {if(showHidden || favoriteOnly || originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList() else jobs.filter {
-        projectIndex.matches(selectedProjects,it) &&
+    val pending=remember(jobs,filter,query,showHidden,favoriteOnly,originFilter,openFolder,projectIndex) {if(showHidden || favoriteOnly || originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList() else jobs.filter {
+        (openFolder==null || openFolder in projectIndex.projects(it)) &&
         it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.CANCELLED,GenerationStatus.FAILED) &&
         (filter==null || it.modality==filter) && matchesCreationSearch(it,query)
     }.sortedByDescending {it.startedAt}}
-    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs,originFilter,selectedProjects,projectIndex) {
+    val localAssets=remember(index,filter,query,hidden,showHidden,favorites,favoriteOnly,jobs,originFilter,openFolder,folderIds) {
         val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
-        index.assets.filter { a -> !a.libraryDeleted && a.uri !in generatedUris && projectIndex.matches(selectedProjects,a) &&
+        index.assets.filter { a -> !a.libraryDeleted && a.uri !in generatedUris && inScope(setOfNotNull(a.projectId)) &&
             a.matchesLibraryOrigin(originFilter) &&
             (filter==null || a.type.name==filter?.name) && a.displayName.contains(query,true) &&
             ("asset:"+a.id in hidden)==showHidden && (!favoriteOnly || "asset:"+a.id in favorites) }.sortedByDescending {it.createdAt}
     }
     val localAssetGroups=remember(localAssets) {localAssets.groupBy(::libraryOrigin)}
-    // Una sola hoja por archivo importado (vista previa, ficha, Lienzo, Agente y acciones).
-    var localTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
-    localTarget?.let {asset -> LocalAssetSheet(asset,{localTarget=null},{message -> scope.launch {snackbar.showSnackbar(message)}},
-        onUseInCanvas,onSendToAgent) }
+    // Archivos por carpeta (sin ocultos ni eliminados), para el recuento bajo cada carpeta.
+    val folderCounts=remember(jobs,index,removed,hidden,projectIndex) {
+        val counts=mutableMapOf<String,Int>()
+        val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
+        jobs.filter {it.status==GenerationStatus.COMPLETED}.forEach {job -> job.outputs.forEach {o ->
+            if(o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden)
+                projectIndex.projects(job,o).forEach {counts[it]=(counts[it] ?: 0)+1}
+        }}
+        index.assets.filter {!it.libraryDeleted && it.uri !in generatedUris && "asset:"+it.id !in hidden}
+            .forEach {a -> a.projectId?.let {counts[it]=(counts[it] ?: 0)+1}}
+        counts.toMap()
+    }
+    // Los proyectos archivados solo aparecen como carpeta si aún tienen archivos.
+    val folders=remember(index,folderCounts) {index.projects.filter {!it.archived || (folderCounts[it.id] ?: 0)>0}.sortedBy {it.name.lowercase()}}
+    val showFolders=openFolder==null && query.isBlank() && !showHidden && !favoriteOnly && folders.isNotEmpty()
+    val folderName=openFolder?.let {id -> index.projects.firstOrNull {it.id==id}?.name}
+    // Si la carpeta abierta desaparece (borrada desde el Agente, p. ej.), se vuelve a la vista principal.
+    if(openFolder!=null && folderName==null) LaunchedEffect(openFolder) {openFolder=null}
+    var moving by remember {mutableStateOf<List<LibraryEntry>?>(null)}
+    var newFolderFor by remember {mutableStateOf<List<LibraryEntry>?>(null)}
+    var creatingFolder by remember {mutableStateOf(false)}
+    var bulkRename by remember {mutableStateOf<List<LibraryEntry>?>(null)}
+    var cropTarget by remember {mutableStateOf<LibraryEntry?>(null)}
+    var cropping by remember {mutableStateOf(false)}
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val timeline=remember(completed,localAssets) {
         val day=SimpleDateFormat("d MMMM yyyy",Locale("es","ES"))
@@ -210,13 +248,86 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         .decoderDispatcher(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(2))
         .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.08).build()}.build()}
     DisposableEffect(imageLoader) {onDispose {imageLoader.shutdown()}}
-    actionTarget?.let {(job,output) ->
-        val token=OutputFiles.token(output)
-        LibraryActions(job,output,OutputFiles.trustedLocalUri(output,conflicts),token in favorites,token in hidden,
-            onDismiss={actionTarget=null},onOpen={
-                val position=jobs.firstOrNull {it.id==job.id}?.outputs?.indexOfFirst {it.id==output.id} ?: -1
-                if(onNavigateToResult!=null && position>=0) onNavigateToResult(job.id,position) else onNavigateToOutput(job.id)
-            },onFavorite={
+    val flat=remember(timeline) {timeline.values.flatten()}
+    fun tokenOf(entry:LibraryEntry):String=when(entry) {
+        is LibraryEntry.Local -> "asset:"+entry.asset.id
+        is LibraryEntry.Out -> OutputFiles.token(entry.job.outputs[entry.index])
+    }
+    fun assetOf(entry:LibraryEntry)=when(entry) {
+        is LibraryEntry.Local -> entry.asset
+        is LibraryEntry.Out -> entry.job.outputs[entry.index].let {o -> index.assets.firstOrNull {!it.libraryDeleted && (it.uri==o.localUri || it.uri==o.url)}}
+    }
+    fun nameOf(entry:LibraryEntry):String=when(entry) {
+        is LibraryEntry.Local -> entry.asset.displayName
+        is LibraryEntry.Out -> names[tokenOf(entry)] ?: listOf(
+            app.modelCatalogRepository.getModelById(entry.job.modelId)?.displayName ?: entry.job.modelId.substringAfterLast('/'),
+            entry.job.prompt.lineSequence().firstOrNull()?.trim()?.take(80).orEmpty()).filter {it.isNotBlank()}.joinToString(" · ")
+    }
+    fun message(text:String) {scope.launch {snackbar.showSnackbar(text)}}
+    fun rename(entry:LibraryEntry,name:String) {
+        if(entry is LibraryEntry.Out) {
+            val token=tokenOf(entry);names=names+(token to name);prefs.edit().putString("name:"+token,name).apply()
+        }
+        assetOf(entry)?.let {asset -> scope.launch {
+            runCatching {runtime.assets.updateAsset(asset.id) {it.copy(displayName=name)}}.onFailure {message("No se pudo cambiar el nombre")}
+        }}
+    }
+    fun openResult(entry:LibraryEntry.Out) {
+        // Keep the viewer in this exact visible collection; folder/filter UI is unchanged.
+        com.vidadomu.nexus.ui.output.OutputViewerScope.prepare(entry.job.id,flat.filterIsInstance<LibraryEntry.Out>().map {it.job.id to it.index})
+        val output=entry.job.outputs[entry.index]
+        val position=jobs.firstOrNull {it.id==entry.job.id}?.outputs?.indexOfFirst {it.id==output.id} ?: -1
+        if(onNavigateToResult!=null && position>=0) onNavigateToResult(entry.job.id,position) else onNavigateToOutput(entry.job.id)
+    }
+    /** Mete los archivos en la carpeta del proyecto [projectId] (null = vista principal). Solo cambia el registro; el archivo no se toca. */
+    fun moveTo(entries:List<LibraryEntry>,projectId:String?) {
+        val target=projectId?.let {id -> index.projects.firstOrNull {it.id==id}?.name} ?: "la Biblioteca"
+        scope.launch {
+            entries.forEach {entry -> when(entry) {
+                is LibraryEntry.Local -> runtime.assets.updateAsset(entry.asset.id) {it.copy(projectId=projectId)}
+                is LibraryEntry.Out -> {
+                    val o=entry.job.outputs[entry.index]
+                    val existing=index.assets.filter {it.uri==o.localUri || it.uri==o.url}
+                    if(existing.isNotEmpty()) existing.forEach {a -> runtime.assets.updateAsset(a.id) {it.copy(projectId=projectId)}}
+                    // Un resultado aún sin registro en la Biblioteca se registra para poder llevarlo a la carpeta.
+                    else runtime.assets.addAsset(com.vidadomu.nexus.agent.core.assets.Asset(id=UUID.randomUUID().toString(),uri=o.localUri ?: o.url,
+                        type=when(o.type) {Modality.IMAGE->com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE;Modality.VIDEO->com.vidadomu.nexus.agent.core.assets.AssetType.VIDEO
+                            Modality.AUDIO->com.vidadomu.nexus.agent.core.assets.AssetType.AUDIO;else->com.vidadomu.nexus.agent.core.assets.AssetType.OTHER},
+                        source=com.vidadomu.nexus.agent.core.assets.AssetSource.GENERATED,displayName=nameOf(entry),mimeType=o.mimeType.ifBlank {null},
+                        projectId=projectId,createdAt=entry.job.completedAt ?: entry.job.startedAt))
+                }
+            }}
+            snackbar.showSnackbar(if(entries.size==1) "Movido a $target" else "${entries.size} archivos movidos a $target")
+        }
+    }
+    fun cropAndSave(entry:LibraryEntry,crop:androidx.compose.ui.geometry.Rect) {
+        cropping=true
+        scope.launch {
+            try {
+                val file=cropToTempFile(context,viewerMedia(entry,conflicts).uri,crop)
+                val original=assetOf(entry)
+                val project=when(entry) {is LibraryEntry.Local -> entry.asset.projectId; is LibraryEntry.Out -> projectIndex.projects(entry.job,entry.job.outputs[entry.index]).firstOrNull()}
+                val saved=com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,android.net.Uri.fromFile(file),"image/jpeg",project)
+                file.delete()
+                saved.assetId?.let {id -> runtime.assets.updateAsset(id) {it.copy(displayName=nameOf(entry).substringBeforeLast('.')+" (recorte)",parentAssetId=original?.id)}}
+                cropTarget=null
+                snackbar.showSnackbar("Recorte guardado como copia; el original no cambia")
+            } catch(e:kotlinx.coroutines.CancellationException) {throw e}
+            catch(e:Exception) {snackbar.showSnackbar("No se pudo recortar: ${e.message ?: "error desconocido"}")}
+            finally {cropping=false}
+        }
+    }
+    fun isImage(entry:LibraryEntry)=viewerMedia(entry,conflicts).kind==Modality.IMAGE
+    @Composable fun FileOptions(entry:LibraryEntry) {
+        val token=tokenOf(entry)
+        val asset=assetOf(entry)
+        val visual=viewerMedia(entry,conflicts).kind in setOf(Modality.IMAGE,Modality.VIDEO)
+        // Lo que lleva a otra pantalla cierra también el visor.
+        fun leaving(action:()->Unit):()->Unit = {viewerAt=null;action()}
+        LibraryFileSheet(entry,nameOf(entry),(entry as? LibraryEntry.Out)?.let {OutputFiles.trustedLocalUri(it.job.outputs[it.index],conflicts)},
+            token in favorites,token in hidden,onDismiss={optionsFor=null},onRename={optionsFor=null;renaming=entry},
+            onSelect={viewerAt=null;marked=marked+token},
+            onFavorite={
                 favorites=if(token in favorites) favorites-token else favorites+token
                 prefs.edit().putStringSet("favorites",favorites).apply()
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -227,12 +338,76 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     hidden=if(wasHidden) hidden+token else hidden-token;prefs.edit().putStringSet("hidden",hidden).apply()
                 }}
             },onDelete={scope.launch {
-                val assets=index.assets.filter {it.uri==output.url || it.uri==output.localUri}
-                runtime.assets.deleteLibraryAssets(assets.map {it.id}.toSet())
-                hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
-                snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
-            }},onError={message -> scope.launch {snackbar.showSnackbar(message)}},
-            onAddToChat=onSendResultToAgent?.let { send -> { send(job.id,output.id) } }, onSelect={toggleMark(token)})
+                when(entry) {
+                    is LibraryEntry.Local -> {
+                        runtime.assets.deleteLibraryAssets(setOf(entry.asset.id))
+                        snackbar.showSnackbar("Eliminado de la biblioteca (los originales se conservan)")
+                    }
+                    is LibraryEntry.Out -> {
+                        val output=entry.job.outputs[entry.index]
+                        runtime.assets.deleteLibraryAssets(index.assets.filter {it.uri==output.url || it.uri==output.localUri}.map {it.id}.toSet())
+                        hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
+                        snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
+                    }
+                }
+            }},onMessage=::message,
+            onAddToChat=when(entry) {
+                is LibraryEntry.Local -> onSendToAgent?.let {send -> leaving {send(entry.asset)}}
+                is LibraryEntry.Out -> onSendResultToAgent?.let {send -> leaving {send(entry.job.id,entry.job.outputs[entry.index].id)}}
+            },
+            onUseInCanvas=if(visual && asset!=null) onUseInCanvas?.let {use -> leaving {use(asset)}} else null,
+            onOpenResult=(entry as? LibraryEntry.Out)?.let {out -> leaving {openResult(out)}},
+            onCrop=if(isImage(entry)) ({cropTarget=entry}) else null,onMove={moving=listOf(entry)})
+    }
+    @Composable fun FileDialogs() {
+        optionsFor?.let {FileOptions(it)}
+        renaming?.let {entry -> RenameFileDialog(nameOf(entry),{renaming=null}) {name -> rename(entry,name);renaming=null}}
+        moving?.let {entries -> MoveToFolderSheet(entries.size,folders,openFolder,{moving=null},onNewFolder={newFolderFor=entries;moving=null}) {id ->
+            moving=null;marked=emptySet();moveTo(entries,id)
+        }}
+        newFolderFor?.let {entries -> RenameFileDialog("",{newFolderFor=null},title="Nueva carpeta") {name ->
+            newFolderFor=null;marked=emptySet()
+            scope.launch {moveTo(entries,runtime.assets.createProject(name).id)}
+        }}
+        if(creatingFolder) RenameFileDialog("",{creatingFolder=false},title="Nueva carpeta") {name ->
+            creatingFolder=false;scope.launch {runtime.assets.createProject(name)}
+        }
+        // Varios a la vez: mismo nombre numerado en el orden de la cuadrícula («Playa 1», «Playa 2»…).
+        bulkRename?.let {entries -> RenameFileDialog(if(entries.size==1) nameOf(entries[0]) else "",{bulkRename=null}) {name ->
+            bulkRename=null;marked=emptySet()
+            if(entries.size==1) rename(entries[0],name) else entries.forEachIndexed {i,entry -> rename(entry,"$name ${i+1}")}
+        }}
+        cropTarget?.let {entry -> ImageCropDialog(viewerMedia(entry,conflicts).uri,cropping,{if(!cropping) cropTarget=null}) {rect -> cropAndSave(entry,rect)}}
+    }
+    val viewerStart=viewerAt?.let {key -> flat.indexOfFirst {it.key==key}}
+    // Si lo abierto deja de estar en la lista (ocultado o eliminado), el visor se cierra.
+    if(viewerStart!=null && viewerStart<0) LaunchedEffect(viewerAt) {viewerAt=null}
+    if(viewerStart!=null && viewerStart>=0) LibraryViewer(flat,viewerStart,conflicts,::nameOf,onClose={viewerAt=null},
+        onOptions={optionsFor=it},onOpenDocument={entry ->
+            val mime=when(entry) {is LibraryEntry.Local -> entry.asset.resolvedMime(); is LibraryEntry.Out -> entry.job.outputs[entry.index].mimeType}
+            if(!com.vidadomu.nexus.ui.output.openLocalCopyWithAnotherApp(context,viewerMedia(entry,conflicts).uri,mime)) message("No hay una aplicación disponible para este archivo")
+        }) {FileDialogs()}
+    else FileDialogs()
+    // Arrastrar para marcar: el tramo entre el archivo donde empezó la pulsación larga y el que está bajo el dedo.
+    // Si el primero ya estaba marcado, el arrastre desmarca (como Google Fotos).
+    val gridState=rememberLazyGridState()
+    val view=androidx.compose.ui.platform.LocalView.current
+    val order by rememberUpdatedState(remember(flat) {flat.map {it.key to tokenOf(it)}})
+    val drag=remember {DragRange()}
+    var edgeSpeed by remember {mutableStateOf(0f)}
+    fun markRange(at:Int) {
+        if(at==drag.last || drag.from<0) return
+        val range=order.subList(minOf(drag.from,at),maxOf(drag.from,at)+1).map {it.second}
+        marked=if(drag.adding) drag.base+range else drag.base-range
+        if(drag.last>=0) DragHaptics.slot(view)
+        drag.last=at
+    }
+    LaunchedEffect(edgeSpeed!=0f) {
+        while(edgeSpeed!=0f) {
+            gridState.scrollBy(edgeSpeed)
+            gridState.keyAt(drag.point)?.let {key -> order.indexOfFirst {it.first==key}.takeIf {it>=0}?.let(::markRange)}
+            withFrameNanos {}
+        }
     }
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={if(selecting) LibrarySelectionBar(markedVisible.size,markedVisible.size==1,
         favoritesOn=markedVisible.isNotEmpty() && markedVisible.all {it in favorites},
@@ -250,12 +425,31 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             scope.launch {snackbar.showSnackbar(if(hide) "$count ocultados" else "$count restaurados")}
         },onOptions={
             val token=markedVisible.first()
-            if(token.startsWith("asset:")) localTarget=localAssets.firstOrNull {"asset:"+it.id==token}
-            else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
+            optionsFor=flat.firstOrNull {tokenOf(it)==token}
             marked=emptySet()
-        }) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=16.dp),verticalAlignment=Alignment.CenterVertically) {
-
-        Text("Biblioteca",modifier=Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall)
+        },onMove={moving=flat.filter {tokenOf(it) in markedVisible}},
+        onRename={bulkRename=flat.filter {tokenOf(it) in markedVisible}},
+        onCrop=flat.singleOrNull {tokenOf(it) in markedVisible}?.takeIf {markedVisible.size==1 && isImage(it)}?.let {entry -> {cropTarget=entry;marked=emptySet()}},
+        onArtBox=onOpenArtBox?.let {open -> flat.filter {tokenOf(it) in markedVisible && isImage(it)}.takeIf {it.isNotEmpty()}?.let {images -> {
+            com.vidadomu.nexus.ui.models.ArtBoxInbox.images.value=images.map {entry ->
+                android.net.Uri.parse(viewerMedia(entry,conflicts).uri) to when(entry) {
+                    is LibraryEntry.Local -> entry.asset.resolvedMime()
+                    is LibraryEntry.Out -> entry.job.outputs[entry.index].mimeType.ifBlank {"image/jpeg"}
+                }
+            }
+            marked=emptySet();open()
+        }}}) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=if(openFolder!=null) 4.dp else 16.dp),verticalAlignment=Alignment.CenterVertically) {
+        // Dentro de una carpeta: flecha atrás y su nombre en lugar de «Biblioteca».
+        if(openFolder!=null) IconButton(onClick={openFolder=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a la Biblioteca")}
+        // Título, recuento y saldo comparten una sola cabecera: ya no hay una fila entera solo para «N archivos · saldo».
+        Column(Modifier.weight(1f)) {
+            Text(folderName ?: "Biblioteca",style=MaterialTheme.typography.headlineSmall,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                val count=completed.sumOf {it.outputs.size}+localAssets.size
+                Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1)
+                com.vidadomu.nexus.ui.components.NexusBalanceChip(compact=true)
+            }
+        }
 
         onOpenHistory?.let {go->IconButton(onClick=go) {Icon(Icons.Default.History,"Historial de trabajos")}}
 
@@ -264,6 +458,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         Box {
         IconButton(onClick={moreVisible=true}) {Icon(Icons.Default.MoreVert,"Más opciones de biblioteca",tint=TextSecondary)}
         DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
+        DropdownMenuItem(text={Text("Nueva carpeta")},leadingIcon={Icon(Icons.Default.CreateNewFolder,null)},onClick={moreVisible=false;creatingFolder=true})
         DropdownMenuItem(text={Text(if(showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas")},leadingIcon={Icon(Icons.Default.Info,null)},onClick={
             moreVisible=false;showDetails=!showDetails;prefs.edit().putBoolean("tile_details",showDetails).apply()})
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
@@ -276,26 +471,10 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if(importing) LinearProgressIndicator(Modifier.fillMaxWidth())
-            // Cabecera tranquila: el recuento y el saldo pasan a una línea secundaria y el título queda entero.
-            Row(Modifier.fillMaxWidth().padding(start=NexusTokens.screenMargin,end=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically) {
-                val count=completed.sumOf {it.outputs.size}+localAssets.size
-                Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.weight(1f))
-                com.vidadomu.nexus.ui.components.NexusBalanceChip()
-            }
             if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
-            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
-                item {Box {
-                    StudioFilterChip(selectedProjects.isNotEmpty(),{projectMenu=true},label={Text(if(selectedProjects.isEmpty()) "Proyectos" else "Proyectos · ${selectedProjects.size}")},
-                        leadingIcon={Icon(Icons.Default.FolderOpen,null)},modifier=Modifier.semantics {contentDescription="Filtrar por proyectos"})
-                    DropdownMenu(projectMenu,{projectMenu=false}) {
-                        DropdownMenuItem(text={Text("Todos los proyectos")},leadingIcon={Icon(if(selectedProjects.isEmpty()) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,null)},onClick={setProjects(emptySet())})
-                        (index.projects.map {it.id to it.name}+listOf(LIBRARY_UNASSIGNED_PROJECT to "Sin proyecto")).forEach {(id,name)->
-                            DropdownMenuItem(text={Text(name)},leadingIcon={Icon(if(id in selectedProjects) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,null)},onClick={setProjects(if(id in selectedProjects) selectedProjects-id else selectedProjects+id)})
-                        }
-                    }
-                }}
+            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
                 item {StudioFilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
@@ -317,9 +496,19 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     modifier=Modifier.semantics {contentDescription="Solo favoritos"})}
                 if(hidden.isNotEmpty() || showHidden) item {StudioFilterChip(showHidden,{showHidden=!showHidden},label={Text("Ocultos")})}
             }
-            if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
-                LibraryNoResults(viewFilters,::applyFilters)
-            } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()},
+            if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty() && !showFolders) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
+                if(openFolder!=null && !viewFilters.hasQuery && filter==null && !favoriteOnly && !showHidden && originFilter==LibraryOriginFilter.ALL)
+                    Text("Carpeta vacía. Marca archivos en la Biblioteca y usa «Cambiar de proyecto» para traerlos aquí.",
+                        Modifier.padding(NexusTokens.space24),style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                else LibraryNoResults(viewFilters,::applyFilters)
+            } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()}
+                .dragToSelect(gridState::keyAt,
+                    onStart={key -> val at=order.indexOfFirst {it.first==key}
+                        if(at<0) false else {drag.base=marked;drag.adding=order[at].second !in marked;drag.from=at;drag.last=-1;markRange(at);DragHaptics.lift(view);true}},
+                    onMove={key -> order.indexOfFirst {it.first==key}.takeIf {it>=0}?.let(::markRange)},
+                    onEdge={speed,at -> drag.point=at;edgeSpeed=speed},
+                    onEnd={edgeSpeed=0f;drag.from=-1}),
+                state=gridState,
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
                 // Trabajos en curso: una línea por trabajo (modelo, estado y tiempo), no una tarjeta.
@@ -335,6 +524,14 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         snackbar.showSnackbar(if(stopped) "Dejas de seguirlo aquí. No se ha cancelado en el proveedor: puede terminar y cobrarse."
                             else "No se pudo dejar de seguir este trabajo")
                     }})}
+                // Carpetas arriba, como en el explorador de archivos: una por proyecto.
+                if(showFolders) {
+                    item(key="folders:title",span={GridItemSpan(maxLineSpan)}) {Text("Carpetas",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
+                        modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
+                    items(folders,key={"folder:"+it.id},span={GridItemSpan((maxLineSpan/3).coerceAtLeast(1))}) {folder ->
+                        FolderTile(folder.name,folderCounts[folder.id] ?: 0) {openFolder=folder.id}
+                    }
+                }
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
                 timeline.forEach {(day,entries) ->
                     item(key="header:$day",span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
@@ -345,16 +542,14 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                                 val asset=entry.asset
                                 val token="asset:"+asset.id
                                 LocalAssetTile(asset,imageLoader,showDetails && columns<3,mark=if(selecting) token in marked else null,duplicate=asset.uri in duplicateUris,
-                                    onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
+                                    onPreview={if(selecting) toggleMark(token) else viewerAt=entry.key})
                             }
                             is LibraryEntry.Out -> {
                                 val job=entry.job;val output=job.outputs[entry.index]
                                 val token=OutputFiles.token(output)
                                 LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<3,
-                                    mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris,
-                                    onActions={if(selecting) toggleMark(token) else actionTarget=job to output}) {
-                                    if(selecting) toggleMark(token)
-                                    else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(output)) else onNavigateToOutput(job.id)
+                                    mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris) {
+                                    if(selecting) toggleMark(token) else viewerAt=entry.key
                                 }
                             }
                         }
@@ -367,16 +562,15 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,duplicate:Boolean=false,onActions:()->Unit,onOpen:()->Unit) {
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,duplicate:Boolean=false,onOpen:()->Unit) {
     val context=LocalContext.current
-    val haptic=LocalHapticFeedback.current
     val interaction=remember {MutableInteractionSource()}
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if(pressed) .96f else 1f,tween(120),label="Media press")
     val duration=mediaDuration(output.durationSeconds)
     val type=when(output.type) {Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.IMAGE->"Imagen";else->"Texto"}
     Box(Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer {scaleX=scale;scaleY=scale}.background(MaterialTheme.colorScheme.surfaceContainer)
-        .combinedClickable(interactionSource=interaction,indication=null,role=Role.Button,onClickLabel="Ver resultado",onClick=onOpen,onLongClickLabel="Opciones del archivo",onLongClick={haptic.performHapticFeedback(HapticFeedbackType.LongPress);onActions()})
+        .clickable(interactionSource=interaction,indication=null,role=Role.Button,onClickLabel="Abrir",onClick=onOpen)
         .semantics(mergeDescendants=true) {contentDescription="$type · ${job.prompt.ifBlank {"Creación"}}${duration?.let {" · $it"}.orEmpty()}"},
         contentAlignment=Alignment.Center) {
         val local=OutputFiles.trustedLocalUri(output,conflicts)
@@ -387,7 +581,7 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
                 imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
             if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
-        // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
+        // Sin ⋮ encima de la imagen ni etiqueta de origen: las opciones están en el visor.
         if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
         else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
         Column(modifier=Modifier.align(Alignment.TopEnd),horizontalAlignment=Alignment.End) {
@@ -405,6 +599,15 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
     }
 }
 
+
+/** Estado de un arrastre para marcar: lo marcado al empezar, si suma o quita, y dónde empezó y va. */
+private class DragRange {
+    var base=emptySet<String>()
+    var adding=true
+    var from=-1
+    var last=-1
+    var point=androidx.compose.ui.geometry.Offset.Zero
+}
 
 /** Un trabajo en curso en una sola línea: progreso, modelo, estado y tiempo transcurrido. */
 @Composable

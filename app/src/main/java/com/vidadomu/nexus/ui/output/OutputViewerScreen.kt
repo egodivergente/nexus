@@ -61,17 +61,22 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
+    val collection=androidx.compose.runtime.saveable.rememberSaveable(jobId) {
+        OutputViewerScope.take(jobId).map {"${it.first}#${it.second}"}
+    }
     var selection by remember(jobId,initialOutputIndex) {mutableStateOf(jobId to initialOutputIndex.coerceAtLeast(0))}
     val job=remember(jobs,selection.first) {jobs.find {it.id==selection.first}}
     val selectedOutput=selection.second
     val libraryPrefs=remember {context.getSharedPreferences("library_actions_v1",0)}
     val assetIndex by com.vidadomu.nexus.assistant.AssistantRuntime.get(app).assets.changes.collectAsState()
     val removed=remember(assetIndex) {assetIndex.assets.filter {it.libraryDeleted}.map {it.uri}.toSet()}
-    val gallery=remember(jobs,removed) {
+    val gallery=remember(jobs,removed,collection,jobId) {
         val hidden=libraryPrefs.getStringSet("hidden",emptySet()).orEmpty()
-        jobs.filter {it.status==GenerationStatus.COMPLETED}.sortedByDescending {it.startedAt}.flatMap {j ->
-            j.outputs.mapIndexedNotNull {i,o -> if(o.type==Modality.IMAGE && o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden) j.id to i else null}
-        }
+        val candidates=if(collection.isEmpty()) jobs.firstOrNull {it.id==jobId}?.outputs?.indices?.map {jobId to it}.orEmpty()
+            else collection.mapNotNull {key -> key.substringAfterLast('#').toIntOrNull()?.let {key.substringBeforeLast('#') to it}}
+        candidates.filter {(id,index) -> jobs.firstOrNull {it.id==id}?.outputs?.getOrNull(index)?.let {o ->
+            o.type==Modality.IMAGE && o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden
+        }==true}
     }
     val galleryIndex=gallery.indexOf(selection)
     val previous=gallery.getOrNull(galleryIndex-1).takeIf {galleryIndex>0}
@@ -87,6 +92,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
     }
     LaunchedEffect(export.message) {export.message?.let {snackbar.showSnackbar(it);exporter.dismissMessage()}}
     var details by remember(jobId) {mutableStateOf(false)}
+    var immersive by remember {mutableStateOf(false)}
     val scope=rememberCoroutineScope()
     var refreshingFlow by remember(jobId) {mutableStateOf(false)}
     val refreshExistingFlow: suspend () -> Unit = {
@@ -139,7 +145,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
                             rightLabel = "Resultado ${selectedOutput + 1}"
                         )
                     } else {
-                        ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory)
+                        ZoomableImageViewer(output.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory,onTap={immersive=true})
                     }
                     Modality.VIDEO->NativeVideoPlayer(trustedLocal ?: output.url, onCaptureFrame = { frameUri -> onReuseAsInput(frameUri.toString(), "image/png") })
                     Modality.AUDIO->NativeAudioPlayer(trustedLocal ?: output.url)
@@ -205,6 +211,13 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
             Spacer(Modifier.height(NexusTokens.space24))
         }
     }
+    if(immersive && chosenOutput?.type==Modality.IMAGE) androidx.compose.ui.window.Dialog(onDismissRequest={immersive=false},
+        properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            ZoomableImageViewer(chosenOutput.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory,onTap={immersive=false})
+            IconButton(onClick={immersive=false},modifier=Modifier.align(Alignment.TopEnd).statusBarsPadding()) {Icon(Icons.Default.Close,"Cerrar pantalla completa",tint=Color.White)}
+        }
+    }
 }
 
 @Composable
@@ -226,7 +239,7 @@ private fun ViewerDetail(label:String,value:String) {
 }
 
 @Composable
-internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onNavigate: ((Int)->Unit)? = null, onOpenHistory: (() -> Unit)? = null) {
+internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onNavigate: ((Int)->Unit)? = null, onOpenHistory: (() -> Unit)? = null, onTap: (() -> Unit)? = null) {
     val navigate by rememberUpdatedState(onNavigate)
     var scale by remember(imageUrl, localUri) { mutableStateOf(1f) }
     var offsetX by remember(imageUrl, localUri) { mutableStateOf(0f) }
@@ -250,7 +263,7 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
             .fillMaxSize()
             .onSizeChanged {viewportSize=it}
             .pointerInput(imageUrl,localUri,scale,viewportSize,imageSize) {
-                detectTapGestures(onDoubleTap={
+                detectTapGestures(onTap={onTap?.invoke()},onDoubleTap={
                     val target=if(scale>1f) 1f else 2f
                     scale=target
                     if(target==1f) {offsetX=0f;offsetY=0f}
@@ -318,7 +331,7 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
 }
 
 @Composable
-private fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)? = null) {
+internal fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -394,7 +407,7 @@ private fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)?
 }
 
 @Composable
-private fun NativeAudioPlayer(audioUrl: String) {
+internal fun NativeAudioPlayer(audioUrl: String) {
     val context = LocalContext.current
     var playbackError by remember(audioUrl) {mutableStateOf<String?>(null)}
     var isPlaying by remember(audioUrl) { mutableStateOf(false) }
@@ -492,7 +505,7 @@ private fun NativeAudioPlayer(audioUrl: String) {
 }
 
 @Composable
-private fun TextOutputViewer(text: String) {
+internal fun TextOutputViewer(text: String) {
     val clipboardManager = LocalClipboardManager.current
     Column(
         modifier = Modifier

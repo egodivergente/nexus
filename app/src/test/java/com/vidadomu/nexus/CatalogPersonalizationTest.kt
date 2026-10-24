@@ -16,7 +16,7 @@ class CatalogPersonalizationTest {
     }
     @Test fun modelRuleHidesAllItsVariantsAcrossProvidersButNotAnotherVersion() {
         val hidden=setOf(groupVisibilityKey(kling))
-        assertFalse(isCatalogModelVisible(kling.copy(id="crun/kling-v3-std",providerModelId="kling-v3-std",providerId="crun"),hidden))
+        assertFalse(isCatalogModelVisible(kling.copy(id="crun/kling-v3-pro",providerModelId="kling-v3-pro",providerId="crun"),hidden))
         assertTrue(isCatalogModelVisible(models.first {it.id.startsWith("kwaivgi/kling-v2.6")},hidden))
     }
     @Test fun hidingSingleRouteKeepsOtherProviderAndRestoringParentRespectsChildRule() {

@@ -14,6 +14,8 @@ internal fun catalogFamily(model: NexusModel): String {
         "gpt-image" in id -> "GPT Image"
         "grok-imagine" in id -> "Grok Imagine"
         "hailuo" in id -> "Hailuo"
+        "tripo" in id -> "Tripo"
+        "happyhorse" in id || "happy-horse" in id -> "HappyHorse"
         "minimax" in id || Regex("\\bh3\\b").containsMatchIn(id) -> "MiniMax H3"
         Regex("\\bwan\\b").containsMatchIn(id) -> "Wan"
         "flux" in id -> "FLUX"

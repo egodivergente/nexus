@@ -290,36 +290,7 @@ private fun AllModelsCard(onClick: () -> Unit) {
     }
 }
 
-@Composable
-internal fun BatchCountChips(selected: Int, enabledFor: (Int) -> Boolean, onSelect: (Int) -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val haptics = rememberNexusHaptics()
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        Text("Cantidad", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f))
-        BATCH_COUNTS.forEach { count ->
-            val isSelected = count == selected
-            val enabled = enabledFor(count)
-            Surface(Modifier.heightIn(min = 36.dp).width(48.dp)
-                .semantics { contentDescription = "Generar $count"; this.selected = isSelected }
-                .clickable(enabled = enabled, role = Role.RadioButton) {
-                    haptics.perform(NexusHapticEvent.SELECTION, changed = !isSelected)
-                    onSelect(count)
-                },
-                shape = NexusTokens.filter,
-                color = if (isSelected) scheme.primary else scheme.surfaceContainerHigh) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text("x$count", style = MaterialTheme.typography.labelLarge,
-                        color = when { isSelected -> scheme.onPrimary; enabled -> scheme.onSurface
-                            else -> scheme.onSurfaceVariant.copy(alpha = .38f) })
-                }
-            }
-        }
-    }
-}
-
-internal val BATCH_COUNTS = listOf(1, 2, 4, 8)
+internal val BATCH_COUNTS = (1..20).toList()
 
 /** Provider-native count field ("num_images" or "n"), when the model exposes one. */
 internal fun nativeCountParameter(model: NexusModel?) =

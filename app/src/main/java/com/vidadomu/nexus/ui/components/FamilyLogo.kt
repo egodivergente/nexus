@@ -30,7 +30,9 @@ internal fun preferredLogo(familyLogo: String?, individualLogo: String?): String
 
 @Composable
 fun BrandLogo(organization: String? = null, family: String? = null, modelId: String? = null,
-    modifier: Modifier = Modifier, size: Dp = 20.dp, containerSize: Dp? = null, shape: Shape? = null) {
+    modifier: Modifier = Modifier, size: Dp = 20.dp, containerSize: Dp? = null, shape: Shape? = null,
+    /** Catalog mode, forwarded to [DefaultBrandLogo]: official artwork on a transparent canvas. */
+    bare: Boolean = false) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("family_logos", 0) }
     val familyKey = family?.takeIf { it.isNotBlank() }?.let { "family:${logoFamilyId(it)}" }
@@ -59,7 +61,7 @@ fun BrandLogo(organization: String? = null, family: String? = null, modelId: Str
         onClick = {}, onLongClickLabel = "Cambiar logo", onLongClick = { menu = true }) else Modifier)) {
         if (uri != null && !failed) AsyncImage(uri, family ?: modelId, Modifier.size(containerSize ?: size),
             contentScale = ContentScale.Fit, onError = { failed = true })
-        else DefaultBrandLogo(organization, family, modelId, size = size, containerSize = containerSize, shape = shape)
+        else DefaultBrandLogo(organization, family, modelId, size = size, containerSize = containerSize, shape = shape, bare = bare)
         DropdownMenu(menu, onDismissRequest = { menu = false }) {
             familyKey?.let { key ->
                 DropdownMenuItem(text = { Text("Logo de toda la familia") }, onClick = { menu = false; target = key; picker.launch(arrayOf("image/*")) })

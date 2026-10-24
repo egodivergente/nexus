@@ -30,7 +30,20 @@ internal object ParameterPresentation {
                 w >= parameter.minValue && h >= parameter.minValue && w <= parameter.maxValue && h <= parameter.maxValue
             } == true }
     }
-    fun title(parameter: ModelParameter): String = if(parameter.key in formatKeys && options(parameter).any { dimensions(it) != null })
+    /** Contract-driven recognition: only the option sets published by the upscaler contract get these names. */
+    private fun isUpscaleEngine(p: ModelParameter) = p.key == "type" && p.options.map(String::lowercase).toSet().containsAll(setOf("standard","super","ultra","fidelity"))
+    private fun isResizeMode(p: ModelParameter) = p.key == "mode" && p.options.map(String::lowercase).toSet() == setOf("percent","aspect","fixed")
+    private val optionLabels: Map<String, Label> = mapOf(
+        "standard" to Label("Estándar", "El más rápido · unos 5 s"),
+        "super" to Label("Super", "Escenas creadas con IA · unos 15 s"),
+        "ultra" to Label("Ultra", "Más detalle · unos 15 s"),
+        "fidelity" to Label("Fidelidad", "Alta fidelidad, para producto · unos 30 s"),
+        "percent" to Label("Por factor", "Multiplica el tamaño"),
+        "aspect" to Label("Ajustar al marco", "Mantiene la proporción"),
+        "fixed" to Label("Tamaño exacto", "Fuerza ancho y alto"))
+    fun title(parameter: ModelParameter): String = if(isUpscaleEngine(parameter)) "Motor de ampliación"
+        else if(isResizeMode(parameter)) "Cómo ajustar el tamaño"
+        else if(parameter.key in formatKeys && options(parameter).any { dimensions(it) != null })
         "Formato" else when (parameter.key.lowercase()) {
             "return_last_frame" -> "Guardar último fotograma"
             "generate_audio", "enable_audio", "sound", "audio" -> "Generar sonido"
@@ -44,7 +57,25 @@ internal object ParameterPresentation {
                 else parameter.displayName
         }
 
-    fun help(parameter: ModelParameter): String = ParameterLabels.help(parameter.key) ?: ParameterLabels.UNKNOWN_HELP
+    fun help(parameter: ModelParameter): String = when {
+        isUpscaleEngine(parameter) -> "Algoritmo de súper-resolución. Estándar es el más rápido; Ultra añade detalle; Fidelidad conserva al máximo el original."
+        isResizeMode(parameter) -> "Por factor multiplica el tamaño. Ajustar al marco y Tamaño exacto usan las medidas que indiques."
+        else -> ParameterLabels.help(parameter.key) ?: ParameterLabels.UNKNOWN_HELP
+    }
+
+    /** Friendly range line for numeric fields; never the broken «1 – —». */
+    fun rangeText(parameter: ModelParameter, locale: Locale = ParameterBounds.spanish): String? {
+        val min = ParameterBounds.minimum(parameter)
+        val max = ParameterBounds.maximum(parameter)
+        return when {
+            min != null && max != null -> "Rango: ${ParameterBounds.format(min, locale)} – ${ParameterBounds.format(max, locale)}"
+            // Only the limit the provider actually published; the missing side is not invented or drawn as «—».
+            min != null -> "Mínimo ${ParameterBounds.format(min, locale)}"
+            max != null -> "Máximo ${ParameterBounds.format(max, locale)}"
+            parameter.type in setOf(ParameterType.INTEGER, ParameterType.FLOAT, ParameterType.SLIDER) -> "Sin rango publicado"
+            else -> null
+        }
+    }
 
     /** Text published by the provider, shown untranslated and attributed, only when it adds something. */
     fun providerNote(parameter: ModelParameter): String? =
@@ -73,6 +104,10 @@ internal object ParameterPresentation {
             return Label(when(value) { "true" -> "Sí"; "false" -> "No"; else -> value })
         if(parameter.key.lowercase() in setOf("duration", "duration_seconds", "seconds") && value.toDoubleOrNull() != null)
             return Label("$value s")
+        if((isUpscaleEngine(parameter) || isResizeMode(parameter)) && value.lowercase() in optionLabels) return optionLabels.getValue(value.lowercase())
+        if(parameter.key == "percent") value.toDoubleOrNull()?.let { number ->
+            return Label("×" + java.math.BigDecimal.valueOf(number).stripTrailingZeros().toPlainString())
+        }
         if(parameter.key !in formatKeys) return Label(value)
         if(value.equals("auto", true)) return Label("Automático")
         if(value.lowercase() in setOf("match_input_image", "same_as_input", "original")) return Label("Como la referencia")

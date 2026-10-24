@@ -31,22 +31,39 @@ internal object AgentDocuments {
     }
     }
     fun mimeType(kind:String)=types.firstOrNull {format(it,null)==kind} ?: "text/plain"
-    suspend fun load(attachment: Attachment): ContentBlock.Document? = withContext(Dispatchers.IO) {
+    /**
+     * [textOnly]: the agent only receives text (Antigravity), so a PDF always goes as its extracted text and other binary
+     * formats cannot be read. [maxBytes]: the provider's limit for an original document (Bedrock: 4,5 MB); null = no limit here.
+     */
+    suspend fun load(attachment: Attachment, textOnly: Boolean = false, maxBytes: Long? = MAX_BYTES): ContentBlock.Document? = withContext(Dispatchers.IO) {
         val format=format(attachment.mimeType,attachment.name) ?: return@withContext null
         val uri=Uri.parse(attachment.uri)
         require(uri.scheme=="file") {"Vuelve a adjuntar el documento para recuperar su copia local."}
         val file=File(uri.path.orEmpty())
-        require(file.isFile && file.length() in 1..MAX_BYTES) {"Bedrock admite documentos de hasta 4,5 MB. Divide el archivo en capítulos y vuelve a adjuntarlo."}
+        require(file.isFile && file.length()>0) {"Vuelve a adjuntar el documento: su copia local está vacía o no existe."}
+        // Un PDF por encima del límite del proveedor no se rechaza: se envía todo su texto (las imágenes son lo que pesa).
+        val tooBig=maxBytes!=null && file.length()>maxBytes
         if(format=="pdf" && android.os.Build.VERSION.SDK_INT>=35) {
-            val extracted=extractPdf(file)
+            val extracted=extractPdf(file,keepImagePages=tooBig || textOnly)
             if(extracted!=null) return@withContext ContentBlock.Document("txt","Document " + attachment.id.filter {it.isLetterOrDigit()}.take(40),extracted.toByteArray(Charsets.UTF_8))
         }
+        if(textOnly) require(format in setOf("txt","md","csv","html")) {
+            "Antigravity solo recibe texto y no se ha podido sacar el texto de este ${format.uppercase()}. Envíalo como PDF con texto o como .txt."
+        }
+        require(!tooBig) {"El documento pesa %.1f MB, este agente admite hasta %.1f MB y no tiene texto que se pueda extraer. Divídelo en partes y vuelve a adjuntarlo."
+            .format(java.util.Locale("es","ES"),file.length()/1_000_000.0,(maxBytes ?: 0L)/1_000_000.0)}
         // Neutral ASCII name: original filename is already present in attachment metadata.
         ContentBlock.Document(format,"Document " + attachment.id.filter {it.isLetterOrDigit()}.take(40),file.readBytes())
     }
     @android.annotation.TargetApi(35)
-    private suspend fun extractPdf(file:File):String? {
-        val text=StringBuilder("Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n")
+    /**
+     * Text of every page. Normally a page with images or without text means the original PDF must go instead (null).
+     * With [keepImagePages] (the original is too big to send) those pages are noted instead, and null means no text at all.
+     */
+    private suspend fun extractPdf(file:File,keepImagePages:Boolean=false):String? {
+        val text=StringBuilder(if(keepImagePages) "Extracción textual del PDF (el agente no puede recibir el original). Las imágenes y gráficos no se han enviado; el original se conserva.\n"
+            else "Extracción textual del PDF. Las imágenes y gráficos no se han analizado; el original se conserva.\n")
+        var anyText=false
         android.os.ParcelFileDescriptor.open(file,android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
             android.graphics.pdf.PdfRenderer(descriptor).use { pdf ->
                 // Pages without extractable text require the original visual document.
@@ -54,12 +71,15 @@ internal object AgentDocuments {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     pdf.openPage(i).use {page ->
                         val content=page.textContents.joinToString("\n") {it.text}
-                        if(content.isBlank() || page.imageContents.isNotEmpty()) return null
+                        val images=page.imageContents.isNotEmpty()
+                        if(!keepImagePages && (content.isBlank() || images)) return null
                         text.append("\n[Pagina ${i+1}]\n").append(content)
+                        if(images || content.isBlank()) text.append("\n(Esta página tiene imágenes que no se han enviado.)")
+                        anyText=anyText || content.isNotBlank()
                     }
                 }
             }
         }
-        return text.toString().takeIf {it.isNotBlank()}
+        return text.toString().takeIf {anyText}
     }
 }

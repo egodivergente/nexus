@@ -21,8 +21,9 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 import java.text.DateFormat
 import java.util.Date
 
+/** [embedded] draws only the content (big fox + project cards) so the Agent tab keeps its composer and the bottom bar; otherwise it is a full-screen sheet, as needed for shared files. */
 @Composable internal fun ContinueProjectChooser(vm: AssistantViewModel, shared: PendingShare? = null,
-    onRetryShare: () -> Unit = {}, onChoose: (String) -> Unit, onDismiss: () -> Unit) {
+    onRetryShare: () -> Unit = {}, onChoose: (String) -> Unit, onDismiss: () -> Unit, embedded: Boolean = false) {
     val ui by vm.ui.collectAsState()
     val context=LocalContext.current
     val store=remember {RuntimePreferences.get(context)}
@@ -37,11 +38,22 @@ import java.util.Date
         .thenBy {if(rules.value("startup.order")=="nombre") it.name.lowercase() else ""}
         .thenByDescending {vm.projectActivity(it.id).takeIf {at->at>0} ?: it.createdAt})
     var all by rememberSaveable {mutableStateOf(false)}
+    val showFox=androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f
     val shown=if(all) projects else projects.take(store.int("startup.recentCount"))
     LaunchedEffect(ui.projects) {creatingName?.let {n->ui.projects.firstOrNull {it.name==n}?.let {creatingName=null;onChoose(it.id)}}}
-    Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-        LazyColumn(Modifier.fillMaxSize().safeDrawingPadding(),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+    val container: @Composable (@Composable () -> Unit) -> Unit = {content ->
+        if(embedded) content() else Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {content()}
+    }
+    container {
+        LazyColumn(Modifier.fillMaxSize().then(if(embedded) Modifier else Modifier.safeDrawingPadding()),
+            contentPadding=PaddingValues(horizontal=if(embedded) 44.dp else 24.dp,vertical=if(embedded) 8.dp else 24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            // The NEXUS fox (nodes in cyan, amber details) stays the identity of the entry screen; it shrinks for a share, and is omitted under very large text.
+            if(showFox) item {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.nexus_logo),"Logo oficial de NEXUS",
+                    Modifier.fillMaxWidth().height(if(embedded) 250.dp else if(shared==null) 104.dp else 56.dp).padding(bottom=if(embedded) 20.dp else 0.dp),
+                    contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+            }
+            if(!embedded || shared!=null) item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(if(shared==null) "Continuar en…" else "Compartir en…",style=MaterialTheme.typography.headlineMedium)
                     Text(if(shared==null) "Tus proyectos, a mano." else "${shared.files.size} archivos conservados · elige proyecto",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -58,7 +70,7 @@ import java.util.Date
                 val accent=listOf(Color(0xFF68DFE0),Color(0xFFAA8DFA),Color(0xFFF4BD6C),Color(0xFFEF8E9D))[Math.floorMod(project.id.hashCode(),4)]
                 Surface(shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerLow,
                     border=BorderStroke(1.dp,accent.copy(alpha=.28f)),modifier=Modifier.fillMaxWidth().clickable(enabled=!busy && shared?.ready!=false) {onChoose(project.id)}) {
-                    Row(Modifier.heightIn(min=96.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Row(Modifier.heightIn(min=if(embedded) 80.dp else 96.dp),verticalAlignment=Alignment.CenterVertically) {
                         Box(Modifier.width(3.dp).height(60.dp).background(accent))
                         Icon(Icons.Default.FolderOpen,null,Modifier.padding(16.dp).size(25.dp),tint=accent)
                         Column(Modifier.weight(1f).padding(vertical=14.dp)) {
@@ -74,7 +86,8 @@ import java.util.Date
             }
             if(projects.size>shown.size) item {TextButton(onClick={all=true}) {Text("Todos los proyectos (${projects.size})")}}
             item {OutlinedButton(onClick={creating=true},enabled=!busy,modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Add,null);Text("Nuevo proyecto")}}
-            ui.activeProjectId?.let {id->item {TextButton(onClick={onChoose(id)},enabled=!busy && shared?.ready!=false,modifier=Modifier.fillMaxWidth()) {Text("Abrir último proyecto")}}}
+            // Embedded: typing in the composer or choosing a card already continues; no extra link is needed.
+            if(!embedded) ui.activeProjectId?.let {id->item {TextButton(onClick={onChoose(id)},enabled=!busy && shared?.ready!=false,modifier=Modifier.fillMaxWidth()) {Text("Abrir último proyecto")}}}
         }
     }
     if(creating) AlertDialog(onDismissRequest={creating=false},title={Text("Nuevo proyecto")},text={OutlinedTextField(name,{name=it},label={Text("Nombre")},singleLine=true)},
