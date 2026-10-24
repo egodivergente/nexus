@@ -243,6 +243,10 @@ fun AssistantScreen(
     // Lienzo: al desplazar o escribir, la barra superior se reduce a una franja fina.
     val scrolledAway by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 } }
     val slimTop = scrolledAway || input.text.isNotEmpty()
+    // Conversaciones a la izquierda: se abre arrastrando el dedo de izquierda a derecha sobre el chat.
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
+        gesturesEnabled = drawer.isOpen) {
     Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
         Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
@@ -260,7 +264,8 @@ fun AssistantScreen(
             val barPinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned
             Box(Modifier.weight(1f).fillMaxWidth()
                 // Mantener pulsado un hueco del chat abre el menú de acciones rápidas, justo donde está el dedo.
-                .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }) {
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }
+                .dragRightToOpen { scope.launch { drawer.open() } }) {
             LazyColumn(Modifier.fillMaxSize(), state = listState,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
@@ -300,6 +305,7 @@ fun AssistantScreen(
                             }
                         }
                         is ChatItem.Board -> ChatBoardCard(item.boardId)
+                        is ChatItem.Context -> CarriedContextCard(item)
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
                             val p = ui.plans.getValue(item.planId)
@@ -365,10 +371,9 @@ fun AssistantScreen(
                 }
             }
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
-            // Ajustes: un engranaje pequeño en la esquina; las conversaciones, círculos numerados flotando junto a él.
+            // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ConversationDiscs(ui, vm)
                 Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Abrir ajustes", onClick = onOpenSettings)
                     .semantics { contentDescription = "Ajustes" }, contentAlignment = Alignment.Center) {
@@ -402,6 +407,24 @@ fun AssistantScreen(
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 reasoningControl = { ReasoningPicker(ui, vm) })
             }
+        }
+    }
+    }
+}
+
+/** Summary brought from another conversation: a short card, tap to read it whole. */
+@Composable
+private fun CarriedContextCard(item: ChatItem.Context) {
+    var open by rememberSaveable(item.id) { mutableStateOf(false) }
+    Surface(onClick = { open = !open }, shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                Icon(Icons.Default.Forum, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Text("Contexto de «${item.from}»", style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            }
+            Text(item.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (open) Int.MAX_VALUE else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
     }
 }

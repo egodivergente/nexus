@@ -34,61 +34,34 @@ internal class ConversationTabs(context: Context) {
     fun close(id: String) {prefs.edit().putStringSet("closed",closed()+id).apply()}
 }
 
-@Composable private fun rememberTabs(): Pair<ConversationTabs,Set<String>> {
-    val context=LocalContext.current
-    val tabs=remember {ConversationTabs(context)}
-    var closed by remember {mutableStateOf(tabs.closed())}
-    DisposableEffect(tabs) {
-        val listener=SharedPreferences.OnSharedPreferenceChangeListener {_,_->closed=tabs.closed()}
-        tabs.prefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose {tabs.prefs.unregisterOnSharedPreferenceChangeListener(listener)}
-    }
-    return tabs to closed
-}
-
 private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
     (listOf(AssistantChatEntry(ui.conversationId,ui.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Nueva conversación"))+vm.conversations()).distinctBy {it.id}
 
-private fun closeTab(id: String, tabs: ConversationTabs, ui: AssistantUiState, vm: AssistantViewModel) {
-    tabs.close(id)
-    if(id==ui.conversationId) {
-        val next=vm.conversations().firstOrNull {it.id !in tabs.closed() && it.id!=id}
-        if(next==null) vm.newConversation() else vm.openConversation(next.id)
-    }
-}
-
 /**
- * Open conversations as small numbered discs floating over the chat (1, 2, 3…). A tap switches, a long press closes
- * (the conversation and its draft stay saved). Nothing is drawn while there is a single conversation.
+ * Conversations panel, opened by dragging from left to right over the chat. The one where the agent is still
+ * working shows a spinner; «Nueva con este contexto» starts a conversation from a summary of the current one.
  */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable internal fun ConversationDiscs(ui: AssistantUiState, vm: AssistantViewModel, modifier: Modifier = Modifier) {
-    val (tabs,closed)=rememberTabs()
-    val open=entries(ui,vm).filter {it.id !in closed}
-    if(open.size<2) return
-    var closing by remember {mutableStateOf<AssistantChatEntry?>(null)}
-    Row(modifier,horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-        open.forEachIndexed {index,chat->
-            val selected=chat.id==ui.conversationId
-            Box(Modifier.size(32.dp).shadow(if(selected) 6.dp else 2.dp,CircleShape).clip(CircleShape)
-                .background(if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=.92f))
-                .border(if(selected) 0.dp else 1.dp,MaterialTheme.colorScheme.outlineVariant,CircleShape)
-                .combinedClickable(enabled=!ui.thinking,onClickLabel="Abrir conversación ${index+1}",onClick={tabs.open(chat.id);vm.openConversation(chat.id)},
-                    onLongClickLabel="Cerrar la conversación ${index+1}",onLongClick={closing=chat})
-                .semantics {contentDescription="Conversación ${index+1}: ${chat.title}"},contentAlignment=Alignment.Center) {
-                Text("${index+1}",style=MaterialTheme.typography.labelLarge,color=if(selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+@Composable internal fun ConversationDrawer(ui: AssistantUiState, vm: AssistantViewModel, onClose: () -> Unit) {
+    val chats=remember(ui.conversationId,ui.items.size,ui.workingIn,ui.activeProjectId) {entries(ui,vm)}
+    val canCarry=!ui.thinking && !ui.carrying && ui.workingIn==null && ui.items.any {it is ChatItem.User}
+    ModalDrawerSheet(Modifier.widthIn(max=320.dp)) {
+        Text("Conversaciones",Modifier.padding(start=28.dp,top=24.dp,bottom=12.dp),style=MaterialTheme.typography.titleMedium)
+        NavigationDrawerItem(label={Text("Nueva conversación")},icon={Icon(Icons.Default.Add,null)},selected=false,
+            onClick={onClose();vm.newConversation()},modifier=Modifier.padding(horizontal=12.dp))
+        if(canCarry || ui.carrying) NavigationDrawerItem(label={Text(if(ui.carrying) "Preparando el resumen…" else "Nueva con este contexto")},
+            icon={if(ui.carrying) CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.Forum,null)},selected=false,
+            onClick={if(canCarry) {vm.newConversationWithContext();onClose()}},modifier=Modifier.padding(horizontal=12.dp))
+        HorizontalDivider(Modifier.padding(vertical=8.dp,horizontal=28.dp))
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
+            items(chats,key={it.id}) {chat->
+                NavigationDrawerItem(selected=chat.id==ui.conversationId,onClick={onClose();vm.openConversation(chat.id)},
+                    label={Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
+                    badge=if(chat.id==ui.workingIn) ({CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)}) else null,
+                    modifier=Modifier.padding(horizontal=12.dp).semantics {
+                        if(chat.id==ui.workingIn) contentDescription="${chat.title}: Nexus sigue trabajando aquí"
+                    })
             }
         }
-        Box(Modifier.size(32.dp).shadow(2.dp,CircleShape).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=.92f))
-            .combinedClickable(enabled=!ui.thinking,onClick=vm::newConversation).semantics {contentDescription="Nueva conversación"},contentAlignment=Alignment.Center) {
-            Icon(Icons.Default.Add,null,Modifier.size(18.dp))
-        }
-    }
-    closing?.let {chat->
-        AlertDialog(onDismissRequest={closing=null},title={Text("Cerrar conversación")},
-            text={Text("«${chat.title}» se cierra aquí pero se conserva con su borrador y sus archivos. Podrás reabrirla desde el menú de pulsación larga.")},
-            confirmButton={TextButton(onClick={closeTab(chat.id,tabs,ui,vm);closing=null}) {Text("Cerrar")}},
-            dismissButton={TextButton(onClick={closing=null}) {Text("Cancelar")}})
     }
 }
 
@@ -96,16 +69,10 @@ private fun closeTab(id: String, tabs: ConversationTabs, ui: AssistantUiState, v
 @Composable internal fun ChatContextMenu(ui: AssistantUiState, vm: AssistantViewModel, expanded: Boolean, offset: DpOffset,
     onDismiss: () -> Unit, onProjects: () -> Unit, onAppearance: () -> Unit, onSettings: () -> Unit, barPinned: Boolean, onPinBar: (Boolean) -> Unit,
     onCopyChat: () -> Unit, onShareChat: () -> Unit, onImportImages: () -> Unit) {
-    val (tabs,closed)=rememberTabs()
     DropdownMenu(expanded=expanded,onDismissRequest=onDismiss,offset=offset) {
-        DropdownMenuItem(text={Text("Nueva conversación")},leadingIcon={Icon(Icons.Default.Add,null)},enabled=!ui.thinking,onClick={onDismiss();vm.newConversation()})
+        DropdownMenuItem(text={Text("Nueva conversación")},leadingIcon={Icon(Icons.Default.Add,null)},onClick={onDismiss();vm.newConversation()})
         DropdownMenuItem(text={Text("Importar imágenes")},leadingIcon={Icon(Icons.Default.AddPhotoAlternate,null)},onClick={onDismiss();onImportImages()})
         DropdownMenuItem(text={Text("Cambiar de proyecto")},leadingIcon={Icon(Icons.Default.FolderOpen,null)},onClick={onDismiss();onProjects()})
-        val reopenable=entries(ui,vm).filter {it.id in closed}
-        reopenable.take(4).forEach {chat->
-            DropdownMenuItem(text={Text("Reabrir: "+chat.title.take(28))},leadingIcon={Icon(Icons.Default.History,null)},enabled=!ui.thinking,
-                onClick={onDismiss();tabs.open(chat.id);vm.openConversation(chat.id)})
-        }
         HorizontalDivider()
         val hasMessages=ui.items.any {it is ChatItem.User || it is ChatItem.Assistant}
         DropdownMenuItem(text={Text("Compartir chat")},leadingIcon={Icon(Icons.Default.Share,null)},enabled=hasMessages,onClick={onDismiss();onShareChat()})
