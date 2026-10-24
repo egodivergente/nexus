@@ -227,6 +227,10 @@ class MainActivity : ComponentActivity() {
                                     createViewModel.selectModality(model.modalities.first())
                                     createViewModel.selectModel(model)
                                     navController.navigate(Screen.Create.route) {launchSingleTop=true}
+                                },
+                                onSelectModelWithMedia = { model, media ->
+                                    createViewModel.prepareWithMedia(model, media)
+                                    navController.navigate(Screen.Create.route) {launchSingleTop=true}
                                 }
                             )
                         }

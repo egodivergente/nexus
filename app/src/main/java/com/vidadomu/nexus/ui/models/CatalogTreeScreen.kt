@@ -43,7 +43,8 @@ import com.vidadomu.nexus.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
+fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
+    onSelectModelWithMedia: ((NexusModel, List<Pair<android.net.Uri, String>>) -> Unit)? = null) {
     val app = LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
     val loading by app.modelCatalogRepository.isLoading.collectAsState()
@@ -163,7 +164,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         if(activeGroup!=null) {
             ModelOptionsScreen(activeGroup,favorites,::toggleFavorite,onSelectModelAndCreate,
                 if(personalizing) ({model -> pendingHide=routeVisibilityKey(model) to (model.displayName+" · "+providerName(model.providerId))}) else null,
-                modifier=Modifier.fillMaxSize().padding(padding))
+                modifier=Modifier.fillMaxSize().padding(padding),onUseWithMedia=onSelectModelWithMedia)
         } else {
         key(modality, family, groupKey) {
         LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) minOf(runtime.int("catalog.columns"),if(androidx.compose.ui.platform.LocalDensity.current.fontScale>1.3f) 2 else 6) else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {

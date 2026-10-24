@@ -17,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
@@ -41,7 +43,8 @@ import com.vidadomu.nexus.ui.components.rememberPublishedPrice
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalLayoutApi::class)
 @Composable
 internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,toggleFavorite:(NexusModel)->Unit,
-    onUse:(NexusModel)->Unit,onHide:((NexusModel)->Unit)?=null,modifier:Modifier=Modifier) {
+    onUse:(NexusModel)->Unit,onHide:((NexusModel)->Unit)?=null,modifier:Modifier=Modifier,
+    onUseWithMedia:((NexusModel,List<Pair<android.net.Uri,String>>)->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val choices=remember {context.getSharedPreferences("catalog_choices_v1",0)}
@@ -75,6 +78,21 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     }
     val publishedUnit=rememberPublishedPrice(selected)?.unit
     val facts=remember(selected,verifiedSelected,publishedUnit) {modelFactSheet(selected,verifiedSelected,publishedUnit)}
+    // Image inputs come from the model's own contract; the images chosen here travel with «Configurar en Lanzadera».
+    val imageField=remember(selected,verifiedSelected) {
+        com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(verifiedSelected ?: selected).firstOrNull {it.mime.startsWith("image/")}
+    }
+    var pickedImages by remember(group.key,modelBookmark(selected)) {mutableStateOf(emptyList<Pair<android.net.Uri,String>>())}
+    fun addImages(uris:List<android.net.Uri>) {
+        val limit=(imageField?.maximum ?: 1).coerceIn(1,50)
+        val extra=uris.map {it to (context.contentResolver.getType(it) ?: "image/jpeg")}
+        pickedImages=(if(limit==1) extra.take(1) else (pickedImages+extra).distinctBy {it.first}.take(limit))
+    }
+    val galleryPicker=androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems=(imageField?.maximum ?: 1).coerceIn(2,50))) {uris -> addImages(uris)}
+    val singleGalleryPicker=androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) {uri -> if(uri!=null) addImages(listOf(uri))}
+    val libraryPicker=com.vidadomu.nexus.assistant.rememberProjectMediaPicker {uris -> addImages(uris)}
 
     Scaffold(modifier=modifier,containerColor=colors.background,contentWindowInsets=WindowInsets(0,0,0,0),bottomBar={
         Surface(color=colors.background) {
@@ -88,7 +106,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     }
                     if(!estimate.hasPrice) estimate.retry?.let {retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Volver a consultar el precio")}}
                 }
-                Button(onClick={onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
+                Button(onClick={if(pickedImages.isNotEmpty() && onUseWithMedia!=null) onUseWithMedia(selected,pickedImages) else onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
                     Text("Configurar en Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
                 }
@@ -129,6 +147,38 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 focusAdvice?.let { advice ->
                     Text("Bueno para: ${advice.good}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurface)
                     Text("Evítalo si: ${advice.avoid}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                }
+            }
+            if(imageField!=null) Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                    Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                        Text(imageField.label,style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
+                        Text((if(imageField.required) "Obligatoria" else "Opcional")+if(imageField.maximum>1) " · hasta ${imageField.maximum} imágenes" else " · una imagen",
+                            style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    }
+                    if(pickedImages.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        items(pickedImages,key={it.first.toString()}) {(uri,_)->
+                            Box(Modifier.size(88.dp)) {
+                                coil.compose.AsyncImage(uri,contentDescription="Imagen elegida",contentScale=androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier=Modifier.fillMaxSize().clip(NexusTokens.thumbnail))
+                                IconButton(onClick={pickedImages=pickedImages.filterNot {it.first==uri}},Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
+                                    Icon(Icons.Default.Close,"Quitar imagen",Modifier.size(18.dp).background(Color.Black.copy(alpha=.55f),androidx.compose.foundation.shape.CircleShape).padding(3.dp),tint=Color.White)
+                                }
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        OutlinedButton(onClick={
+                            val request=androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            if(imageField.maximum>1) galleryPicker.launch(request) else singleGalleryPicker.launch(request)
+                        },modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field) {
+                            Icon(Icons.Default.AddPhotoAlternate,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Galería",maxLines=1)
+                        }
+                        OutlinedButton(onClick={libraryPicker.launch(arrayOf("image/*"),imageField.maximum.coerceIn(1,50))},
+                            modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field) {
+                            Icon(Icons.Default.PhotoLibrary,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Biblioteca",maxLines=1)
+                        }
+                    }
                 }
             }
             ModelEvaluation(selected,group.routes)
