@@ -163,7 +163,7 @@ fun CreateScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(batchSnackbar) },
         bottomBar = {
-            StudioChrome(Modifier.fillMaxWidth()) {
+            com.vidadomu.nexus.ui.components.FloatingActionDock {
                 Column(Modifier.fillMaxWidth().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
                     .padding(horizontal=screenMargin, vertical=8.dp),
                     verticalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -207,8 +207,9 @@ fun CreateScreen(
         containerColor=ScreenBackground,
         topBar={}
     ) { innerPadding ->
-        LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=NexusTokens.space24),
-            modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
+        // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
+        LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=innerPadding.calculateBottomPadding()+NexusTokens.space8),
+            modifier=Modifier.fillMaxSize().padding(top=innerPadding.calculateTopPadding()).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             item(key="launcher-title") {
                 Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {

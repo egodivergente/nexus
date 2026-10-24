@@ -64,8 +64,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                 } }, navigationIcon = { IconButton(onClick = dismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver al lienzo") } })
             },
             bottomBar = {
-                Surface(tonalElevation = 2.dp) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.vidadomu.nexus.ui.components.FloatingActionDock {
+                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if(state.phase in setOf(ComparisonPhase.REVIEW, ComparisonPhase.PREPARING)) {
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -104,7 +104,9 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                 }
             }
         ) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
+            LazyColumn(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = padding.calculateBottomPadding() + 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text(state.source.prompt.ifBlank { "Vuelve al lienzo y escribe un prompt para comparar sus interpretaciones." },
                         style = MaterialTheme.typography.bodyLarge, maxLines = 4, overflow = TextOverflow.Ellipsis)

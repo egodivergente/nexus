@@ -49,6 +49,17 @@ fun StudioChrome(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     }
 }
 
+/**
+ * Bottom action area that floats: no strip or edge behind the button. The screen's content scrolls underneath
+ * (give it this dock's height as bottom content padding) and fades out softly just above the button.
+ */
+@Composable
+fun FloatingActionDock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val base = MaterialTheme.colorScheme.background
+    Column(modifier.fillMaxWidth().background(Brush.verticalGradient(0f to base.copy(alpha = 0f), .3f to base.copy(alpha = .82f), 1f to base))
+        .padding(top = NexusTokens.space24), content = content)
+}
+
 /** Tonal field shared by parameters and saved presets, with no outline or underline. */
 @Composable
 fun StudioTextField(

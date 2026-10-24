@@ -436,7 +436,7 @@ fun FlowStudioScreen(
         },
         topBar = {},
         bottomBar = {
-            Surface(color = BackgroundDark, border = BorderStroke(1.dp, BorderSubtle)) {
+            com.vidadomu.nexus.ui.components.FloatingActionDock {
                 Button(
                     onClick = ::sendAll,
                     enabled = canSend,
@@ -461,8 +461,10 @@ fun FlowStudioScreen(
     ) { innerPadding ->
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding),
-            contentPadding = PaddingValues(NexusTokens.space16),
+            // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
+            modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()).consumeWindowInsets(innerPadding),
+            contentPadding = PaddingValues(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space16,
+                bottom = innerPadding.calculateBottomPadding() + NexusTokens.space8),
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)
         ) {
             item(key="flow-title") {

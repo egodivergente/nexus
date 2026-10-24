@@ -97,9 +97,8 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     val libraryPicker=com.vidadomu.nexus.assistant.rememberProjectMediaPicker {uris -> addImages(uris)}
 
     Scaffold(modifier=modifier,containerColor=colors.background,contentWindowInsets=WindowInsets(0,0,0,0),bottomBar={
-        Surface(color=colors.background) {
-            Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                HorizontalDivider(color=colors.outlineVariant.copy(alpha=.5f))
+        com.vidadomu.nexus.ui.components.FloatingActionDock {
+            Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                     Column(Modifier.weight(1f)) {
                         Text(estimate.amount,style=MaterialTheme.typography.titleMedium,
@@ -115,8 +114,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
             }
         }
     }) {padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-            .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+        // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
+        Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState())
+            .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=padding.calculateBottomPadding()+NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 CatalogGlyph("group:"+group.key,56.dp,labels) {size -> BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=size,bare=true)}
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
