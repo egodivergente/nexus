@@ -1,3 +1,21 @@
+# Flow: conexión y recuperación - 2026-10-24
+
+Código `5a450cf`, rama `codex/nexus-master-artbox-20261023`, APK propia
+**1.9.74-agent-preview / vc108**. Corrige el corte de 5 s hacia AXELPC, evita la
+consulta duplicada y conserva el borrador durante la renovación de sesión.
+4 pruebas HTTP, 4 de configuración y 4 nuevas regresiones de recuperación PASS;
+19 casos de backend existentes PASS. Recuperación real devuelve ready.
+
+**No está validada una generación nueva.** El único intento propio falló antes
+de pulsar Generar en Google (0 envíos). Posteriormente se desplegó la corrección.
+El Pixel recibió otra APK 108 diferente y cambió de pantalla durante las acciones:
+no sobrescribirla sin reconciliar su procedencia; se pidió dejar el teléfono libre.
+**Google VPN sigue pendiente de restaurar**; la última lectura confirma Tailscale
+activo. El usuario autorizó solo el cambio temporal y la restauración posterior.
+Priorizar la restauración, no afirmar que se completó, ni reenviar trabajos inciertos.
+Ver `docs/FLOW-PIXEL-1974-20261024.md` para hashes, pruebas y continuación.
+Los estados siguientes se conservan como historial.
+
 # Nexus / ArtBox y chat compacto - 2026-10-23
 
 Rama `codex/nexus-master-artbox-20261023`, código Android `b588f7c`.

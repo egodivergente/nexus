@@ -1,4 +1,26 @@
 ﻿{
+    "flowConnectionRepair20261024": {
+        "branch": "codex/nexus-master-artbox-20261023",
+        "sourceCommit": "5a450cff40b972f0526fd074f84110bf09c1b96a",
+        "versionCode": 108,
+        "versionName": "1.9.74-agent-preview",
+        "status": "PREVIEW_FLOW_REAL_GENERATION_AND_GOOGLE_VPN_RESTORATION_PENDING",
+        "apkSha256": "9b533d891363a15d46afc7666bba015184ce010f3f63bc3b529cc22f1631ab4e",
+        "pixelObservedOtherApkSha256": "f4c17f8977446b4026f6c9323e1edfdf4e8e1be2a1e9c68d4daf841c67337167",
+        "connectionTestsPassed": 4,
+        "coreConfigurationTestsPassed": 4,
+        "existingBackendTargetedCasesPassed": 19,
+        "newBackendRegressionCasesPassed": 4,
+        "realSessionRecovery": "ready",
+        "googleGenerationClicksByThisTest": 0,
+        "firstAttemptError": "flow_composer_not_empty before Google click",
+        "oldBridgeJobIdsPreserved": 7,
+        "googleVpnRestored": false,
+        "lastObservedVpnPackage": "com.tailscale.ipn",
+        "lastObservedVpnType": 1,
+        "continuation": "Exclusive Pixel use required; finish one new image and restore Google VPN. Do not overwrite the other vc108 APK or replay uncertain jobs.",
+        "documentation": "docs/FLOW-PIXEL-1974-20261024.md"
+    },
     "masterArtBox20261023": {
         "branch": "codex/nexus-master-artbox-20261023",
         "sourceCommit": "b588f7c43a109a629586dca071c251b7457fcd31",

@@ -1,5 +1,7 @@
 # Nexus / ArtBox — ejecución del paquete maestro (23-10-2026)
 
+> Actualización 24-10-2026: correcciones de conexión y recuperación en 1.9.74; generación real y restauración de VPN todavía pendientes. Ver [estado de Flow](FLOW-PIXEL-1974-20261024.md).
+
 ## Punto de partida comprobado
 
 - Rama de trabajo sobre `919f4e8`, que contiene los cambios de Lienzo y Flow; `origin/main` es antecesor y no hay commits remotos pendientes de incorporar.
