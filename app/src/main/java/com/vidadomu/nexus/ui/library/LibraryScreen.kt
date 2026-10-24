@@ -5,6 +5,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.scrollBy
+import com.vidadomu.nexus.ui.models.DragHaptics
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.components.StudioFilterChip
@@ -74,8 +76,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var favoriteOnly by rememberSaveable {mutableStateOf(false)}
     // Resolución, tamaño y fecha al pie de cada miniatura; se puede ocultar desde ⋮.
     var showDetails by remember {mutableStateOf(prefs.getBoolean("tile_details",true))}
-    var actionTarget by remember {mutableStateOf<Pair<GenerationJob,GenerationOutput>?>(null)}
-    // Marcado rápido: mantener pulsado marca; con algo marcado, tocar suma o quita. Vaciar la selección la cierra.
+    // Nombres que el usuario da a lo generado; lo importado guarda el suyo en su propio registro.
+    var names by remember {mutableStateOf(prefs.all.mapNotNull {(k,v) -> if(k.startsWith("name:") && v is String) k.removePrefix("name:") to v else null}.toMap())}
+    // Todo archivo se abre igual: visor a pantalla completa (por clave de la entrada) con sus opciones en ⋮.
+    var viewerAt by remember {mutableStateOf<String?>(null)}
+    var optionsFor by remember {mutableStateOf<LibraryEntry?>(null)}
+    var renaming by remember {mutableStateOf<LibraryEntry?>(null)}
+    // Marcado rápido: mantener pulsado marca y, sin soltar, arrastrar marca el tramo; con algo marcado, tocar suma o quita.
     var marked by remember {mutableStateOf(emptySet<String>())}
     val selecting=marked.isNotEmpty()
     fun toggleMark(token:String) {marked=if(token in marked) marked-token else marked+token}
@@ -131,10 +138,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
         LibraryOriginFilter.values().filter {it in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED,LibraryOriginFilter.IMPORTED) || it in present}
     }
-    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter,selectedProjects,projectIndex) {
+    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter,selectedProjects,projectIndex,names) {
         if(originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList()
         else jobs.map {job -> job.copy(outputs=job.outputs.filter {projectIndex.matches(selectedProjects,job,it) && it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
-            .filter {filter==null || it.modality==filter}.filter {matchesCreationSearch(it,query)}.sortedByDescending {it.startedAt}
+            .filter {filter==null || it.modality==filter}
+            .filter {job -> matchesCreationSearch(job,query) || job.outputs.any {names[OutputFiles.token(it)]?.contains(query,true)==true}}.sortedByDescending {it.startedAt}
     }
     val pending=remember(jobs,filter,query,showHidden,favoriteOnly,originFilter,selectedProjects,projectIndex) {if(showHidden || favoriteOnly || originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList() else jobs.filter {
         projectIndex.matches(selectedProjects,it) &&
@@ -149,10 +157,6 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             ("asset:"+a.id in hidden)==showHidden && (!favoriteOnly || "asset:"+a.id in favorites) }.sortedByDescending {it.createdAt}
     }
     val localAssetGroups=remember(localAssets) {localAssets.groupBy(::libraryOrigin)}
-    // Una sola hoja por archivo importado (vista previa, ficha, Lienzo, Agente y acciones).
-    var localTarget by remember {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Asset?>(null)}
-    localTarget?.let {asset -> LocalAssetSheet(asset,{localTarget=null},{message -> scope.launch {snackbar.showSnackbar(message)}},
-        onUseInCanvas,onSendToAgent) }
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val timeline=remember(completed,localAssets) {
         val day=SimpleDateFormat("d MMMM yyyy",Locale("es","ES"))
@@ -212,13 +216,45 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         .decoderDispatcher(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(2))
         .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.08).build()}.build()}
     DisposableEffect(imageLoader) {onDispose {imageLoader.shutdown()}}
-    actionTarget?.let {(job,output) ->
-        val token=OutputFiles.token(output)
-        LibraryActions(job,output,OutputFiles.trustedLocalUri(output,conflicts),token in favorites,token in hidden,
-            onDismiss={actionTarget=null},onOpen={
-                val position=jobs.firstOrNull {it.id==job.id}?.outputs?.indexOfFirst {it.id==output.id} ?: -1
-                if(onNavigateToResult!=null && position>=0) onNavigateToResult(job.id,position) else onNavigateToOutput(job.id)
-            },onFavorite={
+    val flat=remember(timeline) {timeline.values.flatten()}
+    fun tokenOf(entry:LibraryEntry):String=when(entry) {
+        is LibraryEntry.Local -> "asset:"+entry.asset.id
+        is LibraryEntry.Out -> OutputFiles.token(entry.job.outputs[entry.index])
+    }
+    fun assetOf(entry:LibraryEntry)=when(entry) {
+        is LibraryEntry.Local -> entry.asset
+        is LibraryEntry.Out -> entry.job.outputs[entry.index].let {o -> index.assets.firstOrNull {!it.libraryDeleted && (it.uri==o.localUri || it.uri==o.url)}}
+    }
+    fun nameOf(entry:LibraryEntry):String=when(entry) {
+        is LibraryEntry.Local -> entry.asset.displayName
+        is LibraryEntry.Out -> names[tokenOf(entry)] ?: listOf(
+            app.modelCatalogRepository.getModelById(entry.job.modelId)?.displayName ?: entry.job.modelId.substringAfterLast('/'),
+            entry.job.prompt.lineSequence().firstOrNull()?.trim()?.take(80).orEmpty()).filter {it.isNotBlank()}.joinToString(" · ")
+    }
+    fun message(text:String) {scope.launch {snackbar.showSnackbar(text)}}
+    fun rename(entry:LibraryEntry,name:String) {
+        if(entry is LibraryEntry.Out) {
+            val token=tokenOf(entry);names=names+(token to name);prefs.edit().putString("name:"+token,name).apply()
+        }
+        assetOf(entry)?.let {asset -> scope.launch {
+            runCatching {runtime.assets.updateAsset(asset.id) {it.copy(displayName=name)}}.onFailure {message("No se pudo cambiar el nombre")}
+        }}
+    }
+    fun openResult(entry:LibraryEntry.Out) {
+        val output=entry.job.outputs[entry.index]
+        val position=jobs.firstOrNull {it.id==entry.job.id}?.outputs?.indexOfFirst {it.id==output.id} ?: -1
+        if(onNavigateToResult!=null && position>=0) onNavigateToResult(entry.job.id,position) else onNavigateToOutput(entry.job.id)
+    }
+    @Composable fun FileOptions(entry:LibraryEntry) {
+        val token=tokenOf(entry)
+        val asset=assetOf(entry)
+        val visual=viewerMedia(entry,conflicts).kind in setOf(Modality.IMAGE,Modality.VIDEO)
+        // Lo que lleva a otra pantalla cierra también el visor.
+        fun leaving(action:()->Unit):()->Unit = {viewerAt=null;action()}
+        LibraryFileSheet(entry,nameOf(entry),(entry as? LibraryEntry.Out)?.let {OutputFiles.trustedLocalUri(it.job.outputs[it.index],conflicts)},
+            token in favorites,token in hidden,onDismiss={optionsFor=null},onRename={optionsFor=null;renaming=entry},
+            onSelect={viewerAt=null;marked=marked+token},
+            onFavorite={
                 favorites=if(token in favorites) favorites-token else favorites+token
                 prefs.edit().putStringSet("favorites",favorites).apply()
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -229,12 +265,59 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     hidden=if(wasHidden) hidden+token else hidden-token;prefs.edit().putStringSet("hidden",hidden).apply()
                 }}
             },onDelete={scope.launch {
-                val assets=index.assets.filter {it.uri==output.url || it.uri==output.localUri}
-                runtime.assets.deleteLibraryAssets(assets.map {it.id}.toSet())
-                hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
-                snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
-            }},onError={message -> scope.launch {snackbar.showSnackbar(message)}},
-            onAddToChat=onSendResultToAgent?.let { send -> { send(job.id,output.id) } }, onSelect={toggleMark(token)})
+                when(entry) {
+                    is LibraryEntry.Local -> {
+                        runtime.assets.deleteLibraryAssets(setOf(entry.asset.id))
+                        snackbar.showSnackbar("Eliminado de la biblioteca (los originales se conservan)")
+                    }
+                    is LibraryEntry.Out -> {
+                        val output=entry.job.outputs[entry.index]
+                        runtime.assets.deleteLibraryAssets(index.assets.filter {it.uri==output.url || it.uri==output.localUri}.map {it.id}.toSet())
+                        hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
+                        snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
+                    }
+                }
+            }},onMessage=::message,
+            onAddToChat=when(entry) {
+                is LibraryEntry.Local -> onSendToAgent?.let {send -> leaving {send(entry.asset)}}
+                is LibraryEntry.Out -> onSendResultToAgent?.let {send -> leaving {send(entry.job.id,entry.job.outputs[entry.index].id)}}
+            },
+            onUseInCanvas=if(visual && asset!=null) onUseInCanvas?.let {use -> leaving {use(asset)}} else null,
+            onOpenResult=(entry as? LibraryEntry.Out)?.let {out -> leaving {openResult(out)}})
+    }
+    @Composable fun FileDialogs() {
+        optionsFor?.let {FileOptions(it)}
+        renaming?.let {entry -> RenameFileDialog(nameOf(entry),{renaming=null}) {name -> rename(entry,name);renaming=null}}
+    }
+    val viewerStart=viewerAt?.let {key -> flat.indexOfFirst {it.key==key}}
+    // Si lo abierto deja de estar en la lista (ocultado o eliminado), el visor se cierra.
+    if(viewerStart!=null && viewerStart<0) LaunchedEffect(viewerAt) {viewerAt=null}
+    if(viewerStart!=null && viewerStart>=0) LibraryViewer(flat,viewerStart,conflicts,::nameOf,onClose={viewerAt=null},
+        onOptions={optionsFor=it},onOpenDocument={entry ->
+            val mime=when(entry) {is LibraryEntry.Local -> entry.asset.resolvedMime(); is LibraryEntry.Out -> entry.job.outputs[entry.index].mimeType}
+            if(!com.vidadomu.nexus.ui.output.openLocalCopyWithAnotherApp(context,viewerMedia(entry,conflicts).uri,mime)) message("No hay una aplicación disponible para este archivo")
+        }) {FileDialogs()}
+    else FileDialogs()
+    // Arrastrar para marcar: el tramo entre el archivo donde empezó la pulsación larga y el que está bajo el dedo.
+    // Si el primero ya estaba marcado, el arrastre desmarca (como Google Fotos).
+    val gridState=rememberLazyGridState()
+    val view=androidx.compose.ui.platform.LocalView.current
+    val order by rememberUpdatedState(remember(flat) {flat.map {it.key to tokenOf(it)}})
+    val drag=remember {DragRange()}
+    var edgeSpeed by remember {mutableStateOf(0f)}
+    fun markRange(at:Int) {
+        if(at==drag.last || drag.from<0) return
+        val range=order.subList(minOf(drag.from,at),maxOf(drag.from,at)+1).map {it.second}
+        marked=if(drag.adding) drag.base+range else drag.base-range
+        if(drag.last>=0) DragHaptics.slot(view)
+        drag.last=at
+    }
+    LaunchedEffect(edgeSpeed!=0f) {
+        while(edgeSpeed!=0f) {
+            gridState.scrollBy(edgeSpeed)
+            gridState.keyAt(drag.point)?.let {key -> order.indexOfFirst {it.first==key}.takeIf {it>=0}?.let(::markRange)}
+            withFrameNanos {}
+        }
     }
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={if(selecting) LibrarySelectionBar(markedVisible.size,markedVisible.size==1,
         favoritesOn=markedVisible.isNotEmpty() && markedVisible.all {it in favorites},
@@ -252,8 +335,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             scope.launch {snackbar.showSnackbar(if(hide) "$count ocultados" else "$count restaurados")}
         },onOptions={
             val token=markedVisible.first()
-            if(token.startsWith("asset:")) localTarget=localAssets.firstOrNull {"asset:"+it.id==token}
-            else completed.firstNotNullOfOrNull {job -> job.outputs.firstOrNull {OutputFiles.token(it)==token}?.let {job to it}}?.let {actionTarget=it}
+            optionsFor=flat.firstOrNull {tokenOf(it)==token}
             marked=emptySet()
         }) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=16.dp),verticalAlignment=Alignment.CenterVertically) {
 
@@ -323,7 +405,14 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             }
             if(completed.isEmpty() && pending.isEmpty() && localAssets.isEmpty()) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
                 LibraryNoResults(viewFilters,::applyFilters)
-            } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()},
+            } else LazyVerticalGrid(GridCells.Fixed(columns),Modifier.fillMaxSize().pinchColumns(columns) {columns=it;prefs.edit().putInt("grid_cols",it).apply()}
+                .dragToSelect(gridState::keyAt,
+                    onStart={key -> val at=order.indexOfFirst {it.first==key}
+                        if(at<0) false else {drag.base=marked;drag.adding=order[at].second !in marked;drag.from=at;drag.last=-1;markRange(at);DragHaptics.lift(view);true}},
+                    onMove={key -> order.indexOfFirst {it.first==key}.takeIf {it>=0}?.let(::markRange)},
+                    onEdge={speed,at -> drag.point=at;edgeSpeed=speed},
+                    onEnd={edgeSpeed=0f;drag.from=-1}),
+                state=gridState,
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),verticalArrangement=Arrangement.spacedBy(NexusTokens.galleryGap),
                 contentPadding=PaddingValues(bottom=NexusTokens.space16)) {
                 // Trabajos en curso: una línea por trabajo (modelo, estado y tiempo), no una tarjeta.
@@ -349,16 +438,14 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                                 val asset=entry.asset
                                 val token="asset:"+asset.id
                                 LocalAssetTile(asset,imageLoader,showDetails && columns<3,mark=if(selecting) token in marked else null,duplicate=asset.uri in duplicateUris,
-                                    onPreview={if(selecting) toggleMark(token) else localTarget=asset},onActions={toggleMark(token)})
+                                    onPreview={if(selecting) toggleMark(token) else viewerAt=entry.key})
                             }
                             is LibraryEntry.Out -> {
                                 val job=entry.job;val output=job.outputs[entry.index]
                                 val token=OutputFiles.token(output)
                                 LibraryTile(job,output,conflicts,imageLoader,token in favorites,showDetails && columns<3,
-                                    mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris,
-                                    onActions={if(selecting) toggleMark(token) else actionTarget=job to output}) {
-                                    if(selecting) toggleMark(token)
-                                    else if(onNavigateToResult!=null) onNavigateToResult(job.id,jobs.first {it.id==job.id}.outputs.indexOf(output)) else onNavigateToOutput(job.id)
+                                    mark=if(selecting) token in marked else null,duplicate=(OutputFiles.trustedLocalUri(output,conflicts) ?: output.url) in duplicateUris) {
+                                    if(selecting) toggleMark(token) else viewerAt=entry.key
                                 }
                             }
                         }
@@ -371,16 +458,15 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,duplicate:Boolean=false,onActions:()->Unit,onOpen:()->Unit) {
+private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<String>,imageLoader:ImageLoader,favorite:Boolean,showDetails:Boolean,mark:Boolean?,duplicate:Boolean=false,onOpen:()->Unit) {
     val context=LocalContext.current
-    val haptic=LocalHapticFeedback.current
     val interaction=remember {MutableInteractionSource()}
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if(pressed) .96f else 1f,tween(120),label="Media press")
     val duration=mediaDuration(output.durationSeconds)
     val type=when(output.type) {Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.IMAGE->"Imagen";else->"Texto"}
     Box(Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer {scaleX=scale;scaleY=scale}.background(MaterialTheme.colorScheme.surfaceContainer)
-        .combinedClickable(interactionSource=interaction,indication=null,role=Role.Button,onClickLabel="Ver resultado",onClick=onOpen,onLongClickLabel="Opciones del archivo",onLongClick={haptic.performHapticFeedback(HapticFeedbackType.LongPress);onActions()})
+        .clickable(interactionSource=interaction,indication=null,role=Role.Button,onClickLabel="Abrir",onClick=onOpen)
         .semantics(mergeDescendants=true) {contentDescription="$type · ${job.prompt.ifBlank {"Creación"}}${duration?.let {" · $it"}.orEmpty()}"},
         contentAlignment=Alignment.Center) {
         val local=OutputFiles.trustedLocalUri(output,conflicts)
@@ -391,7 +477,7 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
                 imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
             if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
-        // Opciones al mantener pulsado (sin ⋮ encima de la imagen) y sin etiqueta de origen.
+        // Sin ⋮ encima de la imagen ni etiqueta de origen: las opciones están en el visor.
         if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
         else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
         Column(modifier=Modifier.align(Alignment.TopEnd),horizontalAlignment=Alignment.End) {
@@ -409,6 +495,15 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
     }
 }
 
+
+/** Estado de un arrastre para marcar: lo marcado al empezar, si suma o quita, y dónde empezó y va. */
+private class DragRange {
+    var base=emptySet<String>()
+    var adding=true
+    var from=-1
+    var last=-1
+    var point=androidx.compose.ui.geometry.Offset.Zero
+}
 
 /** Un trabajo en curso en una sola línea: progreso, modelo, estado y tiempo transcurrido. */
 @Composable

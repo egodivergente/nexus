@@ -318,7 +318,7 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
 }
 
 @Composable
-private fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)? = null) {
+internal fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -394,7 +394,7 @@ private fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)?
 }
 
 @Composable
-private fun NativeAudioPlayer(audioUrl: String) {
+internal fun NativeAudioPlayer(audioUrl: String) {
     val context = LocalContext.current
     var playbackError by remember(audioUrl) {mutableStateOf<String?>(null)}
     var isPlaying by remember(audioUrl) { mutableStateOf(false) }
@@ -492,7 +492,7 @@ private fun NativeAudioPlayer(audioUrl: String) {
 }
 
 @Composable
-private fun TextOutputViewer(text: String) {
+internal fun TextOutputViewer(text: String) {
     val clipboardManager = LocalClipboardManager.current
     Column(
         modifier = Modifier
