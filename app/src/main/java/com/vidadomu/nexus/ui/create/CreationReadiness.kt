@@ -40,6 +40,6 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
         !item.mimeType.startsWith("$expected/")
     }
     if(wrong) return result(CreationPhase.INVALID,"Revisa el tipo de archivo de cada entrada.",CreationFixTarget.MEDIA)
-    if(model.providerId=="atlas_cloud") com.vidadomu.nexus.provider.atlas.NativeModelSchema.validate(model,(applicable+("prompt" to state.prompt.trim())).filterValues {it.isNotBlank()})?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
+    if(model.providerId=="atlas_cloud") com.vidadomu.nexus.provider.atlas.NativeModelSchema.validate(model,(applicable+("prompt" to state.prompt.trim().takeIf {model.promptAccepted }.orEmpty())).filterValues {it.isNotBlank()})?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
     return CreationReadiness(CreationPhase.READY)
 }
