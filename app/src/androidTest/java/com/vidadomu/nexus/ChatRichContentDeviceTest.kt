@@ -17,6 +17,7 @@ import com.vidadomu.nexus.assistant.*
 import com.vidadomu.nexus.ui.theme.NexusTheme
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -25,10 +26,17 @@ import java.util.concurrent.atomic.AtomicReference
 /** Real Android WebView and stylus events; isolated offline QA package only. */
 class ChatRichContentDeviceTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val testName=org.junit.rules.TestName()
     private val context get()=InstrumentationRegistry.getInstrumentation().targetContext
     @Before fun ready() {
         check(BuildConfig.OFFLINE_QA)
         compose.runOnUiThread {compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)}
+    }
+    @After fun capture() {
+        val folder=File(context.getExternalFilesDir(null),"rich-qa").apply {mkdirs()}
+        val image=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        File(folder,testName.methodName+".png").outputStream().use {image.compress(Bitmap.CompressFormat.PNG,100,it)}
+        image.recycle()
     }
     private fun web(view:View):WebView? = if(view is WebView) view else if(view is ViewGroup)
         (0 until view.childCount).firstNotNullOfOrNull {web(view.getChildAt(it))} else null
@@ -77,9 +85,10 @@ class ChatRichContentDeviceTest {
         val properties=arrayOf(MotionEvent.PointerProperties().apply {id=0;toolType=MotionEvent.TOOL_TYPE_STYLUS})
         listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_MOVE,MotionEvent.ACTION_UP).forEachIndexed {index,action ->
             val coords=arrayOf(MotionEvent.PointerCoords().apply {this.x=x+index*25;this.y=y+index*12;pressure=if(action==MotionEvent.ACTION_UP) 0f else .6f;size=1f})
-            MotionEvent.obtain(now,now+index*40,action,1,properties,coords,0,0,1f,1f,0,0,InputDevice.SOURCE_STYLUS,0).also {
-                InstrumentationRegistry.getInstrumentation().uiAutomation.injectInputEvent(it,true);it.recycle()
+            MotionEvent.obtain(now,SystemClock.uptimeMillis(),action,1,properties,coords,0,0,1f,1f,0,0,InputDevice.SOURCE_STYLUS,0).also {
+                assertTrue("The device rejected the stylus event",InstrumentationRegistry.getInstrumentation().uiAutomation.injectInputEvent(it,true));it.recycle()
             }
+            SystemClock.sleep(40)
         }
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
     }
@@ -98,6 +107,8 @@ class ChatRichContentDeviceTest {
         assertTrue(store.load(id)!!.strokes.isEmpty())
         node.performTouchInput {longClick()}
         compose.onNodeWithText("Anotaciones").performClick()
+        compose.onNodeWithContentDescription("Terminar anotaciones").assertIsDisplayed()
+        compose.waitForIdle()
         stylus(bounds.center.x,bounds.center.y)
         compose.waitUntil(5000) {store.load(id)!!.images.any {it.strokes.isNotEmpty()} || store.load(id)!!.strokes.isNotEmpty()}
         compose.onNodeWithContentDescription("Terminar anotaciones").performClick()

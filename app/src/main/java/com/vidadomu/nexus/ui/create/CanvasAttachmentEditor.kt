@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.assistant.projectMediaMimeType
 import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
@@ -98,7 +99,7 @@ internal fun CanvasAttachmentEditor(
 }
 
 @Composable
-internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: Boolean = true, onRemove: () -> Unit) {
+internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: Boolean = true, thumbnailSize:Dp=112.dp, onRemove: () -> Unit) {
     val context = LocalContext.current
     var preview by remember(media.id) { mutableStateOf(false) }
     val visual = media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")
@@ -108,8 +109,8 @@ internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: 
             .decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) }.build()
         else Uri.parse(media.uriString)
     }
-    Column(Modifier.width(112.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(Modifier.size(112.dp).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+    Column(Modifier.width(thumbnailSize), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(Modifier.size(thumbnailSize).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(enabled = visual) { preview = true }.semantics { contentDescription = "Revisar $label" }) {
             if (visual) AsyncImage(imageModel, label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
                 onError = { imageFailed = true }, onSuccess = { imageFailed = false })
@@ -117,7 +118,7 @@ internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: 
             if (imageFailed) Text("No se pudo abrir", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Center).padding(8.dp))
             if (enabled) StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
         }
-        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+        if(thumbnailSize>=72.dp) Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2)
     }
     if (preview) AlertDialog(onDismissRequest = { preview = false }, title = { Text(label) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

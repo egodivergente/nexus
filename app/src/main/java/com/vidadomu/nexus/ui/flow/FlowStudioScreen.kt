@@ -752,6 +752,7 @@ private fun DraftCard(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ReferencesSection(
     references: List<FlowStudioReference>,
@@ -771,13 +772,13 @@ private fun ReferencesSection(
             }
             TextButton(onClick=onLibrary,enabled=enabled && references.size<maximumReferences) {Text("Biblioteca")}
         }
-        if(references.isNotEmpty()) Text("Todos los prompts · vídeo en modo Referencias",style=MaterialTheme.typography.labelSmall,color=TextMuted)
+        if(references.isNotEmpty() && !WindowInsets.isImeVisible) Text("Para todos los prompts",style=MaterialTheme.typography.labelSmall,color=TextMuted)
         LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(references, key={it.uri}) { ref ->
                 com.vidadomu.nexus.ui.create.CanvasAttachmentTile(
                     com.vidadomu.nexus.core.model.AttachedMedia(id=ref.uri,uriString=ref.uri,mimeType=ref.mimeType,fileName=ref.fileName,
                         slotType=com.vidadomu.nexus.core.model.MediaSlotType.REFERENCE_IMAGE),
-                    "Referencia ${references.indexOf(ref)+1}",enabled) {onRemove(ref)}
+                    "Referencia ${references.indexOf(ref)+1}",enabled,thumbnailSize=if(WindowInsets.isImeVisible) 48.dp else 72.dp) {onRemove(ref)}
             }
         }
     }

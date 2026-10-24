@@ -52,7 +52,7 @@ import java.io.ByteArrayInputStream
                 IconButton(onClick={full=true}) {Icon(Icons.Default.Fullscreen,"Ampliar contenido")}
             }
             if(code) androidx.compose.foundation.text.selection.SelectionContainer {Text(source,Modifier.fillMaxWidth().heightIn(max=360.dp).verticalScroll(rememberScrollState()).padding(12.dp),fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,style=MaterialTheme.typography.bodySmall)}
-            else ChatVisualWebView(language,source,dark,motion,Modifier.fillMaxWidth().height(360.dp))
+            else ChatVisualWebView(language,source,dark,motion,Modifier.fillMaxWidth().height(if(language=="mermaid") 200.dp else 360.dp))
             message?.let {Text(it,Modifier.padding(12.dp),style=MaterialTheme.typography.bodySmall)}
         }
     }

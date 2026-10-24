@@ -41,8 +41,10 @@ Renderizar una imagen en pantalla no demuestra que el proveedor LLM haya recibid
 
 ## Validación
 
-- APK offline QA compilada e instalada en Pixel conservando su sandbox; aún no se ha sustituido Nexus Agent.
+- APK offline QA y pruebas instrumentadas compiladas e instaladas en Pixel conservando su sandbox.
 - JVM: 681 pruebas de app sin fallos; núcleo 317 casos, 0 fallos y 4 omitidos. Estos resultados no prueban una generación real de pago.
 - Puente Flow: 36 pruebas de recuperación/ajustes sin fallos; después del ajuste a los iconos reales, sus 5 pruebas de ajustes vuelven a pasar.
 - Puente actualizado en AXELPC conservando los 10 IDs de trabajos y de petición. Solo se reinició seguimiento pasivo, sin reenvío. Verificación HTTP del nuevo workspace: proyecto real, Omni 1.1 Flash y 16:9.
-- Pendiente: pruebas físicas, certificado/instalación de Agent y validación de generación real. No se han reenviado encargos anteriores.
+- Pixel físico: los 10 comportamientos dirigidos de compositor, referencias, cantidades, errores, Mermaid, HTML, enlaces y lápiz han pasado. El primer recorrido dio 9/10: la inyección de lápiz tras activar Anotaciones necesitó esperar la recomposición y usar tiempos reales. Corregida la sincronización de la prueba, los 4 casos de contenido/lápiz y el compositor Flow vuelven a pasar (5/5). No se oculta aquel primer fallo.
+- Revisión visual: referencias Flow compactadas a 72 dp (48 con teclado); diagrama con vista de 200 dp y ampliación para evitar un panel vacío excesivo.
+- Pendiente: certificado/instalación final de Agent y validación de generación real. No se han reenviado encargos anteriores.
