@@ -23,7 +23,8 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
         }
         return result(CreationPhase.INVALID,message,target)
     }
-    FormContract.invalidValue(model.parameters,state.parameters)?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
+    val applicable=ParameterDependencies.effective(model,state.parameters)
+    FormContract.invalidValue(model.parameters.filter {it.key in applicable || ParameterDependencies.isApplicable(model,it.key,state.parameters)},applicable)?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
     com.vidadomu.nexus.settings.ModelCapabilities.prompt(model)?.takeIf {it.exceeds(state.prompt)}?.let {
         return result(CreationPhase.INVALID,"${model.displayName}: máximo ${it.maximum} ${it.unitLabel}. El prompt original se conserva.",CreationFixTarget.PROMPT)
     }
@@ -39,6 +40,6 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
         !item.mimeType.startsWith("$expected/")
     }
     if(wrong) return result(CreationPhase.INVALID,"Revisa el tipo de archivo de cada entrada.",CreationFixTarget.MEDIA)
-    if(model.providerId=="atlas_cloud") com.vidadomu.nexus.provider.atlas.NativeModelSchema.validate(model,(state.parameters+("prompt" to state.prompt.trim())).filterValues {it.isNotBlank()})?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
+    if(model.providerId=="atlas_cloud") com.vidadomu.nexus.provider.atlas.NativeModelSchema.validate(model,(applicable+("prompt" to state.prompt.trim())).filterValues {it.isNotBlank()})?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
     return CreationReadiness(CreationPhase.READY)
 }

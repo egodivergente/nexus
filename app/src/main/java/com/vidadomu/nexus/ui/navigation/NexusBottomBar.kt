@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -74,8 +75,11 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                         }
                         // «Biblioteca» cabe entera en 1/5 de 360 dp; solo con letra grande del sistema se abrevia.
                         // El texto no se anuncia: la pestaña ya lleva su nombre (antes se leía «Biblioteca Biblio»).
-                        val compactLabel=screen==Screen.Library && LocalDensity.current.fontScale>1.15f
-                        Text(if(compactLabel) "Biblio" else screen.title,style=MaterialTheme.typography.labelMedium,
+                        // Con letra grande el rótulo deja de crecer a partir de 1,15×: el nombre completo cabe siempre.
+                        val fontScale=LocalDensity.current.fontScale
+                        val base=MaterialTheme.typography.labelMedium
+                        val capped=if(fontScale>1.15f) base.copy(fontSize=(base.fontSize.value*1.15f/fontScale).sp) else base
+                        Text(screen.title,style=capped,
                             color=if(selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines=1,softWrap=false,modifier=Modifier.clearAndSetSemantics {})
                     }

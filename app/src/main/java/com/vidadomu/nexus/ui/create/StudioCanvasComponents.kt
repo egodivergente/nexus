@@ -150,7 +150,9 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
 
 @Composable
 internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
-    busyLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier, actionLabel: String = "Generar") {
+    busyLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier, actionLabel: String = "Generar",
+    /** What is still missing, shown on the disabled button itself so no separate strip competes with it. */
+    disabledLabel: String? = null) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if(pressed) .985f else 1f, tween(NexusTokens.pressDuration), label = "Generate press")
@@ -169,7 +171,7 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
                     // The indeterminate spinner loops forever; with reduced motion or hidden, a static glyph keeps the busy label honest.
                     if(working && motionAllowed) CircularProgressIndicator(Modifier.size(16.dp), color = scheme.onPrimary, strokeWidth = 2.dp)
                     else if(working) Icon(Icons.Filled.Timelapse, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(16.dp))
-                    Text(if(working) busyLabel else "$actionLabel · $cost", style = MaterialTheme.typography.titleSmall.tabularMoney(),
+                    Text(if(working) busyLabel else if(!enabled && disabledLabel != null) disabledLabel else "$actionLabel · $cost", style = MaterialTheme.typography.titleSmall.tabularMoney(),
                         modifier=Modifier.weight(1f,fill=false),maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }

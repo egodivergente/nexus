@@ -72,6 +72,13 @@ private fun Asset.mimeOrDefault():String = mimeType?.takeIf {it.isNotBlank()} ?:
     AssetType.IMAGE->"image/*";AssetType.VIDEO->"video/*";AssetType.AUDIO->"audio/*";else->"application/octet-stream"
 }
 
+/** Imported history entries often carry no MIME: the extension, then the asset type, decide it so the preview opens instead of a generic file card. */
+internal fun Asset.resolvedMime():String {
+    mimeType?.takeIf {it.isNotBlank() && it!="application/octet-stream"}?.let {return it}
+    val extension=android.webkit.MimeTypeMap.getFileExtensionFromUrl(Uri.parse(uri).lastPathSegment ?: displayName).ifBlank {displayName.substringAfterLast('.',"")}
+    return android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase()) ?: mimeOrDefault()
+}
+
 /** «1080p · 12,4 MB · 16 oct · 07:14 · video/mp4» bajo el título de la hoja. */
 @Composable
 private fun LocalAssetFacts(asset:Asset) {
@@ -114,7 +121,7 @@ internal fun LocalAssetSheet(asset:Asset,onDismiss:()->Unit,onMessage:(String)->
     val app=context.applicationContext as NexusApplication
     val scope=rememberCoroutineScope()
     var busy by remember {mutableStateOf(false)}
-    val mime=asset.mimeType ?: "application/octet-stream"
+    val mime=asset.resolvedMime()
     val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) {destination ->
         if(destination!=null) {busy=true;scope.launch {
             try {withContext(Dispatchers.IO) {
@@ -134,7 +141,7 @@ internal fun LocalAssetSheet(asset:Asset,onDismiss:()->Unit,onMessage:(String)->
         runCatching {
             val uri=shareableUri(context,asset)
             val intent=Intent(if(share) Intent.ACTION_SEND else Intent.ACTION_VIEW).apply {
-                if(share) {type=asset.mimeType;putExtra(Intent.EXTRA_STREAM,uri)} else setDataAndType(uri,asset.mimeType ?: "application/octet-stream")
+                if(share) {type=asset.resolvedMime();putExtra(Intent.EXTRA_STREAM,uri)} else setDataAndType(uri,asset.resolvedMime())
                 clipData=android.content.ClipData.newRawUri(asset.displayName,uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }

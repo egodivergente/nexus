@@ -116,7 +116,9 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     fun setProjects(next:Set<String>) {selectedProjects=next;prefs.edit().putStringSet("project_filter",next).apply()}
     val projectIndex=remember(index) {LibraryProjectIndex(index)}
     // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
-    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",3).coerceIn(2,6))}
+    // Sin preferencia guardada, las columnas se adaptan al ancho (miniaturas de ~120 dp); el zoom las fija luego.
+    val widthDp=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",(widthDp/120).coerceIn(3,6)).coerceIn(2,6))}
     val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden,selectedProjects)
     val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
     fun applyFilters(next:LibraryViewFilters) {
@@ -255,7 +257,15 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             marked=emptySet()
         }) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=16.dp),verticalAlignment=Alignment.CenterVertically) {
 
-        Text("Biblioteca",modifier=Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall)
+        // Título, recuento y saldo comparten una sola cabecera: ya no hay una fila entera solo para «N archivos · saldo».
+        Column(Modifier.weight(1f)) {
+            Text("Biblioteca",style=MaterialTheme.typography.headlineSmall,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                val count=completed.sumOf {it.outputs.size}+localAssets.size
+                Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1)
+                com.vidadomu.nexus.ui.components.NexusBalanceChip(compact=true)
+            }
+        }
 
         onOpenHistory?.let {go->IconButton(onClick=go) {Icon(Icons.Default.History,"Historial de trabajos")}}
 
@@ -276,16 +286,10 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if(importing) LinearProgressIndicator(Modifier.fillMaxWidth())
-            // Cabecera tranquila: el recuento y el saldo pasan a una línea secundaria y el título queda entero.
-            Row(Modifier.fillMaxWidth().padding(start=NexusTokens.screenMargin,end=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically) {
-                val count=completed.sumOf {it.outputs.size}+localAssets.size
-                Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1,modifier=Modifier.weight(1f))
-                com.vidadomu.nexus.ui.components.NexusBalanceChip()
-            }
             if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
-            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
                 item {Box {
                     StudioFilterChip(selectedProjects.isNotEmpty(),{projectMenu=true},label={Text(if(selectedProjects.isEmpty()) "Proyectos" else "Proyectos · ${selectedProjects.size}")},
                         leadingIcon={Icon(Icons.Default.FolderOpen,null)},modifier=Modifier.semantics {contentDescription="Filtrar por proyectos"})

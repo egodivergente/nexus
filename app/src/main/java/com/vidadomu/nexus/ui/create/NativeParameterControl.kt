@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.core.model.ModelParameter
+import com.vidadomu.nexus.core.model.ParameterBounds
 import com.vidadomu.nexus.core.model.ParameterType
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusTokens
@@ -91,9 +92,12 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                     Spacer(Modifier.height(8.dp))
                 }
                 else -> {
-                    StudioTextField(value, onChange, modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(if (param.isRequired) "Introduce un valor" else "Automático") },
-                        supportingText = range?.let { r -> { Text("Rango: $r") } }, shape = NexusTokens.field)
+                    // Blank is «no se envía», visibly different from a typed value or the provider's automatic choice.
+                    val rangeLine = ParameterPresentation.rangeText(param, LocalConfiguration.current.locales[0])
+                    StudioTextField(value, onChange, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        placeholder = { Text(if (param.isRequired) "Introduce un valor" else "Sin indicar") },
+                        supportingText = rangeLine?.let { line -> { Text(line, maxLines = 1) } },
+                        shape = NexusTokens.field)
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -106,7 +110,11 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
             Text(ParameterPresentation.help(param))
             ParameterPresentation.providerNote(param)?.let { Text("Texto del proveedor: $it", style = MaterialTheme.typography.bodySmall) }
             if (!param.isRequired) Text("Automático deja que el proveedor elija el valor.")
-            range?.let { Text("Rango: $it") }
+            ParameterPresentation.rangeText(param, LocalConfiguration.current.locales[0])?.let { Text(it) }
+            if (param.type in setOf(ParameterType.INTEGER, ParameterType.FLOAT, ParameterType.SLIDER) && ParameterBounds.maximum(param) == null && ParameterBounds.minimum(param) != null)
+                Text("El proveedor no publica un máximo.")
+            if (!param.isRequired && value.isBlank() && choices.isEmpty() && param.type != ParameterType.BOOLEAN)
+                Text("Vacío: este ajuste no se envía y decide el proveedor.")
             Text(ParameterPresentation.diagnosticKey(param), style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }, confirmButton = { TextButton(onClick = { onChange(param.defaultValue); showDetails = false }) {

@@ -37,10 +37,16 @@ import java.util.Date
         .thenBy {if(rules.value("startup.order")=="nombre") it.name.lowercase() else ""}
         .thenByDescending {vm.projectActivity(it.id).takeIf {at->at>0} ?: it.createdAt})
     var all by rememberSaveable {mutableStateOf(false)}
+    val showFox=androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f
     val shown=if(all) projects else projects.take(store.int("startup.recentCount"))
     LaunchedEffect(ui.projects) {creatingName?.let {n->ui.projects.firstOrNull {it.name==n}?.let {creatingName=null;onChoose(it.id)}}}
     Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
         LazyColumn(Modifier.fillMaxSize().safeDrawingPadding(),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            // The NEXUS fox (nodes in cyan, amber details) stays the identity of the entry screen; it shrinks for a share, and is omitted under very large text.
+            if(showFox) item {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.nexus_logo),"Logo oficial de NEXUS",
+                    Modifier.fillMaxWidth().height(if(shared==null) 104.dp else 56.dp),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+            }
             item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(if(shared==null) "Continuar en…" else "Compartir en…",style=MaterialTheme.typography.headlineMedium)

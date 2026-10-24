@@ -44,6 +44,7 @@ import android.widget.Toast
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.model.Modality
+import com.vidadomu.nexus.core.model.ParameterDependencies
 import com.vidadomu.nexus.core.model.NexusModel
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -167,7 +168,8 @@ fun CreateScreen(
                     .padding(horizontal=screenMargin, vertical=8.dp),
                     verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
-                    if(!busy) readiness.message?.let { reason ->
+                    val inlineReason=readiness.fixTarget==CreationFixTarget.MEDIA || readiness.fixTarget==CreationFixTarget.PROMPT
+                    if(!busy && !inlineReason) readiness.message?.let { reason ->
                         if(readiness.fixTarget==null) Text(reason, color=MaterialTheme.colorScheme.onSurface,
                             style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(horizontal=12.dp))
                         else TextButton(onClick={
@@ -197,7 +199,8 @@ fun CreateScreen(
                     val totalCost=canvasQuantityCost(estimate,quantity,currencyManager::formatUsd)
                     StudioGenerateButton(totalCost, readiness.canSubmit, busy,
                         if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
-                        generateAction, actionLabel=if(state.selectedModel?.promptAccepted == false) "Procesar" else if(quantity.count>1 && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO)) "Generar ${quantity.count}" else "Generar")
+                        generateAction, actionLabel=if(state.selectedModel?.promptAccepted == false) "Procesar" else if(quantity.count>1 && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO)) "Generar ${quantity.count}" else "Generar",
+                        disabledLabel=if(inlineReason) readiness.message else null)
                 }
             }
         },
@@ -297,10 +300,13 @@ fun CreateScreen(
                     if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
                     if(state.selectedModel?.promptAccepted != false) StudioToolChip("Inspirar") {showInspiration=true}
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
-                    StudioToolChip("BytePlus", "Usar mi cuenta BytePlus") {showBytePlus=true}
+                    // BytePlus is a separate account route: only surfaced when it is the active provider; otherwise it lives under «Más».
+                    if(state.selectedModel?.providerId==BYTEPLUS_MEDIA_PROVIDER) StudioToolChip("BytePlus", "Usar mi cuenta BytePlus") {showBytePlus=true}
                     Box {
                         StudioToolChip("Más", "Más herramientas del Lienzo") {showToolMenu=true}
                         DropdownMenu(expanded=showToolMenu,onDismissRequest={showToolMenu=false}) {
+                            if(state.selectedModel?.providerId!=BYTEPLUS_MEDIA_PROVIDER) DropdownMenuItem(text={Text("Usar mi cuenta BytePlus")},
+                                onClick={showToolMenu=false;showBytePlus=true})
                             DropdownMenuItem(text={Text("Mis ajustes")},enabled=state.schemaReady && !state.isSubmitting,
                                 onClick={showToolMenu=false;showPersonalPresets=true})
                         }
@@ -310,8 +316,9 @@ fun CreateScreen(
 
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
-                val inline=state.selectedModel?.let(CanvasInputPlan::primaryParameters).orEmpty().filter {it.key!=countParam?.key}
-                if(inline.isNotEmpty() || state.selectedModel?.parameters?.any {it.isAdvanced} == true) item(key="inline-params") {
+                val selectedForParams=state.selectedModel
+                val inline=selectedForParams?.let {model -> ParameterDependencies.visible(model,com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters),state.parameters)}.orEmpty().filter {it.key!=countParam?.key}
+                if(selectedForParams!=null && inline.isNotEmpty()) item(key="inline-params") {
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
                         Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -321,17 +328,13 @@ fun CreateScreen(
                                 verticalAlignment=Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("Ajustes de ${state.selectedModel?.let(::canvasModelIdentity)?.title.orEmpty()}",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
-                                    Text(inline.take(3).joinToString(" · ") {param -> ParameterPresentation.describe(param,state.parameters[param.key] ?: param.defaultValue)}.ifBlank {"Opciones avanzadas"},
+                                    Text(parameterSummary(selectedForParams!!,inline,state.parameters).ifBlank {"Valores del proveedor"},
                                         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 }
                                 Icon(if(inlineParametersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
                             }
                             if(inlineParametersExpanded) {
-                                inline.forEach { param ->
-                                    key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
-                                }
-                                if(state.selectedModel?.parameters?.any {it.isAdvanced} == true)
-                                    TextButton(onClick={showParameters=true}) {Text("Ajustes avanzados")}
+                                ParameterSheetContent(selectedForParams!!,inline,state.parameters) {key,value -> viewModel.updateParameter(key,value)}
                             }
                         }
                     }
@@ -366,13 +369,7 @@ fun CreateScreen(
         }
         if(state.schemaReady) {
             val params=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty().filter {it.key!=countParam?.key}
-            params.filter { !it.isAdvanced }.forEach { param ->
-                key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
-            }
-            if(params.any {it.isAdvanced}) Text("Opciones adicionales",style=MaterialTheme.typography.titleMedium)
-            params.filter {it.isAdvanced}.forEach { param ->
-                key(state.selectedModel?.id,param.key) { NativeParameterControl(param,state.parameters[param.key] ?: param.defaultValue) {viewModel.updateParameter(param.key,it)} }
-            }
+            state.selectedModel?.let {model -> ParameterSheetContent(model,params,state.parameters) {key,value -> viewModel.updateParameter(key,value)}}
         }
     }
     if(showInspiration) CanvasSheet("Inspiración",{showInspiration=false}) {

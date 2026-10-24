@@ -139,3 +139,6 @@ agent-core 165, núcleo de escritorio 165. Pendiente: probar las claves reales d
 capturar Modelos, la hoja única y el micrófono en el S25 (estaba en uso) y pintar encargos en Windows.
 
 El 17 de octubre se añadió BytePlus ModelArk (Responses API, modelo dola-seed-2-1-turbo-260628), proveedores LLM y multimedia definidos por el usuario y límites configurables en todo el agente (ver CHANGELOG 1.9.23). Pendiente: **activar el modelo en la consola de Ark** (la cuenta devuelve ModelNotOpen) y repetir BytePlusLiveTest con la clave real; instalar en el S25 cuando esté conectado; y comprobar en pantalla que los modelos de un generador propio aparecen en el Lienzo.
+
+
+El 24 de octubre de 2026 se aplicó el paquete de correcciones UX/UI (ArtBox, Lanzadera, Flow, Biblioteca, «Continuar en…») en la rama `ux/correcciones-capturas-20261024` sobre `83db30a` (1.9.73/vc107): Android `1.9.74-agent-preview`/vc108 instalada en el Pixel 8 Pro con los datos conservados. Detalle, pruebas (app 659, agent-core 313) y límites en `docs/UX-CORRECCIONES-20261024.md`. Pendiente: compositor colapsable en el visor de Biblioteca, dependencias de campos de otros modelos, pruebas instrumentadas y generación nueva en Flow desde el Pixel. El S25 no se ha tocado.
