@@ -72,7 +72,7 @@ jobs:
           disk-size: 2048M
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             adb install -r app/build/outputs/apk/offlineQa/app-offlineQa.apk
             adb install -r app/build/outputs/apk/androidTest/offlineQa/app-offlineQa-androidTest.apk
             adb shell am instrument -w -r -e class com.vidadomu.nexus.assistant.AssistantPresentationUiTest,com.vidadomu.nexus.ChatRichContentDeviceTest com.vidadomu.nexus.qa.test/androidx.test.runner.AndroidJUnitRunner | tee ui-evidence-instrumentation.log
