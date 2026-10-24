@@ -10,6 +10,12 @@ import java.util.Locale
 class CatalogRefreshRegressionTest {
     private val models = AtlasModelMapper.parseModelsResponse(javaClass.getResource("/native/catalog-public.json")!!.readText())
 
+    @Test fun conventionalAudioIsNotASpecializedTool() {
+        val audio = models.first().copy(id = "vendor/text-to-speech", providerModelId = "vendor/text-to-speech",
+            modalities = listOf(com.vidadomu.nexus.core.model.Modality.AUDIO), capabilities = emptyList())
+        assertNull(toolCategory(audio))
+    }
+
     @Test fun refreshKeepsHiddenRoutesWhenProviderRenamesUnknownFamily() {
         val original = models.first().copy(id="vendor/engine", providerModelId="vendor/engine", modelFamily="Original", displayName="Original")
         val hidden = setOf(familyVisibilityKey("Original"))

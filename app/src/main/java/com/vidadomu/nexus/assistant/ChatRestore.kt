@@ -26,7 +26,10 @@ internal object ChatRestore {
     fun clean(saved: SavedAssistantChat, now: Long = System.currentTimeMillis()): Result {
         // 1. La misma tarjeta (mismo plan) repetida: se conserva la primera.
         val seenPlans = mutableSetOf<String>()
-        var items = saved.items.filter { it !is ChatItem.PlanCard || seenPlans.add(it.planId) }
+        val discardedOrders = saved.orders?.orders.orEmpty().filter { it.status == OrderStatus.DISCARDED }.map { it.id }.toSet()
+        var items = saved.items.filter { it !is ChatItem.PlanCard ||
+            (saved.plans[it.planId] != null && saved.plans[it.planId]?.state != PlanState.DISCARDED &&
+                it.orderId !in discardedOrders && seenPlans.add(it.planId)) }
         // Avisos de versiones anteriores que contradicen el estado verificado de la tarjeta.
         items = items.filterNot { it is ChatItem.Notice && !it.error && STALE_SENT.containsMatchIn(it.text) }
 
@@ -48,7 +51,7 @@ internal object ChatRestore {
         val removed = mutableSetOf<String>()
         val merged = mutableMapOf<String, Order>()
         items.filterIsInstance<ChatItem.PlanCard>().filter { orderOf[it.planId]?.status in MERGEABLE }
-            .groupBy { card -> saved.plans.getValue(card.planId).plan.let { p -> Triple(p.ref, p.media.map { it.uri }.sorted(), if (p.media.isEmpty()) p.prompt else "") } }
+            .groupBy { card -> saved.plans.getValue(card.planId).plan.fingerprint() }
             .values.filter { it.size > 1 }.forEach { group ->
                 val keep = orderOf.getValue(group.last().planId)
                 val older = group.dropLast(1).map { orderOf.getValue(it.planId) }

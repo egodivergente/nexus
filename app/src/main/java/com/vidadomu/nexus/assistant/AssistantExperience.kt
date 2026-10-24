@@ -87,12 +87,18 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
       Column {
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+        if (onShowLibrary != null) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            IconButton(onClick = { if (libraryExpanded) onHideLibrary() else onShowLibrary() },
+                modifier = Modifier.size(48.dp).semantics {
+                    contentDescription = if (libraryExpanded) "Cerrar accesos" else "Abrir accesos"
+                }) {
+                Box(Modifier.size(if (libraryExpanded) 8.dp else 6.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant, androidx.compose.foundation.shape.CircleShape))
+            }
+        }
         Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
         border=androidx.compose.foundation.BorderStroke(1.dp,com.vidadomu.nexus.ui.theme.BorderEssential),
-        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)
-            .then(if (onShowLibrary != null) Modifier.recentLibraryGesture(opening = !libraryExpanded) {
-                if (libraryExpanded) onHideLibrary() else onShowLibrary()
-            } else Modifier)) {
+        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),

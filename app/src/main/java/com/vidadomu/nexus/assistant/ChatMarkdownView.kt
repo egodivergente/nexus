@@ -112,11 +112,13 @@ fun ChatMarkdownView(
     streaming: Boolean = false,
     answered: String? = null,
     onReply: ((String) -> Boolean)? = null,
+    selectable: Boolean = true,
 ) {
     val st = mdStyles()
     val blocks = remember(text, streaming) { ChatMarkdown.parse(text, streaming) }
     val ctx = remember(answered, onReply) { WidgetCtx(answered, onReply) }
-    SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
+    if (selectable) SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
+    else Box(modifier) { MdBlockList(blocks, st, ctx) }
 }
 
 @Composable

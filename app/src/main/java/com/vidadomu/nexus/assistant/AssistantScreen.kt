@@ -309,6 +309,8 @@ fun AssistantScreen(
                                 onAskAgent = { vm.askAgentToFix(order.id) },
                                 onEdit = { vm.editPlan(p.plan.id, it) },
                                 onDiscard = { vm.discardPlan(p.plan.id) },
+                                onRemove = { vm.removeFailedCard(p.plan.id) },
+                                onPrepareRetry = { vm.editPlan(p.plan.id, PlanEdit()) },
                                 onOpenCanvas = { scope.launch { vm.canvasState(p.plan.id)?.let(onOpenInCanvas) } },
                                 onOpenOutput = { (p.jobId ?: order.jobId)?.let(onNavigateToOutput) },
                                 onRendered = { vm.cardRendered(order.id, it) },
@@ -624,19 +626,47 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
 }
 
 @Composable
-private fun UserBubble(item:ChatItem.User) {
+internal fun UserBubble(item:ChatItem.User) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var actions by rememberSaveable(item.id) { mutableStateOf(false) }
+    var selection by rememberSaveable(item.id) { mutableStateOf(false) }
+    if (selection) MessageSelectionDialog(item.text) { selection = false }
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
         // Tu mensaje: completo (nunca truncado), ancho casi total para ganar altura, con el acento en degradado y seleccionable.
         val accent=MaterialTheme.colorScheme.primary
         val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.30f),accent.copy(alpha=.16f)))}
         Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)
-            .background(brush,NexusTokens.card)) {
-            androidx.compose.foundation.text.selection.SelectionContainer {
+            .background(brush,NexusTokens.card)
+            .combinedClickable(onClick = {}, onLongClickLabel = "Acciones del mensaje", onLongClick = { actions = true })) {
                 Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
+            DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
+                DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, onClick = {
+                    clipboard.setText(AnnotatedString(item.text)); actions = false
+                })
+                DropdownMenuItem(text = { Text("Seleccionar fragmento") }, onClick = { actions = false; selection = true })
+                DropdownMenuItem(text = { Text("Compartir mensaje") }, onClick = {
+                    actions = false
+                    runCatching {
+                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"; putExtra(Intent.EXTRA_TEXT, item.text)
+                        }, "Compartir mensaje"))
+                    }.onFailure { Toast.makeText(context, "No se pudo compartir el mensaje", Toast.LENGTH_SHORT).show() }
+                })
             }
         }
     }
+}
+
+@Composable
+private fun MessageSelectionDialog(text: String, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Seleccionar y copiar") },
+        text = {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(text, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()))
+            }
+        }, confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
 }
 
 /** Lo que el usuario contestó justo después de este mensaje (para bloquear sus paneles y marcar la opción elegida). */
@@ -647,10 +677,12 @@ private fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): String
 }
 
 @Composable
-private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null) {
+internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
+    var selection by rememberSaveable(item.id) { mutableStateOf(false) }
+    if (selection) MessageSelectionDialog(item.text) { selection = false }
     var showSteps by rememberSaveable(item.id) {mutableStateOf(false)}
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         if(item.text.isNotBlank()) {
@@ -662,8 +694,9 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 val streaming = item.stop == "STREAMING"
                 ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) }, streaming = streaming,
-                    answered = answered, onReply = if (streaming) null else onReply)
+                    answered = answered, onReply = if (streaming) null else onReply, selectable = false)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
+                    DropdownMenuItem(text = { Text("Seleccionar fragmento") }, onClick = { actionsExpanded = false; selection = true })
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
                         Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()

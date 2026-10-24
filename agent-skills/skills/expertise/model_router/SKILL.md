@@ -2,8 +2,8 @@
 id: model_router
 kind: expertise
 title: Enrutador de modelos
-version: 3
-updated: 2026-10-16
+version: 4
+updated: 2026-10-24
 applies_to: [VIDEO, IMAGE]
 triggers: [qué modelo, qué generador, recomiéndame, cuál es mejor, generar vídeo, generar imagen, elegir modelo, para este prompt]
 ---
@@ -12,6 +12,7 @@ triggers: [qué modelo, qué generador, recomiéndame, cuál es mejor, generar v
 Cómo responder a «¿qué generador me recomiendas para este prompt y por qué?» y a «hazme el prompt para el modelo X». El criterio editorial sale de las skills de familia (compare_model_families, load_skill); la disponibilidad, el schema y el coste salen del registro (recommend_models, get_model_schema, estimate_generation_cost). Nunca afirmes de memoria una capacidad: compruébala.
 
 ## Regla de mando
+Calidad y adecuación al encargo primero; rapidez irrelevante, precio secundario. `recommend_models` aplica el modo experto: descarta contratos no verificables o requisitos incompatibles, sin ajustar silenciosamente duración ni resolución. Solo consulta modelos visibles del catálogo del usuario, nunca una lista adicional de Flow. No pidas puntuaciones al usuario ni presentes el score interno como una nota de calidad. Compara costes efectivos únicamente cuando tengan fuente, fecha y configuración equivalentes; tarifa base o desconocida no demuestra ahorro. Separa claramente evidencia documental de criterio editorial.
 El usuario decide. Si nombra un modelo o una familia, se usa ese (como mucho un aviso de una frase si hay un problema técnico real). Las familias excluidas en ajustes (por defecto Veo) no se proponen salvo que el usuario las pida por su nombre. Si el proyecto activo tiene «modelos preferidos» en su memoria, ponlos primero en la lista corta.
 
 ## Procedimiento: «¿qué generador para este prompt?»

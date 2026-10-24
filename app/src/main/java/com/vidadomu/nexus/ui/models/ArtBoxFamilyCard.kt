@@ -22,7 +22,7 @@ import com.vidadomu.nexus.core.model.*
         modifier=Modifier.fillMaxWidth().combinedClickable(onClick=onOpen,onLongClick=onOptions,onLongClickLabel="Opciones de ${section.family}")) {
         Column(Modifier.fillMaxWidth().heightIn(min=154.dp).background(Brush.linearGradient(listOf(colors.primary.copy(alpha=.035f),colors.surface.copy(alpha=0f))))
             .padding(horizontal=8.dp,vertical=16.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=48.dp,containerSize=52.dp)
+            BrandLogo(family=section.family,size=48.dp,containerSize=52.dp)
             Text(section.family,style=MaterialTheme.typography.titleSmall,minLines=3,maxLines=3,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
             Text(pluralModelos(section.models.map(::modelGroupTitle).distinct().size),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
         }
@@ -38,8 +38,8 @@ internal fun toolCategory(model: NexusModel): String? {
         CatalogWorkflow.EXTEND in tasks -> "Extender vídeo"
         CatalogWorkflow.UPSCALE in tasks -> if(Modality.VIDEO in model.modalities) "Mejorar vídeo" else "Mejorar imagen"
         tasks.any {it in setOf(CatalogWorkflow.INPAINT,CatalogWorkflow.OUTPAINT,CatalogWorkflow.LAYERS,CatalogWorkflow.REMOVE_BACKGROUND)} -> "Edición de imagen"
+        CatalogWorkflow.EDIT_IMAGE in tasks && CatalogWorkflow.CREATE_IMAGE !in tasks -> "Edición de imagen"
         CatalogWorkflow.EDIT_VIDEO in tasks -> "Edición de vídeo"
-        CatalogWorkflow.AUDIO in tasks -> "Audio, música y voz"
         else -> null
     }
 }

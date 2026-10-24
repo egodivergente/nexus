@@ -791,6 +791,17 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         setPlan(planId) { it.copy(state = PlanState.DISCARDED) }
     }
 
+    fun removeFailedCard(planId: String) {
+        val plan = _ui.value.plans[planId] ?: return
+        if (plan.busy || plan.state == PlanState.UNCERTAIN) return
+        if (orderOf(planId)?.status != com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED &&
+            plan.jobStatus !in setOf("FAILED", "CANCELLED")) return
+        discardPlan(planId)
+        if (_ui.value.plans[planId]?.state == PlanState.DISCARDED) {
+            _ui.update { state -> state.copy(items = state.items.filterNot { it is ChatItem.PlanCard && it.planId == planId }) }
+        }
+    }
+
     /**
      * Envía un plan revisado desde la acción individual o la acción del bloque.
      * La huella evita enviar parámetros distintos de los mostrados.
@@ -867,7 +878,19 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (tracked.isEmpty()) return
         val byId = jobs.associateBy { it.id }
         for (p in tracked) {
-            val job = byId[p.jobId] ?: continue
+            val job = byId[p.jobId]
+            if (job == null) {
+                if (!app.generationRepository.historyLoading.value && app.generationRepository.historyError.value == null &&
+                    p.state == PlanState.SUBMITTED && p.jobStatus !in setOf("COMPLETED", "FAILED", "CANCELLED")) {
+                    val message = "No se encuentra el trabajo en el historial local. Comprueba el proveedor; no se reenviará automáticamente."
+                    runtime.guard.markUncertain(p.plan.id)
+                    orderOf(p.plan.id)?.takeIf { it.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING }?.let {
+                        runtime.orders.uncertain(it.id, message, p.jobId)
+                    }
+                    setPlan(p.plan.id) { it.copy(state = PlanState.UNCERTAIN, busy = false, submitting = false, error = message) }
+                }
+                continue
+            }
             val st = when (job.status) {
                 GenerationStatus.COMPLETED -> "COMPLETED"; GenerationStatus.FAILED -> "FAILED"; GenerationStatus.CANCELLED -> "CANCELLED"
                 GenerationStatus.UPLOADING, GenerationStatus.QUEUED -> "PENDING"; else -> "PROCESSING"

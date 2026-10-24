@@ -114,6 +114,8 @@ internal fun OrderCard(
     onOpenHistory: () -> Unit = {},
     modifier: Modifier = Modifier,
     presentation: AssistantPresentation = AssistantPresentation(),
+    onRemove: () -> Unit = onDiscard,
+    onPrepareRetry: () -> Unit = { onEdit(PlanEdit()) },
 ) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency = app.currencyManager
@@ -156,6 +158,10 @@ internal fun OrderCard(
                         DropdownMenuItem({ Text(if (expanded) "Ocultar detalles" else "Detalles") }, { menu = false; expanded = !expanded })
                         if (order.status.editable) DropdownMenuItem({ Text("Abrir en el Lienzo") }, { menu = false; onOpenCanvas() }, enabled = !p.busy)
                         if (order.status.editable) DropdownMenuItem({ Text("Descartar") }, { menu = false; onDiscard() }, enabled = !p.busy && !assistantBusy)
+                        if (order.status == OrderStatus.FAILED) {
+                            DropdownMenuItem({ Text("Revisar reintento") }, { menu = false; onPrepareRetry() }, enabled = !p.busy && !assistantBusy)
+                            DropdownMenuItem({ Text("Eliminar tarjeta · conservar medios") }, { menu = false; onRemove() }, enabled = !p.busy && !assistantBusy)
+                        }
                         DropdownMenuItem({ Text("Abrir Historial") }, { menu = false; onOpenHistory() })
                     }
                 }

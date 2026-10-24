@@ -1,3 +1,16 @@
+# Segunda entrega ArtBox - 2026-10-24
+
+Rama segura `codex/artbox-integral-2-20261024`, base local `13fa404`.
+Ver `docs/ARTBOX-SECOND-DELIVERY-20261024.md`: acciones de chat/encargos,
+restauración, punto del compositor, gestos, logos persistentes y selección experta.
+Fal e inferencia local completa NO se declaran terminados. Pruebas UI requieren
+instalación y quedan sin ejecutar por prohibición expresa. No publicar esta rama.
+Conservar cambios ajenos de `gradlew.bat` y los demás worktrees.
+Validación final: app 677 PASS; agent-core 312 PASS y 4 omitidas; APK y
+compilación de tests UI PASS. APK SHA-256
+`531EFEA3BF4CB3DAD27463604760AE180C66D9D72E1738F1479D3B83EA0C794B`.
+Sin instalación ni push. Fal e inferencia con pesos/S Pen real siguen pendientes.
+
 # ArtBox: editor local y servicio Atlas - 2026-10-24
 
 Continuación en rama aislada `codex/artbox-local-inpaint-atlas-20261024`,

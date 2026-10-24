@@ -29,7 +29,7 @@ class CatalogMinimalUiTest {
         val initial=app.generationRepository.allJobs.value.map {it.id}
         var selected:NexusModel?=null
         try {
-            compose.setContent {NexusTheme {NexusChrome({},{fail("No generation requested")}) {ModelsScreen {selected=it}}}}
+            compose.setContent {NexusTheme {NexusChrome({},{fail("No generation requested")}) {ModelsScreen(onSelectModelAndCreate = {selected=it})}}}
             compose.onNodeWithText("Favoritos").assertExists()
             compose.onNodeWithContentDescription("Opciones del catálogo").performClick()
             compose.onNodeWithText("Modelos ocultos",substring=true).performClick()

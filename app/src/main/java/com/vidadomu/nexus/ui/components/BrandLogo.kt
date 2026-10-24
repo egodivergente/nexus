@@ -27,7 +27,7 @@ import com.vidadomu.nexus.R
 import com.vidadomu.nexus.ui.theme.BorderSubtle
 
 @Composable
-fun BrandLogo(
+internal fun DefaultBrandLogo(
     organization: String? = null,
     family: String? = null,
     modelId: String? = null,

@@ -1,5 +1,10 @@
 package com.vidadomu.nexus
 
+import androidx.compose.foundation.layout.systemGestures
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -181,7 +186,8 @@ class MainActivity : ComponentActivity() {
                         modifier=Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
                         composable("workspace") {
                             LaunchedEffect(tabRequest) {tabRequest?.let {pager.scrollToPage(it);tabRequest=null}}
-                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,modifier=Modifier.fillMaxSize()) {index ->
+                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,
+                                modifier=Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Horizontal))) {index ->
                                 holder.SaveableStateProvider(tabs[index].route) {
                                 when(tabs[index]) {
                             Screen.Assistant -> {

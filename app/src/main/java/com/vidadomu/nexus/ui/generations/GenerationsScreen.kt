@@ -223,7 +223,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                 }
                                 DropdownMenuItem(text={Text(if(job.id in archived) "Restaurar en recientes" else "Archivar")},onClick={close();archived=if(job.id in archived) archived-job.id else archived+job.id;archivePrefs.edit().putStringSet("ids",archived).apply()})
                                 DropdownMenuItem(text={Text("Diagnóstico")},onClick={close();selectedTechnicalJob=job})
-                                if(isTerminal) DropdownMenuItem(text={Text("Eliminar del historial")},onClick={close();
+                                if(isTerminal && job.outputs.isEmpty()) DropdownMenuItem(text={Text("Eliminar del historial")},onClick={close();
                                     scope.launch {
                                         app.generationRepository.deleteJob(job.id)
                                         android.widget.Toast.makeText(context, "Trabajo eliminado del historial", android.widget.Toast.LENGTH_SHORT).show()

@@ -59,10 +59,10 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
     private suspend fun models(): List<NexusModel> =
         withTimeoutOrNull(15_000) { app.modelCatalogRepository.models.first { it.isNotEmpty() } } ?: app.modelCatalogRepository.models.value
 
-    override suspend fun list(): List<ModelSummary> = (models() + app.flowBridgeProvider.getModels()).distinctBy { "${it.providerId}:${it.id}" }.map(::summary)
+    override suspend fun list(): List<ModelSummary> = models().distinctBy { "${it.providerId}:${it.id}" }.map(::summary)
 
     private suspend fun find(ref: ModelRef): NexusModel =
-        (models() + app.flowBridgeProvider.getModels()).firstOrNull { it.id == ref.modelId && it.providerId == ref.providerId }
+        models().firstOrNull { it.id == ref.modelId && it.providerId == ref.providerId }
             ?: throw IllegalArgumentException("${ref.modelId} no está visible en el catálogo de Nexus.")
 
     override suspend fun schema(ref: ModelRef): ModelSchema {
@@ -73,7 +73,7 @@ class NexusModelRegistry(private val app: NexusApplication) : ModelRegistry {
         } else Triple(agentMediaContract(model).copy(parameters = FormContract.normalize(model.parameters)), emptyList(), "contrato de ${model.providerId} en Nexus")
         configured["${ref.providerId}:${ref.modelId}"] = cfg
         return toSchema(ref, cfg, unsupported, source).copy(textLimits =
-            ProviderPromptLimits.forModel(model)?.let { mapOf("prompt" to it) }.orEmpty())
+            ProviderPromptLimits.forModel(cfg)?.let { mapOf("prompt" to it) }.orEmpty())
     }
 
     /** Modelo ya configurado con su schema (el mismo objeto que usaría el Lienzo). */
@@ -173,9 +173,9 @@ class NexusQuoteEstimator(private val registry: NexusModelRegistry) : CostEstima
         val native = registry.configuredModel(model.ref)
         val images = if (native.supportsImageInput) 1 else 0
         val q = AtlasPriceQuote.fetch(native, params, images) ?: return CostEstimate(null, CostConfidence.UNKNOWN, "Atlas no devolvió cotización.")
-        return if (q.unit == null && !q.baseTariff) {
+        return if (q.isRequestTotal && q.unit == null && !q.baseTariff) {
             CostEstimate(q.usd, CostConfidence.NEXUS_QUOTE, q.configuration.ifBlank { "Calculadora de Atlas" }, source = "https://api.atlascloud.ai/api/v1/model/calculate",
-                checkedAt = java.time.Instant.ofEpochMilli(q.checkedAt).toString().take(10), notes = listOf("Cotización para esta configuración; el cargo real lo confirma el proveedor."))
+                checkedAt = java.time.Instant.ofEpochMilli(q.checkedAt).toString(), notes = listOf("Cotización para esta configuración; el cargo real lo confirma el proveedor."))
         } else CostEstimate(null, CostConfidence.BASE_ONLY, "${"%.3f".format(java.util.Locale.ROOT, q.unitUsd ?: q.usd)} $ por ${q.unit ?: "unidad"}", q.unitUsd, q.unit)
     }
 }

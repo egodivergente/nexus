@@ -74,8 +74,27 @@ class OrderCardLogicTest {
         assertTrue(withFix.rendered.startsWith("Error · botón «Aplicar corrección»"))
     }
 
+    @Test fun restorePreservesDifferentInstructionsAndParametersForSameMedia() {
+        val plans = listOf(plan("a"), plan("b").copy(prompt = "Different instructions"),
+            plan("c", template = "anime-enhance-4k"))
+        val saved = SavedAssistantChat(plans.map { ChatItem.PlanCard("card-${it.id}", it.id) },
+            plans.associate { it.id to PlanUi(it, true, PlanState.PREPARED) })
+        val restored = ChatRestore.clean(saved)
+        assertEquals(3, restored.items.size)
+        assertTrue(restored.discardedPlanIds.isEmpty())
+    }
+
+    @Test fun restoreRemovesDiscardedAndOrphanCardsWithoutTouchingMessages() {
+        val saved = SavedAssistantChat(listOf(ChatItem.PlanCard("gone", "missing"),
+            ChatItem.PlanCard("discarded", "a"), ChatItem.User("user", "Keep\nhttps://example.org", emptyList())),
+            mapOf("a" to PlanUi(plan("a"), false, PlanState.DISCARDED)))
+        val restored = ChatRestore.clean(saved)
+        assertEquals(listOf(saved.items.last()), restored.items)
+        assertEquals(restored.items, ChatRestore.clean(SavedAssistantChat(restored.items, restored.plans, orders = restored.orders)).items)
+    }
+
     @Test fun savedChatWithTriplicatedCardsShowsOneCardPerOrder() {
-        val p1 = PlanUi(plan("p1", template = "anime-enhance-4k"), true, PlanState.PREPARED)
+        val p1 = PlanUi(plan("p1"), true, PlanState.PREPARED)
         val p2 = PlanUi(plan("p2"), true, PlanState.AWAITING_CONFIRMATION)
         val done = PlanUi(plan("p3", video = "file:///otro.mp4"), false, PlanState.SUBMITTED, jobId = "job_9", jobStatus = "COMPLETED")
         val saved = SavedAssistantChat(

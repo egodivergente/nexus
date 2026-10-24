@@ -177,6 +177,7 @@ class RecommendModelsTool(private val d: ToolDeps) : BaseTool(
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val spec = TaskSpec(
+            expertQuality = true,
             modality = input.req("modality").uppercase(),
             task = input.req("task").lowercase(),
             durationSec = input.int("duration_sec"),
@@ -193,7 +194,14 @@ class RecommendModelsTool(private val d: ToolDeps) : BaseTool(
             limit = d.limits().boundedCount(input.int("limit"),3,d.limits().maxRecommendations),
         )
         if (spec.task !in TASKS) throw ToolInputException("Tarea desconocida «${spec.task}».")
-        return ok(d.router.route(spec).toJson())
+        val result = d.router.route(spec).toJson() as JsonObject
+        fun withoutScore(value: kotlinx.serialization.json.JsonElement) =
+            if (value is JsonObject) JsonObject(value.filterKeys { it != "score" }) else value
+        return ok(JsonObject(result.mapValues { (key, value) -> when (key) {
+            "recommended" -> withoutScore(value)
+            "alternatives" -> JsonArray((value as JsonArray).map(::withoutScore))
+            else -> value
+        } }))
     }
 }
 
