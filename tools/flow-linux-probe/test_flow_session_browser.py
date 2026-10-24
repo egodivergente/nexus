@@ -5,7 +5,8 @@ import unittest
 from unittest.mock import patch
 
 from playwright.async_api import async_playwright
-from flow_session import sign_in, repair_project_page, saved_project, remember_project
+from flow_session import sign_in, repair_project_page, saved_project, remember_project, preserve_recovery_draft
+import json
 from auto_auth import CredentialExpiredError
 
 
@@ -141,6 +142,53 @@ class SavedLoginTests(unittest.IsolatedAsyncioTestCase):
         await self.page.set_content('<textarea>private manual draft</textarea>')
         self.assertEqual(await repair_project_page(self.page), 'flow_composer_not_empty')
         self.assertEqual(len(visits), 2)
+
+    async def text_draft_fixture(self):
+        html = '''<section><div contenteditable="true" aria-label="¿Qué quieres crear?"></div>
+        <button aria-label="Añadir ingredientes a ventana para peticiones">+</button>
+        <button aria-label="Iniciar generación">Generate</button></section>'''
+        async def fixture(route):
+            await route.fulfill(content_type='text/html; charset=utf-8', body=html)
+        await self.page.route('**/*', fixture)
+        await self.page.goto('https://flow.google.com/project/draft-fixture')
+        return self.page.locator('[contenteditable="true"]')
+
+    async def test_periodic_auth_refresh_preserves_text_draft_and_restores_it(self):
+        composer = await self.text_draft_fixture()
+        text = 'Mi borrador 😀\ntexto guardado'
+        await composer.fill(text)
+        root = Path(self.tmp.name)
+        async with preserve_recovery_draft(self.page, root, True):
+            self.assertEqual((await composer.inner_text()).strip(), '')
+            self.assertEqual(await repair_project_page(self.page, refresh=True), 'reloaded')
+        self.assertEqual(await composer.inner_text(), text)
+        backup, = (root / 'flow-drafts').glob('*.json')
+        self.assertEqual(json.loads(backup.read_text('utf-8'))['text'], text)
+
+    async def test_new_manual_edit_after_refresh_wins_over_old_backup(self):
+        composer = await self.text_draft_fixture()
+        await composer.fill('previous draft')
+        async with preserve_recovery_draft(self.page, Path(self.tmp.name), True):
+            self.assertEqual(await repair_project_page(self.page, refresh=True), 'reloaded')
+            await composer.fill('new manual edit')
+        self.assertEqual(await composer.inner_text(), 'new manual edit')
+
+    async def test_manual_reference_blocks_refresh_without_clearing_any_text(self):
+        composer = await self.text_draft_fixture()
+        await composer.fill('keep draft with reference')
+        await self.page.evaluate('''() => {const img=document.createElement('img');img.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.querySelector('section').append(img)}''')
+        await self.page.wait_for_function('document.querySelector("img").complete && document.querySelector("img").naturalWidth>0')
+        async with preserve_recovery_draft(self.page, Path(self.tmp.name), True):
+            self.assertEqual(await repair_project_page(self.page, refresh=True), 'flow_composer_not_empty')
+        self.assertEqual(await composer.inner_text(), 'keep draft with reference')
+
+    async def test_unknown_reference_scope_keeps_draft_and_blocks_refresh(self):
+        composer = await self.text_draft_fixture()
+        await composer.fill('keep unknown controls')
+        await self.page.locator('button[aria-label="Iniciar generación"]').evaluate('e=>e.remove()')
+        async with preserve_recovery_draft(self.page, Path(self.tmp.name), True):
+            self.assertEqual(await repair_project_page(self.page, refresh=True), 'flow_composer_not_empty')
+        self.assertEqual(await composer.inner_text(), 'keep unknown controls')
 
 
 if __name__ == '__main__':

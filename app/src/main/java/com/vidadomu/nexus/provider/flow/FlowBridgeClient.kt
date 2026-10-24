@@ -3,7 +3,7 @@ package com.vidadomu.nexus.provider.flow
 import com.vidadomu.nexus.core.model.ProviderError
 import com.vidadomu.nexus.core.network.NetworkErrorParser
 import com.vidadomu.nexus.core.network.awaitResponse
-import com.vidadomu.nexus.core.security.SecureStorage
+import com.vidadomu.nexus.core.security.ISecureStorage
 import com.vidadomu.nexus.ui.settings.FLOW_RECOVERY_KEY
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -25,22 +25,27 @@ import java.net.UnknownHostException
 
 /**
  * Client for the private Tailscale-only bridge that operates the already authenticated Flow tab.
- * The pairing token stays in [SecureStorage] and is only sent as an Authorization header.
+ * The pairing token stays in private credential storage and is only sent as an Authorization header.
  */
 internal class FlowBridgeClient(
     private val client: OkHttpClient,
-    private val secureStorage: SecureStorage
+    private val secureStorage: ISecureStorage,
+    private val hosts: List<Pair<String, String>> = HOSTS,
+    private val probeTimeoutSeconds: () -> Int = { 20 }
 ) {
     suspend fun status(): Result<FlowBridgeStatus> = guarded {
         // Comprobar el estado vuelve a elegir puente: si AXELPC se encendió o se apagó, se nota aquí.
         pinned = null
-        val chosen = base()
-        val where = if (tagFor(chosen) == HOSTS.first().first) "AXELPC" else "ASUS (respaldo; AXELPC no está listo)"
-        requestJson(
+        val (chosen, checked) = selectBase()
+        if (checked != null) Result.success(bridgeStatus(checked, chosen)) else requestJson(
             request = authorizedRequest("$chosen/status").get().build(),
-            decode = { raw ->
-                val payload = json.decodeFromString<StatusPayload>(raw)
-                FlowBridgeStatus(
+            decode = { raw -> bridgeStatus(json.decodeFromString<StatusPayload>(raw), chosen) }
+        )
+    }
+
+    private fun bridgeStatus(payload: StatusPayload, chosen: String): FlowBridgeStatus {
+        val where = if (tagFor(chosen) == hosts.first().first) "AXELPC" else "ASUS (respaldo; AXELPC no está listo)"
+        return FlowBridgeStatus(
                     connected = payload.bridgeStatus.equals("connected", ignoreCase = true),
                     generationEnabled = payload.generationReady,
                     recovering = payload.recovering,
@@ -52,8 +57,6 @@ internal class FlowBridgeClient(
                         .ifEmpty { EXPECTED_OUTPUTS },
                     checkedAt = System.currentTimeMillis(),
                     detail = listOfNotNull("Puente: $where.", statusDetail(payload.reason)).joinToString(" ")
-                )
-            }
         )
     }
 
@@ -428,33 +431,39 @@ internal class FlowBridgeClient(
      * la subida de referencias y el envío vayan al mismo puente. Cada trabajo lleva la marca de su puente (`a.`/`s.`)
      * y siempre se consulta y descarga allí.
      */
-    private suspend fun base(): String {
-        pinned?.let { (url, at) -> if (System.currentTimeMillis() - at < PIN_MS) return url }
-        val primary = HOSTS.first().second
-        val ready = withContext(Dispatchers.IO) {
-            runCatching {
-                // AXELPC tarda 1-3 s en comprobar Flow (abre la página por CDP); con poco margen se caía al ASUS sin motivo.
-                val probe = client.newBuilder().connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
-                    .callTimeout(5, java.util.concurrent.TimeUnit.SECONDS).build()
-                probe.newCall(authorizedRequest("$primary/status").get().build()).execute().use { response ->
-                    response.isSuccessful && json.decodeFromString<StatusPayload>(response.body?.string().orEmpty()).generationReady
+    private suspend fun base(): String = selectBase().first
+
+    private suspend fun selectBase(): Pair<String, StatusPayload?> {
+        pinned?.let { (url, at) -> if (System.currentTimeMillis() - at < PIN_MS) return url to null }
+        val primary = hosts.first().second
+        val checked = withContext(Dispatchers.IO) {
+            try {
+                val seconds = probeTimeoutSeconds().coerceAtLeast(0).toLong()
+                val probe = client.newBuilder().connectTimeout(seconds, java.util.concurrent.TimeUnit.SECONDS)
+                    .callTimeout(seconds, java.util.concurrent.TimeUnit.SECONDS).build()
+                probe.newCall(authorizedRequest("$primary/status").get().build()).awaitResponse().use { response ->
+                    if (response.isSuccessful) json.decodeFromString<StatusPayload>(response.body?.string().orEmpty()) else null
                 }
-            }.getOrDefault(false)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                null
+            }
         }
-        val chosen = if (ready) primary else HOSTS.last().second
+        val chosen = if (checked?.generationReady == true) primary else hosts.last().second
         pinned = chosen to System.currentTimeMillis()
-        return chosen
+        return chosen to checked?.takeIf { it.generationReady }
     }
 
-    private fun tagFor(base: String): String = HOSTS.firstOrNull { it.second == base }?.first ?: HOSTS.last().first
-    private fun tagOf(jobId: String): String = jobId.substringBefore('.', "").takeIf { t -> HOSTS.any { it.first == t } } ?: HOSTS.last().first
+    private fun tagFor(base: String): String = hosts.firstOrNull { it.second == base }?.first ?: hosts.last().first
+    private fun tagOf(jobId: String): String = jobId.substringBefore('.', "").takeIf { t -> hosts.any { it.first == t } } ?: hosts.last().first
     private fun rawId(jobId: String): String = if ('.' in jobId) jobId.substringAfter('.') else jobId
     /** Trabajos antiguos sin marca son del ASUS. */
-    private fun baseFor(jobId: String): String = HOSTS.first { it.first == tagOf(jobId) }.second
+    private fun baseFor(jobId: String): String = hosts.first { it.first == tagOf(jobId) }.second
 
     /** Nombre del puente en uso, para los mensajes. */
     fun hostLabel(jobId: String? = null): String =
-        if ((jobId?.let(::tagOf) ?: pinned?.first?.let(::tagFor)) == HOSTS.first().first) "AXELPC" else "el ASUS"
+        if ((jobId?.let(::tagOf) ?: pinned?.first?.let(::tagFor)) == hosts.first().first) "AXELPC" else "el ASUS"
 
     private fun decodeJob(raw: String, tag: String): FlowBridgeJob {
         val payload = json.decodeFromString<JobPayload>(raw)

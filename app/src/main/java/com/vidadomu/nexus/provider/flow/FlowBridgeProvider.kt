@@ -29,7 +29,10 @@ class FlowBridgeProvider(
     context: android.content.Context? = null
 ) : NexusProvider {
     private val appContext = context?.applicationContext
-    private val bridge = FlowBridgeClient(client, secureStorage)
+    private val bridge = FlowBridgeClient(client, secureStorage, probeTimeoutSeconds = {
+        appContext?.let { com.vidadomu.nexus.settings.RuntimePreferences.get(it).int("flow.connectionTimeout",
+            com.vidadomu.nexus.agent.core.config.RuleScope(provider = "google_flow")) } ?: 20
+    })
     private val queue = context?.getSharedPreferences("flow_queue_v1", android.content.Context.MODE_PRIVATE)
     private val queueLock = kotlinx.coroutines.sync.Mutex()
 

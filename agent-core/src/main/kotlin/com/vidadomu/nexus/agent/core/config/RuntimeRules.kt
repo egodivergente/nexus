@@ -54,6 +54,7 @@ object RuntimeRules {
         RuleDefinition("prompt.observation", "Observación manual de prompt", "Reglas y límites", RuleType.TEXT, "", help="Hipótesis sin verificar; nunca bloquea ni sustituye al contrato.", scoped=true),
         RuleDefinition("flow.drafts", "Instrucciones en un lote de Flow", "Flow", RuleType.INTEGER, "12", 1.0),
         RuleDefinition("flow.references", "Adjuntos locales de Flow", "Flow", RuleType.INTEGER, "0", 0.0, help="0 sin tope local; sujeto a la interfaz de Google"),
+        RuleDefinition("flow.connectionTimeout", "Comprobación del puente (segundos)", "Flow", RuleType.INTEGER, "20", 0.0, help="Espera para elegir AXELPC antes de probar el respaldo. 0 sin corte local.", scoped=true),
     )
     fun definition(key: String) = definitions.first { it.key == key }
 }
