@@ -40,7 +40,9 @@ sealed interface ChatItem {
     data class User(override val id: String, val text: String, val attachments: List<Attachment>, val at: Long = 0L) : ChatItem
     @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
-        val media: List<Attachment> = emptyList(), val at: Long = 0L, val tookMs: Long = 0L) : ChatItem
+        val media: List<Attachment> = emptyList(), val at: Long = 0L, val tookMs: Long = 0L,
+        /** Who answered («AGY · Gemini 3.8 Flash», «Bedrock · …»): the agent can change between messages. */
+        val by: String = "") : ChatItem
     /** Una tarjeta por encargo: [orderId] es persistente y [planId] apunta al plan vigente. */
     @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String, val orderId: String? = null) : ChatItem
@@ -213,7 +215,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
-                        conv.session.renderedMedia.values.toList(), System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime() - started), streamingText = "") }
+                        conv.session.renderedMedia.values.toList(), System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime() - started,
+                        agentLabel(it.settings)), streamingText = "") }
                 }
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
                 r.verifiedNotes.forEach { notice(it, error = false) }
@@ -692,7 +695,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
                 val response = result.text.trim().ifBlank { "No he podido explicar la causa con los datos disponibles. El trabajo conserva su diagnóstico en Historial." }
-                _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop, at = System.currentTimeMillis()), scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop, at = System.currentTimeMillis(), by = agentLabel(it.settings)), scrollRequest = it.scrollRequest + 1) }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 notice("El diagnóstico ha tardado demasiado. El detalle original sigue disponible en Historial.", error = true)
             } catch (e: CancellationException) {

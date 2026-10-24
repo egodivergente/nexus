@@ -488,7 +488,11 @@ class AssistantRuntime(private val app: NexusApplication) {
 
     fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(
         llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
-        documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader { AgentDocuments.load(it) },
+        // El límite de 4,5 MB por documento es de Bedrock; Antigravity solo recibe texto y no tiene ese límite.
+        documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {
+            val agy = !s.offline && s.backend == AssistantSettings.BACKEND_ANTIGRAVITY
+            AgentDocuments.load(it, textOnly = agy, maxBytes = if (agy) null else AgentDocuments.MAX_BYTES)
+        },
         images = if (s.visionEnabled) AttachmentImageLoader { AgentMediaStore.thumbnail(app,it) } else null,
         videos = if (s.visionEnabled) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
         uiContext = { orders.turnContext(guard) },

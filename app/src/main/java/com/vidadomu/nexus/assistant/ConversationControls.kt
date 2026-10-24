@@ -148,7 +148,7 @@ internal fun chatTranscript(ui: AssistantUiState): String {
     return ui.items.mapNotNull {item->
         when(item) {
             is ChatItem.User -> "Tú"+stamp(item.at)+"\n"+item.text
-            is ChatItem.Assistant -> if(item.text.isBlank()) null else "Nexus"+stamp(item.at)+(if(item.tookMs>0) " · respondió en "+formatTook(item.tookMs) else "")+"\n"+item.text
+            is ChatItem.Assistant -> if(item.text.isBlank()) null else "Nexus"+(if(item.by.isNotBlank()) " ("+item.by+")" else "")+stamp(item.at)+(if(item.tookMs>0) " · respondió en "+formatTook(item.tookMs) else "")+"\n"+item.text
             else -> null
         }
     }.joinToString("\n\n")

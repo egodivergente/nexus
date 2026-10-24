@@ -419,7 +419,12 @@ class AntigravityProvider(
                     val status = if (block.isError) "ERROR" else "OK"
                     appendLine("[Resultado de herramienta ${block.toolUseId} ($status)]: ${block.content}")
                 }
-                is ContentBlock.Document -> appendLine("[Documento adjunto: ${block.name} (${block.format}, ${block.bytes.size} bytes)]")
+                // El puente solo transporta texto: los documentos de texto (incluido el texto extraído de un PDF) van completos.
+                is ContentBlock.Document -> if (block.format in TEXT_DOCUMENTS) {
+                    appendLine("[Documento adjunto: ${block.name}]")
+                    appendLine(block.bytes.toString(Charsets.UTF_8).trim())
+                    appendLine("[Fin del documento]")
+                } else appendLine("[Documento adjunto: ${block.name} (${block.format}, ${block.bytes.size} bytes) · su contenido no se puede enviar por este puente]")
                 is ContentBlock.Image -> appendLine("[Imagen adjunta (${block.format}, ${block.bytes.size} bytes)]")
                 is ContentBlock.Reasoning -> Unit
             }
@@ -532,6 +537,8 @@ class AntigravityProvider(
         const val DEFAULT_MODEL = "gemini-3.8-flash"
         private const val DEFAULT_CONVERSATION_ID = "nexus-agy-default"
         private const val TOOL_OPEN_TAG = "<NEXUS_TOOL_CALL>"
+        /** Document formats whose bytes are UTF-8 text and can travel inside the prompt. */
+        val TEXT_DOCUMENTS = setOf("txt", "md", "csv", "html")
         private const val TOOL_CLOSE_TAG = "</NEXUS_TOOL_CALL>"
         private const val TOOL_REMINDER_FOOTER =
             "[Recordatorio Nexus: si necesitas otra herramienta Android de Nexus, usa <NEXUS_TOOL_CALL>{\"name\":\"...\",\"input\":{...}}</NEXUS_TOOL_CALL>; si ya tienes los datos, responde directamente al usuario en español sin etiquetas XML.]"

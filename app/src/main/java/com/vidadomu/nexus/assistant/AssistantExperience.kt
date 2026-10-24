@@ -136,7 +136,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
                         Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
-                            if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            // Quién contestará: proveedor y modelo activos (AGY, Bedrock, un cerebro propio…).
+                            if (text.text.isEmpty()) Text("Escribe a Nexus · " + agentLabel(ui.settings), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             inner()
                         }
                     })

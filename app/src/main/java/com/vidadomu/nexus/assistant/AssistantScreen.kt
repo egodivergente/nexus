@@ -665,12 +665,29 @@ private fun UserBubble(item:ChatItem.User) {
     }
 }
 
-/** Time of the message and, for replies, how long the model took: tiny and secondary so it never competes with the text. */
+/** Who answers, short: provider then model («AGY · Gemini 3.8 Flash», «Bedrock · Claude Sonnet 4 6»), or the custom brain's name. */
+internal fun agentLabel(s: AssistantSettings): String {
+    val provider = when {
+        s.backend == AssistantSettings.BACKEND_ANTIGRAVITY -> "AGY"
+        s.isCustom -> s.brain?.name?.ifBlank { null } ?: "Cerebro propio"
+        s.backend == AssistantSettings.BACKEND_ANTHROPIC -> "Claude API"
+        s.backend == AssistantSettings.BACKEND_OPENAI -> "OpenAI"
+        else -> "Bedrock"
+    }
+    // «us.anthropic.claude-sonnet-4-6-v1:0» → «Claude Sonnet 4 6»; «gemini-3.8-flash» → «Gemini 3.8 Flash».
+    val model = (if (s.isCustom) s.brain?.modelId else s.modelId).orEmpty()
+        .substringAfterLast('/').substringBefore(':').let { id -> if (id.count { it == '.' } >= 2 && id.substringAfterLast('.').any(Char::isLetter)) id.substringAfterLast('.') else id }
+        .removeSuffix("-v1").removeSuffix("-v2").split('-', '_').filter { it.isNotBlank() }
+        .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+    return listOf(provider, model).filter { it.isNotBlank() }.joinToString(" · ")
+}
+
+/** Time of the message and, for replies, who answered and how long it took: tiny and secondary so it never competes with the text. */
 @Composable
-internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier) {
+internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier, by: String = "") {
     if(at<=0L) return
     val time=remember(at) {java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at))}
-    val label=if(tookMs>0) time+" · "+formatTook(tookMs) else time
+    val label=listOfNotNull(by.ifBlank {null},time,formatTook(tookMs).takeIf {tookMs>0}).joinToString(" · ")
     Text(label,modifier,style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,lineHeight=12.sp),
         color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.62f),maxLines=1)
 }
@@ -724,7 +741,7 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
               }
             }
         }
-        if(item.text.isNotBlank() && item.stop!="STREAMING") MessageMeta(item.at,item.tookMs,Modifier.padding(horizontal=NexusTokens.space12))
+        if(item.text.isNotBlank() && item.stop!="STREAMING") MessageMeta(item.at,item.tookMs,Modifier.padding(horizontal=NexusTokens.space12),item.by)
         if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
