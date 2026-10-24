@@ -9,6 +9,7 @@ import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.agent.core.assets.Project
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -74,7 +75,7 @@ class ListProjectsTool(private val d: ToolDeps) : BaseTool(
 }
 
 class CreateProjectTool(private val d: ToolDeps) : BaseTool(
-    "create_project", ToolCategory.ORGANIZE, "Crea un proyecto (si ya existe uno con ese nombre, devuelve el existente). No mueve archivos.",
+    "create_project", ToolCategory.ORGANIZE, "Crea un proyecto, que es también una carpeta de la Biblioteca (si ya existe uno con ese nombre, devuelve el existente). No mueve archivos: usa move_asset.",
     schema {
         string("name", "Nombre del proyecto.", required = true)
         string("description", "Descripción breve.")
@@ -245,31 +246,49 @@ class AssociateAssetTool(private val d: ToolDeps) : BaseTool(
 
 class MoveAssetTool(private val d: ToolDeps) : BaseTool(
     "move_asset", ToolCategory.ORGANIZE,
-    "Mueve un asset a otro proyecto/escena/plano DENTRO del índice. Nunca mueve el archivo físico. En Copiloto es una propuesta.",
+    "Mueve uno o varios assets a otro proyecto/escena/plano DENTRO del índice. Cada proyecto es una carpeta de la Biblioteca: " +
+        "mover a un proyecto mete el archivo en esa carpeta; project=\"ninguno\" lo saca de su carpeta a la vista principal. " +
+        "Para muchos archivos usa asset_ids en una sola llamada. Nunca mueve el archivo físico. En Copiloto es una propuesta.",
     schema {
-        string("asset_id", "Id del asset.", required = true)
-        string("project", "Proyecto destino.")
+        string("asset_id", "Id del asset (o usa asset_ids).")
+        stringArray("asset_ids", "Ids de varios assets a mover a la vez.")
+        string("project", "Proyecto (carpeta) destino, o \"ninguno\" para sacarlo de su carpeta.")
         string("scene", "Escena destino.")
         string("shot", "Plano destino.")
     },
 ) {
-    override fun describe(input: JsonObject) = "Mover ${input.str("asset_id")} a " + listOfNotNull(
-        input.str("project")?.let { "proyecto «$it»" }, input.str("scene")?.let { "escena $it" }, input.str("shot")?.let { "plano $it" },
-    ).joinToString(", ") + " (solo en el índice; el archivo no se toca)"
+    private fun ids(input: JsonObject) = (listOfNotNull(input.str("asset_id")) + input.strList("asset_ids")).distinct()
+    private fun removes(project: String?) = project?.trim()?.lowercase() in setOf("ninguno", "ninguna", "sin proyecto", "none", "")
+
+    override fun describe(input: JsonObject) = ids(input).let { if (it.size == 1) "Mover ${it[0]}" else "Mover ${it.size} archivos" } + " a " +
+        (if (input.str("project") != null && removes(input.str("project"))) "la vista principal (sin proyecto)" else listOfNotNull(
+            input.str("project")?.let { "proyecto «$it»" }, input.str("scene")?.let { "escena $it" }, input.str("shot")?.let { "plano $it" },
+        ).joinToString(", ")) + " (solo en el índice; el archivo no se toca)"
 
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
-        val a = d.assets.asset(input.req("asset_id")) ?: throw ToolInputException("Asset desconocido.")
-        val projectId = input.str("project")?.let { d.assets.findProject(it)?.id ?: return fail("No existe el proyecto «$it».") } ?: a.projectId
-            ?: return fail("El asset no tiene proyecto: indica project.")
-        val scene = input.str("scene")?.let { d.assets.ensureScene(projectId, it) }
-        val shot = input.str("shot")?.let { d.assets.ensureShot(projectId, it, scene?.id) }
-        val projectChanged = projectId != a.projectId
-        val updated = d.assets.updateAsset(a.id) {
-            it.copy(projectId = projectId,
-                sceneId = scene?.id ?: if (projectChanged) null else it.sceneId,
-                shotId = shot?.id ?: if (projectChanged) null else it.shotId)
+        val ids = ids(input).ifEmpty { throw ToolInputException("Indica asset_id o asset_ids.") }
+        val assets = ids.map { d.assets.asset(it) ?: throw ToolInputException("Asset desconocido: $it.") }
+        val project = input.str("project")
+        if (project != null && removes(project)) {
+            val moved = assets.map { a -> d.assets.updateAsset(a.id) { it.copy(projectId = null, sceneId = null, shotId = null) } }
+            return ok { put("moved", moved.size); put("project", JsonNull); put("file_moved", false) }
         }
-        return ok { put("asset", d.assets.assetJson(updated)); put("file_moved", false) }
+        val target = project?.let { d.assets.findProject(it)?.id ?: return fail("No existe el proyecto «$it». Créalo antes con create_project.") }
+        val moved = assets.map { a ->
+            val projectId = target ?: a.projectId ?: return fail("${a.displayName} no tiene proyecto: indica project.")
+            val scene = input.str("scene")?.let { d.assets.ensureScene(projectId, it) }
+            val shot = input.str("shot")?.let { d.assets.ensureShot(projectId, it, scene?.id) }
+            val projectChanged = projectId != a.projectId
+            d.assets.updateAsset(a.id) {
+                it.copy(projectId = projectId,
+                    sceneId = scene?.id ?: if (projectChanged) null else it.sceneId,
+                    shotId = shot?.id ?: if (projectChanged) null else it.shotId)
+            }
+        }
+        return ok {
+            if (moved.size == 1) put("asset", d.assets.assetJson(moved[0])) else put("moved", moved.size)
+            put("file_moved", false)
+        }
     }
 }
 

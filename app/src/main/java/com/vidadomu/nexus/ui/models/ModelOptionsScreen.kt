@@ -84,7 +84,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     val imageField=remember(selected,verifiedSelected) {
         com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(verifiedSelected ?: selected).firstOrNull {it.mime.startsWith("image/")}
     }
-    var pickedImages by remember(group.key,modelBookmark(selected)) {mutableStateOf(emptyList<Pair<android.net.Uri,String>>())}
+    // Images sent from the Library arrive already picked (up to what this model accepts).
+    var pickedImages by remember(group.key,modelBookmark(selected)) {mutableStateOf(
+        if(imageField==null) emptyList() else ArtBoxInbox.images.value.take((imageField.maximum).coerceIn(1,50)))}
     fun addImages(uris:List<android.net.Uri>) {
         val limit=(imageField?.maximum ?: 1).coerceIn(1,50)
         val extra=uris.map {it to (context.contentResolver.getType(it) ?: "image/jpeg")}
@@ -107,7 +109,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     }
                     if(!estimate.hasPrice) estimate.retry?.let {retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Volver a consultar el precio")}}
                 }
-                Button(onClick={if(pickedImages.isNotEmpty() && onUseWithMedia!=null) onUseWithMedia(selected,pickedImages) else onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
+                Button(onClick={
+                    ArtBoxInbox.images.value=emptyList()
+                    if(pickedImages.isNotEmpty() && onUseWithMedia!=null) onUseWithMedia(selected,pickedImages) else onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
                     Text("Configurar en Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
                 }

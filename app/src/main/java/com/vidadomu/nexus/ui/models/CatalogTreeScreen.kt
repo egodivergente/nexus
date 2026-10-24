@@ -215,6 +215,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         add(ArtBoxTab("Favoritos",favoritesOnly,Icons.Default.StarBorder) {favoritesOnly=!favoritesOnly;family=null})
                     })
                 }
+                val inbox=ArtBoxInbox.images.value
+                if(inbox.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {ArtBoxInboxNotice(inbox.size) {ArtBoxInbox.images.value=emptyList()}}
                 item(span={GridItemSpan(maxLineSpan)}) {
                     ArtBoxSearchBar(query,{query=it},filters || activeFilters.isNotEmpty(),filterButtonDescription(activeFilters.size),{filters=!filters})
                 }

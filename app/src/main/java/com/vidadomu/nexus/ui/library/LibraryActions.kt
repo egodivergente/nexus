@@ -34,7 +34,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun LibraryFileSheet(entry:LibraryEntry,name:String,localUri:String?,favorite:Boolean,hidden:Boolean,
     onDismiss:()->Unit,onRename:()->Unit,onSelect:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onDelete:()->Unit,onMessage:(String)->Unit,
-    onAddToChat:(()->Unit)?,onUseInCanvas:(()->Unit)?,onOpenResult:(()->Unit)?) {
+    onAddToChat:(()->Unit)?,onUseInCanvas:(()->Unit)?,onOpenResult:(()->Unit)?,onCrop:(()->Unit)?=null,onMove:(()->Unit)?=null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     val scope=rememberCoroutineScope()
@@ -87,6 +87,8 @@ internal fun LibraryFileSheet(entry:LibraryEntry,name:String,localUri:String?,fa
             onUseInCanvas?.let {use -> Option(Icons.Default.AutoAwesome,"Usar en Lienzo") {onDismiss();use()}}
             Option(Icons.Default.CheckCircle,"Seleccionar") {onDismiss();onSelect()}
             Option(Icons.Default.Edit,"Cambiar el nombre") {onRename()}
+            onMove?.let {move -> Option(Icons.Default.DriveFileMove,"Cambiar de proyecto") {onDismiss();move()}}
+            onCrop?.let {crop -> Option(Icons.Default.Crop,"Recortar") {onDismiss();crop()}}
             Option(Icons.Default.Star,if(favorite) "Quitar de favoritos" else "Marcar favorito") {onFavorite();onDismiss()}
             Option(Icons.Default.Share,if(localUri==null && asset==null) "Compartir enlace" else "Compartir") {send(false)}
             Option(Icons.Default.Download,if(busy) "Guardando…" else "Guardar una copia") {
@@ -108,14 +110,42 @@ internal fun LibraryFileSheet(entry:LibraryEntry,name:String,localUri:String?,fa
 
 /** Rename a Library file. The name only changes how Nexus shows it; the file itself is untouched. */
 @Composable
-internal fun RenameFileDialog(current:String,onDismiss:()->Unit,onSave:(String)->Unit) {
+internal fun RenameFileDialog(current:String,onDismiss:()->Unit,title:String="Cambiar el nombre",onSave:(String)->Unit) {
     var text by remember {mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(current,androidx.compose.ui.text.TextRange(0,current.substringBeforeLast('.').length)))}
     val focus=remember {androidx.compose.ui.focus.FocusRequester()}
     LaunchedEffect(Unit) {focus.requestFocus()}
-    AlertDialog(onDismissRequest=onDismiss,title={Text("Cambiar el nombre")},
+    AlertDialog(onDismissRequest=onDismiss,title={Text(title)},
         text={OutlinedTextField(text,{text=it},singleLine=true,modifier=Modifier.fillMaxWidth().focusRequester(focus))},
         confirmButton={TextButton(enabled=text.text.isNotBlank(),onClick={onSave(text.text.trim())}) {Text("Guardar")}},
         dismissButton={TextButton(onClick=onDismiss) {Text("Cancelar")}})
+}
+
+/** Where to move the marked files: a project folder, out of any folder, or a new folder. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun MoveToFolderSheet(count:Int,folders:List<com.vidadomu.nexus.agent.core.assets.Project>,current:String?,
+    onDismiss:()->Unit,onNewFolder:()->Unit,onPick:(String?)->Unit) {
+    ModalBottomSheet(onDismissRequest=onDismiss,shape=NexusTokens.sheet) {
+        NexusSheetSystemBars()
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.space16).padding(bottom=NexusTokens.space24)) {
+            Text(if(count==1) "Mover 1 archivo a…" else "Mover $count archivos a…",style=MaterialTheme.typography.titleMedium)
+            folders.filter {it.id!=current}.forEach {folder -> Option(Icons.Default.Folder,folder.name) {onPick(folder.id)}}
+            if(current!=null) Option(Icons.Default.PhotoLibrary,"Biblioteca (sin proyecto)") {onPick(null)}
+            Option(Icons.Default.CreateNewFolder,"Nueva carpeta…",onNewFolder)
+        }
+    }
+}
+
+/** A project shown as a folder in the Library. */
+@Composable
+internal fun FolderTile(name:String,count:Int,onOpen:()->Unit) {
+    Surface(onClick=onOpen,shape=NexusTokens.thumbnail,color=MaterialTheme.colorScheme.surfaceContainer,modifier=Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(2.dp)) {
+            Icon(Icons.Default.Folder,null,Modifier.size(36.dp),tint=MaterialTheme.colorScheme.primary)
+            Text(name,style=MaterialTheme.typography.labelLarge,maxLines=2,overflow=TextOverflow.Ellipsis)
+            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelSmall,color=com.vidadomu.nexus.ui.theme.TextSecondary)
+        }
+    }
 }
 
 @Composable

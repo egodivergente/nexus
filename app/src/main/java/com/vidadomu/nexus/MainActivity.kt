@@ -242,6 +242,7 @@ class MainActivity : ComponentActivity() {
                             Screen.Library -> {
                             LibraryScreen(
                                 onOpenHistory={navController.navigate(Screen.Generations.route)},
+                                onOpenArtBox={tabRequest=tabs.indexOf(Screen.Models)},
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onNavigateToResult = { jobId, index -> navController.navigate("output/$jobId?index=$index") },
                                 onUseInCanvas = { asset ->
