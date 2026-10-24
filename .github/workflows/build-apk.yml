@@ -68,13 +68,19 @@ jobs:
           profile: pixel_6
           ram-size: 2048M
           # API35 defaults to a 6G userdata partition; runner had 3.8G left after build.
-          # These six offline fixtures need only the app, tests and nine small PNGs.
+          # Offline fixtures need only the app, test APK and small local assets.
           disk-size: 2048M
           disable-animations: true
           script: |
-            ./gradlew --no-daemon --max-workers=1 --no-parallel -Pkotlin.compiler.execution.strategy=in-process :app:connectedOfflineQaAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.vidadomu.nexus.assistant.AssistantPresentationUiTest
+            set -euo pipefail
+            adb install -r app/build/outputs/apk/offlineQa/app-offlineQa.apk
+            adb install -r app/build/outputs/apk/androidTest/offlineQa/app-offlineQa-androidTest.apk
+            adb shell am instrument -w -r -e class com.vidadomu.nexus.assistant.AssistantPresentationUiTest,com.vidadomu.nexus.ChatRichContentDeviceTest com.vidadomu.nexus.qa.test/androidx.test.runner.AndroidJUnitRunner | tee ui-evidence-instrumentation.log
+            grep -Eq '^OK \([0-9]+ tests?\)' ui-evidence-instrumentation.log
             mkdir -p ui-evidence
+            # Collect before Gradle/UTP uninstalls the QA sandbox and its external files.
             adb pull /sdcard/Android/data/com.vidadomu.nexus.qa/files/studio-ux ui-evidence/
+            adb pull /sdcard/Android/data/com.vidadomu.nexus.qa/files/rich-qa ui-evidence/
 
       - name: Upload test evidence
         if: always()
@@ -87,6 +93,7 @@ jobs:
             app/build/outputs/androidTest-results/
             app/build/reports/androidTests/
             ui-evidence/
+            ui-evidence-instrumentation.log
             gradle.log
           if-no-files-found: warn
 
