@@ -7,11 +7,13 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +44,7 @@ import kotlin.math.roundToInt
 
 /**
  * A board of images inside the chat. One finger scrolls the chat as usual; two fingers on an image move and resize it;
- * the S Pen draws (on an image when the stroke starts on one, otherwise on the board). The pencil button lets a finger draw.
+ * drawing with either pen or finger requires long press → Anotaciones.
  */
 @Composable
 internal fun ChatBoardCard(boardId: String) {
@@ -52,7 +54,8 @@ internal fun ChatBoardCard(boardId: String) {
     LaunchedEffect(boardId) { board = withContext(Dispatchers.IO) { store.load(boardId) } }
     val current = board ?: return
     val scope = rememberCoroutineScope()
-    var fingerDraws by remember { mutableStateOf(false) }
+    var annotations by remember(boardId) { mutableStateOf(false) }
+    var imageMenu by remember(boardId) {mutableStateOf(false)}
     // Owners of the strokes in the order they were drawn (image id, or "" for the board), for «deshacer».
     val drawn = remember(boardId) { mutableStateListOf<String>() }
     var live by remember { mutableStateOf<List<Offset>>(emptyList()) }
@@ -65,14 +68,20 @@ internal fun ChatBoardCard(boardId: String) {
             val density = LocalDensity.current
             val heightDp = with(density) { (widthPx * current.height).toDp() }
             val latest by rememberUpdatedState(current)
-            val drawWithFinger by rememberUpdatedState(fingerDraws)
+            val drawingEnabled by rememberUpdatedState(annotations)
             fun hit(point: Offset): BoardImage? = latest.images.lastOrNull { image ->
                 point.x / widthPx in image.x..(image.x + image.w) && point.y / widthPx in image.y..(image.y + image.h)
             }
-            Box(Modifier.fillMaxWidth().height(heightDp).pointerInput(widthPx) {
+            Box(Modifier.fillMaxWidth().height(heightDp)
+                .semantics {contentDescription="Tablero de imágenes; mantener pulsado para ver opciones"}
+                .pointerInput(boardId) {awaitEachGesture {
+                    val down=awaitFirstDown(requireUnconsumed=false)
+                    if(awaitLongPressOrCancellation(down.id)!=null) imageMenu=true
+                }}
+                .pointerInput(widthPx) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    if (down.type == PointerType.Stylus || down.type == PointerType.Eraser || drawWithFinger) {
+                    if (drawingEnabled) {
                         down.consume()
                         val target = hit(down.position)
                         val points = mutableListOf(down.position)
@@ -137,11 +146,14 @@ internal fun ChatBoardCard(boardId: String) {
                     commit(if (owner.isEmpty()) board.copy(strokes = board.strokes.dropLast(1))
                         else board.copy(images = board.images.map { if (it.id == owner) it.copy(strokes = it.strokes.dropLast(1)) else it }))
                 }, "Deshacer el último trazo", false) { Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(18.dp)) }
-                BoardButton({ fingerDraws = !fingerDraws }, if (fingerDraws) "Dejar de dibujar con el dedo" else "Dibujar con el dedo", fingerDraws) {
-                    Icon(Icons.Default.Draw, null, Modifier.size(18.dp))
+                if(annotations) BoardButton({annotations=false},"Terminar anotaciones",true) {Icon(Icons.Default.Check,null,Modifier.size(18.dp))}
+                DropdownMenu(expanded=imageMenu,onDismissRequest={imageMenu=false}) {
+                    DropdownMenuItem(text={Text(if(annotations) "Terminar anotaciones" else "Anotaciones")},
+                        leadingIcon={Icon(Icons.Default.Draw,null)},onClick={imageMenu=false;annotations=!annotations})
                 }
             }
         }
+        if(annotations) Text("Anotaciones activas · termina con ✓",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
         if (current.dirty) Text("Se enviará al agente con tu próximo mensaje", style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .62f), modifier = Modifier.padding(end = 8.dp))
     }
@@ -149,7 +161,7 @@ internal fun ChatBoardCard(boardId: String) {
 
 @Composable
 private fun BoardButton(onClick: () -> Unit, description: String, active: Boolean, content: @Composable () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, modifier = Modifier.size(36.dp).semantics { contentDescription = description },
+    Surface(onClick = onClick, shape = CircleShape, modifier = Modifier.size(48.dp).semantics { contentDescription = description },
         color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .85f),
         contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface) {
         Box(contentAlignment = Alignment.Center) { content() }

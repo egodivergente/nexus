@@ -268,7 +268,7 @@ fun AssistantScreen(
                 .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
             LazyColumn(Modifier.fillMaxSize(), state = listState,
-                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8, top = 52.dp, bottom = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is CardGroup) {
@@ -373,6 +373,9 @@ fun AssistantScreen(
             }
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
             // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
+            IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
+                Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
@@ -746,7 +749,10 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 val streaming = item.stop == "STREAMING"
-                ChatMarkdownView(remember(item.text) { hideOrderIds(item.text) }, streaming = streaming,
+                val responseText = if(item.text.trim() in setOf("…", "...")) {
+                    if(streaming) "Recibiendo respuesta…" else "La respuesta guardada no contiene texto. Revisa los pasos de este turno."
+                } else hideOrderIds(item.text)
+                ChatMarkdownView(responseText, streaming = streaming,
                     answered = answered, onReply = if (streaming) null else onReply)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
@@ -779,6 +785,7 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
 internal fun AssistantMediaPreview(media: Attachment) {
     val context=LocalContext.current
     when {
+        media.mimeType in setOf("text/html","application/pdf","text/csv","application/json","text/plain","text/markdown") -> AssistantDocumentPreview(media)
         media.mimeType.startsWith("image/") -> AssistantImagePreview(media)
         media.mimeType.startsWith("video/") -> {
             val player=remember(media.uri) {

@@ -715,6 +715,20 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun reorderMedia(id: String, direction: Int) {
+        forgetModelSwitch()
+        _uiState.update { current ->
+            val media=current.attachedMedia.toMutableList()
+            val from=media.indexOfFirst {it.id==id}
+            if(from<0) return@update current
+            val selected=media[from]
+            val peers=media.indices.filter {media[it].slotType==selected.slotType && media[it].fieldKey==selected.fieldKey}
+            val target=peers.getOrNull(peers.indexOf(from)+direction.coerceIn(-1,1)) ?: return@update current
+            java.util.Collections.swap(media,from,target)
+            current.copy(attachedMedia=media)
+        }
+    }
+
     fun removeMedia(id: String) { forgetModelSwitch();
         _uiState.value.attachedMedia.find { it.id == id }?.let { mediaSession.invalidate(it.slotType,it.fieldKey) }
         _uiState.update { current ->

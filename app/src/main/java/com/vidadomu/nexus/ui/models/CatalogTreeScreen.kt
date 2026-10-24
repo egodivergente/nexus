@@ -254,7 +254,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         val (moveUp,moveDown)=reorderActions(group.key)
                         NavigationCard(labels.name("group:"+group.key,group.title),catalogFamily(group.routes.first()),
                             labels.description("group:"+group.key,focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes)),group.routes,modality,
-                            onClick={groupKey=group.key;filters=false},releaseLabel=groupReleaseLabel(group.routes).takeUnless {it=="Fecha no verificada"},compact=compactCards,grid=useGrid,
+                            onClick={groupKey=group.key;filters=false},onQuickUse={
+                                val saved=app.getSharedPreferences("catalog_choices_v1",0)
+                                val order=rules.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',')
+                                val task=restoredWorkflow(group,saved.getString("task:${group.key}",null),saved.getString("use:${group.key}",null),order)
+                                val routes=workflowRoutes(group,order).getValue(task)
+                                val chosen=routes.firstOrNull {modelBookmark(it)==saved.getString("task-route:${group.key}:${task.name}",null)} ?: routes.first()
+                                onSelectModelAndCreate(chosen)
+                            },releaseLabel=groupReleaseLabel(group.routes).takeUnless {it=="Fecha no verificada"},compact=compactCards,grid=useGrid,
                             onLongClick=if(canReorder) null else ({contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())}),
                             onOptions={contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
@@ -375,7 +382,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:(()->Unit)?=null,onOptions:(()->Unit)?=null,glyphKey:String="",dragging:Boolean=false,dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null,
-    onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null) {
+    onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null,onQuickUse:(()->Unit)?=null) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
     val price=routes.mapNotNull(::referencePrice).minOrNull()
@@ -426,6 +433,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 } else IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
             highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+            onQuickUse?.let { action -> TextButton(onClick=action,modifier=Modifier.fillMaxWidth()) {Text("Crear",maxLines=1);Icon(Icons.Default.ArrowForward,null,Modifier.size(16.dp))} }
             onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
         }
     }

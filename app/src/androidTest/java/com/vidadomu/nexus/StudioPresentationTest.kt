@@ -71,7 +71,7 @@ class StudioPresentationTest {
         compose.setContent {
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,1.5f)) {
-                NexusTheme {Box(Modifier.fillMaxSize().safeDrawingPadding()) {StudioBalanceChip("1.622 créditos") {clicks++}}}
+                NexusTheme {Box(Modifier.fillMaxSize().safeDrawingPadding()) {StudioBalanceChip("1.622 créditos",onClick={clicks++})}}
             }
         }
         val results=mutableListOf<TextLayoutResult>()

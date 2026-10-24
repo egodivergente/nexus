@@ -1,7 +1,7 @@
 import sys
 import unittest
 from playwright.async_api import async_playwright
-from flow_settings import prepare_generation, quantity_for_run, SettingsError
+from flow_settings import prepare_generation, quantity_for_run, read_workspace, inspect_workspace, SettingsError
 
 
 class NativeSettingsTests(unittest.IsolatedAsyncioTestCase):
@@ -39,6 +39,28 @@ class NativeSettingsTests(unittest.IsolatedAsyncioTestCase):
         await self.page.get_by_label('Seleccionar familia de modelos').evaluate("e=>e.textContent='Nano Banana Lite'")
         with self.assertRaisesRegex(SettingsError,'flow_model_forbidden'):
             await prepare_generation(self.page,'image',1)
+        self.assertIsNone(await self.page.evaluate('window.submitted'))
+
+    async def test_workspace_labels_are_read_without_opening_settings_or_submitting(self):
+        await self.page.evaluate("document.title='Escena de prueba - Flow'")
+        snapshot=await read_workspace(self.page)
+        self.assertEqual(snapshot['project_name'],'Escena de prueba')
+        self.assertEqual(snapshot['model_name'],'Nano Banana 2.1')
+        self.assertTrue(await self.page.locator('#settings').is_hidden())
+        self.assertIsNone(await self.page.evaluate('window.submitted'))
+
+    async def test_explicit_inspection_closes_the_menu_and_keeps_the_prompt(self):
+        await self.page.locator('#settings [aria-label="Seleccionar familia de modelos"]').evaluate("e=>e.remove()")
+        await self.page.locator('#settings').evaluate("e=>e.innerHTML += '<button aria-label=\"Seleccionar familia de modelos\">Veo 3.1 Fast<br>arrow_drop_down</button><button role=\"radio\" aria-checked=\"true\">crop_16_9<br>16:9</button>'")
+        await self.page.evaluate("document.body.insertAdjacentHTML('beforeend','<textarea id=prompt>Borrador propio</textarea>')")
+        # Force the explicit inspector to open the settings menu, as in the real editor's portal.
+        await self.page.locator('#settings [aria-label="Seleccionar familia de modelos"]').evaluate("e=>e.setAttribute('aria-label','pending')")
+        await self.page.get_by_role('button',name='Activador de ajustes').evaluate("e=>e.addEventListener('click',()=>document.querySelector('[aria-label=pending]').setAttribute('aria-label','Seleccionar familia de modelos'))")
+        snapshot=await inspect_workspace(self.page)
+        self.assertEqual(snapshot['model_name'],'Veo 3.1 Fast')
+        self.assertEqual(snapshot['aspect_ratio'],'16:9')
+        self.assertTrue(await self.page.locator('#settings').is_hidden())
+        self.assertEqual(await self.page.locator('#prompt').input_value(),'Borrador propio')
         self.assertIsNone(await self.page.evaluate('window.submitted'))
 
     def test_batch_quantities_sum_to_requested_count_including_partial_last_run(self):

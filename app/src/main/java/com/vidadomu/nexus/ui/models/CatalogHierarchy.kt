@@ -24,7 +24,9 @@ internal fun modelGroupTitle(model: NexusModel): String {
         // The tier can sit right after the version (kling-v3.0-pro) or after the workflow (seedance-v1.5-pro/image-to-video-fast).
         val tiers = Regex("(?<![a-z])(fast|mini|lite|flash|turbo|pro|std|standard|master|max|prime|ultra)(?![a-z])")
             .findAll(text.substring(versionMatch.range.last + 1)).map { it.groupValues[1] }.distinct().toList()
-        return "$family ${normalized.uppercase()}" + tiers.joinToString("") { " " + (if(it == "std" || it == "standard") "Std" else it.replaceFirstChar { c -> c.uppercase() }) }
+        val product=if(family=="GPT Image") listOf("sunburst","flare","developer").filter {Regex("(?<![a-z])$it(?![a-z])").containsMatchIn(text)}
+            .joinToString("") {" "+it.replaceFirstChar(Char::uppercase)} else ""
+        return "$family ${normalized.uppercase()}" + product + tiers.joinToString("") { " " + (if(it == "std" || it == "standard") "Std" else it.replaceFirstChar { c -> c.uppercase() }) }
     }
     // Strip only explicit workflow names. Unknown product identities remain separate.
     return model.displayName

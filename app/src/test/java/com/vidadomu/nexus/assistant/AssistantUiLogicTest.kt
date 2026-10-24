@@ -33,7 +33,10 @@ class AssistantUiLogicTest {
         assertTrue(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed(NexusGenerationBackend.ORIGIN_KEY))
         assertTrue(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed(NexusGenerationBackend.PLAN_KEY))
         assertTrue(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed("__comparison_batch"))
+        assertTrue(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed("__project_id"))
+        assertTrue(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed("__conversation_id"))
         assertFalse(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed("duration"))
+        assertFalse(com.vidadomu.nexus.data.repository.LocalJobMetadata.allowed("__arbitrary_provider_option"))
     }
 
     @Test fun withoutProxyTheAssistantIsOfflineAndNeverSendsImages() {

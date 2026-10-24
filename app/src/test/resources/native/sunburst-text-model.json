@@ -1,0 +1,142 @@
+{
+  "id": "openai/gpt-image-2.5-sunburst/text-to-image",
+  "displayName": "GPT Image 2.5 Sunburst",
+  "providerId": "atlas_cloud",
+  "organization": "OpenAI",
+  "modalities": [
+    "IMAGE"
+  ],
+  "capabilities": [
+    "TEXT_TO_IMAGE"
+  ],
+  "parameters": [
+    {
+      "key": "quality",
+      "displayName": "Calidad",
+      "type": "ENUM",
+      "defaultValue": "medium",
+      "description": "Nivel de calidad que solicita el proveedor.",
+      "options": [
+        "auto",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "nativeType": "string"
+    },
+    {
+      "key": "size",
+      "displayName": "Tamaño",
+      "type": "RESOLUTION",
+      "defaultValue": "1024x1024",
+      "description": "Dimensiones del resultado.",
+      "options": [
+        "auto",
+        "1024x1024",
+        "1024x768",
+        "768x1024",
+        "1024x1536",
+        "1536x1024",
+        "2048x2048",
+        "2048x1152",
+        "1152x2048",
+        "2560x1088",
+        "1088x2560",
+        "2880x2160",
+        "2160x2880",
+        "3840x2160",
+        "2160x3840"
+      ],
+      "nativeType": "string"
+    },
+    {
+      "key": "background",
+      "displayName": "Fondo",
+      "type": "ENUM",
+      "defaultValue": "auto",
+      "description": "Tipo de fondo del resultado.",
+      "options": [
+        "auto",
+        "opaque",
+        "transparent"
+      ],
+      "isAdvanced": true,
+      "nativeType": "string"
+    },
+    {
+      "key": "output_format",
+      "displayName": "Formato de archivo",
+      "type": "ENUM",
+      "defaultValue": "png",
+      "description": "Tipo de archivo del resultado.",
+      "options": [
+        "png",
+        "jpeg",
+        "webp"
+      ],
+      "isAdvanced": true,
+      "nativeType": "string"
+    },
+    {
+      "key": "moderation",
+      "displayName": "Moderación",
+      "type": "ENUM",
+      "defaultValue": "auto",
+      "description": "Nivel de filtrado de contenido del proveedor.",
+      "options": [
+        "auto",
+        "low"
+      ],
+      "isAdvanced": true,
+      "nativeType": "string"
+    },
+    {
+      "key": "n",
+      "displayName": "Número de imágenes",
+      "type": "INTEGER",
+      "defaultValue": "1",
+      "description": "Cuántas imágenes se generan en una sola petición.",
+      "minValue": 1.0,
+      "maxValue": 10.0,
+      "isAdvanced": true,
+      "nativeType": "integer",
+      "minExact": "1",
+      "maxExact": "10"
+    }
+  ],
+  "description": "GPT Image 2.5 Sunburst generates images from natural-language prompts with arbitrary resolutions up to 3840x2160, five quality tiers including xhigh and max, and first-class transparent backgrounds. Ready-to-use REST inference API, best performance, no coldstarts, affordable pricing.",
+  "pricingInfo": "0.30 cént. / unidad sin especificar (80% dto.)",
+  "badge": "NUEVO",
+  "basePriceUsd": 0.003,
+  "originPriceUsd": 0.004,
+  "priceUnit": "unidad sin especificar",
+  "uuid": "ms-gi25sunt2i",
+  "family": "gpt-image-2.5 Up to 4K Output",
+  "categories": [
+    "TEXT-TO-IMAGE"
+  ],
+  "tags": [
+    "TEXT-TO-IMAGE",
+    "NEW"
+  ],
+  "avatarUrl": "https://static.atlascloud.ai/model/avatar/OPENAI.png",
+  "coverUrl": "https://static.atlascloud.ai/model/cover/openai-gpt-image-2.5-sunburst-text-to-image.jpg",
+  "schemaUrl": "https://static.atlascloud.ai/model/schema/openai-gpt-image-2.5-sunburst-text-to-image.json",
+  "nativeRequiredFields": [
+    "model",
+    "prompt"
+  ],
+  "discount": "80",
+  "supportsNativeAspectRatio": false,
+  "shortDescription": "Destaca por texturas hiperdetalladas y transformaciones en lenguaje natural.",
+  "speedQualityTag": "Ultra Calidad",
+  "popularityScore": 96,
+  "releaseDateMillis": 1788936409835,
+  "pairedEditModelId": "openai/gpt-image-2.5-sunburst/edit",
+  "isFlagship": true,
+  "versionNumeric": 2.5,
+  "modelFamily": "OpenAI Image",
+  "providerPriority": 96
+}

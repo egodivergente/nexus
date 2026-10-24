@@ -31,7 +31,8 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 @Composable
 internal fun CanvasAttachmentEditor(
     field: CanvasInputField, media: List<AttachedMedia>, enabled: Boolean,
-    onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit, compact: Boolean = false
+    onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit, compact: Boolean = false,
+    onReorder: ((String, Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val selected = media.filter(field::contains)
@@ -72,7 +73,13 @@ internal fun CanvasAttachmentEditor(
             }
             if (selected.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 itemsIndexed(selected, key = { _, item -> item.id }) { index, item ->
-                    CanvasAttachmentTile(item, "${field.label} ${index + 1}", enabled) { onRemove(item.id) }
+                    Column {
+                        CanvasAttachmentTile(item, "${field.label} ${index + 1}", enabled) { onRemove(item.id) }
+                        if(selected.size > 1 && onReorder != null) Row {
+                            IconButton(onClick={onReorder(item.id,-1)},enabled=enabled && index>0) {Icon(Icons.Default.ChevronLeft,"Mover referencia antes")}
+                            IconButton(onClick={onReorder(item.id,1)},enabled=enabled && index<selected.lastIndex) {Icon(Icons.Default.ChevronRight,"Mover referencia después")}
+                        }
+                    }
                 }
             }
             if (remaining > 0) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

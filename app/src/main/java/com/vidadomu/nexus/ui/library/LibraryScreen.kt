@@ -273,6 +273,8 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         }}
     }
     fun openResult(entry:LibraryEntry.Out) {
+        // Keep the viewer in this exact visible collection; folder/filter UI is unchanged.
+        com.vidadomu.nexus.ui.output.OutputViewerScope.prepare(entry.job.id,flat.filterIsInstance<LibraryEntry.Out>().map {it.job.id to it.index})
         val output=entry.job.outputs[entry.index]
         val position=jobs.firstOrNull {it.id==entry.job.id}?.outputs?.indexOfFirst {it.id==output.id} ?: -1
         if(onNavigateToResult!=null && position>=0) onNavigateToResult(entry.job.id,position) else onNavigateToOutput(entry.job.id)

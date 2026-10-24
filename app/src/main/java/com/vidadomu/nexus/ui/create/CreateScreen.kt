@@ -74,7 +74,7 @@ fun CreateScreen(
     val haptic = LocalHapticFeedback.current
     val configuration = LocalConfiguration.current
     val horizontalActions = configuration.screenWidthDp >= 600
-    val compactTyping = configuration.screenHeightDp < 500 && WindowInsets.isImeVisible
+    val compactTyping = WindowInsets.isImeVisible
     val canvasScroll = rememberLazyListState()
     val promptFocus = remember { FocusRequester() }
     LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollToItem(0) }
@@ -123,7 +123,7 @@ fun CreateScreen(
     var showRequestInspector by remember { mutableStateOf(false) }
     var showPersonalPresets by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
-    var inlineParametersExpanded by rememberSaveable { mutableStateOf(false) }
+    var inlineParametersExpanded by rememberSaveable(state.selectedModel?.providerId,state.selectedModel?.id) { mutableStateOf(true) }
     var showToolMenu by remember { mutableStateOf(false) }
     var pendingModel by remember { mutableStateOf<NexusModel?>(null) }
     val catalogModels by app.modelCatalogRepository.models.collectAsState()
@@ -241,13 +241,24 @@ fun CreateScreen(
             }
             item(key="composer") {
                 Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    val selected=state.selectedModel
+                    val textRoute=selected?.let {current ->
+                        if(current.pairedEditModelId!=null) current else catalogModels.firstOrNull {
+                            it.providerId==current.providerId && it.pairedEditModelId==current.id
+                        }
+                    }
+                    val editRoute=textRoute?.pairedEditModelId?.let {id -> catalogModels.firstOrNull {it.id==id && it.providerId==textRoute.providerId}}
+                    if(state.selectedModality==Modality.IMAGE && textRoute!=null && editRoute!=null) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        SegmentedButton(selected=selected?.id==textRoute.id,onClick={chooseModel(textRoute)},shape=SegmentedButtonDefaults.itemShape(0,2)) {Text("Desde texto")}
+                        SegmentedButton(selected=selected?.id==editRoute.id,onClick={chooseModel(editRoute)},shape=SegmentedButtonDefaults.itemShape(1,2)) {Text("Con referencias")}
+                    }
                     val mediaContent: @Composable ColumnScope.() -> Unit = {
                         inputFields.forEach { field ->
                             val modelKey = state.selectedModel?.let { it.providerId + "/" + it.id }.orEmpty()
                             key(modelKey,field.key) {
                                 CanvasAttachmentEditor(field,state.attachedMedia,
                                     enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
-                                    onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)},onRemove=viewModel::removeMedia,compact=true)
+                                    onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)},onRemove=viewModel::removeMedia,compact=true,onReorder=viewModel::reorderMedia)
                             }
                         }
                     }

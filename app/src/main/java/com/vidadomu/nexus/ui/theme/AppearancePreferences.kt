@@ -72,10 +72,10 @@ object ChromeVisibility {
     /** The user may prefer the bar to stay put (long-press menu of the chat). Persisted in `nexus_workspace`. */
     val pinned = mutableStateOf(false)
 
-    fun load(context: Context) { pinned.value = context.getSharedPreferences("nexus_workspace", Context.MODE_PRIVATE).getBoolean("bar_pinned", false) }
+    fun load(context: Context) { pinned.value = context.getSharedPreferences("nexus_workspace", Context.MODE_PRIVATE).getBoolean("navigation_visible", true) }
     fun setPinned(context: Context, value: Boolean) {
         pinned.value = value
-        context.getSharedPreferences("nexus_workspace", Context.MODE_PRIVATE).edit().putBoolean("bar_pinned", value).apply()
+        context.getSharedPreferences("nexus_workspace", Context.MODE_PRIVATE).edit().putBoolean("bar_pinned", value).putBoolean("navigation_visible", value).apply()
     }
     val shown: Boolean get() = pinned.value || bottomBar.value
     /** True while a tab is showing a screen inside itself (e.g. an ArtBox family or model sheet): the edge swipe is «Atrás», not «next tab». */

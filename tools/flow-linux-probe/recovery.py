@@ -361,6 +361,7 @@ async def flow_capability():
             flow_session.remember_project(ROOT, page.url)
         return {
             'project_open': True,
+            **await flow_settings.read_workspace(page),
             'composer_editable': await composer.is_editable(),
             # It is normally disabled until a prompt is supplied. That is not a failure.
             'submit_enabled_without_prompt': await submit.is_enabled(),
@@ -972,6 +973,21 @@ async def get_flow_status():
         return await flow_api_status()
     except FlowError as error:
         return flow_error_response(error)
+
+
+@app.get('/api/flow/workspace')
+async def get_flow_workspace():
+    # A settings read never competes with a submission or alters a manual prompt.
+    try:
+        await asyncio.wait_for(FLOW_UI_LOCK.acquire(), timeout=1)
+    except asyncio.TimeoutError:
+        return JSONResponse({'error': 'flow_workspace_busy'}, status_code=409)
+    try:
+        return await with_flow_project_page(flow_settings.inspect_workspace)
+    except FlowError as error:
+        return flow_error_response(error)
+    finally:
+        FLOW_UI_LOCK.release()
 
 
 @app.post('/api/flow/jobs')

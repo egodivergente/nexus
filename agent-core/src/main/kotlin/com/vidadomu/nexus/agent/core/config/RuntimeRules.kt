@@ -22,6 +22,7 @@ object RuntimeRules {
     val definitions = listOf(
         RuleDefinition("ui.motion", "Animaciones", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("ui.haptics", "Respuesta háptica", "Personalización", RuleType.BOOLEAN, "true"),
+        RuleDefinition("flow.connectionTimeout", "Espera de conexión Flow (segundos)", "Reglas y límites", RuleType.INTEGER, "20", 0.0, help="Margen para comprobar el navegador del puente principal antes de usar el respaldo.", scoped=true),
         RuleDefinition("ui.background", "Fondo azul Nexus", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("ui.backgroundOpacity", "Intensidad del fondo", "Personalización", RuleType.DECIMAL, "0.28", 0.0, 1.0),
         RuleDefinition("ui.photo", "Foto de fondo", "Personalización", RuleType.TEXT, "", help="Selecciona una imagen desde la vista Personalización."),

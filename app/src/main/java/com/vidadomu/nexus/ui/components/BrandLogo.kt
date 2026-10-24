@@ -89,7 +89,7 @@ fun BrandLogo(
             R.drawable.ic_logo_runway, R.drawable.ic_logo_elevenlabs, R.drawable.ic_logo_ideogram))
     val artworkSize = if(containerSize == null && needsContrastBacking) size * .8f else size
 
-    if (bare && asset is BrandAsset.Resource) {
+    if ((bare || containerSize == null) && asset is BrandAsset.Resource) {
         val context = LocalContext.current
         val backgroundLuminance = MaterialTheme.colorScheme.background.luminance()
         // One-colour marks (white or black artwork) follow the theme's text colour so they never vanish; coloured marks are untouched.

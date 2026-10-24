@@ -43,6 +43,11 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
  */
 @Composable internal fun ConversationDrawer(ui: AssistantUiState, vm: AssistantViewModel, onClose: () -> Unit) {
     val chats=remember(ui.conversationId,ui.items.size,ui.workingIn,ui.activeProjectId) {entries(ui,vm)}
+    val context=LocalContext.current
+    val tabs=remember {ConversationTabs(context)}
+    var closed by remember {mutableStateOf(tabs.closed())}
+    var showClosed by remember {mutableStateOf(false)}
+    var query by remember {mutableStateOf("")}
     val canCarry=!ui.thinking && !ui.carrying && ui.workingIn==null && ui.items.any {it is ChatItem.User}
     ModalDrawerSheet(Modifier.widthIn(max=320.dp)) {
         Text("Conversaciones",Modifier.padding(start=28.dp,top=24.dp,bottom=12.dp),style=MaterialTheme.typography.titleMedium)
@@ -52,11 +57,18 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
             icon={if(ui.carrying) CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.Forum,null)},selected=false,
             onClick={if(canCarry) {vm.newConversationWithContext();onClose()}},modifier=Modifier.padding(horizontal=12.dp))
         HorizontalDivider(Modifier.padding(vertical=8.dp,horizontal=28.dp))
+        com.vidadomu.nexus.ui.components.StudioTextField(query,{query=it},Modifier.padding(horizontal=16.dp),singleLine=true,placeholder={Text("Buscar conversación")})
+        if(closed.isNotEmpty()) TextButton(onClick={showClosed=!showClosed},modifier=Modifier.padding(horizontal=16.dp)) {Text(if(showClosed) "Ocultar cerradas" else "Ver cerradas · ${closed.size}")}
         androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
-            items(chats,key={it.id}) {chat->
-                NavigationDrawerItem(selected=chat.id==ui.conversationId,onClick={onClose();vm.openConversation(chat.id)},
-                    label={Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
-                    badge=if(chat.id==ui.workingIn) ({CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)}) else null,
+            items(chats.filter {(showClosed || it.id !in closed) && it.title.contains(query,true)},key={it.id}) {chat->
+                NavigationDrawerItem(selected=chat.id==ui.conversationId,onClick={tabs.open(chat.id);closed=tabs.closed();onClose();vm.openConversation(chat.id)},
+                    label={Column {Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        if(chat.preview.isNotBlank() && chat.preview!=chat.title) Text(chat.preview,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(chat.updatedAt>0) Text(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT).format(java.util.Date(chat.updatedAt)),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}},
+                    badge={Row(verticalAlignment=Alignment.CenterVertically) {
+                        if(chat.id==ui.workingIn) CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)
+                        IconButton(onClick={tabs.close(chat.id);closed=tabs.closed()}) {Icon(Icons.Default.Close,"Cerrar conversación de la lista; conservar historial",Modifier.size(16.dp))}
+                    }},
                     modifier=Modifier.padding(horizontal=12.dp).semantics {
                         if(chat.id==ui.workingIn) contentDescription="${chat.title}: Nexus sigue trabajando aquí"
                     })

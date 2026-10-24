@@ -102,6 +102,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     val closePage: () -> Unit = {if(initialPage!=null && onCloseInitialPage!=null) onCloseInitialPage() else pageName=null}
     val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
     var assistantSettingsOpen by remember { mutableStateOf(false) }
+    var advancedAppearance by rememberSaveable {mutableStateOf(false)}
     androidx.activity.compose.BackHandler(enabled = page != null) { closePage() }
     val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured").count { it }
@@ -110,11 +111,12 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         showBalance=page != SettingsPage.BYTEPLUS,
         navigationIcon={ if(page != null) IconButton(onClick=closePage) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
-        if(page in setOf(SettingsPage.RULES,SettingsPage.PROJECTS,SettingsPage.CATALOG,SettingsPage.AUTOMATION,SettingsPage.VISUAL)) {
+        if(page in setOf(SettingsPage.RULES,SettingsPage.PROJECTS,SettingsPage.CATALOG,SettingsPage.AUTOMATION) || page==SettingsPage.VISUAL && advancedAppearance) {
             Box(Modifier.padding(padding)) {com.vidadomu.nexus.settings.RuntimeSettingsEditor(when(page) {SettingsPage.PROJECTS->"Proyectos y conversaciones";SettingsPage.CATALOG->"Catálogo y workflows";SettingsPage.AUTOMATION->"Automatización";SettingsPage.VISUAL->"Personalización";else->null})}
         } else LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             when(page) {
-                SettingsPage.RULES, SettingsPage.PROJECTS, SettingsPage.CATALOG, SettingsPage.AUTOMATION, SettingsPage.VISUAL -> Unit
+                SettingsPage.RULES, SettingsPage.PROJECTS, SettingsPage.CATALOG, SettingsPage.AUTOMATION -> Unit
+                SettingsPage.VISUAL -> item {SettingsCard {AppearanceControls {advancedAppearance=true}}}
                 null -> {
                     item {com.vidadomu.nexus.ui.components.StudioTextField(settingsSearch,{settingsSearch=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Buscar en Ajustes")},leadingIcon={Icon(Icons.Default.Search,null)})}
                     val sections=listOf(
@@ -209,6 +211,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 }
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 SettingRow("Diagnóstico del sistema","Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»",{showDiagnostics=true})
+                Text("Compilación ${com.vidadomu.nexus.BuildConfig.VERSION_CODE} · ${com.vidadomu.nexus.BuildConfig.BUILD_TYPE}\n${com.vidadomu.nexus.BuildConfig.SOURCE_REVISION} · ${com.vidadomu.nexus.BuildConfig.BUILD_DATE}",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
             }}
                 }
             }
@@ -494,13 +497,14 @@ private fun FontScaleRow(appearance:AppearancePreferences) {
         Slider(draft,{draft=it},valueRange=.8f..1.4f,steps=11,onValueChangeFinished={appearance.setFontScale(draft)})
         Text("Así se verá el texto de Nexus.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         // Más espacio para el chat: la barra de pestañas se esconde al bajar y vuelve al subir.
-        var autoHide by remember {mutableStateOf(appearance.autoHideBars())}
+        val context=LocalContext.current
+        val pinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned
         Row(Modifier.fillMaxWidth().padding(top=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Ocultar la barra al bajar por el chat",style=MaterialTheme.typography.bodyLarge)
-                Text("Vuelve en cuanto subes un poco.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                Text("Navegación siempre visible",style=MaterialTheme.typography.bodyLarge)
+                Text("Si la ocultas, desliza hacia arriba desde el borde inferior.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             }
-            Switch(autoHide,{autoHide=it;appearance.setAutoHideBars(it)})
+            Switch(pinned,{com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(context,it)})
         }
     }
 }

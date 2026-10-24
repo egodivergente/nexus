@@ -343,8 +343,9 @@ class AntigravityProvider(
             content += ContentBlock.Text(parsed.visibleText)
         }
         content += parsed.toolUses
-        if (content.isEmpty()) {
-            content += ContentBlock.Text("…")
+        if (content.isEmpty() || parsed.toolUses.isEmpty() && parsed.visibleText.trim() in setOf("…", "...")) {
+            throw LlmException(LlmException.Kind.PROTOCOL,
+                "Antigravity terminó sin devolver texto ni herramientas. El mensaje se conserva; puedes reintentar la respuesta.")
         }
         val stopReason = if (parsed.toolUses.isNotEmpty()) StopReason.TOOL_USE else StopReason.END_TURN
         return LlmResponse(

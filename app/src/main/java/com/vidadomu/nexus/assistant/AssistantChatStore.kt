@@ -17,7 +17,7 @@ internal data class SavedAssistantChat(val items: List<ChatItem>, val plans: Map
     val projectId: String? = null, val conversationId: String? = null, val updatedAt: Long = 0)
 
 /** Private, atomic snapshot. Restoring history never repeats a provider submission. */
-internal data class AssistantChatEntry(val id: String, val title: String, val projectId: String? = null, val updatedAt: Long = 0)
+internal data class AssistantChatEntry(val id: String, val title: String, val projectId: String? = null, val updatedAt: Long = 0, val preview: String = "")
 
 internal class AssistantChatStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "assistant/chat-v1.json").apply { parentFile?.mkdirs() })
@@ -77,7 +77,7 @@ internal class AssistantChatStore(private val context: Context) {
         .filter { it.extension == "json" }.sortedByDescending { it.lastModified() }.mapNotNull { entry ->
             runCatching {
                 val chat = json.decodeFromString<SavedAssistantChat>(entry.readText())
-                AssistantChatEntry(entry.nameWithoutExtension,(if(entry.name.startsWith("sync_")) "↔ " else "") + (chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Nueva conversación"),chat.projectId,chat.updatedAt.takeIf {it>0} ?: entry.lastModified())
+                AssistantChatEntry(entry.nameWithoutExtension,(if(entry.name.startsWith("sync_")) "↔ " else "") + (chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Nueva conversación"),chat.projectId,chat.updatedAt.takeIf {it>0} ?: entry.lastModified(),chat.items.filterIsInstance<ChatItem.User>().lastOrNull()?.text?.take(110).orEmpty())
             }.getOrNull()
         }
 

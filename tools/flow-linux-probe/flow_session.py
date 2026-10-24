@@ -1,6 +1,6 @@
 """Bounded recovery of the existing private Flow browser; no generation actions."""
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 import json
 from pathlib import Path
 import re
@@ -8,7 +8,8 @@ import time
 from urllib.parse import urlsplit
 
 from auto_auth import CredentialExpiredError, load_credential
-from flow_references import COMPOSER
+from flow_references import COMPOSER, composer_reference_count
+import flow_drafts
 
 CDP = 'http://127.0.0.1:9229'
 SIGN_IN = re.compile(r'(Sign in|Log in|Iniciar sesi[oó]n|Acceder|Create with (?:Google )?Flow|Crear con (?:Google )?Flow)', re.I)
@@ -174,6 +175,30 @@ async def repair_project_page(page, refresh=False):
 
 
 @asynccontextmanager
+async def preserve_recovery_draft(page, root, refresh):
+    """Refresh authentication without losing a verified text-only manual draft."""
+    previous = None
+    original_url = page.url if page is not None else None
+    try:
+        if page is not None and refresh:
+            composer = page.locator(COMPOSER)
+            if await composer.count() == 1 and await composer.is_visible() and await composer.is_editable():
+                text = await composer.evaluate('e => (e.value ?? e.innerText) || ""')
+                if text.strip() and await composer_reference_count(page) == 0:
+                    await asyncio.to_thread(flow_drafts.preserve, root, original_url, text)
+                    previous = text
+                    await composer.fill('', timeout=5000)
+        yield
+    finally:
+        if previous is not None and page.url == original_url:
+            # A failed login still leaves the durable private backup. Never write into an auth page.
+            with suppress(Exception):
+                composer = page.locator(COMPOSER)
+                if await composer.count() == 1 and await composer.is_editable():
+                    await flow_drafts.restore_if_untouched(composer, previous, '')
+
+
+@asynccontextmanager
 async def session_lock(root):
     """Coordinate the timer and bridge without blocking the server event loop."""
     root.mkdir(parents=True, exist_ok=True)
@@ -212,11 +237,18 @@ async def ensure_ready(root):
             checked = json.loads(health.read_text()).get('time', 0)
         except (OSError, ValueError):
             checked = 0
+        refresh = time.time() - checked > 300
+        async with preserve_recovery_draft(projects[0] if projects else None, root, refresh):
+            return await _ensure_browser_ready(root, browser, pages, projects, refresh)
+
+
+async def _ensure_browser_ready(root, browser, pages, projects, refresh):
+        health = root / 'session-checked-at.json'
         if projects:
             # A stale SPA can still show its old editor after Google expires the login.
             # Refresh at most once per five minutes, only before a new submission and
             # only when there is no draft. Never reload while following a generation.
-            repaired = await repair_project_page(projects[0], refresh=time.time() - checked > 300)
+            repaired = await repair_project_page(projects[0], refresh=refresh)
             if repaired != 'reloaded':
                 return repaired
         target = projects[0] if projects else next((p for p in pages if urlsplit(p.url).hostname == 'accounts.google.com'), None)

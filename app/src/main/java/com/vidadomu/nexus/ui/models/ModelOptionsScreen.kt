@@ -58,11 +58,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     var savedRoute by rememberSaveable(group.key,workflow) {mutableStateOf(choices.getString("task-route:${group.key}:${workflow.name}",null)
         ?: choices.getString("route:${group.key}:${choices.getString("use:${group.key}",null)}",null))}
     val priceRevision by AtlasPublishedPrice.revision.collectAsState()
-    val defaultRoute=remember(routes,priceRevision) {routes.sortedWith(
-        compareByDescending<NexusModel> {AtlasPublishedPrice.cached(it)!=null || it.priceUnitVerified}
-            .thenByDescending {it.providerPriority}.thenByDescending {it.variantRank}.thenBy {it.id}
-    ).first()}
-    val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: defaultRoute
+    val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: routes.first()
+    var infoOpen by rememberSaveable(group.key) {mutableStateOf(false)}
+    var contractOpen by rememberSaveable(group.key) {mutableStateOf(false)}
     var variantsOpen by remember {mutableStateOf(false)}
     var details by rememberSaveable(group.key) {mutableStateOf(false)}
     val estimate=rememberPriceEstimate(selected)
@@ -80,13 +78,16 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     val facts=remember(selected,verifiedSelected,publishedUnit) {modelFactSheet(selected,verifiedSelected,publishedUnit)}
     val labels=rememberCatalogLabels()
     var editLabels by remember {mutableStateOf(false)}
-    // Image inputs come from the model's own contract; the images chosen here travel with «Configurar en Lanzadera».
+    // Image inputs come from the model's own contract; the images chosen here travel with «Crear con este modelo».
     val imageField=remember(selected,verifiedSelected) {
         com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(verifiedSelected ?: selected).firstOrNull {it.mime.startsWith("image/")}
     }
     // Images sent from the Library arrive already picked (up to what this model accepts).
     var pickedImages by remember(group.key,modelBookmark(selected)) {mutableStateOf(
         if(imageField==null) emptyList() else ArtBoxInbox.images.value.take((imageField.maximum).coerceIn(1,50)))}
+    LaunchedEffect(imageField,modelBookmark(selected)) {
+        if(imageField!=null && pickedImages.isEmpty()) pickedImages=ArtBoxInbox.images.value.take(imageField.maximum.coerceIn(1,50))
+    }
     fun addImages(uris:List<android.net.Uri>) {
         val limit=(imageField?.maximum ?: 1).coerceIn(1,50)
         val extra=uris.map {it to (context.contentResolver.getType(it) ?: "image/jpeg")}
@@ -112,7 +113,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 Button(onClick={
                     ArtBoxInbox.images.value=emptyList()
                     if(pickedImages.isNotEmpty() && onUseWithMedia!=null) onUseWithMedia(selected,pickedImages) else onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
-                    Text("Configurar en Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+                    Text("Crear con este modelo",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
                 }
             }
@@ -156,6 +157,19 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     Text("Evítalo si: ${advice.avoid}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
             }
+            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Text("Variante y proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })
+                Surface(color=colors.surface,shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
+                    .clickable(enabled=routes.size>1,role=Role.Button,onClickLabel="Cambiar variante y proveedor") {variantsOpen=true}) {
+                    Row(Modifier.padding(NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                            Text(optionVariantLabel(selected,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=3,overflow=TextOverflow.Clip)
+                            Text(providerName(selected.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                        }
+                        if(routes.size>1) Icon(Icons.Default.UnfoldMore,"${routes.size} opciones disponibles",tint=colors.onSurfaceVariant)
+                    }
+                }
+            }
             if(imageField!=null) Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                     Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
@@ -188,9 +202,32 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     }
                 }
             }
-            ModelEvaluation(selected,group.routes)
+            TextButton(onClick={infoOpen=true}) {Icon(Icons.Default.Info,null);Spacer(Modifier.width(8.dp));Text("Información y evaluación")}
+            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clickable(role=Role.Button,onClickLabel=if(details) "Plegar detalles" else "Desplegar detalles") {details=!details}
+                    .semantics { stateDescription=if(details) "Desplegado" else "Plegado" },verticalAlignment=Alignment.CenterVertically) {
+                    Text("Detalles del modelo",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                    Icon(if(details) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null,tint=colors.onSurfaceVariant)
+                }
+                if(details) {
+                    Text(guide.purpose,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                    if(estimate.details.isNotBlank()) Text(estimate.details,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    Text(guide.note,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    Text(selected.id,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}) {Text("Fuente del lanzamiento",color=colors.onSurfaceVariant)}}
+                    guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}) {Text("Ficha y tarifas del proveedor",color=colors.onSurfaceVariant)}}
+                }
+                onHide?.let {action -> TextButton(onClick={action(selected)}) {Text("Quitar esta variante",color=colors.onSurfaceVariant)}}
+            }
+        }
+    }
+    if(infoOpen) ModalBottomSheet(onDismissRequest={infoOpen=false},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            Text(com.vidadomu.nexus.ui.create.canvasModelIdentity(selected).title,style=MaterialTheme.typography.titleLarge)
+            ModelEvaluation(verifiedSelected ?: selected,group.routes)
             val promptCapability=verifiedSelected?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt)
-            Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+            TextButton(onClick={contractOpen=!contractOpen}) {Text(if(contractOpen) "Ocultar contrato y límites" else "Contrato, límites y coste")}
+            if(contractOpen) Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
             Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Text("Entradas, límites y coste",style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
                 if(selected.promptAccepted) Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -212,35 +249,6 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 if(verifiedSelected==null) Text("Entradas y límites sin verificar: el esquema del proveedor aún no se ha leído.",
                     style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
             }
-            }
-            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                Text("Variante y proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })
-                Surface(color=colors.surface,shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
-                    .clickable(enabled=routes.size>1,role=Role.Button,onClickLabel="Cambiar variante y proveedor") {variantsOpen=true}) {
-                    Row(Modifier.padding(NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                            Text(optionVariantLabel(selected,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=3,overflow=TextOverflow.Clip)
-                            Text(providerName(selected.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
-                        }
-                        if(routes.size>1) Icon(Icons.Default.UnfoldMore,"${routes.size} opciones disponibles",tint=colors.onSurfaceVariant)
-                    }
-                }
-            }
-            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clickable(role=Role.Button,onClickLabel=if(details) "Plegar detalles" else "Desplegar detalles") {details=!details}
-                    .semantics { stateDescription=if(details) "Desplegado" else "Plegado" },verticalAlignment=Alignment.CenterVertically) {
-                    Text("Detalles del modelo",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
-                    Icon(if(details) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null,tint=colors.onSurfaceVariant)
-                }
-                if(details) {
-                    Text(guide.purpose,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
-                    if(estimate.details.isNotBlank()) Text(estimate.details,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    Text(guide.note,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    Text(selected.id,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                    release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}) {Text("Fuente del lanzamiento",color=colors.onSurfaceVariant)}}
-                    guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}) {Text("Ficha y tarifas del proveedor",color=colors.onSurfaceVariant)}}
-                }
-                onHide?.let {action -> TextButton(onClick={action(selected)}) {Text("Quitar esta variante",color=colors.onSurfaceVariant)}}
             }
         }
     }

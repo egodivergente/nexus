@@ -55,9 +55,12 @@ fun StudioChrome(modifier: Modifier = Modifier, content: @Composable () -> Unit)
  */
 @Composable
 fun FloatingActionDock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val base = MaterialTheme.colorScheme.background
-    Column(modifier.fillMaxWidth().background(Brush.verticalGradient(0f to base.copy(alpha = 0f), .3f to base.copy(alpha = .82f), 1f to base))
-        .padding(top = NexusTokens.space24), content = content)
+    // An opaque, measured action surface keeps the last field readable above the dock.
+    Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
+        Column { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))
+            Column(Modifier.padding(top = NexusTokens.space8), content = content)
+        }
+    }
 }
 
 /** Tonal field shared by parameters and saved presets, with no outline or underline. */
@@ -89,7 +92,7 @@ fun StudioTextField(
 @Composable
 fun StudioToolChip(label: String, description: String = label, enabled: Boolean = true,
     selected: Boolean = false, onClick: () -> Unit) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(NexusTokens.pressDuration), label = "Chip press")
@@ -97,7 +100,7 @@ fun StudioToolChip(label: String, description: String = label, enabled: Boolean 
         if(selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
         tween(NexusTokens.pressDuration), label = "Chip tone")
     Box(Modifier.heightIn(min = NexusTokens.minimumTouch), contentAlignment = Alignment.Center) {
-        Surface(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() },
+        Surface(onClick = { haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled, interactionSource = interactions, color = color,
             contentColor = if(enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             shape = NexusTokens.filter, modifier = Modifier
@@ -117,11 +120,11 @@ fun StudioToolChip(label: String, description: String = label, enabled: Boolean 
 @Composable
 fun StudioRemoveMediaButton(onClick: () -> Unit, modifier: Modifier = Modifier,
     description: String = "Quitar referencia") {
-    val haptic = LocalHapticFeedback.current
+    val haptic = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     Box(modifier.size(NexusTokens.minimumTouch)
         .semantics { contentDescription = description }
         .clickable(role = Role.Button) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick()
+            haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); onClick()
         }) {
         Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp)
             .clip(CircleShape).background(Color.Black.copy(alpha = .50f)), contentAlignment = Alignment.Center) {
@@ -150,8 +153,8 @@ fun StudioCredentialField(value: String, onValueChange: (String) -> Unit,
 fun StudioFilterChip(selected: Boolean, onClick: () -> Unit, label: @Composable () -> Unit,
     modifier: Modifier = Modifier, leadingIcon: (@Composable () -> Unit)? = null,
     shape: Shape = NexusTokens.filter) {
-    val haptic=LocalHapticFeedback.current
-    FilterChip(selected=selected, onClick={haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);onClick()},
+    val haptic=com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
+    FilterChip(selected=selected, onClick={haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION,changed=!selected);onClick()},
         label=label, modifier=modifier, leadingIcon=leadingIcon, shape=shape,
         // Filtros bien visibles: seleccionado = relleno de acento sólido; sin seleccionar = tarjeta con borde propio.
         border=FilterChipDefaults.filterChipBorder(enabled=true, selected=selected,

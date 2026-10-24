@@ -3,8 +3,9 @@ package com.vidadomu.nexus.ui.create
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -56,13 +57,17 @@ internal object ParameterSections {
 internal fun ParameterSheetContent(model: NexusModel, parameters: List<ModelParameter>, values: Map<String, String>,
     onChange: (String, String) -> Unit) {
     val shown = ParameterDependencies.visible(model, parameters, values)
-    val primary = shown.filter { !it.isAdvanced }
-    val optional = shown.filter { it.isAdvanced }
+    val primary = (shown.filter {it.isRequired} + shown.filter { !it.isAdvanced }.take(4)).distinctBy {it.key}
+    val optional = shown.filter { it !in primary }
+    var advanced by rememberSaveable(model.providerId, model.id) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         primary.forEach { param ->
             key(model.id, param.key) { NativeParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }
         }
-        if (optional.isNotEmpty()) {
+        if (optional.isNotEmpty()) TextButton(onClick = { advanced = !advanced }) {
+            Text(if (advanced) "Ocultar ajustes avanzados" else "Avanzado · ${optional.size} opciones")
+        }
+        if (advanced) {
             val sections = ParameterSections.split(optional)
             sections.forEach { section ->
                 Text(section.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

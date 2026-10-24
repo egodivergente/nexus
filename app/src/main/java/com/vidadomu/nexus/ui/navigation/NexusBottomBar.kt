@@ -36,7 +36,7 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
     if(currentRoute?.startsWith("output")==true) return
     val haptic = LocalHapticFeedback.current
     val context=androidx.compose.ui.platform.LocalContext.current
-    // Escondida por defecto en todas las pestañas: un gesto de abajo arriba la trae y se retira sola (o queda fija si el usuario lo elige).
+    // Visible by default; the optional hidden mode retains the edge-swipe shortcut.
     val visible = ChromeVisibility.shown
     androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
     StudioChrome(Modifier.fillMaxWidth()) {

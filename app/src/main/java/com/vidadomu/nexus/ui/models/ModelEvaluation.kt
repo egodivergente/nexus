@@ -55,8 +55,21 @@ private val evaluationCriteria=listOf("Calidad","Fotorealismo","Identidad","Fís
             }
         }
         HorizontalDivider(color=colors.outlineVariant.copy(alpha=.5f))
+        val inputs=com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(model)
+        val routeAdvice=when {
+            !model.promptAccepted -> "Esta operación no usa prompt. Prepara ${inputs.joinToString {it.label.lowercase()}.ifBlank {"sus entradas"}} y ajusta ${model.parameters.filterNot {it.isAdvanced}.take(3).joinToString {it.displayName.lowercase()}.ifBlank {"las opciones del archivo"}}."
+            inputs.isEmpty() && model.pairedEditModelId!=null -> "Esta ruta crea desde texto, sin imágenes. Para conservar una foto o combinar referencias, cambia a la ruta de edición de esta misma variante."
+            inputs.any {it.required} -> "Requiere ${inputs.filter {it.required}.joinToString {it.label.lowercase()}}. ${if(model.promptRequired) "El texto también es obligatorio." else "El texto es opcional."}"
+            inputs.isNotEmpty() -> "Puedes crear sin adjuntos. Admite ${inputs.joinToString {it.label.lowercase() + if(it.maximum<Int.MAX_VALUE) " (hasta ${it.maximum})" else ""}} como guía opcional."
+            else -> "Esta ruta recibe texto sin adjuntos. Los controles disponibles se muestran en su contrato."
+        }
+        Text(routeAdvice,style=MaterialTheme.typography.bodyMedium)
+        if(researchedModelNote(model)==null && model.description.isNotBlank()) {
+            Text("Descripción del proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+            Text(model.description,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+        }
         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            evaluation.facts.take(if(factsOpen) Int.MAX_VALUE else 4).forEach {(label,value)->
+            evaluation.facts.take(if(factsOpen) Int.MAX_VALUE else 0).forEach {(label,value)->
                 Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Text(label,Modifier.weight(.42f),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     Text(value,Modifier.weight(.58f),style=MaterialTheme.typography.bodyMedium)

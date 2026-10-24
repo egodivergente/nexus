@@ -94,6 +94,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                 if (libraryExpanded) onHideLibrary() else onShowLibrary()
             } else Modifier)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
+            Text(agentLabel(ui.settings), Modifier.padding(start = 12.dp, top = 6.dp, end = 12.dp),
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
@@ -137,7 +139,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     decorationBox = { inner ->
                         Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
                             // Quién contestará: proveedor y modelo activos (AGY, Bedrock, un cerebro propio…).
-                            if (text.text.isEmpty()) Text("Escribe a Nexus · " + agentLabel(ui.settings), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             inner()
                         }

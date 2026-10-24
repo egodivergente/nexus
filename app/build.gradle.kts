@@ -1,5 +1,7 @@
 import java.util.Properties
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 plugins {
     id("com.android.application")
@@ -24,12 +26,17 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 108
-        versionName = "1.9.74-agent"
+        versionCode = 109
+        versionName = "1.9.75-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
         buildConfigField("String", "CODENAME", "\"${versionCodename(versionCode!!)}\"")
+        val revision = providers.gradleProperty("nexusRevision").orElse(providers.exec {
+            commandLine("git", "rev-parse", "--short=12", "HEAD")
+        }.standardOutput.asText.map { it.trim() }).get()
+        buildConfigField("String", "SOURCE_REVISION", "\"${revision.replace(Regex("[^a-zA-Z0-9._-]"), "")}\"")
+        buildConfigField("String", "BUILD_DATE", "\"${LocalDate.now(ZoneOffset.UTC)}\"")
         // Claves de Bedrock opcionales desde un fichero local FUERA del repo: -PnexusBedrockFile=<ruta a .properties>
         // (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, BEDROCK_MODEL_ID). Sin Ã©l quedan vacÃ­as.
         val bedrock = Properties().apply {
