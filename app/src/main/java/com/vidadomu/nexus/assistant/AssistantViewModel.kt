@@ -37,10 +37,10 @@ import kotlinx.coroutines.sync.withLock
 sealed interface ChatItem {
     val id: String
     @kotlinx.serialization.Serializable
-    data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
+    data class User(override val id: String, val text: String, val attachments: List<Attachment>, val at: Long = 0L) : ChatItem
     @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
-        val media: List<Attachment> = emptyList()) : ChatItem
+        val media: List<Attachment> = emptyList(), val at: Long = 0L, val tookMs: Long = 0L) : ChatItem
     /** Una tarjeta por encargo: [orderId] es persistente y [planId] apunta al plan vigente. */
     @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String, val orderId: String? = null) : ChatItem
@@ -193,7 +193,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -209,7 +209,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
-                        conv.session.renderedMedia.values.toList()), streamingText = "") }
+                        conv.session.renderedMedia.values.toList(), System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime() - started), streamingText = "") }
                 }
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
                 r.verifiedNotes.forEach { notice(it, error = false) }
@@ -620,7 +620,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val previousMode = conversation.session.mode
         val conv = conversation
         conv.session.mode = AgentMode.ASSISTANT
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList()), thinking = true, scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList(), System.currentTimeMillis()), thinking = true, scrollRequest = it.scrollRequest + 1) }
         val started = android.os.SystemClock.elapsedRealtime()
         turnJob = viewModelScope.launch {
             try {
@@ -630,7 +630,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
                 val response = result.text.trim().ifBlank { "No he podido explicar la causa con los datos disponibles. El trabajo conserva su diagnóstico en Historial." }
-                _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop), scrollRequest = it.scrollRequest + 1) }
+                _ui.update { it.copy(items = it.items + ChatItem.Assistant(newId(), response, result.toolCalls, result.stop, at = System.currentTimeMillis()), scrollRequest = it.scrollRequest + 1) }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 notice("El diagnóstico ha tardado demasiado. El detalle original sigue disponible en Historial.", error = true)
             } catch (e: CancellationException) {

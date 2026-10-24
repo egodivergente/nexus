@@ -15,10 +15,14 @@ internal fun modelGroupTitle(model: NexusModel): String {
         "Nano Banana" -> "nano[- ]banana"
         else -> Regex.escape(family.lowercase()).replace(" ", "[- ]")
     }
-    val version = Regex("$token[- .]*(?:video[- ]*)?v?([oh]?\\d+(?:[._-]\\d+)?)(?=[^0-9]|$)").find(text)?.groupValues?.get(1)
-    if (version != null) {
+    val versionMatch = Regex("$token[- .]*(?:video[- ]*)?v?([oh]?\\d+(?:[._-]\\d+)?)(?=[^0-9]|$)").find(text)
+    val version = versionMatch?.groupValues?.get(1)
+    if (versionMatch != null && version != null) {
         val normalized = version.replace('_', '.').replace('-', '.').removeSuffix(".0")
-        return "$family ${normalized.uppercase()}"
+        // A speed/size tier right after the version (Seedance 2.0 Fast, Mini…) is its own model, not a variant of the base one.
+        // Limited to families where those tiers are separate products with their own price and limits.
+        val tier = if(family == "Seedance") Regex("^[-_ ]?(fast|mini|lite)(?=[^a-z]|$)").find(text.substring(versionMatch.range.last + 1))?.groupValues?.get(1) else null
+        return "$family ${normalized.uppercase()}" + (tier?.let { " " + it.replaceFirstChar { c -> c.uppercase() } } ?: "")
     }
     // Strip only explicit workflow names. Unknown product identities remain separate.
     return model.displayName

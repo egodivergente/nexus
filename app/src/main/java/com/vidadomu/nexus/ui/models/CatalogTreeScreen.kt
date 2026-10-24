@@ -143,6 +143,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     }
     fun back() { if(groupKey != null) groupKey = null else family = null }
     BackHandler(family != null || groupKey != null) { back() }
+    // Inside a family or a model sheet the sideways swipe from the edge means «Atrás»; it must not slide to the previous tab.
+    val nested = family != null || groupKey != null
+    LaunchedEffect(nested) { com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value = nested }
+    DisposableEffect(Unit) { onDispose { com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value = false } }
     fun toggleFavorite(model: NexusModel) {
         val key = modelBookmark(model)
         favorites = if(key in favorites) favorites - key else favorites + key
@@ -245,7 +249,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         NavigationCard(labels.name("group:"+group.key,group.title),catalogFamily(group.routes.first()),
                             labels.description("group:"+group.key,focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes)),group.routes,modality,
                             onClick={groupKey=group.key;filters=false},releaseLabel=groupReleaseLabel(group.routes).takeUnless {it=="Fecha no verificada"},compact=compactCards,grid=useGrid,
-                            onLongClick=if(canReorder) ({}) else ({contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())}),
+                            onLongClick=if(canReorder) null else ({contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())}),
                             onOptions={contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
                             dragging=isDragging,glyphKey="group:"+group.key,
@@ -362,7 +366,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:()->Unit={},onOptions:(()->Unit)?=null,glyphKey:String="",dragging:Boolean=false,dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null,
+private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:(()->Unit)?=null,onOptions:(()->Unit)?=null,glyphKey:String="",dragging:Boolean=false,dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null,
     onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
@@ -376,7 +380,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     // Altura mínima fija en grid para que las tarjetas no bailen cuando falta releaseLabel/highlight.
     val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.03f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Row lift")
     Surface(modifier=cardModifier.fillMaxWidth().graphicsLayer {scaleX=lift;scaleY=lift}.then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick=onClick,
-        onLongClickLabel="Opciones de $title",onLongClick=onLongClick)
+        onLongClickLabel=if(onLongClick!=null) "Opciones de $title" else null,onLongClick=onLongClick)
         .then(if(reorderActions.isEmpty()) Modifier else Modifier.semantics { customActions=reorderActions }),shape=NexusTokens.card,
         color=if(dragging) MaterialTheme.colorScheme.surfaceContainerHigh else SurfaceDark,shadowElevation=if(dragging) 18.dp else 0.dp,
         border=if(dragging) BorderStroke(1.5.dp,MaterialTheme.colorScheme.primary) else null) {
@@ -398,7 +402,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 if(!grid && dragModifier==null && onOptions!=null) IconButton(onClick=onOptions,modifier=Modifier.size(40.dp)) {
                     Icon(Icons.Default.MoreVert,"Opciones de $title",Modifier.size(18.dp),tint=TextSecondary)
                 }
-                if(dragModifier!=null) IconButton(onClick=onLongClick,modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
+                if(dragModifier!=null) IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
             if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.
@@ -406,7 +410,7 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                     Text("Desde $displayPrice",Modifier.padding(horizontal=10.dp,vertical=5.dp),
                         style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
                 } else Spacer(Modifier.weight(1f))
-                if(dragModifier==null) IconButton(onClick=onLongClick,modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
+                if(dragModifier==null) IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)
                 }
             }

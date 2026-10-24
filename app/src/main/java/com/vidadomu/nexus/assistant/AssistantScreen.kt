@@ -248,21 +248,19 @@ fun AssistantScreen(
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={}) {pad ->
         Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).statusBarsPadding().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
-            ConversationTabStrip(ui,vm)
             if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
                 "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
-            // Al bajar por el chat se esconde la barra inferior para ganar espacio; al subir vuelve (Ajustes → Apariencia).
-            val appearance = com.vidadomu.nexus.ui.theme.rememberAppearancePreferences()
-            val autoHide = remember(appearance) { appearance.autoHideBars() }
-            DisposableEffect(Unit) { onDispose { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = true } }
-            val hideOnScroll = remember(autoHide) { object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                    if (autoHide && kotlin.math.abs(available.y) > 6f) com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = available.y > 0
-                    return androidx.compose.ui.geometry.Offset.Zero
-                }
-            } }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(Modifier.fillMaxSize().nestedScroll(hideOnScroll), state = listState,
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val chatContext = LocalContext.current
+            val clipboard = LocalClipboardManager.current
+            var menuOpen by remember { mutableStateOf(false) }
+            var menuAt by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
+            var showAppearance by remember { mutableStateOf(false) }
+            val barPinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned
+            Box(Modifier.weight(1f).fillMaxWidth()
+                // Mantener pulsado un hueco del chat abre el menú de acciones rápidas, justo donde está el dedo.
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
@@ -365,6 +363,24 @@ fun AssistantScreen(
                 }
             }
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
+            // Ajustes: un engranaje pequeño en la esquina; las conversaciones, círculos numerados flotando junto a él.
+            Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ConversationDiscs(ui, vm)
+                Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Abrir ajustes", onClick = onOpenSettings)
+                    .semantics { contentDescription = "Ajustes" }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Settings, null, Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
+                onSettings = onOpenSettings, barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
+                onCopyChat = {
+                    clipboard.setText(AnnotatedString(chatTranscript(ui)))
+                    Toast.makeText(chatContext, "Chat copiado", Toast.LENGTH_SHORT).show()
+                },
+                onShareChat = { shareChat(chatContext, ui) })
+            if (showAppearance) QuickAppearanceSheet({ showAppearance = false }, onOpenSettings)
             }
             if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
                 ordersPanel = false; following = false
@@ -381,7 +397,7 @@ fun AssistantScreen(
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
                 onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
-                reasoningControl = { ReasoningPicker(ui, vm) },workspaceControl={ConversationMenu(ui,vm,{showProject=true},onOpenSettings)})
+                reasoningControl = { ReasoningPicker(ui, vm) })
             }
         }
     }
@@ -642,7 +658,25 @@ private fun UserBubble(item:ChatItem.User) {
                 Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
             }
         }
+        MessageMeta(item.at,0L,Modifier.padding(end=NexusTokens.space8))
     }
+}
+
+/** Time of the message and, for replies, how long the model took: tiny and secondary so it never competes with the text. */
+@Composable
+internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier) {
+    if(at<=0L) return
+    val time=remember(at) {java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at))}
+    val label=if(tookMs>0) time+" · "+formatTook(tookMs) else time
+    Text(label,modifier,style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,lineHeight=12.sp),
+        color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.62f),maxLines=1)
+}
+
+internal fun formatTook(ms: Long): String = when {
+    ms<1_000 -> "${ms} ms"
+    ms<10_000 -> String.format(java.util.Locale("es","ES"),"%.1f s",ms/1000.0)
+    ms<60_000 -> "${ms/1000} s"
+    else -> "${ms/60_000} min ${(ms%60_000)/1000} s"
 }
 
 /** Lo que el usuario contestó justo después de este mensaje (para bloquear sus paneles y marcar la opción elegida). */
@@ -687,6 +721,7 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
               }
             }
         }
+        if(item.text.isNotBlank() && item.stop!="STREAMING") MessageMeta(item.at,item.tookMs,Modifier.padding(horizontal=NexusTokens.space12))
         if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {

@@ -155,4 +155,12 @@ class UxCorrectionsTest {
         assertNotNull(com.vidadomu.nexus.ui.models.toolCategory(lipsync))
         assertNull(com.vidadomu.nexus.ui.models.toolCategory(creator))
     }
+
+    @Test fun speedTiersAreTheirOwnModels() {
+        fun title(id: String) = com.vidadomu.nexus.ui.models.modelGroupTitle(base.copy(id = id, providerModelId = id, displayName = id, organization = "BYTEDANCE", modalities = listOf(Modality.VIDEO)))
+        assertEquals("Seedance 2", title("bytedance/seedance-2.0/text-to-video"))
+        assertEquals("Seedance 2 Fast", title("bytedance/seedance-2.0-fast/text-to-video"))
+        assertEquals("Seedance 2 Mini", title("bytedance/seedance-2.0-mini/reference-to-video"))
+        assertEquals("Seedance 2 Fast", title("bytedance/seedance2-0-fast-t2v"))
+    }
 }

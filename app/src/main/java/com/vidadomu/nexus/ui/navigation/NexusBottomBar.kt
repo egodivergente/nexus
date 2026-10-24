@@ -13,6 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -33,8 +36,8 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
     if(currentRoute?.startsWith("output")==true) return
     val haptic = LocalHapticFeedback.current
     val context=androidx.compose.ui.platform.LocalContext.current
-    // En el chat se esconde al bajar (si está activado en Ajustes) y vuelve al subir; en el resto de pestañas siempre se ve.
-    val visible = ChromeVisibility.bottomBar.value || currentRoute != Screen.Assistant.route
+    // Escondida por defecto en todas las pestañas: un gesto de abajo arriba la trae y se retira sola (o queda fija si el usuario lo elige).
+    val visible = ChromeVisibility.shown
     androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
     StudioChrome(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
@@ -87,5 +90,30 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
             }
         }
     }
+    }
+}
+
+/**
+ * Swipe up from the lower edge of any tab to bring the tab bar in. Only a mostly vertical drag that starts in the band
+ * just above the system gesture area counts, so ordinary scrolling and sideways swiping between tabs are untouched.
+ * The gesture is observed, never consumed.
+ */
+fun Modifier.revealBarOnSwipeUp(): Modifier = this.pointerInput(Unit) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+        val bandTop = size.height - 190.dp.toPx()
+        val bandBottom = size.height - 28.dp.toPx()
+        if (down.position.y !in bandTop..bandBottom) return@awaitEachGesture
+        var dx = 0f; var dy = 0f
+        do {
+            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            val change = event.changes.firstOrNull() ?: break
+            dx = change.position.x - down.position.x
+            dy = change.position.y - down.position.y
+            if (dy < -64.dp.toPx() && kotlin.math.abs(dy) > 1.6f * kotlin.math.abs(dx)) {
+                ChromeVisibility.bottomBar.value = true
+                break
+            }
+        } while (event.changes.any { it.pressed })
     }
 }

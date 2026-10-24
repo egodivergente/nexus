@@ -81,15 +81,15 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
     onReply: (String) -> Unit = {}, onAudio: ((android.net.Uri)->Unit)? = null, onReorder: ((String,Int)->Unit)? = null, onCamera: (() -> Unit)? = null,
     onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
-    reasoningControl: @Composable () -> Unit = {}, workspaceControl: @Composable () -> Unit = {}) {
+    reasoningControl: @Composable () -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
-    Surface(color=com.vidadomu.nexus.ui.theme.LocalChromeColor.current,modifier=Modifier.fillMaxWidth()) {
+    // Flotante, como el campo de búsqueda de Ajustes de Android: una píldora con sombra pegada abajo, sin franjas ni filetes.
+    Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
       Column {
-        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-        Surface(color=MaterialTheme.colorScheme.surface,shape=ComposerShape,
-        border=androidx.compose.foundation.BorderStroke(1.dp,com.vidadomu.nexus.ui.theme.BorderEssential),
-        modifier=Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)
+        Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=ComposerShape,shadowElevation=10.dp,
+        border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),
+        modifier=Modifier.fillMaxWidth()
             .then(if (onShowLibrary != null) Modifier.recentLibraryGesture(opening = !libraryExpanded) {
                 if (libraryExpanded) onHideLibrary() else onShowLibrary()
             } else Modifier)) {
@@ -141,7 +141,6 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         }
                     })
                 reasoningControl()
-                  workspaceControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else if(!canSend && !ui.attaching) {
                     // Nada que enviar: el botón es el micrófono. El dictado se inserta en el campo SIN enviarlo.
@@ -169,7 +168,6 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             }
         }
         }
-        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
       }
     }
 }
@@ -278,7 +276,7 @@ internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
 }
 
 /** Forma única del cuadro de texto: no cambia con el contenido, así los adjuntos y los iconos nunca chocan con una esquina. */
-internal val ComposerShape = RoundedCornerShape(24.dp)
+internal val ComposerShape = RoundedCornerShape(28.dp)
 
 /** Miniatura del adjunto pendiente: imagen o primer fotograma del vídeo; audio y documentos, icono y nombre. */
 @Composable

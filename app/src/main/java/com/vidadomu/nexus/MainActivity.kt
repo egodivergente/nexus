@@ -40,6 +40,7 @@ import com.vidadomu.nexus.ui.generations.GenerationsScreen
 import com.vidadomu.nexus.ui.library.LibraryScreen
 import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
+import com.vidadomu.nexus.ui.navigation.revealBarOnSwipeUp
 import com.vidadomu.nexus.ui.navigation.adjacentTab
 import com.vidadomu.nexus.ui.navigation.tabSwipe
 import com.vidadomu.nexus.ui.navigation.tabEnter
@@ -88,6 +89,10 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
                 val tabs=remember {Screen.bottomNavItems}
+                LaunchedEffect(Unit) {com.vidadomu.nexus.ui.theme.ChromeVisibility.load(this@MainActivity)}
+                // The bar leaves by itself a few seconds after it was brought in, unless the user pinned it.
+                val barShown by com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar
+                LaunchedEffect(barShown) {if(barShown) {kotlinx.coroutines.delay(5_000);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false}}
                 val tabPrefs=remember {getSharedPreferences("nexus_workspace",0)}
                 val pager=rememberPagerState(initialPage=tabPrefs.getInt("page",0).coerceIn(0,tabs.lastIndex),pageCount={tabs.size})
                 val holder=rememberSaveableStateHolder()
@@ -164,7 +169,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    modifier = Modifier.fillMaxSize().imePadding(),
+                    modifier = Modifier.fillMaxSize().imePadding().revealBarOnSwipeUp(),
                     containerColor = ScreenBackground,
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) {
@@ -182,7 +187,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 NexusBottomBar(navController = navController, selectedRoute=if(activeEntry?.destination?.route=="workspace") tabs[pager.currentPage].route else null,
-                                    onSelect={screen->tabRequest=tabs.indexOf(screen);navController.popBackStack("workspace",false)})
+                                    onSelect={screen->tabRequest=tabs.indexOf(screen);navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
                             }
                         }
                     }
@@ -191,7 +196,7 @@ class MainActivity : ComponentActivity() {
                         modifier=Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
                         composable("workspace") {
                             LaunchedEffect(tabRequest) {tabRequest?.let {pager.scrollToPage(it);tabRequest=null}}
-                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,modifier=Modifier.fillMaxSize()) {index ->
+                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value,modifier=Modifier.fillMaxSize()) {index ->
                                 holder.SaveableStateProvider(tabs[index].route) {
                                 when(tabs[index]) {
                             Screen.Assistant -> {
