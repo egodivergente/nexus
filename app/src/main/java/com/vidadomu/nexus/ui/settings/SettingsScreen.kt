@@ -104,7 +104,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     var assistantSettingsOpen by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = page != null) { closePage() }
     val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
-        listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured").count { it }
+        listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured", app.secureStorage.getMaskedProviderApiKey("fal") != "Not configured").count { it }
     }
     val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
@@ -186,7 +186,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                         @Suppress("UNUSED_EXPRESSION")
                         providerKeyRevision
                         Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                            app.providerRegistry.getAllProviders().filter {it.id in setOf("crun","runway")}.forEach {provider->
+                            app.providerRegistry.getAllProviders().filter {it.id in setOf("crun","runway","fal")}.forEach {provider->
                                 ProviderCredentialCard(provider,app.secureStorage.getMaskedProviderApiKey(provider.id),{app.secureStorage.getProviderApiKey(provider.id)},
                                     {providerKeyDialogId=provider.id;providerKeyInput=app.secureStorage.getProviderApiKey(provider.id)},
                                     {app.secureStorage.clearProviderApiKey(provider.id);providerKeyRevision++})

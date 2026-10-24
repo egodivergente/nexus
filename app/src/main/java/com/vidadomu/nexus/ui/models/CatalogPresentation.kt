@@ -88,6 +88,7 @@ internal fun providerName(providerId: String): String = when (providerId.lowerca
     "atlas", "atlas_cloud", "atlas-cloud" -> "Atlas Cloud"
     "crun" -> "Crun"
     "runway" -> "Runway directo"
+    "fal" -> "fal.ai"
     else -> providerId.replaceFirstChar { it.uppercase() }
 }
 

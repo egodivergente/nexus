@@ -41,6 +41,7 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
             isRequestTotal = q.usd != null)
     }
     if(model?.providerId=="crun") return rememberCrunEstimate(model,parameters,prompt,enabled)
+    if(model?.providerId=="fal") return rememberFalTariff(model, enabled)
     val published = rememberPublishedPrice(model)
     val visibleQuote = quote ?: published ?: model?.let { VideoPricePreview.fallback(it, parameters, videoSeconds) }
     return visibleQuote?.let {
@@ -70,6 +71,36 @@ fun rememberPriceEstimate(model: NexusModel?, parameters: Map<String,String>? = 
             }, retry=if(availability==PriceAvailability.ERROR && model!=null) ({attempt++}) else null,
             availability=availability)
     }
+}
+
+@Composable
+private fun rememberFalTariff(model: NexusModel, enabled: Boolean): EstimateUi {
+    val app = LocalContext.current.applicationContext as NexusApplication
+    val currency by app.currencyManager.state.collectAsState()
+    var tariff by remember(model.id) { mutableStateOf<com.vidadomu.nexus.provider.fal.FalTariff?>(null) }
+    var attempt by remember(model.id) { mutableIntStateOf(0) }
+    var pending by remember(model.id) { mutableStateOf(false) }
+    var error by remember(model.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(model.id, enabled, attempt) {
+        tariff = null; error = null
+        if(!enabled) return@LaunchedEffect
+        pending = true
+        try {
+            delay(400)
+            tariff = (app.providerRegistry.getProviderById("fal") as? com.vidadomu.nexus.provider.fal.FalProvider)?.tariff()
+        } catch(e: CancellationException) { throw e }
+        catch(_: Exception) { error = "No se pudo consultar la tarifa autenticada de Fal." }
+        finally { pending = false }
+    }
+    currency.preference
+    return tariff?.let { price ->
+        val date = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(price.checkedAt))
+        EstimateUi("Desde ${app.currencyManager.formatUnitPrice(price.usd)} / ${price.unit}",
+            "Fal · $date · ${price.source}. Tarifa base; no es una cotización total de estas opciones.",
+            hasPrice = true, isRequestTotal = false, availability = PriceAvailability.KNOWN)
+    } ?: EstimateUi(if(pending) "Consultando tarifa…" else "Precio por confirmar",
+        error ?: "Se necesita una clave Fal para consultar la tarifa.", retry = { attempt++ },
+        availability = if(pending) PriceAvailability.LOADING else PriceAvailability.UNAVAILABLE)
 }
 
 /** Cached published tariff for [model], re-read when [AtlasPublishedPrice.revision] grows. */

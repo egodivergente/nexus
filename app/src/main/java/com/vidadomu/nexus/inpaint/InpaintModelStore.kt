@@ -17,8 +17,13 @@ class InpaintModelStore(private val context: Context) {
     fun ready(): Boolean = InpaintContract.weights.all {
         File(folder, it.name).length() == it.bytes && prefs.getString(it.name, null) == it.sha256
     }
-    fun enqueue() = WorkManager.getInstance(context).enqueueUniqueWork("inpaint-download", ExistingWorkPolicy.KEEP,
-        OneTimeWorkRequestBuilder<InpaintDownloadWorker>().setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build())
+    fun enqueue(): Operation {
+        val request = OneTimeWorkRequestBuilder<InpaintDownloadWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
+        check(context.getSharedPreferences("local-inpaint", 0).edit()
+            .putString("downloadWorkId", request.id.toString()).commit()) { "No se pudo conservar la descarga." }
+        return WorkManager.getInstance(context).enqueueUniqueWork("inpaint-download", ExistingWorkPolicy.KEEP, request)
+    }
 
     suspend fun download(onProgress: suspend (Int) -> Unit) = withContext(Dispatchers.IO) {
         val client = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS).build()

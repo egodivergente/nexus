@@ -35,7 +35,7 @@ internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
             "layer-decomposition" in id || "layer_decomposition" in id -> CatalogWorkflow.LAYERS
             "inpaint" in id -> CatalogWorkflow.INPAINT
             "outpaint" in id -> CatalogWorkflow.OUTPAINT
-            "background-remov" in id || "remove-background" in id -> CatalogWorkflow.REMOVE_BACKGROUND
+            "background-remov" in id || "remove-background" in id || "background-removal" in model.categories -> CatalogWorkflow.REMOVE_BACKGROUND
             else -> null
         }
         if(special!=null) return listOf(special)

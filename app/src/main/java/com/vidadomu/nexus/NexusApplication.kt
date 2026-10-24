@@ -100,7 +100,9 @@ class NexusApplication : Application() {
             runwayProvider,
             flowBridgeProvider,
             mockProvider,
-            secureStorage
+            secureStorage,
+            com.vidadomu.nexus.provider.fal.FalProvider(okHttpClient,
+                { secureStorage.getProviderApiKey("fal") }, { atlasProvider.fetchLiveCatalog().getOrThrow() })
         )
         // Los proveedores API del usuario se registran ANTES de crear el catálogo para que entren en la primera carga.
         customMediaStore = com.vidadomu.nexus.provider.custom.CustomMediaStore(this, okHttpClient)

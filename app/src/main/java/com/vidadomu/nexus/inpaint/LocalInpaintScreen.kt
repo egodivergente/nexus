@@ -64,7 +64,8 @@ class LocalInpaintViewModel(application: Application) : AndroidViewModel(applica
             }
             launch {
                 manager.getWorkInfosForUniqueWorkFlow("inpaint-download").collect { works ->
-                    val work = works.maxByOrNull { it.runAttemptCount } ?: return@collect
+                    val work = selectInpaintWork(works, preferences.getString("downloadWorkId", null),
+                        { it.id.toString() }, { it.state.isFinished }) ?: return@collect
                     downloading = !work.state.isFinished
                     ready = withContext(Dispatchers.IO) { InpaintModelStore(context).ready() }
                     if(downloading) mutableMessage.value = "Descargando modelo: ${work.progress.getInt("percent", 0)}%"
@@ -72,15 +73,16 @@ class LocalInpaintViewModel(application: Application) : AndroidViewModel(applica
                 }
             }
             manager.getWorkInfosForUniqueWorkFlow("local-inpaint").collect { works ->
-                val work = works.lastOrNull() ?: return@collect
+                val work = selectInpaintWork(works, preferences.getString("generationWorkId", null),
+                    { it.id.toString() }, { it.state.isFinished }) ?: return@collect
                 busy = !work.state.isFinished
                 when(work.state) {
                     WorkInfo.State.SUCCEEDED -> {
-                        work.outputData.getString("job")?.takeIf { Regex("[a-f0-9-]{36}").matches(it) }?.let { id ->
+                        work.outputData.getString("job")?.takeIf { it == draft?.name && Regex("[a-f0-9-]{36}").matches(it) }?.let { id ->
                             resultFile = File(context.filesDir, "inpaint-jobs/$id/result.png")
                             result = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(resultFile!!.path) }
                         }
-                        mutableMessage.value = "Edición terminada. El original no se ha modificado. Guarda una copia."
+                        if(result != null) mutableMessage.value = "Edición terminada. El original no se ha modificado. Guarda una copia."
                     }
                     WorkInfo.State.FAILED -> mutableMessage.value = work.outputData.getString("error") ?: "La edición local falló."
                     WorkInfo.State.CANCELLED -> mutableMessage.value = "Cancelado. El motor puede tardar en liberar el modelo."
@@ -132,7 +134,10 @@ class LocalInpaintViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun download() { InpaintModelStore(context).enqueue() }
+    fun download() {
+        try { InpaintModelStore(context).enqueue() }
+        catch(_: Exception) { mutableMessage.value = "No se pudo iniciar la descarga del modelo." }
+    }
     fun updatePrompt(value: String) {
         prompt = value
         preferences.edit().putString("prompt", value).apply()
@@ -162,9 +167,16 @@ class LocalInpaintViewModel(application: Application) : AndroidViewModel(applica
                         File(this, "prompt.txt").writeText(instruction)
                     }
                 }
+                val request = OneTimeWorkRequestBuilder<InpaintWorker>()
+                    .setInputData(workDataOf("job" to folder.name, "size" to size, "steps" to steps, "seed" to System.nanoTime())).build()
+                // Persist the exact run before enqueueing: restores the matching source/mask after process death.
                 withContext(Dispatchers.IO) {
-                    manager.enqueueUniqueWork("local-inpaint", ExistingWorkPolicy.KEEP,
-                        OneTimeWorkRequestBuilder<InpaintWorker>().setInputData(workDataOf("job" to folder.name, "size" to size, "steps" to steps, "seed" to System.nanoTime())).build()).result.get()
+                    check(preferences.edit().putString("generationWorkId", request.id.toString())
+                        .putString("draft", folder.name).commit()) { "No se pudo conservar la edición." }
+                }
+                draft = folder
+                withContext(Dispatchers.IO) {
+                    manager.enqueueUniqueWork("local-inpaint", ExistingWorkPolicy.KEEP, request).result.get()
                 }
             } catch(cancelled: CancellationException) { throw cancelled
             } catch(failure: Exception) { mutableMessage.value = failure.message ?: "No se pudo iniciar la edición."; busy = false

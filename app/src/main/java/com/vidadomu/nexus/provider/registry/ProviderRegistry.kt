@@ -17,7 +17,8 @@ class ProviderRegistry(
     private val runwayProvider: RunwayProvider,
     private val flowBridgeProvider: FlowBridgeProvider,
     private val mockNexusProvider: MockNexusProvider,
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
+    private val falProvider: com.vidadomu.nexus.provider.fal.FalProvider? = null
 ) {
     private val providers = mapOf(
         AtlasCloudProvider.PROVIDER_ID to atlasCloudProvider,
@@ -25,7 +26,7 @@ class ProviderRegistry(
         RunwayProvider.PROVIDER_ID to runwayProvider,
         FlowBridgeProvider.PROVIDER_ID to flowBridgeProvider,
         MockNexusProvider.PROVIDER_ID to mockNexusProvider
-    )
+    ) + listOfNotNull(falProvider?.let { it.id to it }).toMap()
 
     /** Proveedores multimedia definidos por el usuario. Se suman a los de arriba; nunca los sustituyen. */
     private val _custom = MutableStateFlow<List<NexusProvider>>(emptyList())
