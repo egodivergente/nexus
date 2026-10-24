@@ -156,6 +156,18 @@ class UxCorrectionsTest {
         assertNull(com.vidadomu.nexus.ui.models.toolCategory(creator))
     }
 
+    @Test fun textTasksNeverUseRoutesThatNeedImagesOrVideo() {
+        val edit = base.copy(id = "black-forest-labs/flux-2-pro/edit", providerModelId = "black-forest-labs/flux-2-pro/edit", modalities = listOf(Modality.IMAGE),
+            capabilities = listOf(ModelCapability.TEXT_TO_IMAGE, ModelCapability.IMAGE_EDITING))
+        val create = base.copy(id = "black-forest-labs/flux-2-pro", providerModelId = "black-forest-labs/flux-2-pro", modalities = listOf(Modality.IMAGE),
+            capabilities = listOf(ModelCapability.TEXT_TO_IMAGE))
+        val v2v = base.copy(id = "runway/seedance2_5/v2v", providerModelId = "runway/seedance2_5/v2v", modalities = listOf(Modality.VIDEO),
+            capabilities = listOf(ModelCapability.TEXT_TO_VIDEO))
+        assertEquals(listOf(com.vidadomu.nexus.ui.models.CatalogWorkflow.EDIT_IMAGE), com.vidadomu.nexus.ui.models.catalogWorkflows(edit))
+        assertEquals(listOf(com.vidadomu.nexus.ui.models.CatalogWorkflow.CREATE_IMAGE), com.vidadomu.nexus.ui.models.catalogWorkflows(create))
+        assertEquals(listOf(com.vidadomu.nexus.ui.models.CatalogWorkflow.EDIT_VIDEO), com.vidadomu.nexus.ui.models.catalogWorkflows(v2v))
+    }
+
     @Test fun speedTiersAreTheirOwnModels() {
         fun title(id: String) = com.vidadomu.nexus.ui.models.modelGroupTitle(base.copy(id = id, providerModelId = id, displayName = id, organization = "BYTEDANCE", modalities = listOf(Modality.VIDEO)))
         assertEquals("Seedance 2", title("bytedance/seedance-2.0/text-to-video"))
