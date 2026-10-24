@@ -112,10 +112,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val dragView=androidx.compose.ui.platform.LocalView.current
     val labels=rememberCatalogLabels()
     var labelTarget by remember {mutableStateOf<Triple<String,String,String>?>(null)}
+    // A long press that lifts a card but never moves it means «personalizar», not «ordenar».
+    val dragMoved=remember {booleanArrayOf(false)}
     val reorderState=rememberReorderableLazyGridState(listState) {from,to ->
         val fromKey=from.key as? String
         val toKey=to.key as? String
         if(fromKey!=null && toKey!=null) {
+            dragMoved[0]=true
             saveOrder(moveCatalogItem(savedOrder,displayedKeys,fromKey,toKey))
             // One soft tick each time the lifted card settles into a new slot.
             DragHaptics.slot(dragView)
@@ -233,8 +236,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         val (moveUp,moveDown)=reorderActions(section.family)
                         ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView,
                             dragModifier=if(canReorder) Modifier.longPressDraggableHandle(
-                                onDragStarted={DragHaptics.lift(dragView)},
-                                onDragStopped={DragHaptics.drop(dragView)}) else null,
+                                onDragStarted={dragMoved[0]=false;DragHaptics.lift(dragView)},
+                                onDragStopped={DragHaptics.drop(dragView)
+                                    if(!dragMoved[0]) labelTarget=Triple("family:"+section.family,section.family,"")}) else null,
                             dragging=isDragging,onMoveUp=moveUp,onMoveDown=moveDown,title=labels.name("family:"+section.family,section.family))
                         }
                     }
@@ -254,8 +258,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
                             dragging=isDragging,glyphKey="group:"+group.key,
                             cardModifier=if(canReorder) Modifier.longPressDraggableHandle(
-                                onDragStarted={DragHaptics.lift(dragView)},
-                                onDragStopped={DragHaptics.drop(dragView)}) else Modifier,
+                                onDragStarted={dragMoved[0]=false;DragHaptics.lift(dragView)},
+                                onDragStopped={DragHaptics.drop(dragView)
+                                    if(!dragMoved[0]) labelTarget=Triple("group:"+group.key,group.title,
+                                        focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes))}) else Modifier,
                             onHide=if(personalizing) ({pendingHide=groupVisibilityKey(group.routes.first()) to group.title}) else null,
                             highlight=(focusAdvice?.let {"Evítalo si: ${it.avoid}"} ?: modelGroupHighlight(group.routes))?.takeUnless {it in duplicatedHighlights},
                             onMoveUp=moveUp,onMoveDown=moveDown)
@@ -328,7 +334,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         val targetGroup=if(model==null) null else groups.firstOrNull {it.key==itemKey}
         val originalDescription=targetGroup?.let {g -> CatalogFocus.forModel(g.routes.first())?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(g.routes)}.orEmpty()
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(labels.name(labelKey,label))},text={Column {
-            TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Cambiar nombre y descripción")}
+            TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Personalizar icono, nombre y tamaño")}
             Text("Para mover una tarjeta, mantenla pulsada y arrástrala.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
             moveUp?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Subir un puesto")}}
             moveDown?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Bajar un puesto")}}
