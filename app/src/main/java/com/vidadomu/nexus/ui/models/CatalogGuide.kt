@@ -3,7 +3,7 @@ package com.vidadomu.nexus.ui.models
 import com.vidadomu.nexus.core.model.*
 
 internal fun catalogFamily(model: NexusModel): String {
-    val id = model.id.lowercase().replace('_', '-')
+    val id = (model.providerModelId?.takeIf { it.isNotBlank() } ?: model.id).lowercase(java.util.Locale.ROOT).replace('_', '-')
     return when {
         "seedream" in id -> "Seedream"
         "seedance" in id -> "Seedance"

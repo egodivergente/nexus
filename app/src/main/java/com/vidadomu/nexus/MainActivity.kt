@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
         com.vidadomu.nexus.sync.DeviceSyncService.resume(this)
         if (!BuildConfig.OFFLINE_QA && savedInstanceState == null && StartupPreview.consume(this)) startupPreviewEpoch = 1
         enableEdgeToEdge()
+        com.vidadomu.nexus.ui.theme.applyNexusFullscreen(window)
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(false)
@@ -334,6 +335,16 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) com.vidadomu.nexus.ui.theme.applyNexusFullscreen(window)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.vidadomu.nexus.ui.theme.applyNexusFullscreen(window)
     }
 
     private fun handleIntent(intent: Intent?) {

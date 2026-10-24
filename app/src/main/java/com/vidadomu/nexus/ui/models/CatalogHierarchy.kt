@@ -5,20 +5,23 @@ import com.vidadomu.nexus.core.model.NexusModel
 /** Navigation groups, not interchangeable API routes. Every leaf retains its original ID. */
 internal data class CatalogModelGroup(val key: String, val title: String, val routes: List<NexusModel>)
 
+internal fun catalogAtRoot(family: String?, query: String, favoritesOnly: Boolean): Boolean =
+    family == null && query.isBlank() && !favoritesOnly
+
 internal fun modelGroupTitle(model: NexusModel): String {
     val family = catalogFamily(model)
-    val text = (model.providerModelId ?: model.id).lowercase()
+    val text = (model.providerModelId?.takeIf { it.isNotBlank() } ?: model.id).lowercase(java.util.Locale.ROOT)
     val token = when (family) {
         "Qwen Image" -> "qwen[- ]image"
         "Grok Imagine" -> "grok[- ]imagine"
         "GPT Image" -> "gpt[- ]image"
         "Nano Banana" -> "nano[- ]banana"
-        else -> Regex.escape(family.lowercase()).replace(" ", "[- ]")
+        else -> Regex.escape(family.lowercase(java.util.Locale.ROOT)).replace(" ", "[- ]")
     }
     val version = Regex("$token[- .]*(?:video[- ]*)?v?([oh]?\\d+(?:[._-]\\d+)?)(?=[^0-9]|$)").find(text)?.groupValues?.get(1)
     if (version != null) {
         val normalized = version.replace('_', '.').replace('-', '.').removeSuffix(".0")
-        return "$family ${normalized.uppercase()}"
+        return "$family ${normalized.uppercase(java.util.Locale.ROOT)}"
     }
     // Strip only explicit workflow names. Unknown product identities remain separate.
     return model.displayName
@@ -29,7 +32,7 @@ internal fun modelGroupTitle(model: NexusModel): String {
 
 internal fun catalogModelGroups(models: List<NexusModel>, favorites: Set<String> = emptySet()): List<CatalogModelGroup> =
     recentModels(models).distinctBy(::modelBookmark)
-        .groupBy { catalogFamily(it) + ":" + modelGroupTitle(it).lowercase() }
+        .groupBy { catalogFamily(it) + ":" + modelGroupTitle(it).lowercase(java.util.Locale.ROOT) }
         .map { (key, routes) -> CatalogModelGroup(key, modelGroupTitle(routes.first()), routes) }
         .sortedByDescending { group -> group.routes.any { modelBookmark(it) in favorites } }
 

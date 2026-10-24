@@ -1,3 +1,14 @@
+# ArtBox: correcciones locales de catálogo - 2026-10-24
+
+Rama aislada `codex/artbox-catalog-fixes-20261024`, base `d21cfe1` de la rama
+ArtBox documentada. Ocultación persistente al refrescar, categorías de Herramientas,
+jerarquía independiente de ordenación, fullscreen y medidas de tarjetas.
+Ver `docs/ARTBOX-CATALOG-20261024.md` para pruebas y evaluación Atlas CLI/inpainting.
+656 pruebas unitarias de app PASS, incluidas 6 regresiones nuevas; validación visual
+de fullscreen y tarjetas en Android pendiente. Atlas CLI bloqueado por Control de aplicaciones.
+Sin instalación, publicación ni créditos por instrucción expresa de esta tarea.
+No incorporar `gradlew.bat`: presenta diferencias de finales de línea ajenas al parche.
+
 # Flow: conexión y recuperación - 2026-10-24
 
 Código `5a450cf`, rama `codex/nexus-master-artbox-20261023`, APK propia

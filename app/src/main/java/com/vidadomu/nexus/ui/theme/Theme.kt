@@ -21,6 +21,13 @@ import androidx.compose.ui.text.font.*
 import androidx.core.view.WindowCompat
 import com.vidadomu.nexus.R
 
+internal fun applyNexusFullscreen(window: android.view.Window) {
+    WindowCompat.getInsetsController(window, window.decorView).apply {
+        systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    }
+}
+
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 private fun brandFont(resource: Int): FontFamily = FontFamily(
     listOf(400, 500, 600, 700).map { weight ->
@@ -43,6 +50,7 @@ fun NexusTheme(content: @Composable () -> Unit) {
     val view=LocalView.current
     SideEffect {
         (view.context as? Activity)?.window?.let { window ->
+            applyNexusFullscreen(window)
             window.statusBarColor=Color.Transparent.toArgb()
             window.navigationBarColor=Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window,view).apply {
@@ -78,6 +86,7 @@ fun NexusSheetSystemBars() {
     val darkIcons = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     SideEffect {
         (view.parent as? DialogWindowProvider)?.window?.let { window ->
+            applyNexusFullscreen(window)
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = darkIcons
                 isAppearanceLightNavigationBars = darkIcons

@@ -23,7 +23,7 @@ import com.vidadomu.nexus.core.model.*
         Column(Modifier.fillMaxWidth().heightIn(min=154.dp).background(Brush.linearGradient(listOf(colors.primary.copy(alpha=.035f),colors.surface.copy(alpha=0f))))
             .padding(horizontal=8.dp,vertical=16.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
             BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=48.dp,containerSize=52.dp)
-            Text(section.family,style=MaterialTheme.typography.titleSmall,maxLines=3,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+            Text(section.family,style=MaterialTheme.typography.titleSmall,minLines=3,maxLines=3,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
             Text(pluralModelos(section.models.map(::modelGroupTitle).distinct().size),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
         }
     }

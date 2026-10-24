@@ -87,21 +87,21 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
         if(toolsView) available.filter {toolCategory(it)!=null && (query.isBlank() || modelSearchText(it).contains(query.lowercase())) && (!favoritesOnly || modelBookmark(it) in favorites)} else
         browseCatalog(available.filter {(providerFilter==null || it.providerId==providerFilter) && (modality != Modality.IMAGE || !imageReferences || ImageModelChoices.acceptsReferences(it))}, modality, use, query, null, favoritesOnly, favorites, CatalogOrder.PRIORITY)
     }
-    val orderScope = "order:${modality.name}:${family ?: if(query.isBlank() && !favoritesOnly) "families" else "search-models"}"
+    val orderScope = "order:${if(toolsView) "TOOLS" else modality.name}:${family ?: if(query.isBlank() && !favoritesOnly) "families" else "search-models"}"
     var savedOrder by remember(orderScope) { mutableStateOf(prefs.getString(orderScope, "").orEmpty().split("\n").filter {it.isNotBlank()}) }
     var contextTarget by remember { mutableStateOf<Triple<String,String,NexusModel?>?>(null) }
-    val sections = remember(visible, favorites,savedOrder,modality,toolsView) { (if(toolsView) visible.groupBy {toolCategory(it)!!}.map {(name,rows)->CatalogSection(name,rows)} else catalogSections(visible, favorites)).sortedWith(
+    val sections = remember(visible, favorites,savedOrder,modality,toolsView,catalogSort,jobs,onlyDated) { sortSections((if(toolsView) visible.groupBy {toolCategory(it)!!}.map {(name,rows)->CatalogSection(name,rows)} else catalogSections(visible, favorites)).sortedWith(
         compareBy<CatalogSection> {savedOrder.indexOf(it.family).let {index -> if(index<0) Int.MAX_VALUE else index}}
             .thenByDescending { section -> section.models.any { modelBookmark(it) in favorites } }
             .thenBy { section -> if(modality == Modality.IMAGE) ImageModelChoices.priority(section.family) else 0 }
             .thenByDescending { section -> section.models.any { CatalogFocus.forModel(it)!=null } }
-    ) }
+    ),catalogSort,jobs,onlyDated) }
     val groups = remember(visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated) }
-    val rootLevel = family==null && query.isBlank() && !favoritesOnly && catalogSort==CatalogSort.PERSONAL
+    val rootLevel = catalogAtRoot(family, query, favoritesOnly)
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
     val listState=rememberLazyGridState()
-    val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f
+    val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.3f
     LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
     val reorderState=rememberReorderableLazyGridState(listState) {from,to ->
         val fromKey=from.key as? String
@@ -212,7 +212,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { _ ->
                         val (moveUp,moveDown)=reorderActions(section.family)
-                        ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)})
+                        ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(if(toolsView) toolVisibilityKey(section.family) else familyVisibilityKey(section.family),section.family,null)})
                         }
                     }
                     if(false) item(span={GridItemSpan(maxLineSpan)}) {
@@ -234,7 +234,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
                         }
                     }
                 }
-                if(visible.isEmpty() || !rootLevel && groups.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
+                if(visible.isEmpty() || if(rootLevel) sections.isEmpty() else groups.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
                     Text(if(loading && models.isEmpty()) "Preparando tu catálogo…" else if(favoritesOnly) "No hay favoritos en esta sección." else "No hay resultados con estos filtros.",color=TextSecondary)
                     TextButton(onClick={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()}) {Text("Limpiar filtros")}
                 }
@@ -317,7 +317,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit) {
             items(hiddenEntries.toList(),key={it.first}) { (key,label) ->
                 Column {
                     Text(label,fontWeight=FontWeight.SemiBold)
-                    Text(when {key.startsWith("family:")->"Familia completa";key.startsWith("group:")->"Modelo y todas sus variantes";else->"Variante concreta"},fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
+                    Text(when {key.startsWith("tool:")->"Categoría de herramientas";key.startsWith("family:")->"Familia completa";key.startsWith("group:")->"Modelo y todas sus variantes";else->"Variante concreta"},fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
                     TextButton(onClick={app.modelCatalogRepository.setCatalogHidden(key,label,false)}) {Text("Recuperar")}
                 }
             }
@@ -343,23 +343,23 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
         onLongClickLabel="Opciones de $title",onLongClick=onLongClick)
         .then(if(reorderActions.isEmpty()) Modifier else Modifier.semantics { customActions=reorderActions }),shape=NexusTokens.card,color=SurfaceDark) {
         Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Row(verticalAlignment=Alignment.Top,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(family=family,size=28.dp,containerSize=40.dp,shape=NexusTokens.field)
                 Column(Modifier.weight(1f)) {
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
                         Text(title,style=MaterialTheme.typography.titleMedium,
-                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
+                            fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,minLines=if(largeFont) 1 else 3,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
                     }
                     Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                        maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
-                    releaseLabel?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+                        minLines=when {largeFont -> 1; grid || !compact -> 3; else -> 2},maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
+                    Text(releaseLabel.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=if(largeFont) Int.MAX_VALUE else 1,overflow=TextOverflow.Ellipsis)
                 }
                 if(!grid) Text(displayPrice ?: "Ver coste",
-                    Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
+                    Modifier.width(92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 // Opciones al mantener pulsado: sin ⋮ en cada fila de la lista.
                 if(dragModifier!=null) IconButton(onClick=onLongClick,modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
-            if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+            if(grid) Row(Modifier.heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.
                 if(displayPrice!=null) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
                     Text("Desde $displayPrice",Modifier.padding(horizontal=10.dp,vertical=5.dp),
@@ -369,7 +369,10 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                     Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)
                 }
             }
-            highlight?.let {Text(it,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+            Text(highlight.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary,minLines=if(largeFont) 1 else 3,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
+            Button(onClick=onClick,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
+                Text("Crear",style=MaterialTheme.typography.labelLarge)
+            }
             onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
         }
     }

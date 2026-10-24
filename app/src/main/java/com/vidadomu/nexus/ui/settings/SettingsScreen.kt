@@ -283,6 +283,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
         AlertDialog(
             onDismissRequest = { showEditKeyDialog = false },
             title = {
+                com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
                 Text(
                     text = "Configurar Clave API de Atlas",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
@@ -338,6 +339,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             onDismissRequest = { providerKeyDialogId = null },
             title = { Text("Configurar clave de ${provider?.displayName ?: providerId}", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
+                com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     Text("La clave se guarda cifrada en el Keystore de Android.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
                     StudioCredentialField(

@@ -3,6 +3,11 @@ import com.vidadomu.nexus.core.model.GenerationJob
 internal enum class CatalogSort(val label:String) { PERSONAL("Mi orden"),NAME("Nombre"),PRICE("Precio base"),RECENT("Usados recientemente"),RELEASE("Más nuevos · lanzamiento") }
 internal fun latestVerifiedRelease(group:CatalogModelGroup):String? = group.routes.mapNotNull {modelRelease(it)?.month}.maxOrNull()
 internal fun filterDatedGroups(groups:List<CatalogModelGroup>,onlyDated:Boolean) = if(onlyDated) groups.filter {latestVerifiedRelease(it)!=null} else groups
+internal fun sortSections(sections: List<CatalogSection>, sort: CatalogSort, jobs: List<GenerationJob>, onlyDated: Boolean): List<CatalogSection> {
+    val groups = sections.map { CatalogModelGroup(it.family, it.family, it.models) }
+    return sortGroups(filterDatedGroups(groups, onlyDated && sort == CatalogSort.RELEASE), sort, jobs)
+        .map { CatalogSection(it.title, it.routes) }
+}
 internal fun sortGroups(groups:List<CatalogModelGroup>,sort:CatalogSort,jobs:List<GenerationJob>):List<CatalogModelGroup> = when(sort) {
     CatalogSort.PERSONAL -> groups
     CatalogSort.NAME -> groups.sortedBy {it.title.lowercase()}

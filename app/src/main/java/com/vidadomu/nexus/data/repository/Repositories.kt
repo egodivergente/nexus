@@ -32,6 +32,9 @@ class ModelCatalogRepository(
             catalogPreferences?.getString("label:$it", it) ?: it
         })
     val hiddenEntries: StateFlow<Map<String,String>> = _hiddenEntries.asStateFlow()
+    private var hiddenRoutes = _hiddenEntries.value.keys.associateWith {
+        catalogPreferences?.getStringSet("routes:$it", emptySet()).orEmpty().toSet()
+    }
 
     @Synchronized
     fun setCatalogHidden(key: String, label: String, hidden: Boolean) {
@@ -40,13 +43,18 @@ class ModelCatalogRepository(
             if(hidden) putString("label:$key", label) else remove("label:$key")
         }?.apply()
         _hiddenEntries.value = next
-        _models.value = _allModels.value.filter { isCatalogModelVisible(it, next.keys) }
+        if (!hidden) catalogPreferences?.edit()?.remove("routes:$key")?.apply()
+        publishCatalog(_allModels.value)
     }
 
     @Synchronized
     private fun publishCatalog(models: List<NexusModel>) {
+        hiddenRoutes = captureHiddenRoutes(_allModels.value + models, _hiddenEntries.value.keys, hiddenRoutes)
+        catalogPreferences?.edit()?.apply {
+            hiddenRoutes.forEach { (key, routes) -> putStringSet("routes:$key", routes) }
+        }?.apply()
         _allModels.value = models
-        _models.value = models.filter { isCatalogModelVisible(it, _hiddenEntries.value.keys) }
+        _models.value = visibleCatalog(models, _hiddenEntries.value.keys, hiddenRoutes)
     }
 
     private val _isLoading = MutableStateFlow(true)
