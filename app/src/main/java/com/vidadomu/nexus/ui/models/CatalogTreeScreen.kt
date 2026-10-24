@@ -4,6 +4,7 @@ import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import com.vidadomu.nexus.ui.components.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.grid.*
@@ -105,10 +106,17 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     // Two narrow columns squeeze the text: they are only offered where the cards still read well.
     val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp>=600
     LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
+    val dragView=androidx.compose.ui.platform.LocalView.current
+    val labels=rememberCatalogLabels()
+    var labelTarget by remember {mutableStateOf<Triple<String,String,String>?>(null)}
     val reorderState=rememberReorderableLazyGridState(listState) {from,to ->
         val fromKey=from.key as? String
         val toKey=to.key as? String
-        if(fromKey!=null && toKey!=null) saveOrder(moveCatalogItem(savedOrder,displayedKeys,fromKey,toKey))
+        if(fromKey!=null && toKey!=null) {
+            saveOrder(moveCatalogItem(savedOrder,displayedKeys,fromKey,toKey))
+            // One soft tick each time the lifted card settles into a new slot.
+            DragHaptics.slot(dragView)
+        }
     }
     val activeGroup = groups.firstOrNull { it.key == groupKey }
     // Tools ignore provider/use/reference filters, so they never count (or show) there.
@@ -214,9 +222,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     val shownSections = sections
                     items(shownSections,key={it.family}) { section ->
                         val children=catalogModelGroups(section.models,favorites)
-                        ReorderableItem(reorderState,key=section.family) { _ ->
+                        ReorderableItem(reorderState,key=section.family) { isDragging ->
                         val (moveUp,moveDown)=reorderActions(section.family)
-                        ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView)
+                        ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView,
+                            dragModifier=if(canReorder) Modifier.longPressDraggableHandle(
+                                onDragStarted={DragHaptics.lift(dragView)},
+                                onDragStopped={DragHaptics.drop(dragView)}) else null,
+                            dragging=isDragging,onMoveUp=moveUp,onMoveDown=moveDown,title=labels.name("family:"+section.family,section.family))
                         }
                     }
                     if(false) item(span={GridItemSpan(maxLineSpan)}) {
@@ -224,14 +236,19 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     }
                 } else {
                     items(groups,key={it.key}) { group ->
-                        ReorderableItem(reorderState,key=group.key) { _ ->
+                        ReorderableItem(reorderState,key=group.key) { isDragging ->
                         val focusAdvice=group.routes.firstNotNullOfOrNull(CatalogFocus::forModel)
                         val (moveUp,moveDown)=reorderActions(group.key)
-                        NavigationCard(group.title,catalogFamily(group.routes.first()),focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes),group.routes,modality,
+                        NavigationCard(labels.name("group:"+group.key,group.title),catalogFamily(group.routes.first()),
+                            labels.description("group:"+group.key,focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes)),group.routes,modality,
                             onClick={groupKey=group.key;filters=false},releaseLabel=groupReleaseLabel(group.routes).takeUnless {it=="Fecha no verificada"},compact=compactCards,grid=useGrid,
-                            onLongClick={contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())},
+                            onLongClick=if(canReorder) ({}) else ({contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())}),
+                            onOptions={contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
-                            cardModifier=if(personalizing) Modifier.longPressDraggableHandle() else Modifier,
+                            dragging=isDragging,glyphKey="group:"+group.key,
+                            cardModifier=if(canReorder) Modifier.longPressDraggableHandle(
+                                onDragStarted={DragHaptics.lift(dragView)},
+                                onDragStopped={DragHaptics.drop(dragView)}) else Modifier,
                             onHide=if(personalizing) ({pendingHide=groupVisibilityKey(group.routes.first()) to group.title}) else null,
                             highlight=(focusAdvice?.let {"Evítalo si: ${it.avoid}"} ?: modelGroupHighlight(group.routes))?.takeUnless {it in duplicatedHighlights},
                             onMoveUp=moveUp,onMoveDown=moveDown)
@@ -300,8 +317,12 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     contextTarget?.let { (key,label,model) ->
         val itemKey=if(model==null) label else groups.firstOrNull {groupVisibilityKey(it.routes.first())==key}?.key
         val (moveUp,moveDown)=itemKey?.let {reorderActions(it)} ?: (null to null)
-        AlertDialog(onDismissRequest={contextTarget=null},title={Text(label)},text={Column {
-            TextButton(onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;contextTarget=null}) {Text("Mover y ordenar")}
+        val labelKey=if(model==null) "family:$label" else "group:$itemKey"
+        val targetGroup=if(model==null) null else groups.firstOrNull {it.key==itemKey}
+        val originalDescription=targetGroup?.let {g -> CatalogFocus.forModel(g.routes.first())?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(g.routes)}.orEmpty()
+        AlertDialog(onDismissRequest={contextTarget=null},title={Text(labels.name(labelKey,label))},text={Column {
+            TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Cambiar nombre y descripción")}
+            Text("Para mover una tarjeta, mantenla pulsada y arrástrala.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
             moveUp?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Subir un puesto")}}
             moveDown?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Bajar un puesto")}}
             TextButton(onClick={
@@ -312,6 +333,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
             TextButton(onClick={pendingHide=key to label;contextTarget=null}) {Text("Quitar de mi catálogo")}
             TextButton(onClick={saveOrder(emptyList());contextTarget=null}) {Text("Restaurar orden predeterminado")}
         }},confirmButton={TextButton(onClick={contextTarget=null}) {Text("Cerrar")}})
+    }
+    labelTarget?.let {(key,name,description) ->
+        CatalogLabelEditor(key,name,description,labels,onDismiss={labelTarget=null},withDescription=key.startsWith("group:"))
     }
     pendingHide?.let { (key,label) ->
         AlertDialog(onDismissRequest={pendingHide=null},title={Text("Quitar $label")},
@@ -335,7 +359,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:()->Unit={},dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null,
+private fun NavigationCard(title:String,family:String,subtitle:String,routes:List<NexusModel>,modality:Modality,onClick:()->Unit,highlight:String?=null,onHide:(()->Unit)?=null,onLongClick:()->Unit={},onOptions:(()->Unit)?=null,glyphKey:String="",dragging:Boolean=false,dragModifier:Modifier?=null,cardModifier:Modifier=Modifier,compact:Boolean=false,grid:Boolean=false,releaseLabel:String?=null,
     onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
@@ -347,12 +371,15 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
         onMoveUp?.let {action -> CustomAccessibilityAction("Subir $title") {action();true}},
         onMoveDown?.let {action -> CustomAccessibilityAction("Bajar $title") {action();true}})
     // Altura mínima fija en grid para que las tarjetas no bailen cuando falta releaseLabel/highlight.
-    Surface(modifier=cardModifier.fillMaxWidth().then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick=onClick,
+    val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.03f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Row lift")
+    Surface(modifier=cardModifier.fillMaxWidth().graphicsLayer {scaleX=lift;scaleY=lift}.then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick=onClick,
         onLongClickLabel="Opciones de $title",onLongClick=onLongClick)
-        .then(if(reorderActions.isEmpty()) Modifier else Modifier.semantics { customActions=reorderActions }),shape=NexusTokens.card,color=SurfaceDark) {
+        .then(if(reorderActions.isEmpty()) Modifier else Modifier.semantics { customActions=reorderActions }),shape=NexusTokens.card,
+        color=if(dragging) MaterialTheme.colorScheme.surfaceContainerHigh else SurfaceDark,shadowElevation=if(dragging) 18.dp else 0.dp,
+        border=if(dragging) BorderStroke(1.5.dp,MaterialTheme.colorScheme.primary) else null) {
         Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                BrandLogo(family=family,modelId=routes.firstOrNull()?.id,size=44.dp,bare=true)
+                CatalogGlyph(glyphKey,44.dp,rememberCatalogLabels()) {size -> BrandLogo(family=family,modelId=routes.firstOrNull()?.id,size=size,bare=true)}
                 Column(Modifier.weight(1f)) {
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
                         Text(title,style=MaterialTheme.typography.titleMedium,
@@ -364,7 +391,10 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                 }
                 if(!grid) Text(displayPrice ?: "Sin tarifa",
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
-                // Opciones al mantener pulsado: sin ⋮ en cada fila de la lista.
+                // Mantener pulsado levanta y arrastra la tarjeta; las opciones (renombrar, ocultar…) viven en este ⋮.
+                if(!grid && dragModifier==null && onOptions!=null) IconButton(onClick=onOptions,modifier=Modifier.size(40.dp)) {
+                    Icon(Icons.Default.MoreVert,"Opciones de $title",Modifier.size(18.dp),tint=TextSecondary)
+                }
                 if(dragModifier!=null) IconButton(onClick=onLongClick,modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
             if(grid) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {

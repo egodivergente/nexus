@@ -78,6 +78,8 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     }
     val publishedUnit=rememberPublishedPrice(selected)?.unit
     val facts=remember(selected,verifiedSelected,publishedUnit) {modelFactSheet(selected,verifiedSelected,publishedUnit)}
+    val labels=rememberCatalogLabels()
+    var editLabels by remember {mutableStateOf(false)}
     // Image inputs come from the model's own contract; the images chosen here travel with «Configurar en Lanzadera».
     val imageField=remember(selected,verifiedSelected) {
         com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(verifiedSelected ?: selected).firstOrNull {it.mime.startsWith("image/")}
@@ -116,12 +118,13 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
             .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=56.dp,bare=true)
+                CatalogGlyph("group:"+group.key,56.dp,labels) {size -> BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=size,bare=true)}
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                    Text(group.title,style=MaterialTheme.typography.titleLarge,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
+                    Text(labels.name("group:"+group.key,group.title),style=MaterialTheme.typography.titleLarge,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
                     Text(listOfNotNull(creator(selected).takeIf {it.isNotBlank()},release?.label).joinToString(" · "),
                         style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
+                IconButton(onClick={editLabels=true}) {Icon(Icons.Default.Edit,"Cambiar nombre, descripción, icono y tamaño",tint=colors.onSurfaceVariant)}
                 IconToggleButton(checked=modelBookmark(selected) in favorites,onCheckedChange={toggleFavorite(selected)}) {
                     Icon(if(modelBookmark(selected) in favorites) Icons.Default.Star else Icons.Default.StarBorder,
                         if(modelBookmark(selected) in favorites) "Quitar de favoritos" else "Añadir a favoritos",tint=if(modelBookmark(selected) in favorites) colors.primary else colors.onSurfaceVariant)
@@ -140,7 +143,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                         }
                     }
                 }
-                Text(workflow.summary,style=MaterialTheme.typography.bodyLarge)
+                Text(labels.description("group:"+group.key,workflow.summary),style=MaterialTheme.typography.bodyLarge)
                 guide.strength.takeUnless {it.startsWith("Uso:") || it.contains("varias imágenes") && workflow==CatalogWorkflow.CREATE_IMAGE}?.let {
                     Text(it,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                 }
@@ -237,6 +240,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
             }
         }
     }
+    if(editLabels) CatalogLabelEditor("group:"+group.key,group.title,workflow.summary,labels,onDismiss={editLabels=false})
     if(variantsOpen) {
     LaunchedEffect(routes) {
         routes.forEach {route -> if(modelBookmark(route) !in verifiedModels) loadVerifiedContract(route)?.let {verifiedModels=verifiedModels+(modelBookmark(route) to it)}}
