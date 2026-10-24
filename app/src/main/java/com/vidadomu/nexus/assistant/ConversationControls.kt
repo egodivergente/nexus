@@ -95,10 +95,11 @@ private fun closeTab(id: String, tabs: ConversationTabs, ui: AssistantUiState, v
 /** Long press on an empty spot of the chat: the actions one reaches for most, as a small floating menu. */
 @Composable internal fun ChatContextMenu(ui: AssistantUiState, vm: AssistantViewModel, expanded: Boolean, offset: DpOffset,
     onDismiss: () -> Unit, onProjects: () -> Unit, onAppearance: () -> Unit, onSettings: () -> Unit, barPinned: Boolean, onPinBar: (Boolean) -> Unit,
-    onCopyChat: () -> Unit, onShareChat: () -> Unit) {
+    onCopyChat: () -> Unit, onShareChat: () -> Unit, onImportImages: () -> Unit) {
     val (tabs,closed)=rememberTabs()
     DropdownMenu(expanded=expanded,onDismissRequest=onDismiss,offset=offset) {
         DropdownMenuItem(text={Text("Nueva conversación")},leadingIcon={Icon(Icons.Default.Add,null)},enabled=!ui.thinking,onClick={onDismiss();vm.newConversation()})
+        DropdownMenuItem(text={Text("Importar imágenes")},leadingIcon={Icon(Icons.Default.AddPhotoAlternate,null)},onClick={onDismiss();onImportImages()})
         DropdownMenuItem(text={Text("Cambiar de proyecto")},leadingIcon={Icon(Icons.Default.FolderOpen,null)},onClick={onDismiss();onProjects()})
         val reopenable=entries(ui,vm).filter {it.id in closed}
         reopenable.take(4).forEach {chat->

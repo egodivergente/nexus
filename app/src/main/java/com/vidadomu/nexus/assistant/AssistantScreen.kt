@@ -143,6 +143,7 @@ fun AssistantScreen(
         }
     }
     val picker = rememberProjectMediaPicker { uris -> vm.attach(uris) }
+    val boardPicker = rememberProjectMediaPicker { uris -> vm.addBoard(uris) }
     // Cámara: la foto va a la caché (FileProvider) y se adjunta como cualquier referencia.
     val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -298,6 +299,7 @@ fun AssistantScreen(
                                 if (!item.resolved) TextButton(onClick = { vm.resolveModeSwitch(item.id) }, enabled = !ui.thinking) { Text("Activar Agente") }
                             }
                         }
+                        is ChatItem.Board -> ChatBoardCard(item.boardId)
                         is ChatItem.Proposal -> ProposalCard(item, onApply = { vm.applyProposal(item.id) }, onReject = { vm.rejectProposal(item.id) })
                         is ChatItem.PlanCard -> item.orderId?.let { ui.orders[it] }?.takeIf { ui.plans[item.planId] != null }?.let { order ->
                             val p = ui.plans.getValue(item.planId)
@@ -379,7 +381,8 @@ fun AssistantScreen(
                     clipboard.setText(AnnotatedString(chatTranscript(ui)))
                     Toast.makeText(chatContext, "Chat copiado", Toast.LENGTH_SHORT).show()
                 },
-                onShareChat = { shareChat(chatContext, ui) })
+                onShareChat = { shareChat(chatContext, ui) },
+                onImportImages = { boardPicker.launch(arrayOf("image/*"), Int.MAX_VALUE) })
             if (showAppearance) QuickAppearanceSheet({ showAppearance = false }, onOpenSettings)
             }
             if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
@@ -395,7 +398,7 @@ fun AssistantScreen(
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
-                onSend = { if(vm.send(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
+                onSend = { if(vm.sendWithBoards(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 reasoningControl = { ReasoningPicker(ui, vm) })
             }

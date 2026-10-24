@@ -51,6 +51,9 @@ sealed interface ChatItem {
     /** Persisted by 1.8.2; opening history never changes the current mode. */
     @kotlinx.serialization.Serializable
     data class ModeSwitch(override val id: String, val text: String, val resolved: Boolean = false) : ChatItem
+    /** A board of imported images the user can arrange and draw on; its content lives in [ChatBoardStore]. */
+    @kotlinx.serialization.Serializable
+    data class Board(override val id: String, val boardId: String) : ChatItem
 }
 
 enum class ProposalState { PENDING, APPLYING, APPLIED, REJECTED, FAILED }
@@ -173,7 +176,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if(_ui.value.thinking) return
         send(request.first,request.second)
     }
-    fun send(text: String, retryAttachments: List<Attachment>? = null): Boolean {
+    /** [note] reaches the agent with the message but is not shown in the user's bubble (e.g. what changed on a board). */
+    fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = ""): Boolean {
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
@@ -201,7 +205,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         turnJob = viewModelScope.launch {
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
-                    orchestrator.send(conv, clean.ifEmpty { "Te adjunto estos archivos." }, atts) { ev -> onEvent(ev) }
+                    orchestrator.send(conv, listOf(clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev) }
                 }
                 // Tiempo máximo por mensaje = ajuste del usuario; 0 = sin límite.
                 val r = AssistantTurnService.runTurn(app) {
@@ -337,6 +341,64 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     // ---- adjuntos y proyectos -----------------------------------------------------------------
 
     fun attach(uris: List<Uri>) = attachMedia(uris,null)
+
+    private val boardStore by lazy { ChatBoardStore(app) }
+
+    /** Places the picked images on a new board at the end of the chat. The images are already private copies in the library. */
+    fun addBoard(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            val entries = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    val asset = runtime.assets.assetByUri(uri.toString())
+                    var w = asset?.width; var h = asset?.height
+                    if (w == null || h == null || w <= 0 || h <= 0) {
+                        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        runCatching { android.graphics.BitmapFactory.decodeFile(uri.path, bounds) }
+                        w = bounds.outWidth; h = bounds.outHeight
+                    }
+                    if (w == null || h == null || w <= 0 || h <= 0) null
+                    else Triple(uri.toString(), asset?.displayName ?: uri.lastPathSegment ?: "imagen", w.toFloat() / h)
+                }
+            }
+            if (entries.isEmpty()) { notice("No se pudieron leer las imágenes.", error = true); return@launch }
+            val board = ChatBoard.arrange("board_" + java.util.UUID.randomUUID().toString().replace("-", "").take(12), entries)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { boardStore.save(board) }
+            _ui.update { it.copy(items = it.items + ChatItem.Board(newId(), board.id), scrollRequest = it.scrollRequest + 1) }
+            if (entries.size < uris.size) notice("${uris.size - entries.size} archivos no eran imágenes legibles y no se han puesto en el tablero.")
+        }
+    }
+
+    /**
+     * Sends the message; boards edited since their last send travel with it: the board as seen, each marked image,
+     * and a note of what changed. Returns false when a message cannot be sent right now.
+     */
+    fun sendWithBoards(text: String): Boolean {
+        if (_ui.value.thinking || _ui.value.attaching || _ui.value.plans.values.any { it.busy }) return false
+        val boards = _ui.value.items.filterIsInstance<ChatItem.Board>().mapNotNull { boardStore.load(it.boardId) }.filter { it.dirty }
+        if (boards.isEmpty()) return send(text)
+        val numbers = _ui.value.items.filterIsInstance<ChatItem.Board>().map { it.boardId }
+        _ui.update { it.copy(attaching = true) }
+        viewModelScope.launch {
+            val exported = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    boards.map { board -> ChatBoardExport.export(app, board, numbers.indexOf(board.id) + 1) }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                _ui.update { it.copy(attaching = false) }
+                notice("No se pudo preparar el tablero: ${e.message?.take(160)}", error = true); return@launch
+            }
+            val added = exported.flatMap { it.files }.mapNotNull { uri ->
+                runCatching { AgentMediaStore.persist(app, uri, "image/jpeg", _ui.value.activeProjectId) }
+                    .onFailure { notice("No se pudo adjuntar el tablero: ${it.message?.take(160)}", error = true) }.getOrNull()
+            }
+            _ui.update { it.copy(pendingAttachments = (it.pendingAttachments + added).distinctBy { a -> a.id }, attaching = false) }
+            if (send(text, note = exported.joinToString("\n\n") { it.note }))
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { boards.forEach { boardStore.save(it.markSent()) } }
+        }
+        return true
+    }
     fun attachAudio(uri: Uri) = attachMedia(listOf(uri),"audio/mp4")
 
     private fun attachMedia(uris: List<Uri>, declaredMime: String?) {
