@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
@@ -95,12 +96,13 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         }
     }) {padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-            .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space24)) {
+            .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=NexusTokens.space32,containerSize=NexusTokens.space32)
+                BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=56.dp,bare=true)
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                    Text(group.title,style=MaterialTheme.typography.titleMedium,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
-                    release?.let {Text(it.label,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)}
+                    Text(group.title,style=MaterialTheme.typography.titleLarge,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
+                    Text(listOfNotNull(creator(selected).takeIf {it.isNotBlank()},release?.label).joinToString(" · "),
+                        style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
                 IconToggleButton(checked=modelBookmark(selected) in favorites,onCheckedChange={toggleFavorite(selected)}) {
                     Icon(if(modelBookmark(selected) in favorites) Icons.Default.Star else Icons.Default.StarBorder,
@@ -111,14 +113,16 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 if(workflows.size>1) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     workflows.keys.forEach {task ->
                         val checked=task==workflow
-                        Surface(shape=NexusTokens.field,color=if(checked) colors.primary.copy(alpha=.12f) else colors.surface,
+                        // Slim pills: the active one is outlined in the accent colour instead of becoming a large block.
+                        Surface(shape=NexusTokens.filter,color=if(checked) colors.primary.copy(alpha=.14f) else Color.Transparent,
+                            border=androidx.compose.foundation.BorderStroke(1.dp,if(checked) colors.primary else colors.outlineVariant),
                             modifier=Modifier.selectable(selected=checked,role=Role.Tab,onClick={taskKey=task.name;choices.edit().putString("task:${group.key}",task.name).apply()})) {
-                            Text(task.label,Modifier.heightIn(min=48.dp).padding(horizontal=NexusTokens.space16,vertical=NexusTokens.space12),style=MaterialTheme.typography.labelLarge,
+                            Text(task.label,Modifier.heightIn(min=40.dp).padding(horizontal=NexusTokens.space16,vertical=9.dp),style=MaterialTheme.typography.labelLarge,
                                 fontWeight=if(checked) FontWeight.SemiBold else FontWeight.Normal,color=if(checked) colors.primary else colors.onSurfaceVariant)
                         }
                     }
                 }
-                Text(workflow.summary,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Medium)
+                Text(workflow.summary,style=MaterialTheme.typography.bodyLarge)
                 guide.strength.takeUnless {it.startsWith("Uso:") || it.contains("varias imágenes") && workflow==CatalogWorkflow.CREATE_IMAGE}?.let {
                     Text(it,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                 }
@@ -129,24 +133,28 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
             }
             ModelEvaluation(selected,group.routes)
             val promptCapability=verifiedSelected?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt)
-            if(selected.promptAccepted) Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                Text(promptCapability?.let {"Prompt: ${it.maximum} ${it.unitLabel}"} ?: "Prompt: Máximo no verificado",style=MaterialTheme.typography.bodyMedium)
+            Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Text("Entradas, límites y coste",style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
+                if(selected.promptAccepted) Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                    Text("Prompt",Modifier.weight(.42f),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    Text(promptCapability?.let {"Hasta ${it.maximum} ${it.unitLabel}"} ?: "Máximo no verificado",Modifier.weight(.58f),style=MaterialTheme.typography.bodyMedium,
+                        color=if(promptCapability==null) colors.onSurfaceVariant else colors.onSurface)
+                }
+                facts.forEach {fact ->
+                    Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                        Text(fact.label,Modifier.weight(.42f),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                        Text(fact.value ?: MISSING_FACT,Modifier.weight(.58f),style=MaterialTheme.typography.bodyMedium,
+                            color=if(fact.value==null) colors.onSurfaceVariant else colors.onSurface)
+                    }
+                }
                 promptCapability?.let {cap->
                     Text("Contrato del proveedor · "+java.text.DateFormat.getDateInstance().format(java.util.Date(cap.verifiedAt)),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
                     if(cap.source.startsWith("https://")) TextButton(onClick={uriHandler.openUri(cap.source)},contentPadding=PaddingValues(0.dp)) {Text("Consultar origen del máximo")}
                 }
-            }
-            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                Text("Qué admite y cómo se cobra",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })
-                facts.forEach {fact ->
-                    Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                        Text(fact.label,Modifier.widthIn(min=88.dp),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                        Text(fact.value ?: MISSING_FACT,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,
-                            color=if(fact.value==null) colors.onSurfaceVariant else colors.onSurface)
-                    }
-                }
                 if(verifiedSelected==null) Text("Entradas y límites sin verificar: el esquema del proveedor aún no se ha leído.",
                     style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+            }
             }
             Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Text("Variante y proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })

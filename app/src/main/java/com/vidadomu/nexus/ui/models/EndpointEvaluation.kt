@@ -36,10 +36,10 @@ internal object EndpointEvaluations {
         val facts=buildList {
             fields.filter {it.key !in setOf("prompt","negative_prompt","seed") && (it.options.isNotEmpty() || it.minimum!=null || it.maximum!=null || it.type=="boolean" || it.maxItems!=null)}.forEach {f->
                 val value=when {
-                    f.options.isNotEmpty() -> f.options.mapNotNull {it.jsonPrimitive.contentOrNull}.joinToString(" · ")
+                    f.options.isNotEmpty() -> f.options.mapNotNull {it.jsonPrimitive.contentOrNull}.joinToString(" · ") {humanValue(it)}
                     f.maxItems!=null -> "${f.minItems ?: if(f.required) 1 else 0}–${f.maxItems} archivos"
                     f.minimum!=null || f.maximum!=null -> listOfNotNull(f.minimum?.let(::number),f.maximum?.let(::number)).joinToString("–")
-                    else -> "Activable"
+                    else -> "Sí / No"
                 }
                 add(title(f.key) to value)
             }
@@ -91,6 +91,23 @@ internal object EndpointEvaluations {
         "seed" -> "Semilla"
         "width" -> "Ancho (px)"
         "height" -> "Alto (px)"
-        else -> key.replace('_',' ')
+        "enable_web_search","web_search" -> "Búsqueda web"
+        "enable_base64_output","base64_output","output_base64" -> "Salida en base64"
+        "enable_safety_checker","safety_checker" -> "Filtro de seguridad"
+        "enable_prompt_expansion","prompt_expansion","prompt_extend" -> "Ampliar instrucciones"
+        "output_format" -> "Formato de archivo"
+        "num_images","n" -> "Número de imágenes"
+        "negative_prompt" -> "Prompt negativo"
+        "watermark" -> "Marca de agua"
+        else -> ParameterLabels.label(key)
+    }
+
+    /** Provider tokens read as plain Spanish; unknown values are left exactly as published. */
+    private fun humanValue(raw: String): String = when(raw.trim().lowercase()) {
+        "default" -> "Predeterminada"
+        "auto" -> "Automática"
+        "true" -> "Sí"
+        "false" -> "No"
+        else -> raw
     }
 }

@@ -98,6 +98,9 @@ fun AssistantScreen(
     onOpenSettings: () -> Unit = {},
     /** Abre la pestaña Historial: los avisos que la mencionan llevan aquí en un toque. */
     onOpenHistory: () -> Unit = {},
+    /** «Continuar en…» drawn over the chat area only, so the composer and the bottom bar stay in place. */
+    projectPicker: (@Composable () -> Unit)? = null,
+    onPickerDismiss: () -> Unit = {},
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
@@ -207,6 +210,8 @@ fun AssistantScreen(
     }
     // Al enfocar el compositor (IME o teclado físico) el último mensaje queda justo encima del campo.
     var composerFocused by remember { mutableStateOf(false) }
+    // Typing in the composer means «continue in the current project»: the chooser steps aside.
+    LaunchedEffect(composerFocused, projectPicker != null) { if (composerFocused && projectPicker != null) onPickerDismiss() }
     val imeVisible = WindowInsets.isImeVisible
     LaunchedEffect(composerFocused, imeVisible) {
         if (composerFocused) { following = true; followLast() }
@@ -359,6 +364,7 @@ fun AssistantScreen(
                     }
                 }
             }
+            projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
             }
             if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
                 ordersPanel = false; following = false

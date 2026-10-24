@@ -96,6 +96,17 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(pager.settledPage) {tabPrefs.edit().putInt("page",pager.settledPage).apply()}
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
+                // One path for «Continuar en…» whether it is drawn inside the Agent tab or as the full sheet used for shared files.
+                val chooseProject: (String, com.vidadomu.nexus.assistant.PendingShare?) -> Unit = {id,sharedNow -> lifecycleScope.launch {
+                    try {
+                        assistantViewModel.selectProject(id)
+                        check(assistantViewModel.ui.first {!it.thinking}.activeProjectId==id)
+                        if(sharedNow!=null && sharedNow.ready) {assistantViewModel.acceptShared(sharedNow);PendingShares(this@MainActivity).consumed(sharedNow.id);pendingShares=PendingShares(this@MainActivity).pending()}
+                        projectChooser=false;tabRequest=0;navController.popBackStack("workspace",false)
+                    } catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                    catch(e:Exception) {shareError="No se pudo abrir el destino. El historial y los archivos compartidos se conservan."}
+                }; Unit}
+                LaunchedEffect(projectChooser) {if(projectChooser) {tabRequest=0;navController.popBackStack("workspace",false)}}
                 agentDraft?.let {draft ->
                     androidx.compose.material3.AlertDialog(onDismissRequest={agentDraft=null},
                         title={androidx.compose.material3.Text("Borrador de ChatGPT")},
@@ -192,6 +203,10 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onOpenSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
                                 onOpenHistory = { navController.openHistoryTab() },
+                                projectPicker = if(projectChooser && pendingShares.firstOrNull()==null) ({
+                                    ContinueProjectChooser(assistantViewModel,null,onChoose={id -> chooseProject(id,null)},onDismiss={projectChooser=false},embedded=true)
+                                }) else null,
+                                onPickerDismiss = { projectChooser = false },
                                 vm = assistantViewModel
                             )
                         }
@@ -309,17 +324,9 @@ class MainActivity : ComponentActivity() {
                         catch(e:Exception) {shareError="No se pudo añadir el lote al chat. Tus archivos se conservan para reintentarlo."}
                     }
                 }
-                if(projectChooser || shared!=null && (rules.value("share.choose").toBoolean() || !shared.ready)) ContinueProjectChooser(assistantViewModel,shared,
-                    onRetryShare={lifecycleScope.launch {if(shared!=null) {PendingShares(this@MainActivity).retry(shared);pendingShares=PendingShares(this@MainActivity).pending()}}},
-                    onChoose={id->lifecycleScope.launch {
-                        try {
-                            assistantViewModel.selectProject(id)
-                            check(assistantViewModel.ui.first {!it.thinking}.activeProjectId==id)
-                            if(shared!=null && shared.ready) {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending()}
-                            projectChooser=false;tabRequest=0;navController.popBackStack("workspace",false)
-                        } catch(e:kotlinx.coroutines.CancellationException) {throw e}
-                        catch(e:Exception) {shareError="No se pudo abrir el destino. El historial y los archivos compartidos se conservan."}
-                    }}, onDismiss={projectChooser=false;if(shared!=null) {lifecycleScope.launch {
+                if(shared!=null && (projectChooser || rules.value("share.choose").toBoolean() || !shared.ready)) ContinueProjectChooser(assistantViewModel,shared,
+                    onRetryShare={lifecycleScope.launch {PendingShares(this@MainActivity).retry(shared);pendingShares=PendingShares(this@MainActivity).pending()}},
+                    onChoose={id->chooseProject(id,shared)}, onDismiss={projectChooser=false;if(shared!=null) {lifecycleScope.launch {
                         if(shared.ready) {assistantViewModel.acceptShared(shared);PendingShares(this@MainActivity).consumed(shared.id);pendingShares=PendingShares(this@MainActivity).pending()}
                     }}})
                 if(shareImporting) androidx.compose.material3.Surface(Modifier.fillMaxSize(),color=androidx.compose.material3.MaterialTheme.colorScheme.background) {
