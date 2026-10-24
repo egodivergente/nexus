@@ -87,7 +87,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
             java.time.YearMonth.parse(it)>=java.time.YearMonth.now().minusMonths(months.toLong())
         }!=false}
         if(toolsView) available.filter {toolCategory(it)!=null && (query.isBlank() || modelSearchText(it).contains(query.lowercase())) && (!favoritesOnly || modelBookmark(it) in favorites)} else
-        browseCatalog(available.filter {(providerFilter==null || it.providerId==providerFilter) && (modality != Modality.IMAGE || !imageReferences || ImageModelChoices.acceptsReferences(it))}, modality, use, query, null, favoritesOnly, favorites, CatalogOrder.PRIORITY)
+        browseCatalog(available.filter {
+            // Upscalers, lip-sync, extend, motion, inpaint… live only in Herramientas, never repeated under Vídeos/Imágenes.
+            (modality !in setOf(Modality.VIDEO,Modality.IMAGE) || toolCategory(it)==null) &&
+            (providerFilter==null || it.providerId==providerFilter) && (modality != Modality.IMAGE || !imageReferences || ImageModelChoices.acceptsReferences(it))}, modality, use, query, null, favoritesOnly, favorites, CatalogOrder.PRIORITY)
     }
     val orderScope = "order:${modality.name}:${family ?: if(query.isBlank() && !favoritesOnly) "families" else "search-models"}"
     var savedOrder by remember(orderScope) { mutableStateOf(prefs.getString(orderScope, "").orEmpty().split("\n").filter {it.isNotBlank()}) }

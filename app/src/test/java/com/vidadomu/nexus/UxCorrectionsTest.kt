@@ -146,4 +146,13 @@ class UxCorrectionsTest {
         assertEquals(categories.size, icons.distinct().size)
         assertFalse(icons.any { it == Icons.Default.Build })
     }
+
+    @Test fun toolsNeverAppearAsCreationModels() {
+        val upscaler = base.copy(id = "x/video/upscaler", providerModelId = "x/video/upscaler", modalities = listOf(Modality.VIDEO), capabilities = listOf(ModelCapability.UPSCALE))
+        val lipsync = base.copy(id = "x/lip-sync", providerModelId = "x/lip-sync", modalities = listOf(Modality.VIDEO), capabilities = emptyList())
+        val creator = base.copy(id = "x/text-to-video", providerModelId = "x/text-to-video", modalities = listOf(Modality.VIDEO), capabilities = listOf(ModelCapability.TEXT_TO_VIDEO))
+        assertNotNull(com.vidadomu.nexus.ui.models.toolCategory(upscaler))
+        assertNotNull(com.vidadomu.nexus.ui.models.toolCategory(lipsync))
+        assertNull(com.vidadomu.nexus.ui.models.toolCategory(creator))
+    }
 }
