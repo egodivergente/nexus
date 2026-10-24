@@ -21,8 +21,10 @@ internal fun modelGroupTitle(model: NexusModel): String {
         val normalized = version.replace('_', '.').replace('-', '.').removeSuffix(".0")
         // A speed/size tier right after the version (Seedance 2.0 Fast, Mini…) is its own model, not a variant of the base one.
         // Limited to families where those tiers are separate products with their own price and limits.
-        val tier = if(family == "Seedance") Regex("^[-_ ]?(fast|mini|lite)(?=[^a-z]|$)").find(text.substring(versionMatch.range.last + 1))?.groupValues?.get(1) else null
-        return "$family ${normalized.uppercase()}" + (tier?.let { " " + it.replaceFirstChar { c -> c.uppercase() } } ?: "")
+        // The tier can sit right after the version (kling-v3.0-pro) or after the workflow (seedance-v1.5-pro/image-to-video-fast).
+        val tiers = Regex("(?<![a-z])(fast|mini|lite|flash|turbo|pro|std|standard|master|max|prime|ultra)(?![a-z])")
+            .findAll(text.substring(versionMatch.range.last + 1)).map { it.groupValues[1] }.distinct().toList()
+        return "$family ${normalized.uppercase()}" + tiers.joinToString("") { " " + (if(it == "std" || it == "standard") "Std" else it.replaceFirstChar { c -> c.uppercase() }) }
     }
     // Strip only explicit workflow names. Unknown product identities remain separate.
     return model.displayName
