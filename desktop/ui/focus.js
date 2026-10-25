@@ -17,7 +17,7 @@ const NexusFocus = {
     ['xai/grok-imagine-image-2.0/text-to-image','Otra interpretación','Probar una interpretación visual distinta del mismo prompt.','Necesitas mantener una referencia exacta.'],
     ['xai/grok-imagine-image-2.0/edit','Edición alternativa','Transformar una imagen existente.','Quieres empezar sin imagen.'],
     ['runway/gen4_image/image','Referencias visuales','Crear o editar imágenes con referencias en Runway.','Necesitas animar un clip.'],
-    ['luma/uni-1/text-to-image','Otra estética','Crear imágenes desde texto en un motor distinto.','Necesitas editar: usa Edit.'],
+    ['luma/uni-1/text-to-image','Otra estética','Crear imágenes desde texto con un modelo distinto.','Necesitas editar: usa Edit.'],
     ['luma/uni-1/edit','Edición visual','Cambiar una imagen existente con instrucciones.','No tienes imagen de entrada.'],
     ['alibaba/wan-2.7/text-to-image','Escenas desde texto','Crear imágenes a partir de una descripción.','Quieres animar una imagen.'],
     ['runway/magnific_precision_upscaler_v2/upscale-image','Ampliar imagen','Aumentar resolución y ajustar nitidez y detalle.','Quieres crear una imagen nueva.'],

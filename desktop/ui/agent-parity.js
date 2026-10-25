@@ -20,8 +20,8 @@
  function error(error,message='No se pudo completar la operación. Los originales se conservan.'){sheet('<h2>Revisar operación</h2>'+notice(message,error.message));}
  function shell(){
   document.body.classList.add('nexus-agent-studio');document.body.style.setProperty('--ui-font-scale',String(state.fontScale||1));
-  const nav=$('#navigation');if(nav){const destinations=[['assistant','Asistente'],['canvas','Lienzo'],['catalog','Modelos'],['history','Historial'],['library','Biblioteca']];if(nav.dataset.parityView!==view||nav.querySelectorAll('[data-nav]').length!==5){nav.dataset.parityView=view;nav.innerHTML=destinations.map(([id,label])=>`<button data-nav="${id}" data-creative-label="${label}" aria-label="${label}" class="${view===id?'active':''}" ${view===id?'aria-current="page"':''}>${id==='assistant'?aiIcon('chat'):icon(id)}<span class="creative-nav-label">${label}</span></button>`).join('');}}
-  const heading=$('#title'),title={assistant:'Asistente',canvas:'Lienzo',catalog:'Modelos',history:'Historial',library:'Biblioteca',settings:'Ajustes'}[view]||'Nexus Studio';if(heading&&heading.textContent!==title)heading.textContent=title;
+  const nav=$('#navigation');if(nav){const destinations=[['assistant','Asistente'],['canvas','Crear'],['catalog','Modelos'],['history','Historial'],['library','Biblioteca']];if(nav.dataset.parityView!==view||nav.querySelectorAll('[data-nav]').length!==5){nav.dataset.parityView=view;nav.innerHTML=destinations.map(([id,label])=>`<button data-nav="${id}" data-creative-label="${label}" aria-label="${label}" class="${view===id?'active':''}" ${view===id?'aria-current="page"':''}>${id==='assistant'?aiIcon('chat'):icon(id)}<span class="creative-nav-label">${label}</span></button>`).join('');}}
+  const heading=$('#title'),title={assistant:'Asistente',canvas:'Crear',catalog:'Modelos',history:'Historial',library:'Biblioteca',settings:'Ajustes'}[view]||'Nexus Studio';if(heading&&heading.textContent!==title)heading.textContent=title;
   const actions=$('#header-actions');
   if(actions&&!$('#parity-balance-chip')){const item=typeof AccountBalances!=='undefined'?AccountBalances.values.atlas_cloud:null;actions.insertAdjacentHTML('beforeend',`<button id="parity-balance-chip" data-parity="balances" aria-label="Abrir saldo y gasto">${item?.value!=null?escape(currency.cost(item.value)):'Saldo y gasto'}</button>`);}
  }
@@ -175,7 +175,7 @@
   if(e.target.id==='parity-font'){state.fontScale=Number(e.target.value);persist();shell();}
   if(e.target.id==='parity-currency'){try{if(e.target.value==='EUR'&&!state.usdToEurRate){const rate=await rpc('exchangeRate');state.usdToEurRate=rate.rate;state.exchangeRateUpdated=rate.date;}state.currency=e.target.value;persist();render();}catch(reason){e.target.value=state.currency||'USD';toast(reason.message);}}
  });
- let searchTimer;document.addEventListener('input',e=>{if(e.target.id==='parity-history-search'){P.search=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>{history();const input=$('#parity-history-search');input.focus();input.setSelectionRange(input.value.length,input.value.length);},160);}});
+ let searchTimer;document.addEventListener('input',e=>{if(e.target.id==='parity-history-search'){P.search=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>{if(view!=='history')return;history();const input=$('#parity-history-search');input.focus();input.setSelectionRange(input.value.length,input.value.length);},160);}});
  document.addEventListener('submit',async e=>{
   if(!e.target.id.startsWith('parity-'))return;e.preventDefault();const form=e.target,data=Object.fromEntries(new FormData(form)),submit=form.querySelector('[type=submit],button.primary');if(submit)submit.disabled=true;
   try{
