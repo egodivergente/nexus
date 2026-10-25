@@ -18,6 +18,7 @@ internal class ConversationTitles(context: Context) {
     companion object {
         private val FILLER = Regex("^(?:(?:hola|buenas|buenos días|buenas tardes|oye|hey|vale|ok|bueno|por favor|porfa|nexus)[,.!:\\s]+)+", RegexOption.IGNORE_CASE)
         private val ASK = Regex("^(?:(?:quiero|necesito|me gustaría|querría) que (?:me )?|(?:puedes|podrías|podrias) |ayúdame a |ayudame a )", RegexOption.IGNORE_CASE)
+        private val VERB = Regex("^(?:haz|hazme|hacer|hacerme|hagas|crea|créame|creame|crear|crearme|genera|generar|generarme|dame|escribe|escribir|prepara|preparar|diseña|diseñar|redacta|redactar)\\s+", RegexOption.IGNORE_CASE)
         private val MARKUP = Regex("[*_`#>\\[\\]]+")
 
         /** «hola, puedes hacerme un vídeo de un faro…» → «Hacerme un vídeo de un faro…». Never empty. */
@@ -25,6 +26,7 @@ internal class ConversationTitles(context: Context) {
             val sync = raw.startsWith("↔ ")
             var text = raw.removePrefix("↔ ").replace(MARKUP, "").replace(Regex("\\s+"), " ").trim()
             text = text.replace(FILLER, "").replace(ASK, "").trim()
+            text.replace(VERB, "").trim().takeIf { it.length >= 3 }?.let { text = it }
             text = text.split(Regex("(?<=[.!?¿¡])\\s|\\n")).firstOrNull { it.isNotBlank() }?.trim()?.trimEnd('.', '!', '?') ?: text
             if (text.length > max) text = text.take(max).substringBeforeLast(' ').ifBlank { text.take(max) } + "…"
             text = text.replaceFirstChar { it.uppercase() }.ifBlank { raw.ifBlank { "Nueva conversación" } }
