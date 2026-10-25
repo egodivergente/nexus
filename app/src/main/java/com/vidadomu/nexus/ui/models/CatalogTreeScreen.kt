@@ -53,7 +53,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val hiddenEntries by app.modelCatalogRepository.hiddenEntries.collectAsState()
     val runtime=remember {com.vidadomu.nexus.settings.RuntimePreferences.get(app)}
     val rules by runtime.state.collectAsState()
-    var toolsView by rememberSaveable {mutableStateOf(false)}
+    // Entering ArtBox opens Vídeos/Imágenes (the modality you chose, saved below), never Herramientas by accident
+    // (revision video 1, 10:01). Tools stay open while you browse them; leaving the tab resets this.
+    var toolsView by remember {mutableStateOf(false)}
     var showLegacy by rememberSaveable {mutableStateOf(false)}
     var personalizing by rememberSaveable { mutableStateOf(false) }
     var manageHidden by rememberSaveable { mutableStateOf(false) }
