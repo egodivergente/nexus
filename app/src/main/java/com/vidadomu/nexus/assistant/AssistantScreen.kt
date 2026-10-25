@@ -374,6 +374,11 @@ fun AssistantScreen(
                 }
             }
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
+            // The header icons float over the conversation: a short fade keeps scrolled text from colliding with them
+            // («Expandir» under the gear, revision video 1, 08:48) without adding a heavy bar.
+            val headerFade = MaterialTheme.colorScheme.background
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp)
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(headerFade.copy(alpha = .94f), headerFade.copy(alpha = .70f), headerFade.copy(alpha = 0f)))))
             // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
             IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
                 Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)

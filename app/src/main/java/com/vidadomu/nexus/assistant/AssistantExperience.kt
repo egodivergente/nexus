@@ -86,16 +86,19 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     // Flotante, como el campo de búsqueda de Ajustes de Android: una píldora con sombra pegada abajo, sin franjas ni filetes.
     Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
+      // Quick access handle: a slim grabber on the composer's top edge instead of a floating dot in its own 48 dp row
+      // (revision video 1, 05:37). Drawn after the composer so it sits above its border; the touch area stays generous.
+      val grabber: @Composable BoxScope.() -> Unit = {
+          if (onShowLibrary != null) Box(Modifier.align(Alignment.TopCenter).offset(y = (-14).dp).size(width = 64.dp, height = 28.dp)
+              .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+              .clickable(onClickLabel = if (libraryExpanded) "Cerrar accesos" else "Abrir accesos") { if (libraryExpanded) onHideLibrary() else onShowLibrary() }
+              .semantics { contentDescription = if (libraryExpanded) "Cerrar accesos" else "Abrir accesos" },
+              contentAlignment = Alignment.Center) {
+              Box(Modifier.size(width = if (libraryExpanded) 32.dp else 24.dp, height = 4.dp)
+                  .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (libraryExpanded) .7f else .45f), androidx.compose.foundation.shape.RoundedCornerShape(2.dp)))
+          }
+      }
       Column {
-        if (onShowLibrary != null) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            IconButton(onClick = { if (libraryExpanded) onHideLibrary() else onShowLibrary() },
-                modifier = Modifier.size(48.dp).semantics {
-                    contentDescription = if (libraryExpanded) "Cerrar accesos" else "Abrir accesos"
-                }) {
-                Box(Modifier.size(if (libraryExpanded) 8.dp else 6.dp)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant, androidx.compose.foundation.shape.CircleShape))
-            }
-        }
         Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=ComposerShape,shadowElevation=10.dp,
             border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
@@ -181,6 +184,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
         }
         }
       }
+      grabber()
     }
 }
 
