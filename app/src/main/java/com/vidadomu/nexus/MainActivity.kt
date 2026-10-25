@@ -203,6 +203,13 @@ class MainActivity : ComponentActivity() {
                         modifier=Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
                         composable("workspace") {
                             LaunchedEffect(tabRequest) {tabRequest?.let {pager.scrollToPage(it);tabRequest=null}}
+                            // Predictable Back (revision video 1, 00:31): an edge swipe on ArtBox, Lanzadera, Flow or Biblioteca
+                            // returns to Agente instead of leaving Nexus; only Back from Agente exits. Screens inside a tab
+                            // (a family, a sheet) register their own handlers later, so they still take precedence.
+                            val workspaceScope = rememberCoroutineScope()
+                            androidx.activity.compose.BackHandler(enabled = pager.currentPage != 0) {
+                                workspaceScope.launch { pager.animateScrollToPage(0) }
+                            }
                             HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value,
                                 modifier=Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Horizontal))) {index ->
                                 holder.SaveableStateProvider(tabs[index].route) {
