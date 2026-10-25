@@ -39,7 +39,7 @@
    const span=el('span','creative-nav-label');[...b.childNodes].filter(n=>n.nodeType===3).forEach(n=>span.append(n));b.append(span);
   });
   if(!$('#creative-status')){
-   const bar=el('footer','creative-status');bar.id='creative-status';bar.innerHTML='<details id="creative-control"><summary aria-label="Abrir estado, saldos y telemetría"><span class="creative-health"></span><span id="creative-status-label">Conectando</span><span class="creative-status-chevron">⌃</span></summary><div class="creative-control-panel"><h2>Estado y consumo</h2><p id="creative-local-status"></p><div id="creative-control-actions"></div></div></details><span id="creative-footer-hint" class="creative-footer-hint">Enter para enviar · Mayús+Enter nueva línea</span><button type="button" data-gallery="commands" class="creative-shortcut" title="Paleta de comandos (Ctrl+K)">Ctrl K</button>';$('main').append(bar);
+   const bar=el('footer','creative-status');bar.id='creative-status';bar.innerHTML='<details id="creative-control"><summary aria-label="Estado, saldos y telemetría" aria-controls="creative-control-panel"><span class="creative-health"></span><span id="creative-status-label">Conectando</span><span class="creative-status-chevron">⌃</span></summary><div id="creative-control-panel" class="creative-control-panel" role="region" aria-labelledby="creative-control-title"><div class="creative-control-heading"><h2 id="creative-control-title">Estado y consumo</h2><button type="button" id="creative-control-close" aria-label="Cerrar estado y consumo">Cerrar</button></div><p id="creative-local-status"></p><div id="creative-control-actions"></div></div></details><span id="creative-footer-hint" class="creative-footer-hint">Enter para enviar · Mayús+Enter nueva línea</span><button type="button" data-gallery="commands" class="creative-shortcut" title="Paleta de comandos (Ctrl+K)">Ctrl K</button>';$('main').append(bar);
   }
   const hint=$('#creative-footer-hint');
   if(hint)text(hint,view==='assistant'?'Enter para enviar · Mayús+Enter otra línea':view==='canvas'?'Enter o Ctrl+Enter para generar · Shift+Enter otra línea':'Ctrl+K comandos rápidos');
@@ -119,6 +119,11 @@
   const extension=new URL(url,location.href).pathname.split('.').pop().toLowerCase(),mime=({jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',avif:'image/avif',gif:'image/gif'})[extension]||'image/png';
   state.draft.media.push({id:crypto.randomUUID(),name:job.name||'Referencia',mime,size:0,url,remoteUrl:url.startsWith('/media/')?null:url,field:field.key});quote=null;persist();renderCanvas();
  }
+ function closeControl(restoreFocus=false){
+  const control=$('#creative-control');if(!control?.open)return;
+  const focusInside=control.contains(document.activeElement);control.open=false;
+  if(restoreFocus&&focusInside)control.querySelector('summary')?.focus();
+ }
  document.addEventListener('input',e=>{if(e.target?.tagName==='TEXTAREA')autoResizeTextarea(e.target);});
  document.addEventListener('dragover',e=>{if(e.target.closest('#creative-command')&&e.dataTransfer?.types.includes('application/x-nexus-job')){e.preventDefault();e.dataTransfer.dropEffect='copy';}});
  document.addEventListener('drop',e=>{if(!e.target.closest('#creative-command'))return;const id=e.dataTransfer?.getData('application/x-nexus-job');if(id){e.preventDefault();attach(id,e.target.closest('[data-field]')?.dataset.field);}});
@@ -126,9 +131,16 @@
   if(e.target.id==='prompt'&&e.key==='Enter'&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.isComposing&&!e.repeat){
    e.preventDefault();const b=$('#generate');if(b&&!b.disabled&&!$('#dialog').open)b.click();
   }
-  if(e.key==='Escape'){document.querySelectorAll('#creative-control,.creative-multi').forEach(n=>n.open=false);}
+  if(e.key==='Escape'){
+   // A modal opened from this panel owns Escape and restores focus to its trigger.
+   if(!e.defaultPrevented&&!document.querySelector('dialog[open]'))closeControl(true);
+   document.querySelectorAll('.creative-multi').forEach(n=>n.open=false);
+  }
  });
  document.addEventListener('click',e=>{
+  if(e.target.closest('#creative-control-close'))closeControl(true);
+  // Keep the panel available behind its dialogs; their close handlers return here.
+  else if(!e.target.closest('#creative-control')&&!e.composedPath().some(n=>n instanceof HTMLDialogElement))closeControl();
   const b=e.target.closest('[data-creative-job]');if(b)studioDetails(b.dataset.creativeJob);
   if(!e.target.closest('.creative-multi'))document.querySelectorAll('.creative-multi[open]').forEach(n=>n.open=false);
  });
