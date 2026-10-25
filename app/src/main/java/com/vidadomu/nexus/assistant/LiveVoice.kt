@@ -80,10 +80,9 @@ internal fun LiveVoiceDialog(ui: AssistantUiState, onSend: (String) -> Boolean, 
     var silences by remember { mutableIntStateOf(0) }
 
     val tts = remember { mutableStateOf<TextToSpeech?>(null) }
-    val recognizer = remember {
-        if (android.os.Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        else SpeechRecognizer.createSpeechRecognizer(context)
-    }
+    // The default recognizer, not createOnDeviceSpeechRecognizer: the on-device one fails («no match», language
+    // unavailable) when the Spanish pack is not downloaded. The system service still runs locally when it can.
+    val recognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
     fun listen() {
         if (!granted) { permission.launch(Manifest.permission.RECORD_AUDIO); return }
         tts.value?.stop(); pendingUtterances = 0

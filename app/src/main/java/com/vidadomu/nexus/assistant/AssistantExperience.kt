@@ -163,7 +163,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                             dictate.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                                 putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
-                                putExtra(android.speech.RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                                // Not EXTRA_PREFER_OFFLINE: without the offline Spanish pack the system recognizer answered
+                                // «No te he entendido» to clear phrases. The system uses the local model when installed.
                                 putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Habla; podrás revisar el texto antes de enviarlo")
                             })
                         } catch (_: android.content.ActivityNotFoundException) {
