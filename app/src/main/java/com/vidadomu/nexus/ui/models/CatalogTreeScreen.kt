@@ -392,7 +392,8 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null,onQuickUse:(()->Unit)?=null) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
-    val price=routes.mapNotNull(::referencePrice).minOrNull()
+    // Only real, positive published prices: never «Desde 0,00» or an empty «Desde».
+    val price=routes.mapNotNull(::referencePrice).filter {it.isFinite() && it>0}.minOrNull()
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
     // Con fuente grande no se recorta texto esencial; con 100 % el resumen está escrito para dos líneas.
     val largeFont=androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f

@@ -131,7 +131,8 @@ class CurrencyManager(
     private fun displayAmount(usdAmount: Double, smallCost: Boolean): String {
         if (!usdAmount.isFinite()) return "—"
         val current=_state.value
-        val dollars=current.preference==CurrencyPreference.USD
+        // Without a usable exchange rate, show the real dollar figure instead of a fake «0,00 €».
+        val dollars=current.preference==CurrencyPreference.USD || !(current.rate.isFinite() && current.rate>0)
         val amount=if(dollars) usdAmount else usdAmount*current.rate
         val unit=if(dollars) "US$" else "€"
         return if(smallCost && amount>0 && number(amount,2)=="0,00") "<0,01 $unit"
