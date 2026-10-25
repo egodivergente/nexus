@@ -432,7 +432,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         AssetSkillSource(app.assets),
         DirectorySkillSource(File(app.filesDir, "skills"), "files/skills"),
         DirectorySkillSource(File(Environment.getExternalStorageDirectory(), "Documents/ALEXIA/Nexus/Skills"), "Documents/ALEXIA/Nexus/Skills"),
-    )).also { s -> s.errors.forEach { logger.log("W", "skill: $it") }; logger.log("I", "skills cargadas: ${s.all().size}") }
+    ), cache = com.vidadomu.nexus.agent.core.skills.SkillParseCache(File(app.cacheDir, "skills-parse-cache-v1.json"))).also { s -> s.errors.forEach { logger.log("W", "skill: $it") }; logger.log("I", "skills cargadas: ${s.all().size}") }
 
     private fun buildDeps() = ToolDeps(
         registry = registry, skills = skills,

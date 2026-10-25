@@ -165,11 +165,43 @@ class DirectorySkillSource(private val root: File, private val label: String = r
 }
 
 /**
+ * Parsed skills keyed by a hash of (origin, text). Parsing ~400 YAML headers with snakeyaml took about a second on
+ * every cold start of the phone; an unchanged file is now read back from JSON. Changed files are parsed again and
+ * entries for removed files are dropped on [save]. A corrupt or missing cache simply means a full parse.
+ */
+class SkillParseCache(private val file: File) {
+    @Serializable private data class Entries(val version: Int = 1, val skills: Map<String, Skill> = emptyMap())
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+    private val loaded: Map<String, Skill> = runCatching {
+        json.decodeFromString(Entries.serializer(), file.readText()).takeIf { it.version == 1 }?.skills
+    }.getOrNull().orEmpty()
+    private val used = linkedMapOf<String, Skill>()
+
+    fun parse(text: String, origin: String): Skill {
+        val key = java.security.MessageDigest.getInstance("SHA-1")
+            .digest((origin + "\u0000" + text).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        val skill = loaded[key] ?: SkillParser.parse(text, origin)
+        used[key] = skill
+        return skill
+    }
+
+    fun save() {
+        if (used.keys == loaded.keys) return
+        runCatching {
+            file.parentFile?.mkdirs()
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(json.encodeToString(Entries.serializer(), Entries(skills = used)))
+            if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
+        }
+    }
+}
+
+/**
  * Índice de skills. Si una skill aparece en varias fuentes gana la de mayor `version`
  * (así un bundle actualizado en disco sustituye a la empaquetada sin recompilar).
  * Las que no parsean se apartan en [errors] sin tumbar el resto.
  */
-class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyList()) {
+class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyList(), cache: SkillParseCache? = null) {
 
     val errors: List<String>
     private val skills: Map<String, Skill>
@@ -179,11 +211,12 @@ class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyL
         val byId = linkedMapOf<String, Skill>()
         for (src in sources) {
             for ((origin, text) in runCatching { src.load() }.getOrElse { errs += "Fuente ilegible: ${it.message}"; emptyList() }) {
-                val s = runCatching { SkillParser.parse(text, origin) }.getOrElse { errs += it.message ?: origin; null } ?: continue
+                val s = runCatching { cache?.parse(text, origin) ?: SkillParser.parse(text, origin) }.getOrElse { errs += it.message ?: origin; null } ?: continue
                 val prev = byId[s.id]
                 if (prev == null || s.version >= prev.version) byId[s.id] = s
             }
         }
+        cache?.save()
         val filter = active.toSet()
         skills = if (filter.isEmpty()) byId else byId.filterKeys { it in filter }
         errors = errs
