@@ -11,9 +11,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 
 import android.util.Log
 
@@ -36,25 +39,39 @@ class ModelCatalogRepository(
         catalogPreferences?.getStringSet("routes:$it", emptySet()).orEmpty().toSet()
     }
 
-    @Synchronized
+    /** Serial background lane: catalogue classification never runs on the main thread (hiding a model froze the dialog). */
+    private val catalogScope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + java.util.concurrent.Executors.newSingleThreadExecutor { task ->
+        Thread(task, "nexus-catalog").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }
+    }.asCoroutineDispatcher())
+
+    /**
+     * Called from UI callbacks. Updates the hidden set and the visible list immediately (a cheap filter), persists the
+     * choice, and recomputes the captured routes in the background. Never blocks the caller.
+     */
     fun setCatalogHidden(key: String, label: String, hidden: Boolean) {
-        val next = if(hidden) _hiddenEntries.value + (key to label) else _hiddenEntries.value - key
-        catalogPreferences?.edit()?.putStringSet("hidden_keys", next.keys)?.apply {
-            if(hidden) putString("label:$key", label) else remove("label:$key")
-        }?.apply()
-        _hiddenEntries.value = next
-        if (!hidden) catalogPreferences?.edit()?.remove("routes:$key")?.apply()
-        publishCatalog(_allModels.value)
+        // Lock-free on the caller's thread: a background publish holding the monitor must never stall a tap.
+        val next = _hiddenEntries.updateAndGet { if (hidden) it + (key to label) else it - key }
+        if (hidden) _models.update { list -> list.filterNot { key in catalogVisibilityKeys(it).keys } }
+        catalogScope.launch {
+            catalogPreferences?.edit()?.apply {
+                putStringSet("hidden_keys", next.keys)
+                if (hidden) putString("label:$key", label) else { remove("label:$key"); remove("routes:$key") }
+            }?.commit()
+            if (!hidden) synchronized(this@ModelCatalogRepository) { hiddenRoutes = hiddenRoutes - key }
+            publishCatalog(_allModels.value)
+        }
     }
 
     @Synchronized
     private fun publishCatalog(models: List<NexusModel>) {
-        hiddenRoutes = captureHiddenRoutes(_allModels.value + models, _hiddenEntries.value.keys, hiddenRoutes)
-        catalogPreferences?.edit()?.apply {
+        val hidden = _hiddenEntries.value.keys
+        val previousRoutes = hiddenRoutes.filterKeys { it in hidden }
+        hiddenRoutes = captureHiddenRoutes(_allModels.value + models, hidden, previousRoutes)
+        if (hiddenRoutes != previousRoutes) catalogPreferences?.edit()?.apply {
             hiddenRoutes.forEach { (key, routes) -> putStringSet("routes:$key", routes) }
         }?.apply()
         _allModels.value = models
-        _models.value = visibleCatalog(models, _hiddenEntries.value.keys, hiddenRoutes)
+        _models.value = visibleCatalog(models, hidden, hiddenRoutes)
     }
 
     private val _isLoading = MutableStateFlow(true)

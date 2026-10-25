@@ -137,11 +137,12 @@ class UxCorrectionsTest {
         assertEquals("Precios desde · por imagen", catalogPriceNote(listOf(image)))
         assertNull(catalogPriceNote(listOf(video, image)))
         assertNull(catalogPriceNote(emptyList()))
+        assertNull(catalogPriceNote(listOf(video, video), anyPrice = false))
     }
 
     @Test fun everyToolCategoryHasItsOwnFunctionalIcon() {
-        val categories = listOf("Edición de vídeo", "Movimiento y pose", "Mejorar imagen", "Extender vídeo",
-            "Audio, música y voz", "Edición de imagen", "Mejorar vídeo", "Sincronización labial")
+        val categories = listOf("Edición de vídeo", "Movimiento y pose", "Upscale imagen", "Extender vídeo",
+            "Audio, música y voz", "Edición de imagen", "Upscale vídeo", "Sincronización labial")
         val icons = categories.map { toolCategoryIcon(it) }
         assertEquals(categories.size, icons.distinct().size)
         assertFalse(icons.any { it == Icons.Default.Build })

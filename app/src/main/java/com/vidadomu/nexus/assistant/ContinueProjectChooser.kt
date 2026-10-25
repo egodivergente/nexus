@@ -34,9 +34,12 @@ import java.util.Date
     var name by rememberSaveable {mutableStateOf("")}
     var creatingName by remember {mutableStateOf<String?>(null)}
     val busy=ui.thinking || ui.plans.values.any {it.busy}
+    // Activity per project from the in-memory index: computed once, never inside the sort comparator.
+    val conversationIndex by vm.conversationIndex.collectAsState()
+    val activity=remember(conversationIndex) {conversationIndex.groupBy {it.projectId}.mapValues {(_,v)->v.maxOf {it.updatedAt}}}
     val projects=ui.projects.sortedWith(compareByDescending<com.vidadomu.nexus.agent.core.assets.Project> {it.id in pinned}
         .thenBy {if(rules.value("startup.order")=="nombre") it.name.lowercase() else ""}
-        .thenByDescending {vm.projectActivity(it.id).takeIf {at->at>0} ?: it.createdAt})
+        .thenByDescending {(activity[it.id] ?: 0L).takeIf {at->at>0} ?: it.createdAt})
     var all by rememberSaveable {mutableStateOf(false)}
     val showFox=androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f
     val shown=if(all) projects else projects.take(store.int("startup.recentCount"))
@@ -75,7 +78,7 @@ import java.util.Date
                         Icon(Icons.Default.FolderOpen,null,Modifier.padding(16.dp).size(25.dp),tint=accent)
                         Column(Modifier.weight(1f).padding(vertical=14.dp)) {
                             Text(project.name,style=MaterialTheme.typography.titleLarge)
-                            val at=vm.projectActivity(project.id).takeIf {it>0} ?: project.createdAt
+                            val at=(activity[project.id] ?: 0L).takeIf {it>0} ?: project.createdAt
                             Text("Última actividad · "+DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(Date(at)),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick={pinned=if(project.id in pinned) pinned-project.id else pinned+project.id;prefs.edit().putStringSet("pinned",pinned).apply()}) {

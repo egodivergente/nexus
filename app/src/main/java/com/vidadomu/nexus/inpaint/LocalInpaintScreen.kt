@@ -204,7 +204,9 @@ class LocalInpaintViewModel(application: Application) : AndroidViewModel(applica
 }
 
 @Composable
-fun LocalInpaintScreen(onBack: () -> Unit, state: LocalInpaintViewModel = viewModel()) {
+fun LocalInpaintScreen(onBack: () -> Unit, state: LocalInpaintViewModel = viewModel(), initialUri: String? = null) {
+    // Opened from «Editar foto» (Biblioteca/visor): load that image once; a restored session is not replaced.
+    androidx.compose.runtime.LaunchedEffect(initialUri) { if (initialUri != null && state.source == null) state.open(android.net.Uri.parse(initialUri)) }
     val message by state.message.collectAsState()
     var editor by remember { mutableStateOf<MaskPaintView?>(null) }
     var erasing by remember { mutableStateOf(false) }

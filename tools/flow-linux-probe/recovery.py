@@ -32,6 +32,7 @@ import flow_agent
 import flow_gallery
 import flow_session
 import flow_settings
+import flow_direct
 
 ROOT = Path(os.environ.get('NEXUS_FLOW_ROOT', str(Path.home() / '.local/share/nexus-flow-probe')))
 HOST = os.environ.get('NEXUS_FLOW_HOST', '100.112.57.2')
@@ -1005,6 +1006,67 @@ async def create_flow_job(request: Request):
         return JSONResponse({'error': error.code}, status_code=error.status_code)
     except FlowError as error:
         return flow_error_response(error)
+
+
+def flow_direct_response(error):
+    body = {'error': error.code}
+    if error.detail:
+        body['detail'] = error.detail
+    return JSONResponse(body, status_code=error.status_code)
+
+
+@app.get('/api/flow/direct/capabilities')
+async def get_flow_direct_capabilities():
+    # Read-only: derived from the verified contract; nothing is sent to Google.
+    try:
+        return await asyncio.to_thread(flow_direct.capabilities)
+    except flow_direct.DirectError as error:
+        return flow_direct_response(error)
+
+
+@app.post('/api/flow/direct/quote')
+async def post_flow_direct_quote(request: Request):
+    try:
+        return await flow_direct.quote(ROOT, await read_limited_json(request))
+    except ReferenceError as error:
+        return JSONResponse({'error': error.code}, status_code=error.status_code)
+    except flow_direct.DirectError as error:
+        return flow_direct_response(error)
+
+
+@app.post('/api/flow/direct/jobs')
+async def post_flow_direct_job(request: Request):
+    try:
+        return JSONResponse(await flow_direct.submit(ROOT, await read_limited_json(request)), status_code=201)
+    except ReferenceError as error:
+        return JSONResponse({'error': error.code}, status_code=error.status_code)
+    except flow_direct.DirectError as error:
+        return flow_direct_response(error)
+
+
+@app.get('/api/flow/direct/jobs/{request_id}')
+async def get_flow_direct_job(request_id: str, recover: bool = False):
+    try:
+        return await flow_direct.status(ROOT, request_id, recover=recover)
+    except flow_direct.DirectError as error:
+        return flow_direct_response(error)
+
+
+@app.get('/api/flow/direct/assets/{request_id}/options')
+async def get_flow_direct_asset_options(request_id: str):
+    # Lists Flow's own download sizes (2K/4K, 1080p/4K) and their credits for an existing result; generates nothing.
+    try:
+        return await flow_direct.asset_options(request_id)
+    except flow_direct.DirectError as error:
+        return flow_direct_response(error)
+
+
+@app.get('/api/flow/direct/media/{name}')
+async def get_flow_direct_media(name: str):
+    try:
+        return FileResponse(flow_direct.media_file(ROOT, name))
+    except flow_direct.DirectError as error:
+        return flow_direct_response(error)
 
 
 @app.post('/api/flow/references')

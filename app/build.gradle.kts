@@ -26,8 +26,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 110
-        versionName = "1.9.76-agent"
+        versionCode = 111
+        versionName = "1.9.77-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -187,7 +187,8 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // WorkManager for background generation tracking
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // 2.10 handles the Android 15+ foreground-service timeout (Service.onTimeout) instead of letting the process crash.
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     // Test dependencies
     testImplementation("junit:junit:4.13.2")

@@ -73,15 +73,48 @@ internal class AssistantChatStore(private val context: Context) {
         } catch(error: Exception) { archived.failWrite(stream); throw error }
     } }
 
-    fun conversations(projectId: String? = null): List<AssistantChatEntry> = File(context.filesDir,"assistant/conversations").listFiles().orEmpty()
-        .filter { it.extension == "json" }.sortedByDescending { it.lastModified() }.mapNotNull { entry ->
-            runCatching {
-                val chat = json.decodeFromString<SavedAssistantChat>(entry.readText())
-                AssistantChatEntry(entry.nameWithoutExtension,(if(entry.name.startsWith("sync_")) "↔ " else "") + (chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Nueva conversación"),chat.projectId,chat.updatedAt.takeIf {it>0} ?: entry.lastModified(),chat.items.filterIsInstance<ChatItem.User>().lastOrNull()?.text?.take(110).orEmpty())
-            }.getOrNull()
-        }
+    /**
+     * Metadata index of saved conversations. Only files whose size or modification time changed are decoded; the rest
+     * come from memory or from a small index file. Listing used to decode every full chat on every call (on the main
+     * thread, inside sort comparators): the cause of the start-up ANRs on the Pixel 8 Pro (25/10/2026).
+     * Must be called off the main thread.
+     */
+    @Serializable private data class IndexedConversation(val modified: Long, val length: Long, val title: String,
+        val projectId: String? = null, val updatedAt: Long = 0, val preview: String = "")
+    @Serializable private data class ConversationIndexFile(val version: Int = 1, val entries: Map<String, IndexedConversation> = emptyMap())
+    private val indexFile = File(context.filesDir, "assistant/conversations-index-v1.json")
+    private val index = java.util.concurrent.ConcurrentHashMap<String, IndexedConversation>()
+    @Volatile private var indexLoaded = false
 
-        .filter { projectId == null || it.projectId == projectId }
+    private fun indexed(name: String, file: File, chat: SavedAssistantChat) = IndexedConversation(file.lastModified(), file.length(),
+        (if(name.startsWith("sync_")) "↔ " else "") + (chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Nueva conversación"),
+        chat.projectId, chat.updatedAt.takeIf { it > 0 } ?: file.lastModified(), chat.items.filterIsInstance<ChatItem.User>().lastOrNull()?.text?.take(110).orEmpty())
+
+    @Synchronized
+    fun conversations(projectId: String? = null): List<AssistantChatEntry> {
+        if (!indexLoaded) {
+            runCatching { json.decodeFromString<ConversationIndexFile>(indexFile.readText()) }.getOrNull()?.let { index.putAll(it.entries) }
+            indexLoaded = true
+        }
+        val files = File(context.filesDir,"assistant/conversations").listFiles().orEmpty().filter { it.extension == "json" }
+        var changed = index.keys.retainAll(files.map { it.nameWithoutExtension }.toSet())
+        files.forEach { file ->
+            val name = file.nameWithoutExtension
+            val known = index[name]
+            if (known != null && known.modified == file.lastModified() && known.length == file.length()) return@forEach
+            val chat = runCatching { json.decodeFromString<SavedAssistantChat>(file.readText()) }.getOrNull()
+            if (chat == null) index.remove(name) else index[name] = indexed(name, file, chat)
+            changed = true
+        }
+        if (changed) runCatching {
+            val target = AtomicFile(indexFile); val out = target.startWrite()
+            try { out.write(json.encodeToString(ConversationIndexFile(entries = HashMap(index))).toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
+            catch (e: Exception) { target.failWrite(out); throw e }
+        }
+        return files.sortedByDescending { it.lastModified() }.mapNotNull { file ->
+            index[file.nameWithoutExtension]?.let { AssistantChatEntry(file.nameWithoutExtension, it.title, it.projectId, it.updatedAt, it.preview) }
+        }.filter { projectId == null || it.projectId == projectId }
+    }
 
     fun conversation(id: String): SavedAssistantChat? {
         if(!Regex("[A-Za-z0-9_-]+").matches(id)) return null

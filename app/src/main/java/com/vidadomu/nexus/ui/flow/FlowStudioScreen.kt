@@ -65,6 +65,8 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -107,6 +109,7 @@ import com.vidadomu.nexus.core.model.GenerationJob
 import com.vidadomu.nexus.core.model.GenerationOutput
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.core.model.Modality
+import com.vidadomu.nexus.core.model.MediaInput
 import com.vidadomu.nexus.core.work.GenerationPollingWorker
 import com.vidadomu.nexus.provider.flow.FlowBridgeStatus
 import com.vidadomu.nexus.ui.components.InlineNotice
@@ -190,6 +193,22 @@ fun FlowStudioScreen(
     var pendingExport by remember { mutableStateOf<Pair<GenerationOutput, FlowExportPlan>?>(null) }
     val exportMime = remember { mutableStateOf("application/octet-stream") }
     var costDetails by rememberSaveable { mutableStateOf(false) }
+    // Explicit settings (model, mode, aspect, seconds, frames) when AXELPC offers the verified direct route.
+    var directCaps by remember { mutableStateOf<com.vidadomu.nexus.provider.flow.FlowDirectCapabilities?>(null) }
+    val directPrefs = remember { context.getSharedPreferences("flow_direct_v1", Context.MODE_PRIVATE) }
+    fun loadDirect(kind: String) = directPrefs.getString(kind, null)?.let { runCatching { Json.decodeFromString<FlowDirectSettings>(it) }.getOrNull() }
+        ?: FlowDirectSettings.default(kind)
+    var videoSettings by remember { mutableStateOf(loadDirect("video")) }
+    var imageSettings by remember { mutableStateOf(loadDirect("image")) }
+    fun saveDirect(kind: String, value: FlowDirectSettings) {
+        if (kind == "video") videoSettings = value else imageSettings = value
+        directPrefs.edit().putString(kind, Json.encodeToString(value)).apply()
+    }
+    val frameSaver = androidx.compose.runtime.saveable.Saver<FlowStudioReference?, String>(
+        save = { it?.let { r -> Json.encodeToString(r) } ?: "" }, restore = { it.takeIf(String::isNotBlank)?.let { r -> Json.decodeFromString<FlowStudioReference>(r) } })
+    var startFrame by rememberSaveable(stateSaver = frameSaver) { mutableStateOf<FlowStudioReference?>(null) }
+    var endFrame by rememberSaveable(stateSaver = frameSaver) { mutableStateOf<FlowStudioReference?>(null) }
+    var directConfirm by remember { mutableStateOf<FlowDirectConfirmation?>(null) }
 
     suspend fun refreshConnection(showChecking: Boolean = true) {
         if (BuildConfig.OFFLINE_QA) {
@@ -238,6 +257,10 @@ fun FlowStudioScreen(
     }
 
     val status = (connection as? FlowStudioConnection.Ready)?.status
+    LaunchedEffect(status?.isReady) {
+        if (status?.isReady == true && !BuildConfig.OFFLINE_QA)
+            directCaps = app.flowBridgeProvider.direct.capabilities().getOrNull()?.takeIf { it.available && it.models.isNotEmpty() }
+    }
     val promptLimit: Int? = null // No verified Google limit for the active model/workflow.
     val accepted = status?.expectedOutputs.orEmpty().map { it.lowercase() }.toSet()
     val acceptedModalities = buildSet {
@@ -310,9 +333,55 @@ fun FlowStudioScreen(
         }
     }
 
+    var qualityOptions by remember { mutableStateOf<List<com.vidadomu.nexus.provider.flow.FlowDirectAssetOption>?>(null) }
+    var qualityLoading by remember { mutableStateOf(false) }
+    var qualityConfirm by remember { mutableStateOf<Triple<GenerationOutput, com.vidadomu.nexus.provider.flow.FlowDirectAssetOption, com.vidadomu.nexus.provider.flow.FlowDirectQuote>?>(null) }
+    LaunchedEffect(exportTarget?.id) {
+        qualityOptions = null
+        val source = exportTarget?.url?.let(com.vidadomu.nexus.provider.flow.FlowDirect::sourceRequest) ?: return@LaunchedEffect
+        qualityLoading = true
+        qualityOptions = app.flowBridgeProvider.direct.assetOptions(source).getOrNull()
+        qualityLoading = false
+    }
+    qualityConfirm?.let { (output, option, quote) ->
+        AlertDialog(onDismissRequest = { qualityConfirm = null }, title = { Text("Descargar en ${option.resolution.uppercase()} desde Flow") },
+            text = { Text((if (quote.included) "Incluido en tu cuenta Flow." else quote.amount?.let { "$it créditos de Flow." }
+                ?: "Flow no muestra el importe.") + "\nFlow procesa el original; Nexus guardará el archivo nuevo en la Biblioteca.") },
+            confirmButton = { TextButton(onClick = {
+                qualityConfirm = null
+                val source = com.vidadomu.nexus.provider.flow.FlowDirect.sourceRequest(output.url) ?: return@TextButton
+                val job = allJobs.firstOrNull { it.id == output.jobId }
+                scope.launch {
+                    val request = com.vidadomu.nexus.core.model.GenerationRequest(id = java.util.UUID.randomUUID().toString(),
+                        providerId = com.vidadomu.nexus.provider.flow.FlowBridgeProvider.PROVIDER_ID,
+                        modelId = "flow/" + com.vidadomu.nexus.provider.flow.FlowDirect.processModel(output.type == Modality.VIDEO),
+                        modality = output.type, prompt = job?.prompt?.ifBlank { null } ?: "Descarga ${option.resolution} desde Flow",
+                        parameters = mapOf(com.vidadomu.nexus.provider.flow.FlowDirect.ROUTE to com.vidadomu.nexus.provider.flow.FlowDirect.DIRECT,
+                            com.vidadomu.nexus.provider.flow.FlowDirect.SOURCE to source,
+                            com.vidadomu.nexus.provider.flow.FlowDirect.RESOLUTION to option.resolution,
+                            com.vidadomu.nexus.provider.flow.FlowDirect.COST to (quote.amount?.toString() ?: "null")))
+                    val result = app.generationRepository.submitGeneration(request)
+                    val created = result.getOrNull() ?: app.generationRepository.getJob(request.id)
+                    if (created == null || created.status == GenerationStatus.FAILED) snackbarHost.showSnackbar(created?.error ?: result.exceptionOrNull()?.message ?: "Flow no aceptó la descarga.")
+                    else { GenerationPollingWorker.enqueue(context.applicationContext, created.id); snackbarHost.showSnackbar("Flow está preparando la versión ${option.resolution.uppercase()}.") }
+                }
+            }) { Text("Descargar") } },
+            dismissButton = { TextButton(onClick = { qualityConfirm = null }) { Text("Cancelar") } })
+    }
     exportTarget?.let { output ->
         FlowExportSheet(
             output = output,
+            flowOptions = qualityOptions,
+            flowOptionsLoading = qualityLoading,
+            onFlowQuality = { option ->
+                val source = com.vidadomu.nexus.provider.flow.FlowDirect.sourceRequest(output.url)
+                exportTarget = null
+                if (source != null) scope.launch {
+                    val quote = app.flowBridgeProvider.direct.quoteProcess(output.type == Modality.VIDEO, source, option.resolution)
+                    quote.onSuccess { qualityConfirm = Triple(output, option, it) }
+                        .onFailure { snackbarHost.showSnackbar(it.message ?: "Flow no confirmó esa resolución. No se ha procesado nada.") }
+                }
+            },
             onDismiss = { exportTarget = null },
             onSave = { format, size ->
                 exportTarget = null
@@ -427,6 +496,111 @@ fun FlowStudioScreen(
         }
     }
 
+    fun persistFrame(uri: Uri, assign: (FlowStudioReference) -> Unit) {
+        scope.launch {
+            try {
+                val mime = com.vidadomu.nexus.assistant.projectMediaMimeType(context, uri)?.lowercase()
+                if (mime !in FlowStudioPlan.REFERENCE_MIME_TYPES) { snackbarHost.showSnackbar("El fotograma debe ser PNG, JPEG o WebP."); return@launch }
+                val local = AgentMediaStore.persist(app, uri, mime, AssistantRuntime.get(app).settings.activeProjectId())
+                assign(FlowStudioReference(local.uri, requireNotNull(mime), local.name))
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { snackbarHost.showSnackbar("No se pudo preparar el fotograma. Vuelve a elegirlo.") }
+        }
+    }
+    val pickStart = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) persistFrame(uri) { startFrame = it } }
+    val pickEnd = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) persistFrame(uri) { endFrame = it } }
+
+    suspend fun uploadFrame(frame: FlowStudioReference?, label: String): MediaInput? {
+        if (frame == null) return null
+        val remote = frame.remoteId ?: run {
+            progressLabel = "Subiendo fotograma $label…"
+            val file = withContext(Dispatchers.IO) {
+                val extension = when (frame.mimeType) { "image/png" -> "png"; "image/webp" -> "webp"; else -> "jpg" }
+                File(context.cacheDir, "flow_frame_${label.lowercase()}.$extension").also { target ->
+                    context.contentResolver.openInputStream(Uri.parse(frame.uri))?.use { input -> target.outputStream().use { input.copyTo(it) } }
+                        ?: error("No se pudo leer el fotograma.")
+                }
+            }
+            app.flowBridgeProvider.uploadFile(file, file.name, frame.mimeType) { _, _ -> }.getOrElse { throw it }
+        }
+        if (label == "inicial") startFrame = frame.copy(remoteId = remote) else endFrame = frame.copy(remoteId = remote)
+        return MediaInput(type = Modality.IMAGE, uriString = frame.uri, mimeType = frame.mimeType, fileName = frame.fileName, remoteUrl = remote)
+    }
+
+    /** Validate, upload, quote, then ask: nothing is generated before the user accepts the amount Flow reported. */
+    fun directSend(batch: List<FlowStudioDraft>, capabilities: com.vidadomu.nexus.provider.flow.FlowDirectCapabilities) {
+        scope.launch {
+            isSubmitting = true
+            try {
+                for (draft in batch) {
+                    val kind = if (draft.modality == Modality.VIDEO) "video" else "image"
+                    val settings = (if (kind == "video") videoSettings else imageSettings).normalized(capabilities, kind)
+                        ?: run { snackbarHost.showSnackbar("Flow no ofrece ${if (kind == "video") "vídeo" else "imagen"} con ajustes en este momento."); return@launch }
+                    val problem = com.vidadomu.nexus.provider.flow.FlowDirect.validate(settings.selection(FlowStudioPlan.clampCount(draft.count),
+                        startFrame?.let { "ref_" + "0".repeat(64) }, endFrame?.let { "ref_" + "1".repeat(64) },
+                        references.mapIndexed { i, _ -> "ref_" + i.toString().padStart(64, '0') }), capabilities)
+                    if (problem != null) { snackbarHost.showSnackbar(problem); return@launch }
+                }
+                if (references.isNotEmpty() && !uploadReferences()) return@launch
+                val refs = FlowStudioPlan.mediaInputs(references)
+                val start = uploadFrame(startFrame, "inicial")
+                val end = uploadFrame(endFrame, "final")
+                val requests = mutableListOf<FlowDirectConfirmation.Item>()
+                val quotes = linkedMapOf<String, com.vidadomu.nexus.provider.flow.FlowDirectQuote>()
+                for (draft in batch) {
+                    val kind = if (draft.modality == Modality.VIDEO) "video" else "image"
+                    val settings = requireNotNull((if (kind == "video") videoSettings else imageSettings).normalized(capabilities, kind))
+                    val selection = settings.selection(FlowStudioPlan.clampCount(draft.count), start?.remoteUrl, end?.remoteUrl, refs.mapNotNull { it.remoteUrl })
+                    val key = com.vidadomu.nexus.provider.flow.FlowDirect.arguments(selection).toString()
+                    if (key !in quotes) {
+                        progressLabel = "Consultando el importe en Flow…"
+                        quotes[key] = app.flowBridgeProvider.direct.quote(selection).getOrElse {
+                            snackbarHost.showSnackbar(it.message ?: "Flow no confirmó el importe. No se ha enviado nada."); return@launch
+                        }
+                    }
+                    requests += FlowDirectConfirmation.Item(draft, settings, quotes.getValue(key))
+                }
+                directConfirm = FlowDirectConfirmation(requests, refs, start, end)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { snackbarHost.showSnackbar(error.message ?: "No se pudo preparar el envío. No se ha enviado nada.") }
+            finally { isSubmitting = false; progressLabel = null }
+        }
+    }
+
+    fun directSubmit(confirmation: FlowDirectConfirmation) {
+        scope.launch {
+            isSubmitting = true
+            try {
+                var sent = 0
+                confirmation.requests.forEachIndexed { index, item ->
+                    val draft = item.draft
+                    progressLabel = "Enviando ${index + 1} de ${confirmation.requests.size} a Flow…"
+                    val request = FlowDirectPlan.request(draft, item.settings, confirmation.references, confirmation.start, confirmation.end, item.quote.amount)
+                    val result = app.generationRepository.submitGeneration(request)
+                    val job = result.getOrNull() ?: app.generationRepository.getJob(request.id)
+                    if (job == null || job.status == GenerationStatus.FAILED) snackbarHost.showSnackbar(job?.error ?: result.exceptionOrNull()?.message ?: "Flow no aceptó el prompt ${index + 1}.")
+                    else {
+                        sent++
+                        drafts.removeAll { it.id == draft.id }
+                        if (job.status != GenerationStatus.COMPLETED) GenerationPollingWorker.enqueue(context.applicationContext, job.id)
+                    }
+                }
+                if (drafts.isEmpty()) drafts += FlowStudioDraft(modality = confirmation.requests.lastOrNull()?.draft?.modality ?: Modality.IMAGE)
+                if (sent > 0) { composerExpanded = false; listState.scrollToItem(0); snackbarHost.showSnackbar("$sent ${if (sent == 1) "trabajo enviado" else "trabajos enviados"} a Flow.") }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { snackbarHost.showSnackbar(error.message ?: "No se pudo completar el envío. Comprueba los trabajos antes de repetir.") }
+            finally { isSubmitting = false; progressLabel = null }
+        }
+    }
+
+    directConfirm?.let { confirmation ->
+        AlertDialog(onDismissRequest = { directConfirm = null },
+            title = { Text("Generar en Flow") },
+            text = { Text(FlowDirectConfirmation.summary(confirmation)) },
+            confirmButton = { TextButton(onClick = { directConfirm = null; directSubmit(confirmation) }) { Text("Generar") } },
+            dismissButton = { TextButton(onClick = { directConfirm = null }) { Text("Cancelar") } })
+    }
+
     val draftEditor: @Composable (FlowStudioDraft) -> Unit = { draft ->
         DraftCard(
                     draft = draft,
@@ -475,8 +649,18 @@ fun FlowStudioScreen(
         bottomBar = {
             com.vidadomu.nexus.ui.components.FloatingActionDock {
                 Column(Modifier.fillMaxWidth().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                    Column(Modifier.fillMaxWidth().heightIn(max=if(WindowInsets.isImeVisible) 220.dp else 340.dp)
-                        .verticalScroll(rememberScrollState())) { drafts.firstOrNull()?.let {draftEditor(it)} }
+                    Column(Modifier.fillMaxWidth().heightIn(max=if(WindowInsets.isImeVisible) 220.dp else if (directCaps != null) 460.dp else 340.dp)
+                        .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val capabilities = directCaps
+                        val kind = if (drafts.firstOrNull()?.modality == Modality.VIDEO) "video" else "image"
+                        val settings = (if (kind == "video") videoSettings else imageSettings).let { s -> capabilities?.let { s.normalized(it, kind) } }
+                        if (capabilities != null && settings != null && !WindowInsets.isImeVisible) FlowDirectSettingsCard(capabilities, kind, settings,
+                            onChange = { saveDirect(kind, it) }, start = startFrame, end = endFrame,
+                            onPickStart = { pickStart.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            onPickEnd = { pickEnd.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            onClearStart = { startFrame = null; endFrame = null }, onClearEnd = { endFrame = null }, enabled = !isSubmitting)
+                        drafts.firstOrNull()?.let {draftEditor(it)}
+                    }
                     if(!WindowInsets.isImeVisible) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                         TextButton(onClick={composerExpanded=true}) {Text(if(drafts.size==1) "Más prompts" else "${drafts.size} prompts preparados")}
                         Spacer(Modifier.weight(1f))
@@ -484,7 +668,7 @@ fun FlowStudioScreen(
                     }
                 }
                 Button(
-                    onClick = ::sendAll,
+                    onClick = { val capabilities = directCaps; if (capabilities != null) { focusManager.clearFocus(force = true); directSend(sendable.toList(), capabilities) } else sendAll() },
                     enabled = canSend,
                     modifier = Modifier.fillMaxWidth().windowInsetsPadding(NexusInsets.bottomEdge)
                         .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
@@ -643,7 +827,11 @@ private fun decodeScaled(resolver: ContentResolver, source: Uri, size: FlowExpor
 private fun FlowExportSheet(
     output: GenerationOutput,
     onDismiss: () -> Unit,
-    onSave: (FlowExportFormat, FlowExportSize) -> Unit
+    onSave: (FlowExportFormat, FlowExportSize) -> Unit,
+    /** Resolutions Flow itself offers for this result (direct route only), with their credits; null = not available. */
+    flowOptions: List<com.vidadomu.nexus.provider.flow.FlowDirectAssetOption>? = null,
+    flowOptionsLoading: Boolean = false,
+    onFlowQuality: (com.vidadomu.nexus.provider.flow.FlowDirectAssetOption) -> Unit = {},
 ) {
     val isVideo = output.type == Modality.VIDEO
     var format by rememberSaveable(output.id) { mutableStateOf(FlowExportFormat.ORIGINAL) }
@@ -654,13 +842,24 @@ private fun FlowExportSheet(
             verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)
         ) {
             Text("Descargar", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+            // Real 2K/4K comes only from Flow's own processing of this result; the phone never invents resolution.
+            if (flowOptionsLoading) Text("Consultando en Flow las resoluciones disponibles…", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            flowOptions?.takeIf { it.isNotEmpty() }?.let { options ->
+                Text("Calidad desde Flow", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    options.forEach { option ->
+                        AssistChip(onClick = { onFlowQuality(option) }, label = { Text(option.label.ifBlank { option.resolution.uppercase() } +
+                            (option.credits?.let { if (it == 0) " · incluido" else " · $it créditos" } ?: ""), maxLines = 1) })
+                    }
+                }
+                Text("Flow procesa el archivo original y Nexus lo guarda como un resultado nuevo.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            }
             if (isVideo) {
                 Text(FlowExport.VIDEO_ORIGINAL_ONLY, style = MaterialTheme.typography.bodySmall, color = TextMuted)
             } else {
                 ExportChoiceRow("Formato", FlowExportFormat.entries, format, { it.label }) { format = it }
-                ExportChoiceRow("Tamaño", FlowExportSize.entries, size, { it.label }) { size = it }
-                Text("Nunca se amplía: si el original es menor, se mantiene su tamaño.",
-                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                // Only reductions: 2K/4K labels here suggested a resolution the local copy never gains.
+                ExportChoiceRow("Reducir en el móvil", listOf(FlowExportSize.ORIGINAL, FlowExportSize.FHD_1080, FlowExportSize.HD_720), size, { it.label }) { size = it }
             }
             Button(onClick = { if (isVideo) onSave(FlowExportFormat.ORIGINAL, FlowExportSize.ORIGINAL) else onSave(format, size) },
                 modifier = Modifier.fillMaxWidth()) {

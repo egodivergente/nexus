@@ -432,7 +432,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         AssetSkillSource(app.assets),
         DirectorySkillSource(File(app.filesDir, "skills"), "files/skills"),
         DirectorySkillSource(File(Environment.getExternalStorageDirectory(), "Documents/ALEXIA/Nexus/Skills"), "Documents/ALEXIA/Nexus/Skills"),
-    )).also { s -> s.errors.forEach { logger.log("W", "skill: $it") }; logger.log("I", "skills cargadas: ${s.all().size}") }
+    ), cache = com.vidadomu.nexus.agent.core.skills.SkillParseCache(File(app.cacheDir, "skills-parse-cache-v1.json"))).also { s -> s.errors.forEach { logger.log("W", "skill: $it") }; logger.log("I", "skills cargadas: ${s.all().size}") }
 
     private fun buildDeps() = ToolDeps(
         registry = registry, skills = skills,
@@ -502,7 +502,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     /** Indexa (sin tocar nexus.db ni archivos) las creaciones ya terminadas, para buscarlas por prompt/modelo. */
     private val importLock = kotlinx.coroutines.sync.Mutex()
 
-    suspend fun importHistory(): Int = importLock.withLock { importHistoryLocked() }
+    /** Walks every finished job and the asset index: never on the caller's (often the main) thread. */
+    suspend fun importHistory(): Int = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { importLock.withLock { importHistoryLocked() } }
 
     private suspend fun importHistoryLocked(): Int {
         var added = 0

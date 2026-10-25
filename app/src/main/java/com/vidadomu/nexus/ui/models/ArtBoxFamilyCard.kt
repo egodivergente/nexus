@@ -51,32 +51,40 @@ import com.vidadomu.nexus.core.model.*
         IconButton(onClick=onOptions,modifier=Modifier.align(Alignment.TopEnd).size(40.dp)) {
             Icon(Icons.Default.MoreVert,"Opciones de ${section.family}",Modifier.size(18.dp),tint=colors.onSurfaceVariant.copy(alpha=.7f))
         }
-        Column(Modifier.fillMaxWidth().heightIn(min=if(toolCategory) 156.dp else 132.dp).padding(horizontal=6.dp,vertical=12.dp),
-            horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp,Alignment.CenterVertically)) {
+        // Same structure and minimum height for every card (families and tools): logo, a two-line title and the count.
+        // Short names no longer leave a blank third line (revision video 1, 11:22; video 2, 02:49). A minimum, not a
+        // fixed height: with bold or larger system text (Pixel 8 Pro, 25/10) a fixed height clipped the count.
+        Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
+            horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             val labels=rememberCatalogLabels()
-            CatalogGlyph("family:"+section.family,60.dp,labels) {size ->
+            CatalogGlyph("family:"+section.family,ArtBoxCardMetrics.logo,labels) {size ->
                 if(toolCategory) {
                     Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
                         Icon(toolCategoryIcon(section.family),null,Modifier.size(size*.57f),tint=colors.primary)
                     }
                 } else BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=size,bare=true)
             }
-            Text(title,style=MaterialTheme.typography.titleSmall,minLines=3,maxLines=3,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
+            Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
             Text(count,style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,maxLines=1)
         }
         }
     }
 }
 
+internal object ArtBoxCardMetrics {
+    val height = 148.dp
+    val logo = 64.dp
+}
+
 /** Functional symbol per category; brand logos stay for providers only. */
 internal fun toolCategoryIcon(category: String): ImageVector = when(category) {
     "Edición de vídeo" -> Icons.Default.ContentCut
     "Movimiento y pose" -> Icons.Default.AccessibilityNew
-    "Mejorar imagen" -> Icons.Default.AutoFixHigh
+    "Upscale imagen" -> Icons.Default.AutoFixHigh
     "Extender vídeo" -> Icons.Default.FastForward
     "Audio, música y voz" -> Icons.Default.GraphicEq
     "Edición de imagen" -> Icons.Default.Brush
-    "Mejorar vídeo" -> Icons.Default.HighQuality
+    "Upscale vídeo" -> Icons.Default.HighQuality
     "Sincronización labial" -> Icons.Default.RecordVoiceOver
     else -> Icons.Default.Build
 }
@@ -88,7 +96,7 @@ internal fun toolCategory(model: NexusModel): String? {
         CatalogWorkflow.MOTION in tasks -> "Movimiento y pose"
         CatalogWorkflow.LIPSYNC in tasks -> "Sincronización labial"
         CatalogWorkflow.EXTEND in tasks -> "Extender vídeo"
-        CatalogWorkflow.UPSCALE in tasks -> if(Modality.VIDEO in model.modalities) "Mejorar vídeo" else "Mejorar imagen"
+        CatalogWorkflow.UPSCALE in tasks -> if(Modality.VIDEO in model.modalities) "Upscale vídeo" else "Upscale imagen"
         tasks.any {it in setOf(CatalogWorkflow.INPAINT,CatalogWorkflow.OUTPAINT,CatalogWorkflow.LAYERS,CatalogWorkflow.REMOVE_BACKGROUND)} -> "Edición de imagen"
         CatalogWorkflow.EDIT_IMAGE in tasks && CatalogWorkflow.CREATE_IMAGE !in tasks -> "Edición de imagen"
         CatalogWorkflow.EDIT_VIDEO in tasks -> "Edición de vídeo"

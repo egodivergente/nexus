@@ -65,7 +65,8 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
     onSendToAgent:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
-    onSendResultToAgent:((String,String)->Unit)?=null, onOpenHistory:(()->Unit)?=null, onOpenArtBox:(()->Unit)?=null) {
+    onSendResultToAgent:((String,String)->Unit)?=null, onOpenHistory:(()->Unit)?=null, onOpenArtBox:(()->Unit)?=null,
+    onEditPhoto:((String)->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -357,7 +358,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             },
             onUseInCanvas=if(visual && asset!=null) onUseInCanvas?.let {use -> leaving {use(asset)}} else null,
             onOpenResult=(entry as? LibraryEntry.Out)?.let {out -> leaving {openResult(out)}},
-            onCrop=if(isImage(entry)) ({cropTarget=entry}) else null,onMove={moving=listOf(entry)})
+            onCrop=if(isImage(entry)) ({cropTarget=entry}) else null,onMove={moving=listOf(entry)},
+            onEdit=if(isImage(entry)) onEditPhoto?.let {edit ->
+                val uri=when(entry) {is LibraryEntry.Out -> OutputFiles.trustedLocalUri(entry.job.outputs[entry.index],conflicts); is LibraryEntry.Local -> entry.asset.uri}
+                uri?.let {u -> {optionsFor=null;edit(u)}}
+            } else null)
     }
     @Composable fun FileDialogs() {
         optionsFor?.let {FileOptions(it)}

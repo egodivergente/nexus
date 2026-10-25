@@ -24,6 +24,8 @@ internal enum class CatalogWorkflow(val label:String, val summary:String) {
     OTHER("Herramienta", "Consulta las entradas y opciones admitidas por este modelo.")
 }
 
+private val EDIT_ROUTE = Regex("(^|[/_.-])(edit|editing|i2i|image-to-image|img2img|reference|references|remix)([/_.-]|$)")
+
 internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
     val capabilities=model.capabilities.toSet()
     val id=(model.providerModelId ?: model.id).lowercase()
@@ -42,7 +44,7 @@ internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
         val generates=ModelCapability.TEXT_TO_IMAGE in capabilities
         // A route named as an edit (…/edit, image-to-image, reference…) needs images even when the provider also tags it
         // text-to-image: it never goes under «Desde texto», or Lanzadera would ask for images on a text task.
-        val editRoute=Regex("(^|[/_.-])(edit|editing|i2i|image-to-image|img2img|reference|references|remix)([/_.-]|$)").containsMatchIn(id)
+        val editRoute=EDIT_ROUTE.containsMatchIn(id)
         val edits=ModelCapability.IMAGE_TO_IMAGE in capabilities || ModelCapability.IMAGE_EDITING in capabilities || editRoute
         // Explicit capabilities win over old or speculative input-mode flags.
         if(generates && !edits) return listOf(CatalogWorkflow.CREATE_IMAGE)

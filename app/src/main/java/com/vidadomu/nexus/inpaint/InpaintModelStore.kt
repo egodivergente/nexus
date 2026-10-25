@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.inpaint
 
+import com.vidadomu.nexus.core.work.promoteToForeground
 import android.content.Context
 import androidx.work.*
 import com.vidadomu.nexus.assistant.MediaEditWorker
@@ -75,7 +76,7 @@ class InpaintModelStore(private val context: Context) {
 
 class InpaintDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
-        setForeground(MediaEditWorker.foreground(applicationContext, "inpaint-download", "Descargando modelo de inpainting local"))
+        promoteToForeground(MediaEditWorker.foreground(applicationContext, "inpaint-download", "Descargando modelo de inpainting local"))
         InpaintModelStore(applicationContext).download { percent -> setProgress(workDataOf("percent" to percent)) }
         Result.success()
     } catch (cancelled: CancellationException) { throw cancelled

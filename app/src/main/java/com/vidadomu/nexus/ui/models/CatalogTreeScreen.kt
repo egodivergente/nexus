@@ -53,7 +53,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val hiddenEntries by app.modelCatalogRepository.hiddenEntries.collectAsState()
     val runtime=remember {com.vidadomu.nexus.settings.RuntimePreferences.get(app)}
     val rules by runtime.state.collectAsState()
-    var toolsView by rememberSaveable {mutableStateOf(false)}
+    // Entering ArtBox opens Vídeos/Imágenes (the modality you chose, saved below), never Herramientas by accident
+    // (revision video 1, 10:01). Tools stay open while you browse them; leaving the tab resets this.
+    var toolsView by remember {mutableStateOf(false)}
     var showLegacy by rememberSaveable {mutableStateOf(false)}
     var personalizing by rememberSaveable { mutableStateOf(false) }
     var manageHidden by rememberSaveable { mutableStateOf(false) }
@@ -203,8 +205,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                     modifier = Modifier.semantics { heading() })
             }
+            // A quiet entry, not a full-width «máscaras» button that breaks the hierarchy; the main way in is
+            // Biblioteca/visor → «Editar foto».
             if(toolsView && family==null) item(span={GridItemSpan(maxLineSpan)}) {
-                OutlinedButton(onClick=onLocalInpaint,modifier=Modifier.fillMaxWidth()) { Text("Editar región con máscara · local") }
+                AssistChip(onClick=onLocalInpaint,label={Text("Editar una foto en el móvil")},
+                    leadingIcon={Icon(Icons.Default.Brush,null,Modifier.size(18.dp))})
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
                 Text("Arrastra el asa, mantén pulsada una tarjeta o toca el asa para subirla o bajarla. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
@@ -232,7 +237,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
                 if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
-                val priceNote=catalogPriceNote(if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes})
+                val priceRoutes=if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes}
+                val priceNote=catalogPriceNote(priceRoutes,anyPrice=priceRoutes.any {(referencePrice(it) ?: 0.0)>0.0})
                 if(priceNote!=null) item(span={GridItemSpan(maxLineSpan)}) {
                     Text(priceNote,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
@@ -345,15 +351,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     }
     contextTarget?.let { (key,label,model) ->
         val itemKey=if(model==null) label else groups.firstOrNull {groupVisibilityKey(it.routes.first())==key}?.key
-        val (moveUp,moveDown)=itemKey?.let {reorderActions(it)} ?: (null to null)
         val labelKey=if(model==null) "family:$label" else "group:$itemKey"
         val targetGroup=if(model==null) null else groups.firstOrNull {it.key==itemKey}
         val originalDescription=targetGroup?.let {g -> CatalogFocus.forModel(g.routes.first())?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(g.routes)}.orEmpty()
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(labels.name(labelKey,label))},text={Column {
             TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Personalizar icono, nombre y tamaño")}
             Text("Para mover una tarjeta, mantenla pulsada y arrástrala.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
-            moveUp?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Subir un puesto")}}
-            moveDown?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Bajar un puesto")}}
+            // Order changes by long-press + drag; up/down stay only as TalkBack actions on each card.
             TextButton(onClick={
                 if(itemKey!=null) saveOrder(listOf(itemKey)+(savedOrder+displayedKeys).distinct().filterNot {it==itemKey})
                 contextTarget=null
@@ -392,7 +396,8 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
     onMoveUp:(()->Unit)?=null,onMoveDown:(()->Unit)?=null,onQuickUse:(()->Unit)?=null) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val currency by app.currencyManager.state.collectAsState()
-    val price=routes.mapNotNull(::referencePrice).minOrNull()
+    // Only real, positive published prices: never «Desde 0,00» or an empty «Desde».
+    val price=routes.mapNotNull(::referencePrice).filter {it.isFinite() && it>0}.minOrNull()
     val displayPrice=remember(price,currency) {price?.let(app.currencyManager::formatUnitPrice)}
     // Con fuente grande no se recorta texto esencial; con 100 % el resumen está escrito para dos líneas.
     val largeFont=androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
