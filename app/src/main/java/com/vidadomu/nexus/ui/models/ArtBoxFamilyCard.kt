@@ -72,11 +72,11 @@ import com.vidadomu.nexus.core.model.*
 internal fun toolCategoryIcon(category: String): ImageVector = when(category) {
     "Edición de vídeo" -> Icons.Default.ContentCut
     "Movimiento y pose" -> Icons.Default.AccessibilityNew
-    "Mejorar imagen" -> Icons.Default.AutoFixHigh
+    "Upscale imagen" -> Icons.Default.AutoFixHigh
     "Extender vídeo" -> Icons.Default.FastForward
     "Audio, música y voz" -> Icons.Default.GraphicEq
     "Edición de imagen" -> Icons.Default.Brush
-    "Mejorar vídeo" -> Icons.Default.HighQuality
+    "Upscale vídeo" -> Icons.Default.HighQuality
     "Sincronización labial" -> Icons.Default.RecordVoiceOver
     else -> Icons.Default.Build
 }
@@ -88,7 +88,7 @@ internal fun toolCategory(model: NexusModel): String? {
         CatalogWorkflow.MOTION in tasks -> "Movimiento y pose"
         CatalogWorkflow.LIPSYNC in tasks -> "Sincronización labial"
         CatalogWorkflow.EXTEND in tasks -> "Extender vídeo"
-        CatalogWorkflow.UPSCALE in tasks -> if(Modality.VIDEO in model.modalities) "Mejorar vídeo" else "Mejorar imagen"
+        CatalogWorkflow.UPSCALE in tasks -> if(Modality.VIDEO in model.modalities) "Upscale vídeo" else "Upscale imagen"
         tasks.any {it in setOf(CatalogWorkflow.INPAINT,CatalogWorkflow.OUTPAINT,CatalogWorkflow.LAYERS,CatalogWorkflow.REMOVE_BACKGROUND)} -> "Edición de imagen"
         CatalogWorkflow.EDIT_IMAGE in tasks && CatalogWorkflow.CREATE_IMAGE !in tasks -> "Edición de imagen"
         CatalogWorkflow.EDIT_VIDEO in tasks -> "Edición de vídeo"
