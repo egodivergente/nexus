@@ -34,6 +34,8 @@ class FlowBridgeProvider(
             com.vidadomu.nexus.agent.core.config.RuleScope(provider = "google_flow")) } ?: 20
     })
     private val queue = context?.getSharedPreferences("flow_queue_v1", android.content.Context.MODE_PRIVATE)
+    /** Explicit model/aspect/seconds/frames through the verified contract on AXELPC (see [FlowDirect]). */
+    val direct = FlowDirectClient(client, secureStorage)
     private val queueLock = kotlinx.coroutines.sync.Mutex()
 
     override val id: String = PROVIDER_ID
@@ -49,6 +51,7 @@ class FlowBridgeProvider(
         bridgeStatus().map { it.isReady }
 
     override suspend fun submitGeneration(request: GenerationRequest): Result<GenerationJob> = withContext(Dispatchers.IO) {
+        if (request.parameters[FlowDirect.ROUTE] == FlowDirect.DIRECT) return@withContext submitDirect(request)
         val flowMode = if(request.modality==Modality.VIDEO) request.parameters["mode"] ?: "Texto" else "Referencias"
         val flowInputs = try { FlowReferences.inputs(request.mediaInputs, if (request.modality == Modality.VIDEO) flowMode else null) } catch (error: IllegalArgumentException) {
             return@withContext Result.failure(ProviderError(error.message ?: "Revisa las referencias de Flow.", httpStatusCode = 400))
@@ -88,6 +91,7 @@ class FlowBridgeProvider(
         if (job.status in setOf(GenerationStatus.COMPLETED, GenerationStatus.FAILED, GenerationStatus.CANCELLED)) {
             return@withContext Result.success(job)
         }
+        if (job.providerJobId?.startsWith(FlowDirect.JOB_PREFIX) == true) return@withContext pollDirect(job)
         if (job.providerJobId?.startsWith("queue_") == true && queue != null) return@withContext queueLock.withLock {
             val previous = job.parameters["__flow_queue_previous"].orEmpty()
             if (previous.isNotBlank() && queue.getString("state_$previous", "") !in setOf("completed", "failed", "released")) {
@@ -197,6 +201,91 @@ class FlowBridgeProvider(
         } catch (error: Exception) {
             Result.failure(if (error is ProviderError) error else ProviderError("No se pudo recuperar el resultado de Flow todavía."))
         }
+    }
+
+    private suspend fun submitDirect(request: GenerationRequest): Result<GenerationJob> {
+        val p = request.parameters
+        p[FlowDirect.SOURCE]?.let { source ->
+            // Flow's own processing of an existing result (2K/4K, 1080p/4K): a new job, its credits accepted by the user.
+            val resolution = p[FlowDirect.RESOLUTION] ?: return Result.failure(ProviderError("Elige la resolución que ofrece Flow."))
+            val quoted = p[FlowDirect.COST] ?: return Result.failure(ProviderError("Consulta el importe de Flow antes de continuar."))
+            val requestId = FlowDirect.requestId(request.id)
+            return direct.process(request.modality == Modality.VIDEO, source, resolution, requestId, quoted.toIntOrNull()).map { remote ->
+                GenerationJob(id = request.id, providerJobId = FlowDirect.JOB_PREFIX + requestId, providerId = id, modelId = request.modelId,
+                    modality = request.modality, prompt = request.prompt, parameters = request.parameters,
+                    status = directStatus(remote), progress = 0.2f, completedAt = if (remote.status == "failed") System.currentTimeMillis() else null,
+                    error = directMessage(remote), technicalDetails = "Descarga procesada por Flow · $resolution · origen $source")
+            }
+        }
+        val mode = p[FlowDirect.MODE] ?: return Result.failure(ProviderError("Elige el modo de Flow."))
+        val classic = when (mode) { "i2v" -> "Fotogramas"; "r2v" -> "Referencias"; "t2v" -> "Texto"; else -> null }
+        val inputs = try { FlowReferences.inputs(request.mediaInputs, classic) } catch (error: IllegalArgumentException) {
+            return Result.failure(ProviderError(error.message ?: "Revisa las imágenes de Flow.", httpStatusCode = 400))
+        }
+        val selection = FlowDirectSelection(
+            model = p[FlowDirect.MODEL] ?: return Result.failure(ProviderError("Elige un modelo de Flow.")),
+            mode = mode, aspect = p[FlowDirect.ASPECT] ?: "16:9",
+            durationSeconds = p[FlowDirect.DURATION]?.toIntOrNull(), resolution = p[FlowDirect.RESOLUTION]?.takeIf { it.isNotBlank() },
+            count = p[FlowDirect.COUNT]?.toIntOrNull() ?: 1,
+            initialFrameId = inputs.initialFrame, endFrameId = inputs.endFrame,
+            referenceIds = if (mode == "r2v" || mode == "t2i") inputs.references else emptyList())
+        // The amount the user saw and accepted. The bridge re-quotes and refuses the job if it changed.
+        val quoted = p[FlowDirect.COST] ?: return Result.failure(ProviderError("Consulta el importe de Flow antes de generar."))
+        val requestId = FlowDirect.requestId(request.id)
+        return direct.submit(selection, request.prompt, requestId, quoted.toIntOrNull()).map { remote ->
+            GenerationJob(id = request.id, providerJobId = FlowDirect.JOB_PREFIX + requestId, providerId = id, modelId = request.modelId,
+                modality = request.modality, prompt = request.prompt, negativePrompt = request.negativePrompt,
+                parameters = request.parameters + mapOf(FlowReferences.PARAMETER to inputs.references.joinToString(","),
+                    FlowReferences.INITIAL_FRAME to inputs.initialFrame.orEmpty(), FlowReferences.END_FRAME to inputs.endFrame.orEmpty()),
+                inputMediaUri = request.mediaInputs.firstOrNull()?.uriString,
+                status = directStatus(remote), progress = if (remote.status == "completed") 0.9f else 0.2f,
+                completedAt = if (remote.status == "failed") System.currentTimeMillis() else null,
+                error = directMessage(remote), technicalDetails = directDetails(selection, quoted))
+        }
+    }
+
+    private suspend fun pollDirect(job: GenerationJob): Result<GenerationJob> {
+        val requestId = requireNotNull(job.providerJobId).removePrefix(FlowDirect.JOB_PREFIX)
+        val remote = direct.status(requestId).getOrElse { return Result.failure(it) }
+        if (remote.status != "completed") return Result.success(job.copy(status = directStatus(remote),
+            completedAt = if (remote.status == "failed") System.currentTimeMillis() else null, error = directMessage(remote)))
+        val destination = AlexiaBridge.getNexusFolderForModality(job.modality)
+        val outputs = job.outputs.toMutableList()
+        remote.outputs.forEachIndexed { index, path ->
+            val outputId = "${job.id}_flowd_$index"
+            if (outputs.firstOrNull { it.id == outputId }?.localUri?.let(::hasUsableLocalFile) == true) return@forEachIndexed
+            val file = direct.media(path, destination, "Flow-${requestId.take(12)}").getOrElse { error ->
+                return Result.success(job.copy(status = GenerationStatus.PROCESSING, outputs = outputs,
+                    error = "${error.message.orEmpty()} El resultado está en Flow; se volverá a copiar sin generar."))
+            }
+            outputs.removeAll { it.id == outputId }
+            outputs += GenerationOutput(id = outputId, jobId = job.id, type = job.modality, url = "flow-direct://$requestId/$index",
+                localUri = Uri.fromFile(file.file).toString(), mimeType = file.mimeType, width = remote.width, height = remote.height,
+                durationSeconds = remote.durationSeconds?.toFloat())
+        }
+        return Result.success(job.copy(status = GenerationStatus.COMPLETED, progress = 1f, completedAt = System.currentTimeMillis(),
+            outputs = outputs, error = null))
+    }
+
+    private fun directStatus(remote: FlowDirectJob): GenerationStatus = when (remote.status) {
+        "completed" -> GenerationStatus.PROCESSING
+        "failed" -> GenerationStatus.FAILED
+        else -> GenerationStatus.GENERATING
+    }
+
+    private fun directMessage(remote: FlowDirectJob): String? = when (remote.status) {
+        "completed" -> "Copiando el resultado de Flow…"
+        "failed" -> (remote.error ?: "Flow no completó la generación.") +
+            if (remote.uncertain) " No se ha reintentado: comprueba el trabajo antes de repetir." else ""
+        else -> "Flow está generando. No se reenvía al consultar."
+    }
+
+    private fun directDetails(selection: FlowDirectSelection, quoted: String): String = buildString {
+        append(FlowDirect.modelLabel(selection.model)).append(" · ").append(FlowDirect.modeLabel(selection.mode))
+        append(" · ").append(selection.aspect)
+        selection.durationSeconds?.let { append(" · ").append(it).append(" s") }
+        if (selection.count > 1) append(" · ×").append(selection.count)
+        append("\nImporte confirmado: ").append(if (quoted == "0") "incluido en tu cuenta Flow" else if (quoted == "null") "no expuesto por Flow" else "$quoted créditos")
     }
 
     /** Flow does not expose a reliable cancellation action through this private bridge. */
