@@ -112,7 +112,9 @@ internal fun ActiveFilterChips(filters: List<ActiveFilter>, onClear: () -> Unit)
 }
 
 /** «Precios desde» only names a unit when every visible model shares one real modality. */
-internal fun catalogPriceNote(models: List<com.vidadomu.nexus.core.model.NexusModel>): String? {
+/** [anyPrice]: at least one shown route has a real published price; otherwise «Precios desde» would announce nothing. */
+internal fun catalogPriceNote(models: List<com.vidadomu.nexus.core.model.NexusModel>, anyPrice: Boolean = true): String? {
+    if (!anyPrice) return null
     val modalities = models.flatMap { it.modalities }.toSet()
     return when (modalities) {
         setOf(com.vidadomu.nexus.core.model.Modality.VIDEO) -> "Precios desde · por 5 s"

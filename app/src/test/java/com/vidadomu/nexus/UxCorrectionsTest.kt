@@ -137,6 +137,7 @@ class UxCorrectionsTest {
         assertEquals("Precios desde · por imagen", catalogPriceNote(listOf(image)))
         assertNull(catalogPriceNote(listOf(video, image)))
         assertNull(catalogPriceNote(emptyList()))
+        assertNull(catalogPriceNote(listOf(video, video), anyPrice = false))
     }
 
     @Test fun everyToolCategoryHasItsOwnFunctionalIcon() {

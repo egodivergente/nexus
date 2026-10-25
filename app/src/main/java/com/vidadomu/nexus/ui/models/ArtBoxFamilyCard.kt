@@ -51,21 +51,28 @@ import com.vidadomu.nexus.core.model.*
         IconButton(onClick=onOptions,modifier=Modifier.align(Alignment.TopEnd).size(40.dp)) {
             Icon(Icons.Default.MoreVert,"Opciones de ${section.family}",Modifier.size(18.dp),tint=colors.onSurfaceVariant.copy(alpha=.7f))
         }
-        Column(Modifier.fillMaxWidth().heightIn(min=if(toolCategory) 156.dp else 132.dp).padding(horizontal=6.dp,vertical=12.dp),
-            horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp,Alignment.CenterVertically)) {
+        // One fixed height for every card (families and tools): no row grows because of one long name, and short names
+        // no longer leave a blank third line between the name and the count (revision video 1, 11:22; video 2, 02:49).
+        Column(Modifier.fillMaxWidth().height(ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
+            horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             val labels=rememberCatalogLabels()
-            CatalogGlyph("family:"+section.family,60.dp,labels) {size ->
+            CatalogGlyph("family:"+section.family,ArtBoxCardMetrics.logo,labels) {size ->
                 if(toolCategory) {
                     Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
                         Icon(toolCategoryIcon(section.family),null,Modifier.size(size*.57f),tint=colors.primary)
                     }
                 } else BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=size,bare=true)
             }
-            Text(title,style=MaterialTheme.typography.titleSmall,minLines=3,maxLines=3,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
+            Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
             Text(count,style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,maxLines=1)
         }
         }
     }
+}
+
+internal object ArtBoxCardMetrics {
+    val height = 148.dp
+    val logo = 64.dp
 }
 
 /** Functional symbol per category; brand logos stay for providers only. */

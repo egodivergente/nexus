@@ -232,7 +232,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
                 if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
-                val priceNote=catalogPriceNote(if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes})
+                val priceRoutes=if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes}
+                val priceNote=catalogPriceNote(priceRoutes,anyPrice=priceRoutes.any {(referencePrice(it) ?: 0.0)>0.0})
                 if(priceNote!=null) item(span={GridItemSpan(maxLineSpan)}) {
                     Text(priceNote,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
@@ -345,15 +346,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     }
     contextTarget?.let { (key,label,model) ->
         val itemKey=if(model==null) label else groups.firstOrNull {groupVisibilityKey(it.routes.first())==key}?.key
-        val (moveUp,moveDown)=itemKey?.let {reorderActions(it)} ?: (null to null)
         val labelKey=if(model==null) "family:$label" else "group:$itemKey"
         val targetGroup=if(model==null) null else groups.firstOrNull {it.key==itemKey}
         val originalDescription=targetGroup?.let {g -> CatalogFocus.forModel(g.routes.first())?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(g.routes)}.orEmpty()
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(labels.name(labelKey,label))},text={Column {
             TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Personalizar icono, nombre y tamaño")}
             Text("Para mover una tarjeta, mantenla pulsada y arrástrala.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
-            moveUp?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Subir un puesto")}}
-            moveDown?.let {action -> TextButton(onClick={action();contextTarget=null}) {Text("Bajar un puesto")}}
+            // Order changes by long-press + drag; up/down stay only as TalkBack actions on each card.
             TextButton(onClick={
                 if(itemKey!=null) saveOrder(listOf(itemKey)+(savedOrder+displayedKeys).distinct().filterNot {it==itemKey})
                 contextTarget=null
