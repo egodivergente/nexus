@@ -1,0 +1,13 @@
+{
+  "version": "1.9.6-agent-desktop",
+  "baseDesktopCommit": "631aa29",
+  "reviewedAndroidCommit": "3b6082cecde9fe37c3bc4b642f7c9114dc62bdaf",
+  "relationship": "Selective adaptation, NOT complete Android source parity",
+  "files": {
+    "core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt": "99e960f710d4b0366cb4cf4f1fc186f009f7cfb977c2041200aa15c91cf190fa",
+    "core/src/main/kotlin/com/vidadomu/nexus/agent/core/skills/Skills.kt": "669d4070ea726095c48c1814dd3247a81a2ffb480bd4e13fcba1f6a18ba284df",
+    "core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt": "20e00f98aebe0d0ab7ad0b7a3454776be4905d157fcd2fceeb24153ed8af20e1",
+    "src/main/kotlin/DesktopAgent.kt": "b35454b320d6f9d9b3b32135cb6234fda17c7274270ccbf5f8a842ac435d5607",
+    "src/main/kotlin/DesktopMarkdown.kt": "3da32f76565b7b5c5c2c538695b0ccacdc74e9fd84f686c41ff8ea6e05216376"
+  }
+}

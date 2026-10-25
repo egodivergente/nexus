@@ -1,0 +1,29 @@
+/* Catalogue parity: uniform, density-aware cards. Colours come from the active theme tokens. */
+.catalog[data-density]{--catalog-card-min:260px;--catalog-logo:30px;--catalog-desc-lines:3}
+.catalog[data-density="compact"]{--catalog-card-min:205px;--catalog-logo:24px;--catalog-desc-lines:0}
+.catalog[data-density="spacious"]{--catalog-card-min:330px;--catalog-logo:42px;--catalog-desc-lines:4}
+body .catalog[data-density],body.nx-desktop .catalog[data-density],body.nexus-agent-studio .catalog[data-density]{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--catalog-card-min),100%),1fr))!important;align-items:stretch}
+.catalog[data-density] .model{display:flex;flex-direction:column;height:100%;min-width:0}
+.catalog[data-density] .model .top{align-items:center;min-height:calc(var(--catalog-logo) + 4px)}
+.catalog[data-density] .model .top .logo,.catalog[data-density] .model .top .initial,.catalog[data-density] .model .top .generic-mark{width:var(--catalog-logo)!important;height:var(--catalog-logo)!important;flex:0 0 var(--catalog-logo);object-fit:contain}
+.catalog[data-density] .model .top h3{white-space:normal!important;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.3;min-height:2.6em}
+.catalog[data-density] .model .description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--catalog-desc-lines);overflow:hidden;min-height:calc(var(--catalog-desc-lines) * 1.55em);line-height:1.55}
+.catalog[data-density] .model .description.decision-brief{min-height:calc(var(--catalog-desc-lines) * 1.55em)}
+.catalog[data-density="compact"] .model .description{display:none}
+.catalog[data-density] .model .card-meta{margin-top:auto;min-height:1.6em}
+.catalog[data-density] .model .price{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model .price[data-price-state="unknown"],.model .price[data-price-state="unconfirmed"],.model .price[data-price-state="mixed"],.guide-cost[data-price-state="unknown"],.guide-cost[data-price-state="unconfirmed"]{color:var(--muted);font-weight:500}
+.catalog-summary{flex-wrap:wrap;gap:8px}
+.catalog-density{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:999px;margin-left:auto}
+.catalog-density button{border:0!important;background:transparent!important;border-radius:999px!important;min-height:26px;padding:0 10px!important;color:var(--muted)}
+.catalog-density button.active{background:color-mix(in srgb,var(--accent) 16%,transparent)!important;color:var(--text)}
+.catalog-hidden-panel{max-width:760px;margin:6px 0 24px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.catalog-hidden-panel h2{margin:0 0 4px;font-size:16px}.catalog-hidden-panel h3{margin:16px 0 6px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.catalog-hidden-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.catalog-hidden-panel ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.catalog-hidden-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--text) 3%,transparent)}
+.catalog-hidden-logo .logo,.catalog-hidden-logo .initial,.catalog-hidden-logo .generic-mark{width:28px;height:28px;object-fit:contain;display:inline-flex}
+.catalog-hidden-text{min-width:0;display:grid}.catalog-hidden-text strong,.catalog-hidden-text small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.catalog-hidden-text small{color:var(--muted)}
+.catalog-undo{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:12px;background:var(--surface-3,var(--panel));color:var(--text);border:1px solid var(--line);box-shadow:0 10px 30px #0006;font-size:12.5px;animation:catalog-undo-in .18s ease-out}
+@keyframes catalog-undo-in{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (prefers-reduced-motion:reduce){.catalog-undo{animation:none}}

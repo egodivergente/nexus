@@ -1,3 +1,7 @@
+# Actualización Desktop 1.9.6-agent-desktop · 25/10/2026
+
+Actualización selectiva de conversaciones, catálogo y núcleo compartido. No implica paridad completa con Android 1.9.77. Ver [alcance, procedencia y pruebas](../docs/DESKTOP-UPDATE-20261025.md). Los apartados siguientes son históricos.
+
 # Edición actual: Nexus Studio 1.9.3
 
 La fuente actual está unificada en `main`. Consulta [biblioteca/PDF/visor](../docs/DESKTOP-LIBRARY-PDF-193.md),

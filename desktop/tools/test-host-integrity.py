@@ -210,15 +210,15 @@ class IntegrityTests(unittest.TestCase):
             self.assertEqual(jobs_by_id['job-1'].get('status'), 'PROCESSING')
             self.assertEqual(jobs_by_id['job-2'].get('status'), 'PROCESSING')
 
-    def test_installation_root_check_rejects_documents_chatgpt_nexus_and_reports_194(self):
+    def test_installation_root_check_rejects_documents_chatgpt_nexus_and_reports_current_version(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)), patch.object(host, 'OFFLINE_QA', True):
             self.assertFalse(host.is_same_installation_root({}, host.ROOT))
             self.assertFalse(host.is_same_installation_root({'root': r'C:\Users\User\Documents\ChatGPT\NEXUS\desktop'}, host.ROOT))
             self.assertTrue(host.is_same_installation_root({'root': str(host.ROOT)}, host.ROOT))
             info = host.dispatch({}, 'init', {})
-            self.assertEqual(info.get('version'), '2026.10.20-device-continuity.2')
+            self.assertEqual(info.get('version'), '2026.10.26-desktop-modern.1')
 
-    def test_startup_onboarding_includes_official_logo_and_version_195(self):
+    def test_startup_onboarding_includes_official_logo_and_version_196(self):
         ui_root = host.ROOT / 'ui'
         logo_path = ui_root / 'branding' / 'nexus-logo.png'
         self.assertTrue(logo_path.is_file())
@@ -226,7 +226,7 @@ class IntegrityTests(unittest.TestCase):
         design_js = (ui_root / 'desktop-design.js').read_text(encoding='utf-8')
         self.assertIn('nx-startup-onboarding', design_js)
         self.assertIn('branding/nexus-logo.png', design_js)
-        self.assertIn('2026.10.19-corte-preview.4', design_js)
+        self.assertIn('2026.10.26-desktop-modern.1', design_js)
         self.assertIn('data-nx-version', design_js)
 
 

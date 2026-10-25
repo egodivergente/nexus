@@ -3,10 +3,14 @@ package com.vidadomu.nexus.agent.core.assets
 import java.io.File
 import java.text.Normalizer
 import java.util.UUID
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -151,10 +155,14 @@ data class AssetQuery(
  * Índice de proyectos/escenas/planos/personajes/assets/generaciones. Persistido en un JSON propio con
  * escritura atómica: no modifica nexus.db ni mueve archivos, así que es reversible por completo.
  */
-class AssetIndex(private val file: File?, private val clock: () -> Long = System::currentTimeMillis) {
+class AssetIndex(
+    private val file: File?,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val persistContext: CoroutineContext = Dispatchers.IO,
+) {
 
     private val mutex = Mutex()
-    private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
+    @Volatile private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
 
     private val mutableChanges = MutableStateFlow(data)
     val changes = mutableChanges.asStateFlow()
@@ -233,9 +241,13 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
-        persist(next)
-        data = next
-        mutableChanges.value = next
+        // The blocking write runs off the caller's thread. Publishing happens inside the same non-cancellable block:
+        // a cancellation arriving after the file was replaced must not leave memory behind the disk.
+        withContext(persistContext + NonCancellable) {
+            persist(next)
+            data = next
+            mutableChanges.value = next
+        }
         result
     }
 

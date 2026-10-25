@@ -1,6 +1,6 @@
 'use strict';
 // Presentation only: keep the existing catalogue, dispatch and confirmation paths.
-const DesktopDesign={version:'2026.10.19-corte-preview.4',ready:false};
+const DesktopDesign={version:'2026.10.26-desktop-modern.1',ready:false};
 const desktopThemeBefore=applyTheme;
 applyTheme=function(){desktopThemeBefore();document.body.classList.add('nx-desktop');};
 const desktopSpark='<img class="nexus-mark" src="branding/nexus-mark.png" alt="" width="20" height="20" aria-hidden="true">';
