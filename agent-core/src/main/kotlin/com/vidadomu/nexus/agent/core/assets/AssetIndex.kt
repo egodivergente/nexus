@@ -204,7 +204,9 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
-        persist(next)
+        // Serializing the whole index and fsync-ing it ran on the caller's thread: edits started from the UI froze the
+        // main thread for seconds at start-up (Pixel 8 Pro trace, 25/10/2026). Same lock, same atomic write, on IO.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { persist(next) }
         data = next
         mutableChanges.value = next
         result

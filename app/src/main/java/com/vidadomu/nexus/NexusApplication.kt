@@ -115,6 +115,10 @@ class NexusApplication : Application() {
         settingsRepository = SettingsRepository(secureStorage, providerRegistry, currencyManager)
         ready.complete(Unit)
         com.vidadomu.nexus.assistant.BytePlusConsumption.get(this).schedule()
+        // The agent runtime (skills, asset index, registries) took ~1 s to build on the main thread when the chat
+        // ViewModel first asked for it. Building it here in the background lets the first frame draw meanwhile;
+        // AssistantRuntime.get is synchronized, so the ViewModel simply reuses the instance.
+        CoroutineScope(Dispatchers.Default).launch { runCatching { com.vidadomu.nexus.assistant.AssistantRuntime.get(this@NexusApplication) } }
 
         // Asynchronously check and refresh currency rate on startup
         CoroutineScope(Dispatchers.IO).launch {

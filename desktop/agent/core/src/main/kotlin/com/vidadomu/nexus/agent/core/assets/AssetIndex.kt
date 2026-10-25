@@ -161,7 +161,8 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
-        persist(next)
+        // Same as agent-core: never serialize and fsync the whole index on the caller's thread.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { persist(next) }
         data = next
         mutableChanges.value = next
         result

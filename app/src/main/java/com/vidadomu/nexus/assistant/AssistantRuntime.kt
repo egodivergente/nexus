@@ -502,7 +502,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     /** Indexa (sin tocar nexus.db ni archivos) las creaciones ya terminadas, para buscarlas por prompt/modelo. */
     private val importLock = kotlinx.coroutines.sync.Mutex()
 
-    suspend fun importHistory(): Int = importLock.withLock { importHistoryLocked() }
+    /** Walks every finished job and the asset index: never on the caller's (often the main) thread. */
+    suspend fun importHistory(): Int = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { importLock.withLock { importHistoryLocked() } }
 
     private suspend fun importHistoryLocked(): Int {
         var added = 0

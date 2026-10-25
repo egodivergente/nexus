@@ -176,7 +176,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             chatsReady.complete(Unit)
             refreshConversations()
             if(_ui.value.activeProjectId==null) { _ui.update {it.copy(activeProjectId=project)};runtime.settings.setActiveProject(project);conversation.session.activeProjectId=project }
-            runCatching { runtime.assets.startProjectSession(project); runtime.importHistory() }; refreshProjects()
+            withContext(Dispatchers.IO) { runCatching { runtime.assets.startProjectSession(project); runtime.importHistory() } }; refreshProjects()
         }
         viewModelScope.launch { runtime.assets.changes.collect { refreshProjects() } }
         viewModelScope.launch { runtime.skillsRevision.collect {
@@ -185,7 +185,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _ui.update { it.copy(settings = settings, skillsCount = runtime.skills.all().size, skillErrors = runtime.skills.errors) }
         } }
         viewModelScope.launch { app.modelCatalogRepository.models.collect { models ->
-            _ui.update { it.copy(catalog = (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary)) }
+            // Summarizing hundreds of models is CPU work: keep it off the main thread.
+            val catalog = withContext(Dispatchers.Default) { (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary) }
+            _ui.update { it.copy(catalog = catalog) }
         } }
         removeOrderListener = runtime.orders.onChange { publishOrders() }
         publishOrders()
