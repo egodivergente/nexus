@@ -51,9 +51,10 @@ import com.vidadomu.nexus.core.model.*
         IconButton(onClick=onOptions,modifier=Modifier.align(Alignment.TopEnd).size(40.dp)) {
             Icon(Icons.Default.MoreVert,"Opciones de ${section.family}",Modifier.size(18.dp),tint=colors.onSurfaceVariant.copy(alpha=.7f))
         }
-        // One fixed height for every card (families and tools): no row grows because of one long name, and short names
-        // no longer leave a blank third line between the name and the count (revision video 1, 11:22; video 2, 02:49).
-        Column(Modifier.fillMaxWidth().height(ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
+        // Same structure and minimum height for every card (families and tools): logo, a two-line title and the count.
+        // Short names no longer leave a blank third line (revision video 1, 11:22; video 2, 02:49). A minimum, not a
+        // fixed height: with bold or larger system text (Pixel 8 Pro, 25/10) a fixed height clipped the count.
+        Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             val labels=rememberCatalogLabels()
             CatalogGlyph("family:"+section.family,ArtBoxCardMetrics.logo,labels) {size ->
