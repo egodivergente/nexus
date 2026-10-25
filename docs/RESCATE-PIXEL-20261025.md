@@ -45,23 +45,62 @@ Estados usados: `comprobado`, `corregido y probado`, `implementado sin probar`, 
 
 ## 5. Otras correcciones de la auditoría
 
+Estados según la sección 15 del encargo.
+
 | ID | Incidencia (vídeo) | Corrección | Commit | Estado |
 |---|---|---|---|---|
-| A-1 | Long-press falla / menú distinto según zona (V1 03:46, 06:56) | `messageLongPress` en fase Initial, cancelable por desplazamiento | `6555e21` | implementado sin probar |
-| A-2 | Mensajes largos del usuario sin plegar (V1 01:54) | Plegado a 8 líneas con «Expandir»/«Contraer»; respuestas nunca se pliegan | `6555e21` | implementado sin probar |
+| A-1 | Long-press falla / menú distinto según zona (V1 03:46, 06:56) | `messageLongPress` en fase Initial, cancelable por desplazamiento | `6555e21` | **comprobado en Pixel** en respuestas (menú del mensaje sobre el texto); en burbuja del usuario pendiente de repetir (la conexión cayó durante la prueba) |
+| A-2 | Mensajes largos del usuario sin plegar (V1 01:54) | Plegado a 8 líneas con «Expandir»/«Contraer» | `6555e21` | **comprobado en Pixel** (aparece «Expandir») |
 | A-3 | Vídeo sin Play cómodo (V1 03:46) | Portada + Play de 60 dp; reproductor creado al pulsar | `65302ed` | implementado sin probar |
-| A-4 | Micrófono «No lo he entendido» | El texto lo muestra el reconocedor del sistema; se dejó de forzar el modo sin conexión | `2574702` | implementado sin probar (requiere voz humana) |
-| A-5 | Renombrar a «Upscale imagen/vídeo» (V2 01:09) | Renombrado con migración de claves guardadas | `0eb1e67` | implementado sin probar |
-| A-6 | «Desde» sin precio | Solo precios reales > 0; sin nota «Precios desde» si nada tiene tarifa | `a9358ee`, `7f6d537` | implementado sin probar |
-| A-7 | Tarjetas con huecos (V1 11:22, V2 02:49) | Altura única 148 dp, título de 2 líneas, logo 64 dp | `7f6d537` | implementado sin probar |
-| A-8 | Botones Subir/Bajar (V1 11:22) | Eliminados del diálogo; quedan como acciones de TalkBack | `7f6d537` | implementado sin probar |
+| A-4 | Micrófono «No lo he entendido» | Sin forzar modo sin conexión (el texto es del reconocedor del sistema) | `2574702` | implementado sin probar (requiere voz humana) |
+| A-5 | «Upscale imagen/vídeo» (V2 01:09) | Renombrado + migración de claves guardadas | `0eb1e67` | implementado sin probar |
+| A-6 | «Desde» sin precio | Solo precios reales > 0; sin nota sin tarifas | `a9358ee`, `7f6d537` | **comprobado en Pixel** (desaparece la nota sin red) |
+| A-7 | Tarjetas con huecos (V1 11:22, V2 02:49) | Estructura y altura mínima comunes (148 dp), título 2 líneas, logo 64 dp | `7f6d537`, `16b5d69` | **comprobado en Pixel** (evidencia 07) |
+| A-8 | Botones Subir/Bajar (V1 11:22) | Fuera del diálogo; quedan para TalkBack | `7f6d537` | **comprobado en Pixel** (evidencia 03) |
+| A-9 | Tirador central (V1 05:37) y compositor alto (V1 01:54) | Asa de 24x4 dp en el borde del compositor; libera una fila de 48 dp | `ed73a3e` | implementado sin probar |
+| A-10 | Iconos de cabecera sobre el texto (V1 08:48) | Degradado corto bajo los iconos | `ed73a3e` | implementado sin probar |
+| A-11 | «Gestionar» en el selector de archivos (V1 04:24) | Barra contextual: Adjuntar · ZIP · Quitar; «Marcar todo» | `159f3ba` | implementado sin probar |
+| A-12 | Editar foto desde Biblioteca (V2 01:42) | «Editar foto» abre el editor local con la imagen; sin botón grande de máscaras | `9cc5b07` | implementado sin probar |
+| A-13 | Títulos de conversación (V1 08:48) | Automático limpio + nombre editable aparte del historial | `b8215c4` | implementado sin probar |
+| A-14 | ArtBox abre Herramientas (V1 10:01) | Herramientas no se restaura al entrar; se recuerda Vídeo/Imagen | `84e4e14` | implementado sin probar |
+| A-15 | Gestos que sacan de la app (V1 00:31) | Atrás desde otra pestaña vuelve a Agente | `c3c5be5` | implementado sin probar |
 
-## 6. Google Flow — diagnóstico
+### Rendimiento de arranque (medido en el Pixel, `am start -W`, código compilado AOT)
 
-- El servidor del puente (`tools/flow-linux-probe/recovery.py`, `POST /api/flow/jobs`) solo lee prompt, tipo, lotes y referencias. **Ignora `mode`, `initialFrameId` y `endFrameId`** que Android envía y no tiene proporción, duración ni modelo: por eso los selectores no aplican nada.
-- El contrato verificado de Desktop (`desktop/flow_contract.py`) fija los valores reales: vídeo 16:9/9:16; 4/6/8 s (Omni 4–10 s; Veo Quality y referencias 8 s); 720p nativo; mejoras de descarga como operación aparte.
-- Upscale no está en la UI de Flow (comprobado por búsqueda en `ui/flow`).
+| Versión | TotalTime | Máx. frames saltados tras el primer frame |
+|---|---|---|
+| 1.9.76 (línea base) | 2.564 ms | ~250 |
+| 1.9.77 primeras correcciones | 1.627 ms | ~184 |
+| 1.9.77 + caché de skills (`4fb64b1`) | **857 ms** | 93 |
+
+Perfiles de muestreo ART: `C:\Users\User\nexus-build-out\pixel-qa-20261025\startup-1977*.trace`. Causas eliminadas del hilo principal: escritura completa del índice de recursos (`AssetIndex.persist` + fsync), `importHistory`, construcción de `AssistantRuntime` (parseo YAML de ~400 skills) y resumen del catálogo.
+
+### Tests
+
+- `agent-core`: 323 tests, 0 fallos (incluye `SkillParseCacheTest`).
+- `app` (`testAgentPreviewUnitTest`): 728 tests, 0 fallos, en la compilación `16b5d69`. Los commits posteriores (Flow directo, títulos, selector, editor, navegación) **aún no se han compilado**: AXELPC quedó desconectado del puente a las 06:01.
+- Puente Flow (`tools/flow-linux-probe/test_flow_direct.py`): 5 tests, 0 fallos.
+
+## 6. Google Flow
+
+### Diagnóstico
+- El servidor del puente del navegador (`recovery.py`, `POST /api/flow/jobs`) solo lee prompt, tipo, lotes y referencias: **ignora `mode`, `initialFrameId` y `endFrameId`** y no tiene proporción, duración ni modelo. Los selectores de Android no podían aplicar nada.
+- El contrato verificado de Desktop (`desktop/flow_contract.py`) fija los valores reales.
+
+### Solución implementada (pendiente de compilar y de instalar el puente)
+- Puente: rutas `/api/flow/direct/{capabilities,quote,jobs,jobs/{id},assets/{id}/options,media/{name}}` (`flow_direct.py`, `2f97e7c`) que reutilizan `flow_provider`/`flow_contract` de Desktop sobre el runtime gflow de AXELPC. Capacidades derivadas del contrato; cotización obligatoria y coste confirmado; ids idempotentes; recuperación sin reenvío; 2K/4K y 1080p/4K como descarga procesada por Flow, cotizada aparte.
+- Android (`75c3dc1`): tarjeta «Ajustes de Flow» (modelo, modo Texto / Inicio y fin / Referencias, 16:9 por defecto o 9:16, segundos válidos, ×1–4, huecos de inicio y fin); confirmación con el importe real antes de enviar; seguimiento y descarga a la Biblioteca; «Calidad desde Flow» en la hoja de descarga; la copia local solo reduce. Sin Upscale en Flow.
+- **Para activarlo**: copiar en `C:\Users\User\AppData\Local\NexusFlow\bridge\` los archivos `flow_direct.py`, `recovery.py` (actualizado) y, desde `desktop/`, `flow_provider.py`, `flow_contract.py`, `flow_batch.py`, `flow_automation.py`; reiniciar el puente.
+- **Prueba de aceptación** (generación real a 16:9 con inicio/fin y descarga 2K/4K): requiere tu autorización explícita por el coste.
 
 ## 7. Pendiente (lista honesta)
 
-Se completa conforme avanzan las pruebas en el Pixel.
+- Compilar y probar en el Pixel todo lo posterior a `16b5d69` (bloqueado: AXELPC desconectado).
+- Desplegar el puente con `flow_direct` en AXELPC y validar `capabilities`/`quote` sin generar.
+- Ajustes de Nexus con aspecto «WebView» (V2 00:52): requiere ver la pantalla en el Pixel.
+- Favoritos no operativos (V2 01:19) y colores de tarjeta no editables (V2 02:49): reproducir en el Pixel.
+- Logo Seedream (V1 11:22): el encargo prohíbe inventar logos; queda revisar el recurso actual y permitir el icono propio.
+- Micrófono: prueba de transcripción real en español con voz humana.
+- Desktop/Studio, Guardian/ASUSVIDAL y copia a Drive (P2): sin empezar.
+- P3 (captura S Pen, modo observación, inpainting de objetos nuevos): solo backlog, sin implementar.
+- Factor del sistema: las burbujas de app de Android 17 (Alexia) pueden dejar SystemUI atascado; no depende de Nexus.
