@@ -72,3 +72,22 @@ python <carpeta-extraida>/desktop/local_host.py --headless --offline-qa --data-d
 ```
 
 La activación en este equipo requiere cerrar Nexus de forma controlada y cambiar únicamente la carpeta versionada del lanzador local, manteniendo `usb_proxy.py` y la versión 1.9.4 para volver atrás. La carpeta nueva por sí sola no cambia la aplicación abierta.
+
+
+## Corrección del panel «Estado y consumo»
+
+El desplegable carecía de un cierre visible y no se ocultaba al pulsar fuera.
+Ahora incluye **Cerrar**, cierre por clic fuera y Escape con retorno del foco al
+control de apertura. Los diálogos de Telemetría conservan su propio cierre y
+regresan al panel sin ocultar el botón que recupera el foco. Su anchura respeta
+el espacio disponible incluso con la navegación expandida.
+
+Verificación adicional: `python desktop/tools/test-status-panel.py` supera
+**23 comprobaciones** en Edge con host real, perfil temporal y `--offline-qa`,
+incluyendo cuatro tamaños y navegación expandida/contraída. Cero errores JS y
+cero operaciones externas. Las **13 suites JavaScript** también pasan.
+La captura e informes están en `outputs/status-panel-20261025/` (locales).
+No se cambia el motor JVM, Sol, las claves, el chat ni los datos del usuario.
+El parche consta de `creative-engine.js` y `creative-engine.css`; sustituirlos
+con respaldo actualiza los recursos en disco, pero la ventana abierta necesita
+una recarga posterior. No recargar una sesión con operaciones en curso.
