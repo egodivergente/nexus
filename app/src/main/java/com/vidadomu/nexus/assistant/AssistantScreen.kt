@@ -833,39 +833,7 @@ internal fun AssistantMediaPreview(media: Attachment) {
     when {
         media.mimeType in setOf("text/html","application/pdf","text/csv","application/json","text/plain","text/markdown") -> AssistantDocumentPreview(media)
         media.mimeType.startsWith("image/") -> AssistantImagePreview(media)
-        media.mimeType.startsWith("video/") -> {
-            val player=remember(media.uri) {
-                ExoPlayer.Builder(context).build().apply {
-                    setMediaItem(MediaItem.fromUri(Uri.parse(media.uri)))
-                    prepare()
-                    playWhenReady=false
-                }
-            }
-            var ratio by remember(media.uri) { mutableStateOf(mediaAspectRatio(media.width, media.height)) }
-            var playbackError by remember(media.uri) { mutableStateOf(false) }
-            DisposableEffect(player) {
-                val listener = object : Player.Listener {
-                    override fun onVideoSizeChanged(size: androidx.media3.common.VideoSize) {
-                        ratio = mediaAspectRatio(size.width, size.height, size.pixelWidthHeightRatio, size.unappliedRotationDegrees)
-                    }
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { playbackError = true }
-                }
-                player.addListener(listener)
-                onDispose { player.removeListener(listener); player.release() }
-            }
-            Column(Modifier.widthIn(max = 280.dp)) {
-                AndroidView(
-                    factory={viewContext -> PlayerView(viewContext).apply {
-                        this.player=player; useController=true
-                        resizeMode=androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    }},
-                    update={it.player=player},
-                    modifier=Modifier.fillMaxWidth().aspectRatio(ratio ?: 1f).clip(NexusTokens.card),
-                )
-                if (playbackError) Text("No se pudo cargar el vídeo. Comprueba el archivo o vuelve a descargarlo.",
-                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
-            }
-        }
+        media.mimeType.startsWith("video/") -> ChatVideoPreview(media)
         media.mimeType.startsWith("audio/") -> {
             val player=remember(media.uri) {
                 ExoPlayer.Builder(context).build().apply { setMediaItem(MediaItem.fromUri(Uri.parse(media.uri))); prepare() }
@@ -1404,4 +1372,66 @@ private data class GroupHeader(val firstId: String, val count: Int)
 internal fun AssistantSettingsSheetHost(vm: AssistantViewModel, onDismiss: () -> Unit) {
     val ui by vm.ui.collectAsState()
     AssistantSettingsDialog(ui, vm, onDismiss)
+}
+
+/**
+ * Chat video: a poster frame with a large, always visible Play. The player is created only when the user taps Play
+ * (it used to prepare one ExoPlayer per video as soon as the conversation was drawn) and released when it leaves.
+ */
+@Composable
+private fun ChatVideoPreview(media: Attachment) {
+    val context = LocalContext.current
+    var active by remember(media.uri) { mutableStateOf(false) }
+    var ratio by remember(media.uri) { mutableStateOf(mediaAspectRatio(media.width, media.height)) }
+    var playbackError by remember(media.uri) { mutableStateOf(false) }
+    Column(Modifier.widthIn(max = 280.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(ratio ?: (16f / 9f)).clip(NexusTokens.card)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+            if (!active) {
+                coil.compose.AsyncImage(
+                    model = coil.request.ImageRequest.Builder(context).data(media.uri)
+                        .decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) }.build(),
+                    contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.matchParentSize())
+                Surface(onClick = { active = true; playbackError = false }, shape = androidx.compose.foundation.shape.CircleShape,
+                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = .55f), modifier = Modifier.size(60.dp)
+                        .semantics { contentDescription = "Reproducir vídeo" }) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(36.dp), tint = androidx.compose.ui.graphics.Color.White)
+                    }
+                }
+                media.durationSec?.let {
+                    Text(formatMediaDuration(it), Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space8)
+                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .55f), NexusTokens.filter)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White)
+                }
+            } else {
+                val player = remember(media.uri) {
+                    ExoPlayer.Builder(context).build().apply {
+                        setMediaItem(MediaItem.fromUri(Uri.parse(media.uri))); prepare(); playWhenReady = true
+                    }
+                }
+                DisposableEffect(player) {
+                    val listener = object : Player.Listener {
+                        override fun onVideoSizeChanged(size: androidx.media3.common.VideoSize) {
+                            ratio = mediaAspectRatio(size.width, size.height, size.pixelWidthHeightRatio, size.unappliedRotationDegrees) ?: ratio
+                        }
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) { playbackError = true; active = false }
+                    }
+                    player.addListener(listener)
+                    onDispose { player.removeListener(listener); player.release() }
+                }
+                AndroidView(
+                    factory = { viewContext -> PlayerView(viewContext).apply {
+                        this.player = player; useController = true; controllerAutoShow = true
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    } },
+                    update = { it.player = player },
+                    modifier = Modifier.matchParentSize())
+            }
+        }
+        if (playbackError) Text("No se pudo reproducir el vídeo. Comprueba el archivo o vuelve a descargarlo.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
 }
