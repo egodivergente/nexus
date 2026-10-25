@@ -1,6 +1,7 @@
 """Keyboard/rendering fixtures and real loopback restart. No inference requests."""
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -10,6 +11,9 @@ from playwright.sync_api import sync_playwright
 root = Path(__file__).resolve().parents[1]
 output = root.parent / 'outputs/assistant-reliability'
 data = output / 'isolated-data'
+# Start every run from an empty profile: a conversation left by an earlier run
+# would otherwise change Agent.items and make the keyboard checks order-dependent.
+shutil.rmtree(data, ignore_errors=True)
 data.mkdir(parents=True, exist_ok=True)
 process = None
 

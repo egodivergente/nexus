@@ -42,12 +42,12 @@
    const bar=el('footer','creative-status');bar.id='creative-status';bar.innerHTML='<details id="creative-control"><summary aria-label="Estado, saldos y telemetría" aria-controls="creative-control-panel"><span class="creative-health"></span><span id="creative-status-label">Conectando</span><span class="creative-status-chevron">⌃</span></summary><div id="creative-control-panel" class="creative-control-panel" role="region" aria-labelledby="creative-control-title"><div class="creative-control-heading"><h2 id="creative-control-title">Estado y consumo</h2><button type="button" id="creative-control-close" aria-label="Cerrar estado y consumo">Cerrar</button></div><p id="creative-local-status"></p><div id="creative-control-actions"></div></div></details><span id="creative-footer-hint" class="creative-footer-hint">Enter para enviar · Mayús+Enter nueva línea</span><button type="button" data-gallery="commands" class="creative-shortcut" title="Paleta de comandos (Ctrl+K)">Ctrl K</button>';$('main').append(bar);
   }
   const hint=$('#creative-footer-hint');
-  if(hint)text(hint,view==='assistant'?'Enter para enviar · Mayús+Enter otra línea':view==='canvas'?'Enter o Ctrl+Enter para generar · Shift+Enter otra línea':'Ctrl+K comandos rápidos');
+  if(hint)text(hint,view==='assistant'?'Enter para enviar · Mayús+Enter otra línea':view==='canvas'?'Enter o Ctrl+Enter para generar · Mayús+Enter otra línea':'Ctrl+K comandos rápidos');
   const panel=$('.creative-control-panel'),actions=$('#creative-control-actions');
   const balances=$('#account-balances');if(balances&&panel&&balances.parentElement!==panel)panel.insertBefore(balances,actions);
   ['telemetry-button','flow-control-button','order-latest','gallery-activity'].forEach(id=>{const b=$('#'+id);if(b&&actions&&b.parentElement!==actions)actions.append(b);});
   const count=initial?.configured?.length||0;
-  text($('#creative-status-label'),initial?.qa?'Laboratorio local':`Multi-Cloud · ${count} motores configurados`);
+  text($('#creative-status-label'),initial?.qa?'Laboratorio local':`${count} proveedor${count===1?'':'es'} configurado${count===1?'':'s'}`);
   text($('#creative-local-status'),$('#connection')?.textContent||'Estado local pendiente');
   document.body.classList.toggle('creative-canvas',view==='canvas');
  }
@@ -60,7 +60,7 @@
   if(loaded){const marker=el('span','nx-selected-label sr-only','MODELO');command.append(marker);}
   const input=el('div','creative-input');prompt.setAttribute('aria-label','Describe tu creación');prompt.placeholder='Describe la escena, iluminación, composición o movimiento…';prompt.rows=3;input.append(prompt);
   const chips=el('div','creative-chips');
-  const motor=el('button','creative-motor');motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?loaded.displayName:'Elegir motor';motor.title=loaded?loaded.displayName+' · Cambiar modelo':'Elegir modelo';chips.append(motor);
+  const motor=el('button','creative-motor');motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?loaded.displayName:'Elegir modelo';motor.title=loaded?loaded.displayName+' · Cambiar modelo':'Elegir modelo';chips.append(motor);
   const extras=el('details','creative-parameters','<summary>Más parámetros</summary><div class="creative-parameter-body"></div>');
   const parameterBody=extras.lastElementChild;
   source.querySelectorAll('[data-param]').forEach(control=>{
@@ -111,7 +111,7 @@
  const productionKey=()=>JSON.stringify(productionJobs().map(j=>[j.id,j.status,j.outputs]));
  function attach(id,fieldKey){
   const job=state.jobs.find(j=>j.id===id),output=job?.outputs?.[0],url=typeof output==='string'?output:output?.url;
-  if(!loaded||busy||job?.status!=='COMPLETED'||job.modality!=='IMAGE'||!isMediaUrl(url))return toast('Elige un motor compatible con referencias de imagen.');
+  if(!loaded||busy||job?.status!=='COMPLETED'||job.modality!=='IMAGE'||!isMediaUrl(url))return toast('Elige un modelo compatible con referencias de imagen.');
   const fields=loaded.fields.filter(f=>f.mime.startsWith('image'));
   const field=fieldKey?fields.find(f=>f.key===fieldKey):fields.length===1?fields[0]:null;
   if(!field)return toast(fields.length?'Suelta la imagen sobre la entrada de referencia que quieras usar.':'Este modelo no admite referencias de imagen.');

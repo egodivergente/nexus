@@ -21,6 +21,13 @@
  function historyItems(items){
   return (Array.isArray(items)?items:[]).filter(i=>i&&i.text&&ROLES.has(i.role)).map(i=>({role:i.role,text:i.text}));
  }
+ // Token usage arrives as «18128 entrada · 33 salida»; show it readable and in Spanish.
+ function usageText(usage){
+  if(usage&&typeof usage==='object')usage=`${Number(usage.input??usage.inputTokens)||0} entrada · ${Number(usage.output??usage.outputTokens)||0} salida`;
+  const text=String(usage??'');const match=text.match(/^(\d+) entrada · (\d+) salida$/);
+  if(!match)return text;const n=v=>Number(v).toLocaleString('es-ES');
+  return `Tokens: ${n(match[1])} de entrada · ${n(match[2])} de salida`;
+ }
  // Assistant answers are never folded: only the user's own long prompts fold.
  function messageMarkup(item,{escape=plainEscape,expanded=false}={}){
   const id=String(item.id),user=item.role==='user',textId='cc-text-'+id;
@@ -30,9 +37,10 @@
    `<div class="agent-text${user?' cc-fold-body':''}" id="${escape(textId)}">${body}</div>`+
    (user?`<button type="button" class="cc-fold-toggle" data-cc-fold="${escape(id)}" aria-controls="${escape(textId)}" aria-expanded="${expanded}"${expanded?'':' hidden'}>${expanded?'Contraer':'Expandir'}</button>`:'')+
    (item.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')+
-   (item.usage?`<small class="hint">${escape(item.usage)}</small>`:'')+
-   (item.failed?'<small class="hint">Envío no confirmado. Tu mensaje se conserva.</small>':'')+
-   `<div class="cc-actions" role="group" aria-label="Acciones del mensaje"><button type="button" class="cc-action" data-cc-copy="${escape(id)}" title="Copiar mensaje" aria-label="Copiar mensaje">${glyphs.copy}<span>Copiar</span></button><button type="button" class="cc-action" data-cc-select="${escape(id)}" title="Seleccionar el texto del mensaje" aria-label="Seleccionar texto">${glyphs.select}<span>Seleccionar</span></button></div></article>`;
+   (item.failed?`<div class="cc-failed" role="status"><span>Envío no confirmado. Tu mensaje se conserva.</span><button type="button" class="cc-retry" data-cc-retry="${escape(id)}">Reintentar</button></div>`:'')+
+   `<div class="cc-actions" role="group" aria-label="Acciones del mensaje">`+
+   (item.usage?`<details class="cc-usage"><summary>Detalles</summary><small>${escape(usageText(item.usage))}</small></details>`:'')+
+   `<button type="button" class="cc-action" data-cc-copy="${escape(id)}" title="Copiar mensaje" aria-label="Copiar mensaje">${glyphs.copy}<span>Copiar</span></button><button type="button" class="cc-action" data-cc-select="${escape(id)}" title="Seleccionar el texto del mensaje" aria-label="Seleccionar texto">${glyphs.select}<span>Seleccionar</span></button></div></article>`;
  }
  function archivePayload(conversation,{items,draft,attachments},id,now=Date.now()){
   return {...(conversation||{}),id,items,draft:draft||'',draftAttachments:attachments||[],updatedAt:now};
@@ -265,10 +273,32 @@
   announce(String(title||'').trim()?'Título actualizado.':'Título automático restablecido.');
  }
 
+ // Resend a message whose delivery was not confirmed. Another draft in the composer is never overwritten.
+ async function retry(id){
+  const index=Agent.items.findIndex(i=>String(i.id)===String(id)),item=Agent.items[index];
+  if(!item?.failed)return;
+  if(Agent.busy||Agent.generating)throw Error('Espera a que termine el mensaje actual.');
+  const draft=String(Agent.draft||'').trim();
+  if(draft&&draft!==String(item.text||'').trim())throw Error('Envía o borra primero el texto del campo de escritura. Tu borrador se conserva.');
+  const before={draft:Agent.draft,attachments:Agent.attachments.slice(),count:Agent.items.length-1};
+  Agent.items.splice(index,1);Agent.draft=item.text;Agent.error='';
+  if(!Agent.attachments.length&&Array.isArray(item.attachments))Agent.attachments=item.attachments.slice();
+  try{if(typeof sendAgent==='function')await sendAgent();}
+  finally{
+   // sendAgent can return early (offline, switching chat, busy): then nothing was resent, so the
+   // failed message goes back where it was, still offering Reintentar, and the composer is restored.
+   if(Agent.items.length===before.count&&!Agent.items.includes(item)){
+    Agent.items.splice(Math.min(index,Agent.items.length),0,item);
+    Agent.draft=before.draft;Agent.attachments=before.attachments;
+    if(view==='assistant'&&typeof renderAssistant==='function')renderAssistant();
+   }
+  }
+ }
  doc.addEventListener('click',async event=>{
   const button=event.target.closest?.('button');if(!button||button.disabled)return;
   const data=button.dataset;
   try{
+   if(data.ccRetry){button.disabled=true;try{await retry(data.ccRetry);}finally{if(button.isConnected)button.disabled=false;}return;}
    if(data.ccMenu){event.preventDefault();await runMenu(data.ccMenu);return;}
    if(data.ccFold){const article=button.closest('.agent-message');if(article)setExpanded(article,!article.classList.contains('cc-expanded'));return;}
    if(data.ccCopy){await copyMessage(data.ccCopy);return;}

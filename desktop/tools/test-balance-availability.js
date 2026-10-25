@@ -28,7 +28,9 @@ assert.equal(requests.length,0);
  await vm.runInContext('refreshBalances()',context);
  assert.equal(requests.length,1);
  assert.equal(flowLabel(),'Conectando…');
- assert.match(bar.innerHTML,/12,5 USD/);
+ // Point 13: one money format everywhere (two decimals, US$ symbol).
+ assert.match(bar.innerHTML,/12,50 US\$/);
+ assert.doesNotMatch(bar.innerHTML,/12,5 USD|12,5000/);
  // Genuine request failures still remain visible for supported providers.
  context.rpc=async()=>{throw Error('Consulta fallida');};
  vm.runInContext('AccountBalances.values={}',context);

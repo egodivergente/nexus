@@ -79,7 +79,7 @@ try:
         assert page.evaluate("document.activeElement.dataset.studioDetail==='source-image'")
         page.locator('#pc-search').fill('sin-coincidencias-de-prueba')
         page.wait_for_timeout(300)
-        assert 'No hay coincidencias' in page.locator('.empty').inner_text()
+        assert 'No hay resultados para esta búsqueda' in page.locator('.empty').inner_text()
         page.locator('[data-ux=clear-filters]').first.click()
         assert page.locator('#pc-search').input_value() == ''
         page.evaluate("()=>{navigate('canvas');studioPicker();}")

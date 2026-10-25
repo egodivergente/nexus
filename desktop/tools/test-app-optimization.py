@@ -37,7 +37,7 @@ try:
           }finally{rpc=original;initial.configured=configured;renderBalances();}
         }""")
         assert balances['calls']==3 and balances['bars']==1,balances
-        assert '25,019' in balances['text'] and '0 créditos' in balances['text'],balances
+        assert '25,02 US$' in balances['text'] and '0 créditos' in balances['text'],balances
         assert balances['text'].count('No disponible')==2,balances
         page.evaluate("initial.configured=['atlas_cloud','runway','crun','google_flow'];renderBalances()")
         for width in (1360,760,480):

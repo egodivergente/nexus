@@ -34,8 +34,9 @@ function parseAccountBalance(provider,response){
 function balanceText(item){
  if(!item)return 'Pendiente';
  if(item.value==null)return 'No disponible';
- const value=new Intl.NumberFormat('es-ES',{maximumFractionDigits:4}).format(item.value);
- return value+(item.currency==='credits'?' créditos':' '+item.currency);
+ if(item.currency==='credits')return new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(item.value)+' créditos';
+ if(item.currency==='USD'&&window.NexusCurrency)return window.NexusCurrency.cost(item.value);
+ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(item.value)+' '+(item.currency==='USD'?'US$':item.currency);
 }
 function renderBalances(){
  if(!initial)return;
