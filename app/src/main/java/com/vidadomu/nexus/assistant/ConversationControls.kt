@@ -47,6 +47,16 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
     val chats=remember(ui.conversationId,ui.items.size,ui.workingIn,ui.activeProjectId,conversationIndex) {entries(ui,vm)}
     val context=LocalContext.current
     val tabs=remember {ConversationTabs(context)}
+    val titles=remember {ConversationTitles(context)}
+    var titleRevision by remember {mutableIntStateOf(0)}
+    var renaming by remember {mutableStateOf<AssistantChatEntry?>(null)}
+    renaming?.let {chat ->
+        var draft by remember(chat.id) {mutableStateOf(titles.display(chat.id, chat.title))}
+        AlertDialog(onDismissRequest={renaming=null},title={Text("Nombre de la conversación")},
+            text={com.vidadomu.nexus.ui.components.StudioTextField(draft,{draft=it},singleLine=true)},
+            confirmButton={TextButton(onClick={titles.rename(chat.id,draft);titleRevision++;renaming=null}) {Text("Guardar")}},
+            dismissButton={TextButton(onClick={titles.rename(chat.id,null);titleRevision++;renaming=null}) {Text("Usar automático")}})
+    }
     var closed by remember {mutableStateOf(tabs.closed())}
     var showClosed by remember {mutableStateOf(false)}
     var query by remember {mutableStateOf("")}
@@ -61,14 +71,19 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
         HorizontalDivider(Modifier.padding(vertical=8.dp,horizontal=28.dp))
         com.vidadomu.nexus.ui.components.StudioTextField(query,{query=it},Modifier.padding(horizontal=16.dp),singleLine=true,placeholder={Text("Buscar conversación")})
         if(closed.isNotEmpty()) TextButton(onClick={showClosed=!showClosed},modifier=Modifier.padding(horizontal=16.dp)) {Text(if(showClosed) "Ocultar cerradas" else "Ver cerradas · ${closed.size}")}
+        val shown=remember(chats,titleRevision,closed,showClosed,query) {
+            chats.map {it.copy(title=titles.display(it.id,it.title))}
+                .filter {(showClosed || it.id !in closed) && (it.title.contains(query,true) || it.preview.contains(query,true))}
+        }
         androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
-            items(chats.filter {(showClosed || it.id !in closed) && it.title.contains(query,true)},key={it.id}) {chat->
+            items(shown,key={it.id}) {chat->
                 NavigationDrawerItem(selected=chat.id==ui.conversationId,onClick={tabs.open(chat.id);closed=tabs.closed();onClose();vm.openConversation(chat.id)},
                     label={Column {Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         if(chat.preview.isNotBlank() && chat.preview!=chat.title) Text(chat.preview,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         if(chat.updatedAt>0) Text(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT).format(java.util.Date(chat.updatedAt)),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}},
                     badge={Row(verticalAlignment=Alignment.CenterVertically) {
                         if(chat.id==ui.workingIn) CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)
+                        IconButton(onClick={renaming=chats.firstOrNull {it.id==chat.id} ?: chat}) {Icon(Icons.Default.Edit,"Cambiar el nombre de la conversación",Modifier.size(16.dp))}
                         IconButton(onClick={tabs.close(chat.id);closed=tabs.closed()}) {Icon(Icons.Default.Close,"Cerrar conversación de la lista; conservar historial",Modifier.size(16.dp))}
                     }},
                     modifier=Modifier.padding(horizontal=12.dp).semantics {
