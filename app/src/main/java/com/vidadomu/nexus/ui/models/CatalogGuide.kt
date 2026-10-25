@@ -2,6 +2,9 @@ package com.vidadomu.nexus.ui.models
 
 import com.vidadomu.nexus.core.model.*
 
+private val H3_TOKEN = Regex("\\bh3\\b")
+private val WAN_TOKEN = Regex("\\bwan\\b")
+
 internal fun catalogFamily(model: NexusModel): String {
     val id = (model.providerModelId?.takeIf { it.isNotBlank() } ?: model.id).lowercase(java.util.Locale.ROOT).replace('_', '-')
     return when {
@@ -16,8 +19,8 @@ internal fun catalogFamily(model: NexusModel): String {
         "hailuo" in id -> "Hailuo"
         "tripo" in id -> "Tripo"
         "happyhorse" in id || "happy-horse" in id -> "HappyHorse"
-        "minimax" in id || Regex("\\bh3\\b").containsMatchIn(id) -> "MiniMax H3"
-        Regex("\\bwan\\b").containsMatchIn(id) -> "Wan"
+        "minimax" in id || H3_TOKEN.containsMatchIn(id) -> "MiniMax H3"
+        WAN_TOKEN.containsMatchIn(id) -> "Wan"
         "flux" in id -> "FLUX"
         "veo" in id -> "Veo"
         "imagen" in id -> "Imagen"

@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.core.work.promoteToForeground
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -25,7 +26,7 @@ class MediaEditWorker(context:Context,params:WorkerParameters):CoroutineWorker(c
         var job=original.copy(state="PROCESSING",error=null,updatedAt=System.currentTimeMillis())
         store.write(job)
         try {
-            setForeground(foreground(applicationContext,id,"Nexus está editando un medio"))
+            promoteToForeground(foreground(applicationContext,id,"Nexus está editando un medio")) // Android may refuse the promotion; the edit still runs.
             val outputs=AgentVideoOperations(app).execute(job) {progress ->
                 if(progress!=job.progress) {job=job.copy(progress=progress,updatedAt=System.currentTimeMillis());store.write(job)}
             }

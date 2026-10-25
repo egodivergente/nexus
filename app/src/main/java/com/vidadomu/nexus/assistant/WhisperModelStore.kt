@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.core.work.promoteToForeground
 import android.content.Context
 import androidx.work.*
 import com.vidadomu.nexus.agent.core.tools.ToolInputException
@@ -92,7 +93,7 @@ class WhisperModelWorker(context:Context,params:WorkerParameters):CoroutineWorke
     override suspend fun doWork():Result = try {
         val store=WhisperModelStore(applicationContext)
         if(!store.verifyExisting()) {
-            setForeground(MediaEditWorker.foreground(applicationContext,"Whisper", "Descargando modelo local de 148 MB"))
+            promoteToForeground(MediaEditWorker.foreground(applicationContext,"Whisper", "Descargando modelo local de 148 MB"))
             store.download()
         }
         Result.success()

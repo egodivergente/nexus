@@ -42,7 +42,9 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
  * working shows a spinner; «Nueva con este contexto» starts a conversation from a summary of the current one.
  */
 @Composable internal fun ConversationDrawer(ui: AssistantUiState, vm: AssistantViewModel, onClose: () -> Unit) {
-    val chats=remember(ui.conversationId,ui.items.size,ui.workingIn,ui.activeProjectId) {entries(ui,vm)}
+    val conversationIndex by vm.conversationIndex.collectAsState()
+    LaunchedEffect(Unit) {vm.refreshConversations()}
+    val chats=remember(ui.conversationId,ui.items.size,ui.workingIn,ui.activeProjectId,conversationIndex) {entries(ui,vm)}
     val context=LocalContext.current
     val tabs=remember {ConversationTabs(context)}
     var closed by remember {mutableStateOf(tabs.closed())}

@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.inpaint
 
+import com.vidadomu.nexus.core.work.promoteToForeground
 import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Bitmap
@@ -29,7 +30,7 @@ class InpaintWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val memory = ActivityManager.MemoryInfo()
             (applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memory)
             InpaintContract.memoryProblem(memory.availMem)?.let { error(it) }
-            setForeground(MediaEditWorker.foreground(applicationContext, jobId, "Inpainting local · preparando motor"))
+            promoteToForeground(MediaEditWorker.foreground(applicationContext, jobId, "Inpainting local · preparando motor"))
             val longest = inputData.getInt("size", 512).also { require(it in setOf(256, 512)) }
             val scale = longest.toFloat() / maxOf(source.width, source.height)
             val width = ((source.width * scale / 64).toInt() * 64).coerceIn(64, longest)

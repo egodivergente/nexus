@@ -563,7 +563,9 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
     // Read from the ViewModel, not the composition: re-entering the editor still sees a save in flight.
     val saving=editing!=null && editing.id in savingIds
     val syncRevision by com.vidadomu.nexus.sync.DeviceSync.get(androidx.compose.ui.platform.LocalContext.current).revision.collectAsState()
-    val conversations=remember(syncRevision) {vm.conversations()}
+    val conversationIndex by vm.conversationIndex.collectAsState()
+    LaunchedEffect(syncRevision) {vm.refreshConversations()}
+    val conversations=remember(conversationIndex,ui.activeProjectId) {vm.conversations()}
     val draftIds=ui.projects.filter {p->drafts[p.id]?.isDirty(p)==true}.map {it.id}.toSet()
     fun startEditing(p:com.vidadomu.nexus.agent.core.assets.Project) {
         if(drafts[p.id]==null) drafts[p.id]=ProjectMemoryDraft.from(p)

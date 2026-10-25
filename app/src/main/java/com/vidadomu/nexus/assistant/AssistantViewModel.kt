@@ -25,6 +25,8 @@ import com.vidadomu.nexus.ui.create.creationReadiness
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -167,11 +169,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val project=savedProject ?: runtime.assets.findProject("General")?.id ?: runtime.assets.createProject("General").id
             chatStore.migrate(project)
+            // Decoding a long chat on the main thread froze start-up (ANR, Pixel 8 Pro 1.9.74). Autosave waits for
+            // chatsReady, so it can never write an empty state over the saved history while this runs.
+            val saved = withContext(Dispatchers.IO) { chatStore.load() }
+            if (saved != null) restoreChat(saved)
             chatsReady.complete(Unit)
+            refreshConversations()
             if(_ui.value.activeProjectId==null) { _ui.update {it.copy(activeProjectId=project)};runtime.settings.setActiveProject(project);conversation.session.activeProjectId=project }
             runCatching { runtime.assets.startProjectSession(project); runtime.importHistory() }; refreshProjects()
         }
-        restoreChat()
         viewModelScope.launch { runtime.assets.changes.collect { refreshProjects() } }
         viewModelScope.launch { runtime.skillsRevision.collect {
             val settings = runtime.settings.load()
@@ -378,7 +384,20 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         switchConversation(null, request)
     }
 
-    internal fun conversations(): List<AssistantChatEntry> = chatStore.conversations(_ui.value.activeProjectId)
+    private val _conversationIndex = MutableStateFlow<List<AssistantChatEntry>>(emptyList())
+    /** All saved conversations (metadata only). Read by the UI without touching disk. */
+    internal val conversationIndex: StateFlow<List<AssistantChatEntry>> = _conversationIndex
+    private var indexJob: kotlinx.coroutines.Job? = null
+
+    /** Rebuilds the metadata index off the main thread; only changed files are decoded. */
+    internal fun refreshConversations() {
+        indexJob?.cancel()
+        indexJob = viewModelScope.launch { _conversationIndex.value = withContext(Dispatchers.IO) { chatStore.conversations(null) } }
+    }
+
+    internal fun conversations(): List<AssistantChatEntry> = conversationsIn(_ui.value.activeProjectId)
+    internal fun conversationsIn(projectId: String?): List<AssistantChatEntry> =
+        _conversationIndex.value.filter { projectId == null || it.projectId == projectId }
     internal fun openConversation(id: String) {ConversationTabs(app).open(id);if(id!=_ui.value.conversationId) switchConversation(id)}
 
     /**
@@ -404,7 +423,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     chatStore.archive(current, runtime.orders.snapshot())
                 } else chatStore.archive(current, if(background != null) parkedOrders else runtime.orders.snapshot())
 
-                val saved = if(id == null) null else chatStore.conversation(id) ?: error("No se pudo abrir la conversación.")
+                val saved = if(id == null) null else withContext(Dispatchers.IO) { chatStore.conversation(id) } ?: error("No se pudo abrir la conversación.")
                 require(saved?.projectId==null || saved.projectId==targetProject) {"La conversación pertenece a otro proyecto"}
                 conversation = orchestrator.newConversation(mode = current.mode, activeProjectId = targetProject)
                 runtime.settings.setActiveProject(targetProject)
@@ -417,6 +436,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     workingIn = background?.conversationId, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
                 publishOrders()
+                refreshConversations()
                 if(retry != null) send(retry.first, retry.second)
             } catch(error: Exception) {
                 _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
@@ -618,7 +638,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun removeAttachment(id: String) = _ui.update { it.copy(pendingAttachments = it.pendingAttachments.filterNot { a -> a.id == id }) }
 
-    internal fun projectActivity(id: String): Long = chatStore.conversations(id).maxOfOrNull {it.updatedAt} ?: 0L
+    internal fun projectActivity(id: String): Long = conversationsIn(id).maxOfOrNull {it.updatedAt} ?: 0L
 
     internal suspend fun acceptShared(batch: PendingShare) {
         require(batch.ready) {"Quedan archivos por importar"}
@@ -641,7 +661,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun selectProject(id: String?) {
         if(id==null || id==_ui.value.activeProjectId) return
-        switchConversation(chatStore.lastConversation(id),targetProject=id)
+        viewModelScope.launch {
+            val last = withContext(Dispatchers.IO) { chatStore.lastConversation(id) }
+            switchConversation(last,targetProject=id)
+        }
     }
 
     private val projectMemorySaves = ProjectMemorySaveGate()
@@ -720,11 +743,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun outputs(jobId: String?): List<String> = app.generationRepository.allJobs.value.firstOrNull { it.id == jobId }?.outputs?.map { it.localUri ?: it.url }.orEmpty()
 
-    private fun restoreChat() {
-        val saved = chatStore.load() ?: return
+    private fun restoreChat(saved: SavedAssistantChat) {
+        // Anything typed during the short restore window is kept after the saved history, never dropped.
+        val early = _ui.value.items
         _ui.update {it.copy(conversationId=saved.conversationId ?: saved.items.firstOrNull()?.id?.replace(Regex("[^A-Za-z0-9_-]"),"_") ?: it.conversationId,
             activeProjectId=saved.projectId ?: it.activeProjectId)}
         restoreSavedChat(saved)
+        if (early.isNotEmpty()) _ui.update { state -> state.copy(items = state.items + early.filterNot { e -> state.items.any { it.id == e.id } }) }
     }
 
     private fun restoreSavedChat(saved: SavedAssistantChat) {

@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.sync
 
+import com.vidadomu.nexus.core.work.promoteToForeground
 import android.accounts.Account
 import android.app.Activity
 import android.app.Application
@@ -187,7 +188,11 @@ class NexusDriveSyncWorker(context:Context,parameters:WorkerParameters):Coroutin
             val notification=NotificationCompat.Builder(applicationContext,"nexus_drive_sync")
                 .setSmallIcon(R.drawable.ic_launcher_foreground).setContentTitle("Sincronizando Nexus con Drive")
                 .setContentText("Guardando proyectos y archivos originales.").setOngoing(true).build()
-            setForeground(ForegroundInfo(id.hashCode(),notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC))
+            // Only a sync the user asked for is promoted to a foreground service. The 15-minute periodic copy runs as a
+            // normal background job: promoting it consumed Android's daily dataSync quota and the system then killed Nexus
+            // (ForegroundServiceDidNotStopInTimeException, Pixel 8 Pro, 25/10/2026). If Android refuses the promotion
+            // (quota exhausted, app in background) the sync still runs within WorkManager's normal window.
+            if(manual) promoteToForeground(ForegroundInfo(id.hashCode(),notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC))
             val complete=manager.synchronize(manual)
             val state=manager.status.value["state"]?.jsonPrimitive?.contentOrNull
             if(complete || (manual && state in setOf("synced","partial","conflicts")))Result.success()
