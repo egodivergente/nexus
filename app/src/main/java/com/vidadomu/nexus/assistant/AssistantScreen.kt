@@ -692,10 +692,20 @@ internal fun UserBubble(item:ChatItem.User) {
         // Tu mensaje: completo (nunca truncado), ancho casi total para ganar altura, con el acento en degradado y seleccionable.
         val accent=MaterialTheme.colorScheme.primary
         val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.30f),accent.copy(alpha=.16f)))}
+        val foldable = remember(item.text) { UserMessageFold.shouldFold(item.text) }
+        var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
         Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)
             .background(brush,NexusTokens.card)
-            .combinedClickable(onClick = {}, onLongClickLabel = "Acciones del mensaje", onLongClick = { actions = true })) {
-                Text(item.text,Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),style=MaterialTheme.typography.bodyMedium,color=TextPrimary)
+            .messageLongPress("Acciones del mensaje") { actions = true }) {
+                Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
+                    Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,
+                        maxLines=if(foldable && !expanded) UserMessageFold.PREVIEW_LINES else Int.MAX_VALUE,
+                        overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if(foldable) TextButton(onClick={expanded=!expanded},contentPadding=PaddingValues(horizontal=0.dp),
+                        modifier=Modifier.align(Alignment.End).heightIn(min=NexusTokens.minimumTouch)) {
+                        Text(if(expanded) "Contraer" else "Expandir",style=MaterialTheme.typography.labelLarge)
+                    }
+                }
             DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
                 DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, onClick = {
                     clipboard.setText(AnnotatedString(item.text)); actions = false
@@ -779,8 +789,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
             // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
             // Casi sin fondo: tus mensajes llevan el acento y las respuestas quedan limpias, a todo el ancho.
             Surface(color=androidx.compose.ui.graphics.Color.Transparent,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
-                .pointerInput(Unit) {detectTapGestures(onLongPress={actionsExpanded=true})}
-                .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
+                .messageLongPress("Acciones de la respuesta") {actionsExpanded=true}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 val streaming = item.stop == "STREAMING"
                 val responseText = remember(item.text, streaming) {
