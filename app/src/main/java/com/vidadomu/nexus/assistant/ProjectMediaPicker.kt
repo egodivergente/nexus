@@ -170,12 +170,13 @@ internal fun ProjectMediaPickerSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(horizontal = NexusTokens.screenMargin), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-            // Título y «Gestionar» en la misma línea: sin una fila solo para el enlace.
+            // No «Gestionar» mode (revision video 1, 04:24): selecting is always possible and the actions for what is
+            // marked appear in a contextual bar at the bottom.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (managing) "Biblioteca del proyecto" else "Fotos y archivos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (!managementOnly) TextButton(onClick = { managing = !managing; selected = emptyList() }, enabled = !busy) {
-                    Text(if (managing) "Volver" else "Gestionar")
-                }
+                if (!managementOnly && filtered.isNotEmpty()) TextButton(onClick = {
+                    selected = if (chosen.size >= minOf(filtered.size, maximum)) emptyList() else filtered.take(maximum).map { it.id }
+                }, enabled = !busy) { Text(if (chosen.isNotEmpty() && chosen.size >= minOf(filtered.size, maximum)) "Desmarcar" else "Marcar todo") }
             }
             if (managementOnly) Box {
                 TextButton(onClick = { projectMenu = true }, enabled = !busy && projects.isNotEmpty()) {
@@ -229,8 +230,15 @@ internal fun ProjectMediaPickerSheet(
                 OutlinedButton(onClick = { onExport(all) }, enabled = all.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
                     Text("ZIP de todas las imágenes · ${all.size}")
                 }
-            } else Button(onClick = { onUse(chosen) }, enabled = chosen.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
-                Text("Usar seleccionadas · ${chosen.size}")
+            } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                // Contextual bar: only meaningful with something marked; attaching stays the primary action.
+                if (chosen.isNotEmpty()) {
+                    IconButton(onClick = { onExport(chosen) }, enabled = !busy) { Icon(Icons.Default.Archive, "Exportar ${chosen.size} en ZIP") }
+                    IconButton(onClick = { confirmDelete = chosen }, enabled = !busy) { Icon(Icons.Default.DeleteOutline, "Quitar ${chosen.size} de la biblioteca") }
+                }
+                Button(onClick = { onUse(chosen) }, enabled = chosen.isNotEmpty() && !busy, modifier = Modifier.weight(1f)) {
+                    Text(if (chosen.isEmpty()) "Marca fotos o archivos" else "Adjuntar · ${chosen.size}")
+                }
             }
             Spacer(Modifier.height(NexusTokens.space8))
         }
