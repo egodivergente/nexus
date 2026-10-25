@@ -16,21 +16,23 @@ process = None
 
 def start(port=0):
     global process
-    harness = ('import local_host as host\nserver=host.ThreadingHTTPServer\n'
-               f'host.ThreadingHTTPServer=lambda address,handler:server((address[0],{port}),handler)\n'
-               'host.main()')
-    process = subprocess.Popen(
-        [sys.executable, '-c', harness, '--headless', '--offline-qa',
-         '--data-dir', str(data)], cwd=root,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NO_WINDOW)
+    command = [sys.executable, 'local_host.py', '--headless', '--offline-qa', '--data-dir', str(data)]
+    if port:
+        command += ['--port', str(port)]
+    with open(output / 'host-stderr.log', 'ab') as log:
+        process = subprocess.Popen(command, cwd=root, stdout=subprocess.DEVNULL, stderr=log,
+                                   creationflags=subprocess.CREATE_NO_WINDOW)
     for _ in range(150):
+        if process.poll() is not None:
+            raise RuntimeError(f'Isolated host exited with {process.returncode}; see host-stderr.log')
         try:
             session = json.loads((data / 'local-session.json').read_text())
             if session['pid'] == process.pid:
                 with urllib.request.urlopen(f"http://127.0.0.1:{session['port']}/health", timeout=1):
+                    if port and session['port'] != port:
+                        raise RuntimeError(f"Host restarted on {session['port']} instead of {port}")
                     return session['port']
-        except (OSError, ValueError):
+        except (OSError, ValueError, KeyError):
             pass
         time.sleep(.1)
     raise RuntimeError('Isolated host did not start')
@@ -79,14 +81,12 @@ try:
                 assert box['y'] >= 0 and box['y']+box['height'] <= height, box
                 page.screenshot(path=str(output/f'assistant-{width}-{"empty" if empty else "chat"}.png'))
 
-        # Keep this page and its cached session alive across an actual host restart.
         process.terminate()
         process.wait(timeout=10)
         failure = page.evaluate("async()=>{try{await rpc('init');return '';}catch(e){return e.message;}}")
         assert 'conexión' in failure and 'Failed to fetch' not in failure, failure
         start(port)
         assert page.evaluate("async()=>Boolean((await rpc('init')).qa)") is True
-        # Cache the current token, restart again: first POST gets a real 403.
         process.terminate()
         process.wait(timeout=10)
         start(port)
@@ -98,7 +98,8 @@ try:
         page.locator('#agent-input').press('Enter')
         page.get_by_role('alert').wait_for()
         assert page.locator('#agent-input').input_value() == 'Conservar este mensaje'
-        assert page.locator('.agent-message.user').count() == 0
+        assert page.locator('.agent-message.user').count() == 1
+        assert page.evaluate('()=>Agent.items[0].failed===true&&Agent.items[0].text===Agent.draft')
         assert not errors, errors
         browser.close()
         print('PASS: Enter/click once, Shift+Enter, IME, focus, 4 viewports, real local disconnect/restart and 403 recovery, preserved draft. No inference.')

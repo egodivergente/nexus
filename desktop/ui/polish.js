@@ -80,22 +80,18 @@ function tidyCatalog() {
     el.textContent=new Intl.DateTimeFormat('es-ES',{month:'short',year:'numeric'}).format(new Date(Number(match[1]),Number(match[2])-1,1));
   });
   document.querySelectorAll('[data-action="dated"]').forEach(button=>button.textContent='Solo con fecha');
-  document.querySelectorAll('[data-hide]').forEach(button=>{
-    if(button.textContent==='···'){button.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';button.setAttribute('aria-label','Ocultar modelo');}
+  document.querySelectorAll('[data-hide],[data-hide-family]').forEach(button=>{
+    if(button.textContent==='···'){button.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';button.setAttribute('aria-label',button.dataset.hideFamily!=null?'Ocultar familia '+button.dataset.hideFamily:'Ocultar modelo');}
   });
   document.querySelectorAll('.model').forEach(card=>{
     const id=card.querySelector('[data-model]')?.dataset.model;
     const provider=card.querySelector('.provider');
     if(!id){
       if(provider)provider.textContent='';
-      const cost=card.querySelector('.price');
-      if(cost)cost.textContent=cost.textContent.replace('Consultar coste','Cotizar antes de usar').replace(/^Desde (.+) · base$/,'Base $1 · unidad sin confirmar');
       return;
     }
     const model=models.find(item=>item.id===id);if(!model)return;
     if(provider)provider.textContent=model.organization==='Atlas Cloud'?'':model.organization;
-    const cost=card.querySelector('.price');
-    if(cost)cost.textContent=cost.textContent.replace('Consultar coste','Cotizar antes de usar').replace(/^Desde (.+) · base$/,'Base $1 · unidad sin confirmar');
     const brief=decisionBrief(model),paragraph=card.querySelector('.description');
     if(paragraph){paragraph.innerHTML=`<strong>Para</strong> ${escape(brief.good)}<br><strong>Evita</strong> ${escape(brief.avoid)}`;paragraph.classList.add('decision-brief');}
   });

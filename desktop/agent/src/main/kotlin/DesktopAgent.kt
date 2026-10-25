@@ -1,7 +1,6 @@
 import com.vidadomu.nexus.agent.core.agent.*
 import com.vidadomu.nexus.agent.core.assets.*
 import com.vidadomu.nexus.agent.core.config.*
-import com.vidadomu.nexus.agent.core.chat.*
 import com.vidadomu.nexus.agent.core.cost.*
 import com.vidadomu.nexus.agent.core.llm.*
 import com.vidadomu.nexus.agent.core.log.Redactor
@@ -21,26 +20,15 @@ private val input = System.`in`.bufferedReader()
 private fun JsonObject.text(key: String, fallback: String = "") = this[key]?.jsonPrimitive?.contentOrNull ?: fallback
 private inline fun <reified T> encoded(value: T) = json.encodeToJsonElement(value)
 private fun obj(vararg pairs: Pair<String, JsonElement>) = JsonObject(pairs.toMap())
-private fun htmlEscape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
-private fun spansHtml(spans: List<MdSpan>) = spans.joinToString("") { span ->
-    var text = htmlEscape(span.text)
-    if (span.code) text = "<code>$text</code>"
-    if (span.bold) text = "<strong>$text</strong>"
-    if (span.italic) text = "<em>$text</em>"
-    if (span.strike) text = "<s>$text</s>"
-    text
-}
-private fun markdownHtml(text: String) = ChatMarkdown.parse(text).joinToString("") { block ->
-    when (block) {
-        is MdBlock.Heading -> "<h3>${spansHtml(block.spans)}</h3>"
-        is MdBlock.Paragraph -> "<p>${spansHtml(block.spans)}</p>"
-        is MdBlock.Quote -> "<blockquote>${spansHtml(block.spans)}</blockquote>"
-        is MdBlock.Code -> "<pre><code>${htmlEscape(block.code)}</code></pre>"
-        is MdBlock.ListBlock -> "<ul>" + block.items.joinToString("") { "<li>${spansHtml(it.spans)}</li>" } + "</ul>"
-        is MdBlock.Table -> "<div class=agent-table><table><thead><tr>" + block.header.joinToString("") { "<th>${spansHtml(it)}</th>" } +
-            "</tr></thead><tbody>" + block.rows.joinToString("") { row -> "<tr>" + row.joinToString("") { "<td>${spansHtml(it)}</td>" } + "</tr>" } + "</tbody></table></div>"
-        MdBlock.Rule -> "<hr>"
+internal fun videoSummary(response: JsonObject): String {
+    val duration = (response["duration_ms"] as? JsonPrimitive)?.longOrNull?.takeIf { it > 0 }
+    val audio = when ((response["audio"] as? JsonPrimitive)?.booleanOrNull) {
+        true -> "Audio detectado."
+        false -> "SIN audio."
+        null -> "Audio no medido."
     }
+    return (if (duration != null) "Duración medida del vídeo: $duration ms. " else "Duración del vídeo no medida. ") +
+        "Marcas de extracción aproximadas. $audio"
 }
 
 // Private stdin/stdout protocol; the Windows host services bounded callbacks.
@@ -66,7 +54,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
     private var skills = loadSkills()
     private fun loadSkills() = SkillStore(listOf(
         DirectorySkillSource(File(root, "agent-skills/skills"), "bundled"),
-        DirectorySkillSource(File(data, "skills"), "personal")))
+        DirectorySkillSource(File(data, "skills"), "personal")), cache = SkillParseCache(File(data, "cache/skill-parse-cache.json")))
     private val published = PublishedRateEstimator.fromJson(File(root, "assets/atlas_published_prices.json").readText())
     private val cost = object : CostEstimator {
         override suspend fun estimate(model: ModelSummary, params: Map<String, String>): CostEstimate =
@@ -134,9 +122,9 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             ContentBlock.Document(response.text("format"), response.text("name"), Base64.getDecoder().decode(response.text("bytes")))
         }, videos = AttachmentVideoLoader { attachment ->
             val response = callback("video", encoded(attachment)).jsonObject
-            response["frames"]!!.jsonArray.flatMap { element ->
+            listOf(ContentBlock.Text(videoSummary(response))) + response["frames"]!!.jsonArray.flatMap { element ->
                 val frame = element.jsonObject
-                listOf(ContentBlock.Text("Fotograma a ${frame["timestamp_ms"]} ms"),
+                listOf(ContentBlock.Text("Fotograma del asset ${attachment.assetId ?: attachment.id}, t≈${frame["timestamp_ms"]} ms"),
                     ContentBlock.Image(frame.text("format"), Base64.getDecoder().decode(frame.text("bytes"))))
             }
         })
@@ -201,7 +189,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                         if(event is com.vidadomu.nexus.agent.core.tools.UiEvent.Info) callback("progress", JsonPrimitive(event.text))
                     }
                 }
-                return obj("text" to JsonPrimitive(turn.text), "html" to JsonPrimitive(markdownHtml(turn.text)), "tools" to encoded(turn.toolCalls),
+                return obj("text" to JsonPrimitive(turn.text), "html" to JsonPrimitive(DesktopMarkdown.html(turn.text)), "tools" to encoded(turn.toolCalls),
                     "inputTokens" to JsonPrimitive(turn.usage.inputTokens), "outputTokens" to JsonPrimitive(turn.usage.outputTokens),
                     "elapsedMs" to JsonPrimitive((System.nanoTime() - started) / 1_000_000),
                     "toolRounds" to JsonPrimitive(turn.toolRounds), "stop" to JsonPrimitive(turn.stop),

@@ -92,17 +92,22 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 assert page.evaluate("state.draft.prompt==='Borrador que debe conservarse'")
                 page.evaluate("()=>{Studio.tab='results';navigate('library');}")
                 capture('library',width,height)
-                assert page.locator('#content .result').count()==2
-                page.locator('[data-studio-detail=sample-a]').click()
+                # pcJobs() lists pending work in the gallery too: two completed results plus the processing one.
+                assert page.locator('#content .result').count()==3
+                assert page.locator('#content .result[data-job=sample-c]').count()==1
+                page.locator('[data-job=sample-a] .gallery-media').click()
+                page.wait_for_selector('dialog.gallery-lightbox[open]')
                 capture('details',width,height)
-                panel=page.locator('.studio-details').bounding_box()
-                assert panel['x']>=0 and panel['x']+panel['width']<=width+1
-                page.locator('.studio-detail-close').click()
+                panel=page.locator('dialog.gallery-lightbox[open]').bounding_box()
+                assert panel['x']>=0 and panel['x']+panel['width']<=width+1,(width,panel)
+                page.locator('.gallery-lightbox [data-gallery=close-viewer]').click()
+                assert page.locator('.gallery-lightbox').count()==0
                 page.evaluate("navigate('settings')")
                 capture('settings',width,height)
                 assert page.locator('#studio-settings').get_attribute('aria-current')=='page'
             page.set_viewport_size({'width':1360,'height':900})
-            page.evaluate("""()=>{loaded=E.normalize(models.find(m=>m.id==='google-flow/nano2'));state.draft={modelId:loaded.id,prompt:'Una esfera con luz cálida',values:E.defaults(loaded),media:[]};navigate('canvas');}""")
+            # Flow models only exist when a local Flow runtime is installed; offline runs fall back to a static catalogue model.
+            page.evaluate("""()=>{loaded=E.normalize(models.find(m=>m.id==='google-flow/nano2')||models.find(m=>m.id==='runway/gen4_image_turbo/image'));state.draft={modelId:loaded.id,prompt:'Una esfera con luz cálida',values:E.defaults(loaded),media:[]};navigate('canvas');}""")
             for width,height in [(1360,900),(480,850),(1280,600)]:
                 capture('canvas-loaded',width,height)
                 button=page.locator('#generate').bounding_box()
@@ -116,8 +121,11 @@ with tempfile.TemporaryDirectory(prefix='nexus-desktop-design-') as folder:
                 page.evaluate('(accent)=>{state.accent=accent;render();}',accent)
                 assert page.evaluate('document.body.classList.contains("nx-desktop")')
                 assert page.evaluate('(accent)=>document.body.classList.contains(accent)',accent)
-            page.evaluate("()=>{state.theme='oled';render();}")
-            assert page.evaluate('getComputedStyle(document.body).getPropertyValue("--nx-bg").trim()')=='#090b0f'
+            # interface-themes.js now owns the palette: OLED is its theme entry, applied inline over desktop-design.css.
+            page.evaluate("()=>{delete state.interfaceTheme;state.theme='oled';render();}")
+            assert page.evaluate('document.body.dataset.interfaceTheme')=='oled'
+            oled=page.evaluate("NexusThemes.themes.find(t=>t.id==='oled').bg.toLowerCase()")
+            assert page.evaluate('getComputedStyle(document.body).getPropertyValue("--nx-bg").trim().toLowerCase()')==oled,oled
             page.emulate_media(reduced_motion='reduce')
             assert page.locator('#agent-compose').evaluate('(node)=>getComputedStyle(node).transitionDuration')=='0s'
             assert not errors,errors

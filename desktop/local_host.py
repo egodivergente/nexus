@@ -380,48 +380,16 @@ def dispatch(keys, operation, args):
         keys[provider]=value
         write_secret(KEY_FILE,keys)
         return {'configured':list(keys)}
-    if operation in {'archiveChat', 'listChats', 'loadChat'}:
-        directory = DATA / 'assistant/conversations'
-        directory.mkdir(parents=True, exist_ok=True)
-        def converted(value):
-            if value.get('desktop'):
-                return value
-            items = []
-            for item in value.get('items', []):
-                role = str(item.get('type', item.get('kind', ''))).split('.')[-1].lower()
-                if role in {'user', 'assistant'}:
-                    attachments = [{'id': a.get('id'), 'url': a.get('uri'), 'mime': a.get('mimeType'), 'name': a.get('name')} for a in item.get('attachments', [])]
-                    items.append({'role': role, 'text': item.get('text', ''), 'attachments': attachments})
-                elif role == 'plancard':
-                    entry=value.get('plans',{}).get(item.get('planId'))
-                    if entry and entry.get('plan'):
-                        plan=entry['plan']
-                        items.append({'role':'assistant','text':plan.get('modelName','Encargo')+' · '+entry.get('state','Archivado')+'\n'+plan.get('prompt',''),
-                            'archivedPlan':plan,'archiveState':entry.get('state'),'archiveJobId':entry.get('jobId')})
-                elif role == 'notice':
-                    items.append({'role':'assistant','text':item.get('text','Aviso archivado')})
-            return {'desktop': True, 'items': items, 'draft': '', 'anchors': {}, 'resultPlans': []}
+    if operation in {'archiveChat', 'listChats', 'loadChat', 'renameChat'}:
+        from conversation_store import store_for
+        store = store_for(DATA / 'assistant')
         if operation == 'archiveChat':
-            items = args.get('items', [])
-            if not items:
-                return {'saved': False}
-            identifier = str(args.get('id', '')) or uuid.uuid4().hex
-            if not re.fullmatch('[A-Za-z0-9_-]{1,100}', identifier):
-                raise ValueError('Identificador de conversación no válido.')
-            from native_operations import atomic_json
-            atomic_json(directory / (identifier+'.json'), {**args, 'desktop': True})
-            return {'saved': True, 'id': identifier}
+            return store.archive(args)
         if operation == 'loadChat':
-            identifier = str(args.get('id', ''))
-            if not re.fullmatch('[A-Za-z0-9_-]{1,100}', identifier):
-                raise ValueError('Conversación no válida.')
-            return converted(json.loads((directory / (identifier+'.json')).read_text('utf-8')))
-        result = []
-        for file in sorted(directory.glob('*.json'), key=lambda path: path.stat().st_mtime, reverse=True):
-            chat = converted(json.loads(file.read_text('utf-8')))
-            title = next((item['text'][:100] for item in chat['items'] if item['role']=='user'), 'Conversación')
-            result.append({'id': file.stem, 'title': title, 'messages': len(chat['items'])})
-        return result
+            return store.load(args.get('id'))
+        if operation == 'renameChat':
+            return store.rename(args.get('id'), args.get('title'))
+        return store.list(args.get('query', ''))
     if operation == 'exchangeRate':
         if OFFLINE_QA:
             raise ValueError('Laboratorio: consulta de cambio bloqueada.')
@@ -477,8 +445,9 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '1.9.5-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
-                'platform': 'HP EliteBook · Windows x64', 'localMedia': True}
+                'version': '1.9.6-agent-desktop', 'androidSource': '9c133096c9c6e7568dd480b7e1ed1cf69f3ba153',
+                'desktopParity': 'selective-20261025', 'reviewedAndroidSource': '3b6082cecde9fe37c3bc4b642f7c9114dc62bdaf',
+                'platform': 'Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
             return {'status': 'unavailable', 'checked_at': 0}
@@ -826,7 +795,7 @@ def run_server(options):
     server.keys = keys
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.5-agent-desktop'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '1.9.6-agent-desktop'}),
         encoding='utf-8',
     )
     if options.headless:

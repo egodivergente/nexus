@@ -165,11 +165,67 @@ class DirectorySkillSource(private val root: File, private val label: String = r
 }
 
 /**
+ * Parsed skills keyed by a hash of (origin, text), so a changed file is parsed again and entries for files that no
+ * longer exist are dropped on [save]. The cache is optional: an unreadable, corrupt, oversized or outdated file
+ * means a full parse, and a failed write leaves the previous cache file in place.
+ */
+class SkillParseCache(private val file: File) {
+    @Serializable private data class Entries(val version: Int, val skills: Map<String, Skill>)
+    private val loaded: Map<String, Skill> = runCatching {
+        if (!file.isFile || file.length() > MAX_BYTES) null
+        else json.decodeFromString(Entries.serializer(), file.readText(Charsets.UTF_8)).takeIf { it.version == FORMAT_VERSION }?.skills
+    }.getOrNull().orEmpty()
+    private val used = linkedMapOf<String, Skill>()
+
+    @Synchronized fun parse(text: String, origin: String): Skill {
+        val key = key(text, origin)
+        val skill = loaded[key]?.takeIf { it.origin == origin } ?: SkillParser.parse(text, origin)
+        used[key] = skill
+        return skill
+    }
+
+    /** Writes the entries used since construction. Returns false when nothing could be written. */
+    @Synchronized fun save(): Boolean {
+        if (used.keys == loaded.keys) return true
+        val dir = file.absoluteFile.parentFile ?: return false
+        var tmp: java.nio.file.Path? = null
+        return try {
+            dir.mkdirs()
+            tmp = java.nio.file.Files.createTempFile(dir.toPath(), file.name + ".", ".tmp")
+            java.io.FileOutputStream(tmp.toFile()).use { output ->
+                output.write(json.encodeToString(Entries.serializer(), Entries(FORMAT_VERSION, used)).toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            try {
+                java.nio.file.Files.move(tmp, file.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                java.nio.file.Files.move(tmp, file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+            true
+        } catch (_: Exception) {
+            false
+        } finally {
+            tmp?.let { runCatching { java.nio.file.Files.deleteIfExists(it) } }
+        }
+    }
+
+    companion object {
+        /** Bump whenever [SkillParser] output changes for the same input. */
+        const val FORMAT_VERSION = 1
+        private const val MAX_BYTES = 32L * 1024 * 1024
+        private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        private fun key(text: String, origin: String): String = java.security.MessageDigest.getInstance("SHA-256")
+            .digest((origin + "\u0000" + text).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    }
+}
+
+/**
  * Índice de skills. Si una skill aparece en varias fuentes gana la de mayor `version`
  * (así un bundle actualizado en disco sustituye a la empaquetada sin recompilar).
  * Las que no parsean se apartan en [errors] sin tumbar el resto.
  */
-class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyList()) {
+class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyList(), cache: SkillParseCache? = null) {
 
     val errors: List<String>
     private val skills: Map<String, Skill>
@@ -179,11 +235,12 @@ class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyL
         val byId = linkedMapOf<String, Skill>()
         for (src in sources) {
             for ((origin, text) in runCatching { src.load() }.getOrElse { errs += "Fuente ilegible: ${it.message}"; emptyList() }) {
-                val s = runCatching { SkillParser.parse(text, origin) }.getOrElse { errs += it.message ?: origin; null } ?: continue
+                val s = runCatching { cache?.parse(text, origin) ?: SkillParser.parse(text, origin) }.getOrElse { errs += it.message ?: origin; null } ?: continue
                 val prev = byId[s.id]
                 if (prev == null || s.version >= prev.version) byId[s.id] = s
             }
         }
+        cache?.save()
         val filter = active.toSet()
         skills = if (filter.isEmpty()) byId else byId.filterKeys { it in filter }
         errors = errs
