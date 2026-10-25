@@ -160,8 +160,21 @@ with tempfile.TemporaryDirectory(prefix='nexus-ten-', dir=Path.home()/'.aki/tmp'
                 check('Modelos: pending prices offer an estimate', page.locator('#content article.model .nx-price-link').count() > 0)
                 sizes = page.evaluate("[...document.querySelectorAll('#content article.model .nx-icon-btn')].slice(0,9).map(b=>{const r=b.getBoundingClientRect();return Math.min(r.width,r.height)})")
                 check('Modelos: icon buttons have a 36px hit area', min(sizes) >= 36, sizes)
-                check('Modelos: no generic «N» initials', page.evaluate("[...document.querySelectorAll('#content article.model .initial')].every(n=>!/^\\s*N\\s*$/.test(n.textContent))"))
+                marks = page.evaluate("[...document.querySelectorAll('#content article.model')].map(a=>{const m=a.querySelector('.top .nx-mark');return m?(m.querySelector('img.logo')?'logo':(m.classList.contains('is-neutral')&&m.querySelector('svg')&&!m.querySelector('.generic-mark')?'neutral':'bad')):'none'})")
+                check('Modelos: every card has a brand logo or the neutral icon, never the generic «N»', marks and all(m in ('logo','neutral') for m in marks) and page.locator('#content article.model .generic-mark').count() == 0, marks)
                 check('Modelos: traits on cards', page.locator('#content article.model .nx-traits li').count() >= total)
+                page.locator('#content .catalog-header-bar [data-kind=VIDEO]').click()
+                page.wait_for_function("()=>document.querySelector('#content article.model .nx-traits')")
+                video = page.evaluate("""()=>[...document.querySelectorAll('#content article.model')].map(a=>({name:a.querySelector('h3')?.textContent,logo:a.querySelector('.nx-mark img.logo')?.getAttribute('src')||'',desc:a.querySelector('.description:not([hidden])')?.textContent||'',meta:Math.round(a.getBoundingClientRect().bottom-a.querySelector('.card-meta').getBoundingClientRect().bottom)}))""")
+                veo = [v for v in video if v['name'] == 'Google Veo']
+                check('Modelos: shipped brand logos are used (Google Veo)', veo and veo[0]['logo'].endswith('logos/google.png'), veo)
+                check('Modelos: modality-only sentences are not repeated as descriptions', not any(v['desc'].startswith(('Crear una escena de vídeo desde la descripción', 'Crear un clip desde la descripción')) for v in video), [v['desc'] for v in video if v['desc']])
+                rows = {}
+                for v in video[:8]:
+                    rows.setdefault(v['meta'], []).append(v['name'])
+                check('Modelos: price line at the same height on every card', len(rows) == 1, rows)
+                page.locator('#content .catalog-header-bar [data-kind=IMAGE]').click()
+                page.wait_for_function("()=>document.querySelector('#content .catalog-header-bar [data-kind=IMAGE].active')")
                 page.locator('[data-nx-intent=background]').click()
                 page.wait_for_selector('[data-nx-clear=intent]')
                 filtered = page.locator('#content article.model').count()

@@ -245,6 +245,20 @@ function traits(list,k=kind){
  return [...new Set(out)].slice(0,3);
 }
 const NOISE=/contrato|openapi|endpoint|schema|esquema|\bapi\b/i;
+// Sentences that only restate the modality: the traits already say it, so they add no difference between cards.
+const GENERIC=/^(crear (un clip|una escena de v[ií]deo|un v[ií]deo|una imagen) desde (la|una) descripci[oó]n|cambiar una imagen existente con instrucciones|animar una imagen de partida|consulta las entradas|trabajar con texto y conversaci[oó]n|crear o transformar audio seg[uú]n)/i;
+const BRANDS=[[/^google|\bveo|\bimagen-|gemini|nano-banana/,'google'],[/pixverse/,'pixverse'],[/^luma|luma-|lumalabs/,'luma'],[/^pika|pika-/,'pika'],[/^vidu|vidu-/,'vidu'],[/^stability|stable-(diffusion|audio|video)/,'stability'],[/ideogram/,'ideogram'],[/^suno|suno-/,'suno'],[/elevenlabs/,'elevenlabs'],[/^nvidia/,'nvidia'],[/^microsoft/,'microsoft'],[/deepseek/,'deepseek'],[/^anthropic|claude/,'anthropic'],[/^black forest|^bfl/,'bfl'],[/^openai|\bsora|dall-e|gpt-image/,'openai'],[/kling|kuaishou/,'kling'],[/minimax|hailuo/,'minimax'],[/^bytedance|^seedance|seedream|seedance|seededit/,'bytedance'],[/qwen|^alibaba/,'qwen'],[/^wan\b|\/wan-|wan2|wan-2/,'wan'],[/^runway/,'runway']];
+function brandKey(m){
+ const org=String(m?.organization||'').toLowerCase(),id=String(m?.id||'').toLowerCase(),fam=String(m?.modelFamily||'').toLowerCase();
+ for(const [re,key] of BRANDS)if(re.test(org))return key;
+ for(const [re,key] of BRANDS)if(re.test(fam)||re.test(id.split('/').pop())||re.test(id))return key;
+ return '';
+}
+if(typeof logo==='function'&&!logo.nxTen){
+ const logoBeforeTen=logo;
+ logo=function(m){const html=logoBeforeTen(m);if(!/generic-mark|class="initial"/.test(html))return html;const key=brandKey(m);return key?`<img class="logo" src="logos/${key}.png" alt="">`:html;};
+ logo.nxTen=true;
+}
 function cards(){
  const grid=$('#content .catalog');if(!grid)return;
  const all=[...grid.querySelectorAll('article.model')];
@@ -253,8 +267,8 @@ function cards(){
   if(card.dataset.ten)continue;card.dataset.ten='1';
   const list=variantsOf(card),top=card.querySelector('.top');
   // A neutral mark when the brand has no logo; real logos are kept untouched.
-  const mark=card.querySelector('.top > .logo, .top > .initial');
-  if(mark){const box=document.createElement('span');box.className='nx-mark';mark.replaceWith(box);box.append(mark);if(mark.classList.contains('initial')){mark.innerHTML=kindGlyph(kind);mark.setAttribute('aria-hidden','true');box.classList.add('is-neutral');}}
+  const mark=card.querySelector('.top > .logo, .top > .initial, .top > .generic-mark');
+  if(mark){const box=document.createElement('span');box.className='nx-mark';mark.replaceWith(box);box.append(mark);if(!mark.matches('img.logo')){mark.className='initial';mark.innerHTML=kindGlyph(kind);mark.setAttribute('aria-hidden','true');box.classList.add('is-neutral');}}
   if(kind!=='CHAT'){
    const example=examplesOn()?exampleOf(list):'',logo=card.querySelector('.nx-mark img.logo');
    const media=document.createElement('div');media.className='nx-card-media';media.dataset.hasExample=example?'1':'0';
@@ -263,8 +277,8 @@ function cards(){
    const shown=media.querySelector('img.nx-example');if(shown?.complete&&shown.naturalWidth)media.classList.add('is-loaded');
   }
   const description=card.querySelector('.description'),text=description?.textContent.trim()||'';
-  if(description&&(!text||counts.get(text)>=3||NOISE.test(text)))description.hidden=true;
   const facts=traits(list);
+  if(description&&(!text||counts.get(text)>=3||NOISE.test(text)||(facts.length&&GENERIC.test(text))))description.hidden=true;
   if(facts.length)(description||top)?.insertAdjacentHTML('afterend',`<ul class="nx-traits" title="Según la ficha del catálogo">${facts.map(f=>`<li>${escape(f)}</li>`).join('')}</ul>`);
   const price=card.querySelector('.price');
   if(price&&['unknown','unconfirmed'].includes(price.dataset.priceState)){
