@@ -34,7 +34,9 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun LibraryFileSheet(entry:LibraryEntry,name:String,localUri:String?,favorite:Boolean,hidden:Boolean,
     onDismiss:()->Unit,onRename:()->Unit,onSelect:()->Unit,onFavorite:()->Unit,onHide:()->Unit,onDelete:()->Unit,onMessage:(String)->Unit,
-    onAddToChat:(()->Unit)?,onUseInCanvas:(()->Unit)?,onOpenResult:(()->Unit)?,onCrop:(()->Unit)?=null,onMove:(()->Unit)?=null) {
+    onAddToChat:(()->Unit)?,onUseInCanvas:(()->Unit)?,onOpenResult:(()->Unit)?,onCrop:(()->Unit)?=null,onMove:(()->Unit)?=null,
+    /** Opens the full-screen local editor (mask, erase, inpaint) on this image. */
+    onEdit:(()->Unit)?=null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     val scope=rememberCoroutineScope()
@@ -88,6 +90,7 @@ internal fun LibraryFileSheet(entry:LibraryEntry,name:String,localUri:String?,fa
             Option(Icons.Default.CheckCircle,"Seleccionar") {onDismiss();onSelect()}
             Option(Icons.Default.Edit,"Cambiar el nombre") {onRename()}
             onMove?.let {move -> Option(Icons.Default.DriveFileMove,"Cambiar de proyecto") {onDismiss();move()}}
+            onEdit?.let {edit -> Option(Icons.Default.Brush,"Editar foto") {onDismiss();edit()}}
             onCrop?.let {crop -> Option(Icons.Default.Crop,"Recortar") {onDismiss();crop()}}
             Option(Icons.Default.Star,if(favorite) "Quitar de favoritos" else "Marcar favorito") {onFavorite();onDismiss()}
             Option(Icons.Default.Share,if(localUri==null && asset==null) "Compartir enlace" else "Compartir") {send(false)}

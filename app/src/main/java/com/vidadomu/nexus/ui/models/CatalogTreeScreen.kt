@@ -203,8 +203,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                     modifier = Modifier.semantics { heading() })
             }
+            // A quiet entry, not a full-width «máscaras» button that breaks the hierarchy; the main way in is
+            // Biblioteca/visor → «Editar foto».
             if(toolsView && family==null) item(span={GridItemSpan(maxLineSpan)}) {
-                OutlinedButton(onClick=onLocalInpaint,modifier=Modifier.fillMaxWidth()) { Text("Editar región con máscara · local") }
+                AssistChip(onClick=onLocalInpaint,label={Text("Editar una foto en el móvil")},
+                    leadingIcon={Icon(Icons.Default.Brush,null,Modifier.size(18.dp))})
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
                 Text("Arrastra el asa, mantén pulsada una tarjeta o toca el asa para subirla o bajarla. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)

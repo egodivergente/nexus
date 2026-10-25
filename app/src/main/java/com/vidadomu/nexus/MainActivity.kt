@@ -250,6 +250,7 @@ class MainActivity : ComponentActivity() {
                         }
                             Screen.Library -> {
                             LibraryScreen(
+                                onEditPhoto={uri -> navController.navigate("local-inpaint?uri=${Uri.encode(uri)}") {launchSingleTop=true}},
                                 onOpenHistory={navController.navigate(Screen.Generations.route)},
                                 onOpenArtBox={tabRequest=tabs.indexOf(Screen.Models)},
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
@@ -300,8 +301,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable("local-inpaint") {
-                            com.vidadomu.nexus.inpaint.LocalInpaintScreen(onBack={navController.popBackStack()})
+                        composable("local-inpaint?uri={uri}", arguments=listOf(androidx.navigation.navArgument("uri") {nullable=true;defaultValue=null})) {entry ->
+                            com.vidadomu.nexus.inpaint.LocalInpaintScreen(onBack={navController.popBackStack()}, initialUri=entry.arguments?.getString("uri"))
                         }
                         composable(Screen.Settings.route) {
                             SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {
