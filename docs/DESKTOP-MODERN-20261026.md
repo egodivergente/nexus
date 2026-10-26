@@ -1,6 +1,10 @@
 # Desktop integrado 26/10/2026
 
-Versión: `2026.10.26-desktop-modern.1`. Edición Python/Edge Windows x64, Java 17.
+Versión: `2026.10.26-desktop-modern.2`. Edición Python/Edge Windows x64, Java 17.
+
+## Ajuste visual de tarjetas
+
+La revisión `.2` aprovecha el ancho del catálogo, reduce la franja vacía del logo a 104 px y muestra logos de 80 px (antes 40 px). En vista cómoda caben cinco o seis columnas a 1920 px, manteniendo botones de al menos 36 px y las vistas compacta/amplia. Los ejemplos reales del proveedor conservan su formato visual cuando están cargados.
 
 ## Procedencia y comportamiento
 

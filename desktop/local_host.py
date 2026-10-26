@@ -475,7 +475,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '2026.10.26-desktop-modern.1', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'version': '2026.10.26-desktop-modern.2', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
                 'desktopParity': 'integrated-20261026', 'reviewedAndroidSource': '3b6082cecde9fe37c3bc4b642f7c9114dc62bdaf',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
@@ -847,7 +847,7 @@ def run_server(options):
         agent_host()  # Resume configured background sync even before opening Agent/Settings.
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.26-desktop-modern.1'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.26-desktop-modern.2'}),
         encoding='utf-8',
     )
     if options.headless:

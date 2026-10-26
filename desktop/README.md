@@ -1,4 +1,4 @@
-# Desktop integrado 2026.10.26-desktop-modern.1
+# Desktop integrado 2026.10.26-desktop-modern.2
 
 Edición Python/Edge para Windows con agente JVM, Corte, importación local de hasta 4 GiB, continuidad de dispositivos y la interfaz y catálogo del 26 de octubre. Consulta [procedencia y verificación](../docs/DESKTOP-MODERN-20261026.md). Los apartados siguientes documentan versiones anteriores.
 

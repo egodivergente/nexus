@@ -1,5 +1,5 @@
 {
-  "version": "2026.10.26-desktop-modern.1",
+  "version": "2026.10.26-desktop-modern.2",
   "baseDesktopCommit": "b236cae27d410d50f1342076f91d4ae99f485517",
   "reviewedAndroidCommit": "3b6082cecde9fe37c3bc4b642f7c9114dc62bdaf",
   "relationship": "Selective Desktop integration preserving Corte, 4 GiB import and device continuity; not full Android parity",

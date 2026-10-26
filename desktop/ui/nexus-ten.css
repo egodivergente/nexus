@@ -147,7 +147,8 @@ body.nx-ten:is([data-ten-view="catalog"],[data-ten-view="library"]) #content{pad
 body.nx-ten[data-ten-view="history"] #content{padding-left:max(var(--t-gutter),calc((100% - 1120px) / 2))!important;padding-right:max(var(--t-gutter),calc((100% - 1120px) / 2))!important;padding-top:20px!important}
 
 /* ---------- Modelos: header, intents and a calmer catalogue ---------- */
-body.nx-ten .nx-catalog-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:20px!important;padding-bottom:18px!important;border-bottom:1px solid var(--t-line)!important}
+body.nx-ten[data-ten-view="catalog"] #content{padding-left:var(--t-gutter)!important;padding-right:var(--t-gutter)!important}
+body.nx-ten .nx-catalog-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:14px!important;padding-bottom:12px!important;border-bottom:1px solid var(--t-line)!important}
 body.nx-ten .nx-catalog-head .quick-guide{display:none}
 body.nx-ten #content .nx-catalog-head .tabs,body.nx-ten #content .history-header-bar .tabs{padding:3px;border-radius:12px;background:var(--t-s1);border:1px solid var(--t-line);gap:2px}
 body.nx-ten #content :is(.nx-catalog-head,.history-header-bar) .tabs button{height:34px!important;min-height:34px!important;padding:0 14px!important;border-radius:9px!important;font-size:var(--t-control)!important;font-weight:500}
@@ -184,17 +185,19 @@ body.nx-ten #content .nx-chip svg{width:15px;height:15px;color:var(--muted)}
 body.nx-ten #content .nx-chip:hover svg{color:var(--text)}
 body.nx-ten #content .nx-chip-clear{height:32px!important;min-height:32px!important;padding:0 10px!important;border:0!important;background:transparent!important;color:var(--muted)!important;font-size:var(--t-meta)!important;text-decoration:underline;text-underline-offset:3px}
 
-/* Cards: three to four columns when comfortable, an example on top, a few useful facts */
-body.nx-ten .catalog[data-density]{--catalog-card-min:340px;--catalog-logo:26px;gap:18px!important}
-body.nx-ten .catalog[data-density="compact"]{--catalog-card-min:230px;--catalog-logo:22px;gap:12px!important}
-body.nx-ten .catalog[data-density="spacious"]{--catalog-card-min:460px;--catalog-logo:28px;gap:22px!important}
-body.nx-ten #content .catalog .model{padding:16px!important;gap:10px;border:1px solid var(--t-line)!important;border-radius:var(--t-radius-lg)!important;background:var(--t-s1)!important;overflow:hidden;transition:background var(--t-fast),border-color var(--t-fast),transform var(--t-fast)}
+/* Dense model cards: larger marks without reserving a poster-sized empty area. */
+body.nx-ten .catalog[data-density]{--catalog-card-min:280px;--catalog-logo:30px;--model-mark:80px;--model-mark-frame:96px;--model-band:104px;gap:14px!important}
+body.nx-ten .catalog[data-density="compact"]{--catalog-card-min:230px;--catalog-logo:28px;--model-mark:64px;--model-mark-frame:80px;--model-band:88px;gap:10px!important}
+body.nx-ten .catalog[data-density="spacious"]{--catalog-card-min:360px;--catalog-logo:36px;--model-mark:96px;--model-mark-frame:112px;--model-band:120px;gap:18px!important}
+body.nx-ten #content .catalog .model{padding:12px!important;gap:8px;border:1px solid var(--t-line)!important;border-radius:var(--t-radius-lg)!important;background:var(--t-s1)!important;overflow:hidden;transition:background var(--t-fast),border-color var(--t-fast),transform var(--t-fast)}
 body.nx-ten #content .catalog .model:hover{background:var(--t-s2)!important;border-color:var(--t-line-strong)!important}
-body.nx-ten .nx-card-media{position:relative;display:grid;place-items:center;margin:-16px -16px 4px;aspect-ratio:16/9;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 70%),var(--t-s2);border-bottom:1px solid var(--t-line)}
+body.nx-ten .nx-card-media{position:relative;display:grid;place-items:center;margin:-12px -12px 2px;aspect-ratio:16/9;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 70%),var(--t-s2);border-bottom:1px solid var(--t-line)}
 body.nx-ten .catalog[data-density="compact"] .nx-card-media{aspect-ratio:2/1}
-body.nx-ten .nx-card-fallback{display:grid;place-items:center;width:64px;height:64px;border-radius:16px;background:var(--t-s3);color:var(--muted)}
-body.nx-ten .nx-card-fallback img{width:40px;height:40px;object-fit:contain}
-body.nx-ten .nx-card-fallback svg{width:30px;height:30px}
+body.nx-ten .catalog[data-density] .nx-card-media:not(.is-loaded){height:var(--model-band);aspect-ratio:auto}
+body.nx-ten .nx-card-fallback{display:grid;place-items:center;width:var(--model-mark-frame);height:var(--model-mark-frame);border-radius:16px;background:transparent;color:var(--muted)}
+body.nx-ten .nx-card-media.is-loaded .nx-card-fallback{visibility:hidden}
+body.nx-ten .nx-card-fallback img{width:var(--model-mark);height:var(--model-mark);object-fit:contain}
+body.nx-ten .nx-card-fallback svg{width:calc(var(--model-mark) * .8);height:calc(var(--model-mark) * .8)}
 body.nx-ten .nx-example{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 220ms var(--t-ease)}
 body.nx-ten .nx-card-media.is-loaded .nx-example{opacity:1}
 body.nx-ten .nx-card-media:not(.is-loaded) .nx-example-tag{display:none}

@@ -153,7 +153,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-ten-', dir=Path.home()/'.aki/tmp'
                 page.wait_for_selector('.nx-intent')
                 total = page.locator('#content article.model').count()
                 cols = page.evaluate("()=>{const cards=[...document.querySelectorAll('#content article.model')];const y=cards[0].getBoundingClientRect().y;return cards.filter(c=>Math.abs(c.getBoundingClientRect().y-y)<2).length}")
-                check('Modelos: three or four columns when comfortable at 1920', 3 <= cols <= 4, cols)
+                check('Modelos: five or six columns when comfortable at 1920', 5 <= cols <= 6, cols)
                 check('Modelos: intents first', page.locator('.nx-intent').count() >= 4 and page.locator('#nx-intents-title').inner_text() == '¿Qué quieres hacer?')
                 check('Modelos: original filter controls hidden', page.evaluate("[...document.querySelectorAll('.nx-orig')].every(n=>n.getBoundingClientRect().width===0)") and page.locator('#sort').count() == 1)
                 check('Modelos: no «Precio por confirmar» on cards', page.locator('#content article.model .price', has_text='Precio por confirmar').count() == 0)
