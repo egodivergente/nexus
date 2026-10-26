@@ -232,6 +232,27 @@ class StoreTests(unittest.TestCase):
         self.assertEqual([], [p.name for p in self.root.rglob('*.tmp')])
 
 
+class DeviceContinuityStoreTests(unittest.TestCase):
+    def test_rich_attachments_survive_and_only_drive_projection_is_hidden(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = ConversationStore(Path(folder))
+            items = [{'role': 'user', 'text': 'Escena de prueba'}]
+            from chat_continuity import history_id
+            fingerprint = history_id(items)
+            store.archive({'id': 'sync_' + fingerprint, 'items': items})
+            rich = {'id': 'device_one', 'items': items, 'continuityOrigin': {'device': 'phone'},
+                    'continuityTextHash': fingerprint, 'continuityAttachments': [{'id': 'a', 'url': '/media/a.png', 'mime': 'image/png', 'name': 'a.png'}]}
+            store.archive(rich)
+            store.archive({**rich, 'id': 'device_two'})
+            self.assertEqual({'device_one', 'device_two'}, {row['id'] for row in store.list()})
+            self.assertEqual('a.png', store.load('device_one')['items'][-1]['attachments'][0]['name'])
+            self.assertEqual(1, len(json.loads((store.directory / 'device_one.json').read_text('utf-8'))['items']))
+            store.archive(store.load('device_one'))
+            self.assertEqual(2, len(store.load('device_one')['items']))
+            self.assertTrue((store.directory / ('sync_' + fingerprint + '.json')).is_file())
+            self.assertEqual({'device_one', 'device_two'}, {row['id'] for row in ConversationStore(Path(folder)).list()})
+
+
 class RpcTests(unittest.TestCase):
     def test_dispatch_operations_keep_their_contract(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(host, 'DATA', Path(folder)):

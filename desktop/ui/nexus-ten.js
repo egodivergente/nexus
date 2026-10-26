@@ -29,6 +29,7 @@ function setText(node,text){if(node&&node.textContent!==text)node.textContent=te
 
 /* ---------- Vocabulary, header and navigation ---------- */
 const VIEWS={
+ editor:['Corte · Montaje','Monta y edita tus medios locales con el agente'],
  assistant:['Asistente','Planifica y prepara tus creaciones conversando'],
  canvas:['Crear','Describe tu idea, elige un modelo y revisa el coste antes de generar'],
  catalog:['Modelos','Elige por lo que quieres conseguir'],

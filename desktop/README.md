@@ -1,3 +1,7 @@
+# Desktop integrado 2026.10.26-desktop-modern.1
+
+Edición Python/Edge para Windows con agente JVM, Corte, importación local de hasta 4 GiB, continuidad de dispositivos y la interfaz y catálogo del 26 de octubre. Consulta [procedencia y verificación](../docs/DESKTOP-MODERN-20261026.md). Los apartados siguientes documentan versiones anteriores.
+
 # Actualización Desktop 1.9.6-agent-desktop · 25/10/2026
 
 Actualización selectiva de conversaciones, catálogo y núcleo compartido. No implica paridad completa con Android 1.9.77. Ver [alcance, procedencia y pruebas](../docs/DESKTOP-UPDATE-20261025.md). Los apartados siguientes son históricos.

@@ -11,11 +11,11 @@ class WindowsToolProvider(private val delegate: LlmProvider) : LlmProvider {
             WindowsStreamingToolProvider(delegate) else WindowsToolProvider(delegate)
         val connections = setOf("web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools",
             "call_mcp_tool", "disconnect_mcp_server", "get_active_generations", "recover_generation", "diagnose_flow",
-            "repair_flow", "get_nexus_settings", "update_nexus_settings", "atlas_get_balance")
+            "repair_flow", "flow_agent_send", "flow_agent_read", "get_generation_history", "get_nexus_settings", "update_nexus_settings", "atlas_get_balance")
         val models = setOf("list_models", "search_models", "get_model", "get_model_schema", "recommend_models",
             "validate_parameters", "estimate_generation_cost", "create_generation_prompt", "compare_model_families",
             "prepare_generation", "prepare_image_upscale", "update_plan", "submit_generation", "get_generation_status",
-            "cancel_generation", "get_model_brief")
+            "cancel_generation", "get_model_brief", "get_ui_state")
         fun select(request: LlmRequest): LlmRequest {
             if (request.tools.size <= 64) return request
             val latestUser = request.messages.indexOfLast { message -> message.role == Role.USER &&

@@ -58,6 +58,15 @@ check('row and rename markup',()=>{
  assert.equal(CC.chatWhen(0),'');
 });
 
+check('synced media remains visible and unsafe links stay inert',()=>{
+ const html=CC.messageMarkup({id:'sync',role:'assistant',text:'Adjuntos',cancelled:true,attachments:[
+  {name:'foto.png',mime:'image/png',url:'/media/foto.png'},
+  {name:'clip.mp4',mime:'video/mp4',url:'/media/clip.mp4'},
+  {name:'inert.txt',url:'javascript:alert(1)'}]});
+ assert(html.includes('<img src="/media/foto.png"')&&html.includes('<video src="/media/clip.mp4"'));
+ assert(html.includes('Turno detenido')&&!html.includes('href="javascript:'));
+});
+
 // Flow tests: run the browser half against a minimal DOM double and an in-memory host.
 function harness({failNew=false,failLoad=false}={}){
  const listeners={};const calls=[];const store=new Map([['android1',{items:[{role:'user',text:'de Android'}]}]]);let failNewOnce=failNew;
@@ -66,12 +75,12 @@ function harness({failNew=false,failLoad=false}={}){
   toast:m=>calls.push(['toast',m]),persist(){},renderAssistant(){},navigate(){},view:'assistant',
   state:{agentConversation:{draft:'mi borrador',items:[]}},
   Agent:{items:[{id:'m1',role:'user',text:'hola'}],draft:'mi borrador',attachments:[{id:'f1',name:'a.png'}],busy:false,generating:false,cardAnchors:new Map(),expandedBatches:new Set(),error:''},
-  async rpc(op,args){calls.push([op,args]);
+  async rpc(op,args){calls.push([op,JSON.parse(JSON.stringify(args||{}))]);
    if(op==='archiveChat'){const id=args.id||'server';store.set(id,{...args,id});return {saved:true,id};}
    if(op==='loadChat'){if(failLoad)throw Error('no se pudo leer');const v=store.get(args.id);if(!v)throw Error('no existe');return JSON.parse(JSON.stringify(v));}
    if(op==='renameChat')return {id:args.id,title:args.title||'Auto',customTitle:args.title||null};
    if(op==='listChats')return [...store.keys()].map(id=>({id,title:id,messages:1,preview:'',updatedAt:1,customTitle:null}));},
-  async agentCall(op,args){calls.push(['agent:'+op,args]);if(op==='new'&&failNewOnce){failNewOnce=false;throw Error('modelo caído');}return {};}
+  async agentCall(op,args){calls.push(['agent:'+op,JSON.parse(JSON.stringify(args||{}))]);if(op==='new'&&failNewOnce){failNewOnce=false;throw Error('modelo caído');}return {};}
  };
  ctx.window=ctx;vm.createContext(ctx);
  vm.runInContext('const escape=s=>String(s??"").replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","\'":"&#39;"}[c]));\n'+source,ctx);
@@ -122,7 +131,7 @@ flows.push((async()=>{
  const {CC:api,calls}=harness();
  api._panel.chats=[{id:'c1',title:'Auto',messages:1}];
  await api.rename('c1','  Mi vídeo  ');
- assert.deepEqual(calls.find(c=>c[0]==='renameChat')[1],{id:'c1',title:'  Mi vídeo  '});
+ assert.deepEqual(JSON.parse(JSON.stringify(calls.find(c=>c[0]==='renameChat')[1])),{id:'c1',title:'  Mi vídeo  '});
  assert.equal(api._panel.chats[0].customTitle,'  Mi vídeo  ');
  await api.rename('c1','');
  assert.equal(api._panel.chats[0].customTitle,null);assert.equal(api._panel.chats[0].title,'Auto');

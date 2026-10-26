@@ -36,7 +36,12 @@
   return `<article data-agent-message="${escape(id)}" class="${escape(classes)}"><div class="agent-author">${user?'Tú':'Nexus'}</div>`+
    `<div class="agent-text${user?' cc-fold-body':''}" id="${escape(textId)}">${body}</div>`+
    (user?`<button type="button" class="cc-fold-toggle" data-cc-fold="${escape(id)}" aria-controls="${escape(textId)}" aria-expanded="${expanded}"${expanded?'':' hidden'}>${expanded?'Contraer':'Expandir'}</button>`:'')+
-   (item.attachments||[]).map(f=>`<span class="agent-file">${escape(f.name)}</span>`).join('')+
+   (item.attachments||[]).map(f=>{
+    const url=String(f.url||'');const safe=/^(?:https?:\/\/|\/(?!\/)|blob:)/i.test(url);
+    const preview=safe&&item.role==='assistant'?(f.mime?.startsWith('image/')?`<img src="${escape(url)}" alt="${escape(f.name)}" loading="lazy" style="max-width:100%;max-height:300px">`:f.mime?.startsWith('video/')?`<video src="${escape(url)}" controls preload="metadata" style="max-width:100%"></video>`:''):'';
+    return `<span class="agent-file">${preview}${safe?`<a href="${escape(url)}" download>${escape(f.name)}</a>`:escape(f.name)}</span>`;
+   }).join('')+
+   (item.cancelled?'<small class="hint">Turno detenido. Tu mensaje se conserva.</small>':'')+
    (item.failed?`<div class="cc-failed" role="status"><span>Envío no confirmado. Tu mensaje se conserva.</span><button type="button" class="cc-retry" data-cc-retry="${escape(id)}">Reintentar</button></div>`:'')+
    `<div class="cc-actions" role="group" aria-label="Acciones del mensaje">`+
    (item.usage?`<details class="cc-usage"><summary>Detalles</summary><small>${escape(usageText(item.usage))}</small></details>`:'')+

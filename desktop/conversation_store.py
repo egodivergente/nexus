@@ -52,7 +52,10 @@ def converted(value):
     """Desktop view of an archived chat. Android files are translated in memory, never rewritten."""
     if value.get('desktop'):
         if value.get('continuityAttachments'):
-            return {**value, 'items': value.get('items', []) + [{'role': 'assistant', 'text': 'Adjuntos archivados de esta conversación', 'attachments': value['continuityAttachments']}]}
+            seen = {(a.get('id'), a.get('url')) for item in value.get('items', []) for a in item.get('attachments', [])}
+            missing = [a for a in value['continuityAttachments'] if (a.get('id'), a.get('url')) not in seen]
+            if missing:
+                return {**value, 'items': value.get('items', []) + [{'role': 'assistant', 'text': 'Adjuntos archivados de esta conversación', 'attachments': missing}]}
         return value
     items = []
     for item in value.get('items', []):
@@ -114,7 +117,7 @@ def _metadata(name, chat, raw, stat):
     return {'modified': stat.st_mtime_ns, 'length': stat.st_size, 'automatic': automatic,
             'messages': len(items), 'preview': (users[-1] if users else '')[:PREVIEW_LIMIT],
             'updatedAt': int(updated), 'projectId': raw.get('projectId'), 'search': search,
-            'continuityOrigin': raw.get('continuityOrigin'), 'continuityTextHash': raw.get('continuityTextHash')}
+            'continuityOrigin': raw.get('continuityOrigin'), 'continuityTextHash': raw.get('continuityTextHash') if isinstance(raw.get('continuityTextHash'), str) else None}
 
 
 def _derived(name, raw, stat):

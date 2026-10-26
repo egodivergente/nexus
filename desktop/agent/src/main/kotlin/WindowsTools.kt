@@ -23,7 +23,7 @@ object WindowsTools {
                 }
             }
         val groups = object : BaseTool("use_desktop_tools", ToolCategory.READ,
-            "Activa herramientas que no aparecen en esta petición por el límite de 64 del puente. group=connections habilita web_search/read_web_page, MCP, saldo, trabajos activos/recuperación Flow y ajustes. group=models vuelve a catálogo, schema, preparación y seguimiento de generaciones. Los archivos, proyectos y edición Windows/Corte permanecen disponibles en ambos grupos. No cambia permisos ni ejecuta acciones.",
+            "Activa herramientas que no aparecen en esta petición por el límite de 64 del puente. group=connections habilita web_search/read_web_page, MCP, saldo, historial, trabajos activos, agente/recuperación Flow y ajustes. group=models vuelve a catálogo, schema, preparación, estado de las tarjetas y seguimiento de generaciones. Los archivos, proyectos y edición Windows/Corte permanecen disponibles en ambos grupos. No cambia permisos ni ejecuta acciones.",
             Json.parseToJsonElement("""{"type":"object","properties":{"group":{"type":"string","enum":["models","connections"]}},"required":["group"]}""").jsonObject) {
             override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome = ToolOutcome(input)
         }

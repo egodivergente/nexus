@@ -10,7 +10,7 @@ import zipfile
 parser=argparse.ArgumentParser();parser.add_argument('--install',action='store_true');args=parser.parse_args()
 root=Path(__file__).resolve().parents[2];desktop=root/'desktop';out=root/'entregas';out.mkdir(exist_ok=True)
 subprocess.run(['python','-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
-version='2026.10.20-device-continuity.2'
+version='2026.10.26-desktop-modern.1'
 files={}
 def include(path,relative):
     if path.is_file():files[str(relative).replace('\\','/')]=path
@@ -23,9 +23,12 @@ for folder in ['ui','agent/runtime','agent/assets']:
 # Package current authoritative skills, rather than an older duplicated tree.
 for p in (root/'agent-skills').rglob('*'):
     include(p,Path('desktop/agent/agent-skills')/p.relative_to(root/'agent-skills'))
-for name in ['test-desktop-local-files.py','test-corte-ui.py','test-corte-media.js','test-corte-windows.py','test-windows-library.py','test-windows-agent-providers.py','test-custom-media.py','test-project-portable.py','test-agent-cancel.py','test-project-controls-ui.py','test-byteplus-pc-live.py','test-byteplus-documents.py','agent-qa-schema.json']:
+for name in ['test-modern-install.py','test-desktop-local-files.py','test-corte-ui.py','test-corte-media.js','test-corte-windows.py','test-windows-library.py','test-windows-agent-providers.py','test-custom-media.py','test-project-portable.py','test-agent-cancel.py','test-project-controls-ui.py','test-byteplus-pc-live.py','test-byteplus-documents.py','agent-qa-schema.json']:
     include(desktop/'tools'/name,Path('desktop/tools')/name)
 for p in (root/'tools/flow-bridge').glob('*.py'):include(p,Path('tools/flow-bridge')/p.name)
+for name in ['android-source-manifest.json', 'desktop-parity-manifest.json']:
+    include(desktop/'agent'/name,Path('desktop/agent')/name)
+include(root/'docs/DESKTOP-MODERN-20261026.md',Path('docs/DESKTOP-MODERN-20261026.md'))
 for p in (root/'docs/windows-corte').glob('*'):
     include(p,Path('docs/windows-corte')/p.name)
 for required in ['desktop/corte_host.py','desktop/corte_render.py','desktop/agent/runtime/corte-model.jar','desktop/agent/runtime/corte-timeline.jar','desktop/agent/runtime/corte-storage.jar','desktop/agent/runtime/nexus-desktop-agent.jar','desktop/ui/corte.js']:
