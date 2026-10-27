@@ -2,7 +2,7 @@ package com.vidadomu.nexus.ui.models
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -34,8 +34,22 @@ internal fun Modifier.logoResizeGesture(
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         onHold(true)
-        val long = awaitLongPressOrCancellation(down.id)
-        if (long == null) { onHold(false); return@awaitEachGesture }
+        val slop = viewConfiguration.touchSlop
+        // true → start adjusting (second finger landed, or the hold completed); false → a tap or a scroll, do nothing.
+        var start: Boolean? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val pressed = event.changes.filter { it.pressed }
+                if (pressed.isEmpty()) return@withTimeoutOrNull false
+                if (pressed.size >= 2) { event.changes.forEach { it.consume() }; return@withTimeoutOrNull true }
+                val first = pressed[0]
+                if (first.isConsumed || (first.position - down.position).getDistance() > slop) return@withTimeoutOrNull false
+            }
+            @Suppress("UNREACHABLE_CODE")
+            false
+        }
+        if (start == null) start = true
+        if (start != true) { onHold(false); return@awaitEachGesture }
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         onAdjusting(true)
         var value = current()
@@ -43,9 +57,9 @@ internal fun Modifier.logoResizeGesture(
         var atLimit = false
         var snapped = abs(value - 1f) < .001f
         val heightPx = size.height.toFloat().coerceAtLeast(1f)
-        var lastY = long.position.y
+        var lastY = down.position.y
         do {
-            val event = awaitPointerEvent()
+            val event = awaitPointerEvent(PointerEventPass.Initial)
             val pressed = event.changes.filter { it.pressed }
             if (pressed.size >= 2) {
                 value *= event.calculateZoom()
