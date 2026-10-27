@@ -5,8 +5,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
@@ -25,7 +23,7 @@ internal fun Modifier.logoResizeGesture(
     current: () -> Float,
     min: Float,
     max: Float,
-    haptic: HapticFeedback,
+    vibrate: (com.vidadomu.nexus.ui.theme.NexusVibration.Kind) -> Unit,
     onHold: (Boolean) -> Unit,
     onAdjusting: (Boolean) -> Unit,
     onScale: (Float) -> Unit,
@@ -50,7 +48,7 @@ internal fun Modifier.logoResizeGesture(
         }
         if (start == null) start = true
         if (start != true) { onHold(false); return@awaitEachGesture }
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
         onAdjusting(true)
         var value = current()
         var lastTick = (value * 20).roundToInt()
@@ -72,20 +70,20 @@ internal fun Modifier.logoResizeGesture(
             var v = value.coerceIn(min, max)
             // Magnet at the default size.
             if (abs(v - 1f) < .04f) {
-                if (!snapped) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); snapped = true }
+                if (!snapped) { vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK); snapped = true }
                 v = 1f
             } else snapped = false
             val hit = v <= min + .001f || v >= max - .001f
-            if (hit && !atLimit) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (hit && !atLimit) vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
             atLimit = hit
             val tick = (v * 20).roundToInt()
-            if (tick != lastTick) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); lastTick = tick }
+            if (tick != lastTick) { vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK); lastTick = tick }
             onScale(v)
             event.changes.forEach { it.consume() }
         } while (event.changes.any { it.pressed })
         onAdjusting(false)
         onHold(false)
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
         onCommit()
     }
 }

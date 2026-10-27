@@ -43,7 +43,7 @@ import com.vidadomu.nexus.core.model.*
     // The lifted card grows, gains a soft shadow and an accent edge; the rest of the grid slides out of its way.
     var logoHeld by remember {mutableStateOf(false)}
     var adjusting by remember {mutableStateOf(false)}
-    val haptic=LocalHapticFeedback.current
+    val appContext=androidx.compose.ui.platform.LocalContext.current.applicationContext
     val labels=rememberCatalogLabels()
     val glyphKey="family:"+section.family
     val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.07f else if(adjusting) 1.04f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Card lift")
@@ -67,7 +67,7 @@ import com.vidadomu.nexus.core.model.*
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             // Fixed slot: the card never changes size, only the logo inside it does.
             Box(Modifier.size(ArtBoxCardMetrics.logoSlot).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
-                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,haptic=haptic,onHold={logoHeld=it},onAdjusting={adjusting=it},
+                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it},onAdjusting={adjusting=it},
                 onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.TopCenter) {
                 // Sin tope de hueco: un logo grande crece hacia abajo y el nombre se escribe por encima.
                 Box(Modifier.wrapContentSize(Alignment.TopCenter,unbounded=true)) {
