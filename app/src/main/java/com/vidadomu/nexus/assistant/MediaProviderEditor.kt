@@ -286,15 +286,18 @@ private fun MediaModelEditorDialog(initial: MediaModelConfig?, takenIds: Set<Str
                 Button(modifier = Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8), onClick = {
                     val params = MediaParamsText.parse(paramsText).getOrElse { error = it.message; return@Button }
                     val p = price.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: run { error = "El precio no es un número."; return@Button } }
-                    val model = MediaModelConfig(
+                    val model = seed.copy(
                         id = id.trim(), name = name.trim(), capability = capability, providerModelId = "", createPath = createPath.trim(), method = method.uppercase(),
-                        requestTemplate = template.trim(), params = params, mode = mode, taskIdPath = taskIdPath, pollPath = pollPath, statusPath = statusPath,
+                        requestTemplate = template.trim(), params = params.map { param ->
+                            val original = seed.params.firstOrNull { it.key == param.key }
+                            if (seed.falQueue) param.copy(min = original?.min, max = original?.max) else param
+                        }, mode = mode, taskIdPath = taskIdPath, pollPath = pollPath, statusPath = statusPath,
                         successValues = MediaParamsText.list(successValues), failureValues = MediaParamsText.list(failureValues), progressPath = progressPath, errorPath = errorPath,
                         resultPaths = MediaParamsText.list(resultPaths), maxImages = int(maxImages, 1), priceUsd = p, priceUnit = priceUnit.trim(),
                     )
                     if (model.id in takenIds) { error = "Ya hay un modelo con ese ID."; return@Button }
                     // Se valida dentro de un proveedor de relleno: los mensajes son los mismos que al guardar.
-                    val problem = MediaProviderConfig("validar", "validar", "https://validar.invalid", models = listOf(model)).problems().firstOrNull()
+                    val problem = MediaProviderConfig("validar", "validar", if (model.falQueue) "https://queue.fal.run" else "https://validar.invalid", models = listOf(model)).problems().firstOrNull()
                     if (problem != null) { error = problem.substringAfter(": ", problem); return@Button }
                     onSave(model)
                 }) { Text("Guardar modelo") }
