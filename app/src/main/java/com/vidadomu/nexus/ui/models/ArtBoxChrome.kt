@@ -45,7 +45,7 @@ internal fun ArtBoxTabs(tabs: List<ArtBoxTab>, modifier: Modifier = Modifier) {
     FlowRow(container, horizontalArrangement = Arrangement.spacedBy(2.dp), maxLines = if (wrap) 3 else 1) {
         tabs.forEach { tab ->
             val indicator by animateDpAsState(if (tab.selected) 24.dp else 0.dp, label = "ArtBox tab indicator")
-            val tint = if (tab.selected) colors.primary else colors.onSurface.copy(alpha = .74f)
+            val tint = if (tab.selected) colors.primary else colors.onSurfaceVariant
             Column(Modifier.clip(NexusTokens.filter).selectable(tab.selected, role = Role.Tab, onClick = tab.onClick)
                 .heightIn(min = 44.dp).padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

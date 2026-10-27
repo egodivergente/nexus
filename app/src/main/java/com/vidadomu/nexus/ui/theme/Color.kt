@@ -26,8 +26,12 @@ val AccentCoral: Color @Composable get() = MaterialTheme.colorScheme.error
 val AccentGold: Color @Composable get() = MaterialTheme.colorScheme.primary
 val ErrorRed: Color @Composable get() = MaterialTheme.colorScheme.error
 val TextPrimary: Color @Composable get() = MaterialTheme.colorScheme.onSurface
+/**
+ * The single secondary-text token: counters, price notes, subtitles, «Última actividad», metadata.
+ * Always opaque (never `.copy(alpha=…)`) so it keeps ≥ 4.5:1 on every surface of the dark palettes.
+ */
 val TextSecondary: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
-val TextMuted: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+val TextMuted: Color @Composable get() = TextSecondary
 val BorderSubtle: Color @Composable get() = Color.Transparent
 val BorderHighlight: Color @Composable get() = Color.Transparent
 val BorderActive: Color @Composable get() = MaterialTheme.colorScheme.primary

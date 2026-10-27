@@ -155,7 +155,7 @@ internal fun ChatBoardCard(boardId: String) {
         }
         if(annotations) Text("Anotaciones activas · termina con ✓",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
         if (current.dirty) Text("Se enviará al agente con tu próximo mensaje", style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .62f), modifier = Modifier.padding(end = 8.dp))
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
     }
 }
 

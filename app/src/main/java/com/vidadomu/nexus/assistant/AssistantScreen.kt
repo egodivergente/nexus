@@ -764,7 +764,7 @@ internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier, 
     val time=remember(at) {java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at))}
     val label=listOfNotNull(by.ifBlank {null},time,formatTook(tookMs).takeIf {tookMs>0}).joinToString(" · ")
     Text(label,modifier,style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,lineHeight=12.sp),
-        color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.62f),maxLines=1)
+        color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
 }
 
 internal fun formatTook(ms: Long): String = when {
