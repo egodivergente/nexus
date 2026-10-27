@@ -82,6 +82,16 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
         edit.apply()
     }
 
+    /** Live resize while a finger is still down: only memory; [commitScale] writes it to disk when the finger lifts. */
+    fun setScaleLive(key: String, scale: Float) { scales[key] = scale.coerceIn(MIN_SCALE, MAX_SCALE) }
+
+    fun commitScale(key: String) {
+        val v = scales[key] ?: 1f
+        if (v in .98f..1.02f) { scales.remove(key); prefs.edit().remove("s:$key").apply() } else prefs.edit().putFloat("s:$key", v).apply()
+    }
+
+    fun resetScale(key: String) { scales.remove(key); prefs.edit().remove("s:$key").apply() }
+
     fun reset(key: String) {
         names.remove(key); descriptions.remove(key); icons.remove(key); scales.remove(key)
         prefs.edit().remove("n:$key").remove("d:$key").remove("i:$key").remove("s:$key").apply()
@@ -97,7 +107,7 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
 
     companion object {
         const val MIN_SCALE = .5f
-        const val MAX_SCALE = 1.6f
+        const val MAX_SCALE = 1.4f
         @Volatile private var instance: CatalogLabelStore? = null
         fun get(context: Context): CatalogLabelStore = instance ?: synchronized(this) {
             instance ?: CatalogLabelStore(context.applicationContext).also { instance = it }

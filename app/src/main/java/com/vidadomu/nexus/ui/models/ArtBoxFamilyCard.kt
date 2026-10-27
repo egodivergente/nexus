@@ -11,6 +11,10 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -37,15 +41,20 @@ import com.vidadomu.nexus.core.model.*
     val colors=MaterialTheme.colorScheme
     val count=pluralModelos(section.models.map(::modelGroupTitle).distinct().size)
     // The lifted card grows, gains a soft shadow and an accent edge; the rest of the grid slides out of its way.
-    val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.07f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Card lift")
+    var logoHeld by remember {mutableStateOf(false)}
+    var adjusting by remember {mutableStateOf(false)}
+    val haptic=LocalHapticFeedback.current
+    val labels=rememberCatalogLabels()
+    val glyphKey="family:"+section.family
+    val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.07f else if(adjusting) 1.04f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Card lift")
     val reorderActions=listOfNotNull(
         onMoveUp?.let {action -> androidx.compose.ui.semantics.CustomAccessibilityAction("Subir ${section.family}") {action();true}},
         onMoveDown?.let {action -> androidx.compose.ui.semantics.CustomAccessibilityAction("Bajar ${section.family}") {action();true}})
     Surface(shape=NexusTokens.card,color=if(dragging) colors.surfaceContainerHigh else colors.surfaceContainerLow,
         shadowElevation=if(dragging) 18.dp else 0.dp,
-        border=BorderStroke(if(dragging) 1.5.dp else .5.dp,if(dragging) colors.primary else colors.outlineVariant.copy(alpha=.7f)),
+        border=BorderStroke(if(dragging||adjusting) 1.5.dp else .5.dp,if(dragging||adjusting) colors.primary else colors.outlineVariant.copy(alpha=.7f)),
         modifier=Modifier.fillMaxWidth().graphicsLayer {scaleX=lift;scaleY=lift}.then(dragModifier ?: Modifier)
-            .combinedClickable(onClick=onOpen,onLongClick=if(dragModifier==null) onOptions else null,onLongClickLabel=if(dragModifier==null) "Opciones de ${section.family}" else null)
+            .combinedClickable(onClick=onOpen,onLongClick=if(dragModifier==null) ({if(!logoHeld) onOptions()}) else null,onLongClickLabel=if(dragModifier==null) "Opciones de ${section.family}" else null)
             .semantics(mergeDescendants=true) {contentDescription="${section.family}, $count"; if(reorderActions.isNotEmpty()) customActions=reorderActions}) {
         Box {
         IconButton(onClick=onOptions,modifier=Modifier.align(Alignment.TopEnd).size(40.dp)) {
@@ -56,24 +65,30 @@ import com.vidadomu.nexus.core.model.*
         // fixed height: with bold or larger system text (Pixel 8 Pro, 25/10) a fixed height clipped the count.
         Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
-            val labels=rememberCatalogLabels()
-            CatalogGlyph("family:"+section.family,ArtBoxCardMetrics.logo,labels) {size ->
-                if(toolCategory) {
-                    Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
-                        Icon(toolCategoryIcon(section.family),null,Modifier.size(size*.57f),tint=colors.primary)
-                    }
-                } else BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=size,bare=true)
+            // Fixed slot: the card never changes size, only the logo inside it does.
+            Box(Modifier.size(ArtBoxCardMetrics.logoSlot).logoResizeGesture(enabled=dragModifier==null,key=glyphKey,current={labels.scale(glyphKey)},
+                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,haptic=haptic,onHold={logoHeld=it},onAdjusting={adjusting=it},
+                onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.Center) {
+                CatalogGlyph(glyphKey,ArtBoxCardMetrics.logo,labels) {size ->
+                    if(toolCategory) {
+                        Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
+                            Icon(toolCategoryIcon(section.family),null,Modifier.size(size*.57f),tint=colors.primary)
+                        }
+                    } else BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=size,bare=true)
+                }
             }
             Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
-            Text(count,style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,maxLines=1)
+            Text(if(adjusting) "Tamaño · "+(labels.scale(glyphKey)*100).toInt()+" %" else count,style=MaterialTheme.typography.labelSmall,color=if(adjusting) colors.primary else colors.onSurfaceVariant,maxLines=1)
         }
         }
     }
 }
 
 internal object ArtBoxCardMetrics {
-    val height = 148.dp
+    val height = 176.dp
     val logo = 64.dp
+    /** Space reserved for the logo: the largest size (logo × MAX_SCALE) fits, so every card has the same height. */
+    val logoSlot = 90.dp
 }
 
 /** Functional symbol per category; brand logos stay for providers only. */
