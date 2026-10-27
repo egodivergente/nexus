@@ -1,5 +1,19 @@
 # Changelog — NEXUS
 
+## 1.9.78-agent (vc112) - 2026-10-27
+
+Auditoría visual (10 mejoras), sobre 1.9.77/vc111:
+- Fondo: velo en degradado sobre la foto personal (mínimo 0,80) para que el texto siempre se lea.
+- Contraste: un único token opaco de texto secundario.
+- Acciones de texto suelto convertidas en botones tonales con icono (Flow, chat).
+- Automatización: ámbito como desplegable, Personalizado/Predeterminado/Heredado, restaurar solo con valor propio, stepper para límites pequeños y ayudas en palabras.
+- ArtBox: aviso de catálogo con Reintentar, estado vacío real, «Favoritos · pestaña» y filtro activo visible con recuento.
+- Flow: el estado de cola aparece una vez, chips como Biblioteca, «N resultados ▾», contador de caracteres y pistas en los iconos; botón Generar deshabilitado legible.
+- Capas fijas: panel inferior con bordes de hoja; mini-reproductor compacto y oculto en Flow.
+- Inicio: selector de proyectos compacto con el zorro como fondo difuminado, fijados/recientes y buscador (>6). Biblioteca: carpetas uniformes y filas en cola distinguibles.
+- Chat: sin ids att_…, recuadros con jerarquía propia, carrusel con indicador y margen para los botones flotantes.
+- Cabeceras: título de Ajustes como el de las pestañas y saldo con icono de monedero.
+
 ## 1.9.62-background (vc96) - 2026-10-20
 
 - El turno del agente se ejecuta en un servicio de primer plano con bloqueo parcial de CPU; la sesión continúa al destruir la pantalla y puede detenerse desde la notificación.
