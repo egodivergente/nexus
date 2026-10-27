@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -44,7 +45,14 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,m
     Surface(shape=NexusTokens.thumbnail,modifier=Modifier.aspectRatio(1f).clickable(
         role=Role.Button,onClickLabel="Abrir ${asset.displayName}",onClick=onPreview)) {
         Box(contentAlignment=Alignment.Center) {
-            if(visual) AsyncImage(asset.uri,asset.displayName,imageLoader=loader,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            if(visual) {
+                val isVideo=asset.type==AssetType.VIDEO
+                when(val thumb=rememberThumb(asset.uri,isVideo)) {
+                    is Thumb.Ready -> androidx.compose.foundation.Image(thumb.bitmap.asImageBitmap(),asset.displayName,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                    Thumb.Failed -> Icon(if(isVideo) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Thumb.Loading -> Unit
+                }
+            }
             else Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(8.dp).padding(bottom=if(showDetails) 24.dp else 0.dp)) {
                 Icon(if(asset.type==AssetType.AUDIO) Icons.Default.GraphicEq else Icons.Default.Description,null)
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)

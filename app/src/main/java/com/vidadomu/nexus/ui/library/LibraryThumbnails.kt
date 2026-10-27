@@ -40,35 +40,38 @@ internal object LibraryThumbnails {
         }
     }.getOrNull()
 
-    suspend fun load(uri: String, video: Boolean): Thumb {
+    suspend fun load(context: android.content.Context, uri: String, video: Boolean): Thumb {
         cache.get(uri)?.let { return Thumb.Ready(it) }
         val file = fileOf(uri)
         android.util.Log.d("NexusThumb", "load ${file?.name} exists=${file?.isFile} len=${file?.length()} canRead=${file?.canRead()}")
         return withContext(Dispatchers.IO) {
             gate.withPermit {
                 runCatching {
-                    val bitmap = if (video) videoFrame(file, uri) else imageAt(file, uri)
+                    val bitmap = if (video) videoFrame(context, file, uri) else imageAt(context, file, uri)
                     if (bitmap != null) { cache.put(uri, bitmap); Thumb.Ready(bitmap) } else Thumb.Failed
                 }.getOrElse { android.util.Log.e("NexusThumb", "fail ${file?.name}", it); Thumb.Failed }.also { android.util.Log.d("NexusThumb", "done ${file?.name} -> ${it::class.simpleName}") }
             }
         }
     }
 
-    private fun imageAt(file: File?, uri: String): Bitmap? {
-        if (file == null || !file.isFile) return null
+    private fun imageAt(context: android.content.Context, file: File?, uri: String): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        val parsed = Uri.parse(uri)
+        fun <T> open(block: (java.io.InputStream) -> T): T? =
+            if (file != null) (if (file.isFile) file.inputStream().use(block) else null)
+            else context.contentResolver.openInputStream(parsed)?.use(block)
+        open { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         var sample = 1
         while (bounds.outWidth / (sample * 2) >= TARGET && bounds.outHeight / (sample * 2) >= TARGET) sample *= 2
-        return BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+        return open { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
     }
 
-    private fun videoFrame(file: File?, uri: String): Bitmap? {
-        if (file == null || !file.isFile) return null
+    private fun videoFrame(context: android.content.Context, file: File?, uri: String): Bitmap? {
+        if (file != null && !file.isFile) return null
         val retriever = MediaMetadataRetriever()
         return try {
-            retriever.setDataSource(file.absolutePath)
+            if (file != null) retriever.setDataSource(file.absolutePath) else retriever.setDataSource(context, Uri.parse(uri))
             val frame = retriever.getFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                 ?: retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
             val scale = TARGET.toFloat() / maxOf(frame.width, frame.height)
@@ -79,8 +82,9 @@ internal object LibraryThumbnails {
 
 @Composable
 internal fun rememberThumb(uri: String?, video: Boolean): Thumb {
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val state by produceState<Thumb>(if (uri == null) Thumb.Failed else Thumb.Loading, uri, video) {
-        value = if (uri == null) Thumb.Failed else LibraryThumbnails.load(uri, video)
+        value = if (uri == null) Thumb.Failed else LibraryThumbnails.load(context, uri, video)
     }
     return state
 }
