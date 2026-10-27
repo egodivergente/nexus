@@ -240,9 +240,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         resultLabel=if(rootLevel) "${visible.size} ${if(visible.size==1) "modelo" else "modelos"}" else null)
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
-                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {
-                    InlineNotice("Sin conexión con el catálogo: muestro el guardado.",isError=false,
+                // Say which provider did not refresh and why; «verificando contratos n/m» is progress, not a failure.
+                val catalogProblem = error?.takeUnless { it.contains("verificando contratos") }
+                if(catalogProblem!=null) item(span={GridItemSpan(maxLineSpan)}) {
+                    InlineNotice(catalogProblem.split(" · ").joinToString("\n"),isError=false,
                         actionLabel=if(loading) null else "Reintentar",onAction={app.modelCatalogRepository.refreshModels(true)})
+                } else if(loading && error!=null) item(span={GridItemSpan(maxLineSpan)}) {
+                    Text(error.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
                 val priceRoutes=if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes}
                 val priceNote=catalogPriceNote(priceRoutes,anyPrice=priceRoutes.any {(referencePrice(it) ?: 0.0)>0.0})

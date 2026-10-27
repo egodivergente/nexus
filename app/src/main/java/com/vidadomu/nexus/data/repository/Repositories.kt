@@ -115,7 +115,10 @@ class ModelCatalogRepository(
                         val prior=previous.filter { it.providerId==provider.id }
                         if(provider.catalogNotice!=null && prior.size>fetched.size) prior else fetched
                     } catch (e: Exception) {
-                        errors += "${provider.displayName}: no se pudo actualizar; se conserva el catálogo anterior"
+                        // Name the reason, so «sin actualizar» can be told apart: no network, expired key, empty answer…
+                        val reason = (e as? com.vidadomu.nexus.core.model.ProviderError)?.humanReadableMessage ?: e.message
+                        errors += "${provider.displayName}: no se pudo actualizar" +
+                            (reason?.takeIf { it.isNotBlank() }?.let { " (${it.take(90)})" } ?: "") + "; uso el catálogo guardado"
                         previous.filter { it.providerId == provider.id }
                     }
                 }.distinctBy { "${it.providerId}:${it.id}" }
