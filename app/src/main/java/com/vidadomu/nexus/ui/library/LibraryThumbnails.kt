@@ -79,11 +79,24 @@ internal object LibraryThumbnails {
     }
 }
 
+/**
+ * Local files that cannot be opened (deleted, moved or never copied to this phone). They are hidden from the grid
+ * instead of leaving an empty placeholder. Only local files are recorded: a remote URL may fail just because there
+ * is no connection, and that must not hide the item.
+ */
+internal object LibraryUnavailable {
+    private val keys = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+    fun count(): Int = keys.size
+    fun mark(key: String) { if (!keys.containsKey(key)) keys[key] = true }
+    fun isUnavailable(key: String?): Boolean = key != null && keys.containsKey(key)
+}
+
 @Composable
 internal fun rememberThumb(uri: String?, video: Boolean): Thumb {
     val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val state by produceState<Thumb>(if (uri == null) Thumb.Failed else Thumb.Loading, uri, video) {
         value = if (uri == null) Thumb.Failed else LibraryThumbnails.load(context, uri, video)
+        if (uri != null && value is Thumb.Failed) LibraryUnavailable.mark(uri)
     }
     return state
 }

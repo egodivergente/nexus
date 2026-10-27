@@ -197,6 +197,16 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         (completed.flatMap {job -> job.outputs.indices.map {LibraryEntry.Out(job,it)}}+localAssets.map {LibraryEntry.Local(it)})
             .sortedByDescending {it.time}.groupBy {day.format(Date(it.time))}
     }
+    // Sin archivos locales que no se pueden abrir: no ocupan hueco ni dejan una baldosa vacía.
+    val unavailableCount=LibraryUnavailable.count()
+    val shownTimeline=remember(timeline,conflicts,unavailableCount) {
+        timeline.mapValues {(_,entries) -> entries.filterNot {entry ->
+            LibraryUnavailable.isUnavailable(when(entry) {
+                is LibraryEntry.Local -> entry.asset.uri
+                is LibraryEntry.Out -> OutputFiles.trustedLocalUri(entry.job.outputs[entry.index],conflicts)
+            })
+        }}.filterValues {it.isNotEmpty()}
+    }
     // Mismo archivo exacto apareciendo más de una vez en la lista visible (p. ej. importado y luego generado otra vez).
     val duplicateUris=remember(completed,localAssets,conflicts) {
         (completed.flatMap {job -> job.outputs.map {OutputFiles.trustedLocalUri(it,conflicts) ?: it.url}}+localAssets.map {it.uri})
@@ -539,7 +549,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     }
                 }
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
-                timeline.forEach {(day,entries) ->
+                shownTimeline.forEach {(day,entries) ->
                     item(key="header:$day",span={GridItemSpan(maxLineSpan)}) {Text(day,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     items(entries,key={it.key}) {entry ->
