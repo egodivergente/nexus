@@ -628,7 +628,16 @@ private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit,onRefresh:()->Unit,o
         val progress=job.progress
         if(progress!=null) CircularProgressIndicator(progress={progress.coerceIn(0f,1f)},modifier=Modifier.size(18.dp),strokeWidth=2.dp)
         else CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
-        Text(model,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
+        // Model plus the start of the prompt: two jobs of the same model are no longer two identical lines.
+        Column(Modifier.weight(1f)) {
+            Text(model,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            job.prompt.trim().takeIf {it.isNotEmpty()}?.let {
+                Text(it,style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            progress?.takeIf {it.isFinite() && it>0f}?.let {
+                LinearProgressIndicator(progress={it.coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().padding(top=4.dp).height(3.dp))
+            }
+        }
         // Pasados ~10 min el trabajo «tarda más de lo normal»: se tiñe de ámbar y ofrece consultar o dejar de seguirlo.
         val stuck=(now-job.startedAt)>=STUCK_AFTER_MS
         Text(if(stuck) "Tarda más de lo normal · $elapsed" else "${com.vidadomu.nexus.ui.components.generationStatusLabel(job)} · $elapsed",

@@ -3,6 +3,9 @@ package com.vidadomu.nexus.ui.library
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -142,11 +145,17 @@ internal fun MoveToFolderSheet(count:Int,folders:List<com.vidadomu.nexus.agent.c
 /** A project shown as a folder in the Library. */
 @Composable
 internal fun FolderTile(name:String,count:Int,onOpen:()->Unit) {
-    Surface(onClick=onOpen,shape=NexusTokens.thumbnail,color=MaterialTheme.colorScheme.surfaceContainer,modifier=Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(2.dp)) {
-            Icon(Icons.Default.Folder,null,Modifier.size(36.dp),tint=MaterialTheme.colorScheme.primary)
-            Text(name,style=MaterialTheme.typography.labelLarge,maxLines=2,overflow=TextOverflow.Ellipsis)
-            Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelSmall,color=com.vidadomu.nexus.ui.theme.TextSecondary)
+    // Uniform tiles: the name always reserves two lines and the count is a short badge beside the icon,
+    // so «950 archivos» no longer wraps and makes one folder taller than its neighbours.
+    Surface(onClick=onOpen,shape=NexusTokens.thumbnail,color=MaterialTheme.colorScheme.surfaceContainer,
+        modifier=Modifier.fillMaxWidth().semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}) {
+        Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Icon(Icons.Default.Folder,null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.weight(1f))
+                Text(folderCount(count),style=MaterialTheme.typography.labelSmall,color=com.vidadomu.nexus.ui.theme.TextSecondary,maxLines=1)
+            }
+            Text(name,style=MaterialTheme.typography.labelLarge,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis)
         }
     }
 }
@@ -155,4 +164,11 @@ internal fun FolderTile(name:String,count:Int,onOpen:()->Unit) {
 private fun Option(icon:ImageVector,label:String,action:()->Unit) {
     ListItem(headlineContent={Text(label)},leadingContent={Icon(icon,null)},
         modifier=Modifier.heightIn(min=48.dp).clickable(role=androidx.compose.ui.semantics.Role.Button,onClick=action))
+}
+
+/** Short folder count for the badge: 950, 1,2 mil… (the full number is read out by TalkBack). */
+internal fun folderCount(count: Int): String = when {
+    count < 1000 -> count.toString()
+    count < 10_000 -> "%.1f mil".format(java.util.Locale("es", "ES"), count / 1000.0).replace(",0 mil", " mil")
+    else -> "${count / 1000} mil"
 }
