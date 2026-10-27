@@ -381,11 +381,6 @@ fun AssistantScreen(
             IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
                 Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            // Who answers, once, in the header (as ChatGPT shows «Work»), instead of a second row inside the composer.
-            Text(agentLabel(ui.settings).substringAfter(" · "), Modifier.align(Alignment.TopCenter).padding(top = 14.dp)
-                .widthIn(max = 200.dp).semantics { contentDescription = "Modelo activo: ${agentLabel(ui.settings)}" },
-                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (cardIds.isNotEmpty()) Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
@@ -748,6 +743,22 @@ private fun MessageSelectionDialog(text: String, onDismiss: () -> Unit) {
         }, confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
 }
 
+/**
+ * Only the distinctive name of who answered, for the line under each reply: «AGY · Gemini 4 Argon Medium» → «Argón»,
+ * «Bedrock · Claude Sonnet 4 6» → «Sonnet», «AGY · Gemini 3.8 Flash» → «Flash». Provider, family, version numbers
+ * and effort words are dropped; a custom brain keeps its own name.
+ */
+internal fun shortModelName(full: String): String {
+    if (full.isBlank()) return full
+    val model = if (" · " in full) full.substringAfter(" · ") else full
+    val noise = setOf("gemini", "claude", "gpt", "openai", "anthropic", "google", "low", "medium", "high", "preview", "latest")
+    val words = model.split(' ').filter { w -> w.isNotBlank() && w.lowercase() !in noise && !w.any(Char::isDigit) }
+    val name = words.joinToString(" ").ifBlank { model }
+    return SPANISH_NAMES[name.lowercase()] ?: name
+}
+
+private val SPANISH_NAMES = mapOf("argon" to "Argón", "neon" to "Neón", "xenon" to "Xenón", "kripton" to "Kriptón", "krypton" to "Kriptón")
+
 /** Who answers, short: provider then model («AGY · Gemini 3.8 Flash», «Bedrock · Claude Sonnet 4 6»), or the custom brain's name. */
 internal fun agentLabel(s: AssistantSettings): String {
     val provider = when {
@@ -770,7 +781,7 @@ internal fun agentLabel(s: AssistantSettings): String {
 internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier, by: String = "") {
     if(at<=0L) return
     val time=remember(at) {java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at))}
-    val label=listOfNotNull(by.ifBlank {null},time,formatTook(tookMs).takeIf {tookMs>0}).joinToString(" · ")
+    val label=listOfNotNull(shortModelName(by).ifBlank {null},time,formatTook(tookMs).takeIf {tookMs>0}).joinToString(" · ")
     Text(label,modifier,style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,lineHeight=12.sp),
         color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
 }
