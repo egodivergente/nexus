@@ -53,7 +53,7 @@ import com.vidadomu.nexus.core.model.*
     Surface(shape=NexusTokens.card,color=if(dragging) colors.surfaceContainerHigh else colors.surfaceContainerLow,
         shadowElevation=if(dragging) 18.dp else 0.dp,
         border=BorderStroke(if(dragging||adjusting) 1.5.dp else .5.dp,if(dragging||adjusting) colors.primary else colors.outlineVariant.copy(alpha=.7f)),
-        modifier=Modifier.fillMaxWidth().graphicsLayer {scaleX=lift;scaleY=lift}.then(dragModifier ?: Modifier)
+        modifier=Modifier.fillMaxWidth().graphicsLayer {scaleX=lift;scaleY=lift}
             .combinedClickable(onClick=onOpen,onLongClick=if(dragModifier==null) ({if(!logoHeld) onOptions()}) else null,onLongClickLabel=if(dragModifier==null) "Opciones de ${section.family}" else null)
             .semantics(mergeDescendants=true) {contentDescription="${section.family}, $count"; if(reorderActions.isNotEmpty()) customActions=reorderActions}) {
         Box {
@@ -66,7 +66,7 @@ import com.vidadomu.nexus.core.model.*
         Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             // Fixed slot: the card never changes size, only the logo inside it does.
-            Box(Modifier.size(ArtBoxCardMetrics.logoSlot).logoResizeGesture(enabled=dragModifier==null,key=glyphKey,current={labels.scale(glyphKey)},
+            Box(Modifier.size(ArtBoxCardMetrics.logoSlot).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
                 min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,haptic=haptic,onHold={logoHeld=it},onAdjusting={adjusting=it},
                 onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.Center) {
                 CatalogGlyph(glyphKey,ArtBoxCardMetrics.logo,labels) {size ->
@@ -77,8 +77,11 @@ import com.vidadomu.nexus.core.model.*
                     } else BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=size,bare=true)
                 }
             }
-            Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
-            Text(if(adjusting) "Tamaño · "+(labels.scale(glyphKey)*100).toInt()+" %" else count,style=MaterialTheme.typography.labelSmall,color=if(adjusting) colors.primary else colors.onSurfaceVariant,maxLines=1)
+            // Mantener pulsado el nombre levanta la tarjeta para reordenarla; mantener pulsado el logo lo redimensiona.
+            Column(Modifier.fillMaxWidth().then(dragModifier ?: Modifier),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
+                Text(if(adjusting) "Tamaño · "+(labels.scale(glyphKey)*100).toInt()+" %" else count,style=MaterialTheme.typography.labelSmall,color=if(adjusting) colors.primary else colors.onSurfaceVariant,maxLines=1)
+            }
         }
         }
     }
