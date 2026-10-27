@@ -59,8 +59,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         ?: choices.getString("route:${group.key}:${choices.getString("use:${group.key}",null)}",null))}
     val priceRevision by AtlasPublishedPrice.revision.collectAsState()
     val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: routes.first()
-    val logicalRoutes=remember(routes,selected,workflow) {
-        com.vidadomu.nexus.routing.logicalVariantRepresentatives(routes,selected,workflow in setOf(CatalogWorkflow.ANIMATE,CatalogWorkflow.FRAMES,CatalogWorkflow.EDIT_IMAGE,CatalogWorkflow.REFERENCES))
+    val autoRouting=com.vidadomu.nexus.settings.RuntimePreferences.get(context).bool("routing.enabled")
+    val logicalRoutes=remember(routes,selected,workflow,autoRouting) {
+        com.vidadomu.nexus.routing.logicalVariantRepresentatives(routes,selected,workflow in setOf(CatalogWorkflow.ANIMATE,CatalogWorkflow.FRAMES,CatalogWorkflow.EDIT_IMAGE,CatalogWorkflow.REFERENCES),automatic=autoRouting)
     }
     var infoOpen by rememberSaveable(group.key) {mutableStateOf(false)}
     var contractOpen by rememberSaveable(group.key) {mutableStateOf(false)}

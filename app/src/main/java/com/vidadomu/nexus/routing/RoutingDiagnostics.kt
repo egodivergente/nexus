@@ -19,6 +19,6 @@ object RoutingDiagnostics {
 
 /** Collapse only registered exact identities. Every original route remains in the repository and saved preferences. */
 fun logicalVariantRepresentatives(models:List<com.vidadomu.nexus.core.model.NexusModel>,
-    preferred:com.vidadomu.nexus.core.model.NexusModel,hasImages:Boolean):List<com.vidadomu.nexus.core.model.NexusModel> =
-    models.groupBy { ExactRouteCompatibility.identity(it,hasImages) ?: "${it.providerId}:${it.id}" }
+    preferred:com.vidadomu.nexus.core.model.NexusModel,hasImages:Boolean,automatic:Boolean = true):List<com.vidadomu.nexus.core.model.NexusModel> =
+    if(!automatic) models else models.groupBy { ExactRouteCompatibility.identity(it,hasImages) ?: "${it.providerId}:${it.id}" }
         .values.map { group -> group.firstOrNull { it.providerId==preferred.providerId && it.id==preferred.id } ?: group.first() }

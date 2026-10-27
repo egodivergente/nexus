@@ -41,13 +41,10 @@ class AutomaticGenerationRouting(private val app: NexusApplication) {
                 }
             } }
             val acceptedCeiling=BigDecimal.valueOf(acceptedUsd)
-            val sourceQuote=selected.await() ?: run {
-                mapped.forEach {it.cancel()}
-                RoutingDiagnostics.save(app,source.id,candidates.size,0,"Se conserva el proveedor elegido: falta total monetario o saldo numérico de origen.")
-                return@coroutineScope null
-            }
-            val ceiling=minOf(sourceQuote.totalUsd,acceptedCeiling)
-            val options=(listOf(QuotedGenerationRoute(original,sourceQuote))+mapped.awaitAll().filterNotNull())
+            val sourceQuote=selected.await()
+            // An unavailable original account must not hide an independently funded exact alternative.
+            val ceiling=sourceQuote?.totalUsd?.let { minOf(it,acceptedCeiling) } ?: acceptedCeiling
+            val options=listOfNotNull(sourceQuote?.let { QuotedGenerationRoute(original,it) })+mapped.awaitAll().filterNotNull()
             val ordered=options.filter { it.quote.funded && it.quote.totalUsd<=ceiling }
                 .sortedWith(compareBy<QuotedGenerationRoute> { it.quote.totalUsd }.thenBy { it.state.selectedModel!!.providerId })
             RoutingDiagnostics.save(app,source.id,candidates.size,ordered.size,
@@ -55,7 +52,7 @@ class AutomaticGenerationRouting(private val app: NexusApplication) {
             if(ordered.isEmpty() || ordered.size==1 && ordered.first().state.selectedModel==source) return@coroutineScope null
             AutomaticRoutePlan(ordered,ceiling,listOf(
                 "Modelo exacto: $identity; parámetros efectivos, roles y orden de referencias conservados.",
-                "Comparadas ${options.size} cotizaciones con saldo numérico. Límite: ${sourceQuote.totalUsd.toPlainString()} USD.",
+                "Comparadas ${options.size} cotizaciones con saldo numérico. Límite: ${ceiling.toPlainString()} USD.",
                 "Cuota de generación: no expuesta por estas APIs; se confirma al admitir la solicitud. Un rechazo explícito permite fallback; un estado incierto lo bloquea.",
                 "Otras rutas: excluidas si falta compatibilidad completa, cotización, conversión monetaria o saldo verificable."
             ))

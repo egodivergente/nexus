@@ -60,6 +60,7 @@ class ExactRouteCompatibilityTest {
         val logical=logicalVariantRepresentatives(all,crun,false)
         assertEquals(listOf(crun,standard,unknown),logical)
         assertEquals(4,all.size)
+        assertEquals(all,logicalVariantRepresentatives(all,crun,false,automatic=false))
     }
     @Test fun referenceRolesOrderAndLocalFilesSurviveButProviderUploadUrlsNeverTransfer() {
         val original=atlas.copy(id="kwaivgi/kling-v3.0-pro/image-to-video",firstFrameField="image",lastFrameField="end_image")
