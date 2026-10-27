@@ -100,3 +100,32 @@ que la base ya lo había ocultado explícitamente y mostraba cuatro destinos.
 Se actualizan esas expectativas conservando las comprobaciones de rutas, acceso
 a Ajustes fuera de la barra e inicialización independiente. No se cambia la
 navegación de producción como parte de este encargo.
+
+
+### Resultado final de las verificaciones locales
+
+- Código compilado: `1c38ac5a4cdbda454f9d137c0178cdbdd33d1c55` (rama propia, vc134).
+- Entorno: JDK Temurin 17.0.21, SDK 35, NDK 27.2.12479018 y CMake 3.22.1.
+- `:app:testAgentPreviewUnitTest`: **750 pruebas superadas**, sin fallos.
+- `:agent-core:test`: **405 superadas y 4 omitidas**, sin fallos.
+- Nuevas pruebas unitarias: 18 casos entre presentación, selección/fallback,
+  seguridad de reenvíos y disposición de fotogramas; todos superados.
+- `:app:assembleAgentPreview`: **correcto**, incluidos los runtimes nativos.
+- `:app:compileOfflineQaAndroidTestKotlin`: **correcto**. Incluye la nueva prueba
+  que abre el micrófono convencional y comprueba que sigue disponible dictar;
+  las pruebas instrumentadas **no se han ejecutado** al no haber dispositivo.
+- APK: `com.vidadomu.nexus.agent`, `1.9.98-agent-preview`, `versionCode=134`.
+  Nombre `Nébula` y revisión de código comprobados dentro del DEX.
+- Las nueve bibliotecas `.so` empaquetadas tienen segmentos LOAD alineados a
+  16 KB; `zipalign -c -P 16 4` pasa. Esto no sustituye una prueba en Android 17.
+- Firma: **sin firmar**, según la configuración del proyecto; no instalable
+  directamente hasta firmarla con el certificado original en su entorno privado.
+- SHA-256 APK: `289735b0aea83f86fdeade229a9b3a55fd6e4861d3fb7dadbf4b8ecc0f587c1d`.
+- Diff revisado y sin errores de espacios, respetando los CRLF históricos de
+  `CONTINUAR.md`. Resultados estructurados en
+  `NEXUS-SEVEN-VALIDATION-20261027.json`.
+
+Estado de cierre: presentación entregada en código y compilación; aceptación visual,
+háptica, consumo e instalación en el S25 pendientes. NEX-UX-006 sigue parcial:
+no se publica como funcional un cambio de proveedor que todavía no está integrado
+con evidencia comercial real. No se han ejecutado generaciones de pago.

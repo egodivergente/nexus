@@ -214,3 +214,8 @@ para alcance y validación; no inferir una actualización del teléfono.
 
 La captura del usuario `74858.jpg` confirma S25 SM-S938B con Nexus 1.9.97/vc133
 y Android 17/API 37 antes de esta entrega; no es una comprobación ADB en vivo.
+
+Validación local de 1.9.98/vc134: APK Agent sin firmar generada, 750 pruebas de
+app y 405 del núcleo superadas (4 omitidas), pruebas de interfaz compiladas
+pero no ejecutadas. Nueve bibliotecas nativas y ZIP alineados a 16 KB. Código
+de la APK: 1c38ac5a4cdb. El informe contiene SHA-256 y límites de aceptación.
