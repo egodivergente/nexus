@@ -57,7 +57,7 @@ fun BrandLogo(organization: String? = null, family: String? = null, modelId: Str
         target = null
     }
     var failed by remember(uri) { mutableStateOf(false) }
-    Box(modifier.then(if (familyKey != null || modelKey != null) Modifier.combinedClickable(
+    Box(modifier.then(if (!bare && (familyKey != null || modelKey != null)) Modifier.combinedClickable(
         onClick = {}, onLongClickLabel = "Cambiar logo", onLongClick = { menu = true }) else Modifier)) {
         if (uri != null && !failed) AsyncImage(uri, family ?: modelId, Modifier.size(containerSize ?: size),
             contentScale = ContentScale.Fit, onError = { failed = true })
