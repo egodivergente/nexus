@@ -72,8 +72,33 @@ private fun mdStyles(): MdStyles {
     )
 }
 
+private val TECHNICAL_ID = Regex("^att_[0-9a-zA-Z]{6,16}$")
+
+/**
+ * Internal attachment ids (`att_da34bd2a`) mean nothing to the reader: they are dropped together with the
+ * parentheses around them, so «padre (`att_…`)» reads «padre». The agent still has the ids in its own context.
+ */
+internal fun hideTechnicalIds(spans: List<MdSpan>): List<MdSpan> {
+    if (spans.none { it.code && TECHNICAL_ID.matches(it.text.trim()) }) return spans
+    val out = spans.toMutableList()
+    var i = 0
+    while (i < out.size) {
+        val sp = out[i]
+        if (sp.code && TECHNICAL_ID.matches(sp.text.trim())) {
+            val prev = out.getOrNull(i - 1); val next = out.getOrNull(i + 1)
+            val wrapped = prev != null && !prev.code && prev.text.trimEnd().endsWith("(") && next != null && !next.code && next.text.startsWith(")")
+            if (wrapped) {
+                out[i - 1] = prev!!.copy(text = prev.text.trimEnd().removeSuffix("(").trimEnd())
+                out[i + 1] = next!!.copy(text = next.text.removePrefix(")"))
+            }
+            out.removeAt(i)
+        } else i++
+    }
+    return out
+}
+
 private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = false): AnnotatedString = buildAnnotatedString {
-    spans.forEachIndexed { idx, sp ->
+    hideTechnicalIds(spans).forEachIndexed { idx, sp ->
         val accentLead = leadAccent && idx == 0 && sp.bold
         val style = SpanStyle(
             color = when {
@@ -187,9 +212,10 @@ private fun MdCallout(b: MdBlock.Callout, st: MdStyles, ctx: WidgetCtx) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(look.icon, null, Modifier.size(16.dp), tint = look.tone)
                 Spacer(Modifier.width(NexusTokens.space4))
-                Text(look.label, style = st.label, color = look.tone)
+                Text(look.label, style = st.label.copy(fontWeight = FontWeight.SemiBold), color = look.tone)
             }
-            MdBlockList(b.blocks, st, ctx)
+            // One step below the bubble's body text, so the box reads as an aside with its own hierarchy.
+            MdBlockList(b.blocks, st.copy(body = MaterialTheme.typography.bodyMedium), ctx)
         }
     }
 }

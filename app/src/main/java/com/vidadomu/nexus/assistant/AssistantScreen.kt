@@ -268,7 +268,9 @@ fun AssistantScreen(
                 .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
             LazyColumn(Modifier.fillMaxSize(), state = listState,
-                contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8, top = 52.dp, bottom = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8, top = 52.dp,
+                    // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
+                    bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is CardGroup) {
@@ -826,8 +828,14 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
         if(item.text.isNotBlank() && item.stop!="STREAMING") MessageMeta(item.at,item.tookMs,Modifier.padding(horizontal=NexusTokens.space12),item.by)
         if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
-        if(item.media.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            items(item.media,key={it.id}) { AssistantMediaPreview(it) }
+        if(item.media.isNotEmpty()) {
+            val mediaState=androidx.compose.foundation.lazy.rememberLazyListState()
+            LazyRow(state=mediaState,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+                contentPadding=PaddingValues(end=NexusTokens.space32)) {
+                items(item.media,key={it.id}) { AssistantMediaPreview(it) }
+            }
+            // Page indicator: with several media the row is a carousel, and the reader must know there is more.
+            if(item.media.size>1) MediaPageDots(item.media.size,mediaState.firstVisibleItemIndex)
         }
     }
 }
@@ -1438,5 +1446,19 @@ private fun ChatVideoPreview(media: Attachment) {
         }
         if (playbackError) Text("No se pudo reproducir el vídeo. Comprueba el archivo o vuelve a descargarlo.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+@Composable
+internal fun MediaPageDots(count: Int, current: Int) {
+    Row(Modifier.padding(top = NexusTokens.space4).semantics(mergeDescendants = true) { contentDescription = "Elemento ${current + 1} de $count" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        repeat(count.coerceAtMost(8)) { index ->
+            val active = index == current.coerceAtMost(7)
+            Box(Modifier.size(if (active) 7.dp else 5.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)))
+        }
+        Spacer(Modifier.width(NexusTokens.space4))
+        Text("${current + 1} / $count", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
     }
 }
