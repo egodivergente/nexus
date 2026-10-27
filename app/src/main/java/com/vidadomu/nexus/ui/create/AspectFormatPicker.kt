@@ -36,7 +36,7 @@ internal fun aspectFormatParameter(parameters: List<ModelParameter>): ModelParam
 internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: (String) -> Unit) {
     val options = ParameterPresentation.options(param)
     val colors = MaterialTheme.colorScheme
-    val scrollable = options.size > 5
+    val scrollable = options.size > 8
     Surface(shape = NexusTokens.card, color = colors.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
             Modifier.padding(4.dp).then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
@@ -45,7 +45,7 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
             options.forEach { option ->
                 val selected = option == value
                 val ratio = ParameterPresentation.proportion(param, option) ?: 1f
-                val label = ParameterPresentation.label(param, option).primary
+                val label = Regex("\\d+\\s*[:x×]\\s*\\d+").find(option)?.value?.replace(" ", "")?.takeIf { option.contains(":") } ?: ParameterPresentation.label(param, option).primary.substringBefore(" ·").trim()
                 val tint = if (selected) colors.onSurface else colors.onSurfaceVariant.copy(alpha = .75f)
                 val cell = (if (scrollable) Modifier.width(64.dp) else Modifier.weight(1f))
                 Surface(
@@ -56,7 +56,7 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
                         stateDescription = if (selected) "Seleccionado" else "No seleccionado"
                     }.clickable(role = Role.RadioButton) { onChange(option) }
                 ) {
-                    Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(Modifier.padding(vertical = 6.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Canvas(Modifier.size(24.dp)) {
                             val edge = size.minDimension - 3.dp.toPx()
                             val w = if (ratio >= 1f) edge else edge * ratio
@@ -67,7 +67,7 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
                             )
                         }
                         Spacer(Modifier.height(2.dp))
-                        Text(label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1,
+                        Text(label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1, softWrap = false,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                     }
                 }

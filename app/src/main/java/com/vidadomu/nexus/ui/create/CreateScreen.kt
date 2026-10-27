@@ -210,7 +210,7 @@ fun CreateScreen(
         // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
         LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=innerPadding.calculateBottomPadding()+NexusTokens.space8),
             modifier=Modifier.fillMaxSize().padding(top=innerPadding.calculateTopPadding()).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
-            verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             item(key="launcher-title") {
                 Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
                     Text("Lanzadera",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
@@ -240,7 +240,7 @@ fun CreateScreen(
                     viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
             }
             item(key="composer") {
-                Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     val selected=state.selectedModel
                     val textRoute=selected?.let {current ->
                         if(current.pairedEditModelId!=null) current else catalogModels.firstOrNull {
@@ -307,10 +307,14 @@ fun CreateScreen(
             }
 
 
+            val allInline=if(state.schemaReady) state.selectedModel?.let {model -> ParameterDependencies.visible(model,com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters),state.parameters)}.orEmpty().filter {it.key!=countParam?.key}.orEmpty() else emptyList()
+            val formatParam=aspectFormatParameter(allInline)
+            val inline=allInline.filter {it.key!=formatParam?.key}
             item {
                 StudioToolRow {
                     if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
+                    if(inline.isNotEmpty()) StudioToolChip("Ajustes", "Ajustes del modelo") {showParameters=true}
                     // BytePlus is a separate account route: only surfaced when it is the active provider; otherwise it lives under «Más».
                     if(state.selectedModel?.providerId==BYTEPLUS_MEDIA_PROVIDER) StudioToolChip("BytePlus", "Usar mi cuenta BytePlus") {showBytePlus=true}
                     Box {
@@ -328,13 +332,10 @@ fun CreateScreen(
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
                 val selectedForParams=state.selectedModel
-                val allInline=selectedForParams?.let {model -> ParameterDependencies.visible(model,com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters),state.parameters)}.orEmpty().filter {it.key!=countParam?.key}
-                val formatParam=aspectFormatParameter(allInline)
-                val inline=allInline.filter {it.key!=formatParam?.key}
                 if(formatParam!=null) item(key="format-picker") {
                     AspectFormatPicker(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue) {viewModel.updateParameter(formatParam.key,it)}
                 }
-                if(selectedForParams!=null && inline.isNotEmpty()) item(key="inline-params") {
+                if(selectedForParams!=null && inline.any {it.isRequired}) item(key="inline-params") {
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
                         Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
