@@ -50,6 +50,8 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
     private val descriptions: SnapshotStateMap<String, String> = mutableStateMapOf()
     private val icons: SnapshotStateMap<String, String> = mutableStateMapOf()
     private val scales: SnapshotStateMap<String, Float> = mutableStateMapOf()
+    /** Free placement of a part of a card (key = "<entry>|<part>"), in dp from its default position. */
+    private val placements: SnapshotStateMap<String, Pair<Float, Float>> = mutableStateMapOf()
 
     init {
         prefs.all.forEach { (key, value) ->
@@ -58,6 +60,10 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
                 key.startsWith("d:") -> (value as? String)?.let { descriptions[key.removePrefix("d:")] = it }
                 key.startsWith("i:") -> (value as? String)?.let { icons[key.removePrefix("i:")] = it }
                 key.startsWith("s:") -> (value as? Float)?.let { scales[key.removePrefix("s:")] = it }
+                key.startsWith("p:") -> (value as? String)?.split(',')?.takeIf { it.size == 2 }?.let { v ->
+                    val x = v[0].toFloatOrNull(); val y = v[1].toFloatOrNull()
+                    if (x != null && y != null) placements[key.removePrefix("p:")] = x to y
+                }
             }
         }
     }
@@ -67,7 +73,7 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
     /** `icon:<name>` or `image:<absolute path>`; null keeps the original artwork. */
     fun icon(key: String): String? = icons[key]
     fun scale(key: String): Float = (scales[key] ?: 1f).coerceIn(MIN_SCALE, MAX_SCALE)
-    fun hasCustom(key: String): Boolean = key in names || key in descriptions || key in icons || key in scales
+    fun hasCustom(key: String): Boolean = key in names || key in descriptions || key in icons || key in scales || placements.keys.any { it.startsWith("$key|") }
 
     fun save(key: String, name: String, description: String, originalName: String, originalDescription: String, icon: String?, scale: Float) {
         val cleanName = name.trim()
@@ -92,7 +98,16 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
 
     fun resetScale(key: String) { scales.remove(key); prefs.edit().remove("s:$key").apply() }
 
+    fun placement(key: String, part: String): Pair<Float, Float> = placements["$key|$part"] ?: (0f to 0f)
+    fun setPlacementLive(key: String, part: String, x: Float, y: Float) { placements["$key|$part"] = x to y }
+    fun commitPlacement(key: String, part: String) {
+        val v = placements["$key|$part"] ?: return
+        if (kotlin.math.abs(v.first) < 1f && kotlin.math.abs(v.second) < 1f) { placements.remove("$key|$part"); prefs.edit().remove("p:$key|$part").apply() }
+        else prefs.edit().putString("p:$key|$part", "${v.first},${v.second}").apply()
+    }
+
     fun reset(key: String) {
+        placements.keys.filter { it.startsWith("$key|") }.forEach { placements.remove(it); prefs.edit().remove("p:$it").apply() }
         names.remove(key); descriptions.remove(key); icons.remove(key); scales.remove(key)
         prefs.edit().remove("n:$key").remove("d:$key").remove("i:$key").remove("s:$key").apply()
     }

@@ -87,3 +87,59 @@ internal fun Modifier.logoResizeGesture(
         onCommit()
     }
 }
+
+/**
+ * Free placement: hold the element until it lifts, then drag it anywhere (it follows the finger). Vibrates when it
+ * lifts and when it lands, and a soft tick when it passes through its original position.
+ */
+internal fun Modifier.holdAndMoveGesture(
+    key: Any,
+    current: () -> Pair<Float, Float>,
+    vibrate: (com.vidadomu.nexus.ui.theme.NexusVibration.Kind) -> Unit,
+    onHold: (Boolean) -> Unit,
+    onMoving: (Boolean) -> Unit,
+    onMove: (Float, Float) -> Unit,
+    onCommit: () -> Unit,
+    limitPx: Float = 600f,
+    pxPerDp: () -> Float,
+): Modifier = this.pointerInput(key) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        onHold(true)
+        val slop = viewConfiguration.touchSlop
+        val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val c = event.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull false
+                if (!c.pressed || c.isConsumed || (c.position - down.position).getDistance() > slop) return@withTimeoutOrNull false
+            }
+            @Suppress("UNREACHABLE_CODE")
+            false
+        }
+        if (held != null) { onHold(false); return@awaitEachGesture }
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+        onMoving(true)
+        val start = current()
+        val k = pxPerDp()
+        var lastPos = down.position
+        var x = start.first * k
+        var y = start.second * k
+        var nearOrigin = false
+        do {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val c = event.changes.firstOrNull { it.id == down.id } ?: event.changes.first()
+            x = (x + (c.position.x - lastPos.x)).coerceIn(-limitPx, limitPx)
+            y = (y + (c.position.y - lastPos.y)).coerceIn(-limitPx, limitPx)
+            lastPos = c.position
+            val near = abs(x) < 8f && abs(y) < 8f
+            if (near && !nearOrigin) vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK)
+            nearOrigin = near
+            onMove(x / k, y / k)
+            event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
+        onMoving(false)
+        onHold(false)
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+        onCommit()
+    }
+}

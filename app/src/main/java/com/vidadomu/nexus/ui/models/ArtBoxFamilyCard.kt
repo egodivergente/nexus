@@ -14,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -80,10 +79,21 @@ import com.vidadomu.nexus.core.model.*
                 }
                 }
             }
-            // Mantener pulsado el nombre levanta la tarjeta para reordenarla; mantener pulsado el logo lo redimensiona.
-            Column(Modifier.fillMaxWidth().then(dragModifier ?: Modifier),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
-                Text(if(adjusting) "Tamaño · "+(labels.scale(glyphKey)*100).toInt()+" %" else count,style=MaterialTheme.typography.labelSmall,color=if(adjusting) colors.primary else colors.onSurfaceVariant,maxLines=1)
+            // Mantener pulsado el nombre lo levanta y se coloca donde quieras; la fila inferior («N modelos») levanta la tarjeta
+            // para reordenarla.
+            val density=androidx.compose.ui.platform.LocalDensity.current
+            val place=labels.placement(glyphKey,"name")
+            var movingName by remember {mutableStateOf(false)}
+            Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,
+                    modifier=Modifier.offset(place.first.dp,place.second.dp).graphicsLayer {val s=if(movingName) 1.08f else 1f;scaleX=s;scaleY=s}
+                        .holdAndMoveGesture(glyphKey+"|name",current={labels.placement(glyphKey,"name")},
+                            vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it},onMoving={movingName=it;adjusting=it},
+                            onMove={x,y->labels.setPlacementLive(glyphKey,"name",x,y)},onCommit={labels.commitPlacement(glyphKey,"name")},
+                            pxPerDp={density.density}))
+                Box(Modifier.fillMaxWidth().heightIn(min=28.dp).then(dragModifier ?: Modifier),contentAlignment=Alignment.Center) {
+                    Text(if(adjusting&&!movingName) "Tamaño · "+(labels.scale(glyphKey)*100).toInt()+" %" else if(movingName) "Suelta donde quieras" else count,style=MaterialTheme.typography.labelSmall,color=if(adjusting) colors.primary else colors.onSurfaceVariant,maxLines=1)
+                }
             }
         }
         }
