@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,7 +55,8 @@ import java.io.File
     }
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {granted->if(granted) beginRecording() else error="El micrófono necesita permiso para grabar."}
     DisposableEffect(Unit) {onDispose {runCatching {recorder?.stop()};recorder?.release();player?.release()}}
-    IconButton(onClick={open=true}) {Icon(Icons.Default.Mic,"Grabar audio o dictar")}
+    IconButton(onClick={open=true}) {Icon(Icons.Outlined.Mic,"Grabar audio o dictar",
+        tint=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)}
     if(open) AlertDialog(onDismissRequest={if(recording) stop();player?.release();player=null;open=false},
         title={Text(if(recording) "Grabando…" else "Nota de voz")},text={Column {
             Text("Escucha la nota antes de adjuntarla al mensaje.")

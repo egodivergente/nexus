@@ -20,6 +20,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -109,8 +111,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
         Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=ComposerShape,shadowElevation=10.dp,
             border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
-            Text(agentLabel(ui.settings), Modifier.padding(start = 12.dp, top = 6.dp, end = 12.dp),
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // The active model lives in the chat header now: the composer stays a single slim row.
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
@@ -141,7 +142,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded)
                 // La cámara solo con el campo vacío: al escribir, el texto recupera el ancho.
                 if (onCamera != null && text.text.isEmpty()) IconButton(onClick = onCamera, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Default.PhotoCamera, "Hacer una foto")
+                    // Same outline style and neutral grey as the clip and the mic; accent only on the main action.
+                    Icon(Icons.Outlined.PhotoCamera, "Hacer una foto", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
@@ -182,7 +184,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         }
                     }
                     if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
-                    else IconButton(onClick=dictateAction) {Icon(Icons.Default.Mic,"Dictar mensaje")}
+                    else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
                     // Conversación por voz en directo (manos libres), como en ChatGPT o Gemini Live.
                     onLive?.let {live -> FilledIconButton(onClick=live,modifier=Modifier.padding(end=4.dp).size(40.dp)) {Icon(Icons.Default.GraphicEq,"Hablar en directo")}}
                 }

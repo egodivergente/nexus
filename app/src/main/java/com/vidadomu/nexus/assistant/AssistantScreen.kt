@@ -53,6 +53,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -362,12 +363,7 @@ fun AssistantScreen(
             val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
             Column(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                AnimatedVisibility(cardIds.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
-                    SmallFloatingActionButton(onClick = { ordersPanel = true }, shape = NexusTokens.pill,
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = TextPrimary) {
-                        Icon(Icons.Default.Inventory2, "Ver encargos")
-                    }
-                }
+                // «Ver encargos» moved to the header: only the scroll-down button floats over the reading area.
                 AnimatedVisibility(!following, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                     SmallFloatingActionButton(onClick = { following = true; scope.launch { followLast() } }, shape = NexusTokens.pill,
                         containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
@@ -385,8 +381,18 @@ fun AssistantScreen(
             IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
                 Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            // Who answers, once, in the header (as ChatGPT shows «Work»), instead of a second row inside the composer.
+            Text(agentLabel(ui.settings).substringAfter(" · "), Modifier.align(Alignment.TopCenter).padding(top = 14.dp)
+                .widthIn(max = 200.dp).semantics { contentDescription = "Modelo activo: ${agentLabel(ui.settings)}" },
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (cardIds.isNotEmpty()) Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Ver encargos") { ordersPanel = true }
+                    .semantics { contentDescription = "Ver encargos" }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Inventory2, null, Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Abrir ajustes", onClick = onOpenSettings)
                     .semantics { contentDescription = "Ajustes" }, contentAlignment = Alignment.Center) {

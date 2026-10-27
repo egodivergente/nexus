@@ -97,21 +97,41 @@ internal fun hideTechnicalIds(spans: List<MdSpan>): List<MdSpan> {
     return out
 }
 
+private val TOOL_NAME = Regex("^[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?:\\(.*\\))?$")
+private val STATE_WORDS = mapOf("QUEUED" to "en cola", "PENDING" to "pendiente", "PROCESSING" to "en curso",
+    "SUBMITTING" to "enviando", "GENERATING" to "generando", "COMPLETED" to "completado", "FAILED" to "fallido",
+    "CANCELLED" to "cancelado", "PAUSED" to "en pausa")
+
+/**
+ * Safety net for replies that still leak internals: a tool name in code (`update_plan`) reads as plain words
+ * («update plan») and an English state (`QUEUED`) as its Spanish label. Real code the user may copy is untouched.
+ */
+internal fun readableSpans(spans: List<MdSpan>): List<MdSpan> = hideTechnicalIds(spans).map { sp ->
+    val t = sp.text.trim()
+    when {
+        !sp.code -> sp
+        t in STATE_WORDS -> sp.copy(text = sp.text.replace(t, STATE_WORDS.getValue(t)), code = false)
+        TOOL_NAME.matches(t) -> sp.copy(text = sp.text.replace(t, t.substringBefore('(').replace('_', ' ')), code = false)
+        else -> sp
+    }
+}
+
 private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = false): AnnotatedString = buildAnnotatedString {
-    hideTechnicalIds(spans).forEachIndexed { idx, sp ->
+    readableSpans(spans).forEachIndexed { idx, sp ->
         val accentLead = leadAccent && idx == 0 && sp.bold
         val style = SpanStyle(
             color = when {
-                sp.code || sp.link != null || accentLead -> st.accent
-                sp.bold || sp.mark -> st.ink
+                sp.link != null || accentLead -> st.accent
+                sp.code || sp.bold || sp.mark -> st.ink
                 else -> Color.Unspecified
             },
             fontWeight = if (sp.bold || sp.mark) FontWeight.Medium else null,
             fontStyle = if (sp.italic) FontStyle.Italic else null,
             fontFamily = if (sp.code) FontFamily.Monospace else null,
-            fontSize = if (sp.code) st.body.fontSize else androidx.compose.ui.unit.TextUnit.Unspecified,
+            // Inline code a step smaller and on a faint tint, so it does not break the line spacing into «patches».
+            fontSize = if (sp.code) st.body.fontSize * 0.88f else androidx.compose.ui.unit.TextUnit.Unspecified,
             background = when {
-                sp.code -> st.accent.copy(alpha = 0.12f)
+                sp.code -> st.ink.copy(alpha = 0.07f)
                 sp.mark -> st.mark
                 else -> Color.Unspecified
             },
@@ -178,7 +198,7 @@ private fun MdBlockView(b: MdBlock, st: MdStyles, ctx: WidgetCtx) {
             Text(annotated(b.spans, st), style = st.label, color = st.accent)
         }
         is MdBlock.Paragraph -> Text(annotated(b.spans, st), style = st.body, color = st.soft)
-        is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) { b.items.forEach { MdListRow(it, st) } }
+        is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) { b.items.forEach { MdListRow(it, st) } }
         is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
             Box(Modifier.width(3.dp).fillMaxHeight().clip(NexusTokens.thumbnail).background(st.accent.copy(alpha = 0.7f)))
             Spacer(Modifier.width(NexusTokens.space12))
@@ -222,6 +242,13 @@ private fun MdCallout(b: MdBlock.Callout, st: MdStyles, ctx: WidgetCtx) {
 
 @Composable
 private fun MdListRow(item: ListItem, st: MdStyles) {
+    // A bullet that only introduces the next ones («- Cómo quitarlo ahora:») is a label, not a peer of its steps.
+    val introText = item.spans.joinToString("") { it.text }.trim()
+    if (item.number == null && item.depth == 0 && introText.endsWith(":") && introText.length <= 60) {
+        Text(annotated(item.spans, st), style = st.body, color = st.ink, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = NexusTokens.space4))
+        return
+    }
     Row(Modifier.padding(start = NexusTokens.space16 * item.depth)) {
         if (item.number != null) {
             Text(item.number!!, style = st.body.copy(fontFamily = MaterialTheme.typography.titleMedium.fontFamily, fontWeight = FontWeight.SemiBold, fontSize = MaterialTheme.typography.bodyMedium.fontSize),
