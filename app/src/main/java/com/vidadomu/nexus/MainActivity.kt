@@ -214,7 +214,9 @@ class MainActivity : ComponentActivity() {
                                 workspaceScope.launch { pager.animateScrollToPage(0) }
                             }
                             HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value,
-                                modifier=Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Horizontal))) {index ->
+                                // No system-gesture inset here: Android already gives the edge back-gesture priority, and that inset
+                                // (~20–25 dp per side with gesture navigation) doubled every screen's own 16 dp margin.
+                                modifier=Modifier.fillMaxSize()) {index ->
                                 holder.SaveableStateProvider(tabs[index].route) {
                                 when(tabs[index]) {
                             Screen.Assistant -> {
