@@ -26,7 +26,8 @@ fun NexusTonalAction(label: String, onClick: () -> Unit, modifier: Modifier = Mo
     FilledTonalButton(onClick = onClick, enabled = enabled, shape = NexusTokens.filter,
         contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = 6.dp),
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // Accent tint instead of a grey tone: stays visible on cards, fields and the composer dock alike.
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = .14f),
             contentColor = MaterialTheme.colorScheme.primary),
         modifier = modifier.heightIn(min = 36.dp).semantics { contentDescription = description }) {
         icon?.let { Icon(it, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
@@ -89,5 +90,16 @@ fun NexusStepper(value: Int, onValue: (Int) -> Unit, minimum: Int, maximum: Int?
         FilledTonalIconButton(onClick = { onValue(value + 1) }, enabled = maximum == null || value < maximum) {
             Icon(androidx.compose.material.icons.Icons.Default.Add, "Aumentar $label")
         }
+    }
+}
+
+/** Icon-only button with a visible hint on long press, so its meaning never depends on guessing the glyph. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NexusHintedIconButton(hint: String, onClick: () -> Unit, modifier: Modifier = Modifier,
+    enabled: Boolean = true, content: @Composable () -> Unit) {
+    TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(hint) } }, state = rememberTooltipState()) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = modifier, content = content)
     }
 }

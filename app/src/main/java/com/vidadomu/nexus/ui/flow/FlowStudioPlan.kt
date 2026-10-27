@@ -96,6 +96,13 @@ object FlowStudioPlan {
         else "${statusLabel(job.status)} — progreso porcentual no disponible · $elapsed"
     }
 
+    /** Card line under a header that already names the status: elapsed time and, only if reported, a percentage. */
+    fun progressDetail(job: GenerationJob, elapsed: String): String? {
+        if (!isActive(job.status)) return null
+        val reported = job.progress?.takeIf { it.isFinite() && it > 0f && it <= 1f }
+        return if (reported != null) "${(reported * 100).toInt()} % · $elapsed" else "$elapsed · Flow no indica el porcentaje"
+    }
+
     /** The bridge refused to send because Flow's own text box already holds something. Nothing was sent. */
     fun isDraftConflict(job: GenerationJob): Boolean =
         job.status == GenerationStatus.FAILED && job.error?.contains("borrador escrito en Flow", ignoreCase = true) == true

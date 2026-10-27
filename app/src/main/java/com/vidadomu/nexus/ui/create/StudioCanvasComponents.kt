@@ -121,24 +121,24 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
         attachments()
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(modifier=Modifier.size(48.dp),enabled=enabled,onClick={
+            com.vidadomu.nexus.ui.components.NexusHintedIconButton("Pegar prompt",modifier=Modifier.size(48.dp),enabled=enabled,onClick={
                 val pasted=clipboard.getText()?.text
                 if(!pasted.isNullOrEmpty() && pasted!=value) {onValueChange(pasted);feedback.perform(NexusHapticEvent.SELECTION)}
             }) {Icon(Icons.Default.ContentPaste,"Pegar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-            IconButton(modifier=Modifier.size(48.dp),enabled=enabled && value.isNotEmpty(),onClick={
+            com.vidadomu.nexus.ui.components.NexusHintedIconButton("Borrar prompt",modifier=Modifier.size(48.dp),enabled=enabled && value.isNotEmpty(),onClick={
                 cleared=value;onValueChange("");feedback.perform(NexusHapticEvent.SELECTION)
             }) {Icon(Icons.Default.Close,"Borrar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-            if(value.isEmpty() && cleared!=null) IconButton(modifier=Modifier.size(48.dp),enabled=enabled,onClick={
+            if(value.isEmpty() && cleared!=null) com.vidadomu.nexus.ui.components.NexusHintedIconButton("Restaurar prompt",modifier=Modifier.size(48.dp),enabled=enabled,onClick={
                 onValueChange(cleared.orEmpty());cleared=null;feedback.perform(NexusHapticEvent.SELECTION)
             }) {Icon(Icons.Default.Undo,"Restaurar prompt",Modifier.size(16.dp))}
             Spacer(Modifier.weight(1f))
             val measured=capability?.measured(value)
             Text(if(capability!=null) "${measured ?: "≈ ?"} / ${capability.maximum} ${capability.unitLabel}"
-                else "${value.codePointCount(0,value.length)}",
+                else value.codePointCount(0,value.length).let {n -> "$n ${if(n==1) "carácter" else "caracteres"}"},
                 style=MaterialTheme.typography.labelSmall,
                 modifier=Modifier.weight(1f,fill=false),
                 color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            IconButton(onClick = {
+            com.vidadomu.nexus.ui.components.NexusHintedIconButton(if(expanded) "Reducir prompt" else "Expandir prompt",onClick = {
                 feedback.perform(NexusHapticEvent.SELECTION); expanded = !expanded
             },enabled=enabled) {
                 Icon(if(expanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,

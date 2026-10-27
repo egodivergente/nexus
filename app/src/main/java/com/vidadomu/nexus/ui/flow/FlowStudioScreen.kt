@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -123,6 +124,9 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.ScreenBackground
 import com.vidadomu.nexus.ui.theme.SurfaceDark
 import com.vidadomu.nexus.ui.theme.TextMuted
+import com.vidadomu.nexus.ui.theme.TextSecondary
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import com.vidadomu.nexus.ui.theme.TextPrimary
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import java.io.File
@@ -136,6 +140,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -677,7 +682,11 @@ fun FlowStudioScreen(
                     modifier = Modifier.fillMaxWidth().windowInsetsPadding(NexusInsets.bottomEdge)
                         .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)
                         .heightIn(min = NexusTokens.minimumTouch),
-                    shape = NexusTokens.field
+                    shape = NexusTokens.field,
+                    // Disabled must still read (tonal fill + legible label); enabled is the full accent.
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     if (isSubmitting) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
@@ -941,10 +950,14 @@ private fun DraftCard(
             },enabled=enabled && Modality.VIDEO in accepted,label={Text("Vídeo")})
             Spacer(Modifier.weight(1f))
             Box {
-                TextButton(onClick={countMenu=true},enabled=enabled) {Text("×${draft.count} ▾")}
+                TextButton(onClick={countMenu=true},enabled=enabled,
+                    modifier=Modifier.semantics {contentDescription="Resultados por prompt: ${draft.count}"}) {
+                    Text("${draft.count} ${if(draft.count==1) "resultado" else "resultados"}")
+                    Icon(Icons.Default.ArrowDropDown,null,Modifier.size(20.dp))
+                }
                 DropdownMenu(countMenu,{countMenu=false}) {
                     (FlowStudioPlan.MIN_COUNT..FlowStudioPlan.MAX_COUNT).forEach {value ->
-                        DropdownMenuItem(text={Text("×$value")},onClick={
+                        DropdownMenuItem(text={Text("$value ${if(value==1) "resultado" else "resultados"}")},onClick={
                             countMenu=false;feedback.perform(NexusHapticEvent.SELECTION,changed=value!=draft.count)
                             onChange(draft.copy(count=value))
                         })
@@ -992,13 +1005,6 @@ private fun ReferencesSection(
 /** Counts and the live line of the newest active job; a tap filters the list below. */
 @Composable
 private fun FlowJobsSummary(counts: FlowStudioPlan.JobCounts, latest: GenerationJob?, selected: String, onShow: (String) -> Unit) {
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(latest?.id) {
-        while (latest != null) {
-            now = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1_000)
-        }
-    }
     Surface(color = SurfaceDark, border = BorderStroke(1.dp, BorderSubtle), shape = NexusTokens.field, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Text("Progreso", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
@@ -1006,15 +1012,13 @@ private fun FlowJobsSummary(counts: FlowStudioPlan.JobCounts, latest: Generation
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
-                FilterChip(selected = selected == "Todos",onClick={onShow("Todos")},label={Text("Todos")})
-                FilterChip(selected = selected == "En curso", onClick = { onShow("En curso") }, label = { Text("En curso · ${counts.active}", maxLines = 1) })
-                FilterChip(selected = selected == "Listos", onClick = { onShow("Listos") }, label = { Text("Listos · ${counts.ready}", maxLines = 1) })
-                FilterChip(selected = selected == "Errores", onClick = { onShow("Errores") }, label = { Text("Errores · ${counts.failed}", maxLines = 1) })
+                // Same chip as Biblioteca: the selected filter is a solid accent fill, unmistakable at a glance.
+                com.vidadomu.nexus.ui.components.StudioFilterChip(selected == "Todos", { onShow("Todos") }, { Text("Todos") })
+                com.vidadomu.nexus.ui.components.StudioFilterChip(selected == "En curso", { onShow("En curso") }, { Text("En curso · ${counts.active}", maxLines = 1) })
+                com.vidadomu.nexus.ui.components.StudioFilterChip(selected == "Listos", { onShow("Listos") }, { Text("Listos · ${counts.ready}", maxLines = 1) })
+                com.vidadomu.nexus.ui.components.StudioFilterChip(selected == "Errores", { onShow("Errores") }, { Text("Errores · ${counts.failed}", maxLines = 1) })
             }
-            latest?.let { job ->
-                Text(FlowStudioPlan.progressLine(job, com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)).orEmpty(),
-                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
-            }
+            // The live line of each job lives in its own card; repeating it here showed the same state twice.
         }
     }
 }
@@ -1048,8 +1052,8 @@ private fun JobResultGroup(job: GenerationJob, onOpen: () -> Unit, onDownload: (
             Text("$time · ${if (job.modality == Modality.VIDEO) "Vídeo" else "Imagen"} · ID ${job.providerJobId?.takeLast(8) ?: job.id.takeLast(8)}",
                 style = MaterialTheme.typography.labelSmall, color = TextMuted)
             if (active) {
-                Text(FlowStudioPlan.progressLine(job, com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)).orEmpty(),
-                    style = MaterialTheme.typography.labelMedium, color = TextPrimary)
+                Text(FlowStudioPlan.progressDetail(job, com.vidadomu.nexus.provider.flow.FlowProgress.elapsed((now - job.startedAt) / 1_000)).orEmpty(),
+                    style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                 TextButton(onClick = onOpen) { Text("Ver estado y opciones") }
             }
             job.error?.takeIf { it.isNotBlank() }?.let {
