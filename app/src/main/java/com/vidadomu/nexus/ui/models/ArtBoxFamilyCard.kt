@@ -68,13 +68,16 @@ import com.vidadomu.nexus.core.model.*
             // Fixed slot: the card never changes size, only the logo inside it does.
             Box(Modifier.size(ArtBoxCardMetrics.logoSlot).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
                 min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,haptic=haptic,onHold={logoHeld=it},onAdjusting={adjusting=it},
-                onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.Center) {
+                onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.TopCenter) {
+                // Sin tope de hueco: un logo grande crece hacia abajo y el nombre se escribe por encima.
+                Box(Modifier.wrapContentSize(Alignment.TopCenter,unbounded=true)) {
                 CatalogGlyph(glyphKey,ArtBoxCardMetrics.logo,labels) {size ->
                     if(toolCategory) {
                         Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
                             Icon(toolCategoryIcon(section.family),null,Modifier.size(size*.57f),tint=colors.primary)
                         }
                     } else BrandLogo(family=section.family,modelId=section.models.firstOrNull()?.id,size=size,bare=true)
+                }
                 }
             }
             // Mantener pulsado el nombre levanta la tarjeta para reordenarla; mantener pulsado el logo lo redimensiona.
@@ -90,7 +93,7 @@ import com.vidadomu.nexus.core.model.*
 internal object ArtBoxCardMetrics {
     val height = 176.dp
     val logo = 64.dp
-    /** Space reserved for the logo: the largest size (logo × MAX_SCALE) fits, so every card has the same height. */
+    /** Space reserved for the logo; bigger logos overflow downwards, so every card keeps the same height. */
     val logoSlot = 90.dp
 }
 

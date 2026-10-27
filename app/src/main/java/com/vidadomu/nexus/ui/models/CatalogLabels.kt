@@ -107,7 +107,7 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
 
     companion object {
         const val MIN_SCALE = .5f
-        const val MAX_SCALE = 1.4f
+        const val MAX_SCALE = 2.2f
         @Volatile private var instance: CatalogLabelStore? = null
         fun get(context: Context): CatalogLabelStore = instance ?: synchronized(this) {
             instance ?: CatalogLabelStore(context.applicationContext).also { instance = it }
