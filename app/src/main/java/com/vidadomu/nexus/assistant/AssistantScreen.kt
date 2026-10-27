@@ -266,7 +266,15 @@ fun AssistantScreen(
             val barPinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned
             Box(Modifier.weight(1f).fillMaxWidth()
                 // Mantener pulsado un hueco del chat abre el menú de acciones rápidas, justo donde está el dedo.
-                .pointerInput(Unit) { detectTapGestures(onLongPress = { pos -> menuAt = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }; menuOpen = true }) }
+                // Both detectors fire at the same timeout; a short wait lets a message claim the press first, so a long
+                // press on text opens only that message's menu and the chat menu stays for the empty space between messages.
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { pos ->
+                    val at = with(density) { androidx.compose.ui.unit.DpOffset(pos.x.toDp(), pos.y.toDp()) }
+                    scope.launch {
+                        kotlinx.coroutines.delay(120)
+                        if (!MessageLongPress.recent()) { menuAt = at; menuOpen = true }
+                    }
+                }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
             LazyColumn(Modifier.fillMaxSize(), state = listState,
                 contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8, top = 52.dp,
@@ -824,7 +832,8 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                 ChatMarkdownView(responseText, streaming = streaming,
                     answered = answered, onReply = if (streaming) null else onReply, selectable = false)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
-                    DropdownMenuItem(text = { Text("Seleccionar fragmento") }, onClick = { actionsExpanded = false; selection = true })
+                    DropdownMenuItem(text = { Text("Seleccionar texto") }, leadingIcon = { Icon(Icons.Default.TextFields, null) },
+                        onClick = { actionsExpanded = false; selection = true })
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
                         Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()

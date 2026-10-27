@@ -17,6 +17,12 @@ import androidx.compose.ui.semantics.semantics
  * up as soon as the finger moves beyond touch slop, so scrolling the conversation is never mistaken for a long press.
  * Once it fires it consumes the rest of the gesture, so no child click runs after the menu opens.
  */
+/** Time of the last long press taken by a message: the chat-wide menu must not open on top of the message menu. */
+internal object MessageLongPress {
+    @Volatile var lastAt: Long = 0L
+    fun recent(windowMs: Long = 600): Boolean = android.os.SystemClock.uptimeMillis() - lastAt < windowMs
+}
+
 internal fun Modifier.messageLongPress(label: String, onLongPress: () -> Unit): Modifier = this
     .pointerInput(onLongPress) {
         awaitEachGesture {
@@ -30,6 +36,7 @@ internal fun Modifier.messageLongPress(label: String, onLongPress: () -> Unit): 
                 }
             }
             if (released == null) {
+                MessageLongPress.lastAt = android.os.SystemClock.uptimeMillis()
                 onLongPress()
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
