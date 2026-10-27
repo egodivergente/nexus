@@ -4,6 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,7 +60,7 @@ fun NexusDropdownSelector(caption: String, value: String, choices: List<String>,
         DropdownMenu(open, { open = false }) {
             choices.forEach { choice ->
                 DropdownMenuItem(text = { Text(choice) }, onClick = { open = false; onValue(choice) },
-                    trailingIcon = if (choice == value) ({ Icon(androidx.compose.material.icons.Icons.Default.Check, "Seleccionado", Modifier.size(18.dp)) }) else null)
+                    trailingIcon = if (choice == value) ({ Icon(Icons.Default.Check, "Seleccionado", Modifier.size(18.dp)) }) else null)
             }
         }
     }
@@ -80,7 +83,7 @@ fun NexusStepper(value: Int, onValue: (Int) -> Unit, minimum: Int, maximum: Int?
     zeroLabel: String? = null, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         FilledTonalIconButton(onClick = { onValue(value - 1) }, enabled = value > minimum) {
-            Icon(androidx.compose.material.icons.Icons.Default.Remove, "Reducir $label")
+            Icon(Icons.Default.Remove, "Reducir $label")
         }
         Text(if (value == 0 && zeroLabel != null) zeroLabel else value.toString(),
             style = MaterialTheme.typography.titleMedium, maxLines = 1,
@@ -88,7 +91,7 @@ fun NexusStepper(value: Int, onValue: (Int) -> Unit, minimum: Int, maximum: Int?
                 .semantics { contentDescription = "$label: " + (if (value == 0 && zeroLabel != null) zeroLabel else value.toString()) },
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         FilledTonalIconButton(onClick = { onValue(value + 1) }, enabled = maximum == null || value < maximum) {
-            Icon(androidx.compose.material.icons.Icons.Default.Add, "Aumentar $label")
+            Icon(Icons.Default.Add, "Aumentar $label")
         }
     }
 }
