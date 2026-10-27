@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -164,7 +165,10 @@ internal fun StudioBalanceChip(balance:String,onClick:()->Unit,compact:Boolean=f
     ) {
         // Saldo discreto: texto sin fondo, para que la cabecera no cargue otro botón-pastilla.
         Surface(shape=NexusTokens.filter,color=Color.Transparent) {
-            Box(contentAlignment=androidx.compose.ui.Alignment.Center,modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=6.dp)) {
+            // Wallet glyph: the amount is recognisable as saldo/gasto without a label; tapping opens the breakdown.
+            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,modifier=Modifier.padding(horizontal=if(compact) NexusTokens.space8 else NexusTokens.space12,vertical=6.dp)) {
+                Icon(Icons.Outlined.AccountBalanceWallet,null,Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
                 Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines=1,overflow=TextOverflow.Ellipsis)
             }

@@ -108,7 +108,9 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured", app.secureStorage.getMaskedProviderApiKey("fal") != "Not configured").count { it }
     }
     val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
-    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint) }; Text(page?.title ?: "Ajustes",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
+    Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint,size=32.dp) }
+                // Same pattern as the tabs: the root «Ajustes» is a screen title; sub-pages are a level below.
+                Text(page?.title ?: "Ajustes",style=if(page==null) MaterialTheme.typography.headlineSmall else com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         showBalance=page != SettingsPage.BYTEPLUS,
         navigationIcon={ if(page != null) IconButton(onClick=closePage) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
         if(page in setOf(SettingsPage.RULES,SettingsPage.PROJECTS,SettingsPage.CATALOG,SettingsPage.AUTOMATION) || page==SettingsPage.VISUAL && advancedAppearance) {
