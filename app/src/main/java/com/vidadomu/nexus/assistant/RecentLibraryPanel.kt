@@ -90,10 +90,13 @@ internal fun RecentLibraryPanel(expanded: Boolean, onClose: () -> Unit, content:
     AnimatedVisibility(expanded,
         enter = if (motion) expandVertically(tween(180), expandFrom = Alignment.Bottom) + fadeIn() else EnterTransition.None,
         exit = if (motion) shrinkVertically(tween(180), shrinkTowards = Alignment.Bottom) + fadeOut() else ExitTransition.None) {
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        // A floating card with the composer's margins, corners and shadow, not a full-width dark slab over the chat.
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = NexusTokens.card, shadowElevation = 8.dp,
+            border = androidx.compose.foundation.BorderStroke(.5.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12).padding(top = NexusTokens.space4)) {
             Column(Modifier.fillMaxWidth().recentLibraryGesture(opening = false, onChange = onClose)
                 .padding(bottom = NexusTokens.space8)) {
-                Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space12), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically) {
                     Text("Archivos recientes", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                     IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Ocultar archivos recientes", Modifier.size(18.dp)) }
                 }

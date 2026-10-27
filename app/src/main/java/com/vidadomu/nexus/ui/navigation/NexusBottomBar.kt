@@ -101,8 +101,10 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
 fun Modifier.revealBarOnSwipeUp(): Modifier = this.pointerInput(Unit) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-        val bandTop = size.height - 190.dp.toPx()
-        val bandBottom = size.height - 28.dp.toPx()
+        // The band stops well above the bottom edge: a swipe from the edge belongs to the system (Home/Recents on
+        // Samsung) and used to trigger both, or neither on the first try. In the Agent tab the composer handle is the main way.
+        val bandTop = size.height - 220.dp.toPx()
+        val bandBottom = size.height - 64.dp.toPx()
         if (down.position.y !in bandTop..bandBottom) return@awaitEachGesture
         var dx = 0f; var dy = 0f
         do {
