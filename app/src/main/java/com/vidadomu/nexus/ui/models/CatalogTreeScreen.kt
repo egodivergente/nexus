@@ -85,7 +85,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     var imageReferences by rememberSaveable { mutableStateOf(true) }
     var allImageFamilies by rememberSaveable { mutableStateOf(false) }
     var use by rememberSaveable { mutableStateOf<CreationUse?>(null) }
-    val visible = remember(models, modality, query, use, favorites, favoritesOnly,providerFilter,imageReferences,toolsView,rules,showLegacy) {
+    val placementRev=CatalogPlacements.revision.intValue
+    val visible = remember(placementRev,models, modality, query, use, favorites, favoritesOnly,providerFilter,imageReferences,toolsView,rules,showLegacy) {
         val months=runtime.int("catalog.ageMonths")
         val available=models.filter {model->showLegacy || months==0 || modelRelease(model)?.month?.let {
             java.time.YearMonth.parse(it)>=java.time.YearMonth.now().minusMonths(months.toLong())
@@ -99,13 +100,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val orderScope = "order:${if(toolsView) "TOOLS" else modality.name}:${family ?: if(query.isBlank() && !favoritesOnly) "families" else "search-models"}"
     var savedOrder by remember(orderScope) { mutableStateOf(prefs.getString(orderScope, "").orEmpty().split("\n").filter {it.isNotBlank()}) }
     var contextTarget by remember { mutableStateOf<Triple<String,String,NexusModel?>?>(null) }
-    val sections = remember(visible, favorites,savedOrder,modality,toolsView,catalogSort,jobs,onlyDated) { sortSections((if(toolsView) visible.groupBy {toolCategory(it)!!}.map {(name,rows)->CatalogSection(name,rows)} else catalogSections(visible, favorites)).sortedWith(
+    val sections = remember(placementRev,visible, favorites,savedOrder,modality,toolsView,catalogSort,jobs,onlyDated) { sortSections((if(toolsView) visible.groupBy {toolCategory(it)!!}.map {(name,rows)->CatalogSection(name,rows)} else catalogSections(visible, favorites)).sortedWith(
         compareBy<CatalogSection> {savedOrder.indexOf(it.family).let {index -> if(index<0) Int.MAX_VALUE else index}}
             .thenByDescending { section -> section.models.any { modelBookmark(it) in favorites } }
             .thenBy { section -> if(modality == Modality.IMAGE) ImageModelChoices.priority(section.family) else 0 }
             .thenByDescending { section -> section.models.any { CatalogFocus.forModel(it)!=null } }
     ),catalogSort,jobs,onlyDated) }
-    val groups = remember(visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated) }
+    val groups = remember(placementRev,visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated) }
     val rootLevel = catalogAtRoot(family, query, favoritesOnly)
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
@@ -119,6 +120,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
     val dragView=androidx.compose.ui.platform.LocalView.current
     val labels=rememberCatalogLabels()
+    var moveTarget by remember {mutableStateOf<Pair<String,String>?>(null)}
     var labelTarget by remember {mutableStateOf<Triple<String,String,String>?>(null)}
     // A long press that lifts a card but never moves it means «personalizar», not «ordenar».
     val dragMoved=remember {booleanArrayOf(false)}
@@ -385,9 +387,22 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 contextTarget=null
             }) {Text("Poner al principio")}
             if(model!=null) TextButton(onClick={toggleFavorite(model);contextTarget=null}) {Text(if(modelBookmark(model) in favorites) "Quitar favorito" else "Marcar favorito")}
+            if(!key.startsWith("tool:")) TextButton(onClick={moveTarget=key to labels.name(labelKey,label);contextTarget=null}) {Text("Mover a otra sección…")}
             TextButton(onClick={pendingHide=key to label;contextTarget=null}) {Text("Quitar de mi catálogo")}
             TextButton(onClick={saveOrder(emptyList());contextTarget=null}) {Text("Restaurar orden predeterminado")}
         }},confirmButton={TextButton(onClick={contextTarget=null}) {Text("Cerrar")}})
+    }
+    moveTarget?.let {(key,name) ->
+        val current=CatalogPlacements.target(key)
+        AlertDialog(onDismissRequest={moveTarget=null},title={Text("Mover «$name»")},text={Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+            Text("Elige dónde quieres verlo. Solo cambia dónde aparece en ArtBox.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(bottom=8.dp))
+            TextButton(onClick={CatalogPlacements.set(key,"none");moveTarget=null}) {Text(if(current=="none") "✓ Vídeos / Imágenes (fuera de Herramientas)" else "Vídeos / Imágenes (fuera de Herramientas)")}
+            CatalogPlacements.toolCategories.forEach {category ->
+                val chosen=current=="tool:$category"
+                TextButton(onClick={CatalogPlacements.set(key,"tool:$category");moveTarget=null}) {Text((if(chosen) "✓ " else "")+"Herramientas · $category")}
+            }
+            if(current!=null) TextButton(onClick={CatalogPlacements.set(key,null);moveTarget=null}) {Text("Volver a su sección original")}
+        }},confirmButton={TextButton(onClick={moveTarget=null}) {Text("Cerrar")}})
     }
     labelTarget?.let {(key,name,description) ->
         CatalogLabelEditor(key,name,description,labels,onDismiss={labelTarget=null},withDescription=key.startsWith("group:"))

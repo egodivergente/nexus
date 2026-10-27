@@ -124,6 +124,16 @@ internal fun toolCategoryIcon(category: String): ImageVector = when(category) {
 
 /** Only discover operations present in the real catalog; this never creates a synthetic endpoint. */
 internal fun toolCategory(model: NexusModel): String? {
+    // The user's own placement (group first, then family) wins over the automatic classification.
+    if(!CatalogPlacements.isEmpty()) {
+        val placed=CatalogPlacements.target(com.vidadomu.nexus.data.repository.groupVisibilityKey(model))
+            ?: CatalogPlacements.target(com.vidadomu.nexus.data.repository.familyVisibilityKey(catalogFamily(model)))
+        if(placed!=null) return if(placed.startsWith("tool:")) placed.removePrefix("tool:") else null
+    }
+    return automaticToolCategory(model)
+}
+
+internal fun automaticToolCategory(model: NexusModel): String? {
     val tasks=catalogWorkflows(model)
     return when {
         CatalogWorkflow.MOTION in tasks -> "Movimiento y pose"

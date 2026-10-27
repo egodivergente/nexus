@@ -109,6 +109,7 @@ class NexusApplication : Application() {
         customMediaStore.ensureBytePlus()
         providerRegistry.setCustomProviders(customMediaStore.providers())
         val catalogCache = com.vidadomu.nexus.data.repository.ModelCatalogCache(this)
+        com.vidadomu.nexus.ui.models.CatalogPlacements.init(this)
         runCatching { com.vidadomu.nexus.data.repository.CatalogNameMigration.run(this) }
         modelCatalogRepository = ModelCatalogRepository(providerRegistry, currencyManager, catalogCache, getSharedPreferences("catalog_customization_v1", 0))
         generationRepository = GenerationRepository(this, database, providerRegistry)
