@@ -8,7 +8,7 @@ class ScreenInitializationTest {
     @Test fun startingWithAnyDestinationKeepsEveryBottomNavigationItemValid() {
         val prefix = Screen::class.java.name
         val parent = Screen::class.java.classLoader!!
-        for (first in listOf("Assistant", "Create", "Models", "Generations", "Library", "Settings")) {
+        for (first in listOf("Assistant", "Create", "Models", "Generations", "Library", "Settings", "Flow")) {
             // Fresh class initialization for each entry point; independent of test order.
             val loader = object : ClassLoader(parent) {
                 override fun loadClass(name: String, resolve: Boolean): Class<*> {
@@ -27,9 +27,9 @@ class ScreenInitializationTest {
             val base = Class.forName(prefix, true, loader)
             val companion = base.getField("Companion").get(null)
             val items = companion.javaClass.getMethod("getBottomNavItems").invoke(companion) as List<*>
-            assertEquals(5, items.size)
+            assertEquals(4, items.size)
             assertTrue("Opening $first must not retain a partially initialized destination", items.all { it != null })
-            assertEquals(listOf("assistant", "models", "create", "flow", "library"),
+            assertEquals(listOf("assistant", "models", "create", "library"),
                 items.map { base.getMethod("getRoute").invoke(it) })
         }
     }

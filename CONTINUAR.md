@@ -203,3 +203,14 @@ El 17 de octubre se añadió BytePlus ModelArk (Responses API, modelo dola-seed-
 
 
 El 24 de octubre de 2026 se aplicó el paquete de correcciones UX/UI (ArtBox, Lanzadera, Flow, Biblioteca, «Continuar en…») en la rama `ux/correcciones-capturas-20261024` sobre `83db30a` (1.9.73/vc107): Android `1.9.74-agent-preview`/vc108 instalada en el Pixel 8 Pro con los datos conservados. Detalle, pruebas (app 659, agent-core 313) y límites en `docs/UX-CORRECCIONES-20261024.md`. Pendiente: compositor colapsable en el visor de Biblioteca, dependencias de campos de otros modelos, pruebas instrumentadas y generación nueva en Flow desde el Pixel. El S25 no se ha tocado.
+
+27/10/2026 — Rama `codex/nexus-seven-improvements-20261027`, sobre `42b8d8e`
+(Android 1.9.97/vc133), entrega de código 1.9.98/vc134 para NEX-UX-001–007.
+Chat, botón de voz, aurora, hover y pareja de fotogramas implementados; NEX-UX-006
+parcial: protección de reenvíos integrada y motor de enrutamiento aislado, pendiente
+adaptación comercial con evidencia exacta. No instalado: puente S25 offline y firma
+privada no disponible aquí. Consultar `docs/NEXUS-SEVEN-IMPROVEMENTS-20261027.md`
+para alcance y validación; no inferir una actualización del teléfono.
+
+La captura del usuario `74858.jpg` confirma S25 SM-S938B con Nexus 1.9.97/vc133
+y Android 17/API 37 antes de esta entrega; no es una comprobación ADB en vivo.

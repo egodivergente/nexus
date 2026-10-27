@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.R
 import com.vidadomu.nexus.settings.RuntimePreferences
@@ -28,7 +28,7 @@ internal fun photoVeilStops(intensity: Float): List<Float> {
     return listOf(minOf(1f, base + .10f), base, minOf(1f, base + .14f))
 }
 
-/** Static supplied artwork or personal photo, without animation loops or sensor polling. */
+/** Personal photos retain their readability veil; dark themes use a restrained ambient aurora. */
 @Composable fun NexusBackdrop(content: @Composable ()->Unit) {
     val config by RuntimePreferences.get(LocalContext.current).state.collectAsState()
     val veil = MaterialTheme.colorScheme.background
@@ -44,7 +44,7 @@ internal fun photoVeilStops(intensity: Float): List<Float> {
                         drawRect(Brush.verticalGradient(stops.map { veil.copy(alpha = it) }))
                     },contentScale=ContentScale.Crop)
             }
-            else Image(painterResource(R.drawable.nexus_blue),null,Modifier.matchParentSize(),alpha=alpha,contentScale=ContentScale.Crop)
+            else if (veil.luminance() < .3f && alpha > 0f) NexusAurora(alpha)
         }
         content()
     }

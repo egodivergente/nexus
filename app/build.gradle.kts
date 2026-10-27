@@ -11,8 +11,8 @@ plugins {
 }
 
 // Nombre de versiÃ³n: cada 10 versionCode cambia el nombre (vc 70â€“79 = Horizonte, 80â€“89 = Ãndigoâ€¦) para orientarse de un vistazo.
-val versionCodenames = listOf("Aurora", "Boreal", "CÃ©nit", "Dorado", "Eclipse", "FÃ©nix", "Glaciar", "Horizonte", "Ãndigo", "JÃºpiter",
-    "Kairos", "Lumen", "Mistral", "NÃ©bula", "Ã“nix", "Polaris", "QuÃ¡sar", "RÃ³dano", "Sirio", "Tundra")
+val versionCodenames = listOf("Aurora", "Boreal", "Cénit", "Dorado", "Eclipse", "Fénix", "Glaciar", "Horizonte", "Índigo", "Júpiter",
+    "Kairos", "Lumen", "Mistral", "Nébula", "Ónix", "Polaris", "Quásar", "Ródano", "Sirio", "Tundra")
 fun versionCodename(code: Int) = versionCodenames[(code / 10) % versionCodenames.size]
 
 android {
@@ -26,8 +26,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 133
-        versionName = "1.9.97-agent"
+        versionCode = 134
+        versionName = "1.9.98-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")

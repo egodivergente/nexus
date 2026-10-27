@@ -83,7 +83,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
     onReply: (String) -> Unit = {}, onAudio: ((android.net.Uri)->Unit)? = null, onReorder: ((String,Int)->Unit)? = null, onCamera: (() -> Unit)? = null,
     onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
-    reasoningControl: @Composable () -> Unit = {}, onLive: (() -> Unit)? = null) {
+    reasoningControl: @Composable () -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     // Flotante, como el campo de búsqueda de Ajustes de Android: una píldora con sombra pegada abajo, sin franjas ni filetes.
@@ -185,8 +185,6 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                     if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
                     else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-                    // Conversación por voz en directo (manos libres), como en ChatGPT o Gemini Live.
-                    onLive?.let {live -> FilledIconButton(onClick=live,modifier=Modifier.padding(end=4.dp).size(40.dp)) {Icon(Icons.Default.GraphicEq,"Hablar en directo")}}
                 }
                 else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }

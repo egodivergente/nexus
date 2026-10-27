@@ -14,6 +14,13 @@ import org.junit.Test
 class AssistantComposerTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun conventionalMicrophoneRemainsWithoutTheAdditionalLiveVoiceButton() {
+        compose.setContent { NexusTheme { InputBar(AssistantUiState(), TextFieldValue(""), {}, {}, {}, {}, {}, onAudio = {}) } }
+        compose.onNodeWithContentDescription("Grabar audio o dictar").assertIsDisplayed().assertHasClickAction().performClick()
+        compose.onNodeWithText("Dictar texto").assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithContentDescription("Hablar en directo").assertDoesNotExist()
+    }
+
     @Test fun canKeepWritingWhileAgentWorks() {
         compose.setContent {
             var draft by remember { mutableStateOf(TextFieldValue("Borrador")) }

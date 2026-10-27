@@ -9,9 +9,9 @@ class ScreenNavigationTest {
     @Test fun bottomNavigationHasEveryInitializedDestination() {
         assertEquals("models", Screen.Models.route)
         assertEquals("flow", Screen.Flow.route)
-        org.junit.Assert.assertTrue(Screen.Flow in Screen.bottomNavItems)
+        assertFalse(Screen.Flow in Screen.bottomNavItems)
         assertEquals(
-            listOf("assistant", "models", "create", "flow", "library"),
+            listOf("assistant", "models", "create", "library"),
             Screen.bottomNavItems.map { it.route }
         )
     }

@@ -164,7 +164,7 @@ fun ChatMarkdownView(
 ) {
     var selectedLink by remember {mutableStateOf<String?>(null)}
     val st = mdStyles().copy(onLink={selectedLink=it})
-    val blocks = remember(text, streaming) { ChatMarkdown.parse(text, streaming) }
+    val blocks = remember(text, streaming) { com.vidadomu.nexus.agent.core.chat.ChatPresentation.blocks(text, streaming) }
     val ctx = remember(answered, onReply) { WidgetCtx(answered, onReply) }
     if (selectable) SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
     else Box(modifier) { MdBlockList(blocks, st, ctx) }
@@ -234,8 +234,7 @@ private fun MdCallout(b: MdBlock.Callout, st: MdStyles, ctx: WidgetCtx) {
                 Spacer(Modifier.width(NexusTokens.space4))
                 Text(look.label, style = st.label.copy(fontWeight = FontWeight.SemiBold), color = look.tone)
             }
-            // One step below the bubble's body text, so the box reads as an aside with its own hierarchy.
-            MdBlockList(b.blocks, st.copy(body = MaterialTheme.typography.bodyMedium), ctx)
+            MdBlockList(b.blocks, st, ctx)
         }
     }
 }

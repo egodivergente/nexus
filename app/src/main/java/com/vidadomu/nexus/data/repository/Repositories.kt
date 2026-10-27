@@ -174,32 +174,37 @@ class GenerationRepository(
     }
     suspend fun reloadHistory() = database.loadHistory()
 
-    suspend fun submitGeneration(request: GenerationRequest, localMetadata: Map<String,String> = emptyMap()): Result<GenerationJob> {
+    private val submissionLocks = Array(64) { kotlinx.coroutines.sync.Mutex() }
+
+    suspend fun submitGeneration(request: GenerationRequest, localMetadata: Map<String,String> = emptyMap()): Result<GenerationJob> =
+        submissionLocks[(request.id.hashCode() and Int.MAX_VALUE) % submissionLocks.size].withLock {
+            submitGenerationLocked(request, localMetadata)
+        }
+
+    private suspend fun submitGenerationLocked(request: GenerationRequest, localMetadata: Map<String,String>): Result<GenerationJob> {
         comparisonRecovery.await()
         try { LocalJobMetadata.validate(localMetadata) }
         catch (e: IllegalArgumentException) { return Result.failure(e) }
+        database.getJobById(request.id)?.let { return SubmissionSafety.reuse(it, request) }
         val provider = providerRegistry.getProviderById(request.providerId)
             ?: return Result.failure(ProviderError("No existe un adaptador ejecutable para ${request.providerId}."))
         if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) return Result.failure(ProviderError("Laboratorio local: envío bloqueado."))
+        val receiptMetadata = localMetadata + (SubmissionSafety.DIGEST_KEY to SubmissionSafety.digest(request))
         val pending=GenerationJob(id=request.id,providerId=request.providerId,modelId=request.modelId,modality=request.modality,
-            prompt=request.prompt,negativePrompt=request.negativePrompt,parameters=request.parameters + localMetadata,
+            prompt=request.prompt,negativePrompt=request.negativePrompt,parameters=request.parameters + receiptMetadata,
             inputMediaUri=request.mediaInputs.firstOrNull()?.uriString,status=GenerationStatus.QUEUED)
         database.insertOrUpdateJob(pending)
         return kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
             val result=try {provider.submitGeneration(request)} catch(e:Exception) {Result.failure(e)}
             if (result.isSuccess) {
-                val submitted = result.getOrThrow().let { it.copy(parameters = it.parameters + localMetadata) }
+                val submitted = result.getOrThrow().let { it.copy(parameters = it.parameters + receiptMetadata) }
                 database.insertOrUpdateJob(submitted)
                 if (context != null && submitted.status != GenerationStatus.COMPLETED) {
                     com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context, submitted.id)
                 }
             } else {
                 val error=result.exceptionOrNull()
-                val definite = error is IllegalArgumentException ||
-                    error is java.net.UnknownHostException ||
-                    error is java.net.ConnectException ||
-                    (error as? ProviderError)?.errorCode in setOf("NO_NETWORK") ||
-                    (error as? ProviderError)?.httpStatusCode?.let {it in setOf(400, 401, 402, 403, 404, 422, 429)} == true
+                val definite = SubmissionSafety.definitelyRejected(error)
                 database.insertOrUpdateJob(pending.copy(status=GenerationStatus.FAILED,
                     error=if(definite) (error as? ProviderError)?.humanReadableMessage ?: error?.message else "No se pudo confirmar el envío. Comprueba el proveedor antes de repetir; podría haberse iniciado.",
                     parameters=pending.parameters+("__submission_uncertain" to (!definite).toString())))

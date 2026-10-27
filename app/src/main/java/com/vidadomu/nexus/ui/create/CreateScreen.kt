@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.AnnotatedString
@@ -253,12 +254,23 @@ fun CreateScreen(
                         SegmentedButton(selected=selected?.id==editRoute.id,onClick={chooseModel(editRoute)},shape=SegmentedButtonDefaults.itemShape(1,2)) {Text("Con referencias")}
                     }
                     val mediaContent: @Composable ColumnScope.() -> Unit = {
-                        inputFields.forEach { field ->
+                        val renderField: @Composable (CanvasInputField, Boolean) -> Unit = { field, frameColumn ->
                             val modelKey = state.selectedModel?.let { it.providerId + "/" + it.id }.orEmpty()
                             key(modelKey,field.key) {
                                 CanvasAttachmentEditor(field,state.attachedMedia,
                                     enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
-                                    onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)},onRemove=viewModel::removeMedia,compact=true,onReorder=viewModel::reorderMedia)
+                                    onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)},onRemove=viewModel::removeMedia,compact=true,onReorder=viewModel::reorderMedia,frameColumn=frameColumn)
+                            }
+                        }
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            // Use available dp, not physical pixels or a device-name check. Large text,
+                            // split screen and landscape retain the readable vertical layout.
+                            if (CanvasInputPlan.pairedFrames(inputFields, state.selectedModel, maxWidth.value, LocalDensity.current.fontScale)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    inputFields.forEach { field -> Box(Modifier.weight(1f)) { renderField(field, true) } }
+                                }
+                            } else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                inputFields.forEach { renderField(it, false) }
                             }
                         }
                     }

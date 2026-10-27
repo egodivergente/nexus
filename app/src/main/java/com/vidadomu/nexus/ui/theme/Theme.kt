@@ -74,10 +74,11 @@ fun NexusTheme(content: @Composable () -> Unit) {
     val fontScale by preferences.fontScaleState()
     val base = LocalDensity.current
     val density = remember(base, fontScale) { Density(base.density, base.fontScale * fontScale) }
-    CompositionLocalProvider(LocalChromeColor provides chromeFor(theme), LocalDensity provides density, androidx.compose.ui.platform.LocalHapticFeedback provides filteredHaptics) {
+    val decorativeMotion = rememberNexusMotionAllowed()
+    CompositionLocalProvider(LocalChromeColor provides chromeFor(theme), LocalDensity provides density,
+        LocalNexusDecorativeMotion provides decorativeMotion, androidx.compose.ui.platform.LocalHapticFeedback provides filteredHaptics) {
         MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
             Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
-                // Static background avoids motion distraction and continuous rendering.
                 NexusBackdrop {content()}
             }
         }
