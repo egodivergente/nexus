@@ -26,7 +26,16 @@ internal fun canvasModelIdentity(model: NexusModel): CanvasModelIdentity {
         val version=match?.groupValues?.get(2).orEmpty().trimEnd('.')
         val variant=match?.groupValues?.get(3).orEmpty().trim('-').replace("developer","Developer").replace("quality","Quality")
         listOf("Grok",kind,version,variant).filter {it.isNotBlank()}.joinToString(" ")
-    } else model.displayName.substringBefore(" · proyecto activo")
+    } else withoutVendorPrefix(model.displayName.substringBefore(" · proyecto activo"))
     val provider=if(model.providerId=="usr_byteplus-media") "BytePlus" else providerName(model.providerId)
     return CanvasModelIdentity(title, listOf(modelUse(model).label,provider).filter {it.isNotBlank()}.distinct().joinToString(" · "),model.providerModelId ?: model.id)
+}
+
+/** Catalog names sometimes start with the vendor in capitals («BLACKFORESTLABS FLUX 3 Edit Image»); the logo already says it. */
+private val VENDOR_PREFIXES = setOf("blackforestlabs", "bfl", "bytedance", "openai", "google", "alibaba", "kwaivgi", "minimax", "xai", "tencent")
+
+internal fun withoutVendorPrefix(title: String): String {
+    val first = title.substringBefore(' ')
+    val rest = title.substringAfter(' ', "").trim()
+    return if (rest.isNotEmpty() && first.lowercase().filter(Char::isLetter) in VENDOR_PREFIXES) rest else title
 }

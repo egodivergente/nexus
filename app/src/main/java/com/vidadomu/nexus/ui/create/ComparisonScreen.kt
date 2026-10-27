@@ -42,6 +42,11 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
     fun cost(amount: Double, unit: ComparisonCurrency): String = if(unit == ComparisonCurrency.USD)
         app.currencyManager.formatUsd(amount) else java.math.BigDecimal.valueOf(amount).stripTrailingZeros().toPlainString()+" créditos Crun"
     val total = state.total?.entries?.joinToString(" + ") { cost(it.value, it.key) }
+    // Base published prices while choosing: an orientation before the real quote of «Revisar lote», never a charge.
+    fun basePrice(model: NexusModel): Double? = com.vidadomu.nexus.ui.models.referencePrice(model)?.takeIf { it > 0.0 }
+    val chosen = state.catalog.filter { ComparisonPlan.key(it) in state.selected }
+    val choiceEstimate = chosen.takeIf { it.isNotEmpty() && it.all { m -> basePrice(m) != null } }
+        ?.sumOf { basePrice(it)!! * state.quantity(it) }?.let(app.currencyManager::formatUsd)
     val completed = state.phase in setOf(ComparisonPhase.SENDING, ComparisonPhase.RESULTS)
     val dismiss = { controller.dismiss(); onDismiss() }
     if(results && state.batchId != null) ComparisonResultsDialog(state.batchId!!, { results = false }, onOpenOutput)
@@ -62,7 +67,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         ComparisonPhase.REVIEW -> "2 · Revisa antes de generar"
                         else -> "Una idea · distintas interpretaciones"
                     }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } }, modifier=Modifier.heightIn(min=76.dp), navigationIcon = { IconButton(onClick = dismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver al lienzo") } })
+                } }, modifier=Modifier.heightIn(min=64.dp), windowInsets = WindowInsets(0),
+                    navigationIcon = { IconButton(onClick = dismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver al lienzo") } })
             },
             bottomBar = {
                 com.vidadomu.nexus.ui.components.FloatingActionDock {
@@ -79,7 +85,9 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                 if(state.withReferences && state.source.attachedMedia.isEmpty()) Text("Añade tus imágenes de referencia en el lienzo.", style = MaterialTheme.typography.bodySmall)
                                 Button(onClick = controller::prepare,
                                 enabled = state.canReview,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Revisar lote · ${state.selectedRequests} ${if(state.selectedRequests==1) "generación" else "generaciones"}") }
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                                    Text("Revisar lote · ${state.selectedRequests} ${if(state.selectedRequests==1) "generación" else "generaciones"}" +
+                                        (choiceEstimate?.let { " · ≈ $it" } ?: "")) }
                             }
                             ComparisonPhase.PREPARING -> {
                                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -109,16 +117,24 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
             LazyColumn(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = padding.calculateBottomPadding() + 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
-                    Text(state.source.prompt.ifBlank { "Vuelve al lienzo y escribe un prompt para comparar sus interpretaciones." },
-                        style = MaterialTheme.typography.bodyLarge, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                    Text("Mismo prompt · ${state.source.attachedMedia.size} ${if(state.source.attachedMedia.size == 1) "referencia" else "referencias"} · ${if(state.phase == ComparisonPhase.CHOOSE) state.selectedRequests else state.requestCount} generaciones en total",
-                        Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // The prompt is context here, not the task: a compact card instead of four lines of large white text.
+                    Surface(shape = com.vidadomu.nexus.ui.theme.NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(state.source.prompt.ifBlank { "Vuelve al lienzo y escribe un prompt para comparar sus interpretaciones." },
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text("Mismo prompt · ${state.source.attachedMedia.size} ${if(state.source.attachedMedia.size == 1) "referencia" else "referencias"} · ${if(state.phase == ComparisonPhase.CHOOSE) state.selectedRequests else state.requestCount} generaciones",
+                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
                 if(BuildConfig.OFFLINE_QA) item { Text("LABORATORIO · tarifas simuladas · envíos bloqueados", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                 if(state.phase == ComparisonPhase.CHOOSE) {
                     item {
                         if(groups.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(groups) {name->AssistChip(onClick={controller.loadGroup(name)},label={Text(name)})}}
-                        TextButton(onClick={saveGroup=!saveGroup}) {Text("Mis grupos")}
+                        com.vidadomu.nexus.ui.components.NexusTonalAction(if(saveGroup) "Cerrar grupos" else "Mis grupos",{saveGroup=!saveGroup},
+                            icon=Icons.Default.Bookmarks,description="Guardar o cargar grupos de modelos")
                         if(saveGroup) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(groupName,{groupName=it},Modifier.weight(1f),singleLine=true,placeholder={Text("Guardar selección como grupo")})
                             TextButton(onClick={controller.saveGroup(groupName.trim());groups=controller.savedGroups();groupName=""},enabled=groupName.isNotBlank() && state.selected.isNotEmpty()) {Text("Guardar")}
@@ -129,22 +145,15 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                             FilterChip(state.withReferences, { controller.setReferenceMode(true) }, label = { Text("Con referencias") })
                             FilterChip(!state.withReferences, { controller.setReferenceMode(false) }, label = { Text("Desde texto") })
                         }
-                        Text(if(state.withReferences) "Se comprobarán tus imágenes con cada modelo." else "Mismo prompt, con los ajustes válidos de cada modelo.", style = MaterialTheme.typography.bodySmall)
+                        // One counter line instead of two help paragraphs.
+                        Text("${state.selected.size}/${state.maximumModels} modelos · hasta ${state.maximumPerModel} generaciones cada uno" +
+                            if(state.withReferences) " · se comprueban tus imágenes" else "",
+                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    item { Text("De 1 a ${state.maximumPerModel} generaciones por modelo. Puedes usar un solo modelo o combinar hasta ${state.maximumModels}.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     item {
                         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
                             placeholder = { Text(if(state.source.selectedModality==Modality.VIDEO) "Hailuo, Kling, Seedance…" else "Seedream, GPT, Flux…") }, leadingIcon = { Icon(Icons.Default.Search, null) },
                             trailingIcon = { if(query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Borrar búsqueda") } })
-                    }
-                    if(state.selected.isNotEmpty()) item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(state.catalog.filter { ComparisonPlan.key(it) in state.selected }, key = ComparisonPlan::key) { model ->
-                                InputChip(selected = true, onClick = { controller.toggle(model) }, label = { Text(canvasModelIdentity(model).title, maxLines = 2) },
-                                    trailingIcon = { Icon(Icons.Default.Close, "Quitar ${model.displayName}", Modifier.size(16.dp)) })
-                            }
-                        }
                     }
                     val shortlist = if(state.source.selectedModality==Modality.VIDEO) state.catalog.take(12) else ImageModelChoices.shortlist(state.catalog)
                     val visible = (if(showAll || query.isNotBlank()) state.catalog else
@@ -158,11 +167,20 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         val checking = key in state.checking
                         val problem = state.selectionProblems[key]
                         val enabled = !checking && (problem == null || key !in state.checked)
+                        // Selected rows carry an accent tint, not only a ticked box at the far edge.
+                        Surface(shape = com.vidadomu.nexus.ui.theme.NexusTokens.card,
+                            color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha = .08f) else androidx.compose.ui.graphics.Color.Transparent,
+                            border = if(selected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .35f)) else null) {
+                        Column(Modifier.padding(horizontal = 8.dp)) {
                         Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { controller.toggle(model) }.heightIn(min = 64.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             com.vidadomu.nexus.ui.components.BrandLogo(organization=model.organization,modelId=model.id,size=28.dp,bare=true)
                             Column(Modifier.weight(1f)) {
                                 Text(canvasModelIdentity(model).title, style = MaterialTheme.typography.titleSmall)
-                                Text(canvasModelIdentity(model).detail + if(catalogFamily(model) == "Midjourney") " · Midjourney / Youchuan" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                // «Con referencias» is the active filter, so it says nothing per row; the base price does.
+                                val detail = canvasModelIdentity(model).detail.let { d -> if(state.withReferences) d.removePrefix("Con referencias · ") else d }
+                                val price = basePrice(model)?.let { "desde " + app.currencyManager.formatUsd(it) + if(Modality.VIDEO in model.modalities) " / 5 s" else " / imagen" }
+                                Text(listOfNotNull(detail + if(catalogFamily(model) == "Midjourney") " · Midjourney / Youchuan" else "", price).joinToString(" · "),
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 val limit = ComparisonPlan.referenceLimit(model)
                                 Text(when {
                                     checking -> "Comprobando referencias…"
@@ -186,7 +204,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                 Icon(Icons.Default.Add, "Más generaciones de ${model.displayName}")
                             }
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        }
+                        }
                     }
                     if(query.isBlank() && state.catalog.size > shortlist.size) item {
                         TextButton(onClick = { showAll = !showAll }, modifier = Modifier.fillMaxWidth()) {
