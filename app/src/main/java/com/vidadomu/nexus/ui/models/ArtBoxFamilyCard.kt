@@ -40,10 +40,11 @@ import com.vidadomu.nexus.core.model.*
     // Con más de dos columnas la tarjeta y su contenido se reducen a la par.
     val f=if(columns<=2) 1f else (2f/columns).coerceIn(.6f,1f)
     val colors=MaterialTheme.colorScheme
-    val count=pluralModelos(section.models.map(::modelGroupTitle).distinct().size)
+    val count=pluralModelos(section.models.map(::modelGroupTitle).distinct().size) // solo para accesibilidad
     // The lifted card grows, gains a soft shadow and an accent edge; the rest of the grid slides out of its way.
     var logoHeld by remember {mutableStateOf(false)}
     var adjusting by remember {mutableStateOf(false)}
+    var movingName by remember {mutableStateOf(false)}
     val appContext=androidx.compose.ui.platform.LocalContext.current.applicationContext
     val labels=rememberCatalogLabels()
     val glyphKey="family:"+section.family
@@ -60,6 +61,15 @@ import com.vidadomu.nexus.core.model.*
         Box {
         IconButton(onClick=onOptions,modifier=Modifier.align(Alignment.TopEnd).size(40.dp)) {
             Icon(Icons.Default.MoreVert,"Opciones de ${section.family}",Modifier.size(18.dp),tint=colors.onSurfaceVariant.copy(alpha=.7f))
+        }
+        // Número de modelos en una insignia tenue (arriba a la izquierda); con uno solo no aporta nada y se oculta.
+        // Mientras se ajusta o se mueve algo, la misma insignia muestra el porcentaje.
+        val modelCount=section.models.map(::modelGroupTitle).distinct().size
+        val badgeText=when {movingName->"↕"; adjusting->(labels.scale(glyphKey)*100).toInt().toString()+" %"; modelCount>1->modelCount.toString(); else->null}
+        if(badgeText!=null) Box(Modifier.align(Alignment.TopStart).padding(8.dp).defaultMinSize(minWidth=24.dp,minHeight=24.dp)
+            .clip(CircleShape).background((if(adjusting||movingName) colors.primary else colors.onSurface).copy(alpha=if(adjusting||movingName) .22f else .08f))
+            .padding(horizontal=6.dp),contentAlignment=Alignment.Center) {
+            Text(badgeText,style=MaterialTheme.typography.labelSmall,color=if(adjusting||movingName) colors.primary else colors.onSurfaceVariant,maxLines=1)
         }
         // Same structure and minimum height for every card (families and tools): logo, a two-line title and the count.
         // Short names no longer leave a blank third line (revision video 1, 11:22; video 2, 02:49). A minimum, not a
@@ -85,7 +95,6 @@ import com.vidadomu.nexus.core.model.*
             // para reordenarla.
             val density=androidx.compose.ui.platform.LocalDensity.current
             val place=labels.placement(glyphKey,"name")
-            var movingName by remember {mutableStateOf(false)}
             Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Text(title,style=if(columns>=4) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,
                     modifier=Modifier.offset(place.first.dp,place.second.dp).graphicsLayer {val s=if(movingName) 1.08f else 1f;scaleX=s;scaleY=s}
@@ -93,9 +102,9 @@ import com.vidadomu.nexus.core.model.*
                             vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onMoving={movingName=it;adjusting=it},
                             onMove={x,y->labels.setPlacementLive(glyphKey,"name",x,y)},onCommit={labels.commitPlacement(glyphKey,"name")},
                             pxPerDp={density.density}))
-                Box(Modifier.fillMaxWidth().heightIn(min=28.dp).then(dragModifier ?: Modifier),contentAlignment=Alignment.Center) {
-                    Text(if(adjusting&&!movingName) "Tamaño · "+(labels.scale(glyphKey)*100).toInt()+" %" else if(movingName) "Suelta donde quieras" else count,style=MaterialTheme.typography.labelSmall,color=if(adjusting) colors.primary else colors.onSurfaceVariant,maxLines=1)
-                }
+                // Franja inferior: mantener pulsada levanta la tarjeta para reordenarla.
+                Box(Modifier.fillMaxWidth().heightIn(min=20.dp).then(dragModifier ?: Modifier))
+            }
             }
         }
         }
@@ -103,7 +112,7 @@ import com.vidadomu.nexus.core.model.*
 }
 
 internal object ArtBoxCardMetrics {
-    val height = 176.dp
+    val height = 160.dp
     val logo = 64.dp
     /** Space reserved for the logo; bigger logos overflow downwards, so every card keeps the same height. */
     val logoSlot = 90.dp

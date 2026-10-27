@@ -262,9 +262,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 }
                 val priceRoutes=if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes}
                 val priceNote=catalogPriceNote(priceRoutes,anyPrice=priceRoutes.any {(referencePrice(it) ?: 0.0)>0.0})
-                if(priceNote!=null) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text(priceNote,style=MaterialTheme.typography.labelMedium,color=TextSecondary)
-                }
+                // La nota «Precios desde · por 5 s» se retiró: el precio se ve al abrir cada modelo.
                 if(rootLevel) {
                     val prioritySections = sections.filter { it.family in ImageModelChoices.families || it.models.any { m -> modelBookmark(m) in favorites } || it.family in savedOrder }
                     val shownSections = sections
