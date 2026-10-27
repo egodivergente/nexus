@@ -39,8 +39,8 @@ fun NexusTonalAction(label: String, onClick: () -> Unit, modifier: Modifier = Mo
  * [caption] names what is being chosen («Ámbito», «Sección») so the value is never mistaken for a title.
  */
 @Composable
-fun NexusDropdownSelector(caption: String, value: String, choices: List<String>, onValue: (String) -> Unit,
-    modifier: Modifier = Modifier, icon: ImageVector? = null) {
+fun NexusDropdownSelector(caption: String, value: String, choices: List<String>,
+    modifier: Modifier = Modifier, icon: ImageVector? = null, onValue: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         OutlinedButton(onClick = { open = true }, shape = NexusTokens.filter,
