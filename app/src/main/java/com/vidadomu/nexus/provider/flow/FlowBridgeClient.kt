@@ -512,7 +512,7 @@ internal class FlowBridgeClient(
             401, 403 -> "La vinculación privada con Flow ya no es válida. Vuelve a conectarla en Ajustes."
             404 -> "El trabajo o el proyecto de Flow ya no está disponible."
             409 -> "No se pudo confirmar el envío a Flow. Revisa Flow antes de volver a enviar."
-            413 -> "La instrucción es demasiado larga para el puente de Flow."
+            413 -> "El prompt es demasiado largo para el puente de Flow. Acórtalo."
             503 -> "Flow no está listo ahora. Abre el proyecto conectado y vuelve a intentarlo."
             else -> "El puente privado de Flow respondió con un error."
         }

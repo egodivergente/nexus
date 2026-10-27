@@ -135,6 +135,14 @@ class FlowBridgeProvider(
                 return@withLock Result.success(job.copy(providerJobId = null, status = GenerationStatus.FAILED,
                     completedAt = System.currentTimeMillis(), error = submissionError?.humanReadableMessage))
             }
+            if (recovered == null && FlowRetryPolicy.rejectedBeforeSending(submissionError?.httpStatusCode)) {
+                queue.edit().putString("state_${job.id}", "failed").commit()
+                return@withLock Result.success(job.copy(providerJobId = null, status = GenerationStatus.FAILED,
+                    completedAt = System.currentTimeMillis(),
+                    error = (submissionError?.humanReadableMessage ?: "El puente de Flow rechazó el encargo.") +
+                        " No se ha enviado nada a Flow; corrígelo y prepáralo de nuevo.",
+                    technicalDetails = submissionError?.technicalDetails ?: "HTTP ${submissionError?.httpStatusCode}"))
+            }
             remote.map { submitted ->
                 if (submitted.state == "failed" && FlowRetryPolicy.shouldRetry(submitted.error, attempt)) {
                     queue.edit().putString("state_${job.id}", "active").commit()

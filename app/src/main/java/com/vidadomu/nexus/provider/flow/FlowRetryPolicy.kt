@@ -21,4 +21,14 @@ internal object FlowRetryPolicy {
         if (attempt > 0) "${jobId}_${block}_r$attempt" else "${jobId}_$block"
 
     fun waiting(retryAt: Long?, now: Long = System.currentTimeMillis()): Boolean = retryAt != null && now < retryAt
+
+    /**
+     * The bridge refused the request itself (malformed, too long, unprocessable) before touching Flow: nothing was
+     * sent and resending the same prompt can never succeed. Such a job must fail at once and release the queue;
+     * polling it forever left it «En cola» for hours and blocked every job behind it.
+     * 409 (uncertain), 401/403 (fixable by reconnecting) and 5xx (transient) are deliberately not included.
+     */
+    val REJECTED_BEFORE_SENDING = setOf(400, 413, 422)
+
+    fun rejectedBeforeSending(httpStatus: Int?): Boolean = httpStatus in REJECTED_BEFORE_SENDING
 }
