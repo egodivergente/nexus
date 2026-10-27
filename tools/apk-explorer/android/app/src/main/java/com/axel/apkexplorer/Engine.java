@@ -37,6 +37,8 @@ public final class Engine implements Runnable {
     static final int W=720, H=1600;
     static final long SESSION_MS=8*60*1000L, SETTLE_MAX_MS=7000, SETTLE_LOADING_MS=6500;
     static final int MAX_ACTIONS=160;
+    /** Only set by the shell QA entrypoint (never by the app or the Shizuku service): lets an explicit plan undo a change. */
+    static volatile boolean allowSensitiveReplay=false;
     static final long DISK_LIMIT=60L*1024*1024;
 
     private final Context context;
@@ -392,7 +394,7 @@ public final class Engine implements Runnable {
             if(replay==null&&resume)loadSession();else prepareFresh();
             open();
             result=replay!=null?runReplay():runExplore();
-        } catch(Throwable e){result="error";try{report.put("error",e.toString());}catch(Exception ignored){} }
+        } catch(Throwable e){result="error";Throwable cause=e;while(cause instanceof java.lang.reflect.InvocationTargetException&&cause.getCause()!=null)cause=cause.getCause();try{report.put("error",cause.toString());}catch(Exception ignored){} }
         finally {
             try{if(ui!=null)UiAutomation.class.getMethod("disconnect").invoke(ui);}catch(Exception ignored){}
             try{if(display!=null)display.release();report.put("display_released",true);}catch(Exception e){result="error";try{report.put("cleanup_error",e.toString());}catch(Exception ignored){}}
@@ -504,7 +506,7 @@ public final class Engine implements Runnable {
             else if(kind.equals("scroll")){guard();shell("input","-d",String.valueOf(displayId),"swipe","360","1250","360","450","350");}
             else{
                 UiNode chosen=null;int found=0,index=-1;
-                for(int i=0;i<obs.top.size();i++){UiNode u=obs.top.get(i);if(u.clickable&&u.enabled&&u.visible&&!u.editable&&!u.password&&ActionPolicy.allowed(u.label)&&matches(u,step)){chosen=u;found++;index=i;}}
+                for(int i=0;i<obs.top.size();i++){UiNode u=obs.top.get(i);if(u.clickable&&u.enabled&&u.visible&&!u.editable&&!u.password&&(allowSensitiveReplay||ActionPolicy.allowed(u.label))&&matches(u,step)){chosen=u;found++;index=i;}}
                 if(found!=1)throw new IOException("Recorrido interrumpido en paso "+count+": selector encontrado "+found+" veces");
                 if(!obs.topLive.get(index).performAction(AccessibilityNodeInfo.ACTION_CLICK))throw new IOException("No se pudo pulsar el paso "+count);
             }
@@ -590,6 +592,7 @@ public final class Engine implements Runnable {
         Object activityThread=Class.forName("android.app.ActivityThread").getMethod("systemMain").invoke(null);
         Context ctx=(Context)activityThread.getClass().getMethod("getSystemContext").invoke(activityThread);
         Engine e;
+        for(String a:args)if(a.equals("--allow-sensitive-replay"))allowSensitiveReplay=true;
         if(args.length>3&&args[3].equals("resume"))e=new Engine(ctx,args[0],Integer.parseInt(args[1]),true);
         else if(args.length>3)e=new Engine(ctx,args[0],Integer.parseInt(args[1]),new String(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(args[3])),StandardCharsets.UTF_8));
         else e=new Engine(ctx,args[0],Integer.parseInt(args[1]));

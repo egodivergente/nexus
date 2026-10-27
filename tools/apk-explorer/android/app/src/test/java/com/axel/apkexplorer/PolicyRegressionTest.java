@@ -14,7 +14,9 @@ public class PolicyRegressionTest {
             "Cambiar el nombre", "Cambiar el nombre de la conversación", "Cambiar de proyecto", "Cerrar conversación de la lista; conservar historial",
             "Nueva conversación", "edit · image",
             "Aumentar Presets por modelo", "Reducir presets por modelo", "Restaurar Presets por modelo a sin límite", "Nueva con este contexto",
-            "Ámbito Ámbito: Global", "Abrir Flow", "Conectar Google Drive"
+            "Ámbito Ámbito: Global", "Abrir Flow", "Conectar Google Drive",
+            "Favorite", "Ver proyectos en lista", "Ver proyectos en cuadrícula", "Upscale local 2x", "Orden: Más recientes", "Cuadrícula: 5 columnas",
+            "Papelera"
         };
         for (String l : blocked) assertFalse("must be blocked: " + l, ActionPolicy.allowed(l));
     }
