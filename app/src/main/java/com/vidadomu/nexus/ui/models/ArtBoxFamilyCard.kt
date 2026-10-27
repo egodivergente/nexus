@@ -105,7 +105,6 @@ import com.vidadomu.nexus.core.model.*
                 // Franja inferior: mantener pulsada levanta la tarjeta para reordenarla.
                 Box(Modifier.fillMaxWidth().heightIn(min=20.dp).then(dragModifier ?: Modifier))
             }
-            }
         }
         }
     }
