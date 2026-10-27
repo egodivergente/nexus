@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -31,6 +32,59 @@ internal fun aspectFormatParameter(parameters: List<ModelParameter>): ModelParam
         options.size in 2..9 && options.all { ParameterPresentation.proportion(param, it) != null }
 }
 
+internal fun aspectLabel(param: ModelParameter, option: String): String =
+    Regex("\\d+\\s*[:x×]\\s*\\d+").find(option)?.value?.replace(" ", "")?.takeIf { option.contains(":") }
+        ?: ParameterPresentation.label(param, option).primary.substringBefore(" ·").trim()
+
+/** Small outlined rectangle with the proportion of the option. */
+@Composable
+private fun ShapeGlyph(ratio: Float, tint: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.unit.Dp = 18.dp) {
+    Canvas(Modifier.size(size)) {
+        val edge = this.size.minDimension - 2.dp.toPx()
+        val w = if (ratio >= 1f) edge else edge * ratio
+        val h = if (ratio >= 1f) edge / ratio else edge
+        drawRoundRect(tint, Offset((this.size.width - w) / 2, (this.size.height - h) / 2), Size(w, h),
+            CornerRadius(2.dp.toPx()), Stroke(1.5.dp.toPx()))
+    }
+}
+
+/**
+ * Format as a single chip that shows the current shape. Touch opens the picker; a pen or mouse hovering over it
+ * (no contact) opens the same picker as a preview, so the options cost no screen space at all.
+ */
+@Composable
+internal fun AspectFormatChip(param: ModelParameter, value: String, onChange: (String) -> Unit) {
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    val ratio = ParameterPresentation.proportion(param, value) ?: 1f
+    Box {
+        Surface(
+            onClick = { open = true }, shape = NexusTokens.filter, color = colors.surfaceContainerHigh,
+            modifier = Modifier.heightIn(min = 36.dp)
+                .semantics { contentDescription = "Formato ${aspectLabel(param, value)}" }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Enter) open = true
+                        }
+                    }
+                }
+        ) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShapeGlyph(ratio, colors.onSurface)
+                Text(aspectLabel(param, value), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            }
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Box(Modifier.width(320.dp).padding(horizontal = 8.dp)) {
+                AspectFormatPicker(param, value) { onChange(it); open = false }
+            }
+        }
+    }
+}
+
 /** One compact row: every shape drawn with its own outline, the chosen one highlighted. No scrolling the page to see it. */
 @Composable
 internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: (String) -> Unit) {
@@ -45,7 +99,7 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
             options.forEach { option ->
                 val selected = option == value
                 val ratio = ParameterPresentation.proportion(param, option) ?: 1f
-                val label = Regex("\\d+\\s*[:x×]\\s*\\d+").find(option)?.value?.replace(" ", "")?.takeIf { option.contains(":") } ?: ParameterPresentation.label(param, option).primary.substringBefore(" ·").trim()
+                val label = aspectLabel(param, option)
                 val tint = if (selected) colors.onSurface else colors.onSurfaceVariant.copy(alpha = .75f)
                 val cell = (if (scrollable) Modifier.width(64.dp) else Modifier.weight(1f))
                 Surface(

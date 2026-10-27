@@ -313,6 +313,7 @@ fun CreateScreen(
             item {
                 StudioToolRow {
                     if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
+                    if(formatParam!=null) AspectFormatChip(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue) {viewModel.updateParameter(formatParam.key,it)}
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
                     if(inline.isNotEmpty()) StudioToolChip("Ajustes", "Ajustes del modelo") {showParameters=true}
                     // BytePlus is a separate account route: only surfaced when it is the active provider; otherwise it lives under «Más».
@@ -332,9 +333,6 @@ fun CreateScreen(
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
                 val selectedForParams=state.selectedModel
-                if(formatParam!=null) item(key="format-picker") {
-                    AspectFormatPicker(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue) {viewModel.updateParameter(formatParam.key,it)}
-                }
                 if(selectedForParams!=null && inline.any {it.isRequired}) item(key="inline-params") {
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
