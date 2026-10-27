@@ -59,6 +59,22 @@ internal fun CanvasAttachmentEditor(
         else single.launch(PickVisualMediaRequest(type))
     }
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = if(compact) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow) {
+        if (compact && field.maximum == 1 && selected.size == 1) Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            CanvasAttachmentTile(selected[0], "${field.label} 1", enabled, thumbnailSize = 68.dp) { onRemove(selected[0].id) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(field.label + if (field.required) " · obligatorio" else "", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                    Icon(Icons.Default.CheckCircle, "Archivo preparado", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = pickGallery, enabled = enabled, modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Cambiar") }
+                    OutlinedButton(onClick = { library.launch(arrayOf(field.mime), remaining) }, enabled = enabled,
+                        modifier = Modifier.weight(1f).heightIn(min = 40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Biblioteca") }
+                }
+            }
+        } else
         Column(Modifier.padding(if(compact) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
