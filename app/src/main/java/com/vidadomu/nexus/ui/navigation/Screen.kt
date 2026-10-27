@@ -19,6 +19,6 @@ enum class Screen(
     Flow("flow", "Flow", Icons.Default.Waves);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Create, Flow, Library)
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Create, Library) // Flow oculto de momento: la pantalla sigue en el código
     }
 }

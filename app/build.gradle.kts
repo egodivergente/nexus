@@ -26,8 +26,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 115
-        versionName = "1.9.79-agent"
+        versionCode = 116
+        versionName = "1.9.80-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")

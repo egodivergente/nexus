@@ -197,7 +197,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 NexusBottomBar(navController = navController, selectedRoute=if(activeEntry?.destination?.route=="workspace") tabs[pager.currentPage].route else null,
-                                    onSelect={screen->tabRequest=tabs.indexOf(screen);navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
+                                    onSelect={screen->tabRequest=tabs.indexOf(screen).takeIf {it>=0};navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
                             }
                         }
                     }
@@ -299,7 +299,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         tabs.forEach {tab ->composable(tab.route) {
-                            LaunchedEffect(tab.route) {tabRequest=tabs.indexOf(tab);navController.popBackStack("workspace",false)}
+                            LaunchedEffect(tab.route) {tabRequest=tabs.indexOf(tab).takeIf {it>=0};navController.popBackStack("workspace",false)}
                         }}
                         composable(Screen.Generations.route) {
                             GenerationsScreen(

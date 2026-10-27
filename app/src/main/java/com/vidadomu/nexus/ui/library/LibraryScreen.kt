@@ -245,10 +245,10 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         exportItems=items
         exportLauncher.launch("Nexus-"+SimpleDateFormat("yyyyMMdd-HHmm",Locale.ROOT).format(Date())+".zip")
     }
-    val imageLoader=remember(context) {ImageLoader.Builder(context).components {add(VideoFrameDecoder.Factory())}
-        .decoderDispatcher(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(2))
-        .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.08).build()}.build()}
-    DisposableEffect(imageLoader) {onDispose {imageLoader.shutdown()}}
+    // El cargador propio de la Biblioteca dejaba las miniaturas en blanco (cola de decodificación limitada y cierre al
+    // recomponer): se usa uno normal, con descodificación de fotogramas para vídeo, que Coil gestiona por sí solo.
+    val imageLoader=remember(context) {ImageLoader.Builder(context.applicationContext).components {add(VideoFrameDecoder.Factory())}
+        .memoryCache {coil.memory.MemoryCache.Builder(context).maxSizePercent(.15).build()}.build()}
     val flat=remember(timeline) {timeline.values.flatten()}
     fun tokenOf(entry:LibraryEntry):String=when(entry) {
         is LibraryEntry.Local -> "asset:"+entry.asset.id
