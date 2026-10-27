@@ -42,6 +42,8 @@ class PlanBuilder(
     private val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
     /** Fotogramas por segundo medidos del vídeo local (null si no se pueden leer). */
     private val probeFrameRate: (suspend (String) -> Double?)? = null,
+    private val costPreflight: com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight =
+        com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight(),
 ) {
 
     suspend fun build(
@@ -111,32 +113,31 @@ class PlanBuilder(
         val shotId = if (projectId != null && shotCode != null) {
             assets.snapshot().shots.firstOrNull { it.projectId == projectId && AssetIndex.norm(it.code) == AssetIndex.norm(shotCode) }?.id
         } else null
-        return PlanBuild.Ready(
-            GenerationPlan(
-                id = id,
-                ref = model.ref,
-                modelName = model.name,
-                modality = model.modalities.firstOrNull() ?: "UNKNOWN",
-                task = task,
-                prompt = fittedPrompt,
-                originalPrompt = if (fittedPrompt != prompt.trim()) prompt else originalPrompt,
-                negativePrompt = v.normalized["negative_prompt"],
-                params = v.normalized,
-                effectiveParams = effective,
-                media = placed,
-                estimate = estimate,
-                rationale = rationale,
-                alternatives = alternatives,
-                projectId = projectId,
-                shotId = shotId,
-                sceneCode = sceneCode,
-                shotCode = shotCode,
-                characters = characters,
-                parentGenerationId = parentGenerationId,
-                warnings = warnings,
-                createdAt = clock(),
-            ),
+        val prepared = GenerationPlan(
+            id = id,
+            ref = model.ref,
+            modelName = model.name,
+            modality = model.modalities.firstOrNull() ?: "UNKNOWN",
+            task = task,
+            prompt = fittedPrompt,
+            originalPrompt = if (fittedPrompt != prompt.trim()) prompt else originalPrompt,
+            negativePrompt = v.normalized["negative_prompt"],
+            params = v.normalized,
+            effectiveParams = effective,
+            media = placed,
+            estimate = estimate,
+            rationale = rationale,
+            alternatives = alternatives,
+            projectId = projectId,
+            shotId = shotId,
+            sceneCode = sceneCode,
+            shotCode = shotCode,
+            characters = characters,
+            parentGenerationId = parentGenerationId,
+            warnings = warnings,
+            createdAt = clock(),
         )
+        return PlanBuild.Ready(prepared.copy(warnings = prepared.warnings + costPreflight.warnings(prepared)))
     }
 
     /** Reconstruye un plan editado manteniendo id, medios y contexto. */
