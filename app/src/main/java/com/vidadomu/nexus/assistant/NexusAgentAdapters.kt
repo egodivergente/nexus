@@ -242,7 +242,7 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
         // Id conocido de antemano: si el envío falla, se mira en nexus.db si pudo llegar al proveedor.
         val jobId = "job_${UUID.randomUUID()}"
         try {
-            GenerationDispatcher(app).submit(state, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt)), jobId = jobId)
+            GenerationDispatcher(app).submit(state, mapOf(ORIGIN_KEY to "assistant", PLAN_KEY to plan.id, "__assistant_original_prompt" to (plan.originalPrompt ?: plan.prompt)), jobId = jobId, maxCostUsd=plan.estimate?.amountUsd)
         } catch (e: Exception) {
             val job = withContext(NonCancellable) { runCatching { app.generationRepository.getJob(jobId) }.getOrNull() }
             // Sin registro = falló antes de enviar (subida de medios, validación). Con «uncertain» = pudo cobrarse.

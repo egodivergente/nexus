@@ -59,6 +59,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         ?: choices.getString("route:${group.key}:${choices.getString("use:${group.key}",null)}",null))}
     val priceRevision by AtlasPublishedPrice.revision.collectAsState()
     val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: routes.first()
+    val logicalRoutes=remember(routes,selected,workflow) {
+        com.vidadomu.nexus.routing.logicalVariantRepresentatives(routes,selected,workflow in setOf(CatalogWorkflow.ANIMATE,CatalogWorkflow.FRAMES,CatalogWorkflow.EDIT_IMAGE,CatalogWorkflow.REFERENCES))
+    }
     var infoOpen by rememberSaveable(group.key) {mutableStateOf(false)}
     var contractOpen by rememberSaveable(group.key) {mutableStateOf(false)}
     var variantsOpen by remember {mutableStateOf(false)}
@@ -158,15 +161,15 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 }
             }
             Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                Text("Variante y proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })
+                Text("Variante",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant,modifier=Modifier.semantics { heading() })
                 Surface(color=colors.surface,shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
-                    .clickable(enabled=routes.size>1,role=Role.Button,onClickLabel="Cambiar variante y proveedor") {variantsOpen=true}) {
+                    .clickable(enabled=logicalRoutes.size>1,role=Role.Button,onClickLabel="Cambiar variante") {variantsOpen=true}) {
                     Row(Modifier.padding(NexusTokens.space16),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                             Text(optionVariantLabel(selected,group.title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=3,overflow=TextOverflow.Clip)
-                            Text(providerName(selected.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                            Text(if(routes.size>logicalRoutes.size) "Proveedor automático según tus ajustes" else providerName(selected.providerId),style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
                         }
-                        if(routes.size>1) Icon(Icons.Default.UnfoldMore,"${routes.size} opciones disponibles",tint=colors.onSurfaceVariant)
+                        if(logicalRoutes.size>1) Icon(Icons.Default.UnfoldMore,"${logicalRoutes.size} opciones disponibles",tint=colors.onSurfaceVariant)
                     }
                 }
             }
@@ -214,6 +217,10 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     if(estimate.details.isNotBlank()) Text(estimate.details,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     Text(guide.note,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     Text(selected.id,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    com.vidadomu.nexus.routing.RoutingDiagnostics.latest(context)?.let { diagnostic ->
+                        Text("Diagnóstico del último enrutamiento",style=MaterialTheme.typography.labelLarge)
+                        Text(diagnostic,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    }
                     release?.let {info -> TextButton(onClick={uriHandler.openUri(info.source)}) {Text("Fuente del lanzamiento",color=colors.onSurfaceVariant)}}
                     guide.source?.let {source -> TextButton(onClick={uriHandler.openUri(source)}) {Text("Ficha y tarifas del proveedor",color=colors.onSurfaceVariant)}}
                 }
@@ -268,7 +275,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                 style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
         }
         LazyColumn(Modifier.fillMaxWidth().weight(1f,false),contentPadding=PaddingValues(horizontal=NexusTokens.space16,vertical=NexusTokens.space16)) {
-            items(routes.sortedWith(compareBy<NexusModel> {providerName(it.providerId)}.thenByDescending {it.variantRank}.thenBy {it.id}),key=::modelBookmark) {route ->
+            items(logicalRoutes.sortedWith(compareBy<NexusModel> {providerName(it.providerId)}.thenByDescending {it.variantRank}.thenBy {it.id}),key=::modelBookmark) {route ->
                 val checked=modelBookmark(route)==modelBookmark(selected)
                 Column {
                     Row(Modifier.fillMaxWidth().selectable(selected=checked,role=Role.RadioButton,onClick={
@@ -284,7 +291,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                             val example=remember(routeEvidence) {exampleCost(route,routeEvidence.tariff,routeEvidence.verified)}
                             Text(example.usd?.let {"≈ ${app.currencyManager.formatCost(it)} · ${example.note}"} ?: example.note,
                                 style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                            if(routes.size>1) Text(differences[modelBookmark(route)] ?: UNDOCUMENTED_DIFFERENCE,style=MaterialTheme.typography.bodySmall,
+                            if(logicalRoutes.size>1) Text(differences[modelBookmark(route)] ?: UNDOCUMENTED_DIFFERENCE,style=MaterialTheme.typography.bodySmall,
                                 color=if(differences[modelBookmark(route)]==UNDOCUMENTED_DIFFERENCE) colors.onSurfaceVariant else colors.onSurface)
                         }
                         RadioButton(selected=checked,onClick=null)

@@ -18,7 +18,7 @@ data class PriceQuote(val usd: Double, val configuration: String, val checkedAt:
     val isRequestTotal: Boolean = false,
     val estimated: Boolean = true,
     val source: String? = null,
-    val estimatedTokens: Long? = null)
+    val estimatedTokens: Long? = null, val exactUsd: String? = null)
 
 /** A published tariff remains visible when a source-video total needs private media. */
 object PublishedTariff {
@@ -85,7 +85,8 @@ object AtlasPriceQuote {
         check(amount != null && amount.isFinite() && amount >= 0) { "Cotización inválida" }
         val estimated = root["data"]?.jsonObject?.get("estimated")?.jsonPrimitive?.booleanOrNull ?: true
         val tokens = root["data"]?.jsonObject?.get("estimated_tokens")?.jsonPrimitive?.longOrNull?.takeIf { it >= 0 }
-        return PriceQuote(amount,configuration,now,isRequestTotal = true,estimated=estimated,source="https://api.atlascloud.ai/api/v1/model/calculate",estimatedTokens=tokens)
+        return PriceQuote(amount,configuration,now,isRequestTotal = true,estimated=estimated,source="https://api.atlascloud.ai/api/v1/model/calculate",estimatedTokens=tokens,
+            exactUsd=root["data"]!!.jsonObject["price"]!!.jsonPrimitive.content)
     }
 
     fun configuration(model: NexusModel, values: Map<String,String>): String {

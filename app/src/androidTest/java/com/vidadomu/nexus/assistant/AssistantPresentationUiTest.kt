@@ -80,13 +80,13 @@ class AssistantPresentationUiTest {
         try {
             val media = Attachment("fixture", Uri.fromFile(file).toString(), "image/png", "Plano de prueba")
             compose.setContent { NexusTheme { Column { Text("Chat conservado"); AssistantMediaPreview(media) } } }
-            compose.onNodeWithText("Ampliar imagen").performClick()
+            compose.onNodeWithContentDescription("Ampliar imagen").performClick()
             compose.onNodeWithContentDescription("Cerrar imagen ampliada").assertIsDisplayed()
             screenshot("foreground-image")
             compose.onNodeWithText("Ajustar").performClick()
             compose.onNodeWithContentDescription("Cerrar imagen ampliada").performClick()
             compose.onNodeWithText("Chat conservado").assertIsDisplayed()
-            compose.onNodeWithText("Ampliar imagen").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Ampliar imagen").assertIsDisplayed()
         } finally { file.delete() }
     }
     @Test fun completedCardsActuallyResizeWithoutLosingResultsOrLogos() {

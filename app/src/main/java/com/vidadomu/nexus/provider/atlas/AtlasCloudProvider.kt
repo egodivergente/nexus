@@ -515,7 +515,9 @@ class AtlasCloudProvider(
                     cashUsd = cash,
                     bonusUsd = bonus,
                     frozenUsd = frozen,
-                    lastUpdated = System.currentTimeMillis()
+                    lastUpdated = System.currentTimeMillis(),
+                    availableUsdExact = availObj?.get("value")?.jsonPrimitive?.content,
+                    balanceCurrency = availObj?.get("currency")?.jsonPrimitive?.content
                 )
                 secureStorage.saveCachedBalance(balance)
                 Result.success(balance)
