@@ -96,18 +96,22 @@ internal data class ActiveFilter(val label: String, val onRemove: () -> Unit)
 
 /** Only real, removable filters; nothing is drawn when none is active. */
 @Composable
-internal fun ActiveFilterChips(filters: List<ActiveFilter>, onClear: () -> Unit) {
+internal fun ActiveFilterChips(filters: List<ActiveFilter>, onClear: () -> Unit, resultLabel: String? = null) {
     if (filters.isEmpty()) return
     val colors = MaterialTheme.colorScheme
     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         items(filters, key = { it.label }) { filter ->
+            // Solid accent fill: an active filter must stand out from the cards, not blend into the background.
             InputChip(selected = true, onClick = filter.onRemove, label = { Text(filter.label, maxLines = 1) },
                 trailingIcon = { Icon(Icons.Default.Close, "Quitar filtro ${filter.label}", Modifier.size(16.dp)) },
                 shape = NexusTokens.filter,
-                colors = InputChipDefaults.inputChipColors(selectedContainerColor = colors.primary.copy(alpha = .14f),
-                    selectedLabelColor = colors.primary, selectedTrailingIconColor = colors.primary))
+                border = InputChipDefaults.inputChipBorder(enabled = true, selected = true, selectedBorderColor = colors.primary, selectedBorderWidth = 1.dp),
+                colors = InputChipDefaults.inputChipColors(selectedContainerColor = colors.primary.copy(alpha = .26f),
+                    selectedLabelColor = colors.onSurface, selectedTrailingIconColor = colors.onSurface))
         }
         if (filters.size > 1) item { TextButton(onClick = onClear) { Text("Limpiar") } }
+        resultLabel?.let { item { Text(it, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant,
+            modifier = Modifier.padding(start = 6.dp)) } }
     }
 }
 

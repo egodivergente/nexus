@@ -201,8 +201,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 }
             }
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
+                // Favoritos filters the tab underneath, so the heading names both instead of contradicting the active tab.
+                val sectionName = if(toolsView) "Herramientas" else when(modality) {
+                    Modality.VIDEO -> "Vídeos"; Modality.IMAGE -> "Imágenes"; Modality.AUDIO -> "Audio"; else -> "Texto" }
                 Text(if(family != null) family.orEmpty()
-                    else "Tus favoritos", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                    else "Favoritos · $sectionName", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                     modifier = Modifier.semantics { heading() })
             }
             // A quiet entry, not a full-width «máscaras» button that breaks the hierarchy; the main way in is
@@ -233,10 +236,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     ArtBoxSearchBar(query,{query=it},filters || activeFilters.isNotEmpty(),filterButtonDescription(activeFilters.size),{filters=!filters})
                 }
                 if(activeFilterItems.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
-                    ActiveFilterChips(activeFilterItems,{use=null;providerFilter=null;imageReferences=false;groupKey=null})
+                    ActiveFilterChips(activeFilterItems,{use=null;providerFilter=null;imageReferences=false;groupKey=null},
+                        resultLabel=if(rootLevel) "${visible.size} ${if(visible.size==1) "modelo" else "modelos"}" else null)
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
-                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {Text("Mostrando catálogo guardado mientras se recupera la conexión.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
+                if(error!=null) item(span={GridItemSpan(maxLineSpan)}) {
+                    InlineNotice("Sin conexión con el catálogo: muestro el guardado.",isError=false,
+                        actionLabel=if(loading) null else "Reintentar",onAction={app.modelCatalogRepository.refreshModels(true)})
+                }
                 val priceRoutes=if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes}
                 val priceNote=catalogPriceNote(priceRoutes,anyPrice=priceRoutes.any {(referencePrice(it) ?: 0.0)>0.0})
                 if(priceNote!=null) item(span={GridItemSpan(maxLineSpan)}) {
@@ -291,8 +298,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     }
                 }
                 if(visible.isEmpty() || if(rootLevel) sections.isEmpty() else groups.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
-                    Text(if(loading && models.isEmpty()) "Preparando tu catálogo…" else if(favoritesOnly) "No hay favoritos en esta sección." else "No hay resultados con estos filtros.",color=TextSecondary)
-                    TextButton(onClick={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()}) {Text("Limpiar filtros")}
+                    CatalogEmptyState(loading=loading && models.isEmpty(),favoritesOnly=favoritesOnly,
+                        onShowAll={favoritesOnly=false},
+                        onClear={query="";use=null;favoritesOnly=false;providerFilter=null;onlyDated=false;prefs.edit().putBoolean("release_only_dated",false).apply()})
                 }
             item(span={GridItemSpan(maxLineSpan)}) {Text("Precios base orientativos. El total se calcula al configurar.",color=TextSecondary,fontSize = MaterialTheme.typography.labelMedium.fontSize)}
             item(span={GridItemSpan(maxLineSpan)}) {Spacer(Modifier.height(NexusTokens.space24))}
@@ -451,5 +459,25 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
             }
             onHide?.let {action -> TextButton(onClick=action) {Icon(Icons.Default.VisibilityOff,null);Text("Quitar de mi catálogo",color=TextSecondary)}}
         }
+    }
+}
+
+/** Empty catalog: a centred illustration, one clear message and the action that actually gets out of it. */
+@Composable
+private fun CatalogEmptyState(loading: Boolean, favoritesOnly: Boolean, onShowAll: () -> Unit, onClear: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(vertical = NexusTokens.space32, horizontal = NexusTokens.space16),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+        if (loading) { CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 2.dp); Text("Preparando tu catálogo…", color = TextSecondary); return@Column }
+        Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Icon(if (favoritesOnly) Icons.Default.StarBorder else Icons.Default.SearchOff, null,
+                Modifier.padding(18.dp).size(36.dp), tint = MaterialTheme.colorScheme.primary)
+        }
+        Text(if (favoritesOnly) "Aún no tienes favoritos aquí" else "No hay resultados con estos filtros",
+            style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(if (favoritesOnly) "Abre un modelo y toca la estrella para tenerlo siempre a mano."
+            else "Prueba con otra búsqueda o quita los filtros activos.",
+            style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        if (favoritesOnly) Button(onClick = onShowAll) { Text("Ver todos los modelos") }
+        else FilledTonalButton(onClick = onClear) { Text("Limpiar filtros") }
     }
 }
