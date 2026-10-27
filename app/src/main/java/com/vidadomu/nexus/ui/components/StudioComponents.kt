@@ -55,11 +55,12 @@ fun StudioChrome(modifier: Modifier = Modifier, content: @Composable () -> Unit)
  */
 @Composable
 fun FloatingActionDock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    // An opaque, measured action surface keeps the last field readable above the dock.
-    Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
-        Column { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))
-            Column(Modifier.padding(top = NexusTokens.space8), content = content)
-        }
+    // Opaque so the last field stays readable. Page tone (the prompt field inside is the lighter surface) with
+    // sheet corners and a hairline edge, so it reads as a panel of the screen rather than a flat black slab.
+    Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background, shape = NexusTokens.sheet,
+        border = androidx.compose.foundation.BorderStroke(.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 8.dp) {
+        Column(Modifier.padding(top = NexusTokens.space8), content = content)
     }
 }
 

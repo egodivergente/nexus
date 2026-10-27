@@ -132,7 +132,7 @@ fun LiveRenderPill(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NexusTokens.screenMargin, vertical = 4.dp)
+                .padding(horizontal = NexusTokens.screenMargin, vertical = 2.dp)
                 .clickable(role = Role.Button) {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onOpenOutput(job.id)
@@ -142,7 +142,7 @@ fun LiveRenderPill(
                 }
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {

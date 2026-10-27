@@ -182,7 +182,10 @@ class MainActivity : ComponentActivity() {
                         if(!WindowInsets.isImeVisible) {
                             androidx.compose.foundation.layout.Column {
                                 val currentRoute = activeEntry?.destination?.route
-                                if (currentRoute?.startsWith("output") != true) {
+                                // Flow already lists its live jobs above its own composer dock; a second floating layer
+                                // there stacked two fixed bars over the content.
+                                val onFlowTab = currentRoute == "workspace" && tabs[pager.currentPage] == Screen.Flow
+                                if (currentRoute?.startsWith("output") != true && !onFlowTab) {
                                     com.vidadomu.nexus.ui.components.LiveRenderPill(
                                         onOpenOutput = { id -> navController.navigate("output/$id") },
                                         onSendToAgent = { jobId, outputId ->
