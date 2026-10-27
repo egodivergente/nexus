@@ -49,7 +49,10 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,m
                 val isVideo=asset.type==AssetType.VIDEO
                 when(val thumb=rememberThumb(asset.uri,isVideo)) {
                     is Thumb.Ready -> androidx.compose.foundation.Image(thumb.bitmap.asImageBitmap(),asset.displayName,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-                    Thumb.Failed -> Icon(if(isVideo) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Thumb.Failed -> Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                        Icon(if(isVideo) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("No disponible",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Thumb.Loading -> Unit
                 }
             }

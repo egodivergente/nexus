@@ -43,13 +43,12 @@ internal object LibraryThumbnails {
     suspend fun load(context: android.content.Context, uri: String, video: Boolean): Thumb {
         cache.get(uri)?.let { return Thumb.Ready(it) }
         val file = fileOf(uri)
-        android.util.Log.d("NexusThumb", "load ${file?.name} exists=${file?.isFile} len=${file?.length()} canRead=${file?.canRead()}")
         return withContext(Dispatchers.IO) {
             gate.withPermit {
                 runCatching {
                     val bitmap = if (video) videoFrame(context, file, uri) else imageAt(context, file, uri)
                     if (bitmap != null) { cache.put(uri, bitmap); Thumb.Ready(bitmap) } else Thumb.Failed
-                }.getOrElse { android.util.Log.e("NexusThumb", "fail ${file?.name}", it); Thumb.Failed }.also { android.util.Log.d("NexusThumb", "done ${file?.name} -> ${it::class.simpleName}") }
+                }.getOrDefault(Thumb.Failed)
             }
         }
     }
