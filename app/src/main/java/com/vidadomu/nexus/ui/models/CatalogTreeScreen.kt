@@ -241,7 +241,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 }
                 if(loading) item(span={GridItemSpan(maxLineSpan)}) {LinearProgressIndicator(Modifier.fillMaxWidth())}
                 // Say which provider did not refresh and why; «verificando contratos n/m» is progress, not a failure.
-                val catalogProblem = error?.takeUnless { it.contains("verificando contratos") }
+                // «n contratos no verificados» is routine (they are checked when the model is opened): not a warning.
+                val catalogProblem = error?.split(" · ")
+                    ?.filterNot { it.contains("verificando contratos") || it.contains("contratos no verificados") }
+                    ?.joinToString(" · ")?.takeIf { it.isNotBlank() }
                 if(catalogProblem!=null) item(span={GridItemSpan(maxLineSpan)}) {
                     InlineNotice(catalogProblem.split(" · ").joinToString("\n"),isError=false,
                         actionLabel=if(loading) null else "Reintentar",onAction={app.modelCatalogRepository.refreshModels(true)})

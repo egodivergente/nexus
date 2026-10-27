@@ -108,7 +108,11 @@ class ModelCatalogRepository(
                 val errors = mutableListOf<String>()
                 val fresh = providers.flatMap { provider ->
                     try {
-                        val catalog=provider.getModels().also { require(it.isNotEmpty()) { "Catálogo vacío" } }
+                        val catalog=provider.getModels()
+                        // fal.ai is complementary by design: with no key, or when Atlas already offers its model, it has
+                        // nothing to add. An empty list there is the expected answer, not a failed refresh.
+                        if(catalog.isEmpty() && provider is com.vidadomu.nexus.provider.fal.FalProvider) return@flatMap emptyList()
+                        require(catalog.isNotEmpty()) { "Catálogo vacío" }
                         val fetched=if(forceNetwork && provider is com.vidadomu.nexus.provider.atlas.AtlasCloudProvider && provider.catalogNotice==null)
                             provider.synchronizeContracts(catalog) { completed, total -> _errorMessage.value = "Atlas: verificando contratos $completed/$total" } else catalog
                         provider.catalogNotice?.let(errors::add)
