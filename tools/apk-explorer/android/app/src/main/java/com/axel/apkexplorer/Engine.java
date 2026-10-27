@@ -299,6 +299,17 @@ public final class Engine implements Runnable {
             model.warn("La pantalla no se estabilizó ("+o.verdict+") tras "+(int)ms+" ms; se usa el último estado visto",model.current);
         return o;
     }
+    /** Like settle(), but tolerates a cold start: waits up to 9 s for a window of the audited app to appear. */
+    private Obs settleApp(long minMs) throws Exception {
+        Obs o=settle(minMs);
+        long until=System.currentTimeMillis()+9000;
+        while(!o.owned&&!stop&&System.currentTimeMillis()<until){
+            if(o.bitmap!=null&&!o.bitmap.isRecycled())o.bitmap.recycle();
+            Thread.sleep(500);
+            o=settle(0);
+        }
+        return o;
+    }
     /** Settle after an action; if nothing seems to have changed, wait once more for slow transitions. */
     private Obs settleAfter(Obs before,long minMs) throws Exception {
         Obs o=settle(minMs);
@@ -413,7 +424,7 @@ public final class Engine implements Runnable {
             ExplorationModel.Decision d=ExplorationModel.Decision.of(ExplorationModel.Decision.Type.RESTART,"reanudar");
             model.performed(d);route.put(new JSONObject().put("kind","restart"));
         }
-        Obs obs=settle(800);
+        Obs obs=settleApp(800);
         int recoveries=0;
         loop:
         while(!stop&&System.currentTimeMillis()<deadline){
@@ -424,7 +435,7 @@ public final class Engine implements Runnable {
                 model.externalExit(who);
                 boolean noWindows=obs.windows==0&&obs.foreignPkg.equals("sin ventanas");
                 if(!noWindows){route.put(new JSONObject().put("kind","back"));if(!tryBack())model.error("«Atrás» no respondió al salir de la app","");obs=settle(500);}
-                if(!obs.owned){if(!tryLaunchFresh())break;route.put(new JSONObject().put("kind","restart"));obs=settle(1500);}
+                if(!obs.owned){if(!tryLaunchFresh())break;route.put(new JSONObject().put("kind","restart"));obs=settleApp(1500);}
                 if(!obs.owned){result="external_boundary";resultReason="no se pudo volver a la app";break;}
                 continue;
             }
@@ -460,7 +471,7 @@ public final class Engine implements Runnable {
                     model.performed(d);route.put(new JSONObject().put("kind","restart"));if(!tryLaunchFresh())break loop;min=1500;break;
                 default:break;
             }
-            obs=settleAfter(before,min);
+            obs=d.type==ExplorationModel.Decision.Type.RESTART?settleApp(min):settleAfter(before,min);
             if(before.bitmap!=null&&before.bitmap!=obs.bitmap&&!before.bitmap.isRecycled())before.bitmap.recycle();
         }
         if(stop)result="stopped";
@@ -475,7 +486,7 @@ public final class Engine implements Runnable {
         String result="finished_partial";
         JSONArray steps=replay.getJSONArray("steps");
         long deadline=System.currentTimeMillis()+SESSION_MS;
-        Obs obs=settle(1200);
+        Obs obs=settleApp(1200);
         int count=0;
         while(!stop&&count<=40&&System.currentTimeMillis()<deadline){
             if(!obs.owned){result="external_boundary";break;}

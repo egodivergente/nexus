@@ -12,7 +12,9 @@ public class PolicyRegressionTest {
             "Modo de razonamiento: Medio", "Quitar 292 de la biblioteca", "Quitar 1 de la biblioteca", "Marcar todo", "Desmarcar", "Seleccionar",
             "Borrar", "Adjuntar · 292", "Al Agente", "Usar en Lienzo", "Exportar 292 en ZIP", "Importar archivos", "Importar desde el dispositivo",
             "Cambiar el nombre", "Cambiar el nombre de la conversación", "Cambiar de proyecto", "Cerrar conversación de la lista; conservar historial",
-            "Nueva conversación", "edit · image"
+            "Nueva conversación", "edit · image",
+            "Aumentar Presets por modelo", "Reducir presets por modelo", "Restaurar Presets por modelo a sin límite", "Nueva con este contexto",
+            "Ámbito Ámbito: Global", "Abrir Flow", "Conectar Google Drive"
         };
         for (String l : blocked) assertFalse("must be blocked: " + l, ActionPolicy.allowed(l));
     }
