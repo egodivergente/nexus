@@ -36,8 +36,8 @@ class GenerationCostPreflight(
     suspend fun warnings(plan: GenerationPlan): List<String> {
         if (plan.ref.providerId !in providerIds) return emptyList()
         val unavailable = listOf("Comparación de proveedores: evidencia insuficiente; no hay ahorro verificable para esta petición. Se conserva el modelo elegido.")
-        val evaluator = policy ?: return unavailable
-        val adapter = source ?: return unavailable
+        val evaluator = policy ?: return emptyList()
+        val adapter = source ?: return emptyList()
         // Isolate the live plan from an adapter retaining or modifying its collections.
         val snapshot = Json.decodeFromString<GenerationPlan>(Json.encodeToString(plan))
         val digest = digest(snapshot)

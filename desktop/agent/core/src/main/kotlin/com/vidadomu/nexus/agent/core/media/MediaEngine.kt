@@ -44,6 +44,20 @@ object MediaEngine {
         if (m.capability.needsImage && input.imageUrls.isEmpty()) add("Este modelo necesita una imagen.")
         if (m.capability.needsVideo && input.videoUrl == null) add("Este modelo necesita un vídeo.")
         if (input.imageUrls.size > m.maxImages.coerceAtLeast(if (m.capability.needsImage) 1 else 0)) add("Este modelo admite como máximo ${m.maxImages} imagen(es).")
+        if (m.falQueue) {
+            if (FalCuratedModels.isMiniMax(m.id) && (input.prompt.isBlank() || input.prompt.length > 50_000))
+                add("MiniMax requiere un prompt de 1 a 50000 caracteres.")
+            m.params.forEach { p ->
+                val raw = input.params[p.key] ?: p.default
+                if (raw.isNotBlank() && p.type in setOf("float", "integer")) {
+                    val n = raw.toDoubleOrNull()
+                    if (n == null || !n.isFinite() || (p.min != null && n < p.min) || (p.max != null && n > p.max) ||
+                        (p.type == "integer" && raw.toLongOrNull() == null)) add("Valor fuera de contrato: ${p.label}.")
+                }
+                if (raw.isNotBlank() && p.type == "boolean" && raw.toBooleanStrictOrNull() == null) add("Valor booleano no válido: ${p.label}.")
+            }
+            if (m.id == "fal-ai/recraft/v4.1/text-to-vector" && input.prompt.length > 10_000) add("Recraft admite hasta 10000 caracteres de prompt.")
+        }
         m.params.filter { it.required }.forEach { p -> if ((input.params[p.key] ?: p.default).isBlank()) add("Falta «${p.label.ifBlank { p.key }}».") }
         m.params.filter { it.options.isNotEmpty() && it.type == "enum" }.forEach { p ->
             val v = input.params[p.key]
@@ -79,6 +93,8 @@ object MediaEngine {
 
     fun parseCreate(m: MediaModelConfig, body: JsonElement): CreateOutcome {
         errorMessage(m, body)?.let { return CreateOutcome.Failed(it) }
+        if (m.falQueue) return try { CreateOutcome.Async(FalQueue.ticket(body)) }
+            catch (_: Exception) { CreateOutcome.Failed("Respuesta de cola Fal incompleta; consulta el proveedor antes de reenviar.") }
         val urls = results(m, body)
         if (m.mode == MediaMode.SYNC) return if (urls.isNotEmpty()) CreateOutcome.Done(urls)
             else CreateOutcome.Failed("La respuesta no contiene la URL del resultado (rutas probadas: ${m.resultPaths.joinToString()}).")
@@ -89,11 +105,23 @@ object MediaEngine {
     }
 
     fun buildPoll(p: MediaProviderConfig, m: MediaModelConfig, taskId: String): MediaHttpCall {
+        if (m.falQueue) { require(p.baseUrl == "https://queue.fal.run"); return FalQueue.poll(taskId) }
         val vars = mapOf<String, JsonElement?>("task_id" to JsonPrimitive(taskId), "model" to JsonPrimitive(m.modelValue))
         return MediaHttpCall(m.pollMethod.uppercase(), p.url(JsonTemplate.renderText(m.pollPath, vars)), null)
     }
 
+    /** Fal COMPLETED means fetch result, not that status contains outputs. GET only. */
+    fun resultCall(m: MediaModelConfig, taskId: String, status: JsonElement): MediaHttpCall? =
+        if (m.falQueue && FalQueue.completed(status) && FalQueue.error(status) == null) FalQueue.result(taskId) else null
+
+    fun parseResult(m: MediaModelConfig, body: JsonElement): PollOutcome {
+        errorMessage(m, body)?.let { return PollOutcome.Failed(it) }
+        val urls = results(m, body)
+        return if (urls.isNotEmpty()) PollOutcome.Done(urls) else PollOutcome.Failed("Fal no devolvió archivos de resultado.")
+    }
+
     fun parsePoll(m: MediaModelConfig, body: JsonElement): PollOutcome {
+        if (m.falQueue) FalQueue.error(body)?.let { return PollOutcome.Failed(it) }
         val status = JsonPaths.string(body, m.statusPath)?.trim()?.lowercase()
         val urls = results(m, body)
         return when {

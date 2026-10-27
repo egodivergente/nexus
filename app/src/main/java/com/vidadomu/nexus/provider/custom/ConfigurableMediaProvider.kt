@@ -2,6 +2,7 @@ package com.vidadomu.nexus.provider.custom
 
 import com.vidadomu.nexus.agent.core.llm.BrainAuthMode
 import com.vidadomu.nexus.agent.core.llm.HttpTarget
+import com.vidadomu.nexus.agent.core.media.FalCuratedModels
 import com.vidadomu.nexus.agent.core.media.CreateOutcome
 import com.vidadomu.nexus.agent.core.media.MediaCapability
 import com.vidadomu.nexus.agent.core.media.MediaEngine
@@ -102,7 +103,8 @@ class ConfigurableMediaProvider(
             supportedAspectRatios = options("aspect_ratio"), supportedResolutions = options("resolution"), supportedDurations = options("duration"),
             shortDescription = cap.label, versionNumeric = 1.0, modelFamily = config.name, isPrimaryGeneration = !cap.name.startsWith("UPSCALE"),
             providerPriority = 60,
-            promptRequired = !(cap.needsImage || cap.needsVideo), promptAccepted = "{{prompt}}" in m.requestTemplate,
+            promptMaxLength = when { FalCuratedModels.isMiniMax(m.id) -> 50000; m.id == "fal-ai/recraft/v4.1/text-to-vector" -> 10000; else -> null },
+            promptRequired = FalCuratedModels.isMiniMax(m.id) || !(cap.needsImage || cap.needsVideo), promptAccepted = "{{prompt}}" in m.requestTemplate,
         )
     }
 
@@ -149,7 +151,9 @@ class ConfigurableMediaProvider(
         val base = GenerationJob(id = request.id, providerId = id, modelId = request.modelId, modality = request.modality, prompt = request.prompt,
             parameters = request.parameters, inputMediaUri = request.mediaInputs.firstOrNull()?.uriString, estimatedCostUsd = model.priceUsd)
         return when (val outcome = MediaEngine.parseCreate(model, body)) {
-            is CreateOutcome.Failed -> Result.failure(IllegalArgumentException(outcome.message))
+            is CreateOutcome.Failed -> if (model.falQueue) Result.failure(
+                com.vidadomu.nexus.agent.core.spend.SubmissionUncertain(outcome.message))
+                else Result.failure(IllegalArgumentException(outcome.message))
             is CreateOutcome.Async -> Result.success(base.copy(providerJobId = outcome.taskId, status = GenerationStatus.GENERATING, technicalDetails = "Tarea creada en $displayName."))
             // Un resultado inmediato también pasa por el sondeo: así se descarga y se archiva igual que los asíncronos.
             is CreateOutcome.Done -> Result.success(base.copy(providerJobId = "sync_${request.id}", status = GenerationStatus.GENERATING,
@@ -163,7 +167,12 @@ class ConfigurableMediaProvider(
         if (taskId.startsWith("sync_") && job.outputs.isNotEmpty())
             return Result.success(job.copy(status = GenerationStatus.COMPLETED, progress = 1f, completedAt = System.currentTimeMillis(), error = null))
         val body = call(MediaEngine.buildPoll(config, model, taskId)).getOrElse { return Result.failure(it) }
-        return Result.success(when (val outcome = MediaEngine.parsePoll(model, body)) {
+        val resultCall = MediaEngine.resultCall(model, taskId, body)
+        val parsed = if (resultCall != null) {
+            val resultBody = call(resultCall).getOrElse { return Result.failure(it) }
+            MediaEngine.parseResult(model, resultBody)
+        } else MediaEngine.parsePoll(model, body)
+        return Result.success(when (val outcome = parsed) {
             is PollOutcome.Done -> job.copy(status = GenerationStatus.COMPLETED, progress = 1f, completedAt = System.currentTimeMillis(), error = null,
                 outputs = outputs(job.id, job.modality, outcome.urls), technicalDetails = "$displayName: completado.")
             is PollOutcome.Failed -> job.copy(status = GenerationStatus.FAILED, completedAt = System.currentTimeMillis(), error = outcome.message, technicalDetails = "$displayName: fallo.")
@@ -189,7 +198,7 @@ class ConfigurableMediaProvider(
     private fun guessMime(url: String, modality: Modality): String {
         val ext = url.substringBefore('?').substringAfterLast('.', "").lowercase()
         return when (ext) {
-            "png" -> "image/png"; "jpg", "jpeg" -> "image/jpeg"; "webp" -> "image/webp"; "gif" -> "image/gif"
+            "svg" -> "image/svg+xml"; "png" -> "image/png"; "jpg", "jpeg" -> "image/jpeg"; "webp" -> "image/webp"; "gif" -> "image/gif"
             "mp4" -> "video/mp4"; "webm" -> "video/webm"; "mov" -> "video/quicktime"
             else -> if (modality == Modality.VIDEO) "video/mp4" else "image/png"
         }

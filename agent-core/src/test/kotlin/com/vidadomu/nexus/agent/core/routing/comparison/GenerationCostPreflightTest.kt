@@ -46,9 +46,9 @@ class GenerationCostPreflightTest {
         assertEquals(ref, plan.ref); assertEquals(before, plan.fingerprint())
         assertEquals(PlanState.PREPARED, guard.state(plan.id))
     }
-    @Test fun `default reports missing evidence and leaves unrelated providers alone`() = runTest {
+    @Test fun `default is silent and leaves unrelated providers alone`() = runTest {
         val s = GenerationCostPreflight()
-        assertTrue(s.warnings(plan).single().contains("evidencia insuficiente"))
+        assertEquals(emptyList(), s.warnings(plan))
         assertEquals(emptyList(), s.warnings(plan.copy(ref = ModelRef("byteplus", "fixture"))))
     }
     @Test fun `no savings is not presented as an alternative saving`() = runTest {

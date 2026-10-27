@@ -1,0 +1,83 @@
+{
+  "checked_at": "2026-10-27",
+  "parameters": {
+    "duration": 8,
+    "resolution": "768P",
+    "count": 1
+  },
+  "fal": {
+    "promotion_ends": "2026-10-31",
+    "max": {
+      "source": "https://fal.ai/models/minimax/h3-max/image-to-video",
+      "usd_per_second": "0.052",
+      "calculated_total_usd": "0.416"
+    },
+    "turbo": {
+      "source": "https://fal.ai/models/minimax/h3-max-turbo/image-to-video",
+      "usd_per_second": "0.026",
+      "calculated_total_usd": "0.208"
+    }
+  },
+  "atlas": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "# MiniMax H3 Max Image-to-Video\n\n> MiniMax H3 Max image-to-video: animate a first-frame image (optionally with a last frame) driven by a text prompt. Supports 480P、768P, 5-15s.\n\n- **Model ID**: `minimax/h3-max/image-to-video`\n- **Type**: Video\n- **Provider**: MINIMAX\n- **Tags**: IMAGE-TO-VIDEO, NEW\n\n## Pricing\n\n- **Estimated price at default parameters**: $0.608 (live quote). Resolution, duration, count and other parameters change it; every generate tool quotes the exact request before anything is billed.\n- Catalog unit price: $0.048 — a starting rate per billing unit (per image, or per second of video at the lowest tier), not the total for a request\n- Discount: 95%\n\n## Links\n\n- [Playground](https://www.atlascloud.ai/models/minimax/h3-max/image-to-video)\n\n---\n\n# minimax/h3-max/image-to-video\n\n> MiniMax H3 Max image-to-video: animate a first-frame image (optionally with a last frame) driven by a text prompt. Supports 480P、768P, 5-15s.\n\n\n## Overview\n\n- **Endpoint**: `https://api.atlascloud.ai/api/v1/model/prediction/{request_id}`\n- **Model ID**: `minimax/h3-max/image-to-video`\n\n\n## API Information\n\nThis model can be used via HTTP API or client libraries.\nSee the input and output schema below, as well as usage examples.\n\n\n### Input Schema\n\nThe API accepts the following input parameters:\n\n- **`model`** (`string`, _required_):\n  model name\n  - Default: `\"minimax/h3-max/image-to-video\"`\n\n- **`prompt`** (`string`, _required_):\n  The text prompt describing the motion / action for the video.\n\n- **`image`** (`string`, _optional_):\n  First frame of the video. Public URL or Base64. Formats: png, jpeg, jpg, webp.\n\n- **`end_image`** (`string`, _optional_):\n  Optional last frame of the video. Public URL or Base64. Formats: png, jpeg, jpg, webp.\n\n- **`resolution`** (`string`, _required_):\n  Native 480P or 768P output, or SR-enhanced 1440P or 4K short edge.\n  - Default: `\"768P\"`\n  - Options: \"480P\", \"768P\", \"1440p-sr\", \"4k-sr\"\n\n- **`duration`** (`number`, _required_):\n  The duration of the generated video in seconds.\n  - Default: `8`\n  - Options: 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15\n\n- **`ratio`** (`string`, _optional_):\n  The aspect ratio of the generated video. Use 'adaptive' to let the model choose.\n  - Default: `\"adaptive\"`\n  - Options: \"adaptive\"\n\n- **`prompt_expansion`** (`boolean`, _optional_):\n  Whether to expand the prompt for better results.\n  - Default: `false`\n\n\n\n**Required Parameters Example**:\n\n```json\n{\n  \"model\": \"minimax/h3-max/image-to-video\",\n  \"prompt\": \"\",\n  \"resolution\": \"768P\",\n  \"duration\": 8\n}\n```\n\n\n**Full Example**:\n\n```json\n{\n  \"model\": \"minimax/h3-max/image-to-video\",\n  \"prompt\": \"\",\n  \"image\": \"\",\n  \"end_image\": \"\",\n  \"resolution\": \"768P\",\n  \"duration\": 8,\n  \"ratio\": \"adaptive\",\n  \"prompt_expansion\": false\n}\n```\n\n\n### Output Schema\n\nThe API returns the following output format:\n\n\n- **`created_at`** (`string (date-time)`, _optional_):\n  ISO timestamp of when the request was created (e.g., “2023-04-01T12:34:56.789Z”).\n\n- **`has_nsfw_contents`** (`array`, _optional_):\n  Array of boolean values indicating NSFW detection for each output.\n\n- **`id`** (`string`, _optional_):\n  Unique identifier for the prediction, the ID of the prediction to get.\n\n- **`model`** (`string`, _optional_):\n  Model ID used for the prediction.\n\n- **`outputs`** (`array`, _optional_):\n  Array of URLs to the generated content (empty when status is not completed).\n\n- **`status`** (`string`, _optional_):\n  Status of the task: created, processing, completed, or failed.\n\n- **`urls`** (`object`, _optional_):\n  Object containing related API endpoints.\n\n\n\n**Example Response**:\n\n```json\n{\n  \"created_at\": \"\",\n  \"has_nsfw_contents\": [],\n  \"id\": \"\",\n  \"model\": \"\",\n  \"outputs\": [],\n  \"status\": \"\",\n  \"urls\": {}\n}\n```\n\n\n## Usage Examples\n\n### cURL\n\n```bash\n# Step 1: Start generation\ncurl -X POST \"https://api.atlascloud.ai/api/v1/model/prediction/{request_id}\" \\\n  -H \"Authorization: Bearer $ATLASCLOUD_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n  \"model\": \"minimax/h3-max/image-to-video\",\n  \"resolution\": \"768P\",\n  \"duration\": 8,\n  \"ratio\": \"adaptive\",\n  \"prompt_expansion\": false\n}'\n\n# Response will contain: {\"code\": 200, \"data\": {\"id\": \"prediction_id\"}}\n\n# Step 2: Poll for result (replace {prediction_id} with actual ID)\ncurl -X GET \"https://api.atlascloud.ai/api/v1/model/prediction/{request_id}\" \\\n  -H \"Authorization: Bearer $ATLASCLOUD_API_KEY\"\n\n# Keep polling until status is \"completed\", \"succeeded\" or \"failed\"\n```\n\n## Additional Resources\n\n- [Model Playground](https://www.atlascloud.ai/models/minimax/h3-max/image-to-video)\n"
+        }
+      ],
+      "structuredContent": {
+        "model": {
+          "model_id": "minimax/h3-max/image-to-video",
+          "display_name": "MiniMax H3 Max Image-to-Video",
+          "type": "Video",
+          "provider": "MINIMAX",
+          "profile": "MiniMax H3 Max image-to-video: animate a first-frame image (optionally with a last frame) driven by a text prompt. Supports 480P、768P, 5-15s."
+        },
+        "pricing": {
+          "discount": "95",
+          "actual": {
+            "base_price": "0.048"
+          },
+          "origin": {
+            "base_price": "0.05"
+          }
+        },
+        "estimated_price_at_defaults_usd": 0.608,
+        "schema_available": true,
+        "documentation_available": true
+      },
+      "isError": false
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "# MiniMax H3 Max Turbo Image-to-Video\n\n> MiniMax H3 Max Turbo image-to-video: animate a first-frame image (optionally with a last frame) driven by a text prompt. Supports 480P, 5-15s.\n\n- **Model ID**: `minimax/h3-max-turbo/image-to-video`\n- **Type**: Video\n- **Provider**: MINIMAX\n- **Tags**: IMAGE-TO-VIDEO, NEW\n\n## Pricing\n\n- **Estimated price at default parameters**: $0.304 (live quote). Resolution, duration, count and other parameters change it; every generate tool quotes the exact request before anything is billed.\n- Catalog unit price: $0.024 — a starting rate per billing unit (per image, or per second of video at the lowest tier), not the total for a request\n- Discount: 95%\n\n## Links\n\n- [Playground](https://www.atlascloud.ai/models/minimax/h3-max-turbo/image-to-video)\n\n---\n\n# minimax/h3-max-turbo/image-to-video\n\n> MiniMax H3 Max Turbo image-to-video: animate a first-frame image (optionally with a last frame) driven by a text prompt. Supports 480P, 5-15s.\n\n\n## Overview\n\n- **Endpoint**: `https://api.atlascloud.ai/api/v1/model/prediction/{request_id}`\n- **Model ID**: `minimax/h3-max-turbo/image-to-video`\n\n\n## API Information\n\nThis model can be used via HTTP API or client libraries.\nSee the input and output schema below, as well as usage examples.\n\n\n### Input Schema\n\nThe API accepts the following input parameters:\n\n- **`model`** (`string`, _required_):\n  model name\n  - Default: `\"minimax/h3-max-turbo/image-to-video\"`\n\n- **`prompt`** (`string`, _required_):\n  The text prompt describing the motion / action for the video.\n\n- **`image`** (`string`, _optional_):\n  First frame of the video. Public URL or Base64. Formats: png, jpeg, jpg, webp.\n\n- **`end_image`** (`string`, _optional_):\n  Optional last frame of the video. Public URL or Base64. Formats: png, jpeg, jpg, webp.\n\n- **`resolution`** (`string`, _required_):\n  The resolution of the generated video.\n  - Default: `\"768P\"`\n  - Options: \"480P\", \"768P\"\n\n- **`duration`** (`number`, _required_):\n  The duration of the generated video in seconds.\n  - Default: `8`\n  - Options: 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15\n\n- **`ratio`** (`string`, _optional_):\n  The aspect ratio of the generated video. Use 'adaptive' to let the model choose.\n  - Default: `\"adaptive\"`\n  - Options: \"adaptive\"\n\n\n\n**Required Parameters Example**:\n\n```json\n{\n  \"model\": \"minimax/h3-max-turbo/image-to-video\",\n  \"prompt\": \"\",\n  \"resolution\": \"768P\",\n  \"duration\": 8\n}\n```\n\n\n**Full Example**:\n\n```json\n{\n  \"model\": \"minimax/h3-max-turbo/image-to-video\",\n  \"prompt\": \"\",\n  \"image\": \"\",\n  \"end_image\": \"\",\n  \"resolution\": \"768P\",\n  \"duration\": 8,\n  \"ratio\": \"adaptive\"\n}\n```\n\n\n### Output Schema\n\nThe API returns the following output format:\n\n\n- **`created_at`** (`string (date-time)`, _optional_):\n  ISO timestamp of when the request was created (e.g., “2023-04-01T12:34:56.789Z”).\n\n- **`has_nsfw_contents`** (`array`, _optional_):\n  Array of boolean values indicating NSFW detection for each output.\n\n- **`id`** (`string`, _optional_):\n  Unique identifier for the prediction, the ID of the prediction to get.\n\n- **`model`** (`string`, _optional_):\n  Model ID used for the prediction.\n\n- **`outputs`** (`array`, _optional_):\n  Array of URLs to the generated content (empty when status is not completed).\n\n- **`status`** (`string`, _optional_):\n  Status of the task: created, processing, completed, or failed.\n\n- **`urls`** (`object`, _optional_):\n  Object containing related API endpoints.\n\n\n\n**Example Response**:\n\n```json\n{\n  \"created_at\": \"\",\n  \"has_nsfw_contents\": [],\n  \"id\": \"\",\n  \"model\": \"\",\n  \"outputs\": [],\n  \"status\": \"\",\n  \"urls\": {}\n}\n```\n\n\n## Usage Examples\n\n### cURL\n\n```bash\n# Step 1: Start generation\ncurl -X POST \"https://api.atlascloud.ai/api/v1/model/prediction/{request_id}\" \\\n  -H \"Authorization: Bearer $ATLASCLOUD_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n  \"model\": \"minimax/h3-max-turbo/image-to-video\",\n  \"resolution\": \"768P\",\n  \"duration\": 8,\n  \"ratio\": \"adaptive\"\n}'\n\n# Response will contain: {\"code\": 200, \"data\": {\"id\": \"prediction_id\"}}\n\n# Step 2: Poll for result (replace {prediction_id} with actual ID)\ncurl -X GET \"https://api.atlascloud.ai/api/v1/model/prediction/{request_id}\" \\\n  -H \"Authorization: Bearer $ATLASCLOUD_API_KEY\"\n\n# Keep polling until status is \"completed\", \"succeeded\" or \"failed\"\n```\n\n## Additional Resources\n\n- [Model Playground](https://www.atlascloud.ai/models/minimax/h3-max-turbo/image-to-video)\n"
+        }
+      ],
+      "structuredContent": {
+        "model": {
+          "model_id": "minimax/h3-max-turbo/image-to-video",
+          "display_name": "MiniMax H3 Max Turbo Image-to-Video",
+          "type": "Video",
+          "provider": "MINIMAX",
+          "profile": "MiniMax H3 Max Turbo image-to-video: animate a first-frame image (optionally with a last frame) driven by a text prompt. Supports 480P, 5-15s."
+        },
+        "pricing": {
+          "discount": "95",
+          "actual": {
+            "base_price": "0.024"
+          },
+          "origin": {
+            "base_price": "0.025"
+          }
+        },
+        "estimated_price_at_defaults_usd": 0.304,
+        "schema_available": true,
+        "documentation_available": true
+      },
+      "isError": false
+    }
+  ]
+}

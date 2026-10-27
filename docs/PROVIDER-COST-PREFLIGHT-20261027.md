@@ -1,5 +1,9 @@
 # PR #10: integración previa a generar (27-10-2026)
 
+> Alcance corregido después por Vidal: selección pequeña de Fal que complemente
+> Atlas. Véase `FAL-CURATED-20261027.md`. Los avisos por defecto se han retirado;
+> este documento conserva la revisión técnica inicial y no es el estado final.
+
 ## Estado y alcance
 
 Revisado PR #10, abierto, borrador, sin fusionar, head
