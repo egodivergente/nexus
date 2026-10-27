@@ -8,6 +8,16 @@ const family=m=>m.modelFamily||m.family||m.organization||m.displayName;
 const route=(id,extra={})=>({id,displayName:id,providerId:'atlas_cloud',modalities:['IMAGE'],modelFamily:'Kling',...extra});
 let checks=0;const check=(name,fn)=>{fn();checks++;};
 
+check('display categories preserve provider contracts and separate tools from generators',()=>{
+ const kling=route('crun/kling/v3-turbo');
+ assert.deepEqual(P.displayModalities(kling),['VIDEO']);
+ assert.deepEqual(kling.modalities,['IMAGE']);
+ assert.deepEqual(P.displayModalities(route('atlascloud/video-analysis')),['VIDEO']);
+ assert.equal(P.categoryOf(route('meshy-v7/image-to-3d',{capabilities:['IMAGE_TO_3D']})),'3d');
+ for(const id of ['runway/ruby/hdr','atlascloud/video-analysis','crun/image-inpaint','pixverse/v6/video-extend','runway/aleph2/v2v','bytedance/avatar-omni-human-v1.5','atlascloud/studio/ugc-ad'])assert.equal(P.categoryOf(route(id)),'tools',id);
+ for(const id of ['bytedance/seedream-v5.0-lite','google/nano-banana-pro/edit-ultra','xai/grok-imagine-video-v1.5/text-to-video'])assert.equal(P.categoryOf(route(id)),'generation',id);
+});
+
 check('missing, zero, negative and non-numeric rates are never priced',()=>{
  for(const basePriceUsd of [null,undefined,'','   ',0,'0','0.000',-1,'-0.5',NaN,Infinity,'Infinity','abc','0x10','1,5',true,false,[1],['0.5'],{},{valueOf:()=>2}]){
   for(const priceUnitVerified of [true,false]){

@@ -138,7 +138,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-ten-', dir=Path.home()/'.aki/tmp'
                 check('Crear: single centred column at 1360', abs(box['x'] + box['width']/2 - (1360+64)/2) < 15, box)
                 page.set_viewport_size({'width':1920, 'height':1080})
                 page.evaluate("""()=>{loaded=E.normalize(models.find(m=>m.id==='runway/gen4_image_turbo/image'));state.draft={modelId:loaded.id,prompt:'Una esfera con luz cálida',values:E.defaults(loaded),media:[]};navigate('canvas');}""")
-                page.wait_for_timeout(250)
+                page.wait_for_selector('#nx-generate-reason', state='attached', timeout=15000)
                 l = page.evaluate("""()=>{const r=document.querySelector('#nx-generate-reason');const chip=document.querySelector('.creative-chips > .creative-motor');
                   return {reasonHidden:r.hidden,validation:document.querySelector('#validation')?.textContent.trim(),hint:!!document.querySelector('.nx-ref-hint'),
                   chipLeft:chip.getBoundingClientRect().x-chip.parentElement.getBoundingClientRect().x,chipText:getComputedStyle(chip).textOverflow,
@@ -155,6 +155,13 @@ with tempfile.TemporaryDirectory(prefix='nexus-ten-', dir=Path.home()/'.aki/tmp'
                 cols = page.evaluate("()=>{const cards=[...document.querySelectorAll('#content article.model')];const y=cards[0].getBoundingClientRect().y;return cards.filter(c=>Math.abs(c.getBoundingClientRect().y-y)<2).length}")
                 check('Modelos: five or six columns when comfortable at 1920', 5 <= cols <= 6, cols)
                 check('Modelos: intents first', page.locator('.nx-intent').count() >= 4 and page.locator('#nx-intents-title').inner_text() == '¿Qué quieres hacer?')
+                check('Modelos: main image catalogue excludes tool and 3D cards', page.evaluate("()=>!filteredModels().some(m=>m.id==='atlascloud/image-upscaler'||m.id==='meshy-v7/image-to-3d')"))
+                page.locator('[data-nx-intent=tools]').click()
+                check('Modelos: image tools remain reachable separately', page.evaluate("()=>filteredModels().some(m=>m.id==='atlascloud/image-upscaler')"))
+                check('Modelos: image tools exclude ordinary generation', page.evaluate("()=>!filteredModels().some(m=>m.id==='google/nano-banana-pro/text-to-image-ultra')"))
+                page.locator('[data-nx-intent="3d"]').click()
+                check('Modelos: 3D remains reachable separately', page.evaluate("()=>filteredModels().some(m=>m.id==='meshy-v7/image-to-3d')"))
+                page.locator('[data-nx-clear=intent]').click()
                 check('Modelos: original filter controls hidden', page.evaluate("[...document.querySelectorAll('.nx-orig')].every(n=>n.getBoundingClientRect().width===0)") and page.locator('#sort').count() == 1)
                 check('Modelos: no «Precio por confirmar» on cards', page.locator('#content article.model .price', has_text='Precio por confirmar').count() == 0)
                 check('Modelos: pending prices offer an estimate', page.locator('#content article.model .nx-price-link').count() > 0)

@@ -58,13 +58,25 @@ function setDensity(state,value){
  state.catalogDensity=value;state.compact=value==='compact';return true;
 }
 
+// Presentation categories do not change provider contracts or generation payloads.
+function displayModalities(model){
+ if(model.id==='crun/kling/v3-turbo'||model.id==='atlascloud/video-analysis')return ['VIDEO'];
+ return model.modalities||[];
+}
+function categoryOf(model){
+ const caps=model.capabilities||[],id=model.id||'';
+ if(caps.some(c=>['IMAGE_TO_3D','TEXT_TO_3D'].includes(c)))return '3d';
+ if(caps.some(c=>['UPSCALE','VIDEO_EXTEND','VIDEO_EDIT','MOTION_CONTROL'].includes(c))||
+  /background|upscal|inpaint|outpaint|expand|watermark|coloriz|face[-_ ]?swap|eras(e|er)|matting|lipsync|lip-sync|avatar|omni-human|dreamactor|infinitetalk|\/studio\/|\/relight$|\/photo-cleanup$|\/video-analysis$|\/shot-reframe$|\/reframe$|\/hdr$|\/performance$|\/v2v$|\/video-to-video$|\/video-edit$|\/edit-video$|\/extend-video$|\/video-extend$/i.test(id))return 'tools';
+ return 'generation';
+}
 const familyKey=(kind,name)=>`${kind}|${name}`;
 function ensureHidden(state){
  if(!Array.isArray(state.hidden))state.hidden=[];
  if(!state.hiddenFamilies||typeof state.hiddenFamilies!=='object'||Array.isArray(state.hiddenFamilies))state.hiddenFamilies={};
  return state;
 }
-function membersOf(models,kind,name,familyOf){return models.filter(m=>m.modalities?.includes(kind)&&familyOf(m)===name);}
+function membersOf(models,kind,name,familyOf){return models.filter(m=>displayModalities(m).includes(kind)&&familyOf(m)===name);}
 function hideFamily(state,kind,name,models,familyOf,now=Date.now()){
  ensureHidden(state);
  const key=familyKey(kind,name),entry=state.hiddenFamilies[key]||{kind,family:name,routes:[],at:now};
@@ -118,7 +130,7 @@ function hiddenEntries(state,models,familyOf){
  return {families,routes,total:families.length+routes.length};
 }
 
-const api={UNIT_LABELS,DENSITIES,UNKNOWN,priceInfo,sortablePrice,routePrice,familyPrice,densityOf,setDensity,familyKey,ensureHidden,hideFamily,restoreFamily,toggleRoute,restoreAll,syncHidden,hiddenEntries};
+const api={UNIT_LABELS,DENSITIES,UNKNOWN,priceInfo,sortablePrice,routePrice,familyPrice,densityOf,setDensity,displayModalities,categoryOf,familyKey,ensureHidden,hideFamily,restoreFamily,toggleRoute,restoreAll,syncHidden,hiddenEntries};
 root.CatalogParity=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 

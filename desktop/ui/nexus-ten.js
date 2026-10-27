@@ -143,9 +143,11 @@ function create(){
 }
 
 /* ---------- Modelos: intents first, a calmer grid and honest prices ---------- */
-const utility=m=>/background|upscal|inpaint|outpaint|expand|watermark|coloriz|face[-_ ]?swap|eras(e|er)|matting/i.test(words(m));
+const utility=m=>window.CatalogParity?CatalogParity.categoryOf(m)==='tools':/background|upscal|inpaint|outpaint|expand|watermark|coloriz|face[-_ ]?swap|eras(e|er)|matting/i.test(words(m));
+const threeD=m=>window.CatalogParity?CatalogParity.categoryOf(m)==='3d':has(m,'IMAGE_TO_3D')||has(m,'TEXT_TO_3D');
 const INTENTS={
  IMAGE:[
+  ['tools','Herramientas de imagen','Mejora, retoque y flujos de trabajo',utility],
   ['generate','Generar imagen','Desde una descripción',m=>has(m,'TEXT_TO_IMAGE')&&!utility(m)],
   ['edit','Editar con instrucciones','Cambia una imagen existente',m=>(has(m,'IMAGE_EDITING')||has(m,'IMAGE_TO_IMAGE'))&&!utility(m)],
   ['background','Eliminar fondo','Recorta el sujeto',m=>/background[-_ ]?remov|remove[-_ ]?(bg|background)|rembg|matting/i.test(words(m))],
@@ -154,8 +156,9 @@ const INTENTS={
   ['3d','Crear en 3D','Desde texto o imagen',m=>has(m,'IMAGE_TO_3D')||has(m,'TEXT_TO_3D')]
  ],
  VIDEO:[
-  ['t2v','Vídeo desde texto','Describe escena y movimiento',m=>has(m,'TEXT_TO_VIDEO')],
-  ['i2v','Animar una imagen','Da movimiento a un fotograma',m=>has(m,'IMAGE_TO_VIDEO')],
+  ['tools','Herramientas de vídeo','Edición, extensión, avatares y acabado',utility],
+  ['t2v','Vídeo desde texto','Describe escena y movimiento',m=>has(m,'TEXT_TO_VIDEO')&&!utility(m)],
+  ['i2v','Animar una imagen','Da movimiento a un fotograma',m=>has(m,'IMAGE_TO_VIDEO')&&!utility(m)],
   ['ref','Vídeo con referencias','Mantén personajes u objetos',m=>has(m,'REFERENCE_TO_VIDEO')],
   ['v2v','Transformar un vídeo','Cambia estilo o contenido',m=>has(m,'VIDEO_TO_VIDEO')||has(m,'VIDEO_EDIT')],
   ['extend','Alargar un vídeo','Continúa un clip',m=>has(m,'VIDEO_EXTEND')],
@@ -173,7 +176,7 @@ const intentOf=id=>(INTENTS[kind]||[]).find(i=>i[0]===id);
 const baseFiltered=filteredModels;
 filteredModels=function(){
  const list=baseFiltered();
- if(!T.intent)return list;
+ if(!T.intent)return ['IMAGE','VIDEO'].includes(kind)&&!query?list.filter(m=>!utility(m)&&!threeD(m)):list;
  const intent=intentOf(T.intent);if(!intent){T.intent='';return list;}
  return list.filter(intent[3]);
 };
@@ -212,9 +215,7 @@ function intentsMarkup(){
 }
 function variantsOf(card){
  if(card.dataset.cardModel){const m=models.find(x=>x.id===card.dataset.cardModel);return m?[m]:[];}
- const name=card.dataset.cardFamily,intent=T.intent&&intentOf(T.intent);
- const list=models.filter(m=>m.modalities?.includes(kind)&&family(m)===name&&!(state.hidden||[]).includes(m.id));
- return intent?list.filter(intent[3]):list;
+ return filteredModels().filter(m=>family(m)===card.dataset.cardFamily);
 }
 // Remote examples reveal the user's IP to the provider CDN: opt-out in Ajustes, never in offline QA unless asked.
 const examplesOn=()=>typeof initial!=='undefined'&&initial&&initial.qa?state.catalogExamples===true:state.catalogExamples!==false;
