@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import androidx.compose.ui.graphics.asImageBitmap
 import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import com.vidadomu.nexus.NexusApplication
@@ -580,11 +581,21 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
         contentAlignment=Alignment.Center) {
         val local=OutputFiles.trustedLocalUri(output,conflicts)
         if(output.type in listOf(Modality.IMAGE,Modality.VIDEO)) {
-            var failed by remember(output.id,local,output.url) {mutableStateOf(false)}
-            if(!failed) AsyncImage(model=remember(output.id,local,output.url) {ImageRequest.Builder(context)
-                .data(local ?: output.url).crossfade(180).apply {if(output.type==Modality.VIDEO) decoderFactory {result,options,_->VideoFrameDecoder(result.source,options)}}.build()},
-                imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
-            if(failed) Icon(if(output.type==Modality.VIDEO) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
+            val isVideo=output.type==Modality.VIDEO
+            if(local!=null) {
+                // Copia local: se lee directamente del móvil y, si no se puede, la baldosa lo dice con un icono.
+                when(val thumb=rememberThumb(local,isVideo)) {
+                    is Thumb.Ready -> androidx.compose.foundation.Image(thumb.bitmap.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                    Thumb.Failed -> Icon(if(isVideo) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
+                    Thumb.Loading -> Unit
+                }
+            } else {
+                var failed by remember(output.id,output.url) {mutableStateOf(false)}
+                if(!failed) AsyncImage(model=remember(output.id,output.url) {ImageRequest.Builder(context)
+                    .data(output.url).crossfade(180).apply {if(isVideo) decoderFactory {result,options,_->VideoFrameDecoder(result.source,options)}}.build()},
+                    imageLoader=imageLoader,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,onError={failed=true})
+                if(failed) Icon(if(isVideo) Icons.Default.Movie else Icons.Default.BrokenImage,null,tint=TextSecondary)
+            }
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
         // Sin ⋮ encima de la imagen ni etiqueta de origen: las opciones están en el visor.
         if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
