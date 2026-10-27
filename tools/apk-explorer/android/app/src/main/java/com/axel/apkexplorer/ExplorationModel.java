@@ -22,7 +22,7 @@ public final class ExplorationModel {
     public static final class Act {
         public String key = "", label = "", kind = Candidate.OTHER, cls = "", resId = "", status = "pending", reason = "", dest = "";
         public double rank;
-        public int attempts, broken, missing, left, top, right, bottom;
+        public int attempts, broken, missing, hopTries, left, top, right, bottom;
     }
 
     public static final class Screen {
@@ -143,7 +143,7 @@ public final class ExplorationModel {
                 e.outcome = isNew ? "nueva" : (isAncestor(to, from) ? "vuelta" : "conocida");
                 if (a != null) {
                     if (a.status.equals("done") && !a.dest.isEmpty() && !a.dest.equals(to.id)) { a.broken++; warn("La acción «" + a.label + "» ya no lleva a " + a.dest + " sino a " + to.id, from.id); }
-                    else { a.status = "done"; a.dest = to.id; }
+                    else { a.status = "done"; a.dest = to.id; a.hopTries = 0; }
                     if (Candidate.TAB.equals(a.kind)) tabDest.put(a.key, to.id);
                 }
             }
@@ -187,6 +187,21 @@ public final class ExplorationModel {
         }
     }
 
+    /**
+     * Tabs and filter chips lead to the same place from every screen that shows them. Once one click
+     * revealed where a tab goes, the copies on the other screens are not clicked again (no N x N tab clicking).
+     */
+    private void resolveKnownTabs() {
+        for (Screen s : screens.values())
+            for (Act a : s.acts) {
+                if (!a.status.equals("pending") || !Candidate.TAB.equals(a.kind)) continue;
+                String d = tabDest.get(a.key);
+                if (d == null || !screens.containsKey(d)) continue;
+                if (d.equals(s.id)) { a.status = "skipped"; a.reason = "pestaña de esta misma pantalla"; }
+                else { a.status = "done"; a.dest = d; }
+            }
+    }
+
     public Act bestPending(Screen s) {
         Act best = null;
         for (Act a : s.acts) if (a.status.equals("pending") && a.attempts < 2 && !excluded.contains(a) && (best == null || a.rank < best.rank)) best = a;
@@ -198,6 +213,7 @@ public final class ExplorationModel {
         if (loops >= 3) return stop("bucle persistente de navegación");
         if (forceRestart) { forceRestart = false; if (restarts < MAX_RESTARTS) return restart("salir de un bucle"); }
         excluded.clear();
+        resolveKnownTabs();
         for (int attempt = 0; attempt < 12; attempt++) {
             Screen cur = screens.get(current);
             if (cur == null) return stop("sin pantalla actual");
@@ -280,7 +296,9 @@ public final class ExplorationModel {
         Pending p = new Pending();
         p.from = current;
         switch (d.type) {
-            case CLICK: p.type = "click"; p.actKey = d.act.key; p.label = d.act.label; p.explore = d.exploring; d.act.attempts++; actionsDone++; if (!d.exploring) navigationActions++; break;
+            case CLICK: p.type = "click"; p.actKey = d.act.key; p.label = d.act.label; p.explore = d.exploring; d.act.attempts++;
+                // A navigation hop that keeps failing to reach its destination is retired after three tries.
+                if (!d.exploring) { d.act.hopTries++; if (d.act.hopTries >= 3) d.act.broken = Math.max(d.act.broken, 2); } actionsDone++; if (!d.exploring) navigationActions++; break;
             case BACK: p.type = "back"; p.label = "Atrás"; actionsDone++; navigationActions++; break;
             case RESTART: p.type = "restart"; p.label = "Reinicio de la app"; break;
             default: return;

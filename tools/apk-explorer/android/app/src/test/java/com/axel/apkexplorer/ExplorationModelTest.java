@@ -111,6 +111,15 @@ public class ExplorationModelTest {
         }
         assertTrue(reason, reason.startsWith("estancado") || reason.equals("completo"));
     }
+    @Test public void aTabWhoseDestinationIsKnownIsNotClickedFromEveryScreen() {
+        ExplorationModel m = new ExplorationModel(); SimApp app = new SimApp();
+        assertEquals("completo", run(m, app, new ArrayList<>(), 300, 99));
+        int tabClicks = 0;
+        for (String c : app.clicked) if (c.equals("Buscar") || c.equals("Perfil") || c.equals("Inicio")) tabClicks++;
+        // 2 first-time tab clicks + the hops needed to come back to the tab bar from deep screens; never one per screen per tab.
+        assertTrue("tab clicks: " + tabClicks, tabClicks <= 8);
+    }
+
     @Test public void nearlyIdenticalFramesUnderOneHeadingAreOneScreen() {
         SimApp app = new SimApp(); SimApp.Obs o = app.observe();
         ExplorationModel m = new ExplorationModel();
