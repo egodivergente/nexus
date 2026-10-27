@@ -123,7 +123,7 @@ fun CreateScreen(
     var showRequestInspector by remember { mutableStateOf(false) }
     var showPersonalPresets by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
-    var inlineParametersExpanded by rememberSaveable(state.selectedModel?.providerId,state.selectedModel?.id) { mutableStateOf(true) }
+    var inlineParametersExpanded by rememberSaveable(state.selectedModel?.providerId,state.selectedModel?.id) { mutableStateOf(state.selectedModel?.parameters.orEmpty().any {it.isRequired && it.key.lowercase() !in setOf("aspect_ratio","aspectratio","ratio","size","image_size")}) }
     var showToolMenu by remember { mutableStateOf(false) }
     var pendingModel by remember { mutableStateOf<NexusModel?>(null) }
     val catalogModels by app.modelCatalogRepository.models.collectAsState()
@@ -310,7 +310,6 @@ fun CreateScreen(
             item {
                 StudioToolRow {
                     if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
-                    if(state.selectedModel?.promptAccepted != false) StudioToolChip("Inspirar") {showInspiration=true}
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
                     // BytePlus is a separate account route: only surfaced when it is the active provider; otherwise it lives under «Más».
                     if(state.selectedModel?.providerId==BYTEPLUS_MEDIA_PROVIDER) StudioToolChip("BytePlus", "Usar mi cuenta BytePlus") {showBytePlus=true}
@@ -329,7 +328,12 @@ fun CreateScreen(
             // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
             if(state.schemaReady) {
                 val selectedForParams=state.selectedModel
-                val inline=selectedForParams?.let {model -> ParameterDependencies.visible(model,com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters),state.parameters)}.orEmpty().filter {it.key!=countParam?.key}
+                val allInline=selectedForParams?.let {model -> ParameterDependencies.visible(model,com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters),state.parameters)}.orEmpty().filter {it.key!=countParam?.key}
+                val formatParam=aspectFormatParameter(allInline)
+                val inline=allInline.filter {it.key!=formatParam?.key}
+                if(formatParam!=null) item(key="format-picker") {
+                    AspectFormatPicker(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue) {viewModel.updateParameter(formatParam.key,it)}
+                }
                 if(selectedForParams!=null && inline.isNotEmpty()) item(key="inline-params") {
                     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
                         border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
