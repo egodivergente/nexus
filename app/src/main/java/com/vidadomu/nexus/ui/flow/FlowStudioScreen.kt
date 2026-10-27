@@ -136,6 +136,8 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -662,9 +664,11 @@ fun FlowStudioScreen(
                         drafts.firstOrNull()?.let {draftEditor(it)}
                     }
                     if(!WindowInsets.isImeVisible) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        TextButton(onClick={composerExpanded=true}) {Text(if(drafts.size==1) "Más prompts" else "${drafts.size} prompts preparados")}
+                        com.vidadomu.nexus.ui.components.NexusTonalAction(if(drafts.size==1) "Más prompts" else "${drafts.size} prompts",
+                            {composerExpanded=true},icon=Icons.Default.Add,
+                            description=if(drafts.size==1) "Preparar más prompts" else "${drafts.size} prompts preparados")
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick={connectionSheet=true}) {Text("Proyecto y ajustes")}
+                        com.vidadomu.nexus.ui.components.NexusTonalAction("Proyecto y ajustes",{connectionSheet=true},icon=Icons.Default.Tune)
                     }
                 }
                 Button(
@@ -966,10 +970,12 @@ private fun ReferencesSection(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Adjuntos · ${references.size}" + if(maximumReferences<Int.MAX_VALUE) "/$maximumReferences" else "", style = MaterialTheme.typography.labelSmall,
                 color = TextPrimary, modifier = Modifier.weight(1f))
-            TextButton(onClick = onAdd, enabled = enabled && references.size < maximumReferences) {
-                Text("Galería")
-            }
-            TextButton(onClick=onLibrary,enabled=enabled && references.size<maximumReferences) {Text("Biblioteca")}
+            val canAdd = enabled && references.size < maximumReferences
+            com.vidadomu.nexus.ui.components.NexusTonalAction("Galería", onAdd, icon = Icons.Default.PhotoLibrary,
+                enabled = canAdd, description = "Adjuntar desde la galería")
+            Spacer(Modifier.width(NexusTokens.space8))
+            com.vidadomu.nexus.ui.components.NexusTonalAction("Biblioteca", onLibrary, icon = Icons.Default.Collections,
+                enabled = canAdd, description = "Adjuntar desde la Biblioteca")
         }
         if(references.isNotEmpty() && !WindowInsets.isImeVisible) Text("Para todos los prompts",style=MaterialTheme.typography.labelSmall,color=TextMuted)
         LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,7 +35,7 @@ internal fun AssistantImagePreview(media: Attachment) {
     Column {
         AsyncImage(model = media.uri, contentDescription = "Ampliar ${media.name ?: "imagen del agente"}", contentScale = ContentScale.Fit,
             modifier = Modifier.width(280.dp).height(220.dp).clip(NexusTokens.card).clickable { opened = true })
-        TextButton(onClick = { opened = true }) { Text("Ampliar imagen") }
+        com.vidadomu.nexus.ui.components.NexusTonalAction("Ampliar", { opened = true }, icon = Icons.Default.ZoomIn, description = "Ampliar imagen")
     }
     if (opened) AssistantImageForeground(media) { opened = false }
 }
