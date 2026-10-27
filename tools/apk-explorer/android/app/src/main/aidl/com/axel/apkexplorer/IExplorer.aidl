@@ -7,4 +7,6 @@ interface IExplorer {
     void stop() = 2;
     ParcelFileDescriptor exportZip() = 3;
     String replay(String plan) = 4;
+    String resume(String packageName, int maxScreens) = 5;
+    String resumable() = 6;
 }

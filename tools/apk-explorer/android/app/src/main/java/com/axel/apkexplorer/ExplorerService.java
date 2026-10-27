@@ -15,6 +15,19 @@ public final class ExplorerService extends IExplorer.Stub {
         new Thread(engine,"explorer-worker").start();
         return "Explorando en pantalla virtual. Puedes usar otra app.";
     }
+    public synchronized String resume(String pkg,int max) {
+        if(engine!=null && engine.running) return "Ya hay una exploración en curso.";
+        if(!pkg.matches("[A-Za-z][\\w]*(\\.[A-Za-z][\\w]*)+") || max<1 || max>20) return "Parámetros inválidos.";
+        engine=new Engine(context,pkg,max,true);
+        new Thread(engine,"explorer-resume").start();
+        return "Explorando en pantalla virtual (auditoría reanudada).";
+    }
+    /** "paquete|resumen" of the latest unfinished audit, or "". */
+    public synchronized String resumable() {
+        if(engine!=null && engine.running) return "";
+        String pkg=Engine.lastResumablePackage();
+        return pkg.isEmpty() ? "" : pkg+"|"+Engine.resumable(pkg);
+    }
     public synchronized String status() { return engine==null ? "Sin sesión" : engine.status; }
     public synchronized String replay(String plan) {
         if(engine!=null && engine.running)return "Ya hay una exploración en curso.";

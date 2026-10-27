@@ -17,17 +17,17 @@ final class ExplorerUi {
     interface Events {
         void navigate(String page); void choose(String pkg); void limit(int count);
         void connect(); void start(); void repeat(); void stop(); void gallery();
-        void retrieve(); void export(boolean before); void save(); void github();
+        void retrieve(); void export(boolean before); void save(); void github(); void resume();
     }
     private final Activity a;
-    private final String page,pkg,route;
+    private final String page,pkg,route,resumeInfo;
     private final int limit;
     private final boolean active,connected;
     private final File archive;
     private final Events events;
     private final int bg=0xff101115, surface=0xff1b1d24, muted=0xffa2a6b5, accent=0xffc9bdff;
-    ExplorerUi(Activity a,String page,String pkg,int limit,boolean active,boolean connected,File archive,String route,Events events){
-        this.a=a;this.page=page;this.pkg=pkg;this.limit=limit;this.active=active;this.connected=connected;this.archive=archive;this.route=route;this.events=events;
+    ExplorerUi(Activity a,String page,String pkg,int limit,boolean active,boolean connected,File archive,String route,String resumeInfo,Events events){
+        this.resumeInfo=resumeInfo;this.a=a;this.page=page;this.pkg=pkg;this.limit=limit;this.active=active;this.connected=connected;this.archive=archive;this.route=route;this.events=events;
     }
     private int dp(int n){return Math.round(a.getResources().getDisplayMetrics().density*n);}
     private GradientDrawable shape(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
@@ -72,6 +72,12 @@ final class ExplorerUi {
         LinearLayout levels=new LinearLayout(a);root.addView(levels);int[] counts={6,12,20};String[] labels={"Rápido · 6","Normal · 12","Amplio · 20"};
         for(int i=0;i<counts.length;i++){final int count=counts[i];TextView chip=new TextView(a);chip.setText(labels[i]);chip.setTextSize(12);chip.setGravity(Gravity.CENTER);chip.setTextColor(limit==count?bg:muted);chip.setBackground(shape(limit==count?accent:surface,14));chip.setSelected(limit==count);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(0,dp(8),dp(6),0);levels.addView(chip,lp);chip.setOnClickListener(v->{if(!active)events.limit(count);});}
         gap(root,16);
+        if(connected&&!active&&resumeInfo!=null&&resumeInfo.contains("|")){
+            String[] parts=resumeInfo.split("\\|",2);
+            LinearLayout resume=card(root);text(resume,"AUDITORÍA INTERRUMPIDA",11,accent).setLetterSpacing(.12f);text(resume,name(parts[0]),19,Color.WHITE);text(resume,parts[1]+" · Se retoma sin repetir las pantallas ya capturadas.",13,muted);
+            button(resume,"Reanudar auditoría",false,events::resume);
+            gap(root,8);
+        }
         Button primary=button(root,active?"Explorando…":!connected?"Preparar conexión":pkg.isEmpty()?"Elegir aplicación":"Explorar "+name(pkg),true,()->{if(!connected)events.connect();else if(pkg.isEmpty())chooseApp();else events.start();});primary.setEnabled(!active);primary.setAlpha(active?.55f:1f);
         if(active){ProgressBar bar=new ProgressBar(a,null,android.R.attr.progressBarStyleHorizontal);bar.setIndeterminate(true);bar.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(accent));root.addView(bar,new LinearLayout.LayoutParams(-1,dp(4)));button(root,"Detener recorrido",false,events::stop);}
         text(root,!connected?"Conecta Shizuku para capturar en segundo plano.":"Conexión lista · Puedes usar otra app durante el recorrido.",13,muted);
