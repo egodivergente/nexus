@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
@@ -17,6 +18,9 @@ import kotlin.math.roundToInt
  *
  * [onHold] tells the card a hold started on the logo, so the card does not also open its options menu.
  */
+/** Set while a finger rests on a logo or name, so a pinch there resizes the logo instead of changing the grid. */
+internal object GestureLock { @Volatile var onCard = false }
+
 internal fun Modifier.logoResizeGesture(
     enabled: Boolean,
     key: Any,
@@ -141,5 +145,38 @@ internal fun Modifier.holdAndMoveGesture(
         onHold(false)
         vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
         onCommit()
+    }
+}
+
+/**
+ * Pinch the grid to change how many columns it shows: spreading the fingers makes cards bigger (fewer columns),
+ * pinching them closer shows more. Vibrates on every change. One finger never takes part, so scrolling is untouched.
+ */
+internal fun Modifier.pinchColumns(columns: Int, max: Int, onColumns: (Int) -> Unit): Modifier = composed {
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val current = androidx.compose.runtime.rememberUpdatedState(columns)
+    pointerInput(max) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            var accumulated = 1f
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.none { it.pressed }) break
+                if (!GestureLock.onCard && event.changes.count { it.pressed } >= 2) {
+                    accumulated *= event.calculateZoom()
+                    val next = when {
+                        accumulated < .82f -> (current.value + 1).coerceAtMost(max)
+                        accumulated > 1.22f -> (current.value - 1).coerceAtLeast(1)
+                        else -> current.value
+                    }
+                    if (next != current.value) {
+                        onColumns(next)
+                        com.vidadomu.nexus.ui.theme.NexusVibration.play(context, com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+                        accumulated = 1f
+                    }
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        }
     }
 }

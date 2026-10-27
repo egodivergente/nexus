@@ -36,7 +36,9 @@ import com.vidadomu.nexus.core.model.*
     /** Long-press-and-drag handle: when present, a long press lifts the card instead of opening a dialog. */
     dragModifier: Modifier? = null, dragging: Boolean = false, onMoveUp: (()->Unit)? = null, onMoveDown: (()->Unit)? = null,
     /** The user's own name for this entry (falls back to the provider's family name). */
-    title: String = section.family) {
+    title: String = section.family, columns: Int = 2) {
+    // Con más de dos columnas la tarjeta y su contenido se reducen a la par.
+    val f=if(columns<=2) 1f else (2f/columns).coerceIn(.6f,1f)
     val colors=MaterialTheme.colorScheme
     val count=pluralModelos(section.models.map(::modelGroupTitle).distinct().size)
     // The lifted card grows, gains a soft shadow and an accent edge; the rest of the grid slides out of its way.
@@ -62,15 +64,15 @@ import com.vidadomu.nexus.core.model.*
         // Same structure and minimum height for every card (families and tools): logo, a two-line title and the count.
         // Short names no longer leave a blank third line (revision video 1, 11:22; video 2, 02:49). A minimum, not a
         // fixed height: with bold or larger system text (Pixel 8 Pro, 25/10) a fixed height clipped the count.
-        Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height).padding(horizontal=8.dp,vertical=12.dp),
+        Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height*f).padding(horizontal=if(columns>=4) 4.dp else 8.dp,vertical=if(columns>=4) 8.dp else 12.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             // Fixed slot: the card never changes size, only the logo inside it does.
-            Box(Modifier.size(ArtBoxCardMetrics.logoSlot).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
-                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it},onAdjusting={adjusting=it},
+            Box(Modifier.size(ArtBoxCardMetrics.logoSlot*f).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
+                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onAdjusting={adjusting=it},
                 onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.TopCenter) {
                 // Sin tope de hueco: un logo grande crece hacia abajo y el nombre se escribe por encima.
                 Box(Modifier.wrapContentSize(Alignment.TopCenter,unbounded=true)) {
-                CatalogGlyph(glyphKey,ArtBoxCardMetrics.logo,labels) {size ->
+                CatalogGlyph(glyphKey,ArtBoxCardMetrics.logo*f,labels) {size ->
                     if(toolCategory) {
                         Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
                             Icon(toolCategoryIcon(section.family),null,Modifier.size(size*.57f),tint=colors.primary)
@@ -85,10 +87,10 @@ import com.vidadomu.nexus.core.model.*
             val place=labels.placement(glyphKey,"name")
             var movingName by remember {mutableStateOf(false)}
             Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                Text(title,style=MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,
+                Text(title,style=if(columns>=4) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,
                     modifier=Modifier.offset(place.first.dp,place.second.dp).graphicsLayer {val s=if(movingName) 1.08f else 1f;scaleX=s;scaleY=s}
                         .holdAndMoveGesture(glyphKey+"|name",current={labels.placement(glyphKey,"name")},
-                            vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it},onMoving={movingName=it;adjusting=it},
+                            vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onMoving={movingName=it;adjusting=it},
                             onMove={x,y->labels.setPlacementLive(glyphKey,"name",x,y)},onCommit={labels.commitPlacement(glyphKey,"name")},
                             pxPerDp={density.density}))
                 Box(Modifier.fillMaxWidth().heightIn(min=28.dp).then(dragModifier ?: Modifier),contentAlignment=Alignment.Center) {

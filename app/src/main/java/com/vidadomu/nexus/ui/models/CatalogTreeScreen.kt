@@ -63,6 +63,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val prefs = remember { app.getSharedPreferences("catalog_grid_v2", 0) }
     var compactCards by remember {mutableStateOf(prefs.getBoolean("compact_cards",true))}
     var gridCards by remember {mutableStateOf(prefs.getBoolean("grid_cards",false))}
+    // Columnas elegidas por el usuario (0 = automático). Se cambian pellizcando la cuadrícula o desde el menú ⋮.
+    var userColumns by remember {mutableStateOf(prefs.getInt("columns_user",0))}
     var moreMenu by remember {mutableStateOf(false)}
     LaunchedEffect(models) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {models.forEach {modelSearchText(it)}}
@@ -110,9 +112,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val listState=rememberLazyGridState()
     val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
-    val rootColumns = catalogColumnCount(runtime.int("catalog.columns"), screenWidth, fontScale)
+    val autoColumns = catalogColumnCount(runtime.int("catalog.columns"), screenWidth, fontScale)
+    val rootColumns = if(userColumns>0) userColumns else autoColumns
     // Two columns on any screen; in the grid the logo sits above the text so names keep their width. Very large fonts stay in a list.
-    val useGrid=gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f
+    val useGrid=userColumns>1 || (gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f)
     LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
     val dragView=androidx.compose.ui.platform.LocalView.current
     val labels=rememberCatalogLabels()
@@ -169,7 +172,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         DropdownMenuItem(text={Text("Personalizar y ordenar")},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
                         DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},onClick={manageHidden=true;moreMenu=false})
                         if(groupKey==null) DropdownMenuItem(text={Text(if(filters) "Ocultar filtros" else "Filtros y orden")},onClick={filters=!filters;moreMenu=false})
-                        if(groupKey==null) DropdownMenuItem(text={Text(if(gridCards) "Ver en lista" else "Ver en cuadrícula")},leadingIcon={Icon(if(gridCards) Icons.Default.ViewList else Icons.Default.GridView,null)},onClick={gridCards=!gridCards;prefs.edit().putBoolean("grid_cards",gridCards).apply();moreMenu=false})
+                        DropdownMenuItem(text={Text("Más columnas · ahora "+(if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1))},leadingIcon={Icon(Icons.Default.GridView,null)},
+                            onClick={val c=((if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1)+1).coerceAtMost(6);userColumns=c;prefs.edit().putInt("columns_user",c).apply()})
+                        DropdownMenuItem(text={Text("Menos columnas")},leadingIcon={Icon(Icons.Default.ViewList,null)},
+                            onClick={val c=((if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1)-1).coerceAtLeast(1);userColumns=c;prefs.edit().putInt("columns_user",c).apply()})
+                        if(userColumns>0) DropdownMenuItem(text={Text("Columnas automáticas")},onClick={userColumns=0;prefs.edit().putInt("columns_user",0).apply();moreMenu=false})
                         DropdownMenuItem(text={Text(if(compactCards) "Usar tarjetas amplias" else "Usar tarjetas compactas")},onClick={compactCards=!compactCards;prefs.edit().putBoolean("compact_cards",compactCards).apply();moreMenu=false})
                         if(groupKey==null && family==null && !toolsView) DropdownMenuItem(text={Text(if(showSecondary) "Ocultar audio y texto" else "Mostrar audio y texto")},
                             onClick={showSecondary=!showSecondary;moreMenu=false})
@@ -191,7 +198,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 modifier=Modifier.fillMaxSize().padding(padding),onUseWithMedia=onSelectModelWithMedia)
         } else {
         key(modality, family, groupKey) {
-        LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) rootColumns else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding), state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding).pinchColumns(columns=if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1,max=6) {c->userColumns=c;prefs.edit().putInt("columns_user",c).apply()}, state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(family==null) item(span={GridItemSpan(maxLineSpan)}) {
                 Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
                     Icon(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.artbox_mark),null,tint=androidx.compose.ui.graphics.Color.Unspecified,modifier=Modifier.size(28.dp))
@@ -268,7 +275,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                                 onDragStarted={dragMoved[0]=false;DragHaptics.lift(dragView)},
                                 onDragStopped={DragHaptics.drop(dragView)
                                     if(!dragMoved[0]) labelTarget=Triple("family:"+section.family,section.family,"")}) else null,
-                            dragging=isDragging,onMoveUp=moveUp,onMoveDown=moveDown,title=labels.name("family:"+section.family,section.family))
+                            dragging=isDragging,onMoveUp=moveUp,onMoveDown=moveDown,title=labels.name("family:"+section.family,section.family),columns=rootColumns)
                         }
                     }
                     if(false) item(span={GridItemSpan(maxLineSpan)}) {
