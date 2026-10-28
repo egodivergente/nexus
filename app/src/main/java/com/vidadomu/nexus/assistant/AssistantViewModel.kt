@@ -98,6 +98,8 @@ data class AssistantUiState(
     val thinking: Boolean = false,
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     val streamingText: String = "",
+    /** Pasos que el agente va haciendo en este turno (para «Pensando…»). */
+    val activity: List<String> = emptyList(),
     /** Respuestas rápidas de la última respuesta del agente; se borran al enviar cualquier mensaje. */
     val replies: List<com.vidadomu.nexus.agent.core.tools.SuggestedReply> = emptyList(),
     val scrollRequest: Long = 0,
@@ -210,7 +212,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** The per-conversation part of [chat] put on screen, keeping what is global (catalog, settings, projects…). */
     private fun AssistantUiState.showing(chat: AssistantUiState) = copy(items = chat.items, plans = chat.plans, pendingAttachments = chat.pendingAttachments,
-        thinking = chat.thinking, streamingText = chat.streamingText, replies = chat.replies, conversationId = chat.conversationId,
+        thinking = chat.thinking, streamingText = chat.streamingText, activity = chat.activity, replies = chat.replies, conversationId = chat.conversationId,
         activeProjectId = chat.activeProjectId, workingIn = null, scrollRequest = scrollRequest + 1)
 
     private fun chatTitle(chat: AssistantUiState) = chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(40) ?: "Nueva conversación"
@@ -281,7 +283,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val carried = _ui.value.items.filterIsInstance<ChatItem.Context>().filter { !it.sent }
         val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
         _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
-            ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", activity = emptyList(), replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -326,7 +328,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
-                    state.copy(thinking = false, streamingText = "", lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
+                    state.copy(thinking = false, streamingText = "", activity = emptyList(), lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
@@ -374,6 +376,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             // A wall opens over whatever is on screen: only for the conversation being looked at.
             is UiEvent.ResultsWall -> if (_ui.value.conversationId == chatId) _ui.update { it.copy(resultsWall = ev.media) }
             is UiEvent.Info -> notice(ev.text, chatId = chatId)
+            is UiEvent.Activity -> updateChat(chatId) { it.copy(activity = (if (it.activity.lastOrNull() == ev.text) it.activity else it.activity + ev.text).takeLast(8)) }
             is UiEvent.StreamingText -> updateChat(chatId) { it.copy(streamingText = ev.text) }
             is UiEvent.Replies -> updateChat(chatId) { it.copy(replies = ev.replies) }
         }

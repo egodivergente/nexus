@@ -38,6 +38,8 @@ sealed interface UiEvent {
     data class ProposedAction(val id: String, val description: String) : UiEvent
     data class ResultsWall(val media: List<Attachment>) : UiEvent
     data class Info(val text: String) : UiEvent
+    /** Paso que el agente está haciendo ahora (se muestra bajo «Pensando…»). */
+    data class Activity(val text: String) : UiEvent
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     data class StreamingText(val text: String) : UiEvent
     /** Botones de respuesta de un toque bajo la última respuesta del agente. Pulsar uno envía [SuggestedReply.text] como mensaje del usuario. */

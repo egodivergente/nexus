@@ -19,6 +19,7 @@ import java.util.Locale
 private data class ReleaseNote(val version: String, val items: List<String>)
 
 private val releaseNotes = listOf(
+    ReleaseNote("1.9.115", listOf("Chat: mientras el agente trabaja muestra sus pasos reales (consultar modelos, mirar la biblioteca…).", "Chat: corregido el parpadeo al escribir o pensar (el desplazamiento automático saltaba arriba y abajo en cada fragmento).")),
     ReleaseNote("1.9.114", listOf("Chat: «Pensando…» muestra el tiempo transcurrido y avisa si tarda más de 30 s.")),
     ReleaseNote("1.9.113", listOf("ArtBox: bordes más suaves, buscador relleno sin borde, pestañas en píldora, logo a la izquierda y un único menú (con Ajustes).")),
     ReleaseNote("1.9.112", listOf("Chat: el selector de esfuerzo es una píldora con el modo actual y una descripción de cada modo.", "ArtBox: sonido de toque al abrir una tarjeta (el del sistema).")),
