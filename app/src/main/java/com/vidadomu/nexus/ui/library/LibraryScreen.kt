@@ -49,6 +49,7 @@ import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.model.*
+import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.ui.components.matchesCreationSearch
 import com.vidadomu.nexus.ui.theme.*
 import java.text.SimpleDateFormat
