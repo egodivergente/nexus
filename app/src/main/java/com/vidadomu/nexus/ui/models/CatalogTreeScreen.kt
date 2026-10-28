@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import com.vidadomu.nexus.ui.theme.stylusHover
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -171,11 +172,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     IconButton(onClick={moreMenu=true}) {Icon(Icons.Default.MoreVert,"Opciones del catálogo")}
                     DropdownMenu(expanded=moreMenu,onDismissRequest={moreMenu=false}) {
                         com.vidadomu.nexus.ui.components.NexusSettingsMenuItem {moreMenu=false}
-                        DropdownMenuItem(text={Text("Editar región · local")},onClick={moreMenu=false;onLocalInpaint()})
+                        HorizontalDivider()
+                        // Organizar
                         if(personalizing) DropdownMenuItem(text={Text("Terminar personalización")},onClick={personalizing=false;moreMenu=false})
-                        DropdownMenuItem(text={Text("Personalizar y ordenar")},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
-                        DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},onClick={manageHidden=true;moreMenu=false})
-                        if(groupKey==null) DropdownMenuItem(text={Text(if(filters) "Ocultar filtros" else "Filtros y orden")},onClick={filters=!filters;moreMenu=false})
+                        DropdownMenuItem(text={Text("Personalizar y ordenar")},leadingIcon={Icon(Icons.Default.DragHandle,null)},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
+                        if(groupKey==null) DropdownMenuItem(text={Text(if(filters) "Ocultar filtros" else "Filtros y orden")},leadingIcon={Icon(Icons.Default.FilterList,null)},onClick={filters=!filters;moreMenu=false})
+                        DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},leadingIcon={Icon(Icons.Default.VisibilityOff,null)},onClick={manageHidden=true;moreMenu=false})
+                        HorizontalDivider()
+                        // Vista
                         DropdownMenuItem(text={Text("Más columnas · ahora "+(if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1))},leadingIcon={Icon(Icons.Default.GridView,null)},
                             onClick={val c=((if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1)+1).coerceAtMost(6);userColumns=c;prefs.edit().putInt("columns_user",c).apply()})
                         DropdownMenuItem(text={Text("Menos columnas")},leadingIcon={Icon(Icons.Default.ViewList,null)},
@@ -184,7 +188,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         DropdownMenuItem(text={Text(if(compactCards) "Usar tarjetas amplias" else "Usar tarjetas compactas")},onClick={compactCards=!compactCards;prefs.edit().putBoolean("compact_cards",compactCards).apply();moreMenu=false})
                         if(groupKey==null && family==null && !toolsView) DropdownMenuItem(text={Text(if(showSecondary) "Ocultar audio y texto" else "Mostrar audio y texto")},
                             onClick={showSecondary=!showSecondary;moreMenu=false})
-                        DropdownMenuItem(text={Text("Actualizar catálogo")},enabled=!loading,onClick={app.modelCatalogRepository.refreshModels(true);moreMenu=false})
+                        HorizontalDivider()
+                        // Catálogo y herramientas
+                        DropdownMenuItem(text={Text("Editar región · local")},leadingIcon={Icon(Icons.Default.Brush,null)},onClick={moreMenu=false;onLocalInpaint()})
+                        DropdownMenuItem(text={Text("Actualizar catálogo")},leadingIcon={Icon(Icons.Default.Refresh,null)},enabled=!loading,onClick={app.modelCatalogRepository.refreshModels(true);moreMenu=false})
                     }
                 }
     }
@@ -392,16 +399,16 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         val originalDescription=targetGroup?.let {g -> CatalogFocus.forModel(g.routes.first())?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(g.routes)}.orEmpty()
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(labels.name(labelKey,label))},text={Column {
             TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Personalizar icono, nombre y tamaño")}
-            Text("Para mover una tarjeta, mantenla pulsada y arrástrala.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
-            // Order changes by long-press + drag; up/down stay only as TalkBack actions on each card.
+            if(model!=null) TextButton(onClick={toggleFavorite(model);contextTarget=null}) {Text(if(modelBookmark(model) in favorites) "Quitar favorito" else "Marcar favorito")}
             TextButton(onClick={
                 if(itemKey!=null) saveOrder(listOf(itemKey)+(savedOrder+displayedKeys).distinct().filterNot {it==itemKey})
                 contextTarget=null
             }) {Text("Poner al principio")}
-            if(model!=null) TextButton(onClick={toggleFavorite(model);contextTarget=null}) {Text(if(modelBookmark(model) in favorites) "Quitar favorito" else "Marcar favorito")}
+            Text("Para mover una tarjeta, mantenla pulsada y arrástrala. El logo y el nombre también se mueven con una pulsación larga sobre ellos.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
+            HorizontalDivider()
             if(!key.startsWith("tool:")) TextButton(onClick={moveTarget=key to labels.name(labelKey,label);contextTarget=null}) {Text("Mover a otra sección…")}
             TextButton(onClick={pendingHide=key to label;contextTarget=null}) {Text("Quitar de mi catálogo")}
-            TextButton(onClick={saveOrder(emptyList());contextTarget=null}) {Text("Restaurar orden predeterminado")}
+            TextButton(onClick={saveOrder(emptyList());contextTarget=null}) {Text("Restaurar el orden de todas las tarjetas")}
         }},confirmButton={TextButton(onClick={contextTarget=null}) {Text("Cerrar")}})
     }
     moveTarget?.let {(key,name) ->
@@ -456,13 +463,32 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
         onMoveDown?.let {action -> CustomAccessibilityAction("Bajar $title") {action();true}})
     // Altura mínima fija en grid para que las tarjetas no bailen cuando falta releaseLabel/highlight.
     val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.03f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Row lift")
-    Surface(modifier=cardModifier.fillMaxWidth().graphicsLayer {scaleX=lift;scaleY=lift}.then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick=onClick,
-        onLongClickLabel=if(onLongClick!=null) "Opciones de $title" else null,onLongClick=onLongClick)
+    var logoHeld by remember {mutableStateOf(false)}
+    val soundView=androidx.compose.ui.platform.LocalView.current
+    Surface(modifier=cardModifier.fillMaxWidth().stylusHover(enabled=!dragging).graphicsLayer {scaleX=lift;scaleY=lift}.then(if(grid) Modifier.heightIn(min=116.dp) else Modifier).combinedClickable(onClick={soundView.playSoundEffect(android.view.SoundEffectConstants.CLICK);onClick()},
+        onLongClickLabel=if(onLongClick!=null) "Opciones de $title" else null,onLongClick=if(onLongClick!=null) ({if(!logoHeld) onLongClick()}) else null)
         .then(if(reorderActions.isEmpty()) Modifier else Modifier.semantics { customActions=reorderActions }),shape=NexusTokens.card,
-        color=if(dragging) MaterialTheme.colorScheme.surfaceContainerHigh else SurfaceDark,shadowElevation=if(dragging) 18.dp else 0.dp,
-        border=if(dragging) BorderStroke(1.5.dp,MaterialTheme.colorScheme.primary) else null) {
+        color=if(dragging) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,shadowElevation=if(dragging) 18.dp else 3.dp,
+        border=BorderStroke(if(dragging) 1.5.dp else .5.dp,if(dragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha=.07f))) {
         Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            val glyph:@Composable ()->Unit = {CatalogGlyph(glyphKey,if(grid) 36.dp else 44.dp,rememberCatalogLabels()) {size -> BrandLogo(family=family,modelId=routes.firstOrNull()?.id,size=size,bare=true)}}
+            val glyph:@Composable ()->Unit = {
+                // Mismo formato que las tarjetas principales: logo más grande; mantenido pulsado se mueve con un dedo y se escala con pellizco.
+                val labels=rememberCatalogLabels()
+                val ctx=LocalContext.current.applicationContext
+                val dens=androidx.compose.ui.platform.LocalDensity.current
+                var adjusting by remember {mutableStateOf(false)}
+                val place=labels.placement(glyphKey,"logo")
+                val slot=if(grid) 76.dp else 64.dp
+                Box(Modifier.size(slot).logoResizeGesture(enabled=glyphKey.isNotEmpty() && dragModifier==null && cardModifier==Modifier && !dragging,key=glyphKey,current={labels.scale(glyphKey)},
+                    min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(ctx,it)},
+                    onHold={logoHeld=it;GestureLock.onCard=it},onAdjusting={adjusting=it},onScale={labels.setScaleLive(glyphKey,it)},
+                    onCommit={labels.commitScale(glyphKey);labels.commitPlacement(glyphKey,"logo")},
+                    placement={labels.placement(glyphKey,"logo")},onMove={x,y->labels.setPlacementLive(glyphKey,"logo",x,y)},pxPerDp={dens.density}),contentAlignment=Alignment.Center) {
+                    Box(Modifier.wrapContentSize(Alignment.Center,unbounded=true).offset(place.first.dp,place.second.dp)) {
+                        CatalogGlyph(glyphKey,if(grid) 56.dp else 52.dp,labels) {size -> BrandLogo(family=family,modelId=routes.firstOrNull()?.id,size=size,bare=true)}
+                    }
+                }
+            }
             val texts:@Composable ColumnScope.()->Unit = {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     Text(title,style=MaterialTheme.typography.titleMedium,

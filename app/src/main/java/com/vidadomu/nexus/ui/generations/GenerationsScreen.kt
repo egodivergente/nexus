@@ -186,6 +186,12 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         } else GenerationSummaryRow(job,currencyManager,
                             onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
                             onRetry={onPrepareAgain(job)},
+                            onDiscard={scope.launch {
+                                // Descartar no borra: deja de consultar al proveedor y manda el trabajo a «Archivados».
+                                app.generationRepository.stopTrackingJob(job.id)
+                                archived=archived+job.id;archivePrefs.edit().putStringSet("ids",archived).apply()
+                                android.widget.Toast.makeText(context,"Encargo apartado. Sigue en Archivados y no se ha cancelado en el proveedor.",android.widget.Toast.LENGTH_LONG).show()
+                            }},
                             variantLabels=variantLabels,
                             menu={ close ->
                                 if(job.outputs.isNotEmpty() && onSendResultToAgent!=null) DropdownMenuItem(text={Text("Añadir al chat")},onClick={close();attachJob=job})

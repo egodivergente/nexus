@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.sizeIn
@@ -213,11 +215,19 @@ class MainActivity : ComponentActivity() {
                             androidx.activity.compose.BackHandler(enabled = pager.currentPage != 0) {
                                 workspaceScope.launch { pager.animateScrollToPage(0) }
                             }
+                            // Más sensible: con arrastrar un 20 % de la pantalla (o un gesto rápido) ya cambia de pestaña, en vez del 50 % por defecto.
                             HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value,
+                                flingBehavior=androidx.compose.foundation.pager.PagerDefaults.flingBehavior(state=pager,snapPositionalThreshold=.2f),
                                 // No system-gesture inset here: Android already gives the edge back-gesture priority, and that inset
                                 // (~20–25 dp per side with gesture navigation) doubled every screen's own 16 dp margin.
                                 modifier=Modifier.fillMaxSize()) {index ->
                                 holder.SaveableStateProvider(tabs[index].route) {
+                                // La pestaña que sale se atenúa y encoge un poco, y la que entra crece: el cambio se siente continuo con el dedo.
+                                Box(Modifier.fillMaxSize().graphicsLayer {
+                                    val distance=kotlin.math.abs((pager.currentPage-index)+pager.currentPageOffsetFraction).coerceAtMost(1f)
+                                    alpha=1f-.35f*distance
+                                    scaleX=1f-.05f*distance;scaleY=1f-.05f*distance
+                                }) {
                                 when(tabs[index]) {
                             Screen.Assistant -> {
                             com.vidadomu.nexus.assistant.AssistantScreen(
@@ -294,6 +304,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                                     else -> Unit
+                                }
                                 }
                                 }
                             }

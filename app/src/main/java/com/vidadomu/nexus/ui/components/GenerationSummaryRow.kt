@@ -62,7 +62,7 @@ internal fun ConfirmedGenerationCost(text:String,modifier:Modifier=Modifier) {
 }
 
 @Composable
-fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->Unit,onRetry:()->Unit={},
+fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->Unit,onRetry:()->Unit={},onDiscard:(()->Unit)?=null,
     variantLabels:Map<String,String>?=null,menu:@Composable (close:()->Unit)->Unit) {
     val app=LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
@@ -115,6 +115,11 @@ fun GenerationSummaryRow(job:GenerationJob,currency:CurrencyManager,onOpen:()->U
         }
         if(job.status==GenerationStatus.FAILED) TextButton(onClick=onRetry,contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {
             Text("Reintentar",style=MaterialTheme.typography.labelMedium)
+        }
+        // Un encargo que lleva más de 15 min «en cola» (o con el seguimiento pausado) se puede apartar sin borrar nada.
+        val stuck=!finished && onDiscard!=null && (System.currentTimeMillis()-job.startedAt>15*60_000L || job.parameters["__tracking_paused"]=="true")
+        if(stuck) TextButton(onClick=onDiscard!!,contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {
+            Text("Descartar",style=MaterialTheme.typography.labelMedium)
         }
         cost?.let {ConfirmedGenerationCost(it)}
         Box {

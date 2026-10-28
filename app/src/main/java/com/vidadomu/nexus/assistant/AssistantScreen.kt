@@ -722,33 +722,41 @@ internal fun UserBubble(item:ChatItem.User) {
         val foldable = remember(item.text) { UserMessageFold.shouldFold(item.text) }
         var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
         Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)
-            .background(brush,NexusTokens.card)
-            .messageLongPress("Acciones del mensaje") { actions = true }) {
+            .background(brush,NexusTokens.card)) {
                 Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-                    Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,
-                        maxLines=if(foldable && !expanded) UserMessageFold.PREVIEW_LINES else Int.MAX_VALUE,
-                        overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    // Pulsación larga = selección nativa de Android (arrastrar para elegir fragmento); las acciones están en «⋯».
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,
+                            maxLines=if(foldable && !expanded) UserMessageFold.PREVIEW_LINES else Int.MAX_VALUE,
+                            overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
                     if(foldable) TextButton(onClick={expanded=!expanded},contentPadding=PaddingValues(horizontal=0.dp),
                         modifier=Modifier.align(Alignment.End).heightIn(min=NexusTokens.minimumTouch)) {
                         Text(if(expanded) "Contraer" else "Expandir",style=MaterialTheme.typography.labelLarge)
                     }
                 }
-            DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
-                DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, onClick = {
-                    clipboard.setText(AnnotatedString(item.text)); actions = false
-                })
-                DropdownMenuItem(text = { Text("Seleccionar fragmento") }, onClick = { actions = false; selection = true })
-                DropdownMenuItem(text = { Text("Compartir mensaje") }, onClick = {
-                    actions = false
-                    runCatching {
-                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"; putExtra(Intent.EXTRA_TEXT, item.text)
-                        }, "Compartir mensaje"))
-                    }.onFailure { Toast.makeText(context, "No se pudo compartir el mensaje", Toast.LENGTH_SHORT).show() }
-                })
-            }
         }
-        MessageMeta(item.at,0L,Modifier.padding(end=NexusTokens.space8))
+        Row(Modifier.padding(end=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            Box {
+                IconButton(onClick={actions=true},modifier=Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreHoriz,"Acciones del mensaje",Modifier.size(18.dp),tint=TextSecondary)
+                }
+                DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
+                    DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, leadingIcon={Icon(Icons.Default.ContentCopy,null)}, onClick = {
+                        clipboard.setText(AnnotatedString(item.text)); actions = false
+                    })
+                    DropdownMenuItem(text = { Text("Compartir mensaje") }, leadingIcon={Icon(Icons.Default.Share,null)}, onClick = {
+                        actions = false
+                        runCatching {
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"; putExtra(Intent.EXTRA_TEXT, item.text)
+                            }, "Compartir mensaje"))
+                        }.onFailure { Toast.makeText(context, "No se pudo compartir el mensaje", Toast.LENGTH_SHORT).show() }
+                    })
+                }
+            }
+            MessageMeta(item.at,0L)
+        }
     }
 }
 
@@ -831,8 +839,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
         if(item.text.isNotBlank()) {
             // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
             // Casi sin fondo: tus mensajes llevan el acento y las respuestas quedan limpias, a todo el ancho.
-            Surface(color=androidx.compose.ui.graphics.Color.Transparent,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()
-                .messageLongPress("Acciones de la respuesta") {actionsExpanded=true}) {
+            Surface(color=androidx.compose.ui.graphics.Color.Transparent,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 val streaming = item.stop == "STREAMING"
                 val responseText = remember(item.text, streaming) {
@@ -840,11 +847,19 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                         if(streaming) "Recibiendo respuesta…" else "La respuesta guardada no contiene texto. Revisa los pasos de este turno."
                     } else hideOrderIds(item.text)
                 }
+                // Selección nativa con pulsación larga y arrastre (al terminar de escribir; durante el streaming el texto cambia).
                 ChatMarkdownView(responseText, streaming = streaming,
-                    answered = answered, onReply = if (streaming) null else onReply, selectable = false)
+                    answered = answered, onReply = if (streaming) null else onReply, selectable = !streaming)
+              }
+            }
+        }
+        if(item.text.isNotBlank() && item.stop!="STREAMING") Row(Modifier.padding(horizontal=NexusTokens.space12),verticalAlignment=Alignment.CenterVertically) {
+            MessageMeta(item.at,item.tookMs,Modifier.weight(1f),item.by)
+            Box {
+                IconButton(onClick={actionsExpanded=true},modifier=Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreHoriz,"Acciones de la respuesta",Modifier.size(18.dp),tint=TextSecondary)
+                }
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
-                    DropdownMenuItem(text = { Text("Seleccionar texto") }, leadingIcon = { Icon(Icons.Default.TextFields, null) },
-                        onClick = { actionsExpanded = false; selection = true })
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
                         Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()
@@ -859,10 +874,8 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                     if(item.toolCalls.isNotEmpty()) DropdownMenuItem(text={Text(if(showSteps) "Ocultar pasos" else "Ver pasos (${item.toolCalls.size})")},
                         leadingIcon={Icon(Icons.Default.Build,null)},onClick={showSteps=!showSteps;actionsExpanded=false})
                 }
-              }
             }
         }
-        if(item.text.isNotBlank() && item.stop!="STREAMING") MessageMeta(item.at,item.tookMs,Modifier.padding(horizontal=NexusTokens.space12),item.by)
         if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) {
