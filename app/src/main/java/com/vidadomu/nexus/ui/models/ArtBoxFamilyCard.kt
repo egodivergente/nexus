@@ -54,9 +54,9 @@ import com.vidadomu.nexus.core.model.*
     val reorderActions=listOfNotNull(
         onMoveUp?.let {action -> androidx.compose.ui.semantics.CustomAccessibilityAction("Subir ${section.family}") {action();true}},
         onMoveDown?.let {action -> androidx.compose.ui.semantics.CustomAccessibilityAction("Bajar ${section.family}") {action();true}})
-    Surface(shape=NexusTokens.card,color=if(dragging) colors.surfaceContainerHigh else colors.surfaceContainerLow,
+    Surface(shape=NexusTokens.card,color=if(dragging) colors.surfaceContainerHigh else colors.surfaceContainer,
         shadowElevation=if(dragging) 18.dp else 3.dp,
-        border=BorderStroke(if(dragging||adjusting) 1.5.dp else .5.dp,if(dragging||adjusting) colors.primary else colors.outlineVariant.copy(alpha=.7f)),
+        border=BorderStroke(if(dragging||adjusting) 1.5.dp else .5.dp,if(dragging||adjusting) colors.primary else colors.onSurface.copy(alpha=.07f)),
         modifier=Modifier.fillMaxWidth().stylusHover(enabled=!dragging && !adjusting).graphicsLayer {scaleX=lift;scaleY=lift}
             .combinedClickable(onClick={view.playSoundEffect(android.view.SoundEffectConstants.CLICK);onOpen()},onLongClick=if(dragModifier==null) ({if(!logoHeld) onOptions()}) else null,onLongClickLabel=if(dragModifier==null) "Opciones de ${section.family}" else null)
             .semantics(mergeDescendants=true) {contentDescription="${section.family}, $count"; if(reorderActions.isNotEmpty()) customActions=reorderActions}) {

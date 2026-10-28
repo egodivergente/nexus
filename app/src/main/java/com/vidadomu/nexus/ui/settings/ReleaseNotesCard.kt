@@ -19,6 +19,7 @@ import java.util.Locale
 private data class ReleaseNote(val version: String, val items: List<String>)
 
 private val releaseNotes = listOf(
+    ReleaseNote("1.9.113", listOf("ArtBox: bordes más suaves, buscador relleno sin borde, pestañas en píldora, logo a la izquierda y un único menú (con Ajustes).")),
     ReleaseNote("1.9.112", listOf("Chat: el selector de esfuerzo es una píldora con el modo actual y una descripción de cada modo.", "ArtBox: sonido de toque al abrir una tarjeta (el del sistema).")),
     ReleaseNote("1.9.111", listOf("Sistema: fecha de la última actualización y cambios por versión.")),
     ReleaseNote("1.9.110", listOf("Lanzadera: límites de modelos, generaciones por modelo y envíos simultáneos sin tope.", "Ajustes: Google Flow ya no ocupa una tarjeta en Proveedores.")),

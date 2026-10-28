@@ -182,3 +182,9 @@ fun nexusScreenTitleStyle():TextStyle = if(LocalDensity.current.fontScale>=1.3f)
     MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleMedium
 
 @Composable fun NexusSettingsButton() {LocalChrome.current?.openSettings?.let {go->IconButton(onClick=go) {Icon(Icons.Outlined.Settings,"Ajustes de Nexus",Modifier.size(20.dp))}}}
+/** «Ajustes de Nexus» como entrada de un menú, para no duplicar un engranaje junto al menú ⋮. */
+@Composable fun NexusSettingsMenuItem(onClick: () -> Unit) {
+    LocalChrome.current?.openSettings?.let { go ->
+        DropdownMenuItem(text = { Text("Ajustes de Nexus") }, leadingIcon = { Icon(Icons.Outlined.Settings, null) }, onClick = { onClick(); go() })
+    }
+}

@@ -44,12 +44,11 @@ internal fun ArtBoxTabs(tabs: List<ArtBoxTab>, modifier: Modifier = Modifier) {
         else modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup()
     FlowRow(container, horizontalArrangement = Arrangement.spacedBy(2.dp), maxLines = if (wrap) 3 else 1) {
         tabs.forEach { tab ->
-            val indicator by animateDpAsState(if (tab.selected) 24.dp else 0.dp, label = "ArtBox tab indicator")
             val tint = if (tab.selected) colors.primary else colors.onSurfaceVariant
-            Column(Modifier.clip(NexusTokens.filter).selectable(tab.selected, role = Role.Tab, onClick = tab.onClick)
-                .heightIn(min = 44.dp).padding(horizontal = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                color = if (tab.selected) colors.primary.copy(alpha = .16f) else androidx.compose.ui.graphics.Color.Transparent,
+                modifier = Modifier.selectable(tab.selected, role = Role.Tab, onClick = tab.onClick).heightIn(min = 40.dp)) {
+                Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     tab.icon?.let {
                         Icon(it, null, Modifier.size(16.dp), tint = tint)
                         Spacer(Modifier.width(4.dp))
@@ -57,8 +56,6 @@ internal fun ArtBoxTabs(tabs: List<ArtBoxTab>, modifier: Modifier = Modifier) {
                     Text(tab.label, style = MaterialTheme.typography.titleSmall, color = tint, maxLines = 1,
                         fontWeight = if (tab.selected) FontWeight.SemiBold else FontWeight.Normal)
                 }
-                Box(Modifier.padding(top = 4.dp).height(2.dp).width(indicator)
-                    .background(colors.primary, RoundedCornerShape(1.dp)))
             }
         }
     }
@@ -69,8 +66,8 @@ internal fun ArtBoxTabs(tabs: List<ArtBoxTab>, modifier: Modifier = Modifier) {
 internal fun ArtBoxSearchBar(query: String, onQuery: (String) -> Unit, filtersActive: Boolean,
     filterDescription: String, onFilters: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    Surface(shape = NexusTokens.filter, color = colors.surfaceContainerLow,
-        border = BorderStroke(.5.dp, colors.outlineVariant.copy(alpha = .7f)),
+    // Gris azulado más sólido y sin borde: separa la zona de control de la cuadrícula de modelos.
+    Surface(shape = NexusTokens.filter, color = colors.surfaceContainerHighest,
         modifier = modifier.fillMaxWidth().heightIn(min = 48.dp)) {
         Row(Modifier.padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Search, null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
