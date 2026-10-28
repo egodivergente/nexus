@@ -162,8 +162,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
                     item {SettingsCard {SettingRow("Sincronización entre móviles","Chats, memoria, skills, galería y adjuntos",{syncOpen=true})}}
                     if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Proveedor, modelo, respuesta y herramientas",{assistantSettingsOpen=true})}}
-                    item {SettingsHeader("Cerebros adicionales",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
-                    item {SettingsCard {BrainsSettingsSection()}}
+                    item {SettingsHeader("Motores del agente",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
+                    item {SettingsCard {BrainsSettingsSection {assistantSettingsOpen=true}}}
                 }
                 SettingsPage.PROVIDERS -> {
                     item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
@@ -205,6 +205,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
             item {SettingsCard {com.vidadomu.nexus.assistant.MediaEditingSettings()}}
             item {SettingsCard {ReleaseNotesCard()}}
+            item {SettingsCard {TelemetryCard()}}
             item {SettingsCard {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}

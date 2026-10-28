@@ -82,7 +82,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     var onlyDated by remember {mutableStateOf(prefs.getBoolean("release_only_dated",false))}
     var providerFilter by rememberSaveable {mutableStateOf<String?>(null)}
     var showSecondary by rememberSaveable {mutableStateOf(false)}
-    var imageReferences by rememberSaveable { mutableStateOf(true) }
+    // «Con referencias» empieza desactivado: activado ocultaba los modelos de imagen que solo aceptan texto.
+    var imageReferences by rememberSaveable { mutableStateOf(false) }
     var allImageFamilies by rememberSaveable { mutableStateOf(false) }
     var use by rememberSaveable { mutableStateOf<CreationUse?>(null) }
     val placementRev=CatalogPlacements.revision.intValue
@@ -326,51 +327,62 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     if(filters && activeGroup==null) ModalBottomSheet(onDismissRequest={filters=false},shape=NexusTokens.sheet,
         sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         NexusSheetSystemBars()
+        val activeCount=listOf(providerFilter!=null,use!=null,favoritesOnly,showLegacy,modality==Modality.IMAGE && imageReferences,onlyDated && catalogSort==CatalogSort.RELEASE).count {it}
+        @Composable fun SwitchRow(title:String,detail:String,checked:Boolean,onChange:(Boolean)->Unit) {
+            Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {Text(title,style=MaterialTheme.typography.bodyLarge);Text(detail,style=MaterialTheme.typography.labelMedium,color=TextSecondary)}
+                Switch(checked,onChange)
+            }
+        }
         Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Text("Filtros",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f).semantics { heading() })
+                Text("Filtros y orden",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f).semantics { heading() })
+                if(activeCount>0) TextButton(onClick={
+                    providerFilter=null;use=null;favoritesOnly=false;showLegacy=false;imageReferences=false;onlyDated=false;groupKey=null
+                    prefs.edit().putBoolean("release_only_dated",false).apply()
+                }) {Text("Restablecer ($activeCount)")}
                 IconButton(onClick={filters=false}) {Icon(Icons.Default.Close,"Cerrar filtros")}
             }
-            LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        item {StudioFilterChip(catalogSort==CatalogSort.RELEASE,{
-                            catalogSort=if(catalogSort==CatalogSort.RELEASE) CatalogSort.PERSONAL else CatalogSort.RELEASE
-                            personalizing=false
-                            prefs.edit().putString("sort",catalogSort.name).apply()
-                        },label={Text("Más nuevos")},leadingIcon={Icon(Icons.Default.NewReleases,null,Modifier.size(16.dp))})}
-                        if(catalogSort==CatalogSort.RELEASE) item {StudioFilterChip(onlyDated,{
-                            onlyDated=!onlyDated;prefs.edit().putBoolean("release_only_dated",onlyDated).apply()
-                        },label={Text("Solo con fecha")})}
+            Text("Ordenar por",style=MaterialTheme.typography.labelLarge,color=TextSecondary,modifier=Modifier.semantics { heading() })
+            FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                CatalogSort.entries.forEach {entry -> StudioFilterChip(catalogSort==entry,{
+                    catalogSort=entry;personalizing=false;prefs.edit().putString("sort",entry.name).apply()
+                },label={Text(if(entry==CatalogSort.RELEASE) "Más nuevos" else entry.label)},shape=NexusTokens.filter)}
             }
             if(catalogSort==CatalogSort.RELEASE) {
-                    Text("Lanzamiento: del más reciente al más antiguo. " + if(onlyDated) "Solo fechas verificadas." else "Los modelos sin fecha aparecen al final.",fontSize = MaterialTheme.typography.labelMedium.fontSize,color=TextSecondary)
+                SwitchRow("Solo con fecha verificada","Los modelos sin fecha de lanzamiento se ocultan",onlyDated) {onlyDated=it;prefs.edit().putBoolean("release_only_dated",it).apply()}
             }
-                    Row(verticalAlignment=Alignment.CenterVertically) {Text("Mostrar modelos antiguos",Modifier.weight(1f));Switch(showLegacy,{showLegacy=it})}
-                    if(!toolsView && modality==Modality.IMAGE) Row(verticalAlignment=Alignment.CenterVertically) {
-                        Text("Solo modelos con referencias",Modifier.weight(1f))
-                        Switch(imageReferences,{imageReferences=it;use=null;groupKey=null})
+            Surface(shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Column(Modifier.padding(horizontal=NexusTokens.space12)) {
+                    SwitchRow("Mis favoritos","Solo los modelos que has marcado",favoritesOnly) {favoritesOnly=it}
+                    HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                    SwitchRow("Modelos antiguos","Incluye versiones anteriores de cada familia",showLegacy) {showLegacy=it}
+                    if(!toolsView && modality==Modality.IMAGE) {
+                        HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                        SwitchRow("Solo con referencias","Únicamente los que aceptan imágenes de entrada",imageReferences) {imageReferences=it;use=null;groupKey=null}
                     }
-                    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        Text("Orden",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.semantics { heading() })
-                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            CatalogSort.entries.forEach {entry -> StudioFilterChip(catalogSort==entry,{
-                                catalogSort=entry;prefs.edit().putString("sort",entry.name).apply()
-                            },label={Text(entry.label)},shape=NexusTokens.filter)}
-                        }
-                        Text("Proveedor",style=MaterialTheme.typography.labelMedium,color=TextSecondary,modifier=Modifier.semantics { heading() })
-                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            StudioFilterChip(providerFilter==null,{providerFilter=null},label={Text("Todos")},shape=NexusTokens.filter)
-                            models.map {it.providerId}.distinct().forEach {id -> StudioFilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
-                        }
-                        StudioFilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Mis favoritos")})
-                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
-                            verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                            StudioFilterChip(use==null,{use=null},label={Text("Todos los usos")})
-                            CreationUse.entries.filter {it.modality==modality}.forEach { value -> StudioFilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
-                        }
-                        TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
-                    }
+                }
+            }
+            val providers=models.map {it.providerId}.distinct()
+            if(providers.size>1) {
+                Text("Proveedor",style=MaterialTheme.typography.labelLarge,color=TextSecondary,modifier=Modifier.semantics { heading() })
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    item {StudioFilterChip(providerFilter==null,{providerFilter=null},label={Text("Todos")},shape=NexusTokens.filter)}
+                    items(providers) {id -> StudioFilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
+                }
+            }
+            val uses=CreationUse.entries.filter {it.modality==modality}
+            if(uses.isNotEmpty()) {
+                Text("Uso",style=MaterialTheme.typography.labelLarge,color=TextSecondary,modifier=Modifier.semantics { heading() })
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    item {StudioFilterChip(use==null,{use=null},label={Text("Todos")})}
+                    items(uses) {value -> StudioFilterChip(use==value,{use=if(use==value) null else value},label={Text(value.label)})}
+                }
+            }
+            Button(onClick={filters=false},Modifier.fillMaxWidth()) {Text("Ver resultados")}
+            TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
         }
     }
     contextTarget?.let { (key,label,model) ->

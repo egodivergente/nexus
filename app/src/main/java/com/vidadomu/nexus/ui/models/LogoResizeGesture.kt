@@ -32,6 +32,10 @@ internal fun Modifier.logoResizeGesture(
     onAdjusting: (Boolean) -> Unit,
     onScale: (Float) -> Unit,
     onCommit: () -> Unit,
+    /** Si se indica, un dedo mueve el logo dentro de su hueco (y solo el pellizco cambia el tamaño). */
+    placement: (() -> Pair<Float, Float>)? = null,
+    onMove: ((Float, Float) -> Unit)? = null,
+    pxPerDp: () -> Float = { 1f },
 ): Modifier = if (!enabled) this else this.pointerInput(key) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -60,17 +64,32 @@ internal fun Modifier.logoResizeGesture(
         var snapped = abs(value - 1f) < .001f
         val heightPx = size.height.toFloat().coerceAtLeast(1f)
         var lastY = down.position.y
+        var lastPos = down.position
+        val k = pxPerDp()
+        val startPlace = placement?.invoke() ?: (0f to 0f)
+        var moveX = startPlace.first * k
+        var moveY = startPlace.second * k
+        var nearCenter = false
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             val pressed = event.changes.filter { it.pressed }
             if (pressed.size >= 2) {
                 value *= event.calculateZoom()
             } else if (pressed.size == 1) {
-                val y = pressed[0].position.y
-                value *= 1f + (lastY - y) / heightPx * 1.6f
-                lastY = y
+                val pos = pressed[0].position
+                if (onMove != null) {
+                    moveX = (moveX + (pos.x - lastPos.x)).coerceIn(-400f, 400f)
+                    moveY = (moveY + (pos.y - lastPos.y)).coerceIn(-400f, 400f)
+                    val near = abs(moveX) < 8f && abs(moveY) < 8f
+                    if (near && !nearCenter) vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK)
+                    nearCenter = near
+                    onMove(moveX / k, moveY / k)
+                } else {
+                    value *= 1f + (lastY - pos.y) / heightPx * 1.6f
+                }
+                lastY = pos.y
             }
-            if (pressed.size == 1) lastY = pressed[0].position.y
+            if (pressed.size == 1) { lastY = pressed[0].position.y; lastPos = pressed[0].position }
             var v = value.coerceIn(min, max)
             // Magnet at the default size.
             if (abs(v - 1f) < .04f) {

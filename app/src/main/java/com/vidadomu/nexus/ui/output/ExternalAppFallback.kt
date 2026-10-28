@@ -22,8 +22,8 @@ internal fun launchAlexia(context: Context): Boolean = try {
 
 /** Texto del aviso persistente cuando Alexia no responde; nunca promete una acción que no se ofrece. */
 internal fun alexiaUnavailableMessage(hasLocalCopy: Boolean): String =
-    if (hasLocalCopy) "No se pudo abrir Alexia. El resultado sigue guardado en Nexus; puedes abrir esta copia con otra app."
-    else "No se pudo abrir Alexia. El resultado sigue en Nexus; para guardar una copia usa «Descargar archivo»."
+    if (hasLocalCopy) "No se pudo abrir la app externa. El resultado sigue guardado en Nexus; puedes abrir esta copia con otra app."
+    else "No se pudo abrir la app externa. El resultado sigue en Nexus; para guardar una copia usa «Descargar archivo»."
 
 internal const val OPEN_WITH_LABEL = "Abrir con otra app"
 

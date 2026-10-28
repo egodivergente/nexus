@@ -300,6 +300,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 val r = AssistantTurnService.runTurn(app) {
                     limits.turnTimeoutMillis?.let { ms -> kotlinx.coroutines.withTimeout(ms) { run() } } ?: run()
                 }
+                _ui.value.settings.let { st ->
+                    TurnTelemetry.record(app, TurnSample(System.currentTimeMillis(), agentLabel(st), st.modelId.ifBlank { "sin modelo" },
+                        android.os.SystemClock.elapsedRealtime() - started, r.usage.inputTokens, r.usage.outputTokens, r.toolCalls.size, r.toolRounds))
+                }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     updateChat(chatId) { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
                         conv.session.renderedMedia.values.toList(), System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime() - started,

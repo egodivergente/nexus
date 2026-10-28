@@ -79,11 +79,16 @@ import com.vidadomu.nexus.core.model.*
         Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height*f).padding(horizontal=if(columns>=4) 4.dp else 8.dp,vertical=if(columns>=4) 8.dp else 12.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             // Fixed slot: the card never changes size, only the logo inside it does.
+            val cardDensity=androidx.compose.ui.platform.LocalDensity.current
             Box(Modifier.size(ArtBoxCardMetrics.logoSlot*f).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
                 min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onAdjusting={adjusting=it},
-                onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey)}),contentAlignment=Alignment.TopCenter) {
+                onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey);labels.commitPlacement(glyphKey,"logo")},
+                placement={labels.placement(glyphKey,"logo")},onMove={x,y->labels.setPlacementLive(glyphKey,"logo",x,y)},
+                pxPerDp={cardDensity.density*f}),contentAlignment=Alignment.TopCenter) {
                 // Sin tope de hueco: un logo grande crece hacia abajo y el nombre se escribe por encima.
-                Box(Modifier.wrapContentSize(Alignment.TopCenter,unbounded=true)) {
+                // La posición se guarda en dp «a tamaño normal» y se escala con la tarjeta: al cambiar de columnas se mantiene proporcional.
+                val logoPlace=labels.placement(glyphKey,"logo")
+                Box(Modifier.wrapContentSize(Alignment.TopCenter,unbounded=true).offset((logoPlace.first*f).dp,(logoPlace.second*f).dp)) {
                 CatalogGlyph(glyphKey,ArtBoxCardMetrics.logo*f,labels) {size ->
                     if(toolCategory) {
                         Box(Modifier.size(size).clip(CircleShape).background(colors.primary.copy(alpha=.14f)),contentAlignment=Alignment.Center) {
@@ -99,11 +104,11 @@ import com.vidadomu.nexus.core.model.*
             val place=labels.placement(glyphKey,"name")
             Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Text(title,style=if(columns>=4) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,
-                    modifier=Modifier.offset(place.first.dp,place.second.dp).graphicsLayer {val s=if(movingName) 1.08f else 1f;scaleX=s;scaleY=s}
+                    modifier=Modifier.offset((place.first*f).dp,(place.second*f).dp).graphicsLayer {val s=if(movingName) 1.08f else 1f;scaleX=s;scaleY=s}
                         .holdAndMoveGesture(glyphKey+"|name",current={labels.placement(glyphKey,"name")},
                             vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onMoving={movingName=it;adjusting=it},
                             onMove={x,y->labels.setPlacementLive(glyphKey,"name",x,y)},onCommit={labels.commitPlacement(glyphKey,"name")},
-                            pxPerDp={density.density}))
+                            pxPerDp={density.density*f}))
                 // Franja inferior: mantener pulsada levanta la tarjeta para reordenarla.
                 Box(Modifier.fillMaxWidth().heightIn(min=20.dp).then(dragModifier ?: Modifier))
             }

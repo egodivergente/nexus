@@ -173,7 +173,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
                     if(job.modality==Modality.IMAGE) ViewerAction(Icons.Default.MovieFilter,"Animar",Modifier.weight(1f)) {onReuseAsInput(trustedLocal ?: output.url, output.mimeType.takeIf { it.startsWith("image/") } ?: "application/octet-stream")}
                     ViewerAction(Icons.Default.Replay,"Remezclar",Modifier.weight(1f)) {onReuseAsInput(job.prompt, null)}
                     if(output.url.startsWith("https://") || output.url.startsWith("http://")) ViewerAction(Icons.Default.Share,"Compartir",Modifier.weight(1f)) {shareMedia(context,output.url,job.prompt)}
-                    ViewerAction(Icons.Default.FolderSpecial,"Alexia",Modifier.weight(1f),"Abrir Alexia") {alexiaFailed=!launchAlexia(context)}
+                    // Sin acceso directo a otra app: el resultado vive en la Biblioteca de Nexus.
                 }
                 // Aviso que no desaparece solo: el botón nunca queda inerte y se ofrece una salida que no descarga ni envía nada.
                 if(alexiaFailed) com.vidadomu.nexus.ui.components.InlineNotice(alexiaUnavailableMessage(trustedLocal!=null),
@@ -202,7 +202,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
                     val cost=remember(job,currencyState) {com.vidadomu.nexus.ui.components.confirmedJobCost(job,currencyManager)}
                     ViewerDetail("Coste",cost)
                     job.actualCostUsd?.let {ViewerDetail("Importe original",currencyManager.formatUsdDetails(it))}
-                    ViewerDetail("Disponibilidad",if(trustedLocal!=null) "Copia local registrada. Consulta su disponibilidad en Alexia." else "El resultado depende del enlace del proveedor.")
+                    ViewerDetail("Disponibilidad",if(trustedLocal!=null) "Copia local guardada en la Biblioteca de Nexus." else "El resultado depende del enlace del proveedor.")
                     job.parameters.filterKeys {!it.startsWith("__")}.forEach {(key,value)->ViewerDetail(key,value)}
                     ViewerDetail("ID",job.id)
                     job.providerJobId?.let {ViewerDetail("ID del proveedor",it)}

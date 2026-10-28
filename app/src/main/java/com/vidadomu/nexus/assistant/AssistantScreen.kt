@@ -1206,6 +1206,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var apiKey by remember { mutableStateOf("") }
     var clearApiKey by remember { mutableStateOf(false) }
     var deleteCredential by remember { mutableStateOf<String?>(null) }
+    var editingSkills by remember { mutableStateOf(false) }
     var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
     var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
@@ -1338,8 +1339,24 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         AssistantSettings.BACKEND_OPENAI -> emptyList()
                         else -> AssistantSettings.KNOWN_MODELS
                     }
-                    if (!isCustom && modelChips.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                        modelChips.forEach { (id, name) -> StudioFilterChip((modelId == id || (backend == AssistantSettings.BACKEND_ANTIGRAVITY && id == AntigravityReasoning.DEFAULT_MODEL && AntigravityReasoning.effort(modelId) != null)), { modelId = id }, label = { Text(name) }) }
+                    if (!isCustom && modelChips.isNotEmpty()) {
+                        // Los modelos de generaciones anteriores no se borran: quedan plegados salvo que uno esté elegido.
+                        val legacyModel = Regex("4-[56]|claude-.*4-6|3\\.[67]-flash")
+                        val (older, current) = modelChips.partition { legacyModel.containsMatchIn(it.first) }
+                        var showOlder by remember(backend) { mutableStateOf(false) }
+                        val selectedIsOlder = older.any { it.first == modelId }
+                        @Composable fun chip(id: String, name: String) = StudioFilterChip((modelId == id || (backend == AssistantSettings.BACKEND_ANTIGRAVITY && id == AntigravityReasoning.DEFAULT_MODEL && AntigravityReasoning.effort(modelId) != null)), { modelId = id }, label = { Text(name) })
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                            current.forEach { (id, name) -> chip(id, name) }
+                        }
+                        if (older.isNotEmpty()) {
+                            TextButton(onClick = { showOlder = !showOlder }, contentPadding = PaddingValues(0.dp)) {
+                                Text(if (showOlder || selectedIsOlder) "Ocultar modelos anteriores" else "Modelos anteriores (${older.size})")
+                            }
+                            if (showOlder || selectedIsOlder) FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                                older.forEach { (id, name) -> chip(id, name) }
+                            }
+                        }
                     }
                     if(backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(modelId) != null) {
                         Text("Razonar",style=MaterialTheme.typography.titleSmall)
@@ -1370,8 +1387,9 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         if (ui.skillErrors.isNotEmpty()) Text("${ui.skillErrors.size} con errores", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                     }
                     if (ui.skillErrors.isNotEmpty()) InlineNotice("Algunas skills no se pudieron cargar.", technicalDetails = ui.skillErrors.joinToString("\n"))
-                    Text("Se cargan de la app y, sin recompilar, de Documents/ALEXIA/Nexus/Skills (las de igual id sustituyen a las de la app).", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+                    Text("Se cargan de la app y, sin recompilar, de la carpeta de skills del teléfono (las de igual id sustituyen a las de la app).", style = MaterialTheme.typography.labelMedium, color = TextMuted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                        FilledTonalButton(onClick = { editingSkills = true }) { Text("Ver y editar") }
                         FilledTonalButton(onClick = vm::reloadSkills) { Text("Recargar skills") }
                         FilledTonalButton(onClick = { vm.reindexHistory() }) { Text("Indexar historial") }
                     }
@@ -1379,6 +1397,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 error?.let { InlineNotice(noticeMessage(it, "Revisa los ajustes antes de guardar."), technicalDetails = it) }
             }
     }
+    if (editingSkills) SkillsEditorDialog(vm, androidx.compose.ui.platform.LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication) { editingSkills = false }
     deleteCredential?.let { target ->
         AlertDialog(onDismissRequest = { deleteCredential = null }, title = { Text("¿Borrar la clave guardada?") },
             text = { Text("Se eliminará al guardar los ajustes. Puedes cerrar sin guardar para conservarla.") },
