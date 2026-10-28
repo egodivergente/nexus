@@ -60,8 +60,10 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
             store.set("ui.photo",uri.toString()); "Fondo seleccionado"
         }.getOrElse { "No se pudo conservar la imagen" }
     }
+    // Ajustes que ya no se muestran (conservan su valor): el arranque con selector de proyecto se gestiona solo.
+    val hiddenKeys = setOf("startup.enabled","startup.cold","startup.idleMinutes")
     val rules = RuntimeRules.definitions.filter {
-        (section==null || it.section==section) && (scopeType=="Global" || it.scoped) &&
+        it.key !in hiddenKeys && (section==null || it.section==section) && (scopeType=="Global" || it.scoped) &&
             "$it".contains(query,true)
     }
     LazyColumn(Modifier.fillMaxWidth().then(if(embedded) Modifier.heightIn(max=1600.dp) else Modifier.fillMaxSize()),

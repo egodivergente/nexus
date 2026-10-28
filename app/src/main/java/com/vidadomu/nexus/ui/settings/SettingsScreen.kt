@@ -125,11 +125,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                         SettingsPage.APPEARANCE to "Tema, tipografía, fondo, movimiento y háptica",
                         SettingsPage.PROJECTS to "Inicio, conversaciones y destino al compartir",
                         SettingsPage.AGENT to "Modelo, memoria, herramientas y consumo",
-                        SettingsPage.CATALOG to "Densidad, antigüedad y orden de workflows",
                         SettingsPage.PROVIDERS to "Cuentas, BytePlus y generadores propios",
-                        SettingsPage.CONNECTIONS to "Flow, dispositivos y sincronización",
                         SettingsPage.AUTOMATION to "Concurrencia y ejecución",
-                        SettingsPage.RULES to "Preferencias por ámbito, exportar e importar",
                         SettingsPage.SECURITY to "Permisos y almacenamiento privado",
                         SettingsPage.SYSTEM to "Diagnóstico y administración")
                     sections.filter {settingsSearch.isBlank() || "${it.first.title} ${it.second}".contains(settingsSearch,true)}.forEach {(target,summary)->
@@ -203,6 +200,10 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             item {SettingsCard {MediaProvidersSettingsSection()}}
                 }
                 SettingsPage.SYSTEM -> {
+            item {SettingsCard {SettingRow("Reglas y límites","Preferencias por ámbito, exportar e importar",{pageName=SettingsPage.RULES.name})}}
+            item {SettingsCard {SettingRow("Catálogo y workflows","Densidad, antigüedad y orden de workflows",{pageName=SettingsPage.CATALOG.name})}}
+            item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
+            item {SettingsCard {com.vidadomu.nexus.assistant.MediaEditingSettings()}}
             item {SettingsCard {ReleaseNotesCard()}}
             item {SettingsCard {
                 Row(verticalAlignment=Alignment.CenterVertically) {

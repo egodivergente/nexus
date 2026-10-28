@@ -1359,9 +1359,8 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     AgentLimitsSettings()
                 }
                 // 4 · Herramientas
+                // «Edición y Whisper» vive ahora en Ajustes → Sistema y diagnóstico.
                 AgentSection("Herramientas", Icons.Default.Build) {
-                    MediaEditingSettings()
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     AgentInternetSettings()
                 }
                 // 5 · Skills

@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,6 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,18 +52,24 @@ internal fun StatusPill(connected: Boolean, label: String) {
 @Composable
 internal fun ProviderCard(name: String, subtitle: String, icon: ImageVector, tint: Color, connected: Boolean,
     idleLabel: String = "Sin clave", content: @Composable ColumnScope.() -> Unit) {
+    // Plegada por defecto: todas las tarjetas de proveedor miden lo mismo; se despliegan con un toque.
+    var open by androidx.compose.runtime.saveable.rememberSaveable(name) { androidx.compose.runtime.mutableStateOf(false) }
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 2.dp) {
         Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+            Row(Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Plegar $name" else "Desplegar $name") { open = !open },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 CategoryTile(icon, tint)
                 Column(Modifier.weight(1f)) {
                     Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 StatusPill(connected, if (connected) "Conectado" else idleLabel)
+                Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = TextSecondary)
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            content()
+            if (open) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                content()
+            }
         }
     }
 }
