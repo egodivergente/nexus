@@ -140,7 +140,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
-                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera, onLive = onLive)
+                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera)
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
                 val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
