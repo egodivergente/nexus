@@ -365,7 +365,7 @@ fun AssistantScreen(
                         AssistantBubble(ChatItem.Assistant("streaming_assistant_preview", ui.streamingText, emptyList(), "STREAMING"), onOpenHistory)
                     }
                 }
-                if (ui.thinking) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(NexusTokens.space8)); Text("Pensando…", color = TextMuted) } }
+                if (ui.thinking) item { ThinkingIndicator() }
             }
             // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
             val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
@@ -1473,5 +1473,21 @@ internal fun MediaPageDots(count: Int, current: Int) {
         }
         Spacer(Modifier.width(NexusTokens.space4))
         Text("${current + 1} / $count", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+    }
+}
+
+
+/** «Pensando…» con el tiempo transcurrido, para saber que sigue trabajando y cuánto lleva; a partir de 30 s recuerda cómo pararlo. */
+@Composable
+private fun ThinkingIndicator() {
+    val seconds by produceState(0) { while (true) { kotlinx.coroutines.delay(1000); value += 1 } }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(NexusTokens.space8))
+            Text("Pensando… " + (if (seconds >= 60) "${seconds / 60} min ${seconds % 60} s" else "$seconds s"), color = TextMuted)
+        }
+        if (seconds >= 30) Text("Tarda más de lo normal. Puedes pararlo con ■ y volver a intentarlo.",
+            style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(start = 26.dp, top = 2.dp))
     }
 }
