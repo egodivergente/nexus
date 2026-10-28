@@ -128,6 +128,18 @@ class NexusApplication : Application() {
             } catch (_: Exception) {}
         }
 
+        // Guarda en el móvil los resultados que solo existen como URL caducable del proveedor.
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if(!BuildConfig.OFFLINE_QA) {
+                    kotlinx.coroutines.delay(20_000)
+                    com.vidadomu.nexus.assistant.AssetLocalizer.run(this@NexusApplication, com.vidadomu.nexus.assistant.AssistantRuntime.get(this@NexusApplication))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("NexusApplication", "Localizar resultados: ${e.javaClass.simpleName}")
+            }
+        }
+
         // Asynchronously classify any pending or existing Nexus creations into Alexia
         CoroutineScope(Dispatchers.IO).launch {
             try {
