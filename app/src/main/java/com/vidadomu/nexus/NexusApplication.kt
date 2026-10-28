@@ -128,6 +128,17 @@ class NexusApplication : Application() {
             } catch (_: Exception) {}
         }
 
+        // Una sola vez: los límites de la Lanzadera (modelos, generaciones por modelo, envíos simultáneos) vuelven a los
+        // valores sin tope. Solo borra esos tres ajustes guardados; el resto de la configuración no se toca.
+        runCatching {
+            val flags = getSharedPreferences("migrations", MODE_PRIVATE)
+            if (!flags.getBoolean("limits_unlimited_v1", false)) {
+                val rules = com.vidadomu.nexus.settings.RuntimePreferences.get(this)
+                listOf("generation.modelCount", "generation.perModelCount", "generation.parallel").forEach { rules.set(it, null) }
+                flags.edit().putBoolean("limits_unlimited_v1", true).apply()
+            }
+        }
+
         // Guarda en el móvil los resultados que solo existen como URL caducable del proveedor.
         CoroutineScope(Dispatchers.IO).launch {
             try {

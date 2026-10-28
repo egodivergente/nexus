@@ -197,10 +197,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                             }
                         }
                     }
-                    item {val flowState=flowPill(flowLinked)
-                        ProviderCard(name="Google Flow",subtitle="Proyecto activo del puente (AXELPC o ASUS)",icon=Icons.Default.AutoAwesome,tint=ProviderTint,connected=flowState.healthy,idleLabel=flowState.label) {
-                        FlowRecoverySettings(onCreateInFlow)
-                    }}
+                    // Google Flow ya no ocupa una tarjeta aquí: el puente sigue activo y se gestiona en Conexiones.
                 }
                 SettingsPage.CUSTOM -> {
             item {SettingsCard {MediaProvidersSettingsSection()}}
