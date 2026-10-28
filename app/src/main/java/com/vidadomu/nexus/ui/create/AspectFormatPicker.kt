@@ -55,7 +55,9 @@ private fun ShapeGlyph(ratio: Float, tint: androidx.compose.ui.graphics.Color, s
  * (no contact) opens the same picker as a preview, so the options cost no screen space at all.
  */
 @Composable
-internal fun AspectFormatChip(param: ModelParameter, value: String, onChange: (String) -> Unit) {
+internal fun AspectFormatChip(param: ModelParameter, value: String, onChange: (String) -> Unit,
+    quickParams: List<ModelParameter> = emptyList(), valueOf: (ModelParameter) -> String = { it.defaultValue }, onQuick: (ModelParameter, String) -> Unit = { _, _ -> },
+    quantity: Int = 1, quantityChoices: List<Int> = emptyList(), onQuantity: ((Int) -> Unit)? = null) {
     var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val ratio = ParameterPresentation.proportion(param, value) ?: 1f
@@ -76,12 +78,21 @@ internal fun AspectFormatChip(param: ModelParameter, value: String, onChange: (S
             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ShapeGlyph(ratio, colors.onSurface)
-                Text(aspectLabel(param, value), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                Text(aspectLabel(param, value) + if (quantity > 1) " · ×$quantity" else "", style = MaterialTheme.typography.labelMedium, maxLines = 1)
             }
         }
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Box(Modifier.width(320.dp).padding(horizontal = 8.dp)) {
-                AspectFormatPicker(param, value) { onChange(it); open = false }
+            Column(Modifier.width(320.dp).padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AspectFormatPicker(param, value) { onChange(it); if (quickParams.isEmpty() && onQuantity == null) open = false }
+                // Calidad, resolución y duración en el mismo panel, solo si el modelo las ofrece.
+                quickParams.forEach { p ->
+                    QuickRow(title = p.displayName.ifBlank { p.key }, options = ParameterPresentation.options(p),
+                        selected = valueOf(p), text = { ParameterPresentation.label(p, it).primary.substringBefore(" ·") }) { onQuick(p, it) }
+                }
+                if (onQuantity != null && quantityChoices.isNotEmpty()) {
+                    QuickRow(title = "Generaciones", options = quantityChoices.take(6).map { it.toString() },
+                        selected = quantity.toString(), text = { "×$it" }) { onQuantity(it.toInt()) }
+                }
             }
         }
     }
@@ -126,6 +137,26 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
                         Text(label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1, softWrap = false,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                     }
+                }
+            }
+        }
+    }
+}
+
+/** One labelled row of small choices inside the format popover. */
+@Composable
+private fun QuickRow(title: String, options: List<String>, selected: String, text: (String) -> String, onPick: (String) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            options.forEach { option ->
+                val on = option == selected
+                Surface(shape = NexusTokens.field, color = if (on) colors.surfaceContainerHighest else colors.surface,
+                    modifier = Modifier.semantics { contentDescription = "$title ${text(option)}"; stateDescription = if (on) "Seleccionado" else "No seleccionado" }
+                        .clickable(role = Role.RadioButton) { onPick(option) }) {
+                    Text(text(option), Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
                 }
             }
         }

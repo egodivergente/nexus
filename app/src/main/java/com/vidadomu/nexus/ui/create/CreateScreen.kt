@@ -325,7 +325,14 @@ fun CreateScreen(
             item {
                 StudioToolRow {
                     if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
-                    if(formatParam!=null) AspectFormatChip(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue) {viewModel.updateParameter(formatParam.key,it)}
+                    if(formatParam!=null) {
+                        val quick=inline.filter {it.key.lowercase() in setOf("quality","resolution","duration","duration_seconds","seconds","video_length") && ParameterPresentation.options(it).size in 2..6}
+                        AspectFormatChip(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue,{viewModel.updateParameter(formatParam.key,it)},
+                            quickParams=quick,valueOf={state.parameters[it.key]?:it.defaultValue},onQuick={p,v -> viewModel.updateParameter(p.key,v)},
+                            quantity=quantity.count,quantityChoices=(listOf(1,2,3,4,6,8)+countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0 && (countParam==null || nativeCountAllowed(countParam,it) || nativeCountAllowed(countParam,1))}.distinct().sorted(),
+                            onQuantity={count -> batchCount=count
+                                if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")})
+                    }
                     StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
                     if(inline.isNotEmpty()) StudioToolChip("Ajustes", "Ajustes del modelo") {showParameters=true}
                     // BytePlus is a separate account route: only surfaced when it is the active provider; otherwise it lives under «Más».
