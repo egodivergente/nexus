@@ -131,7 +131,7 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
             // Inline code a step smaller and on a faint tint, so it does not break the line spacing into «patches».
             fontSize = if (sp.code) st.body.fontSize * 0.88f else androidx.compose.ui.unit.TextUnit.Unspecified,
             background = when {
-                sp.code -> st.ink.copy(alpha = 0.07f)
+                sp.code -> st.ink.copy(alpha = 0.045f)
                 sp.mark -> st.mark
                 else -> Color.Unspecified
             },
@@ -292,19 +292,23 @@ private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
 @Composable
 private fun MdTable(t: MdBlock.Table, st: MdStyles) {
     val cols = maxOf(t.header.size, t.rows.maxOfOrNull { it.size } ?: 0).coerceAtLeast(1)
+    // La tabla ocupa el ancho de la pantalla (hasta 3 columnas sin desplazarse); con más columnas, mínimo 120 dp cada una.
     Surface(color = Color.Transparent, shape = NexusTokens.field, border = BorderStroke(1.dp, st.line), modifier = Modifier.fillMaxWidth()) {
+      BoxWithConstraints {
+        val tableWidth = maxOf(maxWidth, (cols * 120).dp)
         Column(Modifier.horizontalScroll(rememberScrollState())) {
-            Row(Modifier.width((cols*160).dp).background(st.accent.copy(alpha = 0.08f)).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
+            Row(Modifier.width(tableWidth).background(st.accent.copy(alpha = 0.08f)).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
                 for (c in 0 until cols) Text(annotated(t.header.getOrElse(c) { emptyList() }, st),
                     style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent, modifier = Modifier.weight(1f))
             }
             t.rows.forEachIndexed { r, row ->
                 if (r > 0) HorizontalDivider(thickness = 1.dp, color = st.line)
-                Row(Modifier.width((cols*160).dp).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
+                Row(Modifier.width(tableWidth).padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8)) {
                     for (c in 0 until cols) Text(annotated(row.getOrElse(c) { emptyList() }, st), style = st.body.copy(fontSize = MaterialTheme.typography.bodyMedium.fontSize),
                         color = if (c == 0) st.ink else st.soft, modifier = Modifier.weight(1f).padding(end = NexusTokens.space8))
                 }
             }
         }
+      }
     }
 }
