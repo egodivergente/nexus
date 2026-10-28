@@ -19,6 +19,7 @@ import java.util.Locale
 private data class ReleaseNote(val version: String, val items: List<String>)
 
 private val releaseNotes = listOf(
+    ReleaseNote("1.9.119", listOf("Ajustes: la página «Seguridad» ya no aparece en el menú.")),
     ReleaseNote("1.9.118", listOf(
         "Ajustes: una sola lista de motores del agente (Bedrock, Claude, OpenAI, Proxy, Antigravity, BytePlus ModelArk y los tuyos).",
         "Ajustes: modelos anteriores plegados; skills editables con copia propia y «Restaurar original»; telemetría en Sistema.",
@@ -53,7 +54,6 @@ private val pending = listOf(
     "Fondos animados personalizables en ArtBox y rediseño de la pestaña «Herramientas».",
     "Cortes automáticos por escena de punta a punta y dossiers que el agente use de forma proactiva.",
     "Modelos que faltan en ArtBox y diálogo de modelos de vídeo (esperan tus datos).",
-    "Tarjeta «Permisos de Android» en Seguridad (espera tu decisión).",
 )
 
 /** Fecha de la última actualización instalada y qué trae cada versión, plegado por defecto. */

@@ -127,7 +127,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                         SettingsPage.AGENT to "Modelo, memoria, herramientas y consumo",
                         SettingsPage.PROVIDERS to "Cuentas, BytePlus y generadores propios",
                         SettingsPage.AUTOMATION to "Concurrencia y ejecución",
-                        SettingsPage.SECURITY to "Permisos y almacenamiento privado",
+                        // «Seguridad» ya no aparece en el menú (se oculta, su código se conserva).
                         SettingsPage.SYSTEM to "Diagnóstico y administración")
                     sections.filter {settingsSearch.isBlank() || "${it.first.title} ${it.second}".contains(settingsSearch,true)}.forEach {(target,summary)->
                         item {HubRow(target,summary) {pageName=target.name}}
