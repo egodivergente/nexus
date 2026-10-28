@@ -140,12 +140,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
-                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded)
-                // La cámara solo con el campo vacío: al escribir, el texto recupera el ancho.
-                if (onCamera != null && text.text.isEmpty()) IconButton(onClick = onCamera, enabled = !ui.attaching, modifier = Modifier.size(44.dp)) {
-                    // Same outline style and neutral grey as the clip and the mic; accent only on the main action.
-                    Icon(Icons.Outlined.PhotoCamera, "Hacer una foto", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera, onLive = onLive)
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
                 val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
@@ -164,8 +159,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     })
                 reasoningControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
-                else if(!canSend && !ui.attaching) {
-                    // Nada que enviar: el botón es el micrófono. El dictado se inserta en el campo SIN enviarlo.
+                else {
+                    // Micro y enviar siempre juntos a la derecha: el dictado se inserta en el campo SIN enviarlo.
                     val context = LocalContext.current
                     val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                         val spoken = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
@@ -176,18 +171,20 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                             dictate.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                                 putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
-                                // Not EXTRA_PREFER_OFFLINE: without the offline Spanish pack the system recognizer answered
-                                // «No te he entendido» to clear phrases. The system uses the local model when installed.
                                 putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Habla; podrás revisar el texto antes de enviarlo")
                             })
                         } catch (_: android.content.ActivityNotFoundException) {
                             android.widget.Toast.makeText(context, "Este móvil no tiene reconocimiento de voz disponible", android.widget.Toast.LENGTH_LONG).show()
                         }
                     }
-                    if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
-                    else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    if(!ui.attaching) {
+                        if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
+                        else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    }
+                    FilledIconButton(onClick = onSend, enabled = canSend, modifier = Modifier.padding(end = 4.dp).size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje")
+                    }
                 }
-                else IconButton(onClick = onSend, enabled = canSend) { Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", tint = if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)) }
             }
         }
         }

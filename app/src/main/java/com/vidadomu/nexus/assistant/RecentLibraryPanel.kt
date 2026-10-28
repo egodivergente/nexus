@@ -8,12 +8,17 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.composed
 import androidx.compose.ui.Alignment
@@ -55,19 +60,24 @@ internal fun Modifier.recentLibraryGesture(opening: Boolean, onChange: () -> Uni
 @Composable
 internal fun LibraryAttachmentButton(
     enabled: Boolean, onAttach: () -> Unit, onShowLibrary: (() -> Unit)?, libraryExpanded: Boolean,
+    onCamera: (() -> Unit)? = null, onLive: (() -> Unit)? = null,
 ) {
-    Box(Modifier.size(NexusTokens.minimumTouch)
-        .semantics {
-            contentDescription = "Adjuntar"
-            if (onShowLibrary != null) {
-                stateDescription = if (libraryExpanded) "Recientes abiertos" else "Mantén pulsado para ver recientes"
-            }
+    // Un solo «+»: abre el menú con archivos, cámara, recientes y conversación por voz.
+    var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Box {
+        Box(Modifier.size(NexusTokens.minimumTouch)
+            .semantics { contentDescription = "Añadir"; stateDescription = if (libraryExpanded) "Recientes abiertos" else "Menú de adjuntar" }
+            .combinedClickable(enabled = enabled, role = Role.Button,
+                onLongClickLabel = "Mostrar archivos recientes", onLongClick = onShowLibrary, onClick = { menu = true }),
+            contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
         }
-        .combinedClickable(enabled = enabled, role = Role.Button,
-            onLongClickLabel = "Mostrar archivos recientes", onLongClick = onShowLibrary, onClick = onAttach),
-        contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.AttachFile, null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("Archivo o galería") }, leadingIcon = { Icon(Icons.Default.AttachFile, null) }, onClick = { menu = false; onAttach() })
+            onCamera?.let { DropdownMenuItem(text = { Text("Hacer una foto") }, leadingIcon = { Icon(Icons.Default.PhotoCamera, null) }, onClick = { menu = false; it() }) }
+            onShowLibrary?.let { DropdownMenuItem(text = { Text("Recientes de la Biblioteca") }, leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) }, onClick = { menu = false; it() }) }
+            onLive?.let { DropdownMenuItem(text = { Text("Conversación por voz") }, leadingIcon = { Icon(Icons.Default.GraphicEq, null) }, onClick = { menu = false; it() }) }
+        }
     }
 }
 
