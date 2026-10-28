@@ -202,11 +202,16 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         key(modality, family, groupKey) {
         LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding).pinchColumns(columns=if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1,max=6) {c->userColumns=c;prefs.edit().putInt("columns_user",c).apply()}, state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(family==null) item(span={GridItemSpan(maxLineSpan)}) {
-                Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
-                    Icon(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.artbox_mark),null,tint=androidx.compose.ui.graphics.Color.Unspecified,modifier=Modifier.size(28.dp))
-                    Text("ArtBox",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(start=8.dp).weight(1f))
-                    catalogMenu()
-                    NexusSettingsButton()
+                // Título grande y centrado; los botones quedan a la derecha sin empujarlo.
+                Box(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min=56.dp)) {
+                    Row(Modifier.align(Alignment.Center),verticalAlignment=Alignment.CenterVertically) {
+                        Icon(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.artbox_mark),null,tint=androidx.compose.ui.graphics.Color.Unspecified,modifier=Modifier.size(40.dp))
+                        Text("ArtBox",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(start=10.dp))
+                    }
+                    Row(Modifier.align(Alignment.CenterEnd),verticalAlignment=Alignment.CenterVertically) {
+                        catalogMenu()
+                        NexusSettingsButton()
+                    }
                 }
             }
             if(family!=null || favoritesOnly) item(span={GridItemSpan(maxLineSpan)}) {
