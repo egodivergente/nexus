@@ -181,6 +181,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }
     // Los proyectos archivados solo aparecen como carpeta si aún tienen archivos.
     val folders=remember(index,folderCounts) {index.projects.filter {!it.archived || (folderCounts[it.id] ?: 0)>0}.sortedBy {it.name.lowercase()}}
+    // Hasta tres archivos locales (los más recientes) por carpeta, para la vista previa de la tarjeta.
+    val folderPreviews=remember(index) {
+        index.assets.filter {!it.libraryDeleted && it.projectId!=null && !it.uri.startsWith("http") && (it.type==AssetType.IMAGE || it.type==AssetType.VIDEO)}
+            .sortedByDescending {it.createdAt}.groupBy {it.projectId!!}
+            .mapValues {(_,list) -> list.take(3).map {it.uri to (it.type==AssetType.VIDEO)}}
+    }
     val showFolders=openFolder==null && query.isBlank() && !showHidden && !favoriteOnly && folders.isNotEmpty()
     val folderName=openFolder?.let {id -> index.projects.firstOrNull {it.id==id}?.name}
     // Si la carpeta abierta desaparece (borrada desde el Agente, p. ej.), se vuelve a la vista principal.
@@ -551,7 +557,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     item(key="folders:title",span={GridItemSpan(maxLineSpan)}) {Text("Carpetas",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     items(folders,key={"folder:"+it.id},span={GridItemSpan((maxLineSpan/3).coerceAtLeast(1))}) {folder ->
-                        FolderTile(folder.name,folderCounts[folder.id] ?: 0,onLongClick={deletingFolder=folder.id}) {openFolder=folder.id}
+                        FolderTile(folder.name,folderCounts[folder.id] ?: 0,folderPreviews[folder.id].orEmpty(),onLongClick={deletingFolder=folder.id}) {openFolder=folder.id}
                     }
                 }
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).
