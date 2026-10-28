@@ -391,11 +391,6 @@ fun AssistantScreen(
             }
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (cardIds.isNotEmpty()) Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Ver encargos") { ordersPanel = true }
-                    .semantics { contentDescription = "Ver encargos" }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.Inventory2, null, Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
                 Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Abrir ajustes", onClick = onOpenSettings)
                     .semantics { contentDescription = "Ajustes" }, contentAlignment = Alignment.Center) {
@@ -1340,25 +1335,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     }
                     if (!isCustom && modelId.contains("-5-5")) Text("Requiere acceso a este modelo en tu cuenta AWS. Usa los parámetros de muestreo del modelo; conserva tus límites de consumo.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
-                // 2 · Respuesta
-                AgentSection("Respuesta", Icons.Default.Tune) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                        StudioTextField(temperature, { temperature = it }, shape = NexusTokens.field, label = { Text("Temperatura") }, singleLine = true, modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                        StudioTextField(maxTokens, { maxTokens = it.filter(Char::isDigit) }, shape = NexusTokens.field, label = { Text("Máx. tokens") }, singleLine = true, modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                        Text("Enviar miniatura de las imágenes adjuntas al LLM", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        Switch(sendImages, { sendImages = it })
-                    }
-                    StudioTextField(excluded, { excluded = it.take(200) }, shape = NexusTokens.field, label = { Text("No recomendar estas familias") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        supportingText = { Text("Separadas por comas, p. ej. «veo, runway». Si pides uno por su nombre, se respeta.") })
-                }
-                // Presentación del agente (tamaño de las tarjetas y animación de actividad)
-                AgentSection("Tu espacio de creación", Icons.Default.Palette) {
-                    AssistantPresentationSettings()
-                }
+                // «Respuesta» y «Tu espacio de creación» se ocultan: conservan sus valores guardados, sin ensuciar los ajustes.
                 // 3 · Consumo y límites
                 AgentSection("Consumo y límites", Icons.Default.Speed) {
                     AgentBudgetSettings()
