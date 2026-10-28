@@ -480,8 +480,6 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
         DropdownMenuItem(text={Text("Importar de Flow")},leadingIcon={Icon(Icons.Default.CloudDownload,null)},onClick={moreVisible=false;showFlowImport=true})
         DropdownMenuItem(text={Text("Imágenes del proyecto")},leadingIcon={Icon(Icons.Default.PhotoLibrary,null)},onClick={moreVisible=false;projectLibrary.launch(arrayOf("image/*"))})
-        DropdownMenuItem(text={Text("Abrir Alexia")},leadingIcon={Icon(Icons.Default.FolderSpecial,null)},onClick={moreVisible=false
-            if(!com.vidadomu.nexus.ui.output.launchAlexia(context)) scope.launch {snackbar.showSnackbar("No se pudo abrir Alexia. Tus archivos siguen en la Biblioteca de Nexus.")}})
         }
         }
     }}) {padding ->
