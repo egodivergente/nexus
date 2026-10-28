@@ -482,5 +482,10 @@ internal fun toolActivity(name: String): String = when (name) {
     "list_models", "search_models", "recommend_models" -> "Buscando modelos en el catálogo"
     "load_skill", "list_skills" -> "Cargando una skill"
     "view_library_asset", "inspect_image_quality" -> "Mirando un archivo de la biblioteca"
+    "detect_video_scenes" -> "Buscando los cortes de escena del vídeo"
+    "extract_video_frames" -> "Sacando fotogramas del vídeo"
+    "edit_video_assets" -> "Editando el vídeo en el teléfono"
+    "web_search", "read_web_page" -> "Buscando en internet"
+    "create_document" -> "Escribiendo un documento"
     else -> "Usando " + name.replace('_', ' ')
 }

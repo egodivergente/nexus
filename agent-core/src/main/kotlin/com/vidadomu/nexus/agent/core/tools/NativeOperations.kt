@@ -103,6 +103,13 @@ object NativeOperationTools {
                 integerArray("timestamps_ms","Tiempos exactos solicitados en milisegundos.",required=true)
                 integer("max_dimension","Tamaño máximo de fotograma: 320 a 3840; defecto 1920.")
             }),
+        NativeTool(operations,"detect_video_scenes",ToolCategory.READ,
+            "Estima los cambios de escena de un vídeo local comparando el color de fotogramas muestreados (gratis, en el teléfono, sin alterar el vídeo). Devuelve escenas con start_ms/end_ms para recortarlas con edit_video_assets (trim) o sacar un fotograma de cada una con extract_video_frames. Es una estimación: no ve cortes más cortos que el paso y puede confundir un fogonazo con un corte; verifica con fotogramas.",
+            schema {
+                string("asset_id","Id del vídeo local.",required=true)
+                integer("step_ms","Cada cuántos ms se mira un fotograma: 250 a 5000, por defecto 1000.")
+                number("threshold","Sensibilidad 0.05 a 0.9: menos detecta más cortes. Por defecto 0.3.")
+            }),
         NativeTool(operations,"transcribe_media_asset",ToolCategory.ORGANIZE,
             "Transcribe hasta 15 minutos de un vídeo/audio local con Whisper EN ESTE TELÉFONO y el modelo descargado. No sube audio ni usa una API de pago. Produce TXT y SRT indexados; devuelve edit_job_id para consultar estado. Si falta el modelo, indica Ajustes del agente → Edición y Whisper. No inventes una transcripción si falla.",
             schema {

@@ -19,6 +19,18 @@ import java.util.Locale
 private data class ReleaseNote(val version: String, val items: List<String>)
 
 private val releaseNotes = listOf(
+    ReleaseNote("1.9.118", listOf(
+        "Ajustes: una sola lista de motores del agente (Bedrock, Claude, OpenAI, Proxy, Antigravity, BytePlus ModelArk y los tuyos).",
+        "Ajustes: modelos anteriores plegados; skills editables con copia propia y «Restaurar original»; telemetría en Sistema.",
+        "Mis ajustes por modelo: resumen, actualizar y estrella para aplicar al abrir el modelo.",
+        "ArtBox: filtros rediseñados, «Con referencias» ya no oculta modelos por defecto, menús ⋮ agrupados.",
+        "ArtBox: el logo se mueve con un dedo y se escala con pellizco (también en tarjetas de modelo); se mantiene al cambiar de columnas.",
+        "Chat: selección de texto nativa con pulsación larga; acciones en «⋯» junto a la hora.",
+        "Pestañas: el cambio lateral necesita menos recorrido y anima la pantalla.",
+        "Historial: «Descartar» en encargos atascados (no borra ni cancela en el proveedor).",
+        "Agente: nueva herramienta para detectar escenas de un vídeo.",
+        "Inicio: pantalla de bienvenida con el logo grande y sin recortes.",
+        "Sin referencias visibles a Alexia en los resultados.")),
     ReleaseNote("1.9.117", listOf("Ajustes: Catálogo y workflows, Reglas y límites y Conexiones salen del menú principal (Flow, reglas y catálogo pasan a Sistema).", "Ajustes: tarjetas de proveedor plegadas y del mismo tamaño; «Edición y Whisper» en Sistema; tres ajustes de arranque ocultos.")),
     ReleaseNote("1.9.116", listOf("Chat: las tablas de las respuestas se ajustan al ancho de la pantalla y el fondo del código en línea es más suave.")),
     ReleaseNote("1.9.115", listOf("Chat: mientras el agente trabaja muestra sus pasos reales (consultar modelos, mirar la biblioteca…).", "Chat: corregido el parpadeo al escribir o pensar (el desplazamiento automático saltaba arriba y abajo en cada fragmento).")),
@@ -37,10 +49,11 @@ private val releaseNotes = listOf(
     ReleaseNote("1.9.102", listOf("Chat: sin panel de Encargos; el micro dicta con un toque.", "Ajustes: sin «Respuesta» ni «Tu espacio de creación».")),
 )
 private val pending = listOf(
-    "Mover el logo dentro de la tarjeta de ArtBox y sonido al interactuar.",
-    "Rediseñar el selector de esfuerzo (Bajo/Medio/Alto) y el gesto lateral entre pantallas.",
-    "Telemetría: tiempos de respuesta, modelos más usados y tokens por agente.",
+    "Velocidad del agente, motor Codex CLI y generación de imágenes con Antigravity y Codex.",
+    "Fondos animados personalizables en ArtBox y rediseño de la pestaña «Herramientas».",
+    "Cortes automáticos por escena de punta a punta y dossiers que el agente use de forma proactiva.",
     "Modelos que faltan en ArtBox y diálogo de modelos de vídeo (esperan tus datos).",
+    "Tarjeta «Permisos de Android» en Seguridad (espera tu decisión).",
 )
 
 /** Fecha de la última actualización instalada y qué trae cada versión, plegado por defecto. */

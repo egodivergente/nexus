@@ -22,6 +22,13 @@ import com.vidadomu.nexus.assistant.PendingShare
 import com.vidadomu.nexus.assistant.ContinueProjectChooser
 import com.vidadomu.nexus.settings.RuntimePreferences
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -454,75 +461,85 @@ class MainActivity : ComponentActivity() {
 private fun NexusStartupOnboardingOverlay(epoch: Int) {
     if (epoch <= 0) return
     var visible by remember(epoch) { mutableStateOf(true) }
+    var shown by remember(epoch) { mutableStateOf(false) }
     LaunchedEffect(epoch) {
-        kotlinx.coroutines.delay(1900)
+        shown = true
+        kotlinx.coroutines.delay(2800)
         visible = false
     }
+    // El logo entra creciendo con un muelle suave; el resto aparece un instante después.
+    val logoScale by androidx.compose.animation.core.animateFloatAsState(if (shown) 1f else .82f,
+        androidx.compose.animation.core.spring(dampingRatio = .72f, stiffness = 140f), label = "Onboarding logo")
+    val textAlpha by androidx.compose.animation.core.animateFloatAsState(if (shown) 1f else 0f,
+        androidx.compose.animation.core.tween(700, delayMillis = 350), label = "Onboarding text")
+    val colors = androidx.compose.material3.MaterialTheme.colorScheme
     androidx.compose.animation.AnimatedVisibility(
         visible = visible,
         enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)),
-        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(380))
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(420))
     ) {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(ScreenBackground, colors.primary.copy(alpha = .10f).compositeOver(ScreenBackground), ScreenBackground)))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null
                 ) { visible = false },
             contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
-            androidx.compose.material3.Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = ScreenBackground.copy(alpha = 0.96f)
-            ) {}
-            androidx.compose.material3.Surface(
-                shape = com.vidadomu.nexus.ui.theme.NexusTokens.sheet,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
-                border = androidx.compose.foundation.BorderStroke(1.dp, com.vidadomu.nexus.ui.theme.BorderSubtle),
-                tonalElevation = 6.dp,
-                modifier = Modifier.padding(horizontal = 28.dp)
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
             ) {
-                androidx.compose.foundation.layout.Column(
-                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 28.dp),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                // Sin recorte ni tarjeta: el logo entero (orejas incluidas) ocupa casi todo el ancho.
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.nexus_logo),
+                    contentDescription = "Logo oficial de NEXUS",
+                    modifier = Modifier
+                        .fillMaxWidth(.8f)
+                        .heightIn(max = 380.dp)
+                        .graphicsLayer { scaleX = logoScale; scaleY = logoScale },
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(20.dp))
+                androidx.compose.material3.Text(
+                    text = "NEXUS",
+                    style = androidx.compose.material3.MaterialTheme.typography.displaySmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    letterSpacing = 6.sp,
+                    color = com.vidadomu.nexus.ui.theme.TextPrimary,
+                    modifier = Modifier.graphicsLayer { alpha = textAlpha }
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(6.dp))
+                androidx.compose.material3.Text(
+                    text = "Las buenas ideas empiezan aquí.",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                    color = com.vidadomu.nexus.ui.theme.TextSecondary,
+                    modifier = Modifier.graphicsLayer { alpha = textAlpha }
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(20.dp))
+                androidx.compose.material3.Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                    color = colors.primary.copy(alpha = 0.14f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary.copy(alpha = 0.35f)),
+                    modifier = Modifier.graphicsLayer { alpha = textAlpha }
                 ) {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.nexus_logo),
-                        contentDescription = "Logo oficial de NEXUS",
-                        modifier = Modifier
-                            .padding(bottom = 4.dp)
-                            .padding(horizontal = 8.dp)
-                            .sizeIn(maxWidth = 148.dp, maxHeight = 142.dp),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
-                    )
-                    androidx.compose.material3.Surface(
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                        )
-                    ) {
-                        androidx.compose.material3.Text(
-                            text = "v${BuildConfig.VERSION_NAME} · ${BuildConfig.CODENAME} · build ${BuildConfig.VERSION_CODE}",
-                            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                        )
-                    }
                     androidx.compose.material3.Text(
-                        text = "TU ESPACIO CREATIVO",
-                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                        color = com.vidadomu.nexus.ui.theme.TextMuted
-                    )
-                    androidx.compose.material3.Text(
-                        text = "Las buenas ideas empiezan aquí.",
-                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                        color = com.vidadomu.nexus.ui.theme.TextPrimary
+                        text = "v${BuildConfig.VERSION_NAME} · ${BuildConfig.CODENAME} · build ${BuildConfig.VERSION_CODE}",
+                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                        color = colors.primary,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                     )
                 }
+                androidx.compose.foundation.layout.Spacer(Modifier.height(28.dp))
+                androidx.compose.material3.Text(
+                    text = "Toca para empezar",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+                    color = com.vidadomu.nexus.ui.theme.TextMuted,
+                    modifier = Modifier.graphicsLayer { alpha = textAlpha * .8f }
+                )
             }
         }
     }

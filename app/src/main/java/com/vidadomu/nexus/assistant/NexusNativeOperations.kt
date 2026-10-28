@@ -83,6 +83,8 @@ class NexusNativeOperations(
                 "prepare_whisper_model" -> WhisperModelStore(app).enqueue()
                 "edit_video_assets" -> MediaEditJobs(app).start(input.requiredText("action"),input,session)
                 "extract_video_frames" -> MediaEditJobs(app).start("frames",input,session)
+                "detect_video_scenes" -> AgentVideoOperations(app).detectScenes(input.requiredText("asset_id"),
+                    input.integer("step_ms",1000,250..5000).toLong(),(input["threshold"] as? JsonPrimitive)?.content?.toDoubleOrNull()?.coerceIn(.05,.9) ?: .3)
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
                 "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
                 "atlas_get_balance" -> atlasBalance()

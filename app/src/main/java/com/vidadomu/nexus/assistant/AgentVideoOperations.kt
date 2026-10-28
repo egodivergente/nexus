@@ -50,6 +50,63 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
         }
         return asset
     }
+    /**
+     * Detección de escenas por cambio de color entre fotogramas muestreados cada [stepMs]. Es una estimación local y gratuita:
+     * no ve cortes más cortos que el paso ni distingue un cambio de plano de un fogonazo. Devuelve tiempos para recortar con
+     * edit_video_assets (trim) o extraer fotogramas con extract_video_frames; no modifica nada.
+     */
+    internal suspend fun detectScenes(id:String,stepMs:Long,threshold:Double):JsonObject = withContext(Dispatchers.IO) {
+        val source=source(id);val uri=Uri.parse(source.uri)
+        val total=duration(uri)
+        if(total<=0L) throw ToolInputException("No se pudo medir la duración de este vídeo.")
+        val step=stepMs.coerceIn(250L,5000L)
+        // Tope de muestras para que un vídeo largo no bloquee el turno: se amplía el paso en vez de saltarse el final.
+        val effectiveStep=maxOf(step,total/900L)
+        val r=MediaMetadataRetriever()
+        val cuts=mutableListOf<Long>();val scores=mutableListOf<Double>()
+        try {
+            r.setDataSource(app,uri)
+            var previous:DoubleArray?=null;var t=0L;var sampled=0
+            while(t<total) {
+                currentCoroutineContext().ensureActive()
+                val bitmap=(if(Build.VERSION.SDK_INT>=27) r.getScaledFrameAtTime(t*1000,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,64,64)
+                    else r.getFrameAtTime(t*1000,MediaMetadataRetriever.OPTION_CLOSEST_SYNC)) 
+                if(bitmap!=null) {
+                    val hist=colorHistogram(bitmap);bitmap.recycle();sampled++
+                    previous?.let {prev ->
+                        val diff=prev.indices.sumOf {kotlin.math.abs(prev[it]-hist[it])}/6.0
+                        scores+=diff
+                        if(diff>=threshold && (cuts.isEmpty() || t-cuts.last()>=1000L)) cuts+=t
+                    }
+                    previous=hist
+                }
+                t+=effectiveStep
+            }
+            val bounds=listOf(0L)+cuts+listOf(total)
+            val scenes=bounds.zipWithNext().mapIndexed {i,(a,b)->buildJsonObject {put("index",i+1);put("start_ms",a);put("end_ms",b);put("duration_ms",b-a)}}
+            buildJsonObject {
+                put("asset_id",id);put("duration_ms",total);put("scene_count",scenes.size)
+                put("scenes",JsonArray(scenes.take(200)));if(scenes.size>200) put("scenes_truncated",true)
+                put("sample_step_ms",effectiveStep);put("samples",sampled);put("threshold",threshold)
+                put("method","Cambio de histograma de color entre fotogramas muestreados; estimación local, sin coste. Revisa los cortes con extract_video_frames antes de afirmar que son correctos.")
+                put("next_actions","Recorta cada escena con edit_video_assets action=trim (start_ms/end_ms) o saca un fotograma por escena con extract_video_frames.")
+            }
+        } catch(e:ToolInputException) {throw e}
+        catch(e:CancellationException) {throw e}
+        catch(e:Exception) {throw ToolInputException("No se pudieron leer los fotogramas de este vídeo.")}
+        finally {r.release()}
+    }
+    /** 3 canales × 16 intervalos, normalizados: distancia 0 = idénticos, 1 = totalmente distintos. */
+    private fun colorHistogram(bitmap:Bitmap):DoubleArray {
+        val w=bitmap.width;val h=bitmap.height;val pixels=IntArray(w*h);bitmap.getPixels(pixels,0,w,0,0,w,h)
+        val out=DoubleArray(48)
+        for(p in pixels) {
+            out[(p shr 16 and 255)/16]+=1.0;out[16+(p shr 8 and 255)/16]+=1.0;out[32+(p and 255)/16]+=1.0
+        }
+        val n=pixels.size.coerceAtLeast(1).toDouble()
+        for(i in out.indices) out[i]/=n
+        return out
+    }
     internal fun inspect(id:String):JsonObject {
         val source=source(id);val uri=Uri.parse(source.uri)
         val tracks=mutableListOf<JsonObject>()
