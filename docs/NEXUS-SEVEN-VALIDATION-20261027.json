@@ -1,0 +1,103 @@
+{
+  "version": "1.9.98-agent-preview",
+  "versionCode": 134,
+  "package": "com.vidadomu.nexus.agent",
+  "codename": "Nébula",
+  "sourceCommit": "1c38ac5a4cdbda454f9d137c0178cdbdd33d1c55",
+  "apkSha256": "289735b0aea83f86fdeade229a9b3a55fd6e4861d3fb7dadbf4b8ecc0f587c1d",
+  "signed": false,
+  "zipAligned16KiB": true,
+  "nativeLibraries": {
+    "lib/arm64-v8a/libandroidx.graphics.path.so": {
+      "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/arm64-v8a/libc++_shared.so": {
+      "sha256": "4397241b4bd20a8e579bfb41d21107857e12985f6a01ca0c2a5f83380d1270b4",
+      "load_alignment": [
+        16384,
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/arm64-v8a/libnexus_inpaint.so": {
+      "sha256": "236daffad90855f76d8ca17c0d4bbdd239596b2279a98fb0023978d749fc6354",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/arm64-v8a/libnexus_whisper.so": {
+      "sha256": "1316430accf5b920083f3faadf49e8ab7eaf06d86b126b5cfb5b3406380c10a0",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/arm64-v8a/libstable-diffusion.so": {
+      "sha256": "205a9f1698abd22b1e490c1ef8cf51cf834314a86023e65c36e1d26b5aadb423",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/x86_64/libandroidx.graphics.path.so": {
+      "sha256": "4e56c996f13670e70082658de7880c4020eabf4f25e43387f88ed78a713fc9f0",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/x86_64/libc++_shared.so": {
+      "sha256": "db9609240e60ca18b816a5e95a6bbc784e799261efbd5b30c8e2e03b540b3fa8",
+      "load_alignment": [
+        16384,
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/x86_64/libnexus_inpaint.so": {
+      "sha256": "86d3f48895ba5c3032a698325731447ced6b6059e4694651d210391c0c07988f",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    "lib/x86_64/libnexus_whisper.so": {
+      "sha256": "cc500734da39a92e93d18368693a918bb2964aa1faf20f4acd8cb1dd32e6afc4",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ]
+    }
+  },
+  "unitTests": {
+    "agent-core": {
+      "tests": 409,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4
+    },
+    "app": {
+      "tests": 750,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "instrumentationTests": "COMPILED_NOT_EXECUTED",
+  "installedOnS25": false,
+  "realProviderRouting": "NOT_CONNECTED_PARTIAL_NEX_UX_006"
+}

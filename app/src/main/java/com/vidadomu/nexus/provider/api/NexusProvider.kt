@@ -6,7 +6,7 @@ import com.vidadomu.nexus.core.model.GenerationRequest
 import com.vidadomu.nexus.core.model.NexusModel
 import kotlinx.serialization.json.*
 
-data class ProviderAccountStatus(val balanceLabel: String, val details: String = "Saldo disponible")
+data class ProviderAccountStatus(val balanceLabel: String, val details: String = "Saldo disponible", val exactAmount: String? = null, val amountUnit: String? = null)
 
 object ProviderBalanceParser {
     fun decode(raw: String, preferredKeys: List<String>): ProviderAccountStatus {
@@ -24,7 +24,7 @@ object ProviderBalanceParser {
         val (key,value) = find(root) ?: error("El proveedor no devolvió un saldo reconocible.")
         val amount = value.content.toBigDecimal().stripTrailingZeros().toPlainString()
         val money = normalize(key).contains("usd") || normalize(key).contains("dollar")
-        return ProviderAccountStatus(if(money) "$" + amount + " USD" else "$amount créditos")
+        return ProviderAccountStatus(if(money) "$" + amount + " USD" else "$amount créditos", exactAmount=amount, amountUnit=if(money) "USD" else "credits")
     }
     private fun normalize(value: String) = value.lowercase().replace(Regex("[^a-z0-9]"), "")
 }

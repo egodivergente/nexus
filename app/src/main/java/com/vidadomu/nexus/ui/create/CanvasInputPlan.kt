@@ -16,6 +16,11 @@ internal data class CanvasInputField(
 }
 
 internal object CanvasInputPlan {
+    fun pairedFrames(fields: List<CanvasInputField>, model: NexusModel?, widthDp: Float, fontScale: Float): Boolean =
+        widthDp >= 320f && fontScale <= 1.3f && fields.size == 2 &&
+            fields.all { it.maximum == 1 && it.mime == "image/*" } &&
+            fields.any { it.slot == MediaSlotType.LAST_FRAME || it.key == model?.lastFrameField || it.key == "final_frame" }
+
     // A picker batch is bounded even when the provider does not publish maxItems.
     const val PICKER_BATCH = 50
     fun primaryParameters(model: NexusModel): List<ModelParameter> = FormContract.normalize(model.parameters).filter {

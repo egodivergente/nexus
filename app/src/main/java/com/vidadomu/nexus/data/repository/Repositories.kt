@@ -174,32 +174,37 @@ class GenerationRepository(
     }
     suspend fun reloadHistory() = database.loadHistory()
 
-    suspend fun submitGeneration(request: GenerationRequest, localMetadata: Map<String,String> = emptyMap()): Result<GenerationJob> {
+    private val submissionLocks = Array(64) { kotlinx.coroutines.sync.Mutex() }
+
+    suspend fun submitGeneration(request: GenerationRequest, localMetadata: Map<String,String> = emptyMap()): Result<GenerationJob> =
+        submissionLocks[(request.id.hashCode() and Int.MAX_VALUE) % submissionLocks.size].withLock {
+            submitGenerationLocked(request, localMetadata)
+        }
+
+    private suspend fun submitGenerationLocked(request: GenerationRequest, localMetadata: Map<String,String>): Result<GenerationJob> {
         comparisonRecovery.await()
         try { LocalJobMetadata.validate(localMetadata) }
         catch (e: IllegalArgumentException) { return Result.failure(e) }
+        database.getJobById(request.id)?.let { return SubmissionSafety.reuse(it, request) }
         val provider = providerRegistry.getProviderById(request.providerId)
             ?: return Result.failure(ProviderError("No existe un adaptador ejecutable para ${request.providerId}."))
         if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) return Result.failure(ProviderError("Laboratorio local: envío bloqueado."))
+        val receiptMetadata = localMetadata + (SubmissionSafety.DIGEST_KEY to SubmissionSafety.digest(request))
         val pending=GenerationJob(id=request.id,providerId=request.providerId,modelId=request.modelId,modality=request.modality,
-            prompt=request.prompt,negativePrompt=request.negativePrompt,parameters=request.parameters + localMetadata,
+            prompt=request.prompt,negativePrompt=request.negativePrompt,parameters=request.parameters + receiptMetadata,
             inputMediaUri=request.mediaInputs.firstOrNull()?.uriString,status=GenerationStatus.QUEUED)
         database.insertOrUpdateJob(pending)
         return kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
             val result=try {provider.submitGeneration(request)} catch(e:Exception) {Result.failure(e)}
             if (result.isSuccess) {
-                val submitted = result.getOrThrow().let { it.copy(parameters = it.parameters + localMetadata) }
+                val submitted = result.getOrThrow().let { it.copy(parameters = it.parameters + receiptMetadata) }
                 database.insertOrUpdateJob(submitted)
                 if (context != null && submitted.status != GenerationStatus.COMPLETED) {
                     com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context, submitted.id)
                 }
             } else {
                 val error=result.exceptionOrNull()
-                val definite = error is IllegalArgumentException ||
-                    error is java.net.UnknownHostException ||
-                    error is java.net.ConnectException ||
-                    (error as? ProviderError)?.errorCode in setOf("NO_NETWORK") ||
-                    (error as? ProviderError)?.httpStatusCode?.let {it in setOf(400, 401, 402, 403, 404, 422, 429)} == true
+                val definite = SubmissionSafety.definitelyRejected(error)
                 database.insertOrUpdateJob(pending.copy(status=GenerationStatus.FAILED,
                     error=if(definite) (error as? ProviderError)?.humanReadableMessage ?: error?.message else "No se pudo confirmar el envío. Comprueba el proveedor antes de repetir; podría haberse iniciado.",
                     parameters=pending.parameters+("__submission_uncertain" to (!definite).toString())))
@@ -207,6 +212,90 @@ class GenerationRepository(
             result
         }
     }
+
+    /** One logical row and one lock across every provider attempt; no public retry path bypasses the receipt. */
+    suspend fun submitRoutedGeneration(logical: GenerationRequest,
+        routes: List<com.vidadomu.nexus.routing.GenerationRoute>, ceiling: java.math.BigDecimal,
+        diagnostics: List<String>, localMetadata: Map<String,String> = emptyMap()): Result<GenerationJob> =
+        submissionLocks[(logical.id.hashCode() and Int.MAX_VALUE) % submissionLocks.size].withLock {
+            comparisonRecovery.await()
+            LocalJobMetadata.validate(localMetadata)
+            if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) return@withLock Result.failure(ProviderError("Laboratorio local: envío bloqueado."))
+            val digest=SubmissionSafety.digest(logical)
+            database.getJobById(logical.id)?.let { existing ->
+                if(existing.parameters["__routing_logical_digest"]!=digest)
+                    return@withLock Result.failure(ProviderError("El identificador ya pertenece a otro envío. No se ha repetido."))
+                if(existing.parameters["__submission_uncertain"]=="true" || existing.status in setOf(GenerationStatus.FAILED,GenerationStatus.CANCELLED))
+                    return@withLock Result.failure(ProviderError(existing.error ?: "Consulta este trabajo antes de preparar otro envío."))
+                return@withLock Result.success(existing)
+            }
+            val ordered=com.vidadomu.nexus.routing.RoutingSubmissionPolicy.ordered(routes,ceiling,System.currentTimeMillis())
+            if(ordered.isEmpty()) return@withLock Result.failure(ProviderError("Las cotizaciones han caducado o superan el importe aceptado. Revisa el coste."))
+            val events=mutableListOf<kotlinx.serialization.json.JsonObject>()
+            val metadata=localMetadata+mapOf("__routing_logical_digest" to digest,
+                "__routing_original_provider" to logical.providerId,"__routing_original_model" to logical.modelId)
+            var lastError:Throwable?=null
+            var pending=GenerationJob(id=logical.id,providerId=logical.providerId,modelId=logical.modelId,modality=logical.modality,
+                prompt=logical.prompt,negativePrompt=logical.negativePrompt,parameters=logical.parameters+metadata,
+                inputMediaUri=logical.mediaInputs.firstOrNull()?.uriString,status=GenerationStatus.QUEUED)
+            for(route in ordered) {
+                if(System.currentTimeMillis()>=route.validUntil) continue
+                val provider=providerRegistry.getProviderById(route.providerId) ?: continue
+                // Upload/validation errors precede the billable POST and never trigger an untracked generation.
+                val request=try { route.prepareRequest() }
+                    catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                    catch(e:Exception) { lastError=e; continue }
+                if(System.currentTimeMillis()>=route.validUntil) {
+                    lastError=ProviderError("La cotización caducó durante la preparación. Revisa el importe antes de generar.")
+                    continue
+                }
+                require(request.id==logical.id && request.providerId==route.providerId && request.modelId==route.modelId)
+                val attempt=events.size+1
+                fun event(outcome:String)=kotlinx.serialization.json.buildJsonObject {
+                    put("attempt",kotlinx.serialization.json.JsonPrimitive(attempt))
+                    put("provider",kotlinx.serialization.json.JsonPrimitive(route.providerId))
+                    put("model",kotlinx.serialization.json.JsonPrimitive(route.modelId))
+                    put("totalUsd",kotlinx.serialization.json.JsonPrimitive(route.totalUsd.toPlainString()))
+                    put("outcome",kotlinx.serialization.json.JsonPrimitive(outcome))
+                }
+                events+=event("submitting")
+                pending=pending.copy(providerId=request.providerId,modelId=request.modelId,status=GenerationStatus.QUEUED,error=null,parameters=request.parameters+metadata+
+                    mapOf("__routing_attempts" to kotlinx.serialization.json.JsonArray(events).toString(),
+                        "__submission_uncertain" to "true"),estimatedCostUsd=route.totalUsd.toDouble())
+                database.insertOrUpdateJob(pending) // durable BEFORE POST, including process-death protection
+                val accepted=kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable+kotlinx.coroutines.Dispatchers.IO) {
+                    val result=try {provider.submitGeneration(request)} catch(e:Exception) {Result.failure(e)}
+                    if(result.isSuccess) {
+                        events[events.lastIndex]=event("accepted")
+                        val received=result.getOrThrow()
+                        val job=received.copy(id=logical.id,parameters=received.parameters+metadata+mapOf(
+                            SubmissionSafety.DIGEST_KEY to SubmissionSafety.digest(request),
+                            "__submission_uncertain" to "false", "__routing_attempts" to kotlinx.serialization.json.JsonArray(events).toString()),
+                            estimatedCostUsd=route.totalUsd.toDouble(),technicalDetails=listOfNotNull(received.technicalDetails,
+                                diagnostics.joinToString("\n")+"\nIntentos: "+kotlinx.serialization.json.JsonArray(events)).joinToString("\n"))
+                        database.insertOrUpdateJob(job)
+                        if(context!=null && job.status!=GenerationStatus.COMPLETED) com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context,job.id)
+                        Result.success(job)
+                    } else {
+                        lastError=result.exceptionOrNull()
+                        val definite=SubmissionSafety.definitelyRejected(lastError)
+                        events[events.lastIndex]=event(if(definite) "rejected_before_acceptance" else "uncertain")
+                        pending=pending.copy(status=GenerationStatus.FAILED,error=if(definite) lastError?.message else
+                            "No se pudo confirmar el envío. Consulta este trabajo antes de repetir; podría haberse iniciado.",
+                            parameters=pending.parameters+mapOf("__submission_uncertain" to (!definite).toString(),
+                                "__routing_attempts" to kotlinx.serialization.json.JsonArray(events).toString()),
+                            technicalDetails=diagnostics.joinToString("\n"))
+                        database.insertOrUpdateJob(pending)
+                        Result.failure(lastError ?: ProviderError("Envío no confirmado."))
+                    }
+                }
+                if(accepted.isSuccess) return@withLock accepted
+                // Reconcile the persisted server response. A remote id or ambiguity always stops fallback.
+                val recorded=database.getJobById(logical.id) ?: return@withLock accepted
+                if(!com.vidadomu.nexus.routing.RoutingSubmissionPolicy.canFallback(recorded,lastError)) return@withLock accepted
+            }
+            Result.failure(lastError ?: ProviderError("No queda un proveedor compatible dentro del importe aceptado."))
+        }
 
     private val pollLocks = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
 

@@ -871,7 +871,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             _pendingCostAcceptance.value=quote.copy(details="Tu umbral de gasto requiere confirmación. "+quote.details);return
         }
         when(val gate = GenerationCostGuard.onGenerate(quote, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
-            CostGate.Proceed -> launchGeneration(state, onSuccess)
+            CostGate.Proceed -> launchGeneration(state, onSuccess, quote.usd.takeIf {quote.known})
             is CostGate.AskAcceptance -> _pendingCostAcceptance.value = gate.quote
             is CostGate.Reject -> _uiState.update { it.copy(errorMessage = gate.message) }
         }
@@ -884,7 +884,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         val state = _uiState.value
         generationBlocker(state)?.let { message -> _uiState.update { it.copy(errorMessage = message) }; return }
         when(val gate = GenerationCostGuard.onAccept(pending, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
-            CostGate.Proceed -> launchGeneration(state, onSuccess)
+            CostGate.Proceed -> launchGeneration(state, onSuccess, pending.usd.takeIf {pending.known})
             is CostGate.Reject -> _uiState.update { it.copy(errorMessage = gate.message) }
             is CostGate.AskAcceptance -> Unit
         }
@@ -909,12 +909,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         return null
     }
 
-    private fun launchGeneration(state: CreateUiState, onSuccess: (String) -> Unit) {
+    private fun launchGeneration(state: CreateUiState, onSuccess: (String) -> Unit, acceptedUsd:Double? = null) {
         _uiState.update { it.copy(isSubmitting = true, isUploading = false, errorMessage = null, submitFailure = null) }
 
         viewModelScope.launch {
             try {
-                val jobId = GenerationDispatcher(app).submit(state) { uploading, progress ->
+                val jobId = GenerationDispatcher(app).submit(state,maxCostUsd=acceptedUsd) { uploading, progress ->
                     _uiState.update { it.copy(isUploading = uploading, uploadProgress = progress) }
                 }
                 onSuccess(jobId)

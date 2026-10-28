@@ -37,6 +37,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.stylusHover
 
 /** Blur is confined to a static decorative layer. Foreground controls are never blurred.
  * This is a frosted treatment, not a costly capture of the scrolling screen beneath it.
@@ -100,7 +101,7 @@ fun StudioToolChip(label: String, description: String = label, enabled: Boolean 
     val color by animateColorAsState(
         if(selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
         tween(NexusTokens.pressDuration), label = "Chip tone")
-    Box(Modifier.heightIn(min = NexusTokens.minimumTouch), contentAlignment = Alignment.Center) {
+    Box(Modifier.heightIn(min = NexusTokens.minimumTouch).stylusHover(enabled), contentAlignment = Alignment.Center) {
         Surface(onClick = { haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled, interactionSource = interactions, color = color,
             contentColor = if(enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,

@@ -20,10 +20,13 @@ data class RuleDefinition(val key: String, val title: String, val section: Strin
 /** Local preferences only. Remote capabilities never become editable facts here. */
 object RuntimeRules {
     val definitions = listOf(
+        RuleDefinition("routing.enabled", "Elegir proveedor automáticamente", "Reglas y límites", RuleType.BOOLEAN, "true"),
+        RuleDefinition("routing.creditUsd", "Coste real por crédito (USD)", "Reglas y límites", RuleType.DECIMAL, "0", 0.0,
+            help="0 = conversión desconocida: no se compara ese proveedor con tarifas en USD. Usa el coste de tu compra.", scoped=true),
         RuleDefinition("ui.motion", "Animaciones", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("ui.haptics", "Respuesta háptica", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("flow.connectionTimeout", "Espera de conexión Flow (segundos)", "Reglas y límites", RuleType.INTEGER, "20", 0.0, help="Margen para comprobar el navegador del puente principal antes de usar el respaldo.", scoped=true),
-        RuleDefinition("ui.background", "Fondo azul Nexus", "Personalización", RuleType.BOOLEAN, "true"),
+        RuleDefinition("ui.background", "Fondo aurora dinámico", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("ui.backgroundOpacity", "Intensidad del fondo", "Personalización", RuleType.DECIMAL, "0.28", 0.0, 1.0),
         RuleDefinition("ui.photo", "Foto de fondo", "Personalización", RuleType.TEXT, "", help="Selecciona una imagen desde la vista Personalización."),
         RuleDefinition("ui.photoBlur", "Desenfoque de tu foto", "Personalización", RuleType.DECIMAL, "32", 0.0, 100.0),

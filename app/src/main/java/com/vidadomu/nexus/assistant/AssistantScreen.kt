@@ -246,7 +246,6 @@ fun AssistantScreen(
     val slimTop = scrolledAway || input.text.isNotEmpty()
     // Conversaciones a la izquierda: se abre arrastrando el dedo de izquierda a derecha sobre el chat.
     val drawer = rememberDrawerState(DrawerValue.Closed)
-    var liveVoice by rememberSaveable { mutableStateOf(false) }
     ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
         gesturesEnabled = drawer.isOpen) {
     Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
@@ -428,8 +427,7 @@ fun AssistantScreen(
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
                 onSend = { if(vm.sendWithBoards(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
-                reasoningControl = { ReasoningPicker(ui, vm) }, onLive = { liveVoice = true })
-            if (liveVoice) LiveVoiceDialog(ui, onSend = { vm.send(it) }, onClose = { liveVoice = false })
+                reasoningControl = { ReasoningPicker(ui, vm) })
             }
         }
     }
@@ -708,7 +706,7 @@ internal fun UserBubble(item:ChatItem.User) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
         // Tu mensaje: completo (nunca truncado), ancho casi total para ganar altura, con el acento en degradado y seleccionable.
         val accent=MaterialTheme.colorScheme.primary
-        val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.30f),accent.copy(alpha=.16f)))}
+        val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.12f),accent.copy(alpha=.06f)))}
         val foldable = remember(item.text) { UserMessageFold.shouldFold(item.text) }
         var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
         Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)

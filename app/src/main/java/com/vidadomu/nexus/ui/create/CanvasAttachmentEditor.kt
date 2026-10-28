@@ -28,12 +28,15 @@ import com.vidadomu.nexus.assistant.rememberProjectMediaPicker
 import com.vidadomu.nexus.core.model.AttachedMedia
 import com.vidadomu.nexus.ui.components.StudioRemoveMediaButton
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.stylusHover
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 
 @Composable
 internal fun CanvasAttachmentEditor(
     field: CanvasInputField, media: List<AttachedMedia>, enabled: Boolean,
     onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit, compact: Boolean = false,
-    onReorder: ((String, Int) -> Unit)? = null
+    onReorder: ((String, Int) -> Unit)? = null, frameColumn: Boolean = false
 ) {
     val context = LocalContext.current
     val selected = media.filter(field::contains)
@@ -57,6 +60,37 @@ internal fun CanvasAttachmentEditor(
         if (!field.mime.startsWith("image/") && !field.mime.startsWith("video/")) files.launch(arrayOf(field.mime))
         else if (remaining > 1) multiple.launch(PickVisualMediaRequest(type))
         else single.launch(PickVisualMediaRequest(type))
+    }
+    val haptics = rememberNexusHaptics()
+    if (frameColumn) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(field.label, style = MaterialTheme.typography.labelLarge)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (selected.isNotEmpty()) CanvasAttachmentTile(selected.first(), field.label, enabled, thumbnailSize = maxWidth, showLabel = false) {
+                    onRemove(selected.first().id)
+                    haptics.perform(NexusHapticEvent.SELECTION)
+                }
+                else Surface(onClick = pickGallery, enabled = enabled, shape = NexusTokens.thumbnail,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f).stylusHover(enabled),
+                    border = androidx.compose.foundation.BorderStroke(.5.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Icon(Icons.Default.AddPhotoAlternate, "Añadir ${field.label}")
+                        Text(if(field.required) "Obligatorio" else "Opcional", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                IconButton(onClick = pickGallery, enabled = enabled, modifier = Modifier.size(48.dp).stylusHover(enabled)) {
+                    Icon(Icons.Default.AddPhotoAlternate, "Cambiar ${field.label}", Modifier.size(20.dp))
+                }
+                IconButton(onClick = { library.launch(arrayOf(field.mime), 1) }, enabled = enabled,
+                    modifier = Modifier.size(48.dp).stylusHover(enabled)) {
+                    Icon(Icons.Default.PhotoLibrary, "Biblioteca para ${field.label}", Modifier.size(20.dp))
+                }
+            }
+        }
+        return
     }
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = if(compact) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow) {
         if (compact && field.maximum == 1 && selected.size == 1) Row(Modifier.padding(12.dp),
@@ -118,7 +152,7 @@ internal fun CanvasAttachmentEditor(
 }
 
 @Composable
-internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: Boolean = true, thumbnailSize:Dp=112.dp, onRemove: () -> Unit) {
+internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: Boolean = true, thumbnailSize:Dp=112.dp, showLabel: Boolean = true, onRemove: () -> Unit) {
     val context = LocalContext.current
     var preview by remember(media.id) { mutableStateOf(false) }
     val visual = media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")
@@ -137,7 +171,7 @@ internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: 
             if (imageFailed) Text("No se pudo abrir", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Center).padding(8.dp))
             if (enabled) StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
         }
-        if(thumbnailSize>=72.dp) Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+        if(showLabel && thumbnailSize>=72.dp) Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2)
     }
     if (preview) AlertDialog(onDismissRequest = { preview = false }, title = { Text(label) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

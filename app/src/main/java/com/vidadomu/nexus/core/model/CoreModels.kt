@@ -292,7 +292,8 @@ data class AccountBalance(
     val cashUsd: Double,
     val bonusUsd: Double = 0.0,
     val frozenUsd: Double = 0.0,
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
+    val availableUsdExact: String? = null, val balanceCurrency: String? = null
 )
 
 data class ProviderError(

@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.models
 
+import com.vidadomu.nexus.ui.theme.stylusHover
+
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -137,6 +139,7 @@ internal class CatalogLabelStore private constructor(private val appContext: Con
 internal fun CatalogGlyph(key: String, baseSize: Dp, labels: CatalogLabelStore, fallback: @Composable (Dp) -> Unit) {
     val size = baseSize * labels.scale(key)
     val spec = labels.icon(key)
+    Box(Modifier.size(size).stylusHover(enabled = spec != null)) {
     when {
         spec != null && spec.startsWith("image:") && File(spec.removePrefix("image:")).isFile ->
             AsyncImage(File(spec.removePrefix("image:")), null, Modifier.size(size).clip(androidx.compose.foundation.shape.RoundedCornerShape(size * .2f)), contentScale = ContentScale.Fit)
@@ -147,6 +150,7 @@ internal fun CatalogGlyph(key: String, baseSize: Dp, labels: CatalogLabelStore, 
             } else fallback(size)
         }
         else -> fallback(size)
+    }
     }
 }
 

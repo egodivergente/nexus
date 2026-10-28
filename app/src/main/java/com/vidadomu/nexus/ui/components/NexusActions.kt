@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.stylusHover
 
 /**
  * Secondary action that must read as a button, not as loose text: tonal fill, optional icon and a 48 dp target.
@@ -103,6 +104,6 @@ fun NexusHintedIconButton(hint: String, onClick: () -> Unit, modifier: Modifier 
     enabled: Boolean = true, content: @Composable () -> Unit) {
     TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text(hint) } }, state = rememberTooltipState()) {
-        IconButton(onClick = onClick, enabled = enabled, modifier = modifier, content = content)
+        IconButton(onClick = onClick, enabled = enabled, modifier = modifier.stylusHover(enabled), content = content)
     }
 }
