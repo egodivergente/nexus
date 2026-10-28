@@ -7,7 +7,13 @@ import android.media.MediaRecorder
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Mic
@@ -21,7 +27,7 @@ import com.vidadomu.nexus.settings.RuntimePreferences
 import java.io.File
 
 /** Voice notes are reviewed locally. Dictation remains separate from actual recorded audio. */
-@Composable internal fun AudioNoteControl(onAudio: (Uri)->Unit, onDictate: ()->Unit) {
+@OptIn(ExperimentalFoundationApi::class) @Composable internal fun AudioNoteControl(onAudio: (Uri)->Unit, onDictate: ()->Unit) {
     val context=LocalContext.current
     var open by rememberSaveable {mutableStateOf(false)}
     var path by rememberSaveable {mutableStateOf<String?>(null)}
@@ -55,8 +61,11 @@ import java.io.File
     }
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {granted->if(granted) beginRecording() else error="El micrófono necesita permiso para grabar."}
     DisposableEffect(Unit) {onDispose {runCatching {recorder?.stop()};recorder?.release();player?.release()}}
-    IconButton(onClick={open=true}) {Icon(Icons.Outlined.Mic,"Grabar audio o dictar",
-        tint=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)}
+    // Un toque dicta al instante; mantener pulsado abre la nota de voz grabada.
+    Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+        .combinedClickable(onClickLabel="Dictar",onLongClickLabel="Grabar nota de voz",onClick=onDictate,onLongClick={open=true})
+        .semantics{contentDescription="Dictar mensaje. Mantén pulsado para grabar una nota de voz"},contentAlignment=androidx.compose.ui.Alignment.Center) {
+        Icon(Icons.Outlined.Mic,null,tint=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)}
     if(open) AlertDialog(onDismissRequest={if(recording) stop();player?.release();player=null;open=false},
         title={Text(if(recording) "Grabando…" else "Nota de voz")},text={Column {
             Text("Escucha la nota antes de adjuntarla al mensaje.")
