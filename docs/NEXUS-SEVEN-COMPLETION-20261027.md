@@ -27,6 +27,10 @@ Los contratos reales de Seedream y Kling pueden diferir en controles y valores p
 
 ## Validación
 
-Resultado de compilación, pruebas y publicación: completar con la ejecución final de esta rama. La suite de presentación de CI de la entrega 134 tuvo un fallo: buscaba el texto «Ampliar imagen», mientras la acción visible dice «Ampliar» y su descripción accesible es «Ampliar imagen». Se corrige la prueba para usar esa descripción, manteniendo las comprobaciones de apertura, cierre y conservación del chat. No se altera el visor para satisfacer una expectativa obsoleta.
+Código publicado: `d7c16d058cc8b2f586dfb537ca5f64066f9560bd`. Pruebas: **761 de la app y 405 del núcleo superadas**, cuatro omitidas; sin fallos. Las pruebas instrumentadas finales compilan, pero no se han ejecutado. Historial físico conservado: 628 generaciones y 498 resultados antes y después de instalar 134. Resultados estructurados en `NEXUS-SEVEN-COMPLETION-VALIDATION-20261027.json`. La suite de presentación de CI de la entrega 134 tuvo un fallo: buscaba el texto «Ampliar imagen», mientras la acción visible dice «Ampliar» y su descripción accesible es «Ampliar imagen». Se corrige la prueba para usar esa descripción, manteniendo las comprobaciones de apertura, cierre y conservación del chat. No se altera el visor para satisfacer una expectativa obsoleta.
 
 No se certifica paridad con productos de grandes empresas sin mediciones físicas de latencia, batería, temperatura, accesibilidad y S Pen. El estándar se expresa mediante controles y evidencia verificables.
+
+## Cierre de publicación · 28/10/2026
+
+La revisión de código `d60531dcc705b344fa4550c71de116d795a6be5d` conserva todas las rutas manuales cuando se desactiva el enrutamiento y permite evaluar alternativas financiadas aunque la cuenta del proveedor original no esté disponible, siempre dentro del importe aceptado. Tras esta revisión: 11 pruebas dirigidas superadas y APK 1.9.99/vc135 compilada correctamente. La suite completa anterior corresponde a `d7c16d0`. La 1.9.99 sigue sin instalarse; la última instalación comprobada es la 1.9.98/vc134. Las pruebas físicas de S Pen, consumo y generaciones comerciales siguen pendientes.

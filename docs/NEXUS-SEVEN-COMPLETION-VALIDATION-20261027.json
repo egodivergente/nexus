@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "d60531dcc705b344fa4550c71de116d795a6be5d",
+  "installedAtThisCheck": {
+    "versionCode": 134,
+    "versionName": "1.9.98-agent-preview",
+    "device": "Samsung SM-S938B",
+    "certificateMatchesPrevious": true,
+    "historyGenerationsBeforeAfter": [
+      628,
+      628
+    ],
+    "outputsBeforeAfter": [
+      498,
+      498
+    ],
+    "artboxIconsUnchanged": true,
+    "preferenceDifferencesPredateInstall": true
+  },
+  "instrumentation": "compiled for d7c16d0; not executed",
+  "paidGenerations": 0,
+  "app": {
+    "tests": 761,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "core": {
+    "tests": 409,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 4
+  },
+  "fullSuiteSourceCommit": "d7c16d058cc8b2f586dfb537ca5f64066f9560bd",
+  "finalTargetedTests": {
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "finalApkBuild": "BUILD SUCCESSFUL; 1.9.99/vc135, not installed"
+}
