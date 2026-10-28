@@ -244,6 +244,16 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         d.copy(projects = d.projects + p) to p
     }
 
+    /** «Eliminar carpeta»: la archiva y devuelve sus archivos a la Biblioteca general. No borra ningún archivo. */
+    suspend fun archiveProject(projectId: String): Int = edit { d ->
+        if (d.projects.none { it.id == projectId }) return@edit d to 0
+        val moved = d.assets.count { it.projectId == projectId }
+        d.copy(
+            projects = d.projects.map { if (it.id == projectId) it.copy(archived = true) else it },
+            assets = d.assets.map { if (it.projectId == projectId) it.copy(projectId = null) else it },
+        ) to moved
+    }
+
     private fun normalizedMemory(m: ProjectMemory): ProjectMemory = m.copy(
         synopsis = m.synopsis?.trim()?.take(MAX_FIELD)?.ifBlank { null },
         tone = m.tone?.trim()?.take(MAX_FIELD)?.ifBlank { null },

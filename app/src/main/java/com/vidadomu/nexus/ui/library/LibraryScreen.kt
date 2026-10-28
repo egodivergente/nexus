@@ -188,6 +188,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var moving by remember {mutableStateOf<List<LibraryEntry>?>(null)}
     var newFolderFor by remember {mutableStateOf<List<LibraryEntry>?>(null)}
     var creatingFolder by remember {mutableStateOf(false)}
+    var deletingFolder by remember {mutableStateOf<String?>(null)}
     var bulkRename by remember {mutableStateOf<List<LibraryEntry>?>(null)}
     var cropTarget by remember {mutableStateOf<LibraryEntry?>(null)}
     var cropping by remember {mutableStateOf(false)}
@@ -385,6 +386,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             newFolderFor=null;marked=emptySet()
             scope.launch {moveTo(entries,runtime.assets.createProject(name).id)}
         }}
+        deletingFolder?.let {id -> val folder=folders.firstOrNull {it.id==id}
+            if(folder==null) deletingFolder=null else AlertDialog(onDismissRequest={deletingFolder=null},
+                title={Text("Eliminar carpeta «${folder.name}»")},
+                text={Text("Los archivos no se borran: vuelven a la Biblioteca general.")},
+                confirmButton={TextButton(onClick={deletingFolder=null;scope.launch {runtime.assets.archiveProject(id)}}) {Text("Eliminar carpeta")}},
+                dismissButton={TextButton(onClick={deletingFolder=null}) {Text("Cancelar")}})
+        }
         if(creatingFolder) RenameFileDialog("",{creatingFolder=false},title="Nueva carpeta") {name ->
             creatingFolder=false;scope.launch {runtime.assets.createProject(name)}
         }
@@ -543,7 +551,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     item(key="folders:title",span={GridItemSpan(maxLineSpan)}) {Text("Carpetas",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
                     items(folders,key={"folder:"+it.id},span={GridItemSpan((maxLineSpan/3).coerceAtLeast(1))}) {folder ->
-                        FolderTile(folder.name,folderCounts[folder.id] ?: 0) {openFolder=folder.id}
+                        FolderTile(folder.name,folderCounts[folder.id] ?: 0,onLongClick={deletingFolder=folder.id}) {openFolder=folder.id}
                     }
                 }
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).

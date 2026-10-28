@@ -7,6 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -144,11 +145,13 @@ internal fun MoveToFolderSheet(count:Int,folders:List<com.vidadomu.nexus.agent.c
 
 /** A project shown as a folder in the Library. */
 @Composable
-internal fun FolderTile(name:String,count:Int,onOpen:()->Unit) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+internal fun FolderTile(name:String,count:Int,onLongClick:(()->Unit)?=null,onOpen:()->Unit) {
     // Uniform tiles: the name always reserves two lines and the count is a short badge beside the icon,
     // so «950 archivos» no longer wraps and makes one folder taller than its neighbours.
-    Surface(onClick=onOpen,shape=NexusTokens.thumbnail,color=MaterialTheme.colorScheme.surfaceContainer,
-        modifier=Modifier.fillMaxWidth().semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}) {
+    Surface(shape=NexusTokens.thumbnail,color=MaterialTheme.colorScheme.surfaceContainer,
+        modifier=Modifier.fillMaxWidth().semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}
+            .combinedClickable(onClickLabel="Abrir carpeta",onLongClickLabel="Opciones de la carpeta",onClick=onOpen,onLongClick=onLongClick)) {
         Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Icon(Icons.Default.Folder,null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.primary)
