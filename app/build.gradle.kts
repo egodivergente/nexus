@@ -26,8 +26,8 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 134
-        versionName = "1.9.98-agent"
+        versionCode = 136
+        versionName = "1.9.100-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
@@ -144,6 +144,10 @@ val inpaintRuntime = tasks.register<Copy>("prepareInpaintRuntime") {
     doFirst { targets.values.forEach { triple -> check(libraries.get().file("$triple/libc++_shared.so").asFile.isFile) { "Falta libc++ del NDK configurado para $triple" } } }
 }
 android.sourceSets["main"].jniLibs.srcDir(inpaintRuntimeDirectory)
+// Optional verified native binaries from an existing Agent build; normal builds compile CMake as before.
+(project.findProperty("nexusAgentPrebuiltJniDir") as String?)?.let {
+    android.sourceSets["agentPreview"].jniLibs.srcDir(file(it))
+}
 tasks.named("preBuild") { dependsOn(inpaintRuntime) }
 
 dependencies {

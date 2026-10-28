@@ -276,8 +276,9 @@ fun AssistantScreen(
                     }
                 }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
-            LazyColumn(Modifier.fillMaxSize(), state = listState,
-                contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8, top = 52.dp,
+            // Keep the scrolling viewport below the floating controls, not just its first item.
+            LazyColumn(Modifier.fillMaxSize().padding(top = 56.dp), state = listState,
+                contentPadding = PaddingValues(start = NexusTokens.space8, end = NexusTokens.space8,
                     // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
                     bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }

@@ -165,8 +165,8 @@ fun CreateScreen(
         bottomBar = {
             com.vidadomu.nexus.ui.components.FloatingActionDock {
                 Column(Modifier.fillMaxWidth().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
-                    .padding(horizontal=screenMargin, vertical=8.dp),
-                    verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    .padding(horizontal=screenMargin, vertical=4.dp),
+                    verticalArrangement=Arrangement.spacedBy(2.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
                     val inlineReason=readiness.fixTarget==CreationFixTarget.MEDIA || readiness.fixTarget==CreationFixTarget.PROMPT
                     if(!busy && !inlineReason) readiness.message?.let { reason ->

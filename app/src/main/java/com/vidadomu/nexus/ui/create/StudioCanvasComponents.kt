@@ -163,7 +163,7 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
     Box(modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }) {
         Button(onClick = { haptic.perform(NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled && !busy, interactionSource = interactions,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = NexusTokens.action,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = NexusTokens.action,
             colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary,
                 disabledContainerColor = if(busy) scheme.primary else scheme.surfaceContainerHigh,
                 disabledContentColor = if(busy) scheme.onPrimary else scheme.onSurfaceVariant)) {

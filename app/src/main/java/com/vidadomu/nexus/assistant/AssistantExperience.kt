@@ -88,23 +88,24 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
     // Flotante, como el campo de búsqueda de Ajustes de Android: una píldora con sombra pegada abajo, sin franjas ni filetes.
     Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-      // Quick access handle: a slim grabber on the composer's top edge instead of a floating dot in its own 48 dp row
-      // (revision video 1, 05:37). Drawn after the composer so it sits above its border; the touch area stays generous.
+      // Quick access handle: a small arrow on the composer's top edge instead of a floating dot in its own row
+      // Drawn after the composer so it sits above its border; its touch target is at least 48 dp high.
       // The handle shows and hides the tab bar: one tap, or a swipe up/down that starts here, well above the system
       // gesture zone (a swipe from the screen edge collided with Samsung's Home/Recents). Recent files stay on a long
       // press of the clip. When the bar is pinned the handle is not needed and is not drawn.
       val barShown = com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value
       val barPinned = com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned.value
       val grabber: @Composable BoxScope.() -> Unit = {
-          if (!barPinned) Box(Modifier.align(Alignment.TopCenter).offset(y = (-18).dp).size(width = 96.dp, height = 36.dp)
-              .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+          if (!barPinned) Box(Modifier.align(Alignment.TopCenter).offset(y = (-24).dp).size(width = 96.dp, height = 48.dp)
+              .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
               .recentLibraryGesture(opening = !barShown) { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = !barShown }
               .clickable(onClickLabel = if (barShown) "Ocultar pestañas" else "Mostrar pestañas") {
                   com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = !barShown }
               .semantics { contentDescription = if (barShown) "Ocultar pestañas" else "Mostrar pestañas" },
               contentAlignment = Alignment.Center) {
-              Box(Modifier.size(width = if (barShown) 32.dp else 28.dp, height = 4.dp)
-                  .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (barShown) .7f else .55f), androidx.compose.foundation.shape.RoundedCornerShape(2.dp)))
+              Icon(if (barShown) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                  contentDescription = null, modifier = Modifier.size(20.dp),
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant)
           }
       }
       Column {

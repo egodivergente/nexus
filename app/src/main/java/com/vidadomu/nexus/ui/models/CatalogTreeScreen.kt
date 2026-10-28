@@ -363,9 +363,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                             models.map {it.providerId}.distinct().forEach {id -> StudioFilterChip(providerFilter==id,{providerFilter=id},label={Text(providerName(id))},shape=NexusTokens.filter)}
                         }
                         StudioFilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Mis favoritos")})
-                        LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            item { StudioFilterChip(use==null,{use=null},label={Text("Todos los usos")}) }
-                            items(CreationUse.entries.filter {it.modality==modality}) { value -> StudioFilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+                            verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                            StudioFilterChip(use==null,{use=null},label={Text("Todos los usos")})
+                            CreationUse.entries.filter {it.modality==modality}.forEach { value -> StudioFilterChip(use==value,{use=if(use==value)null else value},label={Text(value.label)}) }
                         }
                         TextButton(onClick={app.modelCatalogRepository.refreshModels(true)},enabled=!loading) {Text("Actualizar catálogo y tarifas")}
                     }
@@ -452,10 +453,10 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
             val texts:@Composable ColumnScope.()->Unit = {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     Text(title,style=MaterialTheme.typography.titleMedium,
-                        fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,minLines=if(largeFont) 1 else 3,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
+                        fontSize=if(maxWidth<130.dp) 14.sp else 17.sp,color=TextPrimary,minLines=if(largeFont) 1 else 3,maxLines=Int.MAX_VALUE)
                 }
                 Text(subtitle,style=MaterialTheme.typography.labelMedium,color=TextSecondary,
-                    minLines=when {largeFont -> 1; grid || !compact -> 3; else -> 2},maxLines=when {largeFont -> Int.MAX_VALUE; grid || !compact -> 3; else -> 2},overflow=TextOverflow.Ellipsis)
+                    minLines=when {largeFont -> 1; grid || !compact -> 3; else -> 2},maxLines=Int.MAX_VALUE)
                 Text(releaseLabel.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary,minLines=1,maxLines=1)
             }
             if(grid) {glyph();Column(Modifier.fillMaxWidth(),content=texts)}
@@ -473,14 +474,16 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
             if(stackedPrice) Row(Modifier.heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.
                 if(displayPrice!=null) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
-                    Text("Desde $displayPrice",Modifier.padding(horizontal=10.dp,vertical=5.dp),
-                        style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Column(Modifier.padding(horizontal=8.dp,vertical=4.dp)) {
+                        Text("Desde",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
+                        Text(displayPrice,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
+                    }
                 } else Spacer(Modifier.weight(1f))
                 if(dragModifier==null) IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=Modifier.sizeIn(minWidth=NexusTokens.minimumTouch,minHeight=NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.MoreVert,"Opciones de $title",tint=TextSecondary)
                 } else IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
-            Text(highlight.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary,minLines=if(largeFont) 1 else 3,maxLines=if(largeFont) Int.MAX_VALUE else 3,overflow=TextOverflow.Ellipsis)
+            Text(highlight.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary,minLines=if(largeFont) 1 else 3)
             Button(onClick=onQuickUse ?: onClick,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
                 Text("Crear",style=MaterialTheme.typography.labelLarge)
             }
