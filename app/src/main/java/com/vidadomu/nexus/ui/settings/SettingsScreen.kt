@@ -203,6 +203,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             item {SettingsCard {MediaProvidersSettingsSection()}}
                 }
                 SettingsPage.SYSTEM -> {
+            item {SettingsCard {ReleaseNotesCard()}}
             item {SettingsCard {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
