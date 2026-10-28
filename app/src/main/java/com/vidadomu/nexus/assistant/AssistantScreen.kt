@@ -464,12 +464,23 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
         ReasoningIcon(current, enabled = !ui.thinking, onClick = { open = true })
         DropdownMenu(open, { open = false }) {
             modes.forEach { (name, effort, thinking) ->
-                DropdownMenuItem(text = { Text(name) },
+                DropdownMenuItem(text = { Column { Text(name)
+                        reasoningHint(name)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } } },
                     trailingIcon = { if (name == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = { open = false; vm.setReasoning(effort, thinking)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
             }
         }
     }
+}
+
+private fun reasoningHint(name: String): String? = when (name.lowercase()) {
+    "auto", "automático" -> "El agente decide cuánto pensar"
+    "rápido" -> "Contesta enseguida"
+    "mínimo" -> "Casi sin razonar"
+    "bajo" -> "Razonamiento ligero"
+    "medio" -> "Equilibrio entre velocidad y calidad"
+    "alto" -> "Más profundo, tarda más"
+    else -> null
 }
 
 private fun reasoningAvailable(ui: AssistantUiState): Boolean =

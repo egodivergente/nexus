@@ -83,13 +83,21 @@ internal fun LibraryAttachmentButton(
 
 @Composable
 internal fun ReasoningIcon(current: String, enabled: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(NexusTokens.minimumTouch)
-        .semantics {
-            contentDescription = "Modo de razonamiento: $current"
-            stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
-        }) {
-        Icon(Icons.Default.Speed, null, Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
+    // Una píldora con el modo actual en vez de un icono mudo: se ve de un vistazo qué esfuerzo está activo.
+    val colors = MaterialTheme.colorScheme
+    Surface(onClick = onClick, enabled = enabled, shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = colors.surfaceContainerHighest.copy(alpha = if (enabled) 1f else .5f),
+        modifier = Modifier.heightIn(min = 32.dp)
+            .semantics {
+                contentDescription = "Modo de razonamiento: $current"
+                stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
+            }) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(Icons.Default.Speed, null, Modifier.size(14.dp), tint = colors.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
+            Text(current, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                color = colors.onSurface.copy(alpha = if (enabled) 1f else .38f))
+        }
     }
 }
 
