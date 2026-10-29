@@ -1,4 +1,34 @@
-# Nexus Agent premium — entrega del 29/10/2026
+# Nexus Agent premium — corrección vc164 del 29/10/2026
+
+Rama `codex/nexus-premium-20261029`; fuente de la APK
+`d2616d2cde9f44cf81e48c47e8dbb28a53345dc1`, publicada y verificada en remoto.
+APK **1.9.128-agent-preview / vc164**,
+build AXELPC PASS; instalada como actualización en Pixel y S25 con versión y hash
+comprobados. SHA-256 `99dfb4ed53e9ac188674172decc8c3d1f4e6d8d8bfb24a8da7cca81e5fd69f39`.
+Firma existente, 16 KiB y cinco ARM64 idénticas a vc155 PASS. **205 pruebas app
+ejecutadas PASS; 4 núcleo UP-TO-DATE válidas reutilizadas**, no 209 ejecuciones nuevas.
+Push y SHA de la fuente comprobados en la rama propia mediante `git ls-remote`.
+
+Se aprovecha la altura útil ampliando viewport/previews, manteniendo botones.
+Un solo fotograma poblado usa todo el ancho cuando cabe el par; vacíos compactos.
+Pixel vc164: foto → vacío, fuente 1,5×, 800 × 533 + IME/foco y modal Duración PASS.
+Todas las huellas del borrador se conservaron al actualizar ambos; la retirada de
+la referencia QA del Pixel restauró su borrador original sin borrar el archivo.
+
+**S25 visual vc164 BLOQUEADO por Keyguard** showing/inputRestricted true, foco
+Bouncer/NotificationShade. `am start` ok no acredita foreground; pendiente humano
+desbloquear y repetir QA. No se intentó PIN/bypass. La captura S25 vc162 con tres
+referencias es histórica, no prueba vc164. vc163 solo se compiló, no se instaló.
+Navegación propia Pixel Agente → ArtBox → Biblioteca → Lanzadera completada.
+Logs definitivos posteriores: Pixel 14 726 líneas y S25 101 957, con 0 Fatal/ANR
+de Nexus detectados en sus ventanas disponibles. Esto no acredita visual S25.
+Identidad final confirma ambos hashes/borradores originales sin ausencias;
+solo Pixel foreground, S25 sigue bloqueado sin otra tentativa. Ver suplemento
+en `docs/AUDIT_REPORT.md` y U07.
+Sin pagos, cambios de firma, borrado de originales/datos ni certificación 10/10,
+TalkBack, háptica física o 120 Hz. Se mantiene el siguiente cierre161 como historial.
+
+# Checkpoint histórico: Nexus Agent premium vc161 — 29/10/2026
 
 Rama propia `codex/nexus-premium-20261029`; fuente de la APK `2abd8d732fa686aff954bcf95516a67cd76feb8d`,
 publicada y verificada en remoto. APK **1.9.125-agent-preview / vc161**, compilada

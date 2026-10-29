@@ -1,5 +1,52 @@
 # Auditoría premium de Nexus Agent — 29/10/2026
 
+## Corrección posterior: aprovechar el marco disponible — U07
+
+- **U07 — IMPLEMENTADO, QA PIXEL PASS / S25 VISUAL PENDIENTE por Keyguard,
+  vc164 / 1.9.128-agent-preview.** La captura posterior a vc161
+  mostraba un gran vacío entre Avanzado y Generar. Se amplían el viewport editable
+  y los previews reales con la altura útil, manteniendo botones y márgenes. El
+  mínimo medido decide si cabe, también con fuente 1,5×; no hay un corte artificial
+  por escala de fuente. Scroll de respaldo por IME o desbordamiento real.
+- Un único fotograma poblado ocupa todo el ancho cuando el par horizontal cabe;
+  las ranuras vacías permanecen compactas. Cero o dos poblados mantienen el par.
+  Los previews reciben hasta el 60 % del sobrante en una columna, con capacidad
+  limitada por su ancho real; el resto queda para el editor. Ver CAPABILITY_UI.
+- Fuente compilada, publicada y verificada en remoto:
+  `d2616d2cde9f44cf81e48c47e8dbb28a53345dc1`. Build en AXELPC
+  PASS en 8 min 54 s: **205 pruebas app ejecutadas**, 0 fallos/errores/omitidas;
+  **4 pruebas núcleo UP-TO-DATE**, resultado válido reutilizado sin cambios del
+  núcleo. No se presentan como 209 ejecuciones nuevas.
+- APK: `C:/Users/User/Documents/Codex/nexus-premium-20261029/Nexus-Agent-1.9.128-v164.apk`.
+  SHA-256 `99dfb4ed53e9ac188674172decc8c3d1f4e6d8d8bfb24a8da7cca81e5fd69f39`.
+  Certificado existente `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`,
+  alineación 16 KiB y cinco ARM64 idénticas a vc155: PASS.
+- Instalación Success/hash/versión vc164 y huellas de borrador iguales en ambos.
+  Pixel: retrato con foto → retirada → vacío, fuente 1,5×, ancho/IME y modal de
+  Duración PASS. Con foto, prompt 553 px y hueco Avanzado→Coste 54 px; sin fotos,
+  prompt 1261 px y hueco 115 px; fuente 1,5× con foto, hueco 48 px. Borrador original
+  recuperado exactamente y archivo original sin borrar.
+- **S25 VISUAL BLOQUEADO:** Keyguard showing/inputRestricted true y foco
+  Bouncer/NotificationShade; `am start` Status ok no acredita Nexus foreground.
+  Pendiente humano desbloqueo y QA visual propia vc164. Su borrador de 4908
+  caracteres, 3 activos y 2 conservados sí conserva todas las huellas al instalar.
+  La última captura S25 vc162 no se hereda como prueba vc164. Sin PIN/bypass.
+- Navegación propia Pixel Agente → ArtBox → Biblioteca → Lanzadera completada;
+  revisión independiente de retrato/fuente 1,5× sin otro hallazgo visual de impacto.
+  Identidad final/hash/borrador original exactos en ambos; solo Pixel foreground.
+  Logs definitivos posteriores: Pixel 14 726 líneas y S25 101 957, 0 Fatal/ANR de
+  Nexus detectados en las ventanas disponibles; intervalos en el suplemento.
+  La revisión de logs no sustituye la QA visual bloqueada del S25.
+- Riesgo acotado a layout: conservar estado, capacidades, parámetros, archivos,
+  proveedor, firma y comportamiento de generación. Comparar geometría en el mismo
+  escenario; no agrandar controles ni modificar contratos para llenar la pantalla.
+
+| Iteración | Motivo y evidencia propia |
+|---|---|
+| vc162 | Checkpoint instalado en ambos, hash/huellas del borrador comprobados. Amplió la altura útil, pero la revisión posterior detectó un umbral de fuente que impedía aprovecharla a 1,5× cuando sí cabía. Sus métricas/capturas son históricas, no prueba de vc164. |
+| vc163 | Solo COMPILADA, NO INSTALADA. Retiró ese umbral; la revisión visual con una foto descubrió preview a media anchura y fotograma final vacío estirado. No se cerró como entrega. |
+| vc164 | INSTALADA en ambos con hash/huellas iguales. Layout y navegación Pixel PASS; S25 visual PENDIENTE humano por Keyguard, sin otra tentativa. Da ancho completo al único fotograma poblado, limita preview por ancho y mantiene vacíos compactos. Colector final sin Fatal/ANR de Nexus en ambas ventanas; no acredita visual S25. |
+
 ## Procedencia y criterios
 
 AXELPC; rama propia `codex/nexus-premium-20261029`, base reconciliada `dead4032d43f2b47ccc58471b4466d2adf2f313e` (vc155). Leídos AGENTS.md, CONTINUAR.md y MIGRATION-STATUS.json antes de modificar. La autorización permite compilar, actualizar en sitio y publicar en esta rama; se conservan datos, firma y trabajos ajenos.
@@ -8,9 +55,9 @@ Pixel 8 Pro `38271FDJG00264` y S25 Ultra SM-S938B `R5CXC3J630Y`, con serial ADB 
 
 Se autorizó ampliar Conversaciones y Lanzadera con un motor por proveedor + modelo + endpoint + modalidad. Se reutilizan contratos, catálogo, precios y adaptadores; sin dependencias nuevas. Ambigüedad: conservar semántica o marcar desconocida con explicación. Riesgo irreversible: no ejecutar y registrar. Máximo dos intentos iguales; diagnosticar antes de reintentar. Tests y capturas no sustituyen aceptación física ni medición.
 
-## Plan y estado
+## Plan y estado — cierre histórico comprobado vc161
 
-Fuente final `2abd8d732fa686aff954bcf95516a67cd76feb8d` publicada y verificada. **vc161 / 1.9.125-agent-preview**, 209 pruebas PASS (205 app + 4 núcleo, sin omitidas), APK/hash/firma/alineación/nativas verificados e instalación Success con hash idéntico en ambos. IMPLEMENTADO describe el bloque ejecutado; los límites y pendientes se identifican por separado. Los resultados intermedios no se atribuyen a esta APK.
+Checkpoint histórico `2abd8d732fa686aff954bcf95516a67cd76feb8d` publicado y verificado. **vc161 / 1.9.125-agent-preview**, 209 pruebas PASS (205 app + 4 núcleo, sin omitidas), APK/hash/firma/alineación/nativas verificados e instalación Success con hash idéntico en ambos. Las filas siguientes conservan el cierre de vc161; la corrección posterior y su aceptación propia están en U07. IMPLEMENTADO describe el bloque ejecutado; las evidencias de vc161 no se atribuyen a vc164.
 
 | ID | Impacto / riesgo | Acción y criterio | Estado / evidencia |
 |---|---|---|---|
@@ -38,7 +85,7 @@ Fuente final `2abd8d732fa686aff954bcf95516a67cd76feb8d` publicada y verificada. 
 | D01 | Alto / irreversible | Pagos, Generar/LLM, reenvío histórico, borrado de originales/datos y desinstalación. | DESCARTADO para esta QA por prohibición/riesgo. Tres trabajos nuevos S25 externos, no atribuidos ni revertidos por la auditoría. |
 | D02 | Medio / alto | Cambiar firma, secretos en Git, dependencias nuevas, refactor ajeno y motores/pesos nativos. | DESCARTADO por continuidad/alcance. El motor de capacidades sí fue autorizado; nativas reutilizadas con integridad verificada. |
 
-## Evidencia y límites
+## Evidencia y límites del checkpoint vc161
 
 La comparación privada final confirma IDs/filas originales de trabajos/outputs, integridad SQLite y ningún archivo original del asistente ausente. Sus 9/11 hashes cambiados y los hashes distintos de preferencias seguras impiden afirmar contenido o secretos idénticos. Sin IDs exportados de proyectos/recursos, los conteos no prueban conservación individual. El borrador sí tiene todas sus huellas iguales durante la instalación final de ambos. Véase [AUDIT_REPORT.md](AUDIT_REPORT.md).
 

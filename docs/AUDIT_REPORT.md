@@ -1,6 +1,85 @@
-# Nexus Agent — auditoría y entrega vc161
+# Nexus Agent — entrega vc164 y checkpoint histórico vc161
 
 Fecha: 29/10/2026. Rama: `codex/nexus-premium-20261029`.
+
+## Suplemento vc164 — altura útil y preview real
+
+**1.9.128-agent-preview / vc164 está instalada como actualización en ambos móviles,
+con versión, hash instalado y todas las huellas del borrador antes/después iguales.**
+La QA visual propia del Pixel pasa; la del S25 está **BLOQUEADA por Keyguard**.
+`am start` devuelve Status ok en S25, pero Nexus no está en primer plano: no se
+presenta ese resultado como arranque visual ni como aceptación completa en ambos.
+
+| Artefacto vc164 | Evidencia |
+|---|---|
+| Fuente compilada y publicada | [`d2616d2cde9f44cf81e48c47e8dbb28a53345dc1`](https://github.com/egodivergente/nexus/commit/d2616d2cde9f44cf81e48c47e8dbb28a53345dc1); push y SHA remoto verificados en la rama propia |
+| Build | AXELPC, 8 min 54 s, PASS |
+| APK | `C:/Users/User/Documents/Codex/nexus-premium-20261029/Nexus-Agent-1.9.128-v164.apk` |
+| SHA-256 | `99dfb4ed53e9ac188674172decc8c3d1f4e6d8d8bfb24a8da7cca81e5fd69f39` |
+| Firma / alineación / nativas | Certificado existente `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`; 16 KiB PASS; cinco ARM64 idénticas a vc155 |
+| Pruebas de este build | **205 app ejecutadas PASS**, 0 fallos/errores/omitidas; **4 núcleo UP-TO-DATE**, resultado válido reutilizado sin cambios del núcleo. No son 209 ejecuciones nuevas |
+| Instalación / borradores | Success, vc164 y hash de APK coincidente en ambos; prompt, negativo, parámetros, IDs, URI y conteos iguales durante la actualización |
+
+La corrección usa la altura sobrante para el viewport editable y previews reales,
+manteniendo controles y márgenes. La fuente grande no impone un umbral artificial:
+decide la altura mínima medida. Si solo un fotograma del par está poblado y el par
+horizontal cabe, su preview ocupa todo el ancho y los vacíos quedan compactos.
+Los previews pueden recibir hasta el 60 % del sobrante en una columna, con límite
+por ancho; el resto va al editor. No cambian capacidades ni comportamiento de envío.
+
+| QA propia vc164 | Pixel 8 Pro | S25 Ultra |
+|---|---|---|
+| Instalación y borrador preservado | 72 caracteres, 1 referencia QA activa / 0 conservadas al instalar | 4908 caracteres, 3 activos / 2 conservados; todas las huellas iguales |
+| Retrato con foto → retirada → vacío | PASS; textos/parámetros y fingerprint original recuperados, 0 activos / 0 conservados; sin borrar el archivo original | No comprobado visualmente en vc164 |
+| Fuente 1,5× / ancho 800 × 533 + IME | PASS; prompt mantiene cursor/foco y hoja Duración sobre IME. Retrato tras IME conserva controles visibles | No comprobado visualmente en vc164 |
+| Estabilidad visual | Dos capturas normales vc164 idénticas en geometría | Keyguard `showing=true`, `inputRestricted=true`, foco Bouncer/NotificationShade; Nexus no foreground |
+| Navegación propia vc164 | Agente → ArtBox → Biblioteca → Lanzadera completada, con capturas; revisión independiente sin otro hallazgo visual de impacto en retrato/fuente 1,5× | No comprobada en vc164; bloqueo persiste, sin otra tentativa |
+
+| Geometría Pixel, píxeles físicos y mismo tipo de escenario | vc161 | vc164 |
+|---|---|---|
+| Viewport prompt, sin referencias | 192 px | 1261 px; bounds `[96,444,1248,1705]` |
+| Hueco Avanzado → Coste, sin referencias | 1208 px | 115 px |
+| Viewport prompt, con una foto | 192 px | 553 px; bounds `[96,444,1248,997]` |
+| Hueco Avanzado → Coste, con una foto | 1070 px | 54 px; Avanzado termina en y2606 y Coste empieza en y2660 |
+| Hueco con una foto y fuente 1,5× | Sin comparación equivalente atribuida | 48 px |
+
+La retirada de la referencia QA devuelve exactamente el borrador original del Pixel
+en textos, parámetros, IDs/URI y conteos. Las huellas de instalación del S25 prueban
+conservación durante la actualización, no inspección visual de su formulario.
+La última captura S25 con tres referencias corresponde a **vc162**, sin atribuirla
+a vc164. vc163 fue solo compilada, no instalada.
+
+### Cierre vc164 y límite del S25
+
+La identidad final vuelve a comprobar vc164/hash coincidente y el borrador original
+exacto en ambos, sin ausencias en sus huellas. Pixel: Nexus foreground y Keyguard
+false; S25: Nexus no foreground, Keyguard showing/inputRestricted true. La navegación
+Pixel está completada. El colector definitivo posterior a navegación no detectó
+Fatal/ANR de Nexus en las ventanas disponibles:
+
+| Logs propios vc164 | Pixel | S25 |
+|---|---|---|
+| Líneas revisadas / Fatal o ANR de Nexus detectados | 14 726 / 0 | 101 957 / 0 |
+| Intervalo epoch del dispositivo | 1793253210.081 → 1793253895.315 | 1793253268.022 → 1793253937.221 |
+
+Estos logs no equivalen a QA visual del S25. Fuente/tamaño/rotación
+temporales restaurados: Android 1,0×, timeout 300000 ms, autoRot 1/userRotation 0;
+Pixel 1344 × 2992 @480, S25 1440 × 3120 con override 560. Se conserva S25 AURORA
+y escala de app ≈0,95.
+
+**Pendiente humano: desbloquear el S25 y repetir la QA visual vc164.** Despertar,
+dismiss y colapsar Shade no resolvieron el bloqueo; no se intentó PIN ni bypass.
+No hay decisión pendiente de pago, cambio de firma o acción destructiva. TalkBack,
+háptica física, S Pen y 120 Hz no están certificados. No se declara nivel 10 ni
+completitud física de ambos móviles. El detalle arquitectónico está en
+[CAPABILITY_UI.md](CAPABILITY_UI.md); instalación y QA propia en los JSON privados
+`release-v164.json`, `installation-v164.json`, `qa-v164-layout.json`,
+`qa-v164-cleanup.json`, `final-v164-identity.json` y `final-v164-device-checks.json`.
+
+## Checkpoint histórico comprobado vc161
+
+Las secciones siguientes conservan la entrega vc161 y sus datos propios; sus
+resultados de navegación, logs y comparación completa de bases no se atribuyen a vc164.
 
 ## Resultado comprobado
 

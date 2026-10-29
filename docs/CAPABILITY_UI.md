@@ -73,10 +73,31 @@ generar. Los controles reciben esquemas y valores; no identifican marcas.
 
 La principal usa una composición fija con resúmenes de entradas y chips de ajustes
 comunes. La gestión completa de archivos, el editor ampliado del prompt y Avanzado
-se abren en hojas. El desplazamiento de la principal se habilita solo ante teclado,
-texto ampliado o desbordamiento medido; en ancho suficiente se usan dos columnas.
-El prompt conserva su nodo y foco al reorganizarse. Los propietarios de hojas no
-se retiran por el teclado de otro editor.
+se abren en hojas. En ancho suficiente se usan dos columnas. El desplazamiento de
+respaldo depende del teclado y de si la altura mínima medida supera la disponible;
+la escala de fuente, por sí sola, no desactiva la expansión ni fuerza scroll. El
+prompt conserva su nodo y su rama de layout al entrar IME. Los propietarios de
+hojas no se retiran por el teclado de otro editor.
+
+`FixedLauncherWorkspace` mide la altura base de cada bloque y descuenta la
+extensión ya aplicada para que no se convierta en un mínimo creciente. El espacio
+sobrante aumenta el viewport editable del prompt y las previsualizaciones reales,
+sin aumentar botones, márgenes ni tamaño de letra. En una columna, los previews
+pueden recibir hasta el 60 % del sobrante, limitado por su capacidad según el ancho
+real; el resto va al editor. Sin prompt, los previews pueden usar todo el sobrante
+que admitan. En dos columnas se calcula el margen útil de cada una por separado.
+
+Los campos vacíos permanecen compactos. Cuando un par de fotogramas admite
+presentación horizontal y exactamente uno está poblado, ese preview ocupa todo el
+ancho; la ranura vacía y otras entradas vacías se agrupan de forma compacta. Con
+cero o dos fotogramas poblados se mantiene el par si cabe. La regla usa campos y
+estado, sin marcas; los renderers personalizados conservan su ruta de extensión.
+La capacidad de crecimiento procede del ancho efectivo y de cuántas miniaturas
+comparten la fila; no se estira una ranura vacía para igualarla al preview.
+
+Esta distribución es la implementación de layout de vc164; su aceptación física
+se registra en AUDIT_PLAN/AUDIT_REPORT y no se deduce de la compilación. No cambia
+cardinalidades, parámetros, archivos conservados, precios ni solicitudes.
 
 `DynamicControlRegistry.Provide` registra renderers por clave nativa o tipo
 semántico mediante un `CompositionLocal` acotado. Incluye imagen, inicio/final,
