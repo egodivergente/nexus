@@ -1,4 +1,39 @@
-# Nexus Desktop · 2026.10.29-desktop-premium.5
+# Nexus Desktop · 2026.10.29-desktop-premium.6
+
+## Moving files between projects and content deduplication · desktop-premium.6
+
+Library selection and the original viewer offer **Move to project**, including
+Unassigned and explicitly chosen archived projects. A move updates the shared
+asset index through its existing native API. Moving from a project changes only
+that project's association; moving from All changes all selected associations.
+IDs, URIs, original bytes, history, origin, role, tags and character references
+remain intact. Scene/shot links belonging to another project are cleared when
+crossing projects, to avoid references into the previous project's scene tree.
+
+Files with verified identical bytes appear once while retaining every project
+membership. Importing the same content, even under a different name, returns
+the existing file without moving it or restoring a retired asset. A same-name
+file with different bytes remains a distinct original. Streamed imports,
+clipboard media and the native file picker share content deduplication; legacy
+media aliases are resolved before reuse. Import registration accepts only a
+fresh server receipt and checks the complete local content again.
+
+Moving into a project which already contains the same verified content retires
+only the redundant library association. Existing original files and historical
+IDs remain preserved. An unavailable original never authorizes a destructive
+content merge. Readback determines the result, including a partial result if
+the native API applies only part of a batch or loses its acknowledgement.
+Browsing and content normalization remain read only. No dependencies or
+provider/generation contracts change.
+
+Validation: 19 operation tests, 11 read-only snapshot tests, nine import tests,
+55 model checks, the 43-check project workflow and the 69-check library/resume
+workflow pass. A separate 28-check Edge journey uses the actual bundled JVM
+and real original bytes in a disposable profile to verify moves, existing
+destinations, duplicate imports, retirement, archived imports and data
+preservation. The bundled SyncJournal also transfers the exact move delta to
+an isolated peer with an in-memory remote. No paid/provider operation occurs;
+the physical phones are not modified or claimed as end-to-end move validation.
 
 ## Shared project folders and native classification · desktop-premium.5
 

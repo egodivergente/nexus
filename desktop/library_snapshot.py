@@ -5,6 +5,7 @@ from pathlib import Path
 import threading
 
 from gallery_sources import GallerySources
+from content_identity import verified_content
 
 
 class LibrarySnapshot:
@@ -78,15 +79,43 @@ class LibrarySnapshot:
                              'status':'COMPLETED'} for a in self._index().get('assets',[])
                             if isinstance(a,dict) and isinstance(a.get('id'),str) and isinstance(a.get('uri'),str)]}
 
+    def _content_keys(self, index):
+        # Most originals have different byte counts. Hash only candidate groups
+        # and retain every project membership when two paths contain one file.
+        sizes={};assets={};asset_paths={}
+        for asset in index.get('assets',[]):
+            if not isinstance(asset,dict) or asset.get('libraryDeleted'):continue
+            local=self._local(asset)
+            if local is None:continue
+            try:size=local.stat().st_size
+            except OSError:continue
+            sizes.setdefault(size,set()).add(local)
+            assets.setdefault(local,[]).append(asset.get('id'))
+            asset_paths[asset.get('id')]=list(dict.fromkeys(self.sources._asset_paths(asset)))
+        result={}
+        for paths in sizes.values():
+            if len(paths)<2:continue
+            for path in paths:
+                identity=verified_content(path)
+                if identity:
+                    for identifier in assets[path]:
+                        candidates=asset_paths[identifier]
+                        if len(candidates)>1 and {verified_content(candidate) for candidate in candidates}!={identity}:continue
+                        result[identifier]=f'content:{identity[0]}:{identity[1]}'
+        return result
+
     def snapshot(self):
         with self.lock:
             state=self.read_state() or {};index=self._index()
+            self.sources._reload()
+            content_keys=self._content_keys(index)
             jobs=[j for j in state.get('jobs',[]) if isinstance(j,dict) and isinstance(j.get('id'),str)]
             signature=json.dumps([{key:j.get(key) for key in ('id','status','outputs','projectId','name','modelId','providerId',
                                  'modality','role','startedAt')} | {'parameterProjectId':(j.get('parameters') or {}).get('__project_id')}
                                  for j in jobs],sort_keys=True)
             key=(self.index_key,self._stamp(self.data/'remote-media-cache.json'),
-                 self._stamp(self.data/'media-aliases.json'),self._stamp(self.data/'originals-protection.json'),signature)
+                 self._stamp(self.data/'media-aliases.json'),self._stamp(self.data/'originals-protection.json'),signature,
+                 tuple(sorted(content_keys.items())))
             if key==self.cached_key and self.cached is not None:return self.cached
             self.sources._reload()
             projects=[p for p in index.get('projects',[]) if isinstance(p,dict) and isinstance(p.get('id'),str)]
@@ -137,6 +166,7 @@ class LibrarySnapshot:
                 if not isinstance(asset,dict) or not isinstance(asset.get('id'),str) or not isinstance(asset.get('uri'),str):continue
                 local=self._local(asset);local_uri='/media/'+local.name if local and local.parent==self.media else None
                 keys=['asset:'+asset['id']]
+                if asset['id'] in content_keys:keys.append(content_keys[asset['id']])
                 if local_uri:keys.append('local:'+local_uri)
                 linked=set(uri_keys.get(asset['uri'],set())) | (path_keys.get(str(local),set()) if local else set())
                 for value in keys:linked.update(identity_jobs.get(value,set()))

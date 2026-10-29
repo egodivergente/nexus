@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.10.29-desktop-premium.5'
+DESKTOP_VERSION = '2026.10.29-desktop-premium.6'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -48,6 +48,7 @@ _PREVIEWS_LOCK = threading.Lock()
 _WORKSPACE_SERVICES = {}
 _ORIGINAL_SERVICES = {}
 _LIBRARY_SERVICES = {}
+_LIBRARY_OPERATIONS = {}
 _LIBRARY_PREVIEWS = {}
 _SERVICE_LOCK = threading.RLock()
 
@@ -141,6 +142,17 @@ def library_previews():
             _LIBRARY_PREVIEWS[key]=GalleryPreviews(DATA,library_snapshot().preview_state,
                 lambda:agent_host().native.ffmpeg(),allow_remote=not OFFLINE_QA)
         return _LIBRARY_PREVIEWS[key]
+
+
+def library_operations():
+    host=agent_host()
+    with _SERVICE_LOCK:
+        key=str(DATA)
+        if key not in _LIBRARY_OPERATIONS:
+            from library_operations import LibraryOperations
+            _LIBRARY_OPERATIONS[key]=LibraryOperations(host,read_state,
+                snapshot=lambda:library_snapshot().snapshot())
+        return _LIBRARY_OPERATIONS[key]
 
 
 
@@ -462,6 +474,13 @@ def save_remote(url):
 def dispatch(keys, operation, args):
     if operation == 'librarySnapshot':
         return library_snapshot().snapshot()
+    if operation == 'libraryOperations':
+        return library_operations().command(args)
+    if operation == 'libraryImport':
+        if 'projectId' not in args:raise ValueError('Falta el proyecto de destino.')
+        item=media_importer().completed_item(args.get('id'))
+        return library_operations().register_import(item,args['projectId'],
+            allow_archived=args.get('allowArchivedProject') is True)
     if operation == 'workspaceContinuity':
         return workspace_continuity().command(args)
     if operation == 'originalArchive':
@@ -633,11 +652,7 @@ def dispatch(keys, operation, args):
             raise ValueError('Archivo no valido.')
         if not payload or len(payload) > 12 * 1024 * 1024:
             raise ValueError('Archivo vacio o demasiado grande.')
-        identifier = uuid.uuid4().hex + ext
-        MEDIA.mkdir(parents=True, exist_ok=True)
-        (MEDIA / identifier).write_bytes(payload)
-        return {'id': identifier, 'name': name, 'size': len(payload),
-                'mime': MIME[ext], 'url': '/media/' + identifier}
+        return media_importer().import_bytes(name,payload)
     if operation == 'schema':
         if OFFLINE_QA:
             fixture = json.loads((ROOT / 'tools' / 'agent-qa-schema.json').read_text(encoding='utf-8'))

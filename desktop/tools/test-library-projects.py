@@ -110,7 +110,7 @@ def fixture(root,sources):
         uris[name]='/media/'+target.name
     for name in ('document','unknown'):
         target=media/(uuid.uuid4().hex+'.txt')
-        target.write_text('Documento de aceptación: organización por proyecto sin mover el original.\n','utf-8')
+        target.write_text('Documento de aceptación '+name+': organización por proyecto sin mover el original.\n','utf-8')
         uris[name]='/media/'+target.name
     legacy=media/(uuid.uuid4().hex+sources['imageB'].suffix)
     shutil.copyfile(sources['imageB'],legacy);uris['legacy']='/media/'+legacy.name
@@ -275,7 +275,9 @@ def browser_acceptance(root,sources,output):
                 check('A chosen folder supplies import context without changing Agent project', page.evaluate("NexusGallery.importContext.projectId==='proj-a'&&Agent.snapshot.projectId==='proj-b'"))
                 for project,name,source in [('proj-a','Importado Alba'+sources['imageA'].suffix,sources['imageA']),('__unassigned__','Importado sin proyecto'+sources['imageB'].suffix,sources['imageB'])]:
                     restore(project=project,folder=project)
-                    target=root/name;shutil.copyfile(source,target)
+                    # A genuinely new file tests chosen-folder import; repeated
+                    # original bytes are deliberately rejected by library dedup.
+                    target=root/name;target.write_bytes(source.read_bytes()+b'\nNexus import scope: '+project.encode())
                     with page.expect_file_chooser() as chooser:
                         page.locator('[data-import-gallery]').click()
                     chooser.value.set_files(str(target))
@@ -284,7 +286,7 @@ def browser_acceptance(root,sources,output):
                     asset=next(a for a in current['assets'] if a.get('displayName')==name)
                     check('Library import follows '+('the selected folder' if project=='proj-a' else 'explicit Sin proyecto')+' instead of the Agent project', asset.get('projectId')==('proj-a' if project=='proj-a' else None))
                     copied=root/'media'/asset['uri'][7:]
-                    check('Imported original keeps its exact bytes in '+project, digest_bytes(copied.read_bytes())==digest_bytes(source.read_bytes()))
+                    check('Imported original keeps its exact bytes in '+project, digest_bytes(copied.read_bytes())==digest_bytes(target.read_bytes()))
                 check('Importing originals never fabricates generation jobs', json.dumps(page.evaluate('state.jobs'),sort_keys=True)==original_jobs)
                 check('Library organization and resume never trigger a generation or provider operation', not prohibited,prohibited)
                 check('Project and folder workflows make no external browser requests', not external,external)

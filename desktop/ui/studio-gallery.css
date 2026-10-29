@@ -122,3 +122,14 @@ body.nx-ten .library-files .gallery-filters>div{top:calc(100% + var(--space-2));
  body.nx-ten #content .library-project-folders button{flex:0 0 auto;width:auto;max-width:20rem;}
 }
 @media(max-width:800px){body.nx-ten .library-files .gallery-filters>div{width:min(22rem,calc(100vw - var(--space-8)));grid-template-columns:1fr;}}
+
+.library-move-dialog{display:grid;gap:var(--space-3);min-width:0;max-width:40rem;}
+.library-move-dialog :is(h2,p){margin:0;overflow-wrap:anywhere;}
+.library-move-fields{display:grid;gap:var(--space-4);margin:0;padding:0;border:0;min-width:0;}
+.library-move-fields>label{display:grid;gap:var(--space-2);font-size:var(--t-control);}
+.library-move-fields>button{justify-self:end;}
+#library-move-status{font-size:var(--t-control);line-height:1.5;color:var(--muted);}
+#library-move-status[data-state=error]{color:var(--danger);}
+#library-move-status[data-state=success]{color:var(--text);}
+#library-move-dialog form[hidden]{display:none!important;}
+@media(max-width:600px){.library-move-fields>button{justify-self:stretch;}}

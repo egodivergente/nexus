@@ -65,12 +65,43 @@ class LibraryProjectSnapshotTests(unittest.TestCase):
                          [('a','OUTPUT','GENERATED'),('b','REFERENCE','SHARED')])
         self.assertNotIn('archived-empty',row['projectIds'])
 
+    def test_identical_bytes_at_distinct_paths_share_verified_identity(self):
+        media=self.root/'media';media.mkdir()
+        first='a'*32+'.png';second='b'*32+'.jpg'
+        (media/first).write_bytes(b'same bytes')
+        (media/second).write_bytes(b'same bytes')
+        self.index['assets']=[{'id':'first','uri':'/media/'+first,'projectId':'a','type':'IMAGE'},
+                              {'id':'second','uri':'/media/'+second,'projectId':'b','type':'IMAGE'}]
+        self.index_path.write_text(json.dumps(self.index),'utf-8')
+        rows=self.entries()
+        keys=lambda row:{key for key in row['identityKeys'] if key.startswith('content:')}
+        self.assertTrue(keys(rows['asset:first']))
+        self.assertEqual(keys(rows['asset:first']),keys(rows['asset:second']))
+        self.assertEqual(rows['asset:first']['projectIds'],['a'])
+        self.assertEqual(rows['asset:second']['projectIds'],['b'])
+        # Content edits invalidate the projection even when index metadata stays.
+        (media/second).write_bytes(b'other data')
+        changed=self.entries()
+        self.assertNotEqual(keys(changed['asset:first']),keys(changed['asset:second']))
+
     def test_explicit_unassignment_overrides_original_job_project(self):
         row=self.entries()['job:job:1']
         self.assertEqual(row['projectIds'],[])
         self.assertEqual(row['knownProjectIds'],[])
         self.assertIsNone(row['memberships'][0]['projectId'])
         self.assertTrue(row['projectAssignmentExplicit'])
+
+    def test_conflicting_cached_original_does_not_supply_content_merge_proof(self):
+        media=self.root/'media';media.mkdir()
+        first='a'*32+'.png';second='b'*32+'.png';cached='c'*32+'.png'
+        for name,content in ((first,b'same'),(second,b'same'),(cached,b'else')):
+            (media/name).write_bytes(content)
+        self.index['assets']=[{'id':'first','uri':'/media/'+first,'projectId':'a','type':'IMAGE'},
+                              {'id':'second','uri':'/media/'+second,'projectId':'b','type':'IMAGE'}]
+        self.index_path.write_text(json.dumps(self.index),'utf-8')
+        (self.root/'remote-media-cache.json').write_text(json.dumps({'first':'/media/'+cached}),'utf-8')
+        rows=self.entries()
+        self.assertFalse(any(key.startswith('content:') for key in rows['asset:first']['identityKeys']))
 
     def test_legacy_assignment_uses_parameter_then_latest_generation(self):
         row=self.entries()['job:job:2']

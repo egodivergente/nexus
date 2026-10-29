@@ -321,7 +321,16 @@ def browser_acceptance(root, sources, output):
                 check('Historical and indexed aliases deduplicate to one visible file', len(owners('asset:asset-variant-a')) == 1 and owners('asset:asset-variant-a')[0]['id'] == va[0]['id'])
                 check('A deleted remote original stays out of the real library grid', not owners('job:job-deleted-remote:0'))
                 check('Normalized file count matches the visible grid', page.locator('.gallery-grid .gallery-piece').count() == len(items))
-                page.wait_for_function('()=>[...document.querySelectorAll(".gallery-grid img[data-gallery-preview=thumbnail]")].filter(i=>i.complete&&i.naturalWidth>100).length===4')
+                # The indexed-only copy of imageB and recovered copy of imageA
+                # reuse their physical originals after verified-content dedup.
+                expected_thumbnails=len({digest(path) for path in paths.values()})
+                try:
+                    page.wait_for_function('(expected)=>[...document.querySelectorAll(".gallery-grid img[data-gallery-preview=thumbnail]")].filter(i=>i.complete&&i.naturalWidth>100).length===expected',arg=expected_thumbnails)
+                except Exception:
+                    diagnostics=page.evaluate('''()=>({preview:NexusGallery.preview,items:NexusGallery.items,images:[...document.querySelectorAll(".gallery-grid img[data-gallery-preview=thumbnail]")].map(image=>({id:image.closest("[data-job]")?.dataset.job,state:image.dataset.previewState,src:image.getAttribute("src"),complete:image.complete,width:image.naturalWidth,height:image.naturalHeight,top:image.getBoundingClientRect().top,bottom:image.getBoundingClientRect().bottom}))})''')
+                    (output/'thumbnail-timeout.json').write_text(json.dumps(diagnostics,ensure_ascii=False,indent=2),'utf-8')
+                    page.screenshot(path=str(output/'thumbnail-timeout.png'))
+                    raise
                 page.screenshot(path=str(output/'complete-library-real-media.png'))
                 a_card = page.locator('[data-job="'+va[0]['id']+'"]')
                 a_card.locator('[data-gallery-group]').click()
@@ -340,7 +349,7 @@ def browser_acceptance(root, sources, output):
                 page.keyboard.press('Escape')
                 page.locator('#pc-search').fill('Original solo en el índice')
                 page.wait_for_function('()=>document.querySelectorAll(".gallery-grid .gallery-piece").length===1')
-                check('Indexed originals are searchable without fabricating a history entry', page.locator('.gallery-grid .gallery-piece').count() == 1)
+                check('Indexed originals remain searchable by alternate names after content deduplication', page.locator('.gallery-grid .gallery-piece').count() == 1 and page.locator('.gallery-piece').get_attribute('data-job')==vb[0]['id'])
                 page.locator('.gallery-piece [data-gallery-select]').click()
                 page.locator('#pc-search').focus()
                 page.evaluate("()=>{window.__qaSearch=document.querySelector('#pc-search');window.__qaSearch.setSelectionRange(4,9);}")

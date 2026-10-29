@@ -24,12 +24,17 @@ window.NexusImports = (() => {
   try{
    await ensureAssistantReady();
    const projectId=folderContext&&Object.hasOwn(folderContext,'projectId')?folderContext.projectId:Agent.snapshot.projectId||null;
+   let created=0,existing=0,retired=0;
    for(const file of files){
     const item=await importFile(file,(done,total)=>toast(`Importando ${file.name}: ${Math.round(done/total*100)} %`));
-    const kind=item.mime.startsWith('video/')?'VIDEO':item.mime.startsWith('image/')?'IMAGE':item.mime.startsWith('audio/')?'AUDIO':'OTHER';
-    await agentCall('importAssets',{assets:[{id:'asset_'+item.id.split('.')[0],uri:item.url,type:kind,role:'REFERENCE',source:'IMPORTED',displayName:item.name,mimeType:item.mime,sizeBytes:item.size,createdAt:Date.now(),projectId}]});
+    const result=await rpc('libraryImport',{id:item.id,projectId,allowArchivedProject:folderContext?.allowArchivedProject===true});
+    if(result.status==='created')created++;
+    else if(result.status==='retired')retired++;
+    else if(result.status==='exists')existing++;
+    else throw Error('No se pudo confirmar el registro del archivo.');
    }
-   window.dispatchEvent(new CustomEvent('nexus:library-changed'));await window.NexusGallery?.refresh();toast('Archivos importados en Biblioteca.');if(view==='library')render();
+   window.dispatchEvent(new CustomEvent('nexus:library-changed'));await window.NexusGallery?.refresh();
+   toast([created?`${created} ${created===1?'archivo importado':'archivos importados'}`:'',existing?`${existing} ya ${existing===1?'existía':'existían'} en Biblioteca`:'',retired?`${retired} ${retired===1?'archivo retirado omitido':'archivos retirados omitidos'}`:''].filter(Boolean).join(' · ')||'No hay archivos para importar.');if(view==='library')render();
   }finally{busy=false;}
  }
  // Library import is available without choosing a generation model or project first.

@@ -1,12 +1,16 @@
 """Bounded local imports. The 4 GiB limit is per file, unrelated to provider limits."""
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
+import re
 import shutil
 import threading
 import time
 import uuid
+
+from content_identity import verified_content
 
 MAX_IMPORT_BYTES = 4 * 1024**3
 CHUNK_BYTES = 4 * 1024**2
@@ -35,6 +39,7 @@ class MediaImporter:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         self.pending = {}
+        self.completed = {}
 
     def begin(self, name, size):
         name, ext = validate(name, size)
@@ -78,17 +83,74 @@ class MediaImporter:
 
     def finish(self, identifier):
         with self.lock:
+            pending_id = identifier
             item = self._item(identifier)
             if item['received'] != item['size'] or item['part'].stat().st_size != item['size']:
                 raise ValueError('Importación incompleta. El archivo todavía no está disponible en Biblioteca.')
             with item['part'].open('ab') as stream:
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(item['part'], self.directory / identifier)
-            self.pending.pop(identifier)
-            return {'id': identifier, 'name': item['name'], 'size': item['size'],
-                    'mime': MIME[Path(identifier).suffix], 'url': '/media/' + identifier,
-                    'sha256': item['digest'].hexdigest()}
+            identity = item['size'], item['digest'].hexdigest()
+            existing = None
+            # Compare bytes, never names. Only our unfinished copy is removed;
+            # existing originals and their history references remain intact.
+            candidates = [(path.name, path) for path in self.directory.iterdir()]
+            # Earlier installations keep originals under an alias. Reuse the
+            # valid media ID, rather than copying its differently named target.
+            from native_operations import resolve_media
+            try:
+                aliases = json.loads((self.directory.parent/'media-aliases.json').read_text('utf-8-sig'))
+                if isinstance(aliases, dict):
+                    for alias in aliases:
+                        try:
+                            candidates.append((alias, resolve_media(self.directory.parent, '/media/'+alias, self.directory)))
+                        except (ValueError, OSError, TypeError):
+                            continue
+            except (ValueError, OSError):
+                pass
+            for media_id, candidate in candidates:
+                if (not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+', media_id)
+                        or Path(media_id).suffix not in MIME or candidate.is_symlink()):
+                    continue
+                try:
+                    same_size = candidate.is_file() and candidate.stat().st_size == item['size']
+                except OSError:
+                    continue
+                if same_size and verified_content(candidate) == identity:
+                    existing = media_id
+                    break
+            reused = existing is not None
+            if reused:
+                item['part'].unlink()
+                identifier = existing
+            else:
+                os.replace(item['part'], self.directory / identifier)
+            self.pending.pop(pending_id)
+            result = {'id': identifier, 'name': item['name'], 'size': item['size'],
+                    'mime': MIME[Path(identifier).suffix.lower()], 'url': '/media/' + identifier,
+                    'sha256': identity[1], 'reused': reused}
+            now = time.monotonic()
+            self.completed = {key: value for key, value in self.completed.items() if now - value[0] < 3600}
+            if len(self.completed) >= 1024:
+                self.completed.pop(next(iter(self.completed)))
+            self.completed[identifier] = now, dict(result)
+            return result
+
+    def completed_item(self, identifier):
+        """A server receipt prevents forged library metadata and arbitrary paths."""
+        with self.lock:
+            receipt = self.completed.get(identifier)
+            if not receipt or time.monotonic() - receipt[0] >= 3600:
+                raise ValueError('La importación ha caducado. Vuelve a seleccionar el archivo.')
+            item = receipt[1]
+            from native_operations import resolve_media
+            try:
+                path = resolve_media(self.directory.parent, item['url'], self.directory)
+            except (ValueError, OSError):
+                raise ValueError('El archivo importado ya no está disponible.') from None
+            if verified_content(path) != (item['size'], item['sha256']):
+                raise ValueError('El archivo importado cambió. Vuelve a seleccionarlo.')
+            return dict(item)
 
     def abort(self, identifier):
         with self.lock:
@@ -115,6 +177,16 @@ class MediaImporter:
             after = source.stat()
             if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                 raise ValueError('El original cambió mientras se copiaba. Repite la importación cuando termine de guardarse.')
+            return self.finish(identifier)
+        except BaseException:
+            self.abort(identifier)
+            raise
+
+    def import_bytes(self, name, payload):
+        identifier = self.begin(name, len(payload))['import_id']
+        try:
+            for offset in range(0, len(payload), CHUNK_BYTES):
+                self.append_bytes(identifier, offset, payload[offset:offset + CHUNK_BYTES])
             return self.finish(identifier)
         except BaseException:
             self.abort(identifier)

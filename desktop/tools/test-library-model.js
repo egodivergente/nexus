@@ -69,4 +69,6 @@ const moved=M.build({projects,entries:[{id:'asset:moved',assetId:'moved',uri:'/m
 assert.deepEqual(moved[0].projectIds,['B'],'indexed APK move wins over a legacy local-import asset alias');
 assert.equal(M.filter(moved,{project:'A'}).length,0,'legacy import cannot resurrect the former project');
 assert.equal(M.filter(M.build({projects},[legacyImport]),{project:'A'}).length,1,'standalone legacy import retains its fallback project');
-console.log('library-model: 53 behavioral checks passed');
+assert(a.displayNames.includes('A')&&a.displayNames.includes('Different name'),'dedup preserves every real display name without replacing the canonical title');
+assert.deepEqual(M.filter(result,{query:'different name'}).map(row=>row.id),[a.id],'the same file remains searchable by an alternate indexed name');
+console.log('library-model: 55 behavioral checks passed');

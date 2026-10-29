@@ -42,7 +42,7 @@
   const aliases=unique([row.id,...strings(row.aliases),...(assetId?[assetId,'asset:'+assetId,'local-import:'+assetId]:[]),...(sourceJobId?[sourceJobId]:[])]);
   return {...row,...classification(row,known),id:row.id,assetId,sourceJobId,uri,localUri:local(uri)?uri:'',displayName:text(row.displayName)||text(row.name)||'Archivo',
    modality:kind(row.modality||row.type),createdAt:Number(row.createdAt??row.startedAt)||0,status:row.status||'COMPLETED',
-   identityKeys:identities,aliases,sourceReferences:[...list(row.sourceReferences).filter(ref=>ref&&typeof ref.sourceJobId==='string'&&Number.isInteger(ref.outputIndex)&&ref.outputIndex>=0),...(sourceJobId&&Number.isInteger(row.outputIndex)?[{sourceJobId,outputIndex:row.outputIndex}]:[])],sourceJobIds:unique([sourceJobId,...strings(row.sourceJobIds)].filter(Boolean)),assetIds:unique([assetId,...strings(row.assetIds)].filter(Boolean))};
+   identityKeys:identities,aliases,displayNames:unique([text(row.displayName),text(row.name),...strings(row.displayNames)].filter(Boolean)),sourceReferences:[...list(row.sourceReferences).filter(ref=>ref&&typeof ref.sourceJobId==='string'&&Number.isInteger(ref.outputIndex)&&ref.outputIndex>=0),...(sourceJobId&&Number.isInteger(row.outputIndex)?[{sourceJobId,outputIndex:row.outputIndex}]:[])],sourceJobIds:unique([sourceJobId,...strings(row.sourceJobIds)].filter(Boolean)),assetIds:unique([assetId,...strings(row.assetIds)].filter(Boolean))};
  }
  function build(snapshot,jobs,options={}){
   const deleted=new Set(strings(options.deletedJobIds)),hiddenKeys=new Set(strings(snapshot?.hiddenIdentityKeys)),rows=[],known=Array.isArray(snapshot?.projects)?new Set(snapshot.projects.map(p=>p.id)):null;
@@ -67,7 +67,7 @@
    // and legacy preference keys of identical files from other devices/jobs.
    const preferred=!target.assetId&&source.assetId?source:target,other=preferred===source?target:source;
    const merged={...other,...preferred,createdAt:Math.max(target.createdAt,source.createdAt)};
-   for(const key of ['identityKeys','aliases','sourceJobIds','assetIds'])merged[key]=unique([...target[key],...source[key]]);
+   for(const key of ['identityKeys','aliases','sourceJobIds','assetIds','displayNames'])merged[key]=unique([...target[key],...source[key]]);
    const classified=target.projectAssignmentExplicit&&!source.projectAssignmentExplicit?[target]:source.projectAssignmentExplicit&&!target.projectAssignmentExplicit?[source]:[target,source];
    merged.memberships=[...new Map(classified.flatMap(row=>row.memberships).map(m=>[JSON.stringify(m),m])).values()];
    merged.projectIds=unique(classified.flatMap(row=>row.projectIds));merged.knownProjectIds=unique(classified.flatMap(row=>row.knownProjectIds));
@@ -104,7 +104,7 @@
   const query=text(filters.query).trim().toLocaleLowerCase();
   return list(entries).filter(entry=>!isHidden(entry,prefs)&&matchesClassification(entry,filters)&&(!filters.kind||entry.modality===filters.kind)&&(!filters.provider||entry.providerId===filters.provider)
    &&(!filters.status||entry.status===filters.status)&&(!filters.favorites||isFavorite(entry,prefs))&&(!filters.collection||collection(entry,prefs)===filters.collection)
-   &&(!filters.group||inGroup(entry,filters.group))&&(!query||[entry.displayName,entry.prompt,entry.modelId,entry.source,entry.projectName].join(' ').toLocaleLowerCase().includes(query)));
+   &&(!filters.group||inGroup(entry,filters.group))&&(!query||[entry.displayName,...(entry.displayNames||[]),entry.prompt,entry.modelId,entry.source,entry.projectName].join(' ').toLocaleLowerCase().includes(query)));
  }
  function folders(entries,snapshot={},prefs={}){
   const visible=list(entries).filter(entry=>!isHidden(entry,prefs));
