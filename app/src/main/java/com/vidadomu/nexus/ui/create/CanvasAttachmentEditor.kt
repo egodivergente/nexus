@@ -80,6 +80,21 @@ internal fun CanvasAttachmentEditor(
         else -> "${selected.size} / ${field.maximum}" + if(field.required) " · obligatorio" else ""
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+        if(selected.isEmpty() && !field.required && !frameColumn) {
+            Surface(onClick={sourcesOpen=true},enabled=canImport,shape=NexusTokens.field,
+                color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,colors.outlineVariant),
+                modifier=Modifier.fillMaxWidth().heightIn(min=56.dp).stylusHover(canImport)) {
+                Row(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                    Icon(icon,null,Modifier.size(NexusTokens.iconDefault),tint=colors.onSurfaceVariant)
+                    Column(Modifier.weight(1f)) {
+                        Text(field.label,style=MaterialTheme.typography.labelLarge)
+                        Text(if(field.maximum==1) "Opcional" else "Opcional · $countLabel",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                    }
+                    Icon(Icons.Default.ChevronRight,null,Modifier.size(NexusTokens.iconMedium),tint=colors.onSurfaceVariant)
+                }
+            }
+        } else {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Column(Modifier.weight(1f)) {
@@ -127,6 +142,7 @@ internal fun CanvasAttachmentEditor(
             CanvasAttachmentTile(item,field.label,enabled,thumbnailSize=104.dp) {
                 onRemove(item.id);haptics.perform(NexusHapticEvent.SELECTION)
             }
+        }
         }
         if(selected.size>field.maximum) Text("Este borrador conserva ${selected.size} archivos; el modelo admite ${field.maximum}. Revisa la selección antes de generar.",
             style=MaterialTheme.typography.bodySmall,color=colors.error)

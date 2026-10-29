@@ -29,11 +29,24 @@ internal fun CapabilityMediaInputs(fields: List<CanvasInputField>, model: NexusM
     val pair=declaredFramePair(fields,model)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val parallel=CanvasInputPlan.pairedFrames(pair,model,maxWidth.value,LocalDensity.current.fontScale)
+        // This is presentation order only: native field keys, media order and the request stay unchanged.
+        val groups=(fields.filterNot {parallel && it in pair}.map {listOf(it)}+
+            if(parallel) listOf(pair) else emptyList()).sortedWith(
+                compareBy<List<CanvasInputField>> {group -> group.none {it.required}}
+                    .thenBy {group -> group.minOf {field -> when {
+                        field.mime.startsWith("image/") && field.maximum==1 -> 0
+                        field.mime.startsWith("image/") -> 1
+                        field.mime.startsWith("video/") -> 2
+                        field.mime.startsWith("audio/") -> 3
+                        else -> 4
+                    }}})
         Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            if(parallel) StartEndFrameSelector(pair,media,enabled,onAdd,onRemove,onReorder)
-            fields.filterNot {parallel && it in pair}.forEach {field -> key(model?.providerId,model?.id,field.key) {
-                RegisteredMediaControl(field,media,enabled,{onAdd(field,it)},onRemove,onReorder)
-            }}
+            groups.forEach {group ->
+                if(parallel && group==pair) StartEndFrameSelector(pair,media,enabled,onAdd,onRemove,onReorder)
+                else group.forEach {field -> key(model?.providerId,model?.id,field.key) {
+                    RegisteredMediaControl(field,media,enabled,{onAdd(field,it)},onRemove,onReorder)
+                }}
+            }
         }
     }
 }

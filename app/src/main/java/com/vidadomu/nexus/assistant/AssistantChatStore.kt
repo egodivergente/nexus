@@ -97,7 +97,7 @@ internal class AssistantChatStore(private val context: Context) {
     fun conversations(projectId: String? = null): List<AssistantChatEntry> {
         if (!indexLoaded) {
             runCatching { json.decodeFromString<ConversationIndexFile>(indexFile.readText()) }.getOrNull()
-                ?.takeIf {it.version>=2}?.let { index.putAll(it.entries) }
+                ?.takeIf {it.version>=3}?.let { index.putAll(it.entries) }
             indexLoaded = true
         }
         val files = File(context.filesDir,"assistant/conversations").listFiles().orEmpty().filter { it.extension == "json" }
@@ -112,7 +112,7 @@ internal class AssistantChatStore(private val context: Context) {
         }
         if (changed) runCatching {
             val target = AtomicFile(indexFile); val out = target.startWrite()
-            try { out.write(json.encodeToString(ConversationIndexFile(version = 2, entries = HashMap(index))).toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
+            try { out.write(json.encodeToString(ConversationIndexFile(version = 3, entries = HashMap(index))).toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
             catch (e: Exception) { target.failWrite(out); throw e }
         }
         return files.sortedByDescending { it.lastModified() }.mapNotNull { file ->

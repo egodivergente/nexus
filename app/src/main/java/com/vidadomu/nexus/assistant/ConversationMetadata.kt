@@ -2,6 +2,11 @@ package com.vidadomu.nexus.assistant
 
 internal data class ConversationMetadata(val title:String,val preview:String,val searchText:String)
 
+internal fun conversationPreview(text:String):String = text
+    .replace(Regex("(?m)^\\s*:::[A-Za-z_-]*[ \\t]*"),"")
+    .replace("**","").replace("__","").replace("`","")
+    .replace(Regex("\\s+")," ").trim().take(160)
+
 internal fun normalizeConversationSearch(text:String):String = java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFD)
     .replace(Regex("\\p{M}+"),"").lowercase(java.util.Locale.ROOT)
 
@@ -14,5 +19,5 @@ internal fun conversationMetadata(items:List<ChatItem>):ConversationMetadata {
     }}.filter {it.isNotBlank()}
     val first=items.filterIsInstance<ChatItem.User>().firstOrNull {it.text.isNotBlank()}?.text
     return ConversationMetadata(first?.replace(Regex("\\s+")," ")?.take(180) ?: "Nueva conversación",
-        messages.lastOrNull()?.replace(Regex("\\s+")," ")?.take(160).orEmpty(),normalizeConversationSearch(messages.joinToString("\n")))
+        messages.lastOrNull()?.let(::conversationPreview).orEmpty(),normalizeConversationSearch(messages.joinToString("\n")))
 }
