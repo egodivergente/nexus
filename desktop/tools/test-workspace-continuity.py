@@ -68,6 +68,22 @@ class WorkTest(unittest.TestCase):
         self.assertNotEqual(first['id'],second['id']);self.assertEqual(len(self.source.list()),2)
         self.assertEqual(self.source._snapshot(first['id'])['canvas']['prompt'],'Una escena')
 
+    def test_library_project_and_classification_survive_export_receive_and_resume(self):
+        library={'project':'project_one','folder':'project_one','source':'EDITED','role':'FINAL',
+                 'sceneId':'scene_one','shotId':'shot_one','sort':'recent'}
+        self.args.update(view='library',library=library)
+        snapshot=self.snapshot();target=self.target();target.receive(snapshot)
+        self.assertEqual(target.open(snapshot['id'])['library'],library)
+        self.args['library']['project']='__unassigned__'
+        self.args['library']['folder']=''
+        self.assertEqual(self.snapshot()['library']['project'],'__unassigned__')
+
+    def test_library_classification_rejects_invalid_types_and_identifiers(self):
+        for key,value in [('project',{}),('folder','../../outside'),('source','SECRET'),
+                          ('role',[]),('sceneId','../other'),('shotId',42)]:
+            self.args['library']={key:value}
+            with self.subTest(key=key),self.assertRaises(ValueError):self.source.capture(self.args)
+
     def test_unshared_work_is_not_published(self):
         self.args['shared']=False;self.snapshot();self.assertEqual(self.source.export(),[])
 

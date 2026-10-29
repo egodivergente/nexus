@@ -1,4 +1,48 @@
-# Nexus Desktop · 2026.10.29-desktop-premium.4
+# Nexus Desktop · 2026.10.29-desktop-premium.5
+
+## Shared project folders and native classification · desktop-premium.5
+
+The gallery now displays the APK's actual projects as folders, using their
+stable IDs and names from the shared index. All files, unassigned files and
+each project have separate views and deduplicated counts. Empty archived
+projects retain their metadata; archived projects containing files remain
+accessible. Existing local collections remain explicitly labelled as belonging
+to this PC and never substitute for shared project folders.
+
+Each file retains its project memberships and native classification: origin
+(Nexus/generated, imported, edited, shared), role, scene, shot, characters and
+tags. The same original can belong to two projects without losing either
+membership. Combined filters must match one membership; the role from project
+A cannot satisfy a filter in project B. An explicit unassignment overrides the
+historical generation's project, matching Android. Source defaults and edited
+precedence follow Android LibraryOrigin. No filename or directory heuristic is
+used to invent a project or hierarchy.
+
+Browsing, filtering and viewing do not move files or rewrite the shared index.
+Viewer variant navigation respects the selected project and classification.
+Imports capture the gallery's project before starting the transfer, including
+an explicit null for Unassigned, independently of the assistant's active
+project. Saved work points retain project and classification filters with
+validated values. No generation/provider behavior or dependencies change.
+
+Physical read-only checks found APK 160 on S25 Ultra and APK 161 on Pixel 8
+Pro, each with six project IDs. During this task Drive applied the newer index to Windows,
+which then contained six projects as well. The first completed exchange also
+verified all 283 protected output records against Drive checksum metadata.
+This does not imply that every historical original is available or every
+conflict is resolved; those statuses remain visible separately.
+A final read-only comparison of Windows and Pixel matched all 2,611 asset IDs
+and their project, role, source, scene, shot, character, tag and parent metadata.
+All six project names/archive flags and 1,326 retired records matched too; local
+URIs differ by device and are intentionally excluded from this comparison.
+
+Validation: 53 library-model checks, nine backend projection tests and 15 work
+point tests pass. The 43-check real-media Edge acceptance covers multi-project aliases,
+explicit unassignment, archived/empty folders, cross-scope filters, rename by
+stable ID, resume filters and real file chooser imports. Dark 1440 px and light
+640 px with 150% text pass without horizontal overflow. The existing 69-check
+library/resume workflow also passes. Private audit data and screenshots stay
+outside Git; Android data and installations are not changed.
 
 ## Complete library and explicit resume · desktop-premium.4
 

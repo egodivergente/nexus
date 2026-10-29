@@ -173,8 +173,17 @@ class WorkspaceContinuity:
                 raise ValueError('Posición de montaje no válida.')
             result['editor'][key] = value
         library = inert_values(snapshot['library'])
-        if not isinstance(library, dict) or set(library) - {'collection','favorites','sort','group','limit','viewer','query','kind'}:
+        if not isinstance(library, dict) or set(library) - {'collection','favorites','sort','group','limit','viewer','query','kind','project','folder','source','role','sceneId','shotId'}:
             raise ValueError('Estado de biblioteca no válido.')
+        for key in ('project','folder','sceneId','shotId'):
+            if key in library:
+                value=text(library[key],200,'carpeta de biblioteca')
+                if value and not re.fullmatch(r'[A-Za-z0-9_:.\-]+',value):
+                    raise ValueError('Carpeta de biblioteca no válida.')
+        for key,allowed in (('source',{'','GENERATED','IMPORTED','EDITED','SHARED'}),
+                            ('role',{'','KEYFRAME','REFERENCE','OUTPUT','FINAL','SOURCE','OTHER'})):
+            if key in library and (not isinstance(library[key],str) or library[key] not in allowed):
+                raise ValueError('Clasificación de biblioteca no válida.')
         result['library'] = library
         result['shared'] = snapshot['shared']
         if len(encoded(result)) > 1_000_000:

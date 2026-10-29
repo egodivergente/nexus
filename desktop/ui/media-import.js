@@ -20,12 +20,14 @@ window.NexusImports = (() => {
   if(busy)throw Error('Espera a que termine la importación.');
   if(Agent.busy||Agent.generating)throw Error('Espera a que termine el turno del agente.');
   busy=true;
+  const folderContext=window.NexusGallery?.importContext;
   try{
    await ensureAssistantReady();
+   const projectId=folderContext&&Object.hasOwn(folderContext,'projectId')?folderContext.projectId:Agent.snapshot.projectId||null;
    for(const file of files){
     const item=await importFile(file,(done,total)=>toast(`Importando ${file.name}: ${Math.round(done/total*100)} %`));
     const kind=item.mime.startsWith('video/')?'VIDEO':item.mime.startsWith('image/')?'IMAGE':item.mime.startsWith('audio/')?'AUDIO':'OTHER';
-    await agentCall('importAssets',{assets:[{id:'asset_'+item.id.split('.')[0],uri:item.url,type:kind,role:'REFERENCE',source:'IMPORTED',displayName:item.name,mimeType:item.mime,sizeBytes:item.size,createdAt:Date.now(),projectId:Agent.snapshot.projectId||null}]});
+    await agentCall('importAssets',{assets:[{id:'asset_'+item.id.split('.')[0],uri:item.url,type:kind,role:'REFERENCE',source:'IMPORTED',displayName:item.name,mimeType:item.mime,sizeBytes:item.size,createdAt:Date.now(),projectId}]});
    }
    window.dispatchEvent(new CustomEvent('nexus:library-changed'));await window.NexusGallery?.refresh();toast('Archivos importados en Biblioteca.');if(view==='library')render();
   }finally{busy=false;}
