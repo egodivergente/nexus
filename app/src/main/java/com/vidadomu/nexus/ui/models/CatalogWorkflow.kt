@@ -25,10 +25,13 @@ internal enum class CatalogWorkflow(val label:String, val summary:String) {
 }
 
 private val EDIT_ROUTE = Regex("(^|[/_.-])(edit|editing|i2i|image-to-image|img2img|reference|references|remix)([/_.-]|$)")
+private val VIDEO_INPUT_ROUTE = Regex("(^|[/_.-])(v2v|video[-_]to[-_]video)([/_.-]|$)")
+private val IMAGE_INPUT_ROUTE = Regex("(^|[/_.-])(i2v|image[-_]to[-_]video)([/_.-]|$)")
 
 internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
     val capabilities=model.capabilities.toSet()
-    val id=(model.providerModelId ?: model.id).lowercase()
+    // An upstream model alias can serve several endpoints; the local route and contract keep their task identity.
+    val id=listOfNotNull(model.providerModelId,model.id,model.contractEndpoint).joinToString("/").lowercase()
     if(Modality.CHAT in model.modalities) return listOf(CatalogWorkflow.CHAT)
     if(Modality.AUDIO in model.modalities && Modality.VIDEO !in model.modalities) return listOf(CatalogWorkflow.AUDIO)
     if(ModelCapability.UPSCALE in capabilities || "upscal" in id) return listOf(CatalogWorkflow.UPSCALE)
@@ -65,10 +68,10 @@ internal fun catalogWorkflows(model:NexusModel):List<CatalogWorkflow> {
         ModelCapability.REFERENCE_TO_VIDEO in capabilities -> CatalogWorkflow.REFERENCES
         // The route's own name (v2v, i2v) wins over a generic text-to-video tag: those need a video or an image.
         ModelCapability.VIDEO_EDIT in capabilities || ModelCapability.VIDEO_TO_VIDEO in capabilities || model.inputMode==ModelInputMode.VIDEO_INPUT ||
-            Regex("(^|[/_.-])(v2v|video-to-video)([/_.-]|$)").containsMatchIn(id) -> CatalogWorkflow.EDIT_VIDEO
+            VIDEO_INPUT_ROUTE.containsMatchIn(id) -> CatalogWorkflow.EDIT_VIDEO
         model.lastFrameField!=null && model.supportsLastFrame -> CatalogWorkflow.FRAMES
         ModelCapability.IMAGE_TO_VIDEO in capabilities || model.supportsImageInput ||
-            Regex("(^|[/_.-])(i2v|image-to-video)([/_.-]|$)").containsMatchIn(id) -> CatalogWorkflow.ANIMATE
+            IMAGE_INPUT_ROUTE.containsMatchIn(id) -> CatalogWorkflow.ANIMATE
         ModelCapability.TEXT_TO_VIDEO in capabilities || model.inputMode==ModelInputMode.TEXT_ONLY -> CatalogWorkflow.CREATE_VIDEO
         else -> CatalogWorkflow.REFERENCES
     })
