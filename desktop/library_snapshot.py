@@ -10,7 +10,7 @@ from gallery_sources import GallerySources
 class LibrarySnapshot:
     def __init__(self, data, read_state, archive=None):
         self.data, self.read_state, self.archive = Path(data), read_state, archive
-        self.sources = archive.previews.sources if archive else GallerySources(self.data, read_state)
+        self.sources = GallerySources(self.data, read_state)
         self.media = (self.data / "media").resolve()
         self.lock = threading.RLock()
         self.cached_key = None

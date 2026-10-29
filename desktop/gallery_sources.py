@@ -25,6 +25,7 @@ class GallerySources:
         self.historical_generations = {}
         self.cache = {}
         self.protected = {}
+        self.protection_stamp = None
         self.hashes = {}
         self.local_paths = {}
         self.alias_stamp = None
@@ -63,12 +64,15 @@ class GallerySources:
             workspace = (sync / 'workspaces' / folder).resolve()
             if workspace.is_relative_to((sync / 'workspaces').resolve()):
                 journal_file = workspace / 'journal.json'
-        stamp = (self._stamp(index_file), self._stamp(cache_file), self._stamp(protection_file), self._stamp(configuration_file),
+        stamp = (self._stamp(index_file), self._stamp(cache_file), self._stamp(configuration_file),
                  self._stamp(journal_file) if journal_file is not None else None)
+        protection_stamp = self._stamp(protection_file)
+        if protection_stamp != self.protection_stamp:
+            protection = self._json(protection_file, {})
+            self.protected = protection.get('records', {}) if isinstance(protection, dict) and isinstance(protection.get('records', {}), dict) else {}
+            self.protection_stamp = protection_stamp
         if stamp == self.metadata_key:
             return
-        protection = self._json(protection_file, {})
-        self.protected = protection.get('records', {}) if isinstance(protection, dict) and isinstance(protection.get('records', {}), dict) else {}
         index = self._json(index_file, {})
         if not isinstance(index, dict):
             index = {}

@@ -1,6 +1,6 @@
-# Nexus Desktop · 2026.10.29-desktop-premium.3
+# Nexus Desktop · 2026.10.29-desktop-premium.4
 
-## Complete library and explicit resume · desktop-premium.3
+## Complete library and explicit resume · desktop-premium.4
 
 The library now reads the shared AssetIndex as well as every individual history
 output. It includes indexed originals without a Desktop generation record,
@@ -12,6 +12,9 @@ asset no longer invents a generation job. PDF and other binary documents offer
 an original download instead of being fetched as text or embedded unsafely.
 
 The projection is read only. Browser state and provider payloads stay intact.
+The index has its own provenance resolver so archive protection cannot hold its
+read lock; protection metadata refreshes independently of the large index and
+journal. This corrects contention observed during the real first archive pass.
 Fresh outputs remain visible while the index refreshes; unchanged snapshots do
 not rerender the grid. Refresh preserves search selection and scroll position.
 The canvas, recent tray and stage also request local bounded previews, fixing
@@ -21,15 +24,20 @@ preview workers are shared across history and indexed assets.
 A single background worker protects available completed originals in permanent
 local media. Copies are SHA-256 checked, fsynced and atomically published; failed
 metadata writes roll back the visible record. Original URLs and user files are
-retained. Asset IDs include the output identity and content SHA so a changed
-output cannot overwrite a previous registered original. Historical bootstrap
+retained. New requested asset IDs include the output identity and content SHA so a
+changed output cannot overwrite a previous registered original. Registration
+uses the canonical ID actually persisted by the engine: an existing exact URI,
+including a retired asset, keeps its original ID and metadata. Partial
+registration and metadata failures cannot mark uncommitted identities as saved. Historical bootstrap
 uses existing local originals; explicit retries may retrieve remote outputs.
 Local registration and cloud verification are separate states in Dispositivos.
 A cloud copy counts only after the locally captured SHA-256 and byte size match
 Drive server checksum metadata for its blob; journal success alone is not proof.
 Unavailable or conflicting checksum metadata leaves that original pending.
 The Google callback now remains available for 30 minutes, allowing time for
-manual consent without losing the local callback after five minutes.
+manual consent without losing the local callback after five minutes. Reopening
+a pending authorization reuses its live callback instead of creating a second
+flow or locking reconnection until the timeout.
 
 **Guardar trabajo** records an immutable, explicit work point with project,
 view, model, prompt, controls, original references and editor/library context.
@@ -58,13 +66,17 @@ them to 897 distinct files before user display preferences. A cold projection
 fell from 52.55 s to 13.14 s on AXELPC; cached projection measured 0.019 s. These
 are diagnostic timings, not an EliteBook performance claim.
 
-Release checks: the integrated real-media workflow passed 63 checks, the
-legacy thumbnail/resource suite passed 47, Drive passed 24, work-point backend
+Release checks: the integrated real-media workflow passed 69 checks, the
+legacy thumbnail/resource suite passed 47, Drive passed 25, work-point backend
 13, Android adapter 10, direct continuity 28, the pure library model 26 and
-original-state rendering 5. The seven-view layout matrix completed its layout
+original-state rendering 5, and canonical original registration 9. The seven-view layout matrix completed its layout
 checks; the updated canonical selection/focus/save/contrast suite passed all 36
 focused checks. Physical Android verification covered prepare/readback/discard;
 opening the mobile canvas was mock-tested only to avoid replacing active work.
+The real first local archive pass protected 283 output references in 264 unique
+files. A separate complete SHA-256/size readback found no mismatch. The remaining
+87 historical output references still needed an available original; Drive
+authorization and full cross-device convergence were not inferred from this pass.
 
 ## Gallery correction · desktop-premium.2
 

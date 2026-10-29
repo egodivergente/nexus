@@ -123,7 +123,42 @@ def archive_acceptance(root, state, paths, uris):
     check('Failed metadata registration does not claim cloud backup', archive.public()['registered'] == 0 and archive.public()['pendingCloud'] == archive.public()['archived'])
     register.return_value = True
     archive._register()
+    check('A truthy acknowledgement without canonical index IDs is not a registration', archive.public()['registered'] == 0)
+
+    def canonical_registration(rows):
+        # AssetIndex.addAsset deduplicates by URI and can return an existing ID.
+        # Preserve that canonical metadata, including a pre-existing tombstone.
+        from native_operations import atomic_json
+        current = json.loads((root/'assistant/index.json').read_text('utf-8'))
+        mapping = {}
+        for requested in rows:
+            existing = next((asset for asset in current['assets'] if asset.get('uri') == requested['uri']),None)
+            if existing is None:
+                existing = copy.deepcopy(requested);current['assets'].append(existing)
+            mapping[requested['id']] = existing['id']
+        atomic_json(root/'assistant/index.json',current)
+        return mapping
+
+    register.side_effect = canonical_registration
+    archive._register()
+    variants = {(row['jobId'],row['index']):row for row in archive.records.values()}
+    check('Original registration retains canonical IDs returned by URI deduplication', variants[('job-variants',0)]['assetId'] == 'asset-variant-a' and variants[('job-variants',1)]['assetId'] == 'asset-variant-b')
     check('Local registration still leaves cloud verification pending', archive.public()['registered'] == archive.public()['archived'] and archive.public()['pendingCloud'] == archive.public()['archived'])
+    protected_again = archive.protect('job-variants',0,remote=False)
+    check('Protecting the same verified original again preserves its canonical registration', protected_again['assetId'] == 'asset-variant-a' and protected_again['registered'] is True)
+    hidden_copy = root/'media'/(uuid.uuid4().hex+paths['imageA'].suffix)
+    shutil.copyfile(paths['imageA'],hidden_copy)
+    current_index = json.loads((root/'assistant/index.json').read_text('utf-8'))
+    current_index['assets'].append({'id':'asset-hidden-canonical','uri':'/media/'+hidden_copy.name,'type':'IMAGE','role':'OUTPUT','source':'GENERATED','displayName':'Original retirado','createdAt':1,'libraryDeleted':True})
+    from native_operations import atomic_json
+    atomic_json(root/'assistant/index.json',current_index)
+    hidden_job = {**state['jobs'][0],'id':'job-hidden-canonical','outputs':['/media/'+hidden_copy.name]}
+    state['jobs'].append(hidden_job)
+    archive.protect(hidden_job['id'],remote=False);archive._register()
+    stored_hidden = next(asset for asset in json.loads((root/'assistant/index.json').read_text('utf-8'))['assets'] if asset['id']=='asset-hidden-canonical')
+    hidden_key = archive.previews.key(hidden_job['id'],0,hidden_job['outputs'][0])
+    check('Protecting bytes behind an existing tombstone does not resurrect its library metadata', stored_hidden['libraryDeleted'] is True and archive.records[hidden_key]['assetId'] == 'asset-hidden-canonical')
+    state['jobs'][:] = [job for job in state['jobs'] if job['id'] != hidden_job['id']]
     ephemeral.unlink()
     restarted = archive_module.OriginalArchive(root, lambda: state, start_worker=False)
     check('Protected original survives derived-cache deletion and archive restart', digest(durable) == protected['sha256'] and restarted.public()['archived'] == archive.public()['archived'])
@@ -158,6 +193,7 @@ def archive_acceptance(root, state, paths, uris):
     archive.cloud_verified(confirmed)
     late_key = archive.previews.key(during['id'],0,during['outputs'][0])
     check('Cloud confirmation excludes originals registered after that sync snapshot', archive.records[late_key].get('cloudVerifiedAt') is None and archive.public()['pendingCloud'] == 1)
+    check('Confirmed cloud originals reference canonical IDs present in the shared index', all(any(asset['id']==row['assetId'] and asset.get('uri')==row['uri'] for asset in json.loads((root/'assistant/index.json').read_text('utf-8'))['assets']) for row in archive.records.values() if row.get('cloudVerifiedAt')))
     state['jobs'][:] = [job for job in state['jobs'] if job['id'] != during['id']]
     binary_state = {'jobs':[{'id':'job-binary-original','modality':'IMAGE','status':'COMPLETED','outputs':['https://fixture.invalid/full-original.jpeg']}]}
     binary = archive_module.OriginalArchive(root/'binary-response',lambda:binary_state,start_worker=False)

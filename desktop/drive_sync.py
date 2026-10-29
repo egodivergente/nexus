@@ -61,6 +61,7 @@ class DriveSync:
                            'message': 'El último intercambio dejó originales pendientes de recuperar.'}
         self.failed_media = {}
         self.original_hashes = {}
+        self.auth_lock = threading.Lock()
         self.closed = threading.Event()
         if start_scheduler:
             threading.Thread(target=self._schedule, daemon=True).start()
@@ -195,10 +196,15 @@ class DriveSync:
             return secret['access_token']
 
     def begin(self):
+        with self.auth_lock:
+            return self._begin()
+
+    def _begin(self):
         if not self.config.get('client_id'):
             raise ValueError('Importa primero el JSON OAuth de escritorio de Nexus.')
         if getattr(self, 'auth_server', None):
-            raise ValueError('La conexión de Google ya está abierta. Termina ese paso o espera unos minutos.')
+            if not self.auth_done.is_set():return self.auth_url
+            raise ValueError('Google está terminando la conexión. Espera un momento.')
         owner = self
         state = secrets.token_urlsafe(32)
         verifier = secrets.token_urlsafe(64)
@@ -258,10 +264,11 @@ class DriveSync:
                 self.auth_server = None
 
         threading.Thread(target=serve, daemon=True).start()
-        return 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode({
+        self.auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode({
             'client_id': self.config['client_id'], 'redirect_uri': redirect, 'response_type': 'code',
             'scope': SCOPE, 'access_type': 'offline', 'prompt': 'consent', 'state': state,
             'code_challenge': challenge, 'code_challenge_method': 'S256'})
+        return self.auth_url
 
     def run(self, resolution=None):
         if not self.lock.acquire(False):

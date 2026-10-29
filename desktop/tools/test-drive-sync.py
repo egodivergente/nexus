@@ -59,6 +59,13 @@ class DriveSyncTest(unittest.TestCase):
         self.assertNotIn('test-only', url)
         self.assertGreaterEqual(len(query['state'][0]), 40)
 
+    def test_reopening_pending_authorization_reuses_the_same_live_callback(self):
+        first = self.service.begin()
+        server = self.service.auth_server
+        self.assertEqual(self.service.begin(),first)
+        self.assertIs(self.service.auth_server,server)
+        self.assertFalse(self.service.auth_done.is_set())
+
     def test_invalid_state_cannot_capture_an_authorization(self):
         url = self.service.begin()
         with self.assertRaises(urllib.error.HTTPError):

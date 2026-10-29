@@ -35,13 +35,35 @@ class OriginalArchive:
             self.records = value.get('records', {}) if isinstance(value, dict) else {}
         except (OSError, ValueError):
             self.records = {}
-        self.records = {k:v for k,v in self.records.items() if isinstance(v, dict)}
+        self.records = {k:v for k,v in self.records.items() if isinstance(v, dict)} if isinstance(self.records,dict) else {}
+        self._reconcile_registered_index()
         self.previews = GalleryPreviews(self.data, read_state, lambda: '', allow_remote=False)
         self.work = queue.Queue()
         self.queued = set()
         self.closed = threading.Event()
         if start_worker:
             threading.Thread(target=self._worker, name='nexus-originals', daemon=True).start()
+
+    def _reconcile_registered_index(self):
+        """Invalidate legacy acknowledgements without changing index or disk state.
+
+        addAsset can return an existing URI under a different ID. Older releases
+        recorded boolean success and incorrectly retained the requested ID.
+        The normal registration worker repairs those rows with a verified mapping.
+        """
+        path = self.data/'assistant'/'index.json'
+        if not path.exists():return
+        try:
+            value=json.loads(path.read_text('utf-8'));assets=value.get('assets',[]) if isinstance(value,dict) else []
+            indexed={a['id']:a.get('uri') for a in assets if isinstance(a,dict) and isinstance(a.get('id'),str)} if isinstance(assets,list) else {}
+        except (OSError,ValueError):
+            indexed={}
+        for row in self.records.values():
+            asset_id=row.get('assetId')
+            valid=isinstance(asset_id,str) and indexed.get(asset_id)==row.get('uri') and asset_id in indexed
+            if not valid or not row.get('registered'):
+                row['registered']=False
+                row['cloudVerifiedAt']=None
 
     def _save(self):
         temporary = self.path.with_name(self.path.name + '.' + uuid.uuid4().hex + '.tmp')
@@ -120,8 +142,9 @@ class OriginalArchive:
                 'registered':False,'cloudVerifiedAt':None}
             with self.lock:
                 previous = self.records.get(key, {})
-                if previous.get('sha256') == digest:
-                    record.update(registered=previous.get('registered',False),cloudVerifiedAt=previous.get('cloudVerifiedAt'))
+                if previous.get('sha256') == digest and previous.get('uri') == record['uri']:
+                    record.update(assetId=previous.get('assetId') or record['assetId'],
+                                  registered=previous.get('registered',False),cloudVerifiedAt=previous.get('cloudVerifiedAt'))
                 self._replace_record(key,record)
             return dict(record)
         finally:
@@ -159,14 +182,24 @@ class OriginalArchive:
             'type':r['type'] if r['type'] in {'IMAGE','VIDEO','AUDIO'} else 'OTHER',
             'role':'OUTPUT','source':'GENERATED','createdAt':r.get('createdAt',r['archivedAt']),
             'projectId':r.get('projectId'),'mimeType':r['mimeType'],'sizeBytes':r['sizeBytes']} for _,r in rows]
-        if self.register_assets(assets):
-            with self.lock:
-                previous={key:self.records[key].get('registered',False) for key,_ in rows}
-                for key,_ in rows:self.records[key]['registered']=True
-                try:self._save()
-                except Exception:
-                    for key,value in previous.items():self.records[key]['registered']=value
-                    raise
+        accepted=self.register_assets(assets)
+        if not isinstance(accepted,dict):return
+        with self.lock:
+            previous={}
+            for key,captured in rows:
+                canonical=accepted.get(captured['assetId'])
+                if not isinstance(canonical,str) or not canonical or len(canonical)>200 or any(c<' ' for c in canonical):continue
+                current=self.records.get(key)
+                if (not current or current.get('registered') or current.get('state')!='archived'
+                        or any(current.get(field)!=captured.get(field) for field in ('assetId','uri','sha256'))):
+                    continue
+                previous[key]=dict(current)
+                current.update(assetId=canonical,registered=True,cloudVerifiedAt=None)
+            if not previous:return
+            try:self._save()
+            except Exception:
+                for key,value in previous.items():self.records[key]=value
+                raise
 
     def _worker(self):
         while not self.closed.is_set():

@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.10.29-desktop-premium.3'
+DESKTOP_VERSION = '2026.10.29-desktop-premium.4'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -91,9 +91,22 @@ def original_archive():
             from original_archive import OriginalArchive
             def register(assets):
                 host=_agent
-                if host is None or not host.lock.acquire(False):return False
+                if host is None or not host.lock.acquire(False):return {}
                 try:
-                    host.start();host.exchange('importAssets',{'assets':assets});return True
+                    host.start()
+                    before=host.exchange('snapshot',{}).get('index',{}).get('assets',[])
+                    existing_uris={a.get('uri') for a in before if isinstance(a,dict)}
+                    existing_ids={a.get('id') for a in before if isinstance(a,dict)}
+                    # Updating an existing ID would replace metadata and could
+                    # resurrect a retired asset. Reuse every exact URI as-is.
+                    additions=[a for a in assets if a.get('uri') not in existing_uris and a.get('id') not in existing_ids]
+                    if additions:host.exchange('importAssets',{'assets':additions})
+                    actual=host.exchange('snapshot',{}).get('index',{}).get('assets',[])
+                    by_uri={}
+                    for asset in actual:
+                        if isinstance(asset,dict) and isinstance(asset.get('id'),str) and isinstance(asset.get('uri'),str):
+                            by_uri.setdefault(asset['uri'],asset['id'])
+                    return {a['id']:by_uri[a['uri']] for a in assets if a.get('uri') in by_uri}
                 finally:host.lock.release()
             _ORIGINAL_SERVICES[key]=OriginalArchive(DATA,read_state,register_assets=register,start_worker=not OFFLINE_QA)
         return _ORIGINAL_SERVICES[key]
