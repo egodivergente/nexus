@@ -219,7 +219,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                     DropdownMenuItem(text={Text("Detener seguimiento")},onClick={close();
                                         scope.launch {
                                             val stopped = app.generationRepository.stopTrackingJob(job.id)
-                                            haptics.perform(NexusHapticEvent.CANCEL_CONFIRMED, changed = stopped, accepted = stopped)
+                                            haptics.perform(if (stopped) NexusHapticEvent.CANCEL_CONFIRMED else NexusHapticEvent.ERROR)
                                             android.widget.Toast.makeText(context, if(stopped) "Seguimiento local detenido. No se ha cancelado en el proveedor." else "No se pudo detener el seguimiento", android.widget.Toast.LENGTH_LONG).show()
                                         }
                                     })
@@ -275,7 +275,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         pendingCancelJob = null
                         scope.launch {
                             val result = app.generationRepository.cancelRemoteGeneration(targetId)
-                            haptics.perform(NexusHapticEvent.CANCEL_CONFIRMED, changed = result.isSuccess, accepted = result.isSuccess)
+                            haptics.perform(if (result.isSuccess) NexusHapticEvent.CANCEL_CONFIRMED else NexusHapticEvent.ERROR)
                             val message = result.fold(
                                 onSuccess = { "Generación cancelada en ${providerName(it.providerId)}." },
                                 onFailure = { (it as? ProviderError)?.humanReadableMessage ?: it.message ?: "No se pudo cancelar en el proveedor." }
@@ -291,7 +291,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                         pendingCancelJob = null
                         scope.launch {
                             val stopped = app.generationRepository.stopTrackingJob(targetId)
-                            haptics.perform(NexusHapticEvent.CANCEL_CONFIRMED, changed = stopped, accepted = stopped)
+                            haptics.perform(if (stopped) NexusHapticEvent.CANCEL_CONFIRMED else NexusHapticEvent.ERROR)
                             android.widget.Toast.makeText(
                                 context,
                                 if (stopped) "Seguimiento local detenido. No se ha cancelado en el proveedor." else "No se pudo detener el seguimiento",

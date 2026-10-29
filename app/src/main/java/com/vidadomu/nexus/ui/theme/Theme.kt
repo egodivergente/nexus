@@ -64,13 +64,8 @@ fun NexusTheme(content: @Composable () -> Unit) {
             }
         }
     }
-    val runtime by com.vidadomu.nexus.settings.RuntimePreferences.get(androidx.compose.ui.platform.LocalContext.current).state.collectAsState()
     val platformHaptics=androidx.compose.ui.platform.LocalHapticFeedback.current
-    val filteredHaptics=remember(platformHaptics,runtime.value("ui.haptics")) {object: androidx.compose.ui.hapticfeedback.HapticFeedback {
-        override fun performHapticFeedback(hapticFeedbackType: androidx.compose.ui.hapticfeedback.HapticFeedbackType) {
-            if(runtime.value("ui.haptics").toBoolean()) platformHaptics.performHapticFeedback(hapticFeedbackType)
-        }
-    }}
+    val filteredHaptics=rememberNexusPlatformHaptics(platformHaptics)
     val fontScale by preferences.fontScaleState()
     val base = LocalDensity.current
     val density = remember(base, fontScale) { Density(base.density, base.fontScale * fontScale) }

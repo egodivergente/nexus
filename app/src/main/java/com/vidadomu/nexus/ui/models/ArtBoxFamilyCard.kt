@@ -47,7 +47,6 @@ import com.vidadomu.nexus.core.model.*
     var logoHeld by remember {mutableStateOf(false)}
     var adjusting by remember {mutableStateOf(false)}
     var movingName by remember {mutableStateOf(false)}
-    val appContext=androidx.compose.ui.platform.LocalContext.current.applicationContext
     val labels=rememberCatalogLabels()
     val glyphKey="family:"+section.family
     val lift by androidx.compose.animation.core.animateFloatAsState(if(dragging) 1.07f else if(adjusting) 1.04f else 1f,androidx.compose.animation.core.spring(dampingRatio=.62f,stiffness=420f),label="Card lift")
@@ -62,13 +61,13 @@ import com.vidadomu.nexus.core.model.*
             .semantics(mergeDescendants=true) {contentDescription="${section.family}, $count"; if(reorderActions.isNotEmpty()) customActions=reorderActions}) {
         Box {
         IconButton(onClick=onOptions,modifier=Modifier.align(Alignment.TopEnd).size(40.dp)) {
-            Icon(Icons.Default.MoreVert,"Opciones de ${section.family}",Modifier.size(18.dp),tint=colors.onSurfaceVariant.copy(alpha=.7f))
+            Icon(Icons.Default.MoreVert,"Opciones de ${section.family}",Modifier.size(NexusTokens.iconSmall),tint=colors.onSurfaceVariant.copy(alpha=.7f))
         }
         // Número de modelos en una insignia tenue (arriba a la izquierda); con uno solo no aporta nada y se oculta.
         // Mientras se ajusta o se mueve algo, la misma insignia muestra el porcentaje.
         val modelCount=section.models.map(::modelGroupTitle).distinct().size
         val badgeText=when {movingName->"↕"; adjusting->(labels.scale(glyphKey)*100).toInt().toString()+" %"; modelCount>1->modelCount.toString(); else->null}
-        if(badgeText!=null) Box(Modifier.align(Alignment.TopStart).padding(8.dp).defaultMinSize(minWidth=24.dp,minHeight=24.dp)
+        if(badgeText!=null) Box(Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).defaultMinSize(minWidth=24.dp,minHeight=24.dp)
             .clip(CircleShape).background((if(adjusting||movingName) colors.primary else colors.onSurface).copy(alpha=if(adjusting||movingName) .22f else .08f))
             .padding(horizontal=6.dp),contentAlignment=Alignment.Center) {
             Text(badgeText,style=MaterialTheme.typography.labelSmall,color=if(adjusting||movingName) colors.primary else colors.onSurfaceVariant,maxLines=1)
@@ -76,12 +75,12 @@ import com.vidadomu.nexus.core.model.*
         // Same structure and minimum height for every card (families and tools): logo, a two-line title and the count.
         // Short names no longer leave a blank third line (revision video 1, 11:22; video 2, 02:49). A minimum, not a
         // fixed height: with bold or larger system text (Pixel 8 Pro, 25/10) a fixed height clipped the count.
-        Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height*f).padding(horizontal=if(columns>=4) 4.dp else 8.dp,vertical=if(columns>=4) 8.dp else 12.dp),
+        Column(Modifier.fillMaxWidth().heightIn(min=ArtBoxCardMetrics.height*f).padding(horizontal=if(columns>=4) NexusTokens.space4 else NexusTokens.space8,vertical=if(columns>=4) NexusTokens.space8 else NexusTokens.space12),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp,Alignment.CenterVertically)) {
             // Fixed slot: the card never changes size, only the logo inside it does.
             val cardDensity=androidx.compose.ui.platform.LocalDensity.current
             Box(Modifier.size(ArtBoxCardMetrics.logoSlot*f).logoResizeGesture(enabled=true,key=glyphKey,current={labels.scale(glyphKey)},
-                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onAdjusting={adjusting=it},
+                min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(view,it)},onHold={logoHeld=it;GestureLock.onCard=it},onAdjusting={adjusting=it},
                 onScale={labels.setScaleLive(glyphKey,it)},onCommit={labels.commitScale(glyphKey);labels.commitPlacement(glyphKey,"logo")},
                 placement={labels.placement(glyphKey,"logo")},onMove={x,y->labels.setPlacementLive(glyphKey,"logo",x,y)},
                 pxPerDp={cardDensity.density*f}),contentAlignment=Alignment.TopCenter) {
@@ -106,7 +105,7 @@ import com.vidadomu.nexus.core.model.*
                 Text(title,style=if(columns>=4) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,
                     modifier=Modifier.offset((place.first*f).dp,(place.second*f).dp).graphicsLayer {val s=if(movingName) 1.08f else 1f;scaleX=s;scaleY=s}
                         .holdAndMoveGesture(glyphKey+"|name",current={labels.placement(glyphKey,"name")},
-                            vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(appContext,it)},onHold={logoHeld=it;GestureLock.onCard=it},onMoving={movingName=it;adjusting=it},
+                            vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(view,it)},onHold={logoHeld=it;GestureLock.onCard=it},onMoving={movingName=it;adjusting=it},
                             onMove={x,y->labels.setPlacementLive(glyphKey,"name",x,y)},onCommit={labels.commitPlacement(glyphKey,"name")},
                             pxPerDp={density.density*f}))
                 // Franja inferior: mantener pulsada levanta la tarjeta para reordenarla.

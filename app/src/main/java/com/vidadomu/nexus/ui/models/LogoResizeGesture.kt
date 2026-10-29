@@ -39,6 +39,7 @@ internal fun Modifier.logoResizeGesture(
 ): Modifier = if (!enabled) this else this.pointerInput(key) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        try {
         onHold(true)
         val slop = viewConfiguration.touchSlop
         // true → start adjusting (second finger landed, or the hold completed); false → a tap or a scroll, do nothing.
@@ -55,8 +56,8 @@ internal fun Modifier.logoResizeGesture(
             false
         }
         if (start == null) start = true
-        if (start != true) { onHold(false); return@awaitEachGesture }
-        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+        if (start != true) return@awaitEachGesture
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.START)
         onAdjusting(true)
         var value = current()
         var lastTick = (value * 20).roundToInt()
@@ -72,6 +73,7 @@ internal fun Modifier.logoResizeGesture(
         var nearCenter = false
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
+            var feedback: com.vidadomu.nexus.ui.theme.NexusVibration.Kind? = null
             val pressed = event.changes.filter { it.pressed }
             if (pressed.size >= 2) {
                 value *= event.calculateZoom()
@@ -81,7 +83,7 @@ internal fun Modifier.logoResizeGesture(
                     moveX = (moveX + (pos.x - lastPos.x)).coerceIn(-400f, 400f)
                     moveY = (moveY + (pos.y - lastPos.y)).coerceIn(-400f, 400f)
                     val near = abs(moveX) < 8f && abs(moveY) < 8f
-                    if (near && !nearCenter) vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK)
+                    if (near && !nearCenter) feedback = com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK
                     nearCenter = near
                     onMove(moveX / k, moveY / k)
                 } else {
@@ -93,21 +95,28 @@ internal fun Modifier.logoResizeGesture(
             var v = value.coerceIn(min, max)
             // Magnet at the default size.
             if (abs(v - 1f) < .04f) {
-                if (!snapped) { vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK); snapped = true }
+                if (!snapped) { feedback = com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK; snapped = true }
                 v = 1f
             } else snapped = false
             val hit = v <= min + .001f || v >= max - .001f
-            if (hit && !atLimit) vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+            if (hit && !atLimit) feedback = com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK
             atLimit = hit
             val tick = (v * 20).roundToInt()
-            if (tick != lastTick) { vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK); lastTick = tick }
+            if (tick != lastTick) {
+                if (feedback == null) feedback = com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK
+                lastTick = tick
+            }
             onScale(v)
+            feedback?.let(vibrate)
             event.changes.forEach { it.consume() }
         } while (event.changes.any { it.pressed })
-        onAdjusting(false)
-        onHold(false)
-        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.END)
         onCommit()
+        } finally {
+            // Navigation or pointer-input cancellation must not leave the shared grid gesture locked.
+            onAdjusting(false)
+            onHold(false)
+        }
     }
 }
 
@@ -128,6 +137,7 @@ internal fun Modifier.holdAndMoveGesture(
 ): Modifier = this.pointerInput(key) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        try {
         onHold(true)
         val slop = viewConfiguration.touchSlop
         val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
@@ -139,8 +149,8 @@ internal fun Modifier.holdAndMoveGesture(
             @Suppress("UNREACHABLE_CODE")
             false
         }
-        if (held != null) { onHold(false); return@awaitEachGesture }
-        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+        if (held != null) return@awaitEachGesture
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.START)
         onMoving(true)
         val start = current()
         val k = pxPerDp()
@@ -160,10 +170,12 @@ internal fun Modifier.holdAndMoveGesture(
             onMove(x / k, y / k)
             event.changes.forEach { it.consume() }
         } while (event.changes.any { it.pressed })
-        onMoving(false)
-        onHold(false)
-        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+        vibrate(com.vidadomu.nexus.ui.theme.NexusVibration.Kind.END)
         onCommit()
+        } finally {
+            onMoving(false)
+            onHold(false)
+        }
     }
 }
 
@@ -172,7 +184,7 @@ internal fun Modifier.holdAndMoveGesture(
  * pinching them closer shows more. Vibrates on every change. One finger never takes part, so scrolling is untouched.
  */
 internal fun Modifier.pinchColumns(columns: Int, max: Int, onColumns: (Int) -> Unit): Modifier = composed {
-    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val view = androidx.compose.ui.platform.LocalView.current
     val current = androidx.compose.runtime.rememberUpdatedState(columns)
     pointerInput(max) {
         awaitEachGesture {
@@ -190,7 +202,7 @@ internal fun Modifier.pinchColumns(columns: Int, max: Int, onColumns: (Int) -> U
                     }
                     if (next != current.value) {
                         onColumns(next)
-                        com.vidadomu.nexus.ui.theme.NexusVibration.play(context, com.vidadomu.nexus.ui.theme.NexusVibration.Kind.CLICK)
+                        com.vidadomu.nexus.ui.theme.NexusVibration.play(view, com.vidadomu.nexus.ui.theme.NexusVibration.Kind.TICK)
                         accumulated = 1f
                     }
                     event.changes.forEach { it.consume() }

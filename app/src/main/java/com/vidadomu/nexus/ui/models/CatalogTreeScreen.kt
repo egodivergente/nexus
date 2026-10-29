@@ -230,7 +230,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
             // Biblioteca/visor → «Editar foto».
             if(toolsView && family==null) item(span={GridItemSpan(maxLineSpan)}) {
                 AssistChip(onClick=onLocalInpaint,label={Text("Editar una foto en el móvil")},
-                    leadingIcon={Icon(Icons.Default.Brush,null,Modifier.size(18.dp))})
+                    leadingIcon={Icon(Icons.Default.Brush,null,Modifier.size(NexusTokens.iconSmall))})
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
                 Text("Arrastra el asa, mantén pulsada una tarjeta o toca el asa para subirla o bajarla. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)
@@ -404,7 +404,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 if(itemKey!=null) saveOrder(listOf(itemKey)+(savedOrder+displayedKeys).distinct().filterNot {it==itemKey})
                 contextTarget=null
             }) {Text("Poner al principio")}
-            Text("Para mover una tarjeta, mantenla pulsada y arrástrala. El logo y el nombre también se mueven con una pulsación larga sobre ellos.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
+            Text("Para mover una tarjeta, mantenla pulsada y arrástrala. El logo y el nombre también se mueven con una pulsación larga sobre ellos.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4))
             HorizontalDivider()
             if(!key.startsWith("tool:")) TextButton(onClick={moveTarget=key to labels.name(labelKey,label);contextTarget=null}) {Text("Mover a otra sección…")}
             TextButton(onClick={pendingHide=key to label;contextTarget=null}) {Text("Quitar de mi catálogo")}
@@ -414,7 +414,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     moveTarget?.let {(key,name) ->
         val current=CatalogPlacements.target(key)
         AlertDialog(onDismissRequest={moveTarget=null},title={Text("Mover «$name»")},text={Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-            Text("Elige dónde quieres verlo. Solo cambia dónde aparece en ArtBox.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(bottom=8.dp))
+            Text("Elige dónde quieres verlo. Solo cambia dónde aparece en ArtBox.",style=MaterialTheme.typography.bodySmall,color=TextSecondary,modifier=Modifier.padding(bottom=NexusTokens.space8))
             TextButton(onClick={CatalogPlacements.set(key,"none");moveTarget=null}) {Text(if(current=="none") "✓ Vídeos / Imágenes (fuera de Herramientas)" else "Vídeos / Imágenes (fuera de Herramientas)")}
             CatalogPlacements.toolCategories.forEach {category ->
                 val chosen=current=="tool:$category"
@@ -474,13 +474,12 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
             val glyph:@Composable ()->Unit = {
                 // Mismo formato que las tarjetas principales: logo más grande; mantenido pulsado se mueve con un dedo y se escala con pellizco.
                 val labels=rememberCatalogLabels()
-                val ctx=LocalContext.current.applicationContext
                 val dens=androidx.compose.ui.platform.LocalDensity.current
                 var adjusting by remember {mutableStateOf(false)}
                 val place=labels.placement(glyphKey,"logo")
                 val slot=if(grid) 76.dp else 64.dp
                 Box(Modifier.size(slot).logoResizeGesture(enabled=glyphKey.isNotEmpty() && dragModifier==null && cardModifier==Modifier && !dragging,key=glyphKey,current={labels.scale(glyphKey)},
-                    min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(ctx,it)},
+                    min=CatalogLabelStore.MIN_SCALE,max=CatalogLabelStore.MAX_SCALE,vibrate={com.vidadomu.nexus.ui.theme.NexusVibration.play(soundView,it)},
                     onHold={logoHeld=it;GestureLock.onCard=it},onAdjusting={adjusting=it},onScale={labels.setScaleLive(glyphKey,it)},
                     onCommit={labels.commitScale(glyphKey);labels.commitPlacement(glyphKey,"logo")},
                     placement={labels.placement(glyphKey,"logo")},onMove={x,y->labels.setPlacementLive(glyphKey,"logo",x,y)},pxPerDp={dens.density}),contentAlignment=Alignment.Center) {
@@ -506,14 +505,14 @@ private fun NavigationCard(title:String,family:String,subtitle:String,routes:Lis
                     Modifier.widthIn(max=92.dp),style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                 // Mantener pulsado levanta y arrastra la tarjeta; las opciones (renombrar, ocultar…) viven en este ⋮.
                 if(!grid && dragModifier==null && onOptions!=null) IconButton(onClick=onOptions,modifier=Modifier.size(40.dp)) {
-                    Icon(Icons.Default.MoreVert,"Opciones de $title",Modifier.size(18.dp),tint=TextSecondary)
+                    Icon(Icons.Default.MoreVert,"Opciones de $title",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
                 }
                 if(dragModifier!=null) IconButton(onClick=onOptions ?: onLongClick ?: {},modifier=dragModifier) {Icon(Icons.Default.DragHandle,"Ordenar $title",tint=TextSecondary)}
             }
             if(stackedPrice) Row(Modifier.heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Sin precio publicado no se repite una píldora vacía: solo se muestra cuando aporta dato real.
                 if(displayPrice!=null) Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.filter,modifier=Modifier.weight(1f)) {
-                    Column(Modifier.padding(horizontal=8.dp,vertical=4.dp)) {
+                    Column(Modifier.padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
                         Text("Desde",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
                         Text(displayPrice,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=TextSecondary)
                     }
