@@ -47,7 +47,7 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
         val free=if(canExpand) (available-base).coerceAtLeast(0) else 0
         val capacity=with(density) {mediaCapacity.roundToPx()}
         val mediaExtra=if(wide && canExpand) minOf(capacity,(available-chrome-rightBase).coerceAtLeast(0))
-            else minOf(capacity,if(promptVisible) (free*.45f).roundToInt() else free)
+            else minOf(capacity,if(promptVisible) (free*.60f).roundToInt() else free)
         val promptExtra=if(!promptVisible || !canExpand) 0 else if(wide)
             (available-chrome-leftBase).coerceAtLeast(0) else free-mediaExtra
         val sizing=LauncherContentSizing(with(density) {promptExtra.toDp()},with(density) {mediaExtra.toDp()}) {

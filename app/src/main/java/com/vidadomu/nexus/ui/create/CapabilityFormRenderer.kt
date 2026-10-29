@@ -157,14 +157,24 @@ internal fun CompactCapabilityMediaInputs(fields:List<CanvasInputField>,model:Ne
         val sizing=LocalLauncherContentSizing.current
         val overrides=LocalDynamicControlRenderers.current
         val parallel=CanvasInputPlan.pairedFrames(pair,model,maxWidth.value,density.fontScale)
-        val groups=(if(parallel) listOf(pair) else emptyList())+
-            primary.filterNot {parallel && it in pair}.map {listOf(it)}+
-            secondary.chunked(if(density.fontScale>1.3f) 1 else 2)
+        fun custom(field:CanvasInputField)=overrides.inputKeys[field.key]!=null ||
+            overrides.inputKinds[DynamicControlRegistry.inputKind(field)]!=null
+        val oneFrame=parallel && pair.none(::custom) && pair.count {field -> media.any(field::contains)}==1
+        val primaryGroups=if(oneFrame) {
+            val populated=pair.single {field -> media.any(field::contains)}
+            val remaining=primary.filterNot {it in pair}
+            val compactEmpty=pair.filterNot {it==populated}+
+                remaining.filter {field -> !custom(field) && media.none(field::contains)}
+            listOf(listOf(populated))+remaining.filter {field -> custom(field) || media.any(field::contains)}.map {listOf(it)}+
+                compactEmpty.chunked(2)
+        } else (if(parallel) listOf(pair) else emptyList())+
+            primary.filterNot {parallel && it in pair}.map {listOf(it)}
+        val groups=primaryGroups+secondary.chunked(if(density.fontScale>1.3f) 1 else 2)
         val previewBase=NexusTokens.minimumTouch+NexusTokens.space8
         // A preview can grow only as far as its real column width allows. Empty optional fields stay compact.
         val capacities=groups.map {group ->
             val selected=group.map {field -> media.filter(field::contains)}
-            val builtIn=group.all {overrides.inputKeys[it.key]==null && overrides.inputKinds[DynamicControlRegistry.inputKind(it)]==null}
+            val builtIn=group.none(::custom)
             if(!builtIn || selected.flatten().none {it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/")}) 0.dp
             else {
                 val width=(maxWidth-NexusTokens.space8*(group.size-1))/group.size-NexusTokens.space16

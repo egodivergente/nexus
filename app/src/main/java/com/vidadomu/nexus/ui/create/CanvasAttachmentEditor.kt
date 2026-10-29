@@ -91,7 +91,7 @@ internal fun CanvasAttachmentEditor(
                 Row(Modifier.heightIn(min=if(previewHeight!=null) NexusTokens.minimumTouch else NexusTokens.space32),
                     verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     Icon(icon,null,Modifier.size(NexusTokens.iconSmall),tint=colors.onSurfaceVariant)
-                    Text(field.label+if(field.required) " *" else "",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,maxLines=2,
+                    Text(field.label+if(field.required) "\u00A0*" else "",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,maxLines=2,
                         overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     if(selected.isNotEmpty()) Text(selected.size.toString(),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
                     if(previewHeight==null) Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.iconSmall),tint=colors.primary)
