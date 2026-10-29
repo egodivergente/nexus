@@ -409,7 +409,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     internal fun conversations(): List<AssistantChatEntry> = conversationsIn(_ui.value.activeProjectId)
     internal fun conversationsIn(projectId: String?): List<AssistantChatEntry> =
         _conversationIndex.value.filter { projectId == null || it.projectId == projectId }
-    internal fun openConversation(id: String) {ConversationTabs(app).open(id);if(id!=_ui.value.conversationId) switchConversation(id)}
+    internal fun openConversation(id: String) {
+        ConversationTabs(app).open(id)
+        if(id!=_ui.value.conversationId) {
+            val entry=_conversationIndex.value.firstOrNull {it.id==id}
+            switchConversation(id,targetProject=entry?.projectId ?: _ui.value.activeProjectId)
+        }
+    }
 
     /**
      * Leaving a conversation while the agent answers does not stop it: it keeps working in the background and its

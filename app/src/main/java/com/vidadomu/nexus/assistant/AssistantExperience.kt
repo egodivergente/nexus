@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
@@ -85,9 +86,9 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
     onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
     reasoningControl: @Composable () -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
-    // Banda propia (otro tono y filetes arriba y abajo) para que el cuadro de texto se distinga del chat y de la navegación.
-    // Flotante, como el campo de búsqueda de Ajustes de Android: una píldora con sombra pegada abajo, sin franjas ni filetes.
-    Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
+    var inputFocused by remember(ui.conversationId) { mutableStateOf(false) }
+    // One resting row. References, completion and suggestions only grow it when they are useful.
+    Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4)) {
       // Quick access handle: a small arrow on the composer's top edge instead of a floating dot in its own row
       // Drawn after the composer so it sits above its border; its touch target is at least 48 dp high.
       // The handle shows and hides the tab bar: one tap, or a swipe up/down that starts here, well above the system
@@ -110,11 +111,11 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
       }
       Column {
         Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=ComposerShape,shadowElevation=10.dp,
-            border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+            border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // The active model lives in the chat header now: the composer stays a single slim row.
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
-            if(ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+            if(inputFocused && ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
                 items(ui.replies, key = { it.label }) { reply ->
                     AssistChip(onClick = { onReply(reply.text) }, label = { Text(reply.label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -138,31 +139,27 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                 }}
             }
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-            // Keep a useful writing width on phones and at large font scales. The same selector
-            // stays visible in its own row; no model setting is hidden or changed.
-            val separateReasoning = maxWidth < 480.dp || androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
-            Column {
             Row(verticalAlignment = Alignment.Bottom) {
                 LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
-                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera)
+                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera,
+                    additionalOptions = reasoningControl)
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
                 val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
                 androidx.compose.foundation.text.BasicTextField(text, onInput, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)
+                    .onFocusChanged { inputFocused = it.isFocused }
                     .semantics { contentDescription = "Mensaje para Nexus" },
                     textStyle = style, cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
-                        Box(Modifier.padding(vertical = NexusTokens.space12), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.padding(vertical = NexusTokens.space8), contentAlignment = Alignment.CenterStart) {
                             // Quién contestará: proveedor y modelo activos (AGY, Bedrock, un cerebro propio…).
                             if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             inner()
                         }
                     })
-                if (!separateReasoning) reasoningControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else {
                     // Micro y enviar siempre juntos a la derecha: el dictado se inserta en el campo SIN enviarlo.
@@ -186,14 +183,15 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
                         else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
                     }
-                    FilledIconButton(onClick = onSend, enabled = canSend, modifier = Modifier.padding(end = NexusTokens.space4).size(NexusTokens.minimumTouch)) {
-                        Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje")
+                    IconButton(onClick = onSend, enabled = canSend, modifier = Modifier.size(NexusTokens.minimumTouch)) {
+                        Box(Modifier.size(36.dp).background(
+                            if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
+                            androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", Modifier.size(NexusTokens.iconMedium),
+                                tint = if(canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))
+                        }
                     }
                 }
-            }
-            if (separateReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12),
-                horizontalArrangement = Arrangement.End) { reasoningControl() }
-            }
             }
         }
         }

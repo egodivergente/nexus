@@ -61,6 +61,7 @@ internal fun Modifier.recentLibraryGesture(opening: Boolean, onChange: () -> Uni
 internal fun LibraryAttachmentButton(
     enabled: Boolean, onAttach: () -> Unit, onShowLibrary: (() -> Unit)?, libraryExpanded: Boolean,
     onCamera: (() -> Unit)? = null, onLive: (() -> Unit)? = null,
+    additionalOptions: @Composable () -> Unit = {},
 ) {
     // Un solo «+»: abre el menú con archivos, cámara, recientes y conversación por voz.
     var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -70,35 +71,34 @@ internal fun LibraryAttachmentButton(
             .combinedClickable(enabled = enabled, role = Role.Button,
                 onLongClickLabel = "Mostrar archivos recientes", onLongClick = onShowLibrary, onClick = { menu = true }),
             contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
+            Icon(Icons.Default.Add, null, Modifier.size(NexusTokens.iconMedium),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(text = { Text("Archivo o galería") }, leadingIcon = { Icon(Icons.Default.AttachFile, null) }, onClick = { menu = false; onAttach() })
             onCamera?.let { DropdownMenuItem(text = { Text("Hacer una foto") }, leadingIcon = { Icon(Icons.Default.PhotoCamera, null) }, onClick = { menu = false; it() }) }
             onShowLibrary?.let { DropdownMenuItem(text = { Text("Recientes de la Biblioteca") }, leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) }, onClick = { menu = false; it() }) }
             onLive?.let { DropdownMenuItem(text = { Text("Conversación por voz") }, leadingIcon = { Icon(Icons.Default.GraphicEq, null) }, onClick = { menu = false; it() }) }
+            HorizontalDivider()
+            additionalOptions()
         }
     }
 }
 
 @Composable
 internal fun ReasoningIcon(current: String, enabled: Boolean, onClick: () -> Unit) {
-    // Una píldora con el modo actual en vez de un icono mudo: se ve de un vistazo qué esfuerzo está activo.
-    val colors = MaterialTheme.colorScheme
-    Surface(onClick = onClick, enabled = enabled, shape = NexusTokens.filter,
-        color = colors.surfaceContainerHighest.copy(alpha = if (enabled) 1f else .5f),
+    // A contextual setting in the add menu; it never reserves another row in the composer.
+    DropdownMenuItem(onClick = onClick, enabled = enabled,
         modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
             .semantics {
                 contentDescription = "Modo de razonamiento: $current"
                 stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
-            }) {
-        Row(Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
-            Icon(Icons.Default.Speed, null, Modifier.size(14.dp), tint = colors.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
-            Text(current, style = MaterialTheme.typography.labelMedium, maxLines = 1,
-                color = colors.onSurface.copy(alpha = if (enabled) 1f else .38f))
-        }
-    }
+            },
+        text = { Column {
+            Text("Razonamiento", style = MaterialTheme.typography.bodyMedium)
+            Text(current, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } },
+        leadingIcon = { Icon(Icons.Default.Speed, null, Modifier.size(NexusTokens.iconMedium)) })
 }
 
 @Composable

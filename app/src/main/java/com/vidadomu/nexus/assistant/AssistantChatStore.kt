@@ -17,7 +17,8 @@ internal data class SavedAssistantChat(val items: List<ChatItem>, val plans: Map
     val projectId: String? = null, val conversationId: String? = null, val updatedAt: Long = 0)
 
 /** Private, atomic snapshot. Restoring history never repeats a provider submission. */
-internal data class AssistantChatEntry(val id: String, val title: String, val projectId: String? = null, val updatedAt: Long = 0, val preview: String = "")
+internal data class AssistantChatEntry(val id: String, val title: String, val projectId: String? = null, val updatedAt: Long = 0, val preview: String = "",
+    val searchText: String = "")
 
 internal class AssistantChatStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "assistant/chat-v1.json").apply { parentFile?.mkdirs() })
@@ -80,20 +81,23 @@ internal class AssistantChatStore(private val context: Context) {
      * Must be called off the main thread.
      */
     @Serializable private data class IndexedConversation(val modified: Long, val length: Long, val title: String,
-        val projectId: String? = null, val updatedAt: Long = 0, val preview: String = "")
+        val projectId: String? = null, val updatedAt: Long = 0, val preview: String = "", val searchText: String = "")
     @Serializable private data class ConversationIndexFile(val version: Int = 1, val entries: Map<String, IndexedConversation> = emptyMap())
     private val indexFile = File(context.filesDir, "assistant/conversations-index-v1.json")
     private val index = java.util.concurrent.ConcurrentHashMap<String, IndexedConversation>()
     @Volatile private var indexLoaded = false
 
-    private fun indexed(name: String, file: File, chat: SavedAssistantChat) = IndexedConversation(file.lastModified(), file.length(),
-        (if(name.startsWith("sync_")) "↔ " else "") + (chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(70) ?: "Nueva conversación"),
-        chat.projectId, chat.updatedAt.takeIf { it > 0 } ?: file.lastModified(), chat.items.filterIsInstance<ChatItem.User>().lastOrNull()?.text?.take(110).orEmpty())
+    private fun indexed(file: File, chat: SavedAssistantChat): IndexedConversation {
+        val metadata=conversationMetadata(chat.items)
+        return IndexedConversation(file.lastModified(),file.length(),metadata.title,chat.projectId,
+            chat.updatedAt.takeIf {it>0} ?: file.lastModified(),metadata.preview,metadata.searchText)
+    }
 
     @Synchronized
     fun conversations(projectId: String? = null): List<AssistantChatEntry> {
         if (!indexLoaded) {
-            runCatching { json.decodeFromString<ConversationIndexFile>(indexFile.readText()) }.getOrNull()?.let { index.putAll(it.entries) }
+            runCatching { json.decodeFromString<ConversationIndexFile>(indexFile.readText()) }.getOrNull()
+                ?.takeIf {it.version>=2}?.let { index.putAll(it.entries) }
             indexLoaded = true
         }
         val files = File(context.filesDir,"assistant/conversations").listFiles().orEmpty().filter { it.extension == "json" }
@@ -103,16 +107,16 @@ internal class AssistantChatStore(private val context: Context) {
             val known = index[name]
             if (known != null && known.modified == file.lastModified() && known.length == file.length()) return@forEach
             val chat = runCatching { json.decodeFromString<SavedAssistantChat>(file.readText()) }.getOrNull()
-            if (chat == null) index.remove(name) else index[name] = indexed(name, file, chat)
+            if (chat == null) index.remove(name) else index[name] = indexed(file, chat)
             changed = true
         }
         if (changed) runCatching {
             val target = AtomicFile(indexFile); val out = target.startWrite()
-            try { out.write(json.encodeToString(ConversationIndexFile(entries = HashMap(index))).toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
+            try { out.write(json.encodeToString(ConversationIndexFile(version = 2, entries = HashMap(index))).toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
             catch (e: Exception) { target.failWrite(out); throw e }
         }
         return files.sortedByDescending { it.lastModified() }.mapNotNull { file ->
-            index[file.nameWithoutExtension]?.let { AssistantChatEntry(file.nameWithoutExtension, it.title, it.projectId, it.updatedAt, it.preview) }
+            index[file.nameWithoutExtension]?.let { AssistantChatEntry(file.nameWithoutExtension, it.title, it.projectId, it.updatedAt, it.preview,it.searchText) }
         }.filter { projectId == null || it.projectId == projectId }
     }
 
