@@ -18,7 +18,12 @@ internal fun modelSearchText(model: NexusModel): String = searchCache.getOrPut(m
 }
 
 private val searchWarmup = CompletedSnapshotWarmup<NexusModel> { modelSearchText(it) }
-internal suspend fun warmCatalogSearch(models: List<NexusModel>) = searchWarmup.warm(models)
+internal suspend fun warmCatalogSearch(models: List<NexusModel>) {
+    // A full sequential pass through 863 models thrashed the old 768-entry LRU on every visit.
+    // Follow the current catalog size while retaining the original floor for smaller catalogs.
+    searchCache.resize(maxOf(768, models.size))
+    searchWarmup.warm(models)
+}
 
 /** A model may support several workflows; filters are not exclusive classifications. */
 internal fun matchesUse(model: NexusModel, use: CreationUse): Boolean {
