@@ -74,10 +74,6 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
     val familyModels=remember(filtered,family) {filtered.filter {family==null || catalogFamily(it)==family}}
     val products=remember(familyModels,catalogFavorites) {catalogModelGroups(familyModels,catalogFavorites)}
     val product=products.firstOrNull {it.key==productKey}
-    fun openVariant(group:CatalogModelGroup) {
-        val continuation=catalogVariantContinuation(group,selectedModel)
-        if(continuation!=null) onSelectModel(continuation) else productKey=group.key
-    }
     val orgs = remember(availableModels, modality) {
         availableModels.filter { modality == null || modality in it.modalities }.map { it.organization }.distinct().sorted()
     }
@@ -154,12 +150,12 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                     val isSelected=group.routes.any {modelBookmark(it)==selectedModel?.let(::modelBookmark)}
                     PickerSummaryRow(catalogVariantTitle(group),groupPurpose(group),group.routes.first(),isSelected,onClick={
                         feedback.perform(NexusHapticEvent.SELECTION,changed=!isSelected)
-                        openVariant(group)
+                        productKey=group.key
                     })
                 }
             } else {
                 item {
-                    CatalogVariantSelector(products,product,::openVariant)
+                    CatalogVariantSelector(products,product,{productKey=it.key})
                     Text("Elige el flujo y proveedor de esta variante",Modifier.padding(top=NexusTokens.space8),
                         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
