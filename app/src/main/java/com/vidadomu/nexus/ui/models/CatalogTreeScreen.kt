@@ -106,7 +106,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
             (modality !in setOf(Modality.VIDEO,Modality.IMAGE) || toolCategory(it)==null) &&
             (providerFilter==null || it.providerId==providerFilter) && (modality != Modality.IMAGE || !imageReferences || ImageModelChoices.acceptsReferences(it))}, modality, use, query, null, favoritesOnly, favorites, CatalogOrder.PRIORITY)
     }
-    val orderScope = "order:${if(toolsView) "TOOLS" else modality.name}:${family ?: if(query.isBlank() && !favoritesOnly) "families" else "search-models"}"
+    val rootLevel=catalogAtSectionLevel(family,query,favoritesOnly,toolsView,personalizing)
+    val orderScope = "order:${if(toolsView) "TOOLS" else modality.name}:${family ?: if(rootLevel) "families" else "search-models"}"
     var savedOrder by remember(orderScope) { mutableStateOf(prefs.getString(orderScope, "").orEmpty().split("\n").filter {it.isNotBlank()}) }
     var contextTarget by remember { mutableStateOf<Triple<String,String,NexusModel?>?>(null) }
     val sections = remember(placementRev,visible, favorites,savedOrder,modality,toolsView,catalogSort,jobs,onlyDated) { sortSections((if(toolsView) visible.groupBy {toolCategory(it)!!}.map {(name,rows)->CatalogSection(name,rows)} else catalogSections(visible, favorites)).sortedWith(
@@ -116,7 +117,6 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
             .thenByDescending { section -> section.models.any { CatalogFocus.forModel(it)!=null } }
     ),catalogSort,jobs,onlyDated) }
     val groups = remember(placementRev,visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated) }
-    val rootLevel = catalogAtRoot(family, query, favoritesOnly)
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
     val listState=rememberLazyGridState()
@@ -126,7 +126,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val rootColumns = if(userColumns>0) userColumns else autoColumns
     // Two columns on any screen; in the grid the logo sits above the text so names keep their width. Very large fonts stay in a list.
     val useGrid=userColumns>1 || (gridCards && groupKey==null && androidx.compose.ui.platform.LocalDensity.current.fontScale<1.5f)
-    LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated) {listState.scrollToItem(0)}
+    LaunchedEffect(modality,family,groupKey,query,use,favoritesOnly,catalogSort,onlyDated,rootLevel) {listState.scrollToItem(0)}
     val dragView=androidx.compose.ui.platform.LocalView.current
     val labels=rememberCatalogLabels()
     var moveTarget by remember {mutableStateOf<Pair<String,String>?>(null)}
@@ -144,6 +144,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         }
     }
     val activeGroup = groups.firstOrNull { it.key == groupKey }
+    // A restored pre-family search/favorite leaf retains its exact group, now inside its family brief.
+    LaunchedEffect(activeGroup?.key,family,toolsView,personalizing) {
+        if(family==null && !toolsView && !personalizing && activeGroup!=null)
+            family=catalogFamily(activeGroup.routes.first())
+    }
     val familyDetail=family!=null && !toolsView && !personalizing && groups.isNotEmpty()
     // Tools ignore provider/use/reference filters, so they never count (or show) there.
     val activeFilterItems = buildList {

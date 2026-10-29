@@ -8,6 +8,10 @@ import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 import com.vidadomu.nexus.ui.create.CanvasInputField
 
+/** Search and favorites share the family entry; tools and personalization retain their existing hierarchy. */
+internal fun catalogAtSectionLevel(family:String?,query:String,favoritesOnly:Boolean,toolsView:Boolean,personalizing:Boolean) =
+    catalogAtRoot(family,query,favoritesOnly) || (family==null && !toolsView && !personalizing)
+
 /** The family owns the complete selection; a route's limits only change its visible partition. */
 internal data class CatalogMediaReference(val uriString:String,val mimeType:String)
 internal data class CatalogMediaPartition(val active:List<CatalogMediaReference>,val retained:List<CatalogMediaReference>)
