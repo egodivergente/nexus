@@ -133,6 +133,11 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private var schemaJob: kotlinx.coroutines.Job? = null
     private var schemaRequest = 0
     private fun loadNativeConfiguration(model: NexusModel) {
+        matchingRestoredDraft(model,allowUnresolvedEndpoint=true)?.let {draft ->
+            val key=ModelCapabilityRegistry.key(model,draft.modality).let {it.copy(endpoint=draft.endpoint ?: it.endpoint)}
+            if(pendingSwitchParameters?.matches(key)!=true)
+                pendingSwitchParameters=PendingWorkParameters(key,draft.parameters,draft.parameterAdaptations)
+        }
         val request = ++schemaRequest
         schemaJob?.cancel()
         if (model.providerId != com.vidadomu.nexus.provider.atlas.AtlasCloudProvider.PROVIDER_ID) {
@@ -148,7 +153,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     schemaMessage = null
                 ).withModelMedia(model,::isMediaAvailable)
             }
-            restoreDraftIfMatching(model)
+            restoreDraftIfMatching(model,parametersRestored=true)
             announceResolvedSwitch(model)
             return
         }
@@ -165,7 +170,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                         schemaUnsupported = config.unsupportedRequired.isNotEmpty(),
                         schemaMessage = if(config.unsupportedRequired.isEmpty()) config.notices.takeIf { notes -> notes.isNotEmpty() }?.joinToString("\n") else
                             "Este modelo requiere entradas aún no compatibles: " + config.unsupportedRequired.joinToString()).withModelMedia(config.model,::isMediaAvailable) }
-                    restoreDraftIfMatching(config.model)
+                    restoreDraftIfMatching(config.model,parametersRestored=true)
                     announceResolvedSwitch(config.model)
                 }
             } catch (e: CancellationException) { throw e
@@ -178,7 +183,8 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     // Restore source material before the asynchronous schema load: typing can never be replaced by late I/O.
     private val _uiState = MutableStateFlow(CreateUiState(selectedModality=restoredDraft?.modality ?: Modality.IMAGE,
         prompt=restoredDraft?.prompt.orEmpty(),negativePrompt=restoredDraft?.negativePrompt.orEmpty(),
-        attachedMedia=restoredDraft?.media.orEmpty(),retainedMedia=restoredDraft?.retainedMedia.orEmpty()))
+        attachedMedia=restoredDraft?.media.orEmpty(),retainedMedia=restoredDraft?.retainedMedia.orEmpty(),
+        parameterAdaptations=restoredDraft?.parameterAdaptations.orEmpty()))
     val uiState: StateFlow<CreateUiState> = _uiState.asStateFlow()
 
     init {
@@ -216,7 +222,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private fun observeDraft() = viewModelScope.launch {
         _uiState.map {state -> state.selectedModel?.takeIf {state.schemaReady && !state.isLoadingSchema}?.let {model ->
             model.providerId to CreationDraft(model.id,state.selectedModality,state.prompt,state.parameters,state.attachedMedia,state.negativePrompt,
-                state.retainedMedia,model.providerId,ModelCapabilityRegistry.key(model,state.selectedModality).endpoint)
+                state.retainedMedia,model.providerId,ModelCapabilityRegistry.key(model,state.selectedModality).endpoint,state.parameterAdaptations)
         }}.distinctUntilChanged().debounce(400).collect {entry ->
             if(entry!=null) withContext(Dispatchers.IO) {creationPreferences.saveDraft(entry.second,entry.first)}
         }
@@ -231,17 +237,19 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         val key=ModelCapabilityRegistry.key(model,modality)
         val pending=pendingSwitchParameters?.takeIf {it.matches(key)}
         pendingSwitchParameters=null
-        val saved=pending?.parameters ?: ModelWorkDrafts.find(workDrafts,model,modality)?.parameters
+        val savedDraft=ModelWorkDrafts.find(workDrafts,model,modality)
+        val saved=pending?.parameters ?: savedDraft?.parameters
             ?: creationPreferences.values(model,modality)
         val fallback=FormContract.restoredValues(model,saved)
+        val savedAdaptations=restoredParameterAdaptations(fallback,pending?.adaptations ?: savedDraft?.parameterAdaptations.orEmpty())
         val transfer=pendingParameterTransfer?.takeIf {it.matches(key)}
-        if(transfer==null) return ParameterTransferResult(fallback,emptySet(),pending?.adaptations.orEmpty())
+        if(transfer==null) return ParameterTransferResult(fallback,emptySet(),savedAdaptations)
         pendingParameterTransfer=null
         val media=compatibleModelMedia(model,state.attachedMedia+state.retainedMedia).filter(::isMediaAvailable)
         val capabilities=ModelCapabilityRegistry.resolve(model,modality,fallback,schemaReady,media)
         return transferCompatibleParameters(transfer.source,capabilities,fallback,
             resolve={values ->ModelCapabilityRegistry.resolve(model,modality,values,schemaReady,media)},
-            prompt=state.prompt,media=media,editedValues=transfer.editedValues)
+            prompt=state.prompt,media=media,editedValues=transfer.editedValues,fallbackAdaptations=savedAdaptations)
     }
     /** Saves the work of the model being left and plans what the target model starts with. */
     private fun switchWorkDraft(current:CreateUiState,target:NexusModel,
@@ -254,16 +262,21 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             ModelCapabilityRegistry.resolve(leaving,current.selectedModality,current.parameters,true,current.attachedMedia),
             current.parameters,current.parameterAdaptations) else pendingParameterTransfer?.source
         val edited=pendingParameterTransfer?.takeIf {it.matches(ModelCapabilityRegistry.key(leaving,current.selectedModality))}?.editedValues.orEmpty()
+        val previousDraft=ModelWorkDrafts.find(workDrafts,leaving,current.selectedModality)
+        val pending=pendingSwitchParameters?.takeIf {it.matches(ModelCapabilityRegistry.key(leaving,current.selectedModality))}
+        val savedParameters=(if(configured) current.parameters else pending?.parameters ?: previousDraft?.parameters ?: current.parameters)+edited
+        val savedAdaptations=restoredParameterAdaptations(savedParameters,
+            if(configured) current.parameterAdaptations else pending?.adaptations ?: previousDraft?.parameterAdaptations.orEmpty(),edited.keys)
         val saved=ModelWorkDraft(leaving.id,current.prompt,current.negativePrompt,
-            (if(configured) current.parameters else ModelWorkDrafts.find(workDrafts,leaving,current.selectedModality)?.parameters ?: current.parameters)+edited,
-            current.attachedMedia + current.retainedMedia,leaving.providerId,ModelCapabilityRegistry.key(leaving,current.selectedModality).endpoint,current.selectedModality)
+            savedParameters,current.attachedMedia + current.retainedMedia,leaving.providerId,
+            ModelCapabilityRegistry.key(leaving,current.selectedModality).endpoint,current.selectedModality,savedAdaptations)
         workDrafts=ModelWorkDrafts.remember(workDrafts,saved)
         workDraftStore.save(workDrafts)
         val canonical=canonicalModelMedia(leaving,current.attachedMedia).associateBy {it.id}
         val sourceForTarget=saved.copy(media=saved.media.map {canonical[it.id] ?: it})
         val plan=ModelWorkDrafts.plan(sourceForTarget,ModelWorkDrafts.find(workDrafts,target,targetModality),target,::isMediaAvailable)
-        pendingSwitchParameters=if(plan.restored) PendingWorkParameters(ModelCapabilityRegistry.key(target,targetModality),plan.parameters) else null
-        pendingParameterTransfer=source?.let {PendingParameterTransfer(ModelCapabilityRegistry.key(target,targetModality),it)}
+        pendingSwitchParameters=if(plan.restored) PendingWorkParameters(ModelCapabilityRegistry.key(target,targetModality),plan.parameters,plan.parameterAdaptations) else null
+        pendingParameterTransfer=source?.let {PendingParameterTransfer(ModelCapabilityRegistry.key(target,targetModality),it.withEdits(edited))}
         return plan
     }
     private fun forgetModelSwitch() {
@@ -298,12 +311,21 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
     private fun ModelSwitchPlan.notice():String? =
         if(missingMedia>0) "Borrador del modelo recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null
-    private fun restoreDraftIfMatching(model:NexusModel) {
-        val draft=restoredDraft?.takeIf {!draftRestored && it.modelId==model.id && it.modality==_uiState.value.selectedModality &&
-            (it.providerId==null || it.providerId==model.providerId && it.endpoint==ModelCapabilityRegistry.key(model,it.modality).endpoint)} ?: return
+    private fun matchingRestoredDraft(model:NexusModel,allowUnresolvedEndpoint:Boolean=false):CreationDraft? {
+        val endpoint=ModelCapabilityRegistry.key(model,_uiState.value.selectedModality).endpoint
+        return restoredDraft?.takeIf {
+            !draftRestored && it.modelId==model.id && it.modality==_uiState.value.selectedModality &&
+                (it.providerId==null || it.providerId==model.providerId &&
+                    (it.endpoint==endpoint || allowUnresolvedEndpoint && endpoint==null))}
+    }
+    private fun restoreDraftIfMatching(model:NexusModel,parametersRestored:Boolean=false) {
+        val draft=matchingRestoredDraft(model) ?: return
         draftRestored=true
         val available=draft.media.filter(::isMediaAvailable)
-        _uiState.update {it.copy(parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(model,draft.parameters),
+        _uiState.update {
+            val parameters=if(parametersRestored) it.parameters else FormContract.restoredValues(model,draft.parameters)
+            val adaptations=if(parametersRestored) it.parameterAdaptations else restoredParameterAdaptations(parameters,draft.parameterAdaptations)
+            it.copy(parameters=parameters,parameterAdaptations=adaptations,
             errorMessage=if(available.size<draft.media.size) "Borrador recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null).withModelMedia(model,::isMediaAvailable)}
     }
     fun applyPreset(preset:CreationPreset) { forgetModelSwitch(); val model=_uiState.value.selectedModel ?: return
@@ -643,8 +665,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateParameter(key: String, value: String) { forgetModelSwitch();
         pendingParameterTransfer=pendingParameterTransfer?.let {it.copy(editedValues=it.editedValues+(key to value))}
-        pendingSwitchParameters=pendingSwitchParameters?.let {it.copy(parameters=it.parameters+(key to value),
-            adaptations=it.adaptations.filterNot {adaptation ->adaptation.key==key})}
+        pendingSwitchParameters=pendingSwitchParameters?.withEdit(key,value)
         val old = _uiState.value
         if(old.parameters[key] != value) mediaSession.reset()
         _uiState.update {

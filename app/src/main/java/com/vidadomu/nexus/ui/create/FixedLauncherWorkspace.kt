@@ -31,14 +31,21 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
             .onSizeChanged {naturalContentHeight=it.height},
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(!compactEditor) header()
-            if(compactEditor) promptContent()
-            else if(wide) {
+            // IME changes visibility/width, never the focused editor's Row/Column ancestry or call site.
+            if(wide) {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {modelContent();promptContent()}
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {inputContent();parameterContent()}
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        if(!compactEditor) modelContent()
+                        promptContent()
+                    }
+                    if(!compactEditor) Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        inputContent();parameterContent()
+                    }
                 }
             } else {
-                modelContent();promptContent();inputContent();parameterContent()
+                if(!compactEditor) modelContent()
+                promptContent()
+                if(!compactEditor) {inputContent();parameterContent()}
             }
             status()
             if(!compactEditor) {
@@ -48,7 +55,7 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
     }
 }
 
-/** Reparenting the focused prompt when the keyboard opens must not recreate its text/focus node. */
+/** Width-class changes retain up-to-date content; IME transitions keep the prompt's ancestry fixed above. */
 @Composable
 private fun rememberWorkspaceContent(content:@Composable ()->Unit):@Composable ()->Unit {
     val latest by rememberUpdatedState(content)

@@ -1,6 +1,8 @@
 package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -59,5 +61,31 @@ class ModelWorkDraftsTest {
     @Test fun encodeNeverStoresMoreThanThirtyModels() {
         val drafts=(0 until 40).map {draft("m$it")}
         assertEquals(ModelWorkDrafts.MAX_MODELS,ModelWorkDrafts.decode(ModelWorkDrafts.encode(drafts)).size)
+    }
+
+    @Test fun currentAndPerConfigurationDraftsRoundTripAdaptationsAndDecodeLegacyData() {
+        val adaptation=ParameterTransferAdaptation("duration","Duración","15","5","Límite del contrato")
+        val saved=ModelWorkDraft("b","prompt",parameters=mapOf("duration" to "5"),providerId="test",
+            endpoint="/b",modality=Modality.VIDEO,parameterAdaptations=listOf(adaptation))
+        assertEquals(listOf(saved),ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(saved))))
+        val active=CreationDraft("b",Modality.VIDEO,"prompt",saved.parameters,providerId="test",endpoint="/b",
+            parameterAdaptations=saved.parameterAdaptations)
+        assertEquals(active,Json.decodeFromString<CreationDraft>(Json.encodeToString(active)))
+        val legacy="""{"modelId":"b","modality":"VIDEO","prompt":"prompt","parameters":{"duration":"5"}}"""
+        assertTrue(Json.decodeFromString<CreationDraft>(legacy).parameterAdaptations.isEmpty())
+        assertTrue(ModelWorkDrafts.decode("[$legacy]").single().parameterAdaptations.isEmpty())
+    }
+
+    @Test fun targetPlanRestoresOnlyItsOwnConfigurationAdaptations() {
+        val target=model("same").copy(contractEndpoint="/target")
+        val adaptation=ParameterTransferAdaptation("duration","Duración","15","5","Límite del contrato")
+        val saved=draft("same").copy(providerId=target.providerId,endpoint=target.contractEndpoint,modality=Modality.IMAGE,
+            parameterAdaptations=listOf(adaptation))
+        val other=saved.copy(endpoint="/other",parameterAdaptations=emptyList())
+        val decoded=ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(other,saved)))
+        val plan=ModelWorkDrafts.plan(draft("source"),ModelWorkDrafts.find(decoded,target,Modality.IMAGE),target) {true}
+        assertEquals(listOf(adaptation),plan.parameterAdaptations)
+        val otherPlan=ModelWorkDrafts.plan(draft("source"),ModelWorkDrafts.find(decoded,target.copy(contractEndpoint="/other"),Modality.IMAGE)) {true}
+        assertTrue(otherPlan.parameterAdaptations.isEmpty())
     }
 }

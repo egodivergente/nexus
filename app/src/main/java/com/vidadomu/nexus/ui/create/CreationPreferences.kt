@@ -8,7 +8,8 @@ import kotlinx.serialization.json.Json
 
 @Serializable data class CreationDraft(val modelId:String,val modality:Modality,val prompt:String,
     val parameters:Map<String,String>,val media:List<AttachedMedia> = emptyList(),val negativePrompt:String = "",
-    val retainedMedia:List<AttachedMedia> = emptyList(),val providerId:String? = null,val endpoint:String? = null)
+    val retainedMedia:List<AttachedMedia> = emptyList(),val providerId:String? = null,val endpoint:String? = null,
+    val parameterAdaptations:List<ParameterTransferAdaptation> = emptyList())
 @Serializable data class CreationPreset(val name:String,val values:Map<String,String>)
 
 /** Private, bounded settings. Presets never include keys, prompts or source media. */

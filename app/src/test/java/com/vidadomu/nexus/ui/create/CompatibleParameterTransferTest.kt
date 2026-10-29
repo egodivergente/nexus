@@ -2,6 +2,8 @@ package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.ui.create.capability.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -128,6 +130,90 @@ class CompatibleParameterTransferTest {
         val editedB = parameterTransferSource(b, atB.parameters + ("duration" to "6"), emptyList())
         assertEquals("6", transferCompatibleParameters(editedB, a, original).parameters["duration"])
         assertEquals("15", original["duration"])
+    }
+
+    @Test fun reopeningAnAdaptedCurrentDraftStillRestoresTheOriginalSourceValue() {
+        val a=caps("a",listOf(duration()))
+        val b=caps("b",listOf(duration(6f)))
+        val original=ModelWorkDraft(a.model.id,"prompt",parameters=mapOf("duration" to "15"),
+            providerId=a.key.providerId,endpoint=a.key.endpoint,modality=a.key.modality)
+        val atB=transferCompatibleParameters(ParameterTransferSource(a,original.parameters),b,b.defaults)
+        val active=CreationDraft(b.model.id,Modality.VIDEO,"prompt",atB.parameters,
+            providerId=b.key.providerId,endpoint=b.key.endpoint,parameterAdaptations=atB.adaptations)
+        val reopened=Json.decodeFromString<CreationDraft>(Json.encodeToString(active))
+        val stored=ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(original)))
+        val savedA=ModelWorkDrafts.find(stored,a.model,Modality.VIDEO)!!
+        val values=FormContract.restoredValues(b.model,reopened.parameters)
+        val adaptations=restoredParameterAdaptations(values,reopened.parameterAdaptations)
+        val back=transferCompatibleParameters(parameterTransferSource(b,values,adaptations),a,savedA.parameters)
+        assertEquals("15",back.parameters["duration"])
+        assertTrue(back.adaptations.isEmpty())
+        assertEquals("15",savedA.parameters["duration"])
+    }
+
+    @Test fun explicitlyEditingAnAdaptedValueAfterReopeningTransfersThatNewIntent() {
+        val a=caps("a",listOf(duration(),seed()))
+        val b=caps("b",listOf(duration(6f),seed()))
+        val original=mapOf("duration" to "15","seed" to "1")
+        val atB=transferCompatibleParameters(ParameterTransferSource(a,original),b,b.defaults)
+        val draft=ModelWorkDraft(b.model.id,"prompt",parameters=atB.parameters,providerId=b.key.providerId,
+            endpoint=b.key.endpoint,modality=b.key.modality,parameterAdaptations=atB.adaptations)
+        val reopened=ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(draft))).single()
+        val edited=reopened.parameters+("duration" to "6")
+        val adaptations=restoredParameterAdaptations(edited,reopened.parameterAdaptations,setOf("duration"))
+        val savedAgain=reopened.copy(parameters=edited,parameterAdaptations=adaptations)
+        val restoredAgain=ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(savedAgain))).single()
+        val back=transferCompatibleParameters(parameterTransferSource(b,restoredAgain.parameters,restoredAgain.parameterAdaptations),a,original)
+        assertEquals("6",back.parameters["duration"])
+        assertTrue(restoredAgain.parameterAdaptations.isEmpty())
+        assertEquals("15",original["duration"])
+    }
+
+    @Test fun editingAReopenedDraftBeforeSchemaResolutionKeepsTheEditAndClearsItsAdaptation() {
+        val a=caps("a",listOf(duration()))
+        val b=caps("b",listOf(duration(6f)))
+        val atB=transferCompatibleParameters(source(a,"duration" to "15"),b,b.defaults)
+        val active=CreationDraft(b.model.id,Modality.VIDEO,"prompt",atB.parameters,
+            providerId=b.key.providerId,endpoint=b.key.endpoint,parameterAdaptations=atB.adaptations)
+        val reopened=Json.decodeFromString<CreationDraft>(Json.encodeToString(active))
+        val pending=PendingWorkParameters(b.key,reopened.parameters,reopened.parameterAdaptations)
+            .withEdit("duration","6")
+        assertTrue(pending.matches(b.key))
+        assertFalse(pending.matches(b.key.copy(endpoint="/different")))
+        val resolved=FormContract.restoredValues(b.model,pending.parameters)
+        val annotations=restoredParameterAdaptations(resolved,pending.adaptations)
+        assertEquals("6",resolved["duration"])
+        assertTrue(annotations.isEmpty())
+        val back=transferCompatibleParameters(parameterTransferSource(b,resolved,annotations),a,mapOf("duration" to "15"))
+        assertEquals("6",back.parameters["duration"])
+    }
+
+    @Test fun aRapidSecondSwitchCarriesAnExplicitExactKeyEditFromTheLoadingDestination() {
+        val a=caps("a",listOf(duration()))
+        val c=caps("c",listOf(duration()))
+        val loadingB=PendingParameterTransfer(CapabilityKey("fixture","b",null,Modality.VIDEO),
+            source(a,"duration" to "15"),editedValues=mapOf("duration" to "6","unconfirmed_alias" to "12"))
+        val carried=loadingB.source.withEdits(loadingB.editedValues)
+        assertFalse("unconfirmed_alias" in carried.values)
+        assertEquals("15",loadingB.source.values["duration"])
+        val atC=transferCompatibleParameters(carried,c,c.defaults)
+        assertEquals("6",atC.parameters["duration"])
+        assertTrue(atC.adaptations.isEmpty())
+    }
+
+    @Test fun targetAdaptationsSurviveUnrelatedTransfersButNotAnExplicitSameValueEdit() {
+        val a=caps("a",listOf(seed()))
+        val b=caps("b",listOf(duration(6f),seed()))
+        val adaptation=ParameterTransferAdaptation("duration","Duración","15","5","Límite del contrato")
+        val unchanged=transferCompatibleParameters(source(a,"seed" to "42"),b,b.defaults,
+            fallbackAdaptations=listOf(adaptation))
+        assertEquals("42",unchanged.parameters["seed"])
+        assertEquals(listOf(adaptation),unchanged.adaptations)
+        val edited=transferCompatibleParameters(source(a,"seed" to "42"),b,b.defaults,
+            editedValues=mapOf("duration" to "5"),fallbackAdaptations=listOf(adaptation))
+        assertTrue(edited.adaptations.isEmpty())
+        val explicit=parameterTransferSource(b,edited.parameters,edited.adaptations)
+        assertEquals("5",explicit.values["duration"])
     }
 
     @Test fun publishedStepRejectsAnOtherwiseValidNumberWithoutRoundingIt() {

@@ -10,11 +10,13 @@ import kotlinx.serialization.json.Json
 
 @Serializable data class ModelWorkDraft(val modelId:String,val prompt:String,val negativePrompt:String = "",
     val parameters:Map<String,String> = emptyMap(),val media:List<AttachedMedia> = emptyList(),
-    val providerId:String? = null,val endpoint:String? = null,val modality:Modality? = null)
+    val providerId:String? = null,val endpoint:String? = null,val modality:Modality? = null,
+    val parameterAdaptations:List<ParameterTransferAdaptation> = emptyList())
 
 /** Empty [parameters] means "use the target model defaults"; media still has to pass compatibleModelMedia. */
 internal data class ModelSwitchPlan(val prompt:String,val negativePrompt:String,val parameters:Map<String,String>,
-    val media:List<AttachedMedia>,val missingMedia:Int,val restored:Boolean)
+    val media:List<AttachedMedia>,val missingMedia:Int,val restored:Boolean,
+    val parameterAdaptations:List<ParameterTransferAdaptation> = emptyList())
 
 internal object ModelWorkDrafts {
     const val MAX_MODELS = 30
@@ -42,7 +44,7 @@ internal object ModelWorkDrafts {
         val targetById=target.media.filter {item -> targetModel==null ||
             compatibleModelMedia(targetModel,listOf(item)).any {it.id==item.id}}.associateBy {it.id}
         val retained=(leaving.media.map {targetById[it.id] ?: it}+target.media).distinctBy {it.id}
-        return ModelSwitchPlan(leaving.prompt,leaving.negativePrompt,target.parameters,retained,missing,true)
+        return ModelSwitchPlan(leaving.prompt,leaving.negativePrompt,target.parameters,retained,missing,true,target.parameterAdaptations)
     }
 
     fun encode(drafts:List<ModelWorkDraft>):String = json.encodeToString(drafts.take(MAX_MODELS))

@@ -2,13 +2,27 @@ package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.ui.create.capability.*
+import kotlinx.serialization.Serializable
 
 /** A destination fallback changed this requested setting; the original stays in its source draft. */
-data class ParameterTransferAdaptation(
+@Serializable data class ParameterTransferAdaptation(
     val key: String, val label: String, val requestedValue: String, val actualValue: String, val reason: String,
 )
 
-internal data class ParameterTransferSource(val capabilities: ModelUiCapabilities, val values: Map<String, String>)
+/** Fallback provenance survives schema restoration; an explicit edit makes only that key new intent. */
+internal fun restoredParameterAdaptations(parameters: Map<String, String>, adaptations: List<ParameterTransferAdaptation>,
+    editedKeys: Set<String> = emptySet()): List<ParameterTransferAdaptation> = adaptations.distinctBy { it.key }.mapNotNull {
+    val actual = parameters[it.key] ?: return@mapNotNull null
+    if (it.key in editedKeys || it.requestedValue == actual) null else it.copy(actualValue = actual)
+}
+
+internal data class ParameterTransferSource(val capabilities: ModelUiCapabilities, val values: Map<String, String>) {
+    /** An unresolved intermediate model cannot authorize aliases; exact declared keys still preserve explicit edits. */
+    fun withEdits(editedValues: Map<String, String>): ParameterTransferSource {
+        val declared = capabilities.declaredParameters.map { it.key }.toSet()
+        return copy(values = values + editedValues.filterKeys { it in declared })
+    }
+}
 internal fun parameterTransferSource(capabilities: ModelUiCapabilities, values: Map<String, String>,
     adaptations: List<ParameterTransferAdaptation>): ParameterTransferSource {
     val adapted = adaptations.map { it.key }.toSet()
@@ -30,6 +44,8 @@ internal data class PendingWorkParameters(val target: CapabilityKey, val paramet
     val adaptations: List<ParameterTransferAdaptation> = emptyList()) {
     fun matches(key: CapabilityKey): Boolean = target.providerId == key.providerId && target.modelId == key.modelId &&
         target.modality == key.modality && (target.endpoint == null || target.endpoint == key.endpoint)
+    fun withEdit(key: String, value: String): PendingWorkParameters = copy(parameters = parameters + (key to value),
+        adaptations = adaptations.filterNot { it.key == key })
 }
 
 private enum class PortableParameter { DURATION, ASPECT_RATIO, RESOLUTION }
@@ -78,10 +94,11 @@ internal fun transferCompatibleParameters(
     prompt: String = "",
     media: List<AttachedMedia> = emptyList(),
     editedValues: Map<String, String> = emptyMap(),
+    fallbackAdaptations: List<ParameterTransferAdaptation> = emptyList(),
 ): ParameterTransferResult {
     val base = fallback + editedValues
     if (source.capabilities.support != CapabilitySupport.CONFIRMED || destination.support != CapabilitySupport.CONFIRMED)
-        return ParameterTransferResult(base, emptySet(), emptyList())
+        return ParameterTransferResult(base, emptySet(), restoredParameterAdaptations(base, fallbackAdaptations, editedValues.keys))
     val sourceParameters = (source.capabilities.primaryParameters + source.capabilities.advancedParameters).distinctBy { it.key }
     val targetParameters = destination.declaredParameters
     val sourceByKey = sourceParameters.associateBy { it.key }
@@ -128,5 +145,7 @@ internal fun transferCompatibleParameters(
         ParameterTransferAdaptation(key, value.first.displayName, value.second, result[key].orEmpty(),
             "El contrato de destino conserva su ajuste compatible; el valor anterior sigue guardado en el modelo de origen.")
     }
-    return ParameterTransferResult(result, accepted.keys, adaptations)
+    val retained = restoredParameterAdaptations(result, fallbackAdaptations,
+        accepted.keys + editedValues.keys + adaptations.map { it.key })
+    return ParameterTransferResult(result, accepted.keys, adaptations + retained)
 }
