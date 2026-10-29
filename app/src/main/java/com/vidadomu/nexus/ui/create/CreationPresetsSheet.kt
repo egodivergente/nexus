@@ -19,11 +19,13 @@ import androidx.compose.ui.unit.dp
 @Composable fun CreationPresetsSheet(state:CreateUiState,vm:CreateViewModel,onDismiss:()->Unit) {
     val model=state.selectedModel ?: return
     val prefs=vm.creationPreferences
-    var entries by remember(model.id) {mutableStateOf(prefs.presets(model))}
-    var defaultName by remember(model.id) {mutableStateOf(prefs.defaultPresetName(model))}
-    var name by remember {mutableStateOf("")}
+    val modality=state.selectedModality
+    val modelKey=com.vidadomu.nexus.ui.create.capability.ModelCapabilityRegistry.key(model,modality)
+    var entries by remember(modelKey) {mutableStateOf(prefs.presets(model,modality))}
+    var defaultName by remember(modelKey) {mutableStateOf(prefs.defaultPresetName(model,modality))}
+    var name by remember(modelKey) {mutableStateOf("")}
     var rememberValues by remember {mutableStateOf(prefs.rememberParameters())}
-    var deleting by remember {mutableStateOf<CreationPreset?>(null)}
+    var deleting by remember(modelKey) {mutableStateOf<CreationPreset?>(null)}
     fun summary(values:Map<String,String>):String = model.parameters
         .filter {p->values[p.key].orEmpty().isNotBlank() && values[p.key]!=p.defaultValue}
         .take(5).joinToString(" · ") {p->"${p.displayName}: ${values[p.key]}"}
@@ -35,7 +37,7 @@ import androidx.compose.ui.unit.dp
                 Column(Modifier.weight(1f)) {Text("Recordar últimos parámetros");Text("Si hay un ajuste marcado con la estrella, manda ese.",style=MaterialTheme.typography.bodySmall)}
                 Switch(rememberValues,{rememberValues=it;prefs.setRememberParameters(it)})}}
             item {StudioTextField(name,{name=it},label={Text("Nombre del ajuste (p. ej. «Vertical 4K»)")},singleLine=true,modifier=Modifier.fillMaxWidth())}
-            item {Button(onClick={prefs.savePreset(model,name,state.parameters);entries=prefs.presets(model);name=""},enabled=name.isNotBlank(),modifier=Modifier.fillMaxWidth()) {Text("Guardar opciones actuales")}}
+            item {Button(onClick={prefs.savePreset(model,name,state.parameters,modality);entries=prefs.presets(model,modality);name=""},enabled=name.isNotBlank(),modifier=Modifier.fillMaxWidth()) {Text("Guardar opciones actuales")}}
             if(entries.isEmpty()) item {Text("Aún no has guardado ajustes para este modelo.",style=MaterialTheme.typography.bodyMedium)}
             items(entries,key={it.name}) {entry ->
                 val isDefault=defaultName==entry.name
@@ -46,13 +48,13 @@ import androidx.compose.ui.unit.dp
                                 Text(entry.name,style=MaterialTheme.typography.titleMedium)
                                 Text(summary(entry.values),style=MaterialTheme.typography.bodySmall,maxLines=2)
                             }
-                            IconButton(onClick={val next=if(isDefault) null else entry.name;prefs.setDefaultPreset(model,next);defaultName=next}) {
+                            IconButton(onClick={val next=if(isDefault) null else entry.name;prefs.setDefaultPreset(model,next,modality);defaultName=next}) {
                                 Icon(if(isDefault) Icons.Filled.Star else Icons.Outlined.StarBorder,if(isDefault) "Quitar de «al abrir»" else "Aplicar siempre al abrir este modelo")
                             }
                         }
                         Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                             FilledTonalButton(onClick={vm.applyPreset(entry);onDismiss()}) {Text("Aplicar")}
-                            TextButton(onClick={prefs.savePreset(model,entry.name,state.parameters);entries=prefs.presets(model)}) {Text("Actualizar")}
+                            TextButton(onClick={prefs.savePreset(model,entry.name,state.parameters,modality);entries=prefs.presets(model,modality)}) {Text("Actualizar")}
                             TextButton(onClick={deleting=entry}) {Text("Eliminar")}
                         }
                     }
@@ -65,7 +67,7 @@ import androidx.compose.ui.unit.dp
     deleting?.let {target->
         AlertDialog(onDismissRequest={deleting=null},title={Text("¿Eliminar «${target.name}»?")},
             text={Text("Solo se borra este ajuste guardado; el modelo y tus creaciones no cambian.")},
-            confirmButton={Button(onClick={prefs.removePreset(model,target.name);entries=prefs.presets(model);defaultName=prefs.defaultPresetName(model);deleting=null}) {Text("Eliminar")}},
+            confirmButton={Button(onClick={prefs.removePreset(model,target.name,modality);entries=prefs.presets(model,modality);defaultName=prefs.defaultPresetName(model,modality);deleting=null}) {Text("Eliminar")}},
             dismissButton={TextButton(onClick={deleting=null}) {Text("Cancelar")}})
     }
 }

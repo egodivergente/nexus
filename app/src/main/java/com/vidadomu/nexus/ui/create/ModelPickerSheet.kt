@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,8 +39,26 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
     var org by rememberSaveable { mutableStateOf<String?>(null) }
     var modality by rememberSaveable { mutableStateOf<Modality?>(initialModality) }
     var compatibleOnly by rememberSaveable { mutableStateOf(media.isNotEmpty()) }
-    val filtered = remember(availableModels, modality, media, compatibleOnly, org, query) {
+    var favoritesOnly by rememberSaveable { mutableStateOf(false) }
+    val context=LocalContext.current
+    val favoritesStore=remember(context) {StudioFavoritesStore(context)}
+    var favoritesRevision by remember {mutableIntStateOf(0)}
+    var editingFavorites by remember {mutableStateOf(false)}
+    val favoriteKeys=remember(availableModels,modality,favoritesRevision) {
+        (modality?.let(::listOf) ?: listOf(Modality.IMAGE,Modality.VIDEO,Modality.AUDIO,Modality.CHAT)).flatMap {type ->
+            studioFavorites(availableModels,type,favoritesStore.read(type)).map {it.model.studioKey()}
+        }.toSet()
+    }
+    if(editingFavorites) {
+        val type=modality ?: initialModality
+        StudioFavoritesEditor(type,availableModels,favoritesStore.read(type),onSave={keys ->
+            favoritesStore.save(type,keys);favoritesRevision++;editingFavorites=false
+        },onDismiss={editingFavorites=false})
+        return
+    }
+    val filtered = remember(availableModels, modality, media, compatibleOnly, org, query, favoritesOnly, favoriteKeys) {
         filterCanvasModels(availableModels, modality, media, compatibleOnly, org, query)
+            .filter {!favoritesOnly || it.studioKey() in favoriteKeys}
     }
     val families = remember(filtered) { filtered.groupBy(::catalogFamily).toSortedMap() }
     val orgs = remember(availableModels, modality) {
@@ -55,6 +74,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                         Text("Elige tu modelo",style=MaterialTheme.typography.titleLarge)
                         Text("${filtered.size} ${if(filtered.size==1) "modelo" else "modelos"} · ${families.size} ${if(families.size==1) "familia" else "familias"}",style=MaterialTheme.typography.bodySmall)
                     }
+                    IconButton(onClick={editingFavorites=true}) {Icon(Icons.Default.StarOutline,"Editar modelos favoritos")}
                     IconButton(onClick=onDismiss) {Icon(Icons.Default.Close,"Cerrar selector de modelos")}
                 }
             }
@@ -65,6 +85,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
             }
             item {
                 LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    item {FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.Star,null,Modifier.size(NexusTokens.iconSmall))})}
                     items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio",Modality.CHAT to "Chat")) { (value,label) ->
                         FilterChip(modality==value,{modality=value;org=null},label={Text(label)})
                     }
@@ -90,7 +111,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
             if(filtered.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space16)) {
                     Text("No hay modelos con estos filtros",style=MaterialTheme.typography.titleMedium)
-                    TextButton(onClick={query="";org=null;modality=null;compatibleOnly=false}) {Text("Ver todo el catálogo")}
+                    TextButton(onClick={query="";org=null;modality=null;compatibleOnly=false;favoritesOnly=false}) {Text("Ver todo el catálogo")}
                 }
             }
             families.forEach { (family,models) ->

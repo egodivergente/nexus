@@ -24,18 +24,18 @@ class ModelWorkDraftsTest {
         assertEquals("m34",drafts.first().modelId); assertNull(ModelWorkDrafts.find(drafts,"m4"))
         assertNotNull(ModelWorkDrafts.find(drafts,"m5"))
     }
-    @Test fun targetWithDraftRestoresItsOwnWork() {
+    @Test fun targetWithDraftRestoresParametersButKeepsCurrentTextAndAllResources() {
         val leaving=draft("a",media=listOf(image("one")))
         val target=draft("b",media=listOf(image("two")))
         val plan=ModelWorkDrafts.plan(leaving,target) {true}
         assertTrue(plan.restored)
-        assertEquals("p-b",plan.prompt); assertEquals("neg-b",plan.negativePrompt)
-        assertEquals(mapOf("size" to "b"),plan.parameters); assertEquals(listOf("two"),plan.media.map {it.id})
+        assertEquals("p-a",plan.prompt); assertEquals("neg-a",plan.negativePrompt)
+        assertEquals(mapOf("size" to "b"),plan.parameters); assertEquals(listOf("one","two"),plan.media.map {it.id})
         assertEquals(0,plan.missingMedia)
     }
-    @Test fun restoredDraftSkipsMissingFilesAndCountsThem() {
+    @Test fun restoredDraftRetainsMissingReferencesAndReportsThem() {
         val plan=ModelWorkDrafts.plan(draft("a"),draft("b",media=listOf(image("kept"),image("gone")))) {it.id=="kept"}
-        assertEquals(listOf("kept"),plan.media.map {it.id}); assertEquals(1,plan.missingMedia)
+        assertEquals(listOf("kept","gone"),plan.media.map {it.id}); assertEquals(1,plan.missingMedia)
     }
     @Test fun targetWithoutDraftCarriesPromptAndEveryReferenceWithDefaultParameters() {
         val refs=listOf(image("one"),image("two"),video("clip"))

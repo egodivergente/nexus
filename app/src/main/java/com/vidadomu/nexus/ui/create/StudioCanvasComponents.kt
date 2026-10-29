@@ -104,10 +104,11 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .semantics { contentDescription = "Prompt de creación" }
-            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space12),
+            .heightIn(min = if(expanded) 176.dp else 72.dp)
+            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            // Crece con el texto: vacío ocupa 2 líneas, no un bloque fijo de 4.
-            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 5,
+            // Collapsed editor stays around 120–128 dp including its toolbar. Text scrolls; no text is discarded.
+            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 3,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,
@@ -119,22 +120,21 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         val warning=rules.value("prompt.softWarning",ruleScope).toLongOrNull() ?: 0
         if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary)
         rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        attachments()
         Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space4, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
-            com.vidadomu.nexus.ui.components.NexusHintedIconButton("Pegar prompt",modifier=Modifier.size(48.dp),enabled=enabled,onClick={
+            com.vidadomu.nexus.ui.components.NexusHintedIconButton("Pegar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled,onClick={
                 val pasted=clipboard.getText()?.text
                 if(!pasted.isNullOrEmpty() && pasted!=value) {onValueChange(pasted);feedback.perform(NexusHapticEvent.SELECTION)}
             }) {Icon(Icons.Default.ContentPaste,"Pegar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-            com.vidadomu.nexus.ui.components.NexusHintedIconButton("Borrar prompt",modifier=Modifier.size(48.dp),enabled=enabled && value.isNotEmpty(),onClick={
+            com.vidadomu.nexus.ui.components.NexusHintedIconButton("Borrar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled && value.isNotEmpty(),onClick={
                 cleared=value;onValueChange("");feedback.perform(NexusHapticEvent.SELECTION)
             }) {Icon(Icons.Default.Close,"Borrar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-            if(value.isEmpty() && cleared!=null) com.vidadomu.nexus.ui.components.NexusHintedIconButton("Restaurar prompt",modifier=Modifier.size(48.dp),enabled=enabled,onClick={
+            if(value.isEmpty() && cleared!=null) com.vidadomu.nexus.ui.components.NexusHintedIconButton("Restaurar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled,onClick={
                 onValueChange(cleared.orEmpty());cleared=null;feedback.perform(NexusHapticEvent.SELECTION)
             }) {Icon(Icons.Default.Undo,"Restaurar prompt",Modifier.size(16.dp))}
             Spacer(Modifier.weight(1f))
             val measured=capability?.measured(value)
             Text(if(capability!=null) "${measured ?: "≈ ?"} / ${capability.maximum} ${capability.unitLabel}"
-                else value.codePointCount(0,value.length).let {n -> "$n ${if(n==1) "carácter" else "caracteres"}"},
+                else value.codePointCount(0,value.length).let {n -> if(maximum!=null) "$n / $maximum caracteres" else "$n ${if(n==1) "carácter" else "caracteres"}"},
                 style=MaterialTheme.typography.labelSmall,
                 modifier=Modifier.weight(1f,fill=false),
                 color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -146,6 +146,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        attachments()
     }
 }
 
@@ -153,7 +154,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
 internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
     busyLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier, actionLabel: String = "Generar",
     /** What is still missing, shown on the disabled button itself so no separate strip competes with it. */
-    disabledLabel: String? = null) {
+    disabledLabel: String? = null, showCost: Boolean = true) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if(pressed) .985f else 1f, tween(NexusTokens.pressDuration), label = "Generate press")
@@ -172,7 +173,7 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
                     // The indeterminate spinner loops forever; with reduced motion or hidden, a static glyph keeps the busy label honest.
                     if(working && motionAllowed) CircularProgressIndicator(Modifier.size(16.dp), color = scheme.onPrimary, strokeWidth = 2.dp)
                     else if(working) Icon(Icons.Filled.Timelapse, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(16.dp))
-                    Text(if(working) busyLabel else if(!enabled && disabledLabel != null) disabledLabel else "$actionLabel · $cost", style = MaterialTheme.typography.titleSmall.tabularMoney(),
+                    Text(if(working) busyLabel else if(!enabled && disabledLabel != null) disabledLabel else if(showCost) "$actionLabel · $cost" else actionLabel, style = MaterialTheme.typography.titleSmall.tabularMoney(),
                         modifier=Modifier.weight(1f,fill=false),maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }

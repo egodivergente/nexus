@@ -48,4 +48,9 @@ class ModelSelectionTest {
         assertTrue(retainsAllReferences(m,listOf(clip)))
         assertFalse(retainsAllReferences(m,listOf(clip,image("still"))))
     }
+    @Test fun loneFinalFrameDoesNotSilentlyBecomeTheInitialFrame() {
+        val final=image().copy(slotType=MediaSlotType.LAST_FRAME)
+        val mapped=compatibleModelMedia(model().copy(firstFrameField="first",lastFrameField="last"),listOf(final))
+        assertEquals(listOf(final),mapped)
+    }
 }

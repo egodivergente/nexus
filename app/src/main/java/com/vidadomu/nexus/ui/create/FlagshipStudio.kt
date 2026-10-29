@@ -154,19 +154,6 @@ internal fun FlagshipStudioHeader(
     val animate = rememberSystemAnimatorsEnabled()
     val haptics = rememberNexusHaptics()
     val context = LocalContext.current
-    val favoritesStore = remember(context) { StudioFavoritesStore(context) }
-    var favoritesRevision by remember { mutableStateOf(0) }
-    var editingFavorites by remember { mutableStateOf(false) }
-    val savedFavorites = remember(modality, favoritesRevision) { favoritesStore.read(modality) }
-    val matches = remember(catalog, modality, savedFavorites) { studioFavorites(catalog, modality, savedFavorites) }
-    if (editingFavorites) StudioFavoritesEditor(modality, catalog, savedFavorites,
-        onSave = { keys ->
-            favoritesStore.save(modality, keys)
-            favoritesRevision++
-            editingFavorites = false
-            haptics.perform(NexusHapticEvent.SELECTION)
-        }, onDismiss = { editingFavorites = false })
-    var expanded by rememberSaveable { mutableStateOf(false) }
     var showIdentity by remember {mutableStateOf(false)}
     val identity=selectedModel?.let(::canvasModelIdentity)
     if(showIdentity && selectedModel!=null && identity!=null) AlertDialog(onDismissRequest={showIdentity=false},
@@ -178,7 +165,7 @@ internal fun FlagshipStudioHeader(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         StudioModalitySegments(modality, animate, onModality)
         Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment=Alignment.CenterVertically,
+            Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8), verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(organization=selectedModel?.organization, modelId=selectedModel?.id, size=28.dp)
                 Column(Modifier.weight(1f)) {
@@ -189,19 +176,7 @@ internal fun FlagshipStudioHeader(
                 Icon(Icons.Default.SwapHoriz,"Cambiar modelo",Modifier.size(NexusTokens.iconMedium))
             }
         }
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            TextButton(onClick={expanded=!expanded}) { Text(if(expanded) "Ocultar favoritos" else "Modelos favoritos") }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick={editingFavorites=true}) { Icon(Icons.Default.Tune,"Personalizar modelos destacados",Modifier.size(NexusTokens.iconMedium)) }
-        }
-        if(expanded) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            items(matches,key={it.model.providerId+"/"+it.model.id}) { match ->
-                FlagshipCard(match, match.model.id==selectedModel?.id && match.model.providerId==selectedModel?.providerId, animate) {
-                    onChoose(match.model)
-                }
-            }
-            item(key="all-models") { AllModelsCard(onAllModels) }
-        }
+
     }
 }
 
@@ -211,7 +186,7 @@ private fun StudioModalitySegments(
     animate: Boolean,
     onModality: (Modality) -> Unit,
     modifier: Modifier = Modifier.fillMaxWidth(),
-    segmentHeight: androidx.compose.ui.unit.Dp = 40.dp,
+    segmentHeight: androidx.compose.ui.unit.Dp = NexusTokens.minimumTouch,
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = rememberNexusHaptics()

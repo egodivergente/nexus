@@ -218,6 +218,9 @@ object NativeModelSchema {
     /** Rangos x-depends-on publicados por el schema: {campo → condiciones}. */
     fun conditions(modelId: String): Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>> = conditionsByModel[modelId].orEmpty()
 
+    /** Immutable parsed Input snapshot for UI/validation adapters; this never fetches or alters a contract. */
+    fun inputSchemaSnapshot(modelId: String): JsonObject? = schemas[modelId]
+
     internal fun parseConditions(props: JsonObject): Map<String, List<com.vidadomu.nexus.agent.core.registry.ParamCondition>> =
         props.mapNotNull { (key, raw) ->
             val dep = (raw as? JsonObject)?.get("x-depends-on") as? JsonObject ?: return@mapNotNull null

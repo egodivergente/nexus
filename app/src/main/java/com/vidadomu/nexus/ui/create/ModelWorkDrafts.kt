@@ -9,7 +9,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable data class ModelWorkDraft(val modelId:String,val prompt:String,val negativePrompt:String = "",
-    val parameters:Map<String,String> = emptyMap(),val media:List<AttachedMedia> = emptyList())
+    val parameters:Map<String,String> = emptyMap(),val media:List<AttachedMedia> = emptyList(),
+    val providerId:String? = null,val endpoint:String? = null,val modality:Modality? = null)
 
 /** Empty [parameters] means "use the target model defaults"; media still has to pass compatibleModelMedia. */
 internal data class ModelSwitchPlan(val prompt:String,val negativePrompt:String,val parameters:Map<String,String>,
@@ -21,24 +22,34 @@ internal object ModelWorkDrafts {
 
     fun find(drafts:List<ModelWorkDraft>,modelId:String):ModelWorkDraft? = drafts.firstOrNull {it.modelId==modelId}
 
-    /** Most recent first; the oldest drafts fall off once [max] models are stored. */
+    fun find(drafts:List<ModelWorkDraft>,model:NexusModel,modality:Modality):ModelWorkDraft? = drafts.firstOrNull {
+        it.modelId==model.id && it.providerId==model.providerId && it.endpoint==(model.contractEndpoint ?: model.atlasEndpoint) && it.modality==modality
+    } ?: drafts.firstOrNull {it.modelId==model.id && it.providerId==null}
+
+    private fun key(draft:ModelWorkDraft)=listOf(draft.providerId,draft.modelId,draft.endpoint,draft.modality?.name)
+    /** Most recent first; the oldest parameter snapshots fall off once [max] configurations are stored. */
     fun remember(drafts:List<ModelWorkDraft>,draft:ModelWorkDraft,max:Int=MAX_MODELS):List<ModelWorkDraft> =
-        (listOf(draft)+drafts.filterNot {it.modelId==draft.modelId}).take(max)
+        (listOf(draft)+drafts.filterNot {key(it)==key(draft)}).take(max)
 
     fun plan(leaving:ModelWorkDraft,target:ModelWorkDraft?,isAvailable:(AttachedMedia)->Boolean):ModelSwitchPlan {
         if(target==null) return ModelSwitchPlan(leaving.prompt,leaving.negativePrompt,emptyMap(),leaving.media,0,false)
-        val available=target.media.filter(isAvailable)
-        return ModelSwitchPlan(target.prompt,target.negativePrompt,target.parameters,available,target.media.size-available.size,true)
+        val missing=target.media.count { !isAvailable(it) && leaving.media.none { source -> source.id==it.id } }
+        // Parameters belong to the target configuration. Text and resources belong to this work session.
+        // Keep unavailable references too: the user may recover them, and their absence must stay explicit.
+        val targetById=target.media.associateBy {it.id}
+        val retained=(leaving.media.map {targetById[it.id] ?: it}+target.media).distinctBy {it.id}
+        return ModelSwitchPlan(leaving.prompt,leaving.negativePrompt,target.parameters,retained,missing,true)
     }
 
     fun encode(drafts:List<ModelWorkDraft>):String = json.encodeToString(drafts.take(MAX_MODELS))
     fun decode(raw:String?):List<ModelWorkDraft> = if(raw==null) emptyList() else
-        runCatching {json.decodeFromString<List<ModelWorkDraft>>(raw)}.getOrDefault(emptyList()).distinctBy {it.modelId}.take(MAX_MODELS)
+        runCatching {json.decodeFromString<List<ModelWorkDraft>>(raw)}.getOrDefault(emptyList()).distinctBy(::key).take(MAX_MODELS)
 }
 
 /** Exact state before a model switch, so "Volver" can put it back untouched. */
 internal data class ModelSwitchSnapshot(val model:NexusModel,val modality:Modality,val availableModels:List<NexusModel>,
-    val prompt:String,val negativePrompt:String,val parameters:Map<String,String>,val media:List<AttachedMedia>)
+    val prompt:String,val negativePrompt:String,val parameters:Map<String,String>,val media:List<AttachedMedia>,
+    val retainedMedia:List<AttachedMedia> = emptyList())
 
 data class ModelSwitchNotice(val id:Long,val modelName:String,val parkedMedia:Int) {
     val message:String get() = "Cambiado a $modelName"+when(parkedMedia) {
@@ -50,7 +61,7 @@ data class ModelSwitchNotice(val id:Long,val modelName:String,val parkedMedia:In
 
 internal object ModelSwitchUndo {
     fun snapshot(state:CreateUiState):ModelSwitchSnapshot? = state.selectedModel?.let {
-        ModelSwitchSnapshot(it,state.selectedModality,state.availableModels,state.prompt,state.negativePrompt,state.parameters,state.attachedMedia)
+        ModelSwitchSnapshot(it,state.selectedModality,state.availableModels,state.prompt,state.negativePrompt,state.parameters,state.attachedMedia,state.retainedMedia)
     }
 
     /** Media carried to the new model that it cannot use; they stay in the previous model's draft. */
@@ -61,7 +72,7 @@ internal object ModelSwitchUndo {
 
     fun restore(state:CreateUiState,snapshot:ModelSwitchSnapshot):CreateUiState = state.copy(selectedModel=snapshot.model,
         selectedModality=snapshot.modality,availableModels=snapshot.availableModels,prompt=snapshot.prompt,
-        negativePrompt=snapshot.negativePrompt,parameters=snapshot.parameters,attachedMedia=snapshot.media,
+        negativePrompt=snapshot.negativePrompt,parameters=snapshot.parameters,attachedMedia=snapshot.media,retainedMedia=snapshot.retainedMedia,
         showAdvanced=false,errorMessage=null)
 }
 

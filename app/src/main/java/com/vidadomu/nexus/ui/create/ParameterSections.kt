@@ -64,7 +64,7 @@ internal fun ParameterSheetContent(model: NexusModel, parameters: List<ModelPara
     var advanced by rememberSaveable(model.providerId, model.id) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
         primary.forEach { param ->
-            key(model.id, param.key) { NativeParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }
+            key(model.id, param.key) { RegisteredParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }
         }
         if (optional.isNotEmpty()) TextButton(onClick = { advanced = !advanced }) {
             Text(if (advanced) "Ocultar ajustes avanzados" else "Avanzado · ${optional.size} opciones")
@@ -79,11 +79,11 @@ internal fun ParameterSheetContent(model: NexusModel, parameters: List<ModelPara
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ParameterSections.rows(section.parameters).forEach { row ->
                     if (row.size == 1) key(model.id, row[0].key) {
-                        NativeParameterControl(row[0], values[row[0].key] ?: row[0].defaultValue) { onChange(row[0].key, it) }
+                        RegisteredParameterControl(row[0], values[row[0].key] ?: row[0].defaultValue) { onChange(row[0].key, it) }
                     } else Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.Top) {
                         row.forEach { param ->
                             Box(Modifier.weight(1f)) {
-                                key(model.id, param.key) { NativeParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }
+                                key(model.id, param.key) { RegisteredParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }
                             }
                         }
                     }

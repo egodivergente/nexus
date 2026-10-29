@@ -52,6 +52,7 @@ import androidx.compose.foundation.rememberScrollState
 import com.vidadomu.nexus.ui.components.StudioChrome
 import com.vidadomu.nexus.ui.components.StudioToolChip
 import com.vidadomu.nexus.ui.theme.*
+import com.vidadomu.nexus.ui.create.capability.ModelCapabilityRegistry
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -97,10 +98,14 @@ fun CreateScreen(
             finally { retriever.release() }
         }
     }
-    val estimate = rememberPriceEstimate(state.selectedModel,state.parameters,
+    val effectiveConfiguration=remember(state.selectedModel,state.selectedModality,state.parameters,state.prompt,state.schemaReady,state.attachedMedia) {
+        state.capabilityValidation()?.configuration
+    }
+    val effectivePrompt=effectiveConfiguration?.requestPrompt.orEmpty()
+    val estimate = rememberPriceEstimate(state.selectedModel,effectiveConfiguration?.parameters ?: state.parameters,
         state.attachedMedia.count { it.mimeType.startsWith("image/") }
             .takeIf { it > 0 } ?: state.selectedModel?.takeIf { it.supportsImageInput }?.let { 1 },
-        !state.isLoadingSchema, videoSeconds, state.prompt.length, state.prompt)
+        !state.isLoadingSchema, videoSeconds, effectivePrompt.length, effectivePrompt)
     // Captured with this composition's estimate so the ViewModel can detect a quote shown for an older configuration.
     val costQuote = generationCostQuote(state, estimate)
     val countParam = if(state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && state.selectedModel?.promptAccepted == true)
@@ -124,15 +129,12 @@ fun CreateScreen(
     var showRequestInspector by remember { mutableStateOf(false) }
     var showPersonalPresets by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
-    var inlineParametersExpanded by rememberSaveable(state.selectedModel?.providerId,state.selectedModel?.id) { mutableStateOf(state.selectedModel?.parameters.orEmpty().any {it.isRequired && it.key.lowercase() !in setOf("aspect_ratio","aspectratio","ratio","size","image_size")}) }
     var showToolMenu by remember { mutableStateOf(false) }
-    var pendingModel by remember { mutableStateOf<NexusModel?>(null) }
     val catalogModels by app.modelCatalogRepository.models.collectAsState()
-    // Single selection path for the flagship rail and the picker sheet, media-loss confirmation included.
+    // A model change preserves the prompt and all files; incompatible media stays in Conservados.
     val chooseModel: (NexusModel) -> Unit = { model ->
         if(model.id != state.selectedModel?.id || model.providerId != state.selectedModel?.providerId) {
-            if(state.attachedMedia.isNotEmpty()) pendingModel=model
-            else viewModel.selectModel(model)
+            viewModel.selectModel(model)
         }
     }
     var showInspiration by remember { mutableStateOf(false) }
@@ -156,9 +158,10 @@ fun CreateScreen(
     val readiness=creationReadiness(if(comparisonState.phase == ComparisonPhase.SENDING) state.copy(isSubmitting = true) else state)
     val screenMargin = if(horizontalActions) NexusTokens.tabletMargin else NexusTokens.screenMargin
 
-    val inputFields = state.selectedModel?.takeIf { state.schemaReady }?.let {
-        CanvasInputPlan.fields(it, state.parameters)
-    }.orEmpty()
+    val capabilities=remember(state.selectedModel,state.selectedModality,state.parameters,state.schemaReady,state.attachedMedia) {
+        state.selectedModel?.let {ModelCapabilityRegistry.resolve(it,state.selectedModality,state.parameters,state.schemaReady,state.attachedMedia)}
+    }
+    val inputFields=capabilities?.inputFields.orEmpty()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -176,8 +179,8 @@ fun CreateScreen(
                         else TextButton(onClick={
                             when(readiness.fixTarget) {
                                 CreationFixTarget.MODEL -> showModelPickerSheet=true
-                                CreationFixTarget.PROMPT -> batchScope.launch {canvasScroll.animateScrollToItem(1);promptFocus.requestFocus()}
-                                CreationFixTarget.MEDIA -> batchScope.launch { canvasScroll.animateScrollToItem(1) }
+                                CreationFixTarget.PROMPT -> batchScope.launch {canvasScroll.animateScrollToItem(2);promptFocus.requestFocus()}
+                                CreationFixTarget.MEDIA -> batchScope.launch { canvasScroll.animateScrollToItem(3) }
                                 CreationFixTarget.PARAMETERS -> showParameters=true
                                 CreationFixTarget.RETRY_CONFIGURATION -> viewModel.retryConfiguration()
                                 null -> Unit
@@ -188,20 +191,16 @@ fun CreateScreen(
                             Icon(Icons.Default.ChevronRight, null)
                         }
                     }
-                    if(state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && state.selectedModel?.promptAccepted != false && state.schemaReady && !busy && !compactTyping) {
-                        val shownCount=quantity.count
-                        GenerationQuantityControl(shownCount,true,onCount={count ->
-                            batchCount=count
-                            if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")
-                        },onModels={viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},
-                            allowed={count -> countParam==null || nativeCountAllowed(countParam,count) || nativeCountAllowed(countParam,1)},
-                            choices=(BATCH_COUNTS + listOf(shownCount) + countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0}.distinct().sorted())
-                    }
                     val totalCost=canvasQuantityCost(estimate,quantity,currencyManager::formatUsd)
-                    StudioGenerateButton(totalCost, readiness.canSubmit, busy,
+                    GenerateActionBar(if(isKnownCost(estimate)) totalCost else "Por confirmar", readiness.canSubmit, busy,
                         if(comparisonState.phase == ComparisonPhase.SENDING) "Enviando lote…" else readiness.message ?: "Generando…",
-                        generateAction, actionLabel=if(state.selectedModel?.promptAccepted == false) "Procesar" else if(quantity.count>1 && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO)) "Generar ${quantity.count}" else "Generar",
-                        disabledLabel=if(inlineReason) readiness.message else null)
+                        generateAction, actionLabel=when(state.selectedModality) {
+                            Modality.VIDEO -> if(state.selectedModel?.promptAccepted==false) "Procesar vídeo" else if(quantity.count>1) "Generar ${quantity.count} vídeos" else "Generar vídeo"
+                            Modality.IMAGE -> if(state.selectedModel?.promptAccepted==false) "Procesar imagen" else if(quantity.count>1) "Generar ${quantity.count} imágenes" else "Generar imagen"
+                            Modality.AUDIO -> "Generar audio"
+                            Modality.CHAT -> "Enviar consulta"
+                            else -> "Procesar"
+                        },disabledLabel=if(inlineReason) readiness.message else null,onCostDetails={showPriceDetails=true})
                 }
             }
         },
@@ -253,37 +252,24 @@ fun CreateScreen(
                         SegmentedButton(selected=selected?.id==textRoute.id,onClick={chooseModel(textRoute)},shape=SegmentedButtonDefaults.itemShape(0,2)) {Text("Desde texto")}
                         SegmentedButton(selected=selected?.id==editRoute.id,onClick={chooseModel(editRoute)},shape=SegmentedButtonDefaults.itemShape(1,2)) {Text("Con referencias")}
                     }
-                    val mediaContent: @Composable ColumnScope.() -> Unit = {
-                        val renderField: @Composable (CanvasInputField, Boolean) -> Unit = { field, frameColumn ->
-                            val modelKey = state.selectedModel?.let { it.providerId + "/" + it.id }.orEmpty()
-                            key(modelKey,field.key) {
-                                CanvasAttachmentEditor(field,state.attachedMedia,
-                                    enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
-                                    onAdd={viewModel.addCanvasMedia(field.key,modelKey,it)},onRemove=viewModel::removeMedia,compact=true,onReorder=viewModel::reorderMedia,frameColumn=frameColumn)
-                            }
-                        }
-                        BoxWithConstraints(Modifier.fillMaxWidth()) {
-                            // Use available dp, not physical pixels or a device-name check. Large text,
-                            // split screen and landscape retain the readable vertical layout.
-                            if (CanvasInputPlan.pairedFrames(inputFields, state.selectedModel, maxWidth.value, LocalDensity.current.fontScale)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                                    inputFields.forEach { field -> Box(Modifier.weight(1f)) { renderField(field, true) } }
-                                }
-                            } else Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                                inputFields.forEach { renderField(it, false) }
-                            }
-                        }
-                    }
-                    if(state.selectedModel?.promptAccepted != false) StudioPromptField(state.prompt,viewModel::updatePrompt,
-                        if(state.selectedModality==Modality.CHAT) "Escribe tu consulta…" else "Describe lo que quieres crear o transformar…",
-                        focusRequester=promptFocus,enabled=!state.isSubmitting,capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),attachments=mediaContent)
-                    else Column(content=mediaContent)
-                    if(state.schemaReady && inputFields.isEmpty() && state.selectedModel?.promptAccepted == true) {
-                        if(state.selectedModel?.pairedEditModelId != null) TextButton(onClick=viewModel::switchToEditModel) {
-                            Text("Cambiar al modelo de edición con imágenes")
-                        }
-                    }
+                    if(capabilities?.promptVisible==true) PromptEditor(state.prompt,viewModel::updatePrompt,
+                        when(state.selectedModality) {Modality.VIDEO -> "Describe el movimiento, la acción y la cámara…";Modality.CHAT -> "Escribe tu consulta…";else -> "Describe lo que quieres crear o transformar…"},
+                        focusRequester=promptFocus,enabled=!state.isSubmitting,
+                        capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),
+                        ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,
+                            model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name))
                 }
+            }
+            item(key="capability-inputs") {
+                capabilities?.let {resolved -> DynamicFormRenderer(resolved,state.parameters,state.attachedMedia,
+                    enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,countKey=countParam?.key,
+                    onAdd={field,items ->
+                        val modelKey=state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty()
+                        viewModel.addCanvasMedia(field.key,modelKey,items)
+                    },onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia,onChange=viewModel::updateParameter) }
+            }
+            if(state.retainedMedia.isNotEmpty()) item(key="retained-media") {
+                ConservedMediaSection(state.retainedMedia,!state.isSubmitting,viewModel::removeRetainedMedia)
             }
 
             // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
@@ -319,57 +305,27 @@ fun CreateScreen(
             }
 
 
-            val allInline=if(state.schemaReady) state.selectedModel?.let {model -> ParameterDependencies.visible(model,com.vidadomu.nexus.core.model.FormContract.normalize(model.parameters),state.parameters)}.orEmpty().filter {it.key!=countParam?.key}.orEmpty() else emptyList()
-            val formatParam=aspectFormatParameter(allInline)
-            val inline=allInline.filter {it.key!=formatParam?.key}
-            item {
+            if(state.schemaReady && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && capabilities?.promptVisible==true) item(key="generation-quantity") {
+                GenerationQuantityControl(quantity.count,!state.isSubmitting,onCount={count ->
+                    batchCount=count
+                    if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")
+                },onModels={viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},
+                    allowed={count -> countParam==null || nativeCountAllowed(countParam,count) || nativeCountAllowed(countParam,1)},
+                    choices=(BATCH_COUNTS+listOf(quantity.count)+countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0}.distinct().sorted())
+            }
+            item(key="creation-tools") {
                 StudioToolRow {
                     if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
-                    if(formatParam!=null) {
-                        val quick=inline.filter {it.key.lowercase() in setOf("quality","resolution","duration","duration_seconds","seconds","video_length") && ParameterPresentation.options(it).size in 2..6}
-                        AspectFormatChip(formatParam,state.parameters[formatParam.key]?:formatParam.defaultValue,{viewModel.updateParameter(formatParam.key,it)},
-                            quickParams=quick,valueOf={state.parameters[it.key]?:it.defaultValue},onQuick={p,v -> viewModel.updateParameter(p.key,v)},
-                            quantity=quantity.count,quantityChoices=(listOf(1,2,3,4,6,8)+countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0 && (countParam==null || nativeCountAllowed(countParam,it) || nativeCountAllowed(countParam,1))}.distinct().sorted(),
-                            onQuantity={count -> batchCount=count
-                                if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")})
-                    }
-                    StudioToolChip("Coste", "Detalles del coste estimado") {showPriceDetails=true}
-                    if(inline.isNotEmpty()) StudioToolChip("Ajustes", "Ajustes del modelo") {showParameters=true}
-                    // BytePlus is a separate account route: only surfaced when it is the active provider; otherwise it lives under «Más».
-                    if(state.selectedModel?.providerId==BYTEPLUS_MEDIA_PROVIDER) StudioToolChip("BytePlus", "Usar mi cuenta BytePlus") {showBytePlus=true}
                     Box {
-                        StudioToolChip("Más", "Más herramientas del Lienzo") {showToolMenu=true}
+                        StudioToolChip("Más", "Más herramientas de Lanzadera") {showToolMenu=true}
                         DropdownMenu(expanded=showToolMenu,onDismissRequest={showToolMenu=false}) {
-                            if(state.selectedModel?.providerId!=BYTEPLUS_MEDIA_PROVIDER) DropdownMenuItem(text={Text("Usar mi cuenta BytePlus")},
-                                onClick={showToolMenu=false;showBytePlus=true})
+                            DropdownMenuItem(text={Text("Todos los parámetros")},enabled=state.schemaReady,
+                                onClick={showToolMenu=false;showParameters=true})
+                            DropdownMenuItem(text={Text("Comparar modelos")},enabled=state.schemaReady && !state.isSubmitting,
+                                onClick={showToolMenu=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true})
                             DropdownMenuItem(text={Text("Mis ajustes")},enabled=state.schemaReady && !state.isSubmitting,
                                 onClick={showToolMenu=false;showPersonalPresets=true})
-                        }
-                    }
-                }
-            }
-
-            // Los ajustes propios del modelo, a la vista (antes solo vivían dentro de una hoja): aprovechan el espacio del Lienzo.
-            if(state.schemaReady) {
-                val selectedForParams=state.selectedModel
-                if(selectedForParams!=null && inline.any {it.isRequired}) item(key="inline-params") {
-                    Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surface,
-                        border=androidx.compose.foundation.BorderStroke(.5.dp,MaterialTheme.colorScheme.outlineVariant)) {
-                        Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                            Row(Modifier.fillMaxWidth().heightIn(min=48.dp)
-                                .semantics(mergeDescendants=true) { stateDescription=if(inlineParametersExpanded) "Expandido" else "Contraído" }
-                                .clickable(role=androidx.compose.ui.semantics.Role.Button) {inlineParametersExpanded=!inlineParametersExpanded},
-                                verticalAlignment=Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Ajustes de ${state.selectedModel?.let(::canvasModelIdentity)?.title.orEmpty()}",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface)
-                                    Text(parameterSummary(selectedForParams!!,inline,state.parameters).ifBlank {"Valores del proveedor"},
-                                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                }
-                                Icon(if(inlineParametersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
-                            }
-                            if(inlineParametersExpanded) {
-                                ParameterSheetContent(selectedForParams!!,inline,state.parameters) {key,value -> viewModel.updateParameter(key,value)}
-                            }
+                            DropdownMenuItem(text={Text("Usar mi cuenta BytePlus")},onClick={showToolMenu=false;showBytePlus=true})
                         }
                     }
                 }
@@ -402,7 +358,7 @@ fun CreateScreen(
                 actionLabel=if(state.schemaReady) null else "Reintentar",onAction=if(!state.schemaReady && !state.isLoadingSchema) viewModel::retryConfiguration else null)
         }
         if(state.schemaReady) {
-            val params=state.selectedModel?.parameters?.let(com.vidadomu.nexus.core.model.FormContract::normalize).orEmpty().filter {it.key!=countParam?.key}
+            val params=(capabilities?.primaryParameters.orEmpty()+capabilities?.advancedParameters.orEmpty()).filter {it.key!=countParam?.key}.distinctBy {it.key}
             state.selectedModel?.let {model -> ParameterSheetContent(model,params,state.parameters) {key,value -> viewModel.updateParameter(key,value)}}
         }
     }
@@ -465,13 +421,6 @@ fun CreateScreen(
                 }
             }) {Text("Generar $count")}},
             dismissButton={TextButton(onClick={pendingBatch=null}) {Text("Cancelar")}})
-    }
-
-    pendingModel?.let { target ->
-        AlertDialog(onDismissRequest={pendingModel=null}, title={Text("Cambiar de modelo")},
-            text={Text("Tienes ${state.attachedMedia.size} referencias preparadas. Al cambiar a ${target.displayName}, solo se mantendrán las que admita su configuración. Las demás saldrán del borrador, no de la Biblioteca ni del archivo original. El tipo de creación puede cambiar. El prompt se conserva y las opciones pasan a las del nuevo modelo. No se enviará ninguna generación.")},
-            confirmButton={TextButton(onClick={pendingModel=null;viewModel.selectModel(target)}) {Text("Cambiar y revisar")}},
-            dismissButton={TextButton(onClick={pendingModel=null}) {Text("Conservar modelo")}})
     }
 
     // Modal Bottom Sheet para Inspector de Solicitud (DEBUG)

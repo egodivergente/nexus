@@ -32,8 +32,9 @@ class GenerationDispatcher(private val app: NexusApplication) {
             val localInputs=state.attachedMedia.map { media -> MediaInput(
                 type=when {media.mimeType.startsWith("video/")->Modality.VIDEO; media.mimeType.startsWith("audio/")->Modality.AUDIO; else->Modality.IMAGE},
                 uriString=media.uriString,mimeType=media.mimeType,fileName=media.fileName,slotType=media.slotType,fieldKey=media.fieldKey) }
-            val logical=NativeGenerationRequest.build(model,state.selectedModality,state.prompt,
-                ParameterDependencies.effective(model,state.parameters),localInputs,jobId)
+            val effective=requireNotNull(state.capabilityValidation()).configuration
+            val logical=NativeGenerationRequest.build(model,state.selectedModality,effective.requestPrompt.orEmpty(),
+                effective.parameters,localInputs,jobId)
             val routes=routePlan.routes.map { route ->
                 val target=requireNotNull(route.state.selectedModel)
                 com.vidadomu.nexus.routing.GenerationRoute(target.providerId,target.id,route.quote.totalUsd,route.quote.checkedAt+300_000) {
@@ -51,6 +52,9 @@ class GenerationDispatcher(private val app: NexusApplication) {
 
     private suspend fun prepareRequest(state:CreateUiState,jobId:String,onProgress:(Boolean,Float?)->Unit):GenerationRequest {
         val model=requireNotNull(state.selectedModel)
+        // Revalidate each routed target immediately before upload as well as the visible source form.
+        val validation=requireNotNull(state.capabilityValidation())
+        require(validation.canSubmit) { validation.issues.firstOrNull()?.message ?: "Revisa el contrato del modelo." }
         val provider = app.providerRegistry.getProviderById(model.providerId)
             ?: error("Proveedor no disponible.")
         val inputs = state.attachedMedia.mapIndexed { index, media ->
@@ -78,7 +82,7 @@ class GenerationDispatcher(private val app: NexusApplication) {
         }
         onProgress(false, null)
         // Fields that do not apply to the chosen mode stay in the draft but never reach the provider.
-        return NativeGenerationRequest.build(model, state.selectedModality, state.prompt,
-            ParameterDependencies.effective(model, state.parameters), inputs, jobId)
+        return NativeGenerationRequest.build(model, state.selectedModality, validation.configuration.requestPrompt.orEmpty(),
+            validation.configuration.parameters, inputs, jobId)
     }
 }

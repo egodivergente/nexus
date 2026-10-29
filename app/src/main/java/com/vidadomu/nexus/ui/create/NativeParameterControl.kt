@@ -23,17 +23,58 @@ import com.vidadomu.nexus.core.model.ParameterBounds
 import com.vidadomu.nexus.core.model.ParameterType
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 
 /** One shared, compact editor. Display labels never replace native contract values. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun NativeParameterControl(param: ModelParameter, value: String, onChange: (String) -> Unit) {
+internal fun NativeParameterControl(param: ModelParameter, value: String, compact: Boolean = false, onChange: (String) -> Unit) {
     var showDetails by remember(param.key) { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val title = ParameterPresentation.title(param)
-    val choices = ParameterPresentation.options(param)
+    // A selectable option must come from this endpoint's enum. Derived size presets are not a capability.
+    val choices = param.options
+    val haptics=rememberNexusHaptics()
+    val choose:(String)->Unit = {next ->
+        onChange(next);haptics.perform(NexusHapticEvent.SELECTION,changed=next!=value)
+    }
     val range = ParameterPresentation.range(param, LocalConfiguration.current.locales[0])
-    Surface(shape = NexusTokens.field, color = colors.surfaceContainerHigh,
+    val selectorChoices=if(param.type==ParameterType.BOOLEAN) ParameterPresentation.booleanChoices(param).map {it.first} else choices
+    if(compact && selectorChoices.isNotEmpty()) {
+        var expanded by remember(param.key) {mutableStateOf(false)}
+        Box(Modifier.fillMaxWidth()) {
+            Surface(onClick={expanded=true},shape=NexusTokens.field,color=colors.surfaceContainerHigh,
+                modifier=Modifier.fillMaxWidth().heightIn(min=72.dp)
+                    .semantics {contentDescription=title;stateDescription=ParameterPresentation.describe(param,value)}) {
+                Row(Modifier.padding(NexusTokens.space12),verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                        Text(title,style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)
+                        Text(ParameterPresentation.label(param,value).primary,style=MaterialTheme.typography.bodyMedium)
+                    }
+                    Icon(Icons.Default.ExpandMore,null,Modifier.size(NexusTokens.iconSmall),tint=colors.onSurfaceVariant)
+                }
+            }
+            DropdownMenu(expanded,{expanded=false}) {
+                if(!param.isRequired && "" !in selectorChoices) DropdownMenuItem(text={Text("Automático")},
+                    onClick={choose("");expanded=false})
+                selectorChoices.forEach {option -> DropdownMenuItem(text={Text(ParameterPresentation.describe(param,option))},
+                    trailingIcon=if(value==option) {{Icon(Icons.Default.Check,"Seleccionado")}} else null,
+                    onClick={choose(option);expanded=false}) }
+                HorizontalDivider()
+                DropdownMenuItem(text={Text("Detalles y límites")},onClick={expanded=false;showDetails=true},leadingIcon={Icon(Icons.Default.Info,null)})
+            }
+        }
+    } else if(compact) {
+        // Free text and numbers share the same single field geometry as compact selectors.
+        // Published ranges/steps remain available in Details and are checked by the exact constraint engine.
+        StudioTextField(value,onChange,modifier=Modifier.fillMaxWidth().heightIn(min=72.dp),singleLine=true,
+            label={Text(title,style=MaterialTheme.typography.labelMedium)},
+            placeholder={Text(if(param.isRequired) "Introduce un valor" else "Automático")},
+            trailingIcon={IconButton(onClick={showDetails=true}) {Icon(Icons.Default.MoreHoriz,"Detalles y límites de $title")}},
+            shape=NexusTokens.field)
+    } else Surface(shape = NexusTokens.field, color = colors.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -59,14 +100,14 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                 param.type == ParameterType.BOOLEAN -> {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         ParameterPresentation.booleanChoices(param).forEach { (option, label) ->
-                            ParameterChip(param, option, value, onChange, label)
+                            ParameterChip(param, option, value, choose, label)
                         }
                     }
                 }
                 choices.isNotEmpty() && choices.size <= 6 -> {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (!param.isRequired) ParameterChip(param, "", value, onChange)
-                        choices.forEach { ParameterChip(param, it, value, onChange) }
+                        if (!param.isRequired) ParameterChip(param, "", value, choose)
+                        choices.forEach { ParameterChip(param, it, value, choose) }
                     }
                 }
                 choices.isNotEmpty() -> {
@@ -80,12 +121,12 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                         ExposedDropdownMenu(expanded, { expanded = false }) {
                             if (!param.isRequired) DropdownMenuItem(text = { Text("Automático") },
                                 trailingIcon = if (value.isEmpty()) {{ Icon(Icons.Default.Check, "Seleccionado") }} else null,
-                                onClick = { onChange(""); expanded = false })
+                                onClick = { choose(""); expanded = false })
                             choices.forEach { option ->
                                 DropdownMenuItem(text = { Text(ParameterPresentation.describe(param, option)) },
                                     leadingIcon = { FormatPreview(param, option) },
                                     trailingIcon = if (value == option) {{ Icon(Icons.Default.Check, "Seleccionado") }} else null,
-                                    onClick = { onChange(option); expanded = false })
+                                    onClick = { choose(option); expanded = false })
                             }
                         }
                     }
@@ -117,7 +158,7 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                 Text("Vacío: este ajuste no se envía y decide el proveedor.")
             Text(ParameterPresentation.diagnosticKey(param), style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } }, confirmButton = { TextButton(onClick = { onChange(param.defaultValue); showDetails = false }) {
+        } }, confirmButton = { TextButton(onClick = { choose(param.defaultValue); showDetails = false }) {
             Text("Restaurar")
         } }, dismissButton = { TextButton(onClick = { showDetails = false }) { Text("Cerrar") } })
 }

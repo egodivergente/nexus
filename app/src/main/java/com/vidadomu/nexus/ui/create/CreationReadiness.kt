@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.*
+import com.vidadomu.nexus.ui.create.capability.*
 
 enum class CreationPhase { CHOOSE_MODEL, CONFIGURING, PREPARING, INVALID, READY, UPLOADING, SUBMITTING }
 enum class CreationFixTarget { MODEL, PROMPT, MEDIA, PARAMETERS, RETRY_CONFIGURATION }
@@ -13,33 +14,37 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
     if(state.isLoadingSchema) return result(CreationPhase.CONFIGURING,"Cargando opciones…")
     if(!state.schemaReady) return result(CreationPhase.CONFIGURING,state.schemaMessage ?: "Carga la configuración del modelo.",if(state.schemaUnsupported) CreationFixTarget.MODEL else CreationFixTarget.RETRY_CONFIGURATION)
     if(state.isPreparingMedia) return result(CreationPhase.PREPARING,"Preparando archivos…")
-    state.missingRequiredFields.firstOrNull()?.let { missing ->
-        val message=when(missing) {"Prompt","Instrucciones","Descripción de la canción"->"Escribe un prompt.";"Vídeo de entrada"->"Añade un vídeo de entrada.";"Imagen de entrada"->"Añade una imagen de entrada.";else->"Completa: $missing."}
-        val target=when {
-            missing in setOf("Prompt","Instrucciones","Descripción de la canción") -> CreationFixTarget.PROMPT
-            missing in setOf("Imagen de entrada","Último fotograma","Imágenes de referencia","Vídeo de entrada","Fotograma Inicio") ||
-                model.contractMedia.any {it.label==missing || it.key==missing} -> CreationFixTarget.MEDIA
-            else -> CreationFixTarget.PARAMETERS
+    val validation=requireNotNull(state.capabilityValidation())
+    validation.issues.firstOrNull()?.let { issue ->
+        val target=when(issue.kind) {
+            CapabilityIssueKind.MODEL -> CreationFixTarget.MODEL
+            CapabilityIssueKind.UNKNOWN -> if(issue.fieldKey==null) CreationFixTarget.MODEL else CreationFixTarget.PARAMETERS
+            CapabilityIssueKind.PROMPT -> CreationFixTarget.PROMPT
+            CapabilityIssueKind.MEDIA -> CreationFixTarget.MEDIA
+            CapabilityIssueKind.PARAMETER,CapabilityIssueKind.DEPENDENCY -> CreationFixTarget.PARAMETERS
         }
+        val missingInput=if(issue.kind==CapabilityIssueKind.MEDIA) ModelCapabilityRegistry.resolve(
+            model,state.selectedModality,state.parameters,state.schemaReady,state.attachedMedia).inputs.firstOrNull {
+                it.field.key==issue.fieldKey && state.attachedMedia.count(it.field::contains)<it.minimum
+            } else null
+        val message=if(missingInput?.minimum==1) when {
+            missingInput.field.mime.startsWith("video/") -> "Añade un vídeo de entrada."
+            missingInput.field.slot==MediaSlotType.PRIMARY_IMAGE && model.lastFrameField==null -> "Añade una imagen de entrada."
+            else -> "Falta: ${missingInput.field.label}."
+        } else issue.message
         return result(CreationPhase.INVALID,message,target)
     }
-    val applicable=ParameterDependencies.effective(model,state.parameters)
-    FormContract.invalidValue(model.parameters.filter {it.key in applicable || ParameterDependencies.isApplicable(model,it.key,state.parameters)},applicable)?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
-    com.vidadomu.nexus.settings.ModelCapabilities.prompt(model)?.takeIf {it.exceeds(state.prompt)}?.let {
-        return result(CreationPhase.INVALID,"${model.displayName}: máximo ${it.maximum} ${it.unitLabel}. El prompt original se conserva.",CreationFixTarget.PROMPT)
-    }
-    val media=state.attachedMedia
-    if(media.count {it.slotType==MediaSlotType.REFERENCE_IMAGE && it.fieldKey==null}>model.maxImages ||
-       media.count {it.slotType==MediaSlotType.VIDEO_REFERENCE && it.fieldKey==null}>model.maxVideos)
-        return result(CreationPhase.INVALID,"Hay más archivos de los que admite este modelo.",CreationFixTarget.MEDIA)
-    val wrong=media.any {item ->
-        val expected=item.fieldKey?.let {key->model.contractMedia.find {it.key==key}?.mime?.substringBefore('/')} ?: when(item.slotType) {
-            MediaSlotType.VIDEO_INPUT,MediaSlotType.VIDEO_REFERENCE->"video"
-            else->"image"
+    // Specialized compatibility checks stay in the existing API adapters.
+    if(model.contractEndpoint!=null) {
+        val effective=validation.configuration
+        try {
+            val request=GenerationRequest("validation",model.providerId,model.id,state.selectedModality,
+                effective.requestPrompt.orEmpty(),parameters=effective.parameters)
+            com.vidadomu.nexus.provider.runway.ContractPayload.validate(model,request)
+            com.vidadomu.nexus.provider.crun.CrunTextCatalog.validateSuno(model,request)
+        } catch(error:IllegalArgumentException) {
+            return result(CreationPhase.INVALID,error.message ?: "Revisa las opciones del modelo.",CreationFixTarget.PARAMETERS)
         }
-        !item.mimeType.startsWith("$expected/")
     }
-    if(wrong) return result(CreationPhase.INVALID,"Revisa el tipo de archivo de cada entrada.",CreationFixTarget.MEDIA)
-    if(model.providerId=="atlas_cloud") com.vidadomu.nexus.provider.atlas.NativeModelSchema.validate(model,(applicable+("prompt" to state.prompt.trim().takeIf {model.promptAccepted }.orEmpty())).filterValues {it.isNotBlank()})?.let {return result(CreationPhase.INVALID,it,CreationFixTarget.PARAMETERS)}
     return CreationReadiness(CreationPhase.READY)
 }

@@ -17,8 +17,8 @@ fun nexusTypography(heading: FontFamily, body: FontFamily): Typography {
         fontSize = 17.sp, lineHeight = 24.sp)
     val titleSm = TextStyle(fontFamily = heading, fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp, lineHeight = 20.sp)
-    val main = TextStyle(fontFamily = body, fontSize = 16.sp, lineHeight = 24.sp)
-    val secondary = TextStyle(fontFamily = body, fontSize = 14.sp, lineHeight = 20.sp)
+    val main = TextStyle(fontFamily = body, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
+    val secondary = TextStyle(fontFamily = body, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
     val labelLg = TextStyle(fontFamily = body, fontWeight = FontWeight.Medium,
         fontSize = 14.sp, lineHeight = 20.sp)
     val metadata = TextStyle(fontFamily = body, fontWeight = FontWeight.Medium,

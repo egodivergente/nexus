@@ -9,10 +9,16 @@ internal fun compatibleModelMedia(model: NexusModel, attached: List<AttachedMedi
         val videos = attached.filter { it.fieldKey==null && it.mimeType.startsWith("video/") }
         return buildList {
             addAll(attached.filter {media -> media.fieldKey!=null && model.contractMedia.any {it.key==media.fieldKey}})
-            var index = 0
-            if (model.firstFrameField != null) images.getOrNull(index++)?.let { add(it.copy(slotType = MediaSlotType.PRIMARY_IMAGE)) }
-            if (model.lastFrameField != null) images.getOrNull(index++)?.let { add(it.copy(slotType = MediaSlotType.LAST_FRAME)) }
-            if (model.imagesArrayField != null) addAll(images.drop(index).take(model.maxImages).map { it.copy(slotType = MediaSlotType.REFERENCE_IMAGE) })
+            val remaining=images.toMutableList()
+            fun take(preferred:MediaSlotType,allowLast:Boolean):AttachedMedia? {
+                val match=remaining.firstOrNull {it.slotType==preferred}
+                    ?: remaining.firstOrNull {allowLast || it.slotType!=MediaSlotType.LAST_FRAME}
+                if(match!=null) remaining.remove(match)
+                return match
+            }
+            if (model.firstFrameField != null) take(MediaSlotType.PRIMARY_IMAGE,false)?.let { add(it.copy(slotType = MediaSlotType.PRIMARY_IMAGE)) }
+            if (model.lastFrameField != null) take(MediaSlotType.LAST_FRAME,true)?.let { add(it.copy(slotType = MediaSlotType.LAST_FRAME)) }
+            if (model.imagesArrayField != null) addAll(remaining.take(model.maxImages).map { it.copy(slotType = MediaSlotType.REFERENCE_IMAGE) })
             if (model.videoField != null) videos.firstOrNull()?.let { add(it.copy(slotType = MediaSlotType.VIDEO_INPUT)) }
             if (model.videosArrayField != null) addAll(videos.drop(if(model.videoField != null) 1 else 0).take(model.maxVideos).map { it.copy(slotType = MediaSlotType.VIDEO_REFERENCE) })
         }
