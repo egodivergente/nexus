@@ -19,6 +19,11 @@ internal data class CatalogMediaPartition(val active:List<CatalogMediaReference>
 internal fun mergeCatalogMediaReferences(current:List<CatalogMediaReference>,incoming:List<CatalogMediaReference>) =
     (current+incoming).distinctBy {it.uriString}
 
+/** Incorporate a new Library selection once; recreation must not replay it over later edits. */
+internal fun applyCatalogInboxSelection(current:List<CatalogMediaReference>,incoming:List<CatalogMediaReference>,
+    alreadyHandled:List<CatalogMediaReference>):List<CatalogMediaReference> =
+    if(incoming==alreadyHandled) current else mergeCatalogMediaReferences(incoming,current)
+
 /** A deliberate replacement uses the new file first while preserving the earlier inputs in the same pool. */
 internal fun addCatalogMediaReferences(current:List<CatalogMediaReference>,incoming:List<CatalogMediaReference>,singleInput:Boolean) =
     if(singleInput) mergeCatalogMediaReferences(incoming,current) else mergeCatalogMediaReferences(current,incoming)

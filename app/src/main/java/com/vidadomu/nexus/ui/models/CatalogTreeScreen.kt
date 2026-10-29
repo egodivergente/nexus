@@ -76,9 +76,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     val inboxMedia=ArtBoxInbox.images.value
     val familyMedia=rememberSaveable(stateSaver=CatalogMediaSelectionSaver) {mutableStateOf(
         inboxMedia.map {CatalogMediaReference(it.first.toString(),it.second)})}
+    val handledInboxMedia=rememberSaveable(stateSaver=CatalogMediaSelectionSaver) {mutableStateOf(emptyList<CatalogMediaReference>())}
     LaunchedEffect(inboxMedia) {
-        familyMedia.value=mergeCatalogMediaReferences(familyMedia.value,
-            inboxMedia.map {CatalogMediaReference(it.first.toString(),it.second)})
+        val incoming=inboxMedia.map {CatalogMediaReference(it.first.toString(),it.second)}
+        familyMedia.value=applyCatalogInboxSelection(familyMedia.value,incoming,handledInboxMedia.value)
+        if(handledInboxMedia.value!=incoming) handledInboxMedia.value=incoming
     }
     var query by rememberSaveable { mutableStateOf("") }
     var searchVisible by rememberSaveable {mutableStateOf(false)}

@@ -54,6 +54,44 @@ class CatalogFamilyMediaRetentionTest {
         assertEquals(listOf(image("one"),image("two"),image("three")),selection)
     }
 
+    @Test fun aNewInboxImageHasPriorityAtASingleInputWithoutLosingThePreviousImage() {
+        val previous=listOf(image("a"))
+        val inbox=listOf(image("b"))
+        val selection=applyCatalogInboxSelection(previous,inbox,alreadyHandled=emptyList())
+        assertEquals(listOf(image("b"),image("a")),selection)
+        val limited=catalogMediaPartition(selection,field(1))
+        assertEquals(inbox,limited.active)
+        assertEquals(previous,limited.retained)
+        assertEquals(listOf(image("a")),previous)
+    }
+
+    @Test fun recreationDoesNotReplayAnInboxOverALaterGalleryChoiceOrRestoreAnExplicitlyRemovedFile() {
+        val inbox=listOf(image("b"))
+        val imported=applyCatalogInboxSelection(listOf(image("a")),inbox,emptyList())
+        val edited=removeCatalogMediaReference(addCatalogMediaReferences(imported,listOf(image("c")),singleInput=true),image("b").uriString)
+        val scope=object:SaverScope {override fun canBeSaved(value:Any)=true}
+        val savedSelection=with(CatalogMediaSelectionSaver) {scope.save(edited)}!!
+        val savedHandled=with(CatalogMediaSelectionSaver) {scope.save(inbox)}!!
+        val restored=CatalogMediaSelectionSaver.restore(savedSelection)!!
+        val handled=CatalogMediaSelectionSaver.restore(savedHandled)!!
+        val reapplied=applyCatalogInboxSelection(restored,inbox.toList(),handled)
+        assertSame(restored,reapplied)
+        assertEquals(listOf(image("c"),image("a")),reapplied)
+        assertEquals(listOf(image("c")),catalogMediaPartition(reapplied,field(1)).active)
+        assertFalse(reapplied.any {it.uriString==image("b").uriString})
+        assertSame(reapplied,applyCatalogInboxSelection(reapplied,inbox,handled))
+    }
+
+    @Test fun clearingInboxAfterUseKeepsThePoolAndAllowsANewExplicitSelectionToTakePriority() {
+        val pool=listOf(image("c"),image("b"),image("a"))
+        val handled=listOf(image("b"))
+        val cleared=applyCatalogInboxSelection(pool,emptyList(),handled)
+        assertEquals(pool,cleared)
+        val explicit=applyCatalogInboxSelection(cleared,listOf(image("b")),alreadyHandled=emptyList())
+        assertEquals(listOf(image("b"),image("c"),image("a")),explicit)
+        assertEquals(pool.map {it.uriString}.toSet(),explicit.map {it.uriString}.toSet())
+    }
+
     @Test fun explicitRemovalDeletesOnlyTheChosenReferenceAndPromotesTheNextActiveOne() {
         val original=listOf(image("one"),image("two"),image("three"))
         val selection=removeCatalogMediaReference(original,original.first().uriString)
