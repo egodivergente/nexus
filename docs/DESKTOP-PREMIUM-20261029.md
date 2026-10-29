@@ -1,5 +1,47 @@
 # Nexus Desktop · 2026.10.29-desktop-premium.1
 
+## Gallery correction · desktop-premium.2
+
+The first delivery's gallery test used a tiny fixture to check layout. It did
+not validate the production gallery's sources or video frames. The user's
+screenshot exposed empty videos and unavailable historical images.
+
+Video cards now show real cached frames before hover. Images use bounded
+thumbnails from existing originals. A read-only resolver follows explicit
+generation identity and immutable journal revisions to recover local originals
+behind stale historical URLs; compatible historical variants must agree in
+SHA-256. Multi-result order comes from coherent historical output arrays,
+never filenames, prompts or approximate timestamps. The job/index records and
+original URLs remain unchanged.
+
+Thumbnail processing is limited to two workers, one FFmpeg decoder thread per
+video, and visible cards. Hover playback releases its source on leave or close.
+The viewer and download actions use the same recovered full original rather
+than retrying an expired URL. Missing sources have a scoped retry state.
+
+No new dependencies or generations are used. The preview cache is private and
+derived; original files are never overwritten. Remote fallback only retrieves
+registered outputs or reads an existing provider prediction, with bounded
+download sizes and no automatic generation retry.
+
+Real production validation decoded the first 36 thumbnails successfully using
+local originals with zero network requests. Across the whole visual history,
+205 of 271 first-result thumbnails decoded from locally available originals.
+The full history has 370 output
+references: 54 were already local, 229 more resolve to proven local originals,
+and 87 had no proven local correspondence at the audit snapshot. This last
+count does not prove remote originals are irrecoverable.
+
+`test-gallery-previews.py` uses isolated copies of a real 378 KB image and
+5.3 MB video, checking real decoded pixels, frame visibility before hover,
+full-original playback/download, cache/limits/error states and preserved data.
+`test-gallery-sources.py` covers provenance, coherent historical ordinal
+recovery, SHA disagreement and malformed/unrelated records: 15 tests PASS.
+The real-media, HTTP and resource regression suite passed 46 checks, including
+rejection/eviction of corrupt downloaded cache copies while preserving user
+originals. A pending normal save completes before preview requests so newly
+imported results are visible to the resolver.
+
 Base: `codex/desktop-modern-20261026` at `dfb9d561`, reconciled with the
 AXELPC Desktop shortcut and installed modern edition. Work is isolated in
 `codex/desktop-premium-20261029`; the dirty primary checkout and Android

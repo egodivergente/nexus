@@ -28,7 +28,7 @@ const oldDescription=description;
 description=function(model) {return decisionBrief(model).good||oldDescription(model);};
 document.addEventListener('error',event=>{
   if(event.target instanceof HTMLImageElement && event.target.matches('img.logo')) event.target.outerHTML=genericMark;
-  if(event.target instanceof HTMLImageElement && event.target.matches('.result img')) {
+  if(event.target instanceof HTMLImageElement && event.target.matches('.result img') && !event.target.hasAttribute('data-gallery-preview')) {
     const img=event.target, card=img.closest('[data-job]'), jobId=card?.dataset?.job;
     const job=jobId&&typeof state!=='undefined'&&Array.isArray(state?.jobs)?state.jobs.find(j=>j.id===jobId):null;
     const showUnavailable=()=>{if(!img.isConnected)return;const fallback=document.createElement('div');fallback.className='media-unavailable';fallback.textContent='Vista previa no disponible';img.replaceWith(fallback);};

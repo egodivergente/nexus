@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.10.29-desktop-premium.1'
+DESKTOP_VERSION = '2026.10.29-desktop-premium.2'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -43,6 +43,8 @@ ALLOWED_PROVIDERS = {'atlas_cloud': 'https://api.atlascloud.ai',
 from media_import import MIME, MAX_IMPORT_BYTES, MediaImporter
 _IMPORTERS = {}
 _IMPORTERS_LOCK = threading.Lock()
+_PREVIEWS = {}
+_PREVIEWS_LOCK = threading.Lock()
 
 
 def media_importer():
@@ -51,6 +53,30 @@ def media_importer():
         if key not in _IMPORTERS:
             _IMPORTERS[key] = MediaImporter(MEDIA)
         return _IMPORTERS[key]
+
+
+def gallery_previews():
+    with _PREVIEWS_LOCK:
+        key = (str(DATA), OFFLINE_QA)
+        if key not in _PREVIEWS:
+            from gallery_previews import GalleryPreviews
+
+            def recover(job):
+                if OFFLINE_QA or job.get('providerId') != 'atlas_cloud' or not job.get('remoteId'):
+                    return []
+                try:
+                    answer = provider_request(windows_keys(KEY_FILE), 'atlas_cloud',
+                        '/api/v1/model/prediction/' + urllib.parse.quote(str(job['remoteId']), safe=''), 'GET', timeout=8)
+                    data = answer.get('data') or answer
+                    return [value if isinstance(value, str) else value.get('url', '')
+                            for value in data.get('outputs', [])]
+                except Exception:
+                    return []
+
+            _PREVIEWS[key] = GalleryPreviews(DATA, read_state,
+                lambda: agent_host().native.ffmpeg(), recover_outputs=recover,
+                allow_remote=not OFFLINE_QA)
+        return _PREVIEWS[key]
 
 
 
@@ -242,7 +268,7 @@ def allowed(provider, path, method, paid=False):
                                  or provider == 'runway' and path == '/v1/uploads')
 
 
-def provider_request(keys, provider, path, method, body=None, paid=False):
+def provider_request(keys, provider, path, method, body=None, paid=False, timeout=120):
     if not allowed(provider, path, method, paid):
         raise ValueError('Ruta no admitida por Nexus.')
     key = keys.get(provider)
@@ -253,7 +279,7 @@ def provider_request(keys, provider, path, method, body=None, paid=False):
     if provider == 'runway':
         headers['X-Runway-Version'] = '2024-11-06'
     content = json.dumps(body).encode('utf-8') if body is not None else None
-    return public_json(ALLOWED_PROVIDERS[provider] + path, headers, content, method)
+    return public_json(ALLOWED_PROVIDERS[provider] + path, headers, content, method, timeout=timeout)
 
 
 def select_files():
@@ -628,6 +654,32 @@ class Handler(BaseHTTPRequestHandler):
             self.respond((ROOT / 'nexus.ico').read_bytes(), 'image/x-icon'); return
         if path == '/session':
             self.respond(json.dumps({'token': self.server.token}).encode(), 'application/json'); return
+        if path.startswith('/gallery-preview/'):
+            if self.headers.get('Sec-Fetch-Site') == 'cross-site':
+                self.send_error(403); return
+            try:
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                identifier = urllib.parse.unquote(path.removeprefix('/gallery-preview/'))
+                index = int(query.get('index', ['0'])[0])
+                if not identifier or '/' in identifier or len(identifier) > 256 or not 0 <= index < 10000:
+                    raise ValueError('Identificador de miniatura no válido.')
+                previews = gallery_previews()
+                if query.get('original', ['0'])[0] == '1':
+                    _, url, original = previews.original(identifier, index)
+                    if original:
+                        self.send_media(original, download=query.get('download', ['0'])[0] == '1'); return
+                    parsed = urllib.parse.urlsplit(url)
+                    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+                        raise ValueError('Original no disponible.')
+                    self.send_response(302)
+                    self.send_header('Location', url)
+                    self.send_header('Cache-Control', 'private, no-store')
+                    self.send_header('Content-Length', '0')
+                    self.end_headers(); return
+                target = previews.thumbnail(identifier, index)
+                self.send_media(target); return
+            except (ValueError, OSError):
+                self.send_error(404, 'Preview unavailable'); return
         if path.startswith('/media/'):
             try:
                 file_path = media_path(path.removeprefix('/media/'))
@@ -643,7 +695,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404); return
         self.respond(file_path.read_bytes(), mimetypes.guess_type(file_path)[0] or 'application/octet-stream')
 
-    def send_media(self, path):
+    def send_media(self, path, download=False):
         size = path.stat().st_size
         first, last = 0, size - 1
         wanted = self.headers.get('Range', '')
@@ -661,6 +713,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Accept-Ranges', 'bytes')
         self.send_header('Cache-Control', 'private, no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
+        if download:
+            self.send_header('Content-Disposition', "attachment; filename*=UTF-8''" + urllib.parse.quote(path.name))
         if wanted:
             self.send_header('Content-Range', f'bytes {first}-{last}/{size}')
         self.end_headers()

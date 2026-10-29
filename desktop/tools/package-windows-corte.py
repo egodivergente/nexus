@@ -33,6 +33,8 @@ for name in ['android-source-manifest.json', 'desktop-parity-manifest.json']:
     include(desktop/'agent'/name,Path('desktop/agent')/name)
 include(root/'docs/DESKTOP-MODERN-20261026.md',Path('docs/DESKTOP-MODERN-20261026.md'))
 include(root/'docs/DESKTOP-PREMIUM-20261029.md',Path('docs/DESKTOP-PREMIUM-20261029.md'))
+for name in ['test-gallery-previews.py','test-gallery-sources.py']:
+    include(desktop/'tools'/name,Path('desktop/tools')/name)
 for p in (root/'docs/windows-corte').glob('*'):
     include(p,Path('docs/windows-corte')/p.name)
 for required in ['desktop/corte_host.py','desktop/corte_render.py','desktop/agent/runtime/corte-model.jar','desktop/agent/runtime/corte-timeline.jar','desktop/agent/runtime/corte-storage.jar','desktop/agent/runtime/nexus-desktop-agent.jar','desktop/ui/corte.js']:
