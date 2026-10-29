@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.10.29-desktop-premium.2'
+DESKTOP_VERSION = '2026.10.29-desktop-premium.3'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -45,6 +45,11 @@ _IMPORTERS = {}
 _IMPORTERS_LOCK = threading.Lock()
 _PREVIEWS = {}
 _PREVIEWS_LOCK = threading.Lock()
+_WORKSPACE_SERVICES = {}
+_ORIGINAL_SERVICES = {}
+_LIBRARY_SERVICES = {}
+_LIBRARY_PREVIEWS = {}
+_SERVICE_LOCK = threading.RLock()
 
 
 def media_importer():
@@ -77,6 +82,52 @@ def gallery_previews():
                 lambda: agent_host().native.ffmpeg(), recover_outputs=recover,
                 allow_remote=not OFFLINE_QA)
         return _PREVIEWS[key]
+
+
+def original_archive():
+    with _SERVICE_LOCK:
+        key=str(DATA)
+        if key not in _ORIGINAL_SERVICES:
+            from original_archive import OriginalArchive
+            def register(assets):
+                host=_agent
+                if host is None or not host.lock.acquire(False):return False
+                try:
+                    host.start();host.exchange('importAssets',{'assets':assets});return True
+                finally:host.lock.release()
+            _ORIGINAL_SERVICES[key]=OriginalArchive(DATA,read_state,register_assets=register,start_worker=not OFFLINE_QA)
+        return _ORIGINAL_SERVICES[key]
+
+
+def workspace_continuity():
+    with _SERVICE_LOCK:
+        key=str(DATA)
+        if key not in _WORKSPACE_SERVICES:
+            from workspace_continuity import WorkspaceContinuity
+            _WORKSPACE_SERVICES[key]=WorkspaceContinuity(DATA,read_state,write_state)
+            if not OFFLINE_QA:
+                from android_handoff import AndroidHandoff
+                _WORKSPACE_SERVICES[key].android_handoff=AndroidHandoff(DATA)
+        return _WORKSPACE_SERVICES[key]
+
+
+def library_snapshot():
+    with _SERVICE_LOCK:
+        key=str(DATA)
+        if key not in _LIBRARY_SERVICES:
+            from library_snapshot import LibrarySnapshot
+            _LIBRARY_SERVICES[key]=LibrarySnapshot(DATA,read_state,original_archive())
+        return _LIBRARY_SERVICES[key]
+
+
+def library_previews():
+    with _SERVICE_LOCK:
+        key=(str(DATA),OFFLINE_QA)
+        if key not in _LIBRARY_PREVIEWS:
+            from gallery_previews import GalleryPreviews
+            _LIBRARY_PREVIEWS[key]=GalleryPreviews(DATA,library_snapshot().preview_state,
+                lambda:agent_host().native.ffmpeg(),allow_remote=not OFFLINE_QA)
+        return _LIBRARY_PREVIEWS[key]
 
 
 
@@ -141,6 +192,8 @@ def agent_host():
             from corte_host import CorteHost
             _agent.corte = CorteHost(ROOT, DATA, _agent.native)
             if not OFFLINE_QA:
+                _agent.workspace_continuity=workspace_continuity()
+                _agent.original_archive=original_archive()
                 from drive_sync import DriveSync
                 _agent.drive_sync = DriveSync(_agent)
                 from device_continuity import DeviceContinuity
@@ -220,6 +273,8 @@ def write_state(value):
         if path.exists():
             shutil.copy2(path, DATA / 'state.json.bak')
         os.replace(temporary, path)
+    archive=_ORIGINAL_SERVICES.get(str(DATA))
+    if archive and not OFFLINE_QA:archive.schedule(value,remote=True)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -392,6 +447,16 @@ def save_remote(url):
 
 
 def dispatch(keys, operation, args):
+    if operation == 'librarySnapshot':
+        return library_snapshot().snapshot()
+    if operation == 'workspaceContinuity':
+        return workspace_continuity().command(args)
+    if operation == 'originalArchive':
+        archive=original_archive()
+        if args.get('op','status')=='status':return archive.public()
+        if args.get('op') in {'scan','retry'}:
+            return archive.schedule(remote=not OFFLINE_QA,retry=args.get('op')=='retry')
+        raise ValueError('Operación de protección de originales no admitida.')
     if operation == 'deviceContinuity':
         if OFFLINE_QA:
             return {'enabled': False, 'configured': False, 'status': 'Laboratorio sin conexion'}
@@ -654,16 +719,17 @@ class Handler(BaseHTTPRequestHandler):
             self.respond((ROOT / 'nexus.ico').read_bytes(), 'image/x-icon'); return
         if path == '/session':
             self.respond(json.dumps({'token': self.server.token}).encode(), 'application/json'); return
-        if path.startswith('/gallery-preview/'):
+        if path.startswith(('/gallery-preview/','/library-preview/')):
             if self.headers.get('Sec-Fetch-Site') == 'cross-site':
                 self.send_error(403); return
             try:
                 query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-                identifier = urllib.parse.unquote(path.removeprefix('/gallery-preview/'))
+                asset_preview=path.startswith('/library-preview/')
+                identifier = urllib.parse.unquote(path.removeprefix('/library-preview/' if asset_preview else '/gallery-preview/'))
                 index = int(query.get('index', ['0'])[0])
                 if not identifier or '/' in identifier or len(identifier) > 256 or not 0 <= index < 10000:
                     raise ValueError('Identificador de miniatura no válido.')
-                previews = gallery_previews()
+                previews = library_previews() if asset_preview else gallery_previews()
                 if query.get('original', ['0'])[0] == '1':
                     _, url, original = previews.original(identifier, index)
                     if original:
@@ -902,6 +968,7 @@ def run_server(options):
     server.keys = keys
     if not OFFLINE_QA:
         agent_host()  # Resume configured background sync even before opening Agent/Settings.
+        original_archive().schedule(read_state(),remote=False)
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
         json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': DESKTOP_VERSION}),
@@ -914,6 +981,7 @@ def run_server(options):
     try:
         server.serve_forever(poll_interval=0.5)
     finally:
+        if str(DATA) in _ORIGINAL_SERVICES:_ORIGINAL_SERVICES[str(DATA)].close()
         if _agent is not None:
             _agent.close()
         server.server_close()

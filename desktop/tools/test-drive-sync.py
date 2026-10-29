@@ -1,5 +1,6 @@
 import json
 import io
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -9,7 +10,7 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from drive_sync import DriveSync, DriveAuthorizationRequired, SCOPE
@@ -205,6 +206,88 @@ class DriveSyncTest(unittest.TestCase):
         self.service.command({'op': 'configure', 'id': 'oauth.json'})
         self.assertFalse(selected.exists())
         self.assertEqual(self.host.read_secret(self.service.secret_file)['client_secret'], 'test-only')
+
+    def archive_fixture(self):
+        self.host.lock = threading.Lock()
+        self.host.start = lambda: None
+        (self.root/'media').mkdir(exist_ok=True)
+        path = self.root/'media'/('a'*32+'.png');path.write_bytes(b'original-byte-proof')
+        sha = hashlib.sha256(path.read_bytes()).hexdigest();uri = '/media/' + path.name
+        record = {'assetId':'original-one','sha256':sha,'sizeBytes':path.stat().st_size,'uri':uri,'state':'archived','registered':True}
+        archive = SimpleNamespace(lock=threading.RLock(), records={'one':record}, cloud_verified=Mock())
+        self.host.original_archive = archive
+        self.host.native = SimpleNamespace(asset=lambda *_:({},path))
+        self.host.corte = SimpleNamespace(lock=threading.Lock(),projects=self.root/'projects')
+        self.host.exchange = lambda op,args: {'index':{'assets':[{'id':'original-one','uri':uri}]}} if op=='snapshot' else {'rootId':'folder-one','state':'synced','missingMedia':0}
+        return path,sha,uri,archive
+
+    def test_synced_transfer_never_claims_cloud_copy_without_server_checksum(self):
+        path,sha,uri,archive = self.archive_fixture()
+        reply = io.BytesIO(json.dumps({'files':[{'name':'blob-'+sha+'.png','size':str(path.stat().st_size)}]}).encode())
+        with patch.object(self.service,'token',return_value='private-test-token'), patch('drive_sync.urllib.request.urlopen',return_value=reply):
+            self.service.run()
+            with self.service.lock:pass
+        archive.cloud_verified.assert_not_called()
+
+    def test_drive_blob_verification_requires_local_and_server_sha256_and_size(self):
+        path,sha,uri,archive = self.archive_fixture()
+        originals={'original-one':{'sha256':sha,'uri':uri,'sizeBytes':path.stat().st_size}}
+        valid={'name':'blob-'+sha+'.png','size':str(path.stat().st_size),'sha256Checksum':sha}
+        for changed,expected in [({}, {'original-one':sha}),({'sha256Checksum':'0'*64},{}),({'size':'1'},{}),({'sha256Checksum':None},{})]:
+            reply=io.BytesIO(json.dumps({'files':[{**valid,**changed}]}).encode())
+            with patch.object(self.service,'token',return_value='private-test-token'), patch('drive_sync.urllib.request.urlopen',return_value=reply):
+                self.assertEqual(self.service.verify_original_blobs('folder-one',originals,{uri:str(path)}),expected)
+        path.write_bytes(b'changed-original')
+        with patch('drive_sync.urllib.request.urlopen') as network:
+            self.assertEqual(self.service.verify_original_blobs('folder-one',originals,{uri:str(path)}),{})
+        network.assert_not_called()
+
+    def test_checksums_are_paginated_and_no_media_payload_is_downloaded(self):
+        path,sha,uri,archive=self.archive_fixture();originals={'original-one':{'sha256':sha,'uri':uri,'sizeBytes':path.stat().st_size}}
+        replies=[io.BytesIO(json.dumps(v).encode()) for v in [{'files':[],'nextPageToken':'page-two'},
+            {'files':[{'name':'blob-'+sha+'.png','size':str(path.stat().st_size),'sha256Checksum':sha}]}]]
+        with patch.object(self.service,'token',return_value='private-test-token'),patch('drive_sync.urllib.request.urlopen',side_effect=replies) as network:
+            result=self.service.verify_original_blobs('folder-one',originals,{uri:str(path)})
+        self.assertEqual(result,{'original-one':sha});self.assertEqual(network.call_count,2)
+        for call in network.call_args_list:
+            query=urllib.parse.parse_qs(urllib.parse.urlsplit(call.args[0].full_url).query)
+            self.assertIn('sha256Checksum',query['fields'][0]);self.assertNotIn('alt',query)
+
+    def test_mismatched_duplicate_remote_blob_names_are_not_claimed_verified(self):
+        path,sha,uri,archive=self.archive_fixture();originals={'original-one':{'sha256':sha,'uri':uri,'sizeBytes':path.stat().st_size}}
+        rows=[{'name':'blob-'+sha+'.png','size':str(path.stat().st_size),'sha256Checksum':digest} for digest in [sha,'0'*64]]
+        with patch.object(self.service,'token',return_value='private-test-token'),patch('drive_sync.urllib.request.urlopen',return_value=io.BytesIO(json.dumps({'files':rows}).encode())):
+            self.assertEqual(self.service.verify_original_blobs('folder-one',originals,{uri:str(path)}),{})
+
+    def test_partial_and_conflicting_sync_can_confirm_only_verified_originals(self):
+        path,sha,uri,archive=self.archive_fixture()
+        for state in ['partial','conflicts','synced']:
+            archive.cloud_verified.reset_mock()
+            self.host.exchange=lambda op,args: {'index':{'assets':[{'id':'original-one','uri':uri}]}} if op=='snapshot' else {'rootId':'folder-one','state':state,'missingMedia':1}
+            def verify(folder,originals,paths):
+                self.assertFalse(self.host.lock.locked(),'Checksum HTTP must leave the agent available')
+                self.assertEqual(originals['original-one']['uri'],uri)
+                return {'original-one':sha}
+            with patch.object(self.service,'token',return_value='private-test-token'),patch.object(self.service,'verify_original_blobs',side_effect=verify):
+                self.service.run()
+                with self.service.lock:pass
+            archive.cloud_verified.assert_called_once_with({'original-one':sha})
+
+    def test_checksum_service_failure_keeps_copy_pending_without_losing_sync_result(self):
+        path,sha,uri,archive=self.archive_fixture()
+        with patch.object(self.service,'token',return_value='private-test-token'),patch.object(self.service,'verify_original_blobs',side_effect=urllib.error.URLError('offline')):
+            self.service.run()
+            with self.service.lock:pass
+        archive.cloud_verified.assert_not_called();self.assertEqual(self.service.public()['state'],'synced')
+        self.assertTrue(self.service.public()['cloudVerificationPending'])
+
+    def test_same_asset_id_with_changed_snapshot_uri_is_not_cloud_proof(self):
+        path,sha,uri,archive=self.archive_fixture()
+        self.host.exchange=lambda op,args:{'index':{'assets':[{'id':'original-one','uri':uri+'-changed'}]}} if op=='snapshot' else {'rootId':'folder-one','state':'synced'}
+        with patch.object(self.service,'token',return_value='private-test-token'),patch.object(self.service,'verify_original_blobs') as verify:
+            self.service.run()
+            with self.service.lock:pass
+        verify.assert_not_called();archive.cloud_verified.assert_not_called()
 
     def test_corte_receives_filesystem_uris_while_library_links_stay_portable(self):
         media = self.root / 'media'

@@ -106,7 +106,8 @@ def main():
         for kind in ('IMAGE', 'VIDEO'):
             identifier = 'cached-' + kind.lower()
             primary, duplicate = identifier + '-asset', identifier + '-copy'
-            assets.extend([{'id': primary, 'uri': missing, 'type': kind, 'role': 'OUTPUT', 'source': 'GENERATED', 'displayName': identifier, 'createdAt': 1},
+            absent_source = '/media/' + uuid.uuid4().hex + ('.jpeg' if kind == 'IMAGE' else '.mp4')
+            assets.extend([{'id': primary, 'uri': absent_source, 'type': kind, 'role': 'OUTPUT', 'source': 'GENERATED', 'displayName': identifier, 'createdAt': 1},
                            {'id': duplicate, 'uri': local[kind], 'type': kind, 'role': 'OUTPUT', 'source': 'GENERATED', 'displayName': identifier, 'createdAt': 1}])
             cache[primary] = local[kind]
             generations.append({'id': identifier + '-generation', 'nexusJobId': identifier,
@@ -207,7 +208,7 @@ def main():
 
                     def thumbnail(request):
                         p = urlsplit(request.url)
-                        return p.path.startswith('/gallery-preview/') and 'original=1' not in p.query
+                        return p.path.startswith(('/gallery-preview/', '/library-preview/')) and 'original=1' not in p.query
 
                     def requested(request):
                         p = urlsplit(request.url)
@@ -220,7 +221,7 @@ def main():
                         pending.discard(request.url)
 
                     def response_received(response):
-                        if urlsplit(response.url).path.startswith('/gallery-preview/'):
+                        if urlsplit(response.url).path.startswith(('/gallery-preview/', '/library-preview/')):
                             responses[urlsplit(response.url).path + '?' + urlsplit(response.url).query] = response.status
 
                     def guard(route):
@@ -244,14 +245,27 @@ def main():
                     page.goto(url)
                     page.wait_for_function('()=>!!initial&&!!window.NexusGallery')
                     page.evaluate("()=>{document.querySelector('#nx-startup-onboarding')?.remove();Studio.tab='results';navigate('library');}")
+                    page.evaluate('async()=>{await NexusGallery.refresh();}')
+
+                    def canonical(identifier, index=None):
+                        ordinal = (1 if identifier == 'alternative-image' else 0) if index is None else index
+                        value = page.evaluate("({id,index})=>NexusGallery.items.find(row=>row.identityKeys.includes('job:'+id+':'+index))?.id", {'id':identifier,'index':ordinal})
+                        if not value:
+                            raise AssertionError('Missing normalized source identity: ' + identifier)
+                        return value
+
+                    def card(identifier, index=None):
+                        return page.locator('[data-job="' + canonical(identifier,index) + '"]')
+
                     page.mouse.move(0, 0)
                     good = ['real-image', 'real-video', 'cached-image', 'cached-video', 'alternative-image']
-                    page.wait_for_function("ids=>ids.every(id=>{const n=document.querySelector('[data-job=\"'+id+'\"] .gallery-media');const i=n?.querySelector('.gallery-thumbnail');return n?.dataset.previewState==='ready'&&i?.complete&&i.naturalWidth>10;})", arg=good, timeout=60000)
+                    page.wait_for_function("ids=>ids.every(id=>{const index=id==='alternative-image'?1:0,row=NexusGallery.items.find(e=>e.identityKeys.includes('job:'+id+':'+index)),n=row&&document.querySelector('[data-job=\"'+row.id+'\"] .gallery-media');const i=n?.querySelector('.gallery-thumbnail');return n?.dataset.previewState==='ready'&&i?.complete&&i.naturalWidth>10&&Number(getComputedStyle(i).opacity)>=.99;})", arg=good, timeout=60000)
                     for identifier in good:
-                        image = page.locator(f'[data-job="{identifier}"] .gallery-thumbnail')
+                        image = card(identifier).locator('.gallery-thumbnail')
                         check(identifier + ': real thumbnail visible before hover', image.is_visible() and image.evaluate('(n)=>n.complete&&n.naturalWidth>10&&getComputedStyle(n).opacity===\'1\''))
-                    page.wait_for_selector('[data-job="missing-image"] .gallery-media[data-preview-state=failed]')
-                    check('Missing image has an honest fallback and keeps its image node', page.locator('[data-job="missing-image"] .gallery-thumbnail').count() == 1 and page.locator('[data-job="missing-image"] .media-unavailable').count() == 0)
+                    check('Identical media aliases deduplicate without losing provenance', len({canonical(identifier) for identifier in good}) == 2)
+                    card('missing-image').locator('.gallery-media[data-preview-state=failed]').wait_for()
+                    check('Missing image has an honest fallback and keeps its image node', card('missing-image').locator('.gallery-thumbnail').count() == 1 and card('missing-image').locator('.media-unavailable').count() == 0)
                     check('All video originals stay unloaded before hover', page.locator('.gallery-hover-video[src]').count() == 0)
                     check('No original request before user interaction', not any('original=1' in request or request.split('?')[0].endswith('.mp4') for request in requests))
                     check('Thumbnail queue never exceeds two requests', peak[0] <= 2, peak[0])
@@ -273,25 +287,28 @@ def main():
                             recovered_hash = hashlib.sha256(answer.read()).hexdigest()
                         check(identifier + ': recovered original preserves exact source bytes', recovered_hash == original_hashes[kind])
 
-                    page.locator('[data-job="real-video"] .gallery-media').hover()
-                    page.wait_for_function("()=>{const v=document.querySelector('[data-job=real-video] video');return v?.videoWidth>10&&!v.paused&&v.readyState>=2;}", timeout=30000)
+                    card('real-video').locator('.gallery-media').hover()
+                    page.wait_for_function("id=>{const v=document.querySelector('[data-job=\"'+id+'\"] video');return v?.videoWidth>10&&!v.paused&&v.readyState>=2;}", arg=canonical('real-video'), timeout=30000)
                     check('Hover plays a real video with decoded frames', page.locator('.gallery-piece.is-previewing').count() == 1)
                     page.mouse.move(0, 0)
                     page.wait_for_function("()=>document.querySelectorAll('.gallery-hover-video[src]').length===0")
                     check('Leaving the video releases its original source', page.locator('.gallery-hover-video[src]').count() == 0)
-                    page.locator('[data-job="real-video"] .gallery-media').click()
+                    card('real-video').locator('.gallery-media').click()
                     page.wait_for_function("()=>{const v=document.querySelector('.gallery-lightbox video[data-gallery-preview=original]');return v?.videoWidth>10&&v.readyState>=1;}")
                     page.evaluate("window.__qaVideoViewer=document.querySelector('.gallery-lightbox video')")
                     check('Video viewer decodes the real original', page.locator('.gallery-lightbox video').count() == 1)
                     page.screenshot(path=str(args.output / 'real-gallery-video-viewer.png'))
                     page.keyboard.press('Escape')
                     check('Closing the video viewer releases its decoder source', page.evaluate("!window.__qaVideoViewer.isConnected&&!window.__qaVideoViewer.getAttribute('src')&&window.__qaVideoViewer.paused"))
-                    page.locator('[data-job="alternative-image"] .gallery-media').click()
+                    card('alternative-image').locator('.gallery-media').click()
                     page.wait_for_function("()=>{const n=document.querySelector('.gallery-lightbox img[data-gallery-preview=original]');return n?.complete&&n.naturalWidth>10;}")
-                    check('Viewer opens the valid alternative output', 'index=1' in page.locator('.gallery-lightbox [data-gallery-preview=original]').get_attribute('src'))
+                    source_url = page.locator('.gallery-lightbox [data-gallery-preview=original]').get_attribute('src')
+                    with urllib.request.urlopen(url + source_url.lstrip('/'), timeout=15) as answer:
+                        alternative_hash = hashlib.sha256(answer.read()).hexdigest()
+                    check('Viewer opens the full valid alternative output', alternative_hash == original_hashes['IMAGE'])
                     page.screenshot(path=str(args.output / 'real-gallery-alternative-viewer.png'))
                     page.keyboard.press('Escape')
-                    page.locator('[data-job="cached-image"] .gallery-media').click()
+                    card('cached-image').locator('.gallery-media').click()
                     page.wait_for_function("()=>{const i=document.querySelector('.gallery-lightbox img[data-gallery-preview=original]');return i?.complete&&i.naturalWidth>10;}")
                     with page.expect_download(timeout=15000) as download_event:
                         page.locator('.gallery-lightbox [data-gallery=download-original]').click()
@@ -300,7 +317,7 @@ def main():
                     with urllib.request.urlopen(url + 'gallery-preview/cached-image?index=0&original=1&download=1', timeout=15) as answer:
                         check('Recovered download is served as an attachment', answer.headers.get('Content-Disposition', '').startswith('attachment'))
                     page.keyboard.press('Escape')
-                    page.locator('[data-job="missing-image"] .gallery-media').click()
+                    card('missing-image').locator('.gallery-media').click()
                     page.wait_for_selector('.gallery-original-error')
                     check('Unavailable original offers a retry without deleting the job', page.locator('.gallery-original-error [data-gallery=retry-preview]').is_visible() and page.evaluate("state.jobs.some(j=>j.id==='missing-image')"))
                     check('Unavailable original cannot trigger a misleading download', page.locator('.gallery-lightbox [data-gallery=download-original]').is_disabled())

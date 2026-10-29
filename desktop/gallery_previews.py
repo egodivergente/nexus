@@ -20,6 +20,7 @@ from gallery_sources import GallerySources
 
 MAX_REMOTE_BYTES = 64 * 1024 * 1024
 FLAGS = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+PROCESS_PREVIEW_WORKERS = threading.BoundedSemaphore(2)
 
 
 class PreviewUnavailable(ValueError):
@@ -36,7 +37,7 @@ class GalleryPreviews:
         self.ffmpeg = ffmpeg
         self.recover_outputs = recover_outputs
         self.allow_remote = allow_remote
-        self.workers = threading.BoundedSemaphore(2)
+        self.workers = PROCESS_PREVIEW_WORKERS
         self.guard = threading.Lock()
         self.failures = {}
 

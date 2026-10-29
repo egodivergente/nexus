@@ -3,20 +3,6 @@
 window.NexusImports = (() => {
  const maxBytes=4*1024**3;
  let busy=false;
- function syncGallery(){
-  if(!Agent.snapshot||Agent.busy||Agent.generating)return false;
-  const known=new Set(state.jobs.flatMap(job=>(job.outputs||[]).map(value=>typeof value==='string'?value:value?.url)));
-  let changed=false;
-  for(const asset of Agent.snapshot.index.assets){
-   const id='local-import:'+asset.id;
-   if(asset.libraryDeleted||asset.source!=='IMPORTED'||asset.role!=='REFERENCE'||!asset.uri.startsWith('/media/')||known.has(asset.uri)||(state.deletedJobIds||[]).includes(id))continue;
-   state.jobs.unshift({id,providerId:'local_media',modelId:'local-import',name:asset.displayName,prompt:asset.displayName,
-    modality:asset.type==='OTHER'?'CHAT':asset.type,status:'COMPLETED',outputs:[asset.uri],startedAt:asset.createdAt,
-    parameters:{},projectId:asset.projectId,localImport:true});
-   known.add(asset.uri);changed=true;
-  }
-  if(changed)persist();return changed;
- }
  function base64(bytes){let text='';for(let i=0;i<bytes.length;i+=32768)text+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(text);}
  async function importFile(file,onProgress=()=>{}){
   if(!file.size||file.size>maxBytes)throw Error('El archivo debe tener contenido y no superar los 4 GiB.');
@@ -41,13 +27,12 @@ window.NexusImports = (() => {
     const kind=item.mime.startsWith('video/')?'VIDEO':item.mime.startsWith('image/')?'IMAGE':item.mime.startsWith('audio/')?'AUDIO':'OTHER';
     await agentCall('importAssets',{assets:[{id:'asset_'+item.id.split('.')[0],uri:item.url,type:kind,role:'REFERENCE',source:'IMPORTED',displayName:item.name,mimeType:item.mime,sizeBytes:item.size,createdAt:Date.now(),projectId:Agent.snapshot.projectId||null}]});
    }
-   syncGallery();toast('Archivos importados en Biblioteca.');if(view==='library')render();
+   window.dispatchEvent(new CustomEvent('nexus:library-changed'));await window.NexusGallery?.refresh();toast('Archivos importados en Biblioteca.');if(view==='library')render();
   }finally{busy=false;}
  }
  // Library import is available without choosing a generation model or project first.
  function controls(){
   if(view!=='library')return;
-  if(syncGallery()){render();return;}
   if(document.querySelector('[data-import-gallery]'))return;
   const toolbar=document.querySelector('#header-actions');if(!toolbar)return;
   const button=document.createElement('button');button.dataset.importGallery='true';button.textContent='Importar · hasta 4 GiB';

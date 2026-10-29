@@ -52,6 +52,11 @@ LAYOUT = """()=>{
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='nexus-premium-') as temp:
+        # Small local fixture for contrast/focus journeys only. Real image/video
+        # provenance and playback are covered by test-gallery-previews.py.
+        fixture_media = Path(temp) / 'media' / ('f' * 32 + '.png')
+        fixture_media.parent.mkdir(parents=True, exist_ok=True)
+        fixture_media.write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j+XkAAAAASUVORK5CYII='))
         env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
         with (OUT / 'host.log').open('w', encoding='utf-8') as log:
             host = subprocess.Popen(
@@ -201,9 +206,11 @@ def main():
 
                     contrast = """n=>{const c=getComputedStyle(n),ctx=document.createElement('canvas').getContext('2d');const pixel=v=>{ctx.clearRect(0,0,1,1);ctx.fillStyle=v;ctx.fillRect(0,0,1,1);return [...ctx.getImageData(0,0,1,1).data]};const lum=v=>{const rgb=pixel(v).slice(0,3).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722};let p=n,bg=c.backgroundColor;while(p&&pixel(bg)[3]===0){p=p.parentElement;if(p)bg=getComputedStyle(p).backgroundColor;}const a=lum(c.color),b=lum(bg);return {color:c.color,background:bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}}"""
                     for theme in ('aurora', 'light'):
-                        page.evaluate("theme=>{state.interfaceTheme=theme;window.NexusThemes.apply();state.jobs=[{id:'premium-gallery-fixture',name:'Referencia local de prueba',modelId:'local/source',providerId:'local_media',prompt:'Prueba aislada de galería',modality:'IMAGE',status:'COMPLETED',startedAt:1,outputs:['/media/'+('f'.repeat(32))+'.png'],parameters:{}}];PC.search='';PC.kind='';PC.provider='';PC.status='';Studio.tab='results';navigate('library');}", theme)
+                        entry_id = page.evaluate("async theme=>{state.interfaceTheme=theme;window.NexusThemes.apply();state.jobs=[{id:'premium-gallery-fixture',name:'Referencia local de prueba',modelId:'local/source',providerId:'local_media',prompt:'Prueba aislada de galería',modality:'IMAGE',status:'COMPLETED',startedAt:1,outputs:['/media/'+('f'.repeat(32))+'.png'],parameters:{}}];PC.search='';PC.kind='';PC.provider='';PC.status='';Studio.tab='results';await flush();navigate('library');await NexusGallery.refresh();return NexusGallery.items.find(entry=>entry.identityKeys.includes('job:premium-gallery-fixture:0'))?.id;}", theme)
+                        check(f'{theme} gallery exposes the canonical file identity', bool(entry_id))
                         page.wait_for_selector('.gallery-piece')
-                        page.locator('[data-gallery-select="premium-gallery-fixture"]').click()
+                        page.locator('[data-gallery-select="' + entry_id + '"]').click()
+                        check(f'{theme} canonical file selection is active', page.locator('[data-gallery-select="' + entry_id + '"]').get_attribute('aria-pressed') == 'true')
                         selection = page.locator('.gallery-selection').evaluate(contrast)
                         check(f'{theme} gallery selection remains readable', selection['ratio'] >= 4.5, selection)
                         page.locator('.gallery-filters > summary').click()
@@ -211,6 +218,7 @@ def main():
                         page.screenshot(path=str(OUT / f'gallery-{theme}-selection-filters.png'))
                         page.locator('.gallery-filters > summary').click()
                         page.locator('[data-gallery=clear]').click()
+                        check(f'{theme} clearing selection removes its action bar', page.locator('.gallery-selection').count() == 0 and page.locator('[data-gallery-select="' + entry_id + '"]').get_attribute('aria-pressed') == 'false')
                         page.locator('.gallery-media').click()
                         page.wait_for_selector('.gallery-lightbox')
                         viewer = page.locator('.gallery-viewer-top').evaluate(contrast)

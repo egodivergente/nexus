@@ -98,16 +98,17 @@
   const list=wrap.lastElementChild;
   const jobs=productionJobs();
   jobs.forEach(j=>{
-   const output=j.outputs?.[0],url=typeof output==='string'?output:output?.url,valid=isMediaUrl(url),completed=j.status==='COMPLETED';
+   const output=j.outputs?.[0],url=typeof output==='string'?output:output?.url,poster=window.NexusGallery?.previewForJob?NexusGallery.previewForJob(j):'/gallery-preview/'+encodeURIComponent(j.id)+'?index=0',valid=isMediaUrl(url),completed=j.status==='COMPLETED';
    const piece=el('button','creative-piece');piece.type='button';piece.dataset.creativeJob=j.id;piece.title=j.name||j.modelId;piece.setAttribute('aria-label','Abrir '+piece.title);
-   piece.innerHTML=valid?(j.modality==='VIDEO'?`<video src="${escape(url)}" muted playsinline preload="none"></video><span>▷</span>`:`<img src="${escape(url)}" alt="${escape(piece.title)}" loading="lazy" decoding="async">`):`<span>${escape(j.status==='FAILED'?'Fallido':'En proceso')}</span>`;
+   piece.innerHTML=valid&&poster?`<img data-gallery-preview="thumbnail" alt="${escape(piece.title)}" decoding="async">${j.modality==='VIDEO'?'<span>▷</span>':''}`:`<span>${escape(j.status==='FAILED'?'Fallido':'En proceso')}</span>`;
+   const image=piece.querySelector('img');if(image)requestAnimationFrame(()=>{if(!image.isConnected)return;if(window.NexusGallery?.loadPreview)NexusGallery.loadPreview(image,poster);else image.src=poster;});
    if(valid&&completed&&j.modality==='IMAGE'){piece.draggable=true;piece.addEventListener('dragstart',e=>{e.dataTransfer.setData('application/x-nexus-job',j.id);e.dataTransfer.effectAllowed='copy';});piece.title+=' · Arrastra para usar como referencia';}
    list.append(piece);
   });
   if(!jobs.length)list.innerHTML='<p class="creative-tray-empty">Tu próxima creación empieza arriba. Aquí aparecerán tus resultados.</p>';
   return wrap;
  }
- const productionJobs=()=>state.jobs.filter(j=>['IMAGE','VIDEO'].includes(j.modality)&&!state.studioGallery?.hidden?.includes(j.id)).slice(0,12);
+ const productionJobs=()=>state.jobs.filter(j=>['IMAGE','VIDEO'].includes(j.modality)&&!state.studioGallery?.hidden?.includes(j.id)&&(!j.outputs?.length||!window.NexusGallery?.previewForJob||NexusGallery.previewForJob(j)!==null)).slice(0,12);
  const productionKey=()=>JSON.stringify(productionJobs().map(j=>[j.id,j.status,j.outputs]));
  function attach(id,fieldKey){
   const job=state.jobs.find(j=>j.id===id),output=job?.outputs?.[0],url=typeof output==='string'?output:output?.url;

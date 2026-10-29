@@ -18,10 +18,18 @@ class GallerySources:
         self.lock = threading.RLock()
         self.metadata_key = None
         self.assets = {}
+        self.assets_by_uri = {}
+        self.generations_by_job = {}
+        self.generations_by_remote = {}
         self.generations = []
         self.historical_generations = {}
         self.cache = {}
+        self.protected = {}
         self.hashes = {}
+        self.local_paths = {}
+        self.alias_stamp = None
+        self.configuration_stamp = None
+        self.configuration = {}
 
     @staticmethod
     def _stamp(path):
@@ -41,19 +49,26 @@ class GallerySources:
     def _reload(self):
         index_file = self.data / 'assistant' / 'index.json'
         cache_file = self.data / 'remote-media-cache.json'
+        protection_file = self.data / 'originals-protection.json'
         sync = self.data / 'assistant' / 'sync'
         configuration_file = sync / 'connection.json'
-        configuration = self._json(configuration_file, {})
+        configuration_stamp = self._stamp(configuration_file)
+        if configuration_stamp != self.configuration_stamp:
+            self.configuration = self._json(configuration_file, {})
+            self.configuration_stamp = configuration_stamp
+        configuration = self.configuration
         folder = configuration.get('folderId') if isinstance(configuration, dict) else None
         journal_file = None
         if isinstance(folder, str) and folder:
             workspace = (sync / 'workspaces' / folder).resolve()
             if workspace.is_relative_to((sync / 'workspaces').resolve()):
                 journal_file = workspace / 'journal.json'
-        stamp = (self._stamp(index_file), self._stamp(cache_file), self._stamp(configuration_file),
+        stamp = (self._stamp(index_file), self._stamp(cache_file), self._stamp(protection_file), self._stamp(configuration_file),
                  self._stamp(journal_file) if journal_file is not None else None)
         if stamp == self.metadata_key:
             return
+        protection = self._json(protection_file, {})
+        self.protected = protection.get('records', {}) if isinstance(protection, dict) and isinstance(protection.get('records', {}), dict) else {}
         index = self._json(index_file, {})
         if not isinstance(index, dict):
             index = {}
@@ -62,6 +77,17 @@ class GallerySources:
         self.assets = {row['id']: row for row in (asset_rows if isinstance(asset_rows, list) else [])
                        if isinstance(row, dict) and isinstance(row.get('id'), str)}
         self.generations = [row for row in (generation_rows if isinstance(generation_rows, list) else []) if isinstance(row, dict)]
+        self.assets_by_uri = {}
+        for asset in self.assets.values():
+            uri=asset.get('uri')
+            if isinstance(uri,str):self.assets_by_uri.setdefault(uri,[]).append(asset)
+        self.generations_by_job = {};self.generations_by_remote = {}
+        for generation in self.generations:
+            for identifier in set(value for value in (generation.get('id'),generation.get('nexusJobId')) if isinstance(value,str)):
+                if isinstance(identifier,str):self.generations_by_job.setdefault(identifier,[]).append(generation)
+            remote=generation.get('providerJobId');provider=generation.get('providerId')
+            if isinstance(remote,str) and isinstance(provider,str):
+                self.generations_by_remote.setdefault((provider,remote),[]).append(generation)
         self.historical_generations = {}
         journal = self._json(journal_file, {}) if journal_file is not None else {}
         revisions = journal.get('revisions') if isinstance(journal, dict) else None
@@ -80,8 +106,15 @@ class GallerySources:
     def _local(self, uri):
         if not isinstance(uri, str) or not uri.startswith('/media/'):
             return None
+        aliases = self._stamp(self.data / 'media-aliases.json')
+        if aliases != self.alias_stamp:
+            self.local_paths.clear();self.alias_stamp=aliases
+        cached = self.local_paths.get(uri)
+        if cached is not None and cached.is_file():return cached
         try:
-            return resolve_media(self.data, uri)
+            path=resolve_media(self.data, uri)
+            self.local_paths[uri]=path
+            return path
         except (OSError, ValueError, TypeError, AttributeError):
             return None
 
@@ -103,6 +136,8 @@ class GallerySources:
         return self.hashes[key]
 
     def _unambiguous(self, paths):
+        paths=list(dict.fromkeys(paths))
+        if len(paths)==1:return paths[0] if paths[0].is_file() else None
         identities = {}
         for path in dict.fromkeys(paths):
             try:
@@ -149,13 +184,13 @@ class GallerySources:
                         paths.extend(self._asset_paths(self.assets.get(identifier)))
         return paths
 
-    def resolve(self, job_id, index=0):
+    def resolve(self, job_id, index=0, *, state=None, reload=True):
         """Return (historical job, its unchanged output URL, proven local original)."""
         if not isinstance(job_id, str):
             raise ValueError('Identificador de creación no válido.')
         if not isinstance(index, int) or isinstance(index, bool) or index < 0:
             raise ValueError('Índice de resultado no válido.')
-        state = self.read_state()
+        state = self.read_state() if state is None else state
         jobs = state.get('jobs', []) if isinstance(state, dict) else []
         if not isinstance(jobs, list):
             jobs = []
@@ -172,9 +207,16 @@ class GallerySources:
         if direct is not None:
             return job, original, direct
         with self.lock:
-            self._reload()
-            exact = [path for asset in self.assets.values() if asset.get('uri') == original
-                     for path in self._asset_paths(asset)]
+            if reload:self._reload()
+            protection_key = hashlib.sha256(json.dumps([job_id,index,original],ensure_ascii=False).encode()).hexdigest()
+            protected = self.protected.get(protection_key, {})
+            if (isinstance(protected,dict) and protected.get('state') == 'archived'
+                    and protected.get('jobId') == job_id and protected.get('index') == index
+                    and protected.get('sourceUrl') == original):
+                path = self._local(protected.get('uri'))
+                if path and self._hash(path).hex() == protected.get('sha256'):
+                    return job,original,path
+            exact = [path for asset in self.assets_by_uri.get(original,[]) for path in self._asset_paths(asset)]
             if exact:
                 return job, original, self._unambiguous(exact)
             identity = {job_id}
@@ -183,15 +225,13 @@ class GallerySources:
             # its parent's media unless that very output URI is retained.
             if source and isinstance(source.get('outputs'), list) and index < len(source['outputs']) and self._url(source['outputs'][index]) == original:
                 identity.add(source['id'])
-            linked = [generation for generation in self.generations if self._compatible(job, generation)
-                      and (isinstance(generation.get('nexusJobId'), str) and generation['nexusJobId'] in identity
-                           or isinstance(generation.get('id'), str) and generation['id'] in identity)]
+            linked = [generation for identifier in identity for generation in self.generations_by_job.get(identifier,[])
+                      if self._compatible(job,generation)]
             candidates = self._generation_paths(linked, len(outputs), index)
             if candidates:
                 return job, original, self._unambiguous(candidates)
             remote_id = job.get('remoteId')
-            linked = [generation for generation in self.generations if remote_id and self._compatible(job, generation)
-                      and generation.get('providerJobId') == remote_id
-                      and generation.get('providerId') == job.get('providerId')]
+            linked = [generation for generation in self.generations_by_remote.get((job.get('providerId'),remote_id),[])
+                      if remote_id and self._compatible(job,generation)]
             candidates = self._generation_paths(linked, len(outputs), index)
             return job, original, self._unambiguous(candidates)

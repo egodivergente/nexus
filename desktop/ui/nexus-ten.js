@@ -80,7 +80,8 @@ function sidebar(){
 /* ---------- Crear: one composition with the preview as protagonist ---------- */
 const mediaOf=j=>{const o=j?.outputs?.[0];return typeof o==='string'?o:o?.url;};
 const activeJob=j=>['SENDING','QUEUED','PROCESSING','GENERATING'].includes(j?.status);
-const stageJob=()=>state.jobs.find(j=>['IMAGE','VIDEO'].includes(j.modality)&&!state.studioGallery?.hidden?.includes(j.id));
+const stagePoster=j=>window.NexusGallery?.previewForJob?NexusGallery.previewForJob(j):'/gallery-preview/'+encodeURIComponent(j.id)+'?index=0';
+const stageJob=()=>state.jobs.find(j=>['IMAGE','VIDEO'].includes(j.modality)&&!state.studioGallery?.hidden?.includes(j.id)&&(!j.outputs?.length||stagePoster(j)!==null));
 const stageKey=()=>{const j=stageJob();return JSON.stringify([j?.id,j?.status,mediaOf(j),busy,!!loaded]);};
 function stageMarkup(){
  const j=stageJob(),url=mediaOf(j),label=j?(j.name||models.find(m=>m.id===j.modelId)?.displayName||j.modelId):'';
@@ -88,7 +89,7 @@ function stageMarkup(){
  if(!j)return `<div class="nx-stage-frame is-empty"><img class="nx-stage-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="88" height="84"><strong>Tu creación aparecerá aquí</strong><span>${loaded?'Describe la escena, revisa el coste y pulsa Generar.':'Elige un modelo, describe la escena y revisa el coste.'} El resultado se mostrará en este espacio y quedará en tu biblioteca.</span></div>`;
  if(activeJob(j))return `<div class="nx-stage-frame is-working" role="status"><span class="loading"></span><strong>${j.status==='SENDING'?'Enviando la petición…':'Generando con '+escape(label)}</strong><span>${escape(String(j.prompt||'').slice(0,140))}</span><small>El estado se actualiza solo. Puedes seguir trabajando.</small></div>`;
  if(j.status==='FAILED')return `<div class="nx-stage-frame is-error" role="status"><strong>No se completó la última creación</strong><span>${escape(String(j.error||'El proveedor no completó la tarea.').slice(0,180))}</span><button type="button" data-creative-job="${escape(j.id)}">Ver detalles</button></div>`;
- const visual=url&&isMediaUrl(url)?(j.modality==='VIDEO'?`<video src="${escape(url)}" muted playsinline loop preload="metadata" aria-label="${escape(label)}"></video>`:`<img src="${escape(url)}" alt="${escape(label)}" decoding="async">`):'<span class="nx-stage-missing">Resultado sin vista previa</span>';
+ const poster=stagePoster(j),visual=url&&isMediaUrl(url)&&poster?`<img data-gallery-preview="thumbnail" data-stage-poster="${escape(poster)}" alt="${escape(label)}" decoding="async">`:'<span class="nx-stage-missing">Resultado sin vista previa</span>';
  return `<button type="button" class="nx-stage-frame is-result" data-creative-job="${escape(j.id)}" aria-label="Abrir ${escape(label)}">${visual}<span class="nx-stage-caption"><strong>${escape(label)}</strong><small>Última creación · abrir detalles</small></span></button>`;
 }
 function create(){
@@ -111,7 +112,7 @@ function create(){
  const guide=$('#studio-start-guide');if(guide&&main.firstElementChild!==guide)main.prepend(guide);
  let preview=stage.querySelector(':scope > .nx-stage');
  if(!preview){preview=document.createElement('section');preview.className='nx-stage';preview.setAttribute('aria-label','Vista previa');stage.prepend(preview);}
- const key=stageKey();if(preview.dataset.key!==key){preview.dataset.key=key;preview.innerHTML=stageMarkup();}
+ const key=stageKey();if(preview.dataset.key!==key){preview.dataset.key=key;preview.innerHTML=stageMarkup();const image=preview.querySelector('[data-stage-poster]');if(image)requestAnimationFrame(()=>{if(!image.isConnected)return;if(window.NexusGallery?.loadPreview)NexusGallery.loadPreview(image,image.dataset.stagePoster);else image.src=image.dataset.stagePoster;});}
  const production=stage.querySelector('.creative-production');
  if(production){
   setText(production.querySelector('.creative-tray-heading h2'),'Recientes');

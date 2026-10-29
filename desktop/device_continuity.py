@@ -196,6 +196,7 @@ class DeviceContinuity:
         self.manifest = None
         self.sources = {}
         self.private_sources = {}
+        self.workspace_sources = {}
         self.media_inventory = {}
         self.media_paths = {}
         self.media_scanned = False
@@ -409,6 +410,7 @@ class DeviceContinuity:
         documents = []
         sources = {}
         private_sources = {}
+        workspace_sources = {}
         private = self.private()
         if self.config['skills']:
             for file in self.skills.rglob('*'):
@@ -429,8 +431,23 @@ class DeviceContinuity:
             documents.append(dict(kind='credentials', name='credentials.json', hash=sha, bytes=len(data)))
         if self.config['skills']:
             scopes.append('skill')
+        workspace = getattr(self.host, 'workspace_continuity', None)
+        if workspace is not None:
+            # A capability string is harmless to older peers: unsupported kinds
+            # are ignored by the Android v1 receiver. Only explicitly shared work
+            # is advertised, and receiving it never applies a draft.
+            scopes.append('workspace-v1')
+            for snapshot in workspace.export():
+                data = encoded(snapshot);sha = digest(data)
+                sources[sha] = data
+                documents.append(dict(kind='workspace', name='workspace/' + snapshot['id'] + '.json', hash=sha, bytes=len(data)))
+                for reference in snapshot['canvas']['references']:
+                    path = workspace.blob(reference.get('sha256'))
+                    if path is not None:
+                        workspace_sources[reference['sha256']] = path
         with self.publish_lock:
             self.sources, self.private_sources = sources, private_sources
+            self.workspace_sources = workspace_sources
             self.manifest = dict(protocol=1, device=self.config['device'], documents=documents, scopes=scopes)
 
     def start_server(self):
@@ -453,7 +470,7 @@ class DeviceContinuity:
                         source = encoded(owner.manifest)
                     elif re.fullmatch(r'/blob/[a-f0-9]{64}', self.path):
                         sha = self.path[6:]
-                        source = owner.private_sources.get(sha, owner.sources.get(sha))
+                        source = owner.private_sources.get(sha, owner.sources.get(sha, owner.workspace_sources.get(sha)))
                     else:
                         source = None
                 if source is None:
@@ -464,7 +481,11 @@ class DeviceContinuity:
                 self.send_header('Cache-Control', 'no-store')
                 self.send_header('Connection', 'close')
                 self.end_headers()
-                encrypt(io.BytesIO(source), self.wfile, key, token)
+                if isinstance(source, Path):
+                    with source.open('rb') as stream:
+                        encrypt(stream, self.wfile, key, token)
+                else:
+                    encrypt(io.BytesIO(source), self.wfile, key, token)
         self.server = ThreadingHTTPServer(('0.0.0.0', self.config['port']), Handler)
         self.server.daemon_threads = True
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -607,8 +628,13 @@ class DeviceContinuity:
         device = str(uuid.UUID(manifest['device']))
         if manifest['protocol'] != 1 or device == self.config['device']:
             raise ValueError('Invalid peer manifest')
+        workspace = getattr(self.host, 'workspace_continuity', None)
+        if workspace is not None:
+            workspace.observe_peer(device, manifest.get('scopes', []))
         for doc in manifest['documents']:
-            if doc['kind'] not in {'skill', 'credentials', 'chat'}:
+            if doc['kind'] not in {'skill', 'credentials', 'chat', 'workspace'}:
+                continue
+            if doc['kind'] == 'workspace' and (workspace is None or 'workspace-v1' not in manifest.get('scopes', [])):
                 continue
             if doc['kind'] == 'chat' and not self.config['chatAttachments']:
                 continue
@@ -627,6 +653,17 @@ class DeviceContinuity:
             data = self.fetch(peer, '/blob/' + doc['hash'])
             if digest(data) != doc['hash'] or len(data) != doc['bytes']:
                 raise ValueError('Invalid document integrity')
+            if doc['kind'] == 'workspace':
+                if len(data) > 1_000_000:
+                    raise ValueError('Workspace snapshot too large')
+                def obtain_workspace_blob(sha, destination):
+                    with destination.open('wb') as output:
+                        self.fetch(peer, '/blob/' + sha, target=output)
+                workspace.receive(json.loads(data), obtain_workspace_blob)
+                private = self.private()
+                private.setdefault('peers', {})[state_key] = {'hash':doc['hash'], 'policy':policy}
+                self.host.write_secret(self.secret_file, private)
+                continue
             chat = None
             if doc['kind'] == 'chat':
                 raw = json.loads(data)
