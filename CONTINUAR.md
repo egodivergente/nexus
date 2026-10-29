@@ -1,3 +1,11 @@
+# Apariencia Axel vc171 - 29/10/2026
+
+Rama codex/nexus-axel-appearance-20261029. Fuente 4961c5a7d1383ae924073d2fcdce7c9260b66d95 publicada/verificada. APK1.9.135-agent-preview, hash b7da59716343f2413f3c38c04a31ebb02670534e669edc046261a042adb654b9, firma original y5ARM64 intactas. Build AXELPC PASS;303pruebasapp ejecutadas PASS+4core UP-TO-DATE. Instalada como actualizacion en Pixel yS25 conhash/version verificados yborradores iguales durante install.
+
+Cinco temas/motor compartido/selector reversible/fox Axel/prompt compacto implementados. Pixel5previews,Cancelar,Aplicar/reabrirChampagneSubtle55%,fuente1.5/IME,cuatropestanas/paisaje yhuella final PASS. S25visual BLOQUEADO Keyguard; noforeground171. NoPIN/bypass. PixelquedaChampagne afinArena anterior;S25conservaAURORA. Ver docs/APPEARANCE_REPORT.md,AXEL_DESIGN_LANGUAGE.md,APPEARANCE_INVENTORY.md. Historial inferior no es la entrega actual.
+
+---
+
 # Checkpoint vc169 - 29/10/2026
 
 APK 1.9.133-agent-preview compilada en AXELPC e instalada en Pixel y S25. Hash, version y foreground verificados. Fuente 712ae1c86def5594ae20aaf5137b934de612ac81 publicada/verificada. 288 pruebas app PASS; 4 de nucleo UP-TO-DATE. Detalle y SHA256 en docs/AUDIT_REPORT.md.

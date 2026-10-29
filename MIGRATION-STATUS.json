@@ -1,4 +1,27 @@
 ﻿{
+    "appearanceAndroid20261029": {
+        "branch": "codex/nexus-axel-appearance-20261029",
+        "sourceCommit": "4961c5a7d1383ae924073d2fcdce7c9260b66d95",
+        "sourceRemoteVerification": "VERIFIED_GIT_LS_REMOTE",
+        "versionCode": 171,
+        "versionName": "1.9.135-agent-preview",
+        "buildHost": "AXELPC",
+        "apkSha256": "b7da59716343f2413f3c38c04a31ebb02670534e669edc046261a042adb654b9",
+        "certificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "installedBothHashesAndVersionsVerified": true,
+        "composerFingerprintPreservedOnInstallBoth": true,
+        "appSelectedTestsExecutedPassed": 303,
+        "coreSelectedTestsUpToDate": 4,
+        "pixelQa": "FIVE_PREVIEWS_CANCEL_APPLY_REOPEN_FONT150_IME_FOUR_TABS_LANDSCAPE_PASS_BOUNDED",
+        "pixelAppearance": "CHAMPAGNE_SUBTLE_0.55_REDUCED_FALSE",
+        "s25Qa": "BLOCKED_KEYGUARD_NO_FOREGROUND",
+        "s25Appearance": "AURORA_PRESERVED",
+        "nexusCrashesOrAnrsDetectedAvailableWindows": 0,
+        "noNewDependencies": true,
+        "report": "docs/APPEARANCE_REPORT.md",
+        "inventory": "docs/APPEARANCE_INVENTORY.md",
+        "designLanguage": "docs/AXEL_DESIGN_LANGUAGE.md"
+    },
     "premiumAndroid20261029": {
         "branch": "codex/nexus-premium-20261029",
         "sourceCommit": "712ae1c86def5594ae20aaf5137b934de612ac81",
