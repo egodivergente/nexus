@@ -38,7 +38,8 @@ import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 internal fun CanvasAttachmentEditor(
     field: CanvasInputField, media: List<AttachedMedia>, enabled: Boolean,
     onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit, compact: Boolean = false,
-    onReorder: ((String, Int) -> Unit)? = null, frameColumn: Boolean = false, summaryMode: Boolean = false
+    onReorder: ((String, Int) -> Unit)? = null, frameColumn: Boolean = false, summaryMode: Boolean = false,
+    summaryPreviewHeight:Dp?=null
 ) {
     val context = LocalContext.current
     val selected = media.filter(field::contains)
@@ -81,28 +82,47 @@ internal fun CanvasAttachmentEditor(
         else -> "${selected.size} / ${field.maximum}" + if(field.required) " · obligatorio" else ""
     }
     if(summaryMode) {
+        val previewBase=NexusTokens.minimumTouch+NexusTokens.space8
+        val previewHeight=summaryPreviewHeight ?: if(selected.isNotEmpty()) previewBase else null
         Surface(onClick={if(selected.isEmpty()) sourcesOpen=true else managing=true},enabled=enabled,shape=NexusTokens.field,
             color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,colors.outlineVariant),
             modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription=field.label+". "+countLabel}) {
             Column(Modifier.padding(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                Row(Modifier.heightIn(min=if(previewHeight!=null) NexusTokens.minimumTouch else NexusTokens.space32),
+                    verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     Icon(icon,null,Modifier.size(NexusTokens.iconSmall),tint=colors.onSurfaceVariant)
                     Text(field.label+if(field.required) " *" else "",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,maxLines=2,
                         overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    if(selected.isEmpty()) Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.iconSmall),tint=colors.primary)
-                    else Text(selected.size.toString(),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
-                }
-                if(selected.isNotEmpty()) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                    selected.take(if(field.maximum==1) 1 else 3).forEach {item -> key(item.id) {
-                        CanvasAttachmentTile(item,field.label,enabled=false,thumbnailSize=56.dp,showLabel=false) {}
-                    }}
-                    if(selected.size>3) TextButton(onClick={managing=true},contentPadding=PaddingValues(NexusTokens.space4)) {
-                        Text("+${selected.size-3}",style=MaterialTheme.typography.labelLarge)
+                    if(selected.isNotEmpty()) Text(selected.size.toString(),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                    if(previewHeight==null) Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.iconSmall),tint=colors.primary)
+                    else IconButton(onClick={sourcesOpen=true},enabled=canImport) {
+                        val replacing=field.maximum==1 && selected.isNotEmpty()
+                        Icon(if(replacing) Icons.Default.SwapHoriz else Icons.Default.Add,
+                            if(replacing) "Cambiar ${field.label}" else "Añadir a ${field.label}",Modifier.size(NexusTokens.iconSmall))
                     }
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick={sourcesOpen=true},enabled=canImport) {
-                        Icon(if(field.maximum==1) Icons.Default.SwapHoriz else Icons.Default.Add,
-                            if(field.maximum==1) "Cambiar ${field.label}" else "Añadir a ${field.label}",Modifier.size(NexusTokens.iconSmall))
+                }
+                if(previewHeight!=null) BoxWithConstraints(Modifier.fillMaxWidth().height(previewHeight)) {
+                    if(selected.isEmpty()) Icon(icon,null,Modifier.align(Alignment.Center).size(NexusTokens.iconDefault),tint=colors.primary)
+                    else {
+                        val grid=selected.size>3 && previewHeight>=previewBase*2+NexusTokens.space4
+                        val shown=selected.take(if(field.maximum==1) 1 else if(grid) 4 else 3)
+                        val columns=if(grid) 2 else shown.size
+                        val width=(maxWidth-NexusTokens.space4*(columns-1))/columns
+                        val height=if(grid) (previewHeight-NexusTokens.space4)/2 else previewHeight
+                        Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                            shown.chunked(columns).forEach {row -> Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                                row.forEach {item -> key(item.id) {Box {
+                                    CanvasAttachmentTile(item,field.label,enabled=false,thumbnailSize=width,showLabel=false,previewHeight=height) {}
+                                    if(item==shown.last() && selected.size>shown.size) Surface(Modifier.align(Alignment.BottomEnd),shape=NexusTokens.thumbnail,
+                                        color=colors.surface.copy(alpha=.94f)) {
+                                        TextButton(onClick={managing=true},contentPadding=PaddingValues(NexusTokens.space4),
+                                            modifier=Modifier.heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription="Ver los ${selected.size} archivos de ${field.label}"}) {
+                                            Text("+${selected.size-shown.size}",style=MaterialTheme.typography.labelLarge)
+                                        }
+                                    }
+                                }}}
+                            }}
+                        }
                     }
                 }
             }
@@ -205,7 +225,7 @@ internal fun CanvasAttachmentEditor(
 
 @Composable
 internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: Boolean = true, thumbnailSize:Dp=112.dp, showLabel: Boolean = true,
-    position:Int?=null,onMoveBefore:(()->Unit)?=null,onMoveAfter:(()->Unit)?=null,onRemove: () -> Unit) {
+    previewHeight:Dp=thumbnailSize,position:Int?=null,onMoveBefore:(()->Unit)?=null,onMoveAfter:(()->Unit)?=null,onRemove: () -> Unit) {
     val context = LocalContext.current
     var preview by remember(media.id) { mutableStateOf(false) }
     val visual = media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")
@@ -216,7 +236,7 @@ internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: 
         else Uri.parse(media.uriString)
     }
     Column(Modifier.width(thumbnailSize), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
-        Box(Modifier.size(thumbnailSize).clip(NexusTokens.field).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        Box(Modifier.width(thumbnailSize).height(previewHeight).clip(NexusTokens.field).background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(enabled = visual || onMoveBefore!=null || onMoveAfter!=null) { preview = true }.semantics { contentDescription = "Revisar $label" }) {
             if (visual) AsyncImage(imageModel, label, Modifier.fillMaxSize(), contentScale = ContentScale.Fit,
                 onError = { imageFailed = true }, onSuccess = { imageFailed = false })

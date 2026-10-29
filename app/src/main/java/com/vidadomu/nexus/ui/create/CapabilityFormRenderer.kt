@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.core.model.AttachedMedia
 import com.vidadomu.nexus.core.model.ModelParameter
 import com.vidadomu.nexus.core.model.NexusModel
@@ -151,24 +152,55 @@ internal fun CompactCapabilityMediaInputs(fields:List<CanvasInputField>,model:Ne
     val pair=declaredFramePair(fields,model)
     val primary=fields.filter {it.required || media.any(it::contains) || it.mime.startsWith("image/")}
     val secondary=fields.filterNot {it in primary}
-    val render: @Composable (CanvasInputField)->Unit = {field -> key(model?.providerId,model?.id,field.key) {
-        RegisteredSummaryMediaControl(field,media,enabled,{onAdd(field,it)},onRemove,onReorder)
-    }}
-    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val parallel=CanvasInputPlan.pairedFrames(pair,model,maxWidth.value,LocalDensity.current.fontScale)
-            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                if(parallel) Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    pair.forEach {field -> Box(Modifier.weight(1f)) {render(field)}}
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val density=LocalDensity.current
+        val sizing=LocalLauncherContentSizing.current
+        val overrides=LocalDynamicControlRenderers.current
+        val parallel=CanvasInputPlan.pairedFrames(pair,model,maxWidth.value,density.fontScale)
+        val groups=(if(parallel) listOf(pair) else emptyList())+
+            primary.filterNot {parallel && it in pair}.map {listOf(it)}+
+            secondary.chunked(if(density.fontScale>1.3f) 1 else 2)
+        val previewBase=NexusTokens.minimumTouch+NexusTokens.space8
+        // A preview can grow only as far as its real column width allows. Empty optional fields stay compact.
+        val capacities=groups.map {group ->
+            val selected=group.map {field -> media.filter(field::contains)}
+            val builtIn=group.all {overrides.inputKeys[it.key]==null && overrides.inputKinds[DynamicControlRegistry.inputKind(it)]==null}
+            if(!builtIn || selected.flatten().none {it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/")}) 0.dp
+            else {
+                val width=(maxWidth-NexusTokens.space8*(group.size-1))/group.size-NexusTokens.space16
+                selected.minOf {items ->
+                    val maximum=when(items.size) {
+                        2 -> (width-NexusTokens.space4)/2
+                        3 -> (width-NexusTokens.space4*2)/3
+                        else -> width
+                    }
+                    (maximum-previewBase).coerceAtLeast(0.dp)
                 }
-                primary.filterNot {parallel && it in pair}.forEach {render(it)}
             }
         }
-        secondary.chunked(if(LocalDensity.current.fontScale>1.3f) 1 else 2).forEach {row ->
+        val capacityPixels=capacities.map {with(density) {it.roundToPx()}}
+        val totalCapacity=capacityPixels.sum()
+        val capacity=with(density) {totalCapacity.toDp()}
+        SideEffect {sizing.reportMediaCapacity(capacity)}
+        var remaining=with(density) {sizing.mediaExtra.roundToPx()}.coerceAtMost(totalCapacity)
+        var capacityLeft=totalCapacity
+        val extras=capacityPixels.map {pixels ->
+            val extra=if(capacityLeft<=0) 0 else minOf(remaining,(remaining.toLong()*pixels/capacityLeft).toInt())
+            remaining-=extra;capacityLeft-=pixels
+            with(density) {extra.toDp()}
+        }
+        Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        groups.forEachIndexed {index,row ->
+            val showPreview=capacities[index]>0.dp || row.any {field -> media.any {field.contains(it) && (it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/"))}}
+            val previewHeight=if(showPreview) previewBase+extras[index] else null
             Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                row.forEach {field -> Box(Modifier.weight(1f)) {render(field)}}
-                if(row.size==1 && LocalDensity.current.fontScale<=1.3f) Spacer(Modifier.weight(1f))
+                row.forEach {field -> Box(Modifier.weight(1f)) {
+                    key(model?.providerId,model?.id,field.key) {
+                        RegisteredSummaryMediaControl(field,media,enabled,{onAdd(field,it)},onRemove,onReorder,previewHeight)
+                    }
+                }}
             }
+        }
         }
     }
 }

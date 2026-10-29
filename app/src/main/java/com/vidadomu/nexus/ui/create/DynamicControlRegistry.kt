@@ -97,11 +97,12 @@ internal object DynamicControlRegistry {
 }
 /** Fixed-workspace summaries reuse the same key/kind extension points and picker state as the detailed editor. */
 @Composable internal fun RegisteredSummaryMediaControl(field:CanvasInputField,media:List<AttachedMedia>,enabled:Boolean,
-    onAdd:(List<Pair<Uri,String>>)->Unit,onRemove:(String)->Unit,onReorder:(String,Int)->Unit) {
+    onAdd:(List<Pair<Uri,String>>)->Unit,onRemove:(String)->Unit,onReorder:(String,Int)->Unit,
+    previewHeight:androidx.compose.ui.unit.Dp?=null) {
     val registered=LocalDynamicControlRenderers.current
     val custom=registered.inputKeys[field.key] ?: registered.inputKinds[DynamicControlRegistry.inputKind(field)]
     if(custom!=null) custom(field,media,enabled,onAdd,onRemove,onReorder)
-    else CanvasAttachmentEditor(field,media,enabled,onAdd,onRemove,compact=true,onReorder=onReorder,summaryMode=true)
+    else CanvasAttachmentEditor(field,media,enabled,onAdd,onRemove,compact=true,onReorder=onReorder,summaryMode=true,summaryPreviewHeight=previewHeight)
 }
 
 @Composable internal fun InputImageSlot(f:CanvasInputField,m:List<AttachedMedia>,enabled:Boolean,add:(List<Pair<Uri,String>>)->Unit,remove:(String)->Unit,reorder:(String,Int)->Unit) = CanvasAttachmentEditor(f,m,enabled,add,remove,compact=true,onReorder=reorder)

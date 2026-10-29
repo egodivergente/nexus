@@ -214,7 +214,7 @@ fun CreateScreen(
         FixedLauncherWorkspace(
             modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)
                 .padding(horizontal=screenMargin,vertical=NexusTokens.space4),
-            scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,
+            scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,promptVisible=capabilities?.promptVisible==true,
             header={LauncherWorkspaceHeader(state.selectedModality,viewModel::selectModality)},
             model={FlagshipStudioHeader(state.selectedModality,catalogModels,state.selectedModel,
                 viewModel::selectModality,chooseModel,{showModelPickerSheet=true},onOpenFlow)},

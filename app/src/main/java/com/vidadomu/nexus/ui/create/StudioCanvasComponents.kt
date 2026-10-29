@@ -109,18 +109,20 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         if(focused) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
         tween(if(motion) NexusTokens.contentDuration else 0), label = "Prompt focus")
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+    val workspaceExtra=if(initiallyExpanded) 0.dp else LocalLauncherContentSizing.current.promptExtra
     Column(modifier.fillMaxWidth().clip(NexusTokens.prompt).background(tone)
-        .animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0))) {
+        .then(if(initiallyExpanded || (onExpand==null && workspaceExtra==0.dp)) Modifier.animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0)) else Modifier)) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .bringIntoViewRequester(bringPromptIntoView)
             .onFocusChanged { focused = it.isFocused;onEditorFocusChanged(it.isFocused) }
             .semantics { contentDescription = "Prompt de creación" }
-            .heightIn(min = if(expanded) 176.dp else 72.dp)
+            .then(if(!expanded && workspaceExtra>0.dp) Modifier.height(72.dp+workspaceExtra)
+                else Modifier.heightIn(min = if(expanded) 176.dp else 72.dp))
             .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             // Collapsed editor stays around 120–128 dp including its toolbar. Text scrolls; no text is discarded.
-            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 3,
+            enabled = enabled, minLines = 2, maxLines = if(!expanded && workspaceExtra>0.dp) Int.MAX_VALUE else if(expanded) 18 else 3,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,
