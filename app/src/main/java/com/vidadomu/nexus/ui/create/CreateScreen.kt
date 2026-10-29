@@ -79,6 +79,7 @@ fun CreateScreen(
     val compactTyping = WindowInsets.isImeVisible
     val canvasScroll = rememberLazyListState()
     val promptFocus = remember { FocusRequester() }
+    var promptFocused by remember {mutableStateOf(false)}
     LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollToItem(0) }
     val inputVideo = state.attachedMedia.singleOrNull { it.mimeType.startsWith("video/") }
     var videoSeconds by remember(inputVideo?.uriString) { mutableStateOf<Double?>(null) }
@@ -163,6 +164,15 @@ fun CreateScreen(
     }
     val inputFields=capabilities?.inputFields.orEmpty()
 
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // The parent already reserves the IME. Use the remaining height, including large text, rather than a device/orientation name.
+    val compactEditor=compactTyping && maxHeight < 480.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)
+    LaunchedEffect(compactEditor,promptFocused) {
+        if(compactEditor && promptFocused) {
+            withFrameNanos { }
+            canvasScroll.scrollToItem(2)
+        }
+    }
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(batchSnackbar) },
@@ -173,7 +183,7 @@ fun CreateScreen(
                     verticalArrangement=Arrangement.spacedBy(2.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
                     val inlineReason=readiness.fixTarget==CreationFixTarget.MEDIA || readiness.fixTarget==CreationFixTarget.PROMPT
-                    if(!busy && !inlineReason) readiness.message?.let { reason ->
+                    if(!compactEditor && !busy && !inlineReason) readiness.message?.let { reason ->
                         if(readiness.fixTarget==null) Text(reason, color=MaterialTheme.colorScheme.onSurface,
                             style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(horizontal=NexusTokens.space12))
                         else TextButton(onClick={
@@ -200,7 +210,7 @@ fun CreateScreen(
                             Modality.AUDIO -> "Generar audio"
                             Modality.CHAT -> "Enviar consulta"
                             else -> "Procesar"
-                        },disabledLabel=if(inlineReason) readiness.message else null,onCostDetails={showPriceDetails=true})
+                        },disabledLabel=if(inlineReason && !compactEditor) readiness.message else null,onCostDetails={showPriceDetails=true})
                 }
             }
         },
@@ -212,7 +222,7 @@ fun CreateScreen(
             modifier=Modifier.fillMaxSize().padding(top=innerPadding.calculateTopPadding()).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             item(key="launcher-title") {
-                Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
+                if(!compactEditor) Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
                     Text("Lanzadera",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
                     com.vidadomu.nexus.ui.components.NexusSettingsButton()
 
@@ -236,7 +246,7 @@ fun CreateScreen(
                 }
             }
             item(key="studio-header") {
-                FlagshipStudioHeader(state.selectedModality, catalogModels, state.selectedModel,
+                if(!compactEditor) FlagshipStudioHeader(state.selectedModality, catalogModels, state.selectedModel,
                     viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
             }
             item(key="composer") {
@@ -248,7 +258,7 @@ fun CreateScreen(
                         }
                     }
                     val editRoute=textRoute?.pairedEditModelId?.let {id -> catalogModels.firstOrNull {it.id==id && it.providerId==textRoute.providerId}}
-                    if(state.selectedModality==Modality.IMAGE && textRoute!=null && editRoute!=null) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    if(!compactEditor && state.selectedModality==Modality.IMAGE && textRoute!=null && editRoute!=null) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         SegmentedButton(selected=selected?.id==textRoute.id,onClick={chooseModel(textRoute)},shape=SegmentedButtonDefaults.itemShape(0,2)) {Text("Desde texto")}
                         SegmentedButton(selected=selected?.id==editRoute.id,onClick={chooseModel(editRoute)},shape=SegmentedButtonDefaults.itemShape(1,2)) {Text("Con referencias")}
                     }
@@ -257,7 +267,8 @@ fun CreateScreen(
                         focusRequester=promptFocus,enabled=!state.isSubmitting,
                         capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),
                         ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,
-                            model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name))
+                            model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),
+                        onFocusChanged={promptFocused=it})
                 }
             }
             item(key="capability-inputs") {
@@ -349,6 +360,7 @@ fun CreateScreen(
                 } else InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa sus detalles antes de volver a generar."),technicalDetails=raw)
             } }
         }
+    }
     }
     if(showParameters) CanvasSheet("Parámetros",{showParameters=false}) {
         if(state.isLoadingSchema) LinearProgressIndicator(Modifier.fillMaxWidth())

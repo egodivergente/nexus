@@ -102,8 +102,9 @@ internal object DynamicControlRegistry {
 
 @Composable internal fun PromptEditor(value:String,onValueChange:(String)->Unit,placeholder:String,
     focusRequester:FocusRequester?,enabled:Boolean,capability:com.vidadomu.nexus.agent.core.registry.PromptCapability?,
-    ruleScope:com.vidadomu.nexus.agent.core.config.RuleScope) {
-    StudioPromptField(value,onValueChange,placeholder,focusRequester=focusRequester,enabled=enabled,capability=capability,ruleScope=ruleScope)
+    ruleScope:com.vidadomu.nexus.agent.core.config.RuleScope,onFocusChanged:(Boolean)->Unit = {}) {
+    StudioPromptField(value,onValueChange,placeholder,focusRequester=focusRequester,enabled=enabled,capability=capability,
+        ruleScope=ruleScope,onEditorFocusChanged=onFocusChanged)
 }
 
 /** All dynamic controls in one flow. Values/callbacks remain owned by CreateViewModel. */
@@ -120,7 +121,8 @@ internal object DynamicControlRegistry {
 /** Displays an already resolved estimate. It never calculates a tariff or starts a provider request. */
 @Composable internal fun CostEstimator(amount:String,onDetails:()->Unit,modifier:Modifier=Modifier) {
     TextButton(onClick=onDetails,modifier=modifier.heightIn(min=NexusTokens.minimumTouch)
-        .semantics {contentDescription="Coste estimado: $amount. Ver detalles"},contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {
+        .semantics {contentDescription="Coste estimado: $amount. Ver detalles"},shape=NexusTokens.thumbnail,
+        contentPadding=PaddingValues(horizontal=NexusTokens.space8,vertical=NexusTokens.space4)) {
         Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
             Text("Coste estimado",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             Text(amount,style=MaterialTheme.typography.labelLarge.tabularMoney())

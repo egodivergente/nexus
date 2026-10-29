@@ -5,6 +5,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -83,12 +85,21 @@ internal fun StudioToolRow(content: @Composable () -> Unit) {
         verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {content()}
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class,ExperimentalLayoutApi::class)
 @Composable
 internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     placeholder: String, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null,
-    enabled: Boolean = true, maximum: Int? = null, capability: com.vidadomu.nexus.agent.core.registry.PromptCapability? = null, ruleScope: com.vidadomu.nexus.agent.core.config.RuleScope = com.vidadomu.nexus.agent.core.config.RuleScope(), attachments: @Composable ColumnScope.() -> Unit = {}) {
+    enabled: Boolean = true, maximum: Int? = null, capability: com.vidadomu.nexus.agent.core.registry.PromptCapability? = null, ruleScope: com.vidadomu.nexus.agent.core.config.RuleScope = com.vidadomu.nexus.agent.core.config.RuleScope(), onEditorFocusChanged:(Boolean)->Unit = {}, attachments: @Composable ColumnScope.() -> Unit = {}) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
+    val bringPromptIntoView=remember {BringIntoViewRequester()}
+    val imeVisible=WindowInsets.isImeVisible
+    LaunchedEffect(focused,imeVisible) {
+        if(focused && imeVisible) {
+            withFrameNanos { }
+            bringPromptIntoView.bringIntoView()
+        }
+    }
     val haptic = LocalHapticFeedback.current
     val feedback = rememberNexusHaptics()
     val clipboard = LocalClipboardManager.current
@@ -102,7 +113,8 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         .animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0))) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .onFocusChanged { focused = it.isFocused }
+            .bringIntoViewRequester(bringPromptIntoView)
+            .onFocusChanged { focused = it.isFocused;onEditorFocusChanged(it.isFocused) }
             .semantics { contentDescription = "Prompt de creación" }
             .heightIn(min = if(expanded) 176.dp else 72.dp)
             .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8),
