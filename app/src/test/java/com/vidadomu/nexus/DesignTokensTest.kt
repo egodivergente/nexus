@@ -20,6 +20,10 @@ class DesignTokensTest {
                 c.error to c.surface,c.onErrorContainer to c.errorContainer).forEach { (text,bg) ->
                 assertTrue("$theme text contrast is ${contrast(text,bg)}",contrast(text,bg)>=4.5f)
             }
+            val visuals = NexusThemeSpecs.visuals(theme)
+            listOf(c.onSurfaceVariant, visuals.warning).forEach { ink ->
+                assertTrue("$theme neutral chat panel contrast", contrast(ink, visuals.promptSurface) >= 4.5f)
+            }
         }
     }
     @Test fun typographyHasNoStyleBelowTwelve() {

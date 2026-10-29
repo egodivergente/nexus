@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.assistant
 
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.LocalNexusVisuals
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -39,7 +40,7 @@ import com.vidadomu.nexus.agent.core.chat.MdBlock
 import com.vidadomu.nexus.agent.core.chat.MdSpan
 import kotlinx.coroutines.delay
 
-/** Estilos del bocadillo: cuerpo en Manrope, títulos en la fuente de marca, acento del tema. */
+/** Reading hierarchy shared by saved responses and streaming text. */
 private data class MdStyles(
     val body: TextStyle,
     val ink: Color,
@@ -50,6 +51,8 @@ private data class MdStyles(
     val codeBg: Color,
     val line: Color,
     val heading: TextStyle,
+    val subheading: TextStyle,
+    val supporting: TextStyle,
     val label: TextStyle,
     val onLink: (String) -> Unit = {},
 )
@@ -58,16 +61,20 @@ private data class MdStyles(
 private fun mdStyles(): MdStyles {
     val cs = MaterialTheme.colorScheme
     val ty = MaterialTheme.typography
+    val reading = chatReadingStyles(ty)
+    val visuals = LocalNexusVisuals.current
     return MdStyles(
-        body = ty.bodyLarge,
+        body = reading.body,
         ink = cs.onSurface,
         soft = cs.onSurface,
         muted = cs.onSurfaceVariant,
         accent = cs.onSurfaceVariant,
-        mark = cs.primary.copy(alpha = 0.22f),
-        codeBg = cs.background.copy(alpha = 0.72f),
+        mark = cs.primary.copy(alpha = 0.08f),
+        codeBg = visuals.codeSurface,
         line = cs.outlineVariant,
-        heading = ty.titleMedium,
+        heading = reading.heading,
+        subheading = reading.subheading,
+        supporting = reading.supporting,
         label = ty.labelMedium,
     )
 }
@@ -125,7 +132,7 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
                 sp.code || sp.bold || sp.mark -> st.ink
                 else -> Color.Unspecified
             },
-            fontWeight = if (sp.bold || sp.mark) FontWeight.Medium else null,
+            fontWeight = if (sp.bold || sp.mark) FontWeight.SemiBold else null,
             fontStyle = if (sp.italic) FontStyle.Italic else null,
             fontFamily = if (sp.code) FontFamily.Monospace else null,
             // Inline code a step smaller and on a faint tint, so it does not break the line spacing into «patches».
@@ -195,7 +202,7 @@ private fun MdBlockView(b: MdBlock, st: MdStyles, ctx: WidgetCtx) {
         is MdBlock.Heading -> if (b.level <= 2) {
             Text(annotated(b.spans, st), style = st.heading, color = st.ink)
         } else {
-            Text(annotated(b.spans, st), style = st.label, color = st.accent)
+            Text(annotated(b.spans, st), style = st.subheading, color = st.ink)
         }
         is MdBlock.Paragraph -> Text(annotated(b.spans, st), style = st.body, color = st.soft)
         is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) { b.items.forEach { MdListRow(it, st) } }
@@ -222,19 +229,21 @@ private fun MdCallout(b: MdBlock.Callout, st: MdStyles, ctx: WidgetCtx) {
     val look = when (b.kind) {
         CalloutKind.TLDR -> CalloutLook(cs.primary, Icons.Default.AutoAwesome, "En breve")
         CalloutKind.TIP -> CalloutLook(cs.tertiary, Icons.Default.Info, "Consejo")
-        CalloutKind.WARN -> CalloutLook(cs.error, Icons.Outlined.WarningAmber, "Ojo")
+        CalloutKind.WARN -> CalloutLook(LocalNexusVisuals.current.warning, Icons.Outlined.WarningAmber, "Ojo")
         CalloutKind.DECISION -> CalloutLook(cs.primary, Icons.Default.Tune, "Decisión")
         CalloutKind.RESULT -> CalloutLook(cs.tertiary, Icons.Default.Check, "Resultado")
     }
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(NexusTokens.field).background(look.tone.copy(alpha = 0.09f))) {
-        Box(Modifier.width(3.dp).fillMaxHeight().background(look.tone))
-        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+    // Stable neutral surface: only the label/icon carry semantic colour, never an alarming full-height stripe.
+    Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
+        color = LocalNexusVisuals.current.promptSurface,
+        border = BorderStroke(NexusTokens.divider, cs.outlineVariant)) {
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(look.icon, null, Modifier.size(16.dp), tint = look.tone)
-                Spacer(Modifier.width(NexusTokens.space4))
-                Text(look.label, style = st.label.copy(fontWeight = FontWeight.SemiBold), color = look.tone)
+                Icon(look.icon, null, Modifier.size(NexusTokens.iconSmall), tint = look.tone)
+                Spacer(Modifier.width(NexusTokens.space8))
+                Text(look.label, style = MaterialTheme.typography.labelLarge, color = look.tone)
             }
-            MdBlockList(b.blocks, st, ctx)
+            MdBlockList(b.blocks, st.copy(body = st.supporting, soft = st.muted, mark = Color.Transparent), ctx)
         }
     }
 }

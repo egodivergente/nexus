@@ -68,7 +68,7 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(0.dp)) {
-                        Box(Modifier.width(52.dp).height(24.dp).clip(NexusTokens.pill)
+                        Box(Modifier.width(52.dp).height(NexusTokens.space24).clip(MaterialTheme.shapes.small)
                             .background(tone),
                             contentAlignment=Alignment.Center) {
                             Icon(screen.icon,contentDescription=null,

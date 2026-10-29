@@ -409,10 +409,7 @@ fun AssistantScreen(
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 IconButton(onClick = onOpenSettings, modifier = Modifier.size(NexusTokens.minimumTouch)) {
-                    Box(Modifier.size(NexusTokens.space32).clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Settings, "Ajustes", Modifier.size(NexusTokens.iconSmall), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Icon(Icons.Default.Settings, "Ajustes", Modifier.size(NexusTokens.iconMedium), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },

@@ -110,8 +110,8 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
           }
       }
       Column {
-        Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=ComposerShape,shadowElevation=10.dp,
-            border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+        Surface(color=LocalNexusVisuals.current.promptSurface,shape=MaterialTheme.shapes.medium,
+            border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
             // The active model lives in the chat header now: the composer stays a single slim row.
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
@@ -145,7 +145,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     additionalOptions = reasoningControl)
                 val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
                 // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
-                val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+                val style = chatReadingStyles(MaterialTheme.typography).body.copy(color = MaterialTheme.colorScheme.onSurface)
                 androidx.compose.foundation.text.BasicTextField(text, onInput, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .semantics { contentDescription = "Mensaje para Nexus" },
@@ -186,7 +186,7 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     IconButton(onClick = onSend, enabled = canSend, modifier = Modifier.size(NexusTokens.minimumTouch)) {
                         Box(Modifier.size(36.dp).background(
                             if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
-                            androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                            MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
                             Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", Modifier.size(NexusTokens.iconMedium),
                                 tint = if(canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))
                         }
