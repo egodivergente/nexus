@@ -168,9 +168,11 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 }
                 SettingsPage.BYTEPLUS -> { item { BytePlusConsumptionSettings() } }
                 SettingsPage.AGENT -> {
+                    // The category promises model controls first; keep the common entry above
+                    // the potentially long Drive project list so it never requires scrolling.
+                    if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Proveedor, modelo, respuesta y herramientas",{assistantSettingsOpen=true})}}
                     item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
                     item {SettingsCard {SettingRow("Sincronización entre móviles","Chats, memoria, skills, galería y adjuntos",{syncOpen=true})}}
-                    if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Proveedor, modelo, respuesta y herramientas",{assistantSettingsOpen=true})}}
                     item {SettingsHeader("Motores del agente",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
                     item {SettingsCard {BrainsSettingsSection {assistantSettingsOpen=true}}}
                 }
