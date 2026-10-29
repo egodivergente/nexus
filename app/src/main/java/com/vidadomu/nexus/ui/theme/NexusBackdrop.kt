@@ -32,7 +32,7 @@ internal fun photoVeilStops(intensity: Float): List<Float> {
     val veil = MaterialTheme.colorScheme.background
     val enabled = config.value("ui.background").toBoolean()
     val photo = config.value("ui.photo")
-    ProvideNexusAmbientPhase(appearance.ambientMode, appearance.intensity, enabled && photo.isBlank()) {
+    ProvideNexusAmbientPhase(appearance.ambientMode, appearance.intensity, (enabled && photo.isBlank()) || AppearancePreferences.preview.value!=null) {
         Box(Modifier.fillMaxSize()) {
             if (enabled) {
                 if (photo.isNotBlank()) {

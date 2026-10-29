@@ -40,7 +40,7 @@ private fun brandFont(resource: Int): FontFamily = FontFamily(
 @Composable
 internal fun nexusThemeTypography(appearance:NexusAppearance):Typography = remember(appearance) {
     val heading=if(appearance in setOf(NexusAppearance.QUARTZ,NexusAppearance.CHAMPAGNE)) FontFamily.Serif else brandFont(R.font.space_grotesk)
-    nexusTypography(heading,brandFont(R.font.manrope))
+    nexusTypography(heading,FontFamily.SansSerif)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -75,7 +75,7 @@ fun NexusTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalNexusAppearance provides theme, LocalNexusVisuals provides NexusThemeSpecs.visuals(theme),
         LocalChromeColor provides chromeFor(theme), LocalDensity provides density,
         LocalNexusDecorativeMotion provides decorativeMotion, androidx.compose.ui.platform.LocalHapticFeedback provides filteredHaptics) {
-        MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
+        MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusThemeSpecs.treatment(theme).shapes) {
             Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
                 NexusBackdrop {content()}
             }

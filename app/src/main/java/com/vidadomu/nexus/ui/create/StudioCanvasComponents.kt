@@ -113,8 +113,8 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         tween(if(motion) NexusTokens.contentDuration else 0), label = "Prompt focus")
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
     val toolbarTint=if(enabled) MaterialTheme.colorScheme.onSurfaceVariant else visuals.disabledText
-    Column(modifier.fillMaxWidth().clip(NexusTokens.prompt).background(visuals.promptSurface)
-        .border(if(focused) NexusTokens.divider*2 else NexusTokens.divider,borderColor,NexusTokens.prompt)
+    Column(modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(visuals.promptSurface)
+        .border(if(focused) NexusTokens.divider*2 else NexusTokens.divider,borderColor,MaterialTheme.shapes.medium)
         .then(if(initiallyExpanded || onExpand==null) Modifier.animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0)) else Modifier)) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)

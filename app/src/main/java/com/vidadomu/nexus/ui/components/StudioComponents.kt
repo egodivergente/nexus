@@ -60,7 +60,7 @@ fun FloatingActionDock(modifier: Modifier = Modifier, content: @Composable Colum
     // sheet corners and a hairline edge, so it reads as a panel of the screen rather than a flat black slab.
     Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background, shape = NexusTokens.sheet,
         border = androidx.compose.foundation.BorderStroke(.5.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 8.dp) {
+        shadowElevation = com.vidadomu.nexus.ui.theme.NexusThemeSpecs.treatment(com.vidadomu.nexus.ui.theme.LocalNexusAppearance.current).shadowElevation) {
         Column(Modifier.padding(top = NexusTokens.space8), content = content)
     }
 }

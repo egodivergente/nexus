@@ -147,7 +147,7 @@ internal fun ThemeGallery(selection:AppearanceSelection,onSelect:(NexusAppearanc
 private fun ThemeMiniature(appearance:NexusAppearance,selection:AppearanceSelection,selected:Boolean) {
     val colors=remember(appearance) {palette(appearance)}
     val typography=nexusThemeTypography(appearance)
-    MaterialTheme(colorScheme=colors,typography=typography,shapes=NexusTokens.shapes) {
+    MaterialTheme(colorScheme=colors,typography=typography,shapes=NexusThemeSpecs.treatment(appearance).shapes) {
         Surface(shape=NexusTokens.field,color=colors.background,
             modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch*4).clearAndSetSemantics {}) {
             Box(Modifier.clip(NexusTokens.field)) {
@@ -155,7 +155,7 @@ private fun ThemeMiniature(appearance:NexusAppearance,selection:AppearanceSelect
                 Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text("Nexus",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
-                        Icon(Icons.Default.AutoAwesome,null,Modifier.size(NexusTokens.iconSmall),tint=colors.primary)
+                        AxelMark(Modifier.size(NexusTokens.iconDefault),appearance=appearance)
                     }
                     Surface(shape=NexusTokens.thumbnail,color=colors.surfaceContainer.copy(alpha=.94f)) {
                         Column(Modifier.fillMaxWidth().padding(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {

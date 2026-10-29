@@ -29,7 +29,7 @@ fun NexusSheet(
 ) {
     // Swipe, scrim and back all pass through confirmValueChange; while blocked the sheet cannot hide.
     val canDismiss by rememberUpdatedState(dismissEnabled)
-    ModalBottomSheet(onDismissRequest = { if (canDismiss) onDismiss() }, shape = NexusTokens.sheet,
+    ModalBottomSheet(onDismissRequest = { if (canDismiss) onDismiss() }, shape = com.vidadomu.nexus.ui.theme.NexusThemeSpecs.treatment(com.vidadomu.nexus.ui.theme.LocalNexusAppearance.current).sheet,
         containerColor=com.vidadomu.nexus.ui.theme.LocalNexusVisuals.current.sheetSurface,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
             confirmValueChange = { it != SheetValue.Hidden || canDismiss })) {

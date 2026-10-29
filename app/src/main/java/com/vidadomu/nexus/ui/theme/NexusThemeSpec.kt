@@ -3,6 +3,10 @@ package com.vidadomu.nexus.ui.theme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Shape
 
 /** Theme identities share semantic roles, never provider or generation rules. */
 enum class AmbientStyle { AURORA, LIQUID, SILK, ATMOSPHERE, NEBULA }
@@ -20,7 +24,18 @@ data class NexusVisualTokens(val promptSurface:Color,val promptBorder:Color,val 
 val LocalNexusAppearance=staticCompositionLocalOf {NexusAppearance.AURORA}
 val LocalNexusVisuals=staticCompositionLocalOf {NexusThemeSpecs.visuals(NexusAppearance.AURORA)}
 
+@Immutable
+data class NexusSurfaceTreatment(val shapes:Shapes,val sheet:Shape,val shadowElevation:Dp,val borderWidth:Dp)
+
 object NexusThemeSpecs {
+    private fun finish(corner:Int,shadow:Int)=NexusSurfaceTreatment(
+        Shapes(extraSmall=RoundedCornerShape(8.dp),small=RoundedCornerShape(8.dp),medium=RoundedCornerShape(corner.dp),
+            large=RoundedCornerShape((corner+4).dp),extraLarge=RoundedCornerShape((corner+8).dp)),
+        RoundedCornerShape(topStart=(corner+8).dp,topEnd=(corner+8).dp),shadow.dp,1.dp)
+    private val treatments=mapOf(NexusAppearance.AURORA to finish(16,6),NexusAppearance.OBSIDIAN to finish(12,2),
+        NexusAppearance.CHAMPAGNE to finish(18,4),NexusAppearance.EMERALD to finish(20,6),NexusAppearance.NOCTURNE to finish(16,8))
+    fun treatment(theme:NexusAppearance):NexusSurfaceTreatment=treatments[theme] ?: treatments.getValue(NexusAppearance.AURORA)
+
     private fun c(value:Long)=Color(value)
     private fun dark(bg:Long,low:Long,high:Long,chrome:Long,primary:Long,secondary:Long,tertiary:Long,
         style:AmbientStyle,lights:List<Long>):NexusThemeSpec {
