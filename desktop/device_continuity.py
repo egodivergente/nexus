@@ -202,6 +202,14 @@ class DeviceContinuity:
         self.status = 'Sin vincular'
         self.dirty = False
         self.last_errors = []
+        self.activity_file = self.root / 'activity.json'
+        self.activity = {}
+        try:
+            activity = json.loads(self.activity_file.read_text('utf-8'))
+            self.activity = {key: value for key, value in activity.items()
+                             if key == 'lastSuccessAt' and isinstance(value, (int, float))}
+        except (OSError, ValueError, AttributeError):
+            pass
         defaults = dict(enabled=False, peers=[], address='', port=8797, interval=30,
                         timeout=120, maxFileMb=0, skills=True, credentials=True,
                         settings=True, agy=True, deletions=False, chatAttachments=True, device=str(uuid.uuid4()),
@@ -217,7 +225,8 @@ class DeviceContinuity:
         return self.host.read_secret(self.secret_file)
 
     def public(self):
-        return {**self.config, 'configured': bool(self.private().get('key')), 'status': self.status,
+        return {**self.config, **self.activity, 'busy': self.lock.locked(),
+                'configured': bool(self.private().get('key')), 'status': self.status,
                 'lastErrors': self.last_errors}
 
     def command(self, args):
@@ -258,6 +267,12 @@ class DeviceContinuity:
                 self.lock.release()
             self.wake.set()
         elif op == 'run':
+            if not self.config['enabled']:
+                raise ValueError('Activa la vinculación antes de sincronizar con tus móviles.')
+            if not self.private().get('key') or not self.config['peers'] or not self.config['address']:
+                raise ValueError('Completa la vinculación con tus móviles antes de sincronizar.')
+            if not self.lock.locked():
+                self.status = 'Intercambio pendiente'
             self.wake.set()
         elif op != 'status':
             raise ValueError('Operacion desconocida.')
@@ -725,6 +740,9 @@ class DeviceContinuity:
                     self.status = ('Esperando a que termine el turno' if set(failures) == {'AgentBusy'} or self.dirty else
                                    'Continuidad pendiente. Reintento automatico.' if failures else
                                    'Sincronizado - ' + time.strftime('%H:%M:%S'))
+                    if not failures and not self.dirty:
+                        self.activity['lastSuccessAt'] = int(time.time() * 1000)
+                        atomic(self.activity_file, encoded(self.activity))
                 except Exception as error:
                     self.last_errors = [type(error).__name__]
                     self.status = 'Continuidad pendiente. Reintento automatico.'

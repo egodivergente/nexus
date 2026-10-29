@@ -5,12 +5,15 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 import zipfile
 
 parser=argparse.ArgumentParser();parser.add_argument('--install',action='store_true');args=parser.parse_args()
 root=Path(__file__).resolve().parents[2];desktop=root/'desktop';out=root/'entregas';out.mkdir(exist_ok=True)
-subprocess.run(['python','-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
-version='2026.10.26-desktop-modern.2'
+subprocess.run([sys.executable,'-X','utf8',str(desktop/'tools/verify-corte-source.py')],check=True)
+sys.path.insert(0,str(desktop))
+from local_host import DESKTOP_VERSION
+version=DESKTOP_VERSION
 files={}
 def include(path,relative):
     if path.is_file():files[str(relative).replace('\\','/')]=path
@@ -29,6 +32,7 @@ for p in (root/'tools/flow-bridge').glob('*.py'):include(p,Path('tools/flow-brid
 for name in ['android-source-manifest.json', 'desktop-parity-manifest.json']:
     include(desktop/'agent'/name,Path('desktop/agent')/name)
 include(root/'docs/DESKTOP-MODERN-20261026.md',Path('docs/DESKTOP-MODERN-20261026.md'))
+include(root/'docs/DESKTOP-PREMIUM-20261029.md',Path('docs/DESKTOP-PREMIUM-20261029.md'))
 for p in (root/'docs/windows-corte').glob('*'):
     include(p,Path('docs/windows-corte')/p.name)
 for required in ['desktop/corte_host.py','desktop/corte_render.py','desktop/agent/runtime/corte-model.jar','desktop/agent/runtime/corte-timeline.jar','desktop/agent/runtime/corte-storage.jar','desktop/agent/runtime/nexus-desktop-agent.jar','desktop/ui/corte.js']:

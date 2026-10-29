@@ -1,6 +1,6 @@
-param([switch]$NoLaunch, [string]$AdditionalShortcut, [int]$Port = 0)
+param([switch]$NoLaunch, [string]$AdditionalShortcut, [int]$Port = 0, [string]$PythonExecutable)
 $ErrorActionPreference = 'Stop'
-$python = (Get-Command python.exe -ErrorAction Stop).Source
+$python = if ($PythonExecutable) { (Resolve-Path -LiteralPath $PythonExecutable).Path } else { (Get-Command python.exe -ErrorAction Stop).Source }
 $pythonw = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) { throw 'Falta Python para Windows.' }
 if ((Get-AuthenticodeSignature -LiteralPath $pythonw).Status -ne 'Valid') { throw 'Python no tiene una firma valida.' }

@@ -272,7 +272,7 @@ with tempfile.TemporaryDirectory(prefix='nexus-ten-', dir=Path.home()/'.aki/tmp'
                 # 16, 17 · Ajustes
                 page.evaluate("navigate('settings')")
                 page.wait_for_selector('.nx-settings')
-                check('Ajustes: five categories', page.locator('.nx-settings-section').count() == 5 and page.locator('[data-nx-settings-jump]').count() == 5)
+                check('Ajustes: categories include device continuity', page.locator('.nx-settings-section').count() == 6 and page.locator('[data-nx-settings-jump]').count() == 6 and page.locator('#nx-settings-continuity').count() == 1)
                 themes = page.evaluate("[...document.querySelectorAll('.interface-themes button')].map(b=>{const r=b.getBoundingClientRect(),p=b.querySelector('.theme-preview').getBoundingClientRect(),n=[...b.children].find(c=>c.tagName==='SPAN'&&!c.className);return [r.height,p.height,n?n.getBoundingClientRect().width:0]})")
                 check('Ajustes: complete theme thumbnails with names', all(h >= 100 and p >= 70 and n > 20 for h, p, n in themes), themes)
                 page.locator('.interface-themes [data-interface-theme=ocean]').click()

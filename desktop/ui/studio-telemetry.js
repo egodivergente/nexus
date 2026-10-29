@@ -30,7 +30,7 @@ if(typeof document!=='undefined')(()=>{
  }
  function draw(){
   mount();const s=T.snapshot(),local=s.rows.filter(r=>r.ok&&['init','save','localPing'].includes(r.op));
-  const b=$('#telemetry-button');if(b){b.textContent='Telemetría'+(T.enabled&&local.length?' · '+fmt(local.at(-1).ms):'');b.title='Latencia local y estado de solicitudes';}
+  const b=$('#telemetry-button');if(b){const text='Telemetría'+(T.enabled&&local.length?' · '+fmt(local.at(-1).ms):'');if(b.textContent!==text)b.textContent=text;b.title='Latencia local y estado de solicitudes';}
   if(!dialog?.open)return;
   const jobs=state.jobs||[],working=jobs.filter(j=>['SENDING','QUEUED','PROCESSING','GENERATING'].includes(j.status));
   const memory=performance.memory?.usedJSHeapSize;

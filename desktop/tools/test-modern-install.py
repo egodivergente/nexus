@@ -36,7 +36,9 @@ with tempfile.TemporaryDirectory(prefix='nexus-modern-package-') as folder:
                 page.goto(url)
                 page.wait_for_function('()=>!!initial&&!!window.NexusTen&&!!window.NexusChatContinuity&&!!window.CatalogParity&&!!window.NexusAgentParity')
                 page.evaluate("()=>document.getElementById('nx-startup-onboarding')?.remove()")
-                assert page.evaluate('initial.version') == '2026.10.26-desktop-modern.2'
+                manifest = args.desktop/'build-info.json'
+                expected_version = json.loads(manifest.read_text('utf-8'))['version'] if manifest.exists() else '2026.10.29-desktop-premium.1'
+                assert page.evaluate('initial.version') == expected_version
                 assert page.evaluate('initial.maxImportBytes') == 4*1024**3
                 page.evaluate("async()=>{await ensureAssistantReady();await agentCall('createProject',{name:'Paquete moderno · prueba aislada'});}")
                 assert page.evaluate('Agent.snapshot.tools.length') == 81

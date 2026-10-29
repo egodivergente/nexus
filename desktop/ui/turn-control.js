@@ -31,4 +31,8 @@ agentCall=function(op,args={}){
  if(Agent.cancelDraining)return Promise.reject(Error('Espera a que termine la operación ya enviada.'));
  return agentCallBeforeTurnControl(op,args);
 };
-setInterval(()=>{if(Agent.cancelDraining&&!Agent.callbacks.size){Agent.cancelDraining=false;if(view==='assistant'||view==='editor')renderAssistant();}},250);
+// Callback completion is already known by the event pump. Idle workspaces do
+// not need four timer wakeups per second just to discover that nothing changed.
+window.addEventListener('nexus:agent-callbacks-drained',()=>{
+ if(Agent.cancelDraining&&!Agent.callbacks.size){Agent.cancelDraining=false;if(view==='assistant'||view==='editor')renderAssistant();}
+});

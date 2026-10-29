@@ -12,7 +12,7 @@ import urllib.request
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from drive_sync import DriveSync, SCOPE
+from drive_sync import DriveSync, DriveAuthorizationRequired, SCOPE
 
 
 class Host:
@@ -94,6 +94,57 @@ class DriveSyncTest(unittest.TestCase):
         self.service.command({'op': 'disconnect'})
         self.assertEqual(original.read_bytes(), b'original-test-video')
         self.assertEqual(self.host.read_secret(self.service.secret_file), {'client_secret': 'test-only'})
+
+    def test_temporary_offline_does_not_invalidate_saved_authorization(self):
+        self.host.write_secret(self.service.secret_file, {'client_secret': 'test-only', 'refresh_token': 'test-refresh'})
+        with patch('drive_sync.urllib.request.urlopen', side_effect=urllib.error.URLError('offline')):
+            self.service.run()
+            with self.service.lock:
+                pass
+        self.assertEqual(self.service.public()['state'], 'retry')
+        self.assertTrue(self.service.public()['connected'])
+        self.assertEqual(self.host.read_secret(self.service.secret_file)['refresh_token'], 'test-refresh')
+
+    def test_revoked_token_requests_reauthorization(self):
+        rejected = urllib.error.HTTPError('https://oauth2.googleapis.com/token', 400, 'Bad request', {}, io.BytesIO(b'{"error":"invalid_grant"}'))
+        with patch('drive_sync.urllib.request.urlopen', side_effect=rejected):
+            with self.assertRaises(DriveAuthorizationRequired):
+                self.service._token_request({'grant_type': 'refresh_token'})
+
+    def test_last_success_survives_restart_but_is_cleared_on_disconnect(self):
+        self.service.activity = {'lastSuccessAt': 1234567890000, 'lastCompletedAt': 1234567890000}
+        self.service.activity_file.write_text(json.dumps(self.service.activity))
+        restarted = DriveSync(self.host, start_scheduler=False)
+        self.assertEqual(restarted.public()['lastSuccessAt'], 1234567890000)
+        restarted.command({'op': 'disconnect'})
+        self.assertNotIn('lastSuccessAt', restarted.public())
+        self.assertFalse(restarted.activity_file.exists())
+
+    def test_activity_file_never_reexports_unrecognized_fields(self):
+        self.service.activity_file.write_text(json.dumps({'lastSuccessAt': 123, 'access_token': 'do-not-export'}))
+        restarted = DriveSync(self.host, start_scheduler=False)
+        self.assertNotIn('do-not-export', json.dumps(restarted.public()))
+
+    def test_restart_exposes_saved_conflicts_without_a_network_request(self):
+        self.service.config_file.write_text(json.dumps({'folderId': 'workspace-one'}))
+        folder = self.service.root / 'workspaces' / 'workspace-one'
+        folder.mkdir(parents=True)
+        conflicts = [{'key': 'projects:one', 'versions': [{'id': 'r1', 'value': {'name': 'One'}}]}]
+        (folder / 'conflicts.json').write_text(json.dumps(conflicts))
+        with patch('drive_sync.urllib.request.urlopen', side_effect=AssertionError('No network on hydration')):
+            restarted = DriveSync(self.host, start_scheduler=False)
+        self.assertEqual(restarted.public()['state'], 'conflicts')
+        self.assertTrue(restarted.public()['historical'])
+        self.assertEqual(restarted.public()['conflicts'], conflicts)
+        restarted.status = {'state': 'syncing'}
+        self.assertEqual(restarted.public()['conflicts'], conflicts)
+
+    def test_restart_labels_previous_missing_originals_as_historical(self):
+        self.service.activity_file.write_text(json.dumps({'lastCompletedAt': 1234567890000, 'lastMissingMedia': 104}))
+        restarted = DriveSync(self.host, start_scheduler=False)
+        self.assertEqual(restarted.public()['state'], 'partial')
+        self.assertTrue(restarted.public()['historical'])
+        self.assertEqual(restarted.public()['missingMedia'], 104)
 
     def test_effective_connection_checks_account_folder_and_commits_without_exposing_tokens(self):
         self.service.config['folderId'] = 'folder-one'

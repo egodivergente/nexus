@@ -140,7 +140,7 @@
  }
  const balanceObserver=new MutationObserver(()=>{balanceObserver.disconnect();balances();balanceObserver.observe(document.querySelector('main'),{childList:true,subtree:true});});
  balanceObserver.observe(document.querySelector('main'),{childList:true,subtree:true});
- setInterval(balances,5000);
+ setInterval(()=>{if(!document.hidden)balances();},5000);
  document.addEventListener('click',async e=>{
   const b=e.target.closest('button'),visual=e.target.closest('.gallery-media');
   if(!b&&visual&&!e.target.closest('audio'))return showViewer(visual.closest('[data-job]').dataset.job);

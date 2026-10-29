@@ -27,6 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
+DESKTOP_VERSION = '2026.10.29-desktop-premium.1'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -475,7 +476,7 @@ def dispatch(keys, operation, args):
         if flow_models and not OFFLINE_QA:
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
-                'version': '2026.10.26-desktop-modern.2', 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
+                'version': DESKTOP_VERSION, 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
                 'desktopParity': 'integrated-20261026', 'reviewedAndroidSource': '3b6082cecde9fe37c3bc4b642f7c9114dc62bdaf',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
@@ -733,23 +734,19 @@ def is_same_installation_root(previous, current_root=ROOT):
         return False
 
 
-def _stop_foreign_host(previous):
+def existing_host_url(previous):
+    """Reuse a healthy instance without terminating its agent, exports or sync."""
     try:
-        prev_pid = int(previous.get('pid') or 0)
-    except (TypeError, ValueError):
-        return
-    if prev_pid <= 0 or prev_pid == os.getpid():
-        return
-    cmd = (
-        f'$p = Get-CimInstance Win32_Process -Filter "ProcessId = {prev_pid}" -ErrorAction SilentlyContinue; '
-        f'if ($p -and ($p.CommandLine -like "*local_host.py*")) {{ Stop-Process -Id {prev_pid} -Force -ErrorAction SilentlyContinue }}'
-    )
-    subprocess.run(
-        ['powershell', '-NoProfile', '-Command', cmd],
-        capture_output=True,
-        timeout=10,
-        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
-    )
+        port = int(previous.get('port') or 0)
+        if not 1 <= port <= 65535:
+            return None
+        url = f'http://127.0.0.1:{port}/'
+        with urllib.request.urlopen(url + 'health', timeout=0.5) as answer:
+            if answer.read(128) == b'{"app":"Nexus Studio"}':
+                return url
+    except (OSError, ValueError, TypeError, urllib.error.URLError):
+        pass
+    return None
 
 
 def main():
@@ -807,7 +804,13 @@ def main():
                         options.port = int(previous['port'])
                     except (TypeError, ValueError):
                         pass
-                _stop_foreign_host(previous)
+                # A different installed edition may still own a live workspace.
+                # Opening it preserves in-flight work; the new edition takes over
+                # on its next launch after that instance has been closed.
+                previous_url = existing_host_url(previous)
+                if previous_url:
+                    open_window(previous_url)
+                    return
                 for _ in range(30):
                     time.sleep(0.15)
                     candidate = kernel.CreateMutexW(None, True, mutex_name)
@@ -847,7 +850,7 @@ def run_server(options):
         agent_host()  # Resume configured background sync even before opening Agent/Settings.
     url = f'http://127.0.0.1:{server.server_port}/'
     SESSION_FILE.write_text(
-        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': '2026.10.26-desktop-modern.2'}),
+        json.dumps({'pid': os.getpid(), 'port': server.server_port, 'root': str(ROOT.resolve()), 'version': DESKTOP_VERSION}),
         encoding='utf-8',
     )
     if options.headless:
@@ -871,9 +874,13 @@ def open_window(url):
     if edge:
         profile = DATA / 'EdgeProfile'
         profile.mkdir(parents=True, exist_ok=True)
+        area = wintypes.RECT()
+        size = (1280, 720)
+        if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(area), 0):
+            size = (min(1280, area.right-area.left), min(840, area.bottom-area.top))
         subprocess.Popen([edge, '--app=' + url, '--user-data-dir=' + str(profile),
-                          '--no-first-run', '--no-default-browser-check', '--force-dark-mode',
-                          '--window-size=1280,840'],
+                          '--no-first-run', '--no-default-browser-check',
+                          f'--window-size={size[0]},{size[1]}'],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         os.startfile(url)

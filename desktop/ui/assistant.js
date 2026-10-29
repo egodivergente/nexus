@@ -109,7 +109,7 @@ async function agentCall(op,args={}) {
    if(Agent.callbacks.has(request.id))continue;Agent.callbacks.add(request.id);
    try{const value=await agentCallback(request.op,request.args);await rpc('agentReply',{owner:Agent.owner,id:request.id,ok:true,value});}
    catch(error){await rpc('agentReply',{owner:Agent.owner,id:request.id,ok:false,error:error.message});}
-   finally{Agent.callbacks.delete(request.id);}
+   finally{Agent.callbacks.delete(request.id);if(!Agent.callbacks.size)window.dispatchEvent(new CustomEvent('nexus:agent-callbacks-drained'));}
   }}catch(error){console.error('Agent bridge:',error.message);}finally{processing=false;}
  };
  const interval=setInterval(pump,180);

@@ -16,6 +16,10 @@ from native_operations import atomic_json
 SCOPE = 'https://www.googleapis.com/auth/drive.file'
 
 
+class DriveAuthorizationRequired(ValueError):
+    """A rejected/revoked authorization, as distinct from a temporary network error."""
+
+
 class DriveSync:
     def __init__(self, host, start_scheduler=True):
         self.host = host
@@ -27,6 +31,32 @@ class DriveSync:
         self.lock = threading.Lock()
         self.auth_lock = threading.Lock()
         self.status = {'state': 'idle'}
+        self.activity_file = self.root / 'activity.json'
+        try:
+            activity = json.loads(self.activity_file.read_text('utf-8'))
+            self.activity = {key: value for key, value in activity.items()
+                             if key in {'lastCompletedAt', 'lastSuccessAt', 'lastMissingMedia'} and isinstance(value, (int, float))}
+        except (OSError, ValueError, AttributeError):
+            self.activity = {}
+        self.conflicts = []
+        try:
+            folder = str(self.config.get('folderId', ''))
+            workspace = (self.root / 'workspaces' / folder).resolve()
+            conflicts_file = workspace / 'conflicts.json'
+            if folder and workspace.is_relative_to((self.root / 'workspaces').resolve()) and conflicts_file.stat().st_size <= 16_777_216:
+                rows = json.loads(conflicts_file.read_text('utf-8'))
+                if isinstance(rows, list) and all(isinstance(row, dict) and isinstance(row.get('key'), str)
+                        and isinstance(row.get('versions'), list) and all(isinstance(version, dict)
+                        and isinstance(version.get('id'), str) for version in row['versions']) for row in rows):
+                    self.conflicts = rows
+        except (OSError, ValueError):
+            pass
+        if self.conflicts:
+            self.status = {'state': 'conflicts', 'historical': True,
+                           'message': 'Hay versiones conservadas del último intercambio para revisar.'}
+        elif self.activity.get('lastMissingMedia', 0) > 0:
+            self.status = {'state': 'partial', 'historical': True,
+                           'message': 'El último intercambio dejó originales pendientes de recuperar.'}
         self.failed_media = {}
         self.closed = threading.Event()
         if start_scheduler:
@@ -39,9 +69,11 @@ class DriveSync:
 
     def public(self):
         connected = bool(self.host.read_secret(self.secret_file).get('refresh_token'))
-        return {**self.status, 'connected': connected, 'configured': bool(self.config.get('client_id')),
+        return {**self.status, **self.activity, 'busy': self.lock.locked(),
+                'connected': connected, 'configured': bool(self.config.get('client_id')),
                 'enabled': self.config.get('enabled', False), 'folderId': self.config.get('folderId'),
-                'conflicts': self.status.get('conflicts', [])}
+                'missingMedia': self.status.get('missingMedia', self.activity.get('lastMissingMedia', 0)),
+                'conflicts': self.status.get('conflicts', self.conflicts)}
 
     def command(self, args):
         op = args.get('op', 'status')
@@ -77,6 +109,9 @@ class DriveSync:
             self.host.write_secret(self.secret_file, {k: v for k, v in secret.items() if k == 'client_secret'})
             self.config.update(enabled=False, folderId=None)
             atomic_json(self.config_file, self.config)
+            self.activity.clear()
+            self.conflicts.clear()
+            self.activity_file.unlink(missing_ok=True)
             self.status = {'state': 'idle'}
         elif op == 'enabled':
             self.config['enabled'] = args.get('enabled') is True
@@ -129,10 +164,18 @@ class DriveSync:
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 result = json.load(response)
-        except Exception:
-            raise ValueError('Google no ha renovado la autorización. Vuelve a conectar Drive.') from None
+        except urllib.error.HTTPError as error:
+            try:
+                reason = json.loads(error.read(8192)).get('error')
+            except (ValueError, AttributeError, OSError):
+                reason = None
+            if error.code in {400, 401} and isinstance(reason, str) and reason in {'invalid_grant', 'invalid_client', 'unauthorized_client', 'access_denied'}:
+                raise DriveAuthorizationRequired('Google no ha renovado la autorización. Vuelve a conectar Drive.') from None
+            raise RuntimeError('Google Drive no está disponible. Se reintentará la conexión.') from None
+        except (OSError, ValueError):
+            raise RuntimeError('No se pudo conectar con Google Drive. Se reintentará la conexión.') from None
         if not result.get('access_token'):
-            raise ValueError('Google no devolvió la autorización de Drive.')
+            raise DriveAuthorizationRequired('Google no devolvió la autorización de Drive.')
         return result
 
     def token(self):
@@ -141,7 +184,7 @@ class DriveSync:
             if secret.get('expires_at', 0) > time.time() + 60:
                 return secret['access_token']
             if not secret.get('refresh_token'):
-                raise ValueError('Conecta Google Drive desde Ajustes.')
+                raise DriveAuthorizationRequired('Conecta Google Drive desde Ajustes.')
             result = self._token_request({'grant_type': 'refresh_token', 'refresh_token': secret['refresh_token'],
                                          'client_id': self.config['client_id'], 'client_secret': secret['client_secret']})
             secret.update(result, expires_at=time.time() + result.get('expires_in', 3600))
@@ -220,6 +263,7 @@ class DriveSync:
     def run(self, resolution=None):
         if not self.lock.acquire(False):
             return
+        self.status = {'state': 'queued', 'lastAttemptAt': int(time.time() * 1000)}
         def work():
             try:
                 token = self.token()
@@ -266,12 +310,19 @@ class DriveSync:
                     self.config['folderId'] = result['rootId']
                     atomic_json(self.config_file, self.config)
                     self.status = result
+                    self.conflicts = result.get('conflicts', [])
+                    if result.get('state') in {'synced', 'partial', 'conflicts'}:
+                        self.activity['lastCompletedAt'] = int(time.time() * 1000)
+                        self.activity['lastMissingMedia'] = max(0, int(result.get('missingMedia', 0)))
+                        if result['state'] == 'synced':
+                            self.activity['lastSuccessAt'] = self.activity['lastCompletedAt']
+                        atomic_json(self.activity_file, self.activity)
                 finally:
                     self.host.lock.release()
             except Exception as error:
                 # Provider URLs, OAuth responses and credentials never become UI diagnostics.
-                authorization = str(error) in {'Vuelve a conectar Google Drive.', 'Conecta Google Drive desde Ajustes.',
-                    'Google no ha renovado la autorización. Vuelve a conectar Drive.'}
+                authorization = isinstance(error, DriveAuthorizationRequired) or str(error) in {
+                    'Vuelve a conectar Google Drive.', 'Conecta Google Drive desde Ajustes.'}
                 self.status = {'state': 'authorization_required' if authorization else 'retry',
                     'message': 'Vuelve a conectar Google Drive.' if authorization else 'No se ha completado la sincronización. Se reintentará sin borrar datos.'}
             finally:

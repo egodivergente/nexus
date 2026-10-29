@@ -61,6 +61,26 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             peer.command({'op': 'configure', 'address': 'http://100.72.111.97:8797\nhttps://user:password@example.invalid'})
 
+    def test_manual_sync_explains_paused_or_incomplete_pairing(self):
+        peer = self.peer('manual')
+        peer.config['enabled'] = False
+        with self.assertRaisesRegex(ValueError, 'Activa la vinculación'):
+            peer.command({'op': 'run'})
+        peer.config['enabled'] = True
+        with self.assertRaisesRegex(ValueError, 'Completa la vinculación'):
+            peer.command({'op': 'run'})
+        peer.config.update(peers=['http://127.0.0.1:8795'], address='http://127.0.0.1:8797')
+        result = peer.command({'op': 'run'})
+        self.assertEqual(result['status'], 'Intercambio pendiente')
+        self.assertTrue(peer.wake.is_set())
+
+    def test_last_success_survives_restart_without_exposing_activity_fields(self):
+        peer = self.peer('activity')
+        peer.activity_file.write_text(json.dumps({'lastSuccessAt': 1234567890000, 'key': 'do-not-export'}))
+        restarted = DeviceContinuity(peer.host, start=False)
+        self.assertEqual(restarted.public()['lastSuccessAt'], 1234567890000)
+        self.assertNotIn('do-not-export', json.dumps(restarted.public()))
+
     def test_return_route_rejection_falls_back_without_failing_the_peer(self):
         peer = self.peer('route-fallback')
         peer.config['address'] = 'http://100.72.111.97:8797\nhttp://192.168.1.147:8797'

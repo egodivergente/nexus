@@ -5,7 +5,7 @@
    confirmation and the dispatch paths stay exactly as they were. Nothing here sends a request. */
 (()=>{
 if(window.NexusTen||typeof render!=='function')return;
-const T={version:'10.0',intent:'',filtersOpen:false,frame:0,lastView:null};
+const T={version:'10.0',intent:'',filtersOpen:false,frame:0,lastView:null,observer:null};
 const has=(m,c)=>(m.capabilities||[]).includes(c);
 const words=m=>[m.id,m.displayName,m.modelFamily,m.family,m.providerModelId].join(' ');
 const svg=(body,extra='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${body}</svg>`;
@@ -55,6 +55,9 @@ function header(){
  const primary=actions.querySelector('.nx-header-primary');
  if(wantsPrimary&&!primary)actions.insertAdjacentHTML('afterbegin',`<button type="button" class="primary nx-header-primary" data-nav="canvas">${glyph.plus}<span>Crear</span></button>`);
  else if(!wantsPrimary&&primary)primary.remove();
+ const wantsContinuity=['library','assistant'].includes(view),continuity=actions.querySelector('#continuity-shortcut');
+ if(wantsContinuity&&!continuity)actions.insertAdjacentHTML('beforeend',`<button type="button" id="continuity-shortcut" data-continuity-open title="Continuar en otro dispositivo" aria-label="Continuar en otro dispositivo">${svg('<rect x="3" y="4" width="12" height="9" rx="1.5"/><path d="M6 17h6M9 13v4"/><rect x="17" y="8" width="4" height="11" rx="1"/>')}<span>Dispositivos</span></button>`);
+ else if(!wantsContinuity&&continuity)continuity.remove();
  if(!actions.querySelector('#nx-tools')){
   actions.insertAdjacentHTML('beforeend',`<details id="nx-tools" class="nx-menu nx-tools"><summary title="Herramientas locales">${glyph.tools}<span>Herramientas</span></summary><div class="nx-menu-panel" role="group" aria-label="Herramientas locales">${TOOLS.map(([id,label,hint])=>`<button type="button" class="nx-menu-item" data-parity="${id}"><strong>${label}</strong><small>${hint}</small></button>`).join('')}</div></details>`);
  }
@@ -68,7 +71,9 @@ function sidebar(){
   const label=b.querySelector('.creative-nav-label');if(label)setText(label,'Crear');
   if(b.getAttribute('aria-label')!=='Crear')b.setAttribute('aria-label','Crear');
   if(b.title!=='Crear')b.title='Crear';
-  if(b.dataset.creativeLabel!=='Crear')b.dataset.creativeLabel='Crear';
+  // CreativeEngine uses this marker to know that it has wrapped the label.
+  // Marking a fresh base-shell button early leaves bare clipped text on resize.
+  if(label&&b.dataset.creativeLabel!=='Crear')b.dataset.creativeLabel='Crear';
  });
 }
 
@@ -376,7 +381,7 @@ function library(){
 }
 
 /* ---------- Ajustes: categories and aligned rows ---------- */
-const SECTIONS=[['appearance','Apariencia','Tema, tamaño del texto y moneda'],['providers','Proveedores','Conexiones y saldos de cada servicio'],['agent','Agente','Modelo conversacional y herramientas'],['data','Datos','Lo que se guarda en este equipo'],['about','Acerca de','Versión y ayuda']];
+const SECTIONS=[['appearance','Apariencia','Tema, tamaño del texto y moneda'],['providers','Proveedores','Conexiones y saldos de cada servicio'],['agent','Agente','Modelo conversacional y herramientas'],['continuity','Dispositivos','Proyectos, galería y continuidad con Nexus Agent'],['data','Datos','Lo que se guarda en este equipo'],['about','Acerca de','Versión y ayuda']];
 const AGENT_ROWS={settings:['Modelo y conexión','El modelo conversacional y cómo se conecta: Bedrock directo o proxy.','Configurar'],whisper:['Edición y Whisper','Edición local de vídeo y audio y transcripción en este PC.','Abrir'],internet:['Internet y herramientas MCP','Búsqueda web y conexiones MCP que el agente puede usar.','Gestionar'],diagnostics:['Diagnóstico del sistema','Estado de los servicios locales y de las conexiones.','Ver diagnóstico']};
 const rowMarkup=(title,detail='')=>`<div class="nx-row"><div class="nx-row-text"><strong>${title}</strong>${detail?`<small>${detail}</small>`:''}</div><div class="nx-row-controls"></div></div>`;
 function makeRow(title,detail,...controls){const holder=document.createElement('div');holder.innerHTML=rowMarkup(title,detail);const r=holder.firstElementChild;r.lastElementChild.append(...controls.filter(Boolean));return r;}
@@ -400,6 +405,7 @@ function settings(){
  if(!loose.length)return;
  const rows=id=>shell.querySelector(`#nx-settings-${id} .nx-rows`),originals=shell.querySelector('.nx-settings-originals');
  for(const node of loose){
+  if(node.id==='continuity-hub'){rows('continuity').append(node);continue;}
   if(node.querySelector('.account')){
    node.querySelectorAll('.account').forEach(account=>{
     account.classList.add('nx-row','nx-account');
@@ -432,17 +438,18 @@ function settings(){
 /* ---------- Global wiring ---------- */
 function versionNoise(){document.querySelectorAll('.brand .nx-version-badge,#studio-start-guide .nx-version-badge').forEach(n=>n.remove());}
 function enhance(){
- T.frame=0;
+ T.frame=0;T.observer?.disconnect();
  try{
   document.body.classList.add('nx-ten');
   if(document.body.dataset.tenView!==view)document.body.dataset.tenView=view;
   if(T.lastView!==view){T.lastView=view;document.querySelectorAll('.nx-menu[open]').forEach(d=>{d.open=false;});}
   header();sidebar();versionNoise();create();catalog();assistant();history();library();settings();
  }catch(error){console.warn('Nexus 10:',error);}
+ finally{T.observer?.observe(document.body,{childList:true,subtree:true});}
 }
 function schedule(){if(!T.frame)T.frame=requestAnimationFrame(enhance);}
 const renderBefore=render;render=function(){renderBefore();enhance();};
-new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});
+T.observer=new MutationObserver(schedule);T.observer.observe(document.body,{childList:true,subtree:true});
 window.addEventListener('nexus:canvas-status',schedule);
 
 const closeMenu=d=>{d.open=false;if(d.classList.contains('nx-filter-menu'))T.filtersOpen=false;};

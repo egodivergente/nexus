@@ -55,6 +55,9 @@ async function corteRefresh(){
  if(r.revision!==Corte.snapshot?.revision||JSON.stringify(r.missing_media)!==JSON.stringify(Corte.snapshot?.missing_media)){Corte.snapshot=r;Corte.selected=new Set(r.selection);Corte.playhead=r.playhead_us;if(view==='editor')renderCorteTimeline();}
 }
 function renderCorte(){
+ // Project/assistant initialization can complete after navigation has changed.
+ // A late editor render must never replace the current workspace or its draft.
+ if(view!=='editor')return;
  const content=$('#content');content.classList.remove('agent-view','canvas-view');content.classList.add('corte-view');
  const projects=(Agent.snapshot?.index.projects||[]).filter(p=>!p.archived);
  content.innerHTML=`<div class="corte-top"><div class="corte-project-group"><span class="corte-kicker">PROYECTO</span><select id="corte-project" aria-label="Proyecto Nexus"><option value="">Selecciona un proyecto</option>${projects.map(p=>`<option value="${escape(p.id)}" ${Corte.projectId===p.id?'selected':''}>${escape(p.name)}</option>`).join('')}</select><button data-corte="new" class="corte-icon-button" title="Nuevo proyecto" aria-label="Nuevo proyecto">${corteGlyph('plus')}</button></div><span id="corte-revision" role="status"></span><div class="corte-panel-switches" role="group" aria-label="Paneles del espacio de trabajo"><button data-corte="media" aria-controls="corte-media" title="Mostrar u ocultar medios" aria-pressed="true">${corteGlyph('media')}<span>Medios</span></button><button data-corte="chat" aria-controls="corte-chat" title="Mostrar u ocultar agente" aria-pressed="true">${corteGlyph('chat')}<span>Agente</span></button><button data-corte="focus" class="corte-icon-button" title="Vista de enfoque" aria-label="Vista de enfoque" aria-pressed="false">${corteGlyph('focus')}</button></div><button data-corte="export" class="primary">${corteGlyph('export')}Exportar vídeo</button></div>
@@ -65,7 +68,7 @@ function renderCorte(){
  renderCorteTimeline();renderCorteAssets();renderAssistant();corteApplyPanels();
  const video=$('#corte-video');video.addEventListener('timeupdate',()=>{Corte.playhead=Math.round(video.currentTime*1e6);corteTimecode();const line=$('.corte-playhead');if(line)line.style.left=(100+Corte.playhead/1e6*Corte.zoom)+'px';});
  if(Corte.loaded&&Agent.snapshot?.projectId&&Agent.snapshot.projectId!==Corte.projectId&&!Corte.loading){Corte.loading=true;corteOpen(Agent.snapshot.projectId).catch(e=>toast(e.message)).finally(()=>Corte.loading=false);return;}
- if(!Corte.loaded&&!Corte.loading){Corte.loading=true;ensureAssistantReady().then(()=>{const id=Agent.snapshot.projectId;if(id)return corteOpen(id);renderCorte();}).catch(e=>toast(e.message)).finally(()=>Corte.loading=false);}
+ if(!Corte.loaded&&!Corte.loading){Corte.loading=true;ensureAssistantReady().then(()=>{if(view!=='editor')return;const id=Agent.snapshot.projectId;if(id)return corteOpen(id);renderCorte();}).catch(e=>toast(e.message)).finally(()=>Corte.loading=false);}
 }
 function renderCorteTimeline(){
  const timeline=$('#corte-timeline');if(!timeline)return;

@@ -11,7 +11,11 @@
  function selected(){const old={graphite:'aurora',amber:'quartz',carbon:'aurora'};return themes.find(t=>t.id===(old[state.interfaceTheme]||state.interfaceTheme))||themes.find(t=>t.id===(state.theme==='oled'?'oled':'aurora'));}
  function apply(){
   const t=selected(),body=document.body;body.dataset.interfaceTheme=t.id;body.style.setProperty('--danger',t.id==='light'?'#9C3E42':'#E6A5AA');body.style.setProperty('--error-container',t.id==='light'?'#F7DEDF':'#35262B');
-  for(const [key,value] of Object.entries({bg:t.bg,panel:t.panel,surface:t.raised,line:t.border,border:t.border,text:t.text,muted:t.muted,accent:t.accent,'nx-bg':t.bg,'nx-sidebar':t.sidebar,'nx-panel':t.panel,'nx-raised':t.raised,'nx-border':t.border,'nx-text':t.text,'nx-muted':t.muted,'nx-soft':t.muted,'surface-0':t.bg,'surface-1':t.panel,'surface-2':t.raised,'surface-3':t.raised,'surface-4':t.border}))body.style.setProperty('--'+key,value);
+  body.style.colorScheme=t.id==='light'?'light':'dark';
+  for(const [key,value] of Object.entries({bg:t.bg,panel:t.panel,surface:t.raised,line:t.border,text:t.text,muted:t.muted,accent:t.accent}))body.style.setProperty('--'+key,value);
+  // Existing screens consume aliases of one palette, so native controls and
+  // nested panels change theme together instead of retaining stale colours.
+  for(const [key,value] of Object.entries({border:'line','nx-bg':'bg','nx-sidebar':'bg','nx-panel':'panel','nx-raised':'surface','nx-border':'line','nx-text':'text','nx-muted':'muted','nx-soft':'muted','surface-0':'bg','surface-1':'panel','surface-2':'surface','surface-3':'surface','surface-4':'line'}))body.style.setProperty('--'+key,`var(--${value})`);
  }
  function markup(){return `<h2>Temas</h2><div class="interface-themes" role="group" aria-label="Tema de la interfaz">${themes.map(t=>`<button type="button" data-interface-theme="${t.id}" aria-pressed="${selected().id===t.id}" style="--swatch-bg:${t.bg};--swatch-panel:${t.raised};--swatch-accent:${t.accent}"><span class="theme-preview" aria-hidden="true"><i></i><i></i><i></i></span><span>${t.name}</span><span class="theme-selected" aria-hidden="true">✓</span></button>`).join('')}</div>`;}
  document.addEventListener('click',e=>{
