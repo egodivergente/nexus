@@ -59,7 +59,7 @@ import java.util.Date
         if(embedded) content() else Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {content()}
     }
     val projectRow: @Composable (com.vidadomu.nexus.agent.core.assets.Project) -> Unit = {project ->
-        val accent=listOf(Color(0xFF68DFE0),Color(0xFFAA8DFA),Color(0xFFF4BD6C),Color(0xFFEF8E9D))[Math.floorMod(project.id.hashCode(),4)]
+        val accent=listOf(MaterialTheme.colorScheme.primary,MaterialTheme.colorScheme.secondary,MaterialTheme.colorScheme.tertiary,MaterialTheme.colorScheme.onSurfaceVariant)[Math.floorMod(project.id.hashCode(),4)]
         val isPinned=project.id in pinned
         // One compact row for every project: same radius, tone and edge; the colour bar is the only per-project mark.
         Surface(shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerLow,

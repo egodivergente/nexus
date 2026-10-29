@@ -232,34 +232,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     }
     if(syncOpen) DeviceSyncSettings {syncOpen=false}
     if(assistantSettingsOpen && assistantViewModel != null) com.vidadomu.nexus.assistant.AssistantSettingsSheetHost(assistantViewModel) {assistantSettingsOpen=false}
-    if(appearanceOpen) NexusSheet("Apariencia", {appearanceOpen=false}, icon=Icons.Default.Palette) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-            NexusSheetGroup("Tema", Icons.Default.Palette) {
-            NexusAppearance.entries.forEach {option->
-                val preview = remember(option) { palette(option) }
-                Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={val changed=selectedTheme!=option;appearance.setTheme(option);haptics.perform(NexusHapticEvent.SELECTION,changed=changed)})
-                    .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
-                    RadioButton(selectedTheme==option,null)
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                        Text(option.label,style=MaterialTheme.typography.bodyLarge)
-                        Text(option.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
-                        Surface(shape=NexusTokens.field,color=preview.background) {
-                            Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space8,vertical=NexusTokens.space4),
-                                verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                                Surface(shape=NexusTokens.thumbnail,color=preview.surface,modifier=Modifier.size(22.dp)) {}
-                                Surface(shape=NexusTokens.thumbnail,color=preview.primary,modifier=Modifier.size(22.dp)) {}
-                                Text("Aa",style=MaterialTheme.typography.labelMedium,color=preview.onBackground)
-                                Spacer(Modifier.weight(1f))
-                                Text("Vista previa",style=MaterialTheme.typography.labelSmall,color=preview.onBackground.copy(alpha=.72f))
-                            }
-                        }
-                    }
-                }
-            }
-            TextButton(onClick={appearance.setTheme(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado",color=TextSecondary)}
-            }
-        }
-    }
+    if(appearanceOpen) PremiumAppearancePicker(appearance,onDismiss={appearanceOpen=false})
     if(currencyOpen) NexusSheet("Moneda", {currencyOpen=false}, icon=Icons.Default.CurrencyExchange) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             NexusSheetGroup("Preferencia de moneda", Icons.Default.CurrencyExchange) {
@@ -445,20 +418,27 @@ private fun ProviderCredentialCard(
         })
     }
 }
-private enum class SettingsPage(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tint: androidx.compose.ui.graphics.Color) {
-    CATALOG("Catálogo y workflows", Icons.Default.GridView, androidx.compose.ui.graphics.Color(0xFF68DFE0)),
-    CONNECTIONS("Conexiones", Icons.Default.Cable, androidx.compose.ui.graphics.Color(0xFF34D399)),
-    AUTOMATION("Automatización", Icons.Default.PlayCircleOutline, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
-    SECURITY("Seguridad", Icons.Default.Security, androidx.compose.ui.graphics.Color(0xFFFBBF24)),
-    VISUAL("Fondo, movimiento y háptica", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
-    RULES("Reglas y límites", Icons.Default.Tune, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
-    PROJECTS("Proyectos y conversaciones", Icons.Default.FolderOpen, androidx.compose.ui.graphics.Color(0xFF34D399)),
-    APPEARANCE("Personalización", Icons.Default.Palette, androidx.compose.ui.graphics.Color(0xFFA78BFA)),
-    BYTEPLUS("Consumo BytePlus", Icons.Default.AccountBalanceWallet, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
-    AGENT("Agentes y memoria", Icons.Default.AutoAwesome, androidx.compose.ui.graphics.Color(0xFF4EBAE8)),
-    PROVIDERS("Proveedores de generación", Icons.Default.CloudQueue, androidx.compose.ui.graphics.Color(0xFF34D399)),
-    CUSTOM("Generadores propios", Icons.Default.Extension, androidx.compose.ui.graphics.Color(0xFFFBBF24)),
-    SYSTEM("Sistema y diagnóstico", Icons.Default.Settings, androidx.compose.ui.graphics.Color(0xFF94A3B8)),
+private enum class SettingsPage(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    CATALOG("Catálogo y workflows", Icons.Default.GridView),
+    CONNECTIONS("Conexiones", Icons.Default.Cable),
+    AUTOMATION("Automatización", Icons.Default.PlayCircleOutline),
+    SECURITY("Seguridad", Icons.Default.Security),
+    VISUAL("Fondo, movimiento y háptica", Icons.Default.Palette),
+    RULES("Reglas y límites", Icons.Default.Tune),
+    PROJECTS("Proyectos y conversaciones", Icons.Default.FolderOpen),
+    APPEARANCE("Personalización", Icons.Default.Palette),
+    BYTEPLUS("Consumo BytePlus", Icons.Default.AccountBalanceWallet),
+    AGENT("Agentes y memoria", Icons.Default.AutoAwesome),
+    PROVIDERS("Proveedores de generación", Icons.Default.CloudQueue),
+    CUSTOM("Generadores propios", Icons.Default.Extension),
+    SYSTEM("Sistema y diagnóstico", Icons.Default.Settings);
+
+    val tint:androidx.compose.ui.graphics.Color @Composable get() = when(this) {
+        AUTOMATION,VISUAL,APPEARANCE -> MaterialTheme.colorScheme.secondary
+        SECURITY,CUSTOM -> MaterialTheme.colorScheme.tertiary
+        SYSTEM -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.primary
+    }
 }
 
 /** Fila de categoría de Ajustes: baldosa del color de su categoría, título y resumen de su estado. */

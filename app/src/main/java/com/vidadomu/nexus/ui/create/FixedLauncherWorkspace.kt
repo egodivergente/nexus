@@ -10,9 +10,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
-import kotlin.math.roundToInt
 
-/** Only editable text and real media previews consume spare space in the fixed workspace. */
+/** The main prompt stays compact; only real media previews consume spare space automatically. */
 internal data class LauncherContentSizing(val promptExtra:Dp=0.dp,val mediaExtra:Dp=0.dp,
     val reportMediaCapacity:(Dp)->Unit = {})
 internal val LocalLauncherContentSizing=staticCompositionLocalOf {LauncherContentSizing()}
@@ -46,10 +45,10 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
         val canExpand=measured && !fallback && !compactEditor
         val free=if(canExpand) (available-base).coerceAtLeast(0) else 0
         val capacity=with(density) {mediaCapacity.roundToPx()}
-        val mediaExtra=if(wide && canExpand) minOf(capacity,(available-chrome-rightBase).coerceAtLeast(0))
-            else minOf(capacity,if(promptVisible) (free*.60f).roundToInt() else free)
-        val promptExtra=if(!promptVisible || !canExpand) 0 else if(wide)
-            (available-chrome-leftBase).coerceAtLeast(0) else free-mediaExtra
+        val mediaExtra=if(!canExpand) 0 else minOf(capacity,
+            if(wide) (available-chrome-rightBase).coerceAtLeast(0) else free)
+        // Expanding the prompt is explicit in its editor sheet, never a consequence of an empty workspace.
+        val promptExtra=0
         val sizing=LauncherContentSizing(with(density) {promptExtra.toDp()},with(density) {mediaExtra.toDp()}) {
             if(mediaCapacity!=it) mediaCapacity=it
         }

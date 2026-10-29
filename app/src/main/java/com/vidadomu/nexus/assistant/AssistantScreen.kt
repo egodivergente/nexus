@@ -559,12 +559,7 @@ private fun EmptyHint() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
     ) {
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(id = com.vidadomu.nexus.R.drawable.nexus_logo),
-            contentDescription = "Logo oficial de NEXUS",
-            modifier = Modifier.sizeIn(maxWidth = 64.dp, maxHeight = 60.dp),
-            contentScale = ContentScale.Fit
-        )
+        com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(56.dp),contentDescription="Axel · Nexus")
         Text(
             text = "Las buenas ideas empiezan aquí.",
             style = MaterialTheme.typography.titleSmall,

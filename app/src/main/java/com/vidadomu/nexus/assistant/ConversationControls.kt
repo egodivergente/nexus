@@ -244,23 +244,9 @@ private fun drawerTitle(titles: ConversationTitles, chat: AssistantChatEntry): S
 /** Fast look-and-feel changes without leaving the chat. The full screen stays in Ajustes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun QuickAppearanceSheet(onDismiss: () -> Unit, onMoreSettings: () -> Unit) {
-    val appearance=com.vidadomu.nexus.ui.theme.rememberAppearancePreferences()
-    var theme by remember {mutableStateOf(appearance.theme())}
-    var scale by remember {mutableFloatStateOf(appearance.fontScale())}
-    ModalBottomSheet(onDismissRequest=onDismiss,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            Text("Apariencia",style=MaterialTheme.typography.titleLarge)
-            Text("Tema",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                items(com.vidadomu.nexus.ui.theme.NexusAppearance.entries.toList(),key={option -> option.name}) {option ->
-                    FilterChip(theme==option,{theme=option;appearance.setTheme(option)},label={Text(option.label)})
-                }
-            }
-            Text("Tamaño de letra · ${(scale*100).toInt()} %",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            Slider(scale,{scale=it},onValueChangeFinished={appearance.setFontScale(scale)},valueRange=.8f..1.4f)
-            TextButton(onClick={onDismiss();onMoreSettings()},contentPadding=PaddingValues(0.dp)) {Text("Más opciones: fondo, movimiento, háptica…")}
-        }
-    }
+    com.vidadomu.nexus.ui.settings.PremiumAppearancePicker(
+        appearance=com.vidadomu.nexus.ui.theme.rememberAppearancePreferences(),onDismiss=onDismiss,onMoreSettings=onMoreSettings)
+
 }
 
 

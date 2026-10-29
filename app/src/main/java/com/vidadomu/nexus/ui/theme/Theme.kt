@@ -37,17 +37,19 @@ private fun brandFont(resource: Int): FontFamily = FontFamily(
 )
 
 
+@Composable
+internal fun nexusThemeTypography(appearance:NexusAppearance):Typography = remember(appearance) {
+    val heading=if(appearance in setOf(NexusAppearance.QUARTZ,NexusAppearance.CHAMPAGNE)) FontFamily.Serif else brandFont(R.font.space_grotesk)
+    nexusTypography(heading,brandFont(R.font.manrope))
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NexusTheme(content: @Composable () -> Unit) {
     val preferences = rememberAppearancePreferences()
     val theme by preferences.themeState()
     val scheme = remember(theme) { palette(theme) }
-    val typography = remember(theme) {
-        val heading = if(theme==NexusAppearance.QUARTZ) FontFamily.Serif else brandFont(R.font.space_grotesk)
-        val body = brandFont(R.font.manrope)
-        nexusTypography(heading, body)
-    }
+    val typography = nexusThemeTypography(theme)
     val view=LocalView.current
     val imeVisible = WindowInsets.isImeVisible
     LaunchedEffect(imeVisible) {
@@ -59,8 +61,8 @@ fun NexusTheme(content: @Composable () -> Unit) {
             window.statusBarColor=Color.Transparent.toArgb()
             window.navigationBarColor=Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window,view).apply {
-                isAppearanceLightStatusBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
-                isAppearanceLightNavigationBars=theme in setOf(NexusAppearance.LIGHT, NexusAppearance.SAND, NexusAppearance.ROSE)
+                isAppearanceLightStatusBars=!NexusThemeSpecs.forAppearance(theme).isDark
+                isAppearanceLightNavigationBars=!NexusThemeSpecs.forAppearance(theme).isDark
             }
         }
     }
@@ -70,7 +72,8 @@ fun NexusTheme(content: @Composable () -> Unit) {
     val base = LocalDensity.current
     val density = remember(base, fontScale) { Density(base.density, base.fontScale * fontScale) }
     val decorativeMotion = rememberNexusMotionAllowed()
-    CompositionLocalProvider(LocalChromeColor provides chromeFor(theme), LocalDensity provides density,
+    CompositionLocalProvider(LocalNexusAppearance provides theme, LocalNexusVisuals provides NexusThemeSpecs.visuals(theme),
+        LocalChromeColor provides chromeFor(theme), LocalDensity provides density,
         LocalNexusDecorativeMotion provides decorativeMotion, androidx.compose.ui.platform.LocalHapticFeedback provides filteredHaptics) {
         MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusTokens.shapes) {
             Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {

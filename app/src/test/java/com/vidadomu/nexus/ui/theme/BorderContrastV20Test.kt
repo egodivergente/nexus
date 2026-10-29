@@ -19,9 +19,10 @@ class BorderContrastV20Test {
         assertTrue("$theme $name is $ratio:1, needs $minimum:1", ratio >= minimum)
     }
 
-    @Test fun coversTheEightExistingThemes() {
+    @Test fun preservesTheEightExistingThemesAndAddsFourPremiumIdentities() {
         assertEquals(listOf("AURORA", "OLED", "QUARTZ", "OCEAN", "FOREST", "SAND", "ROSE", "LIGHT"),
-            NexusAppearance.entries.map { it.name })
+            NexusAppearance.entries.take(8).map { it.name })
+        assertEquals(5,NexusAppearance.premiumThemes.size)
     }
 
     @Test fun essentialBorderIsOpaqueAndReachesThreeToOneOnEveryBackdrop() {

@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.horizontalScroll
@@ -45,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.LocalNexusVisuals
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import com.vidadomu.nexus.ui.theme.tabularMoney
 
@@ -105,60 +107,61 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     val clipboard = LocalClipboardManager.current
     var cleared by rememberSaveable { mutableStateOf<String?>(null) }
     val motion=rememberNexusMotionAllowed()
-    val tone by animateColorAsState(
-        if(focused) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
+    val visuals=LocalNexusVisuals.current
+    val borderColor by animateColorAsState(
+        if(focused) MaterialTheme.colorScheme.primary else visuals.promptBorder,
         tween(if(motion) NexusTokens.contentDuration else 0), label = "Prompt focus")
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
-    val workspaceExtra=if(initiallyExpanded) 0.dp else LocalLauncherContentSizing.current.promptExtra
-    Column(modifier.fillMaxWidth().clip(NexusTokens.prompt).background(tone)
-        .then(if(initiallyExpanded || (onExpand==null && workspaceExtra==0.dp)) Modifier.animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0)) else Modifier)) {
+    val toolbarTint=if(enabled) MaterialTheme.colorScheme.onSurfaceVariant else visuals.disabledText
+    Column(modifier.fillMaxWidth().clip(NexusTokens.prompt).background(visuals.promptSurface)
+        .border(if(focused) NexusTokens.divider*2 else NexusTokens.divider,borderColor,NexusTokens.prompt)
+        .then(if(initiallyExpanded || onExpand==null) Modifier.animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0)) else Modifier)) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .bringIntoViewRequester(bringPromptIntoView)
             .onFocusChanged { focused = it.isFocused;onEditorFocusChanged(it.isFocused) }
             .semantics { contentDescription = "Prompt de creación" }
-            .then(if(!expanded && workspaceExtra>0.dp) Modifier.height(72.dp+workspaceExtra)
-                else Modifier.heightIn(min = if(expanded) 176.dp else 72.dp))
+            .heightIn(min = if(expanded) 176.dp else 72.dp)
             .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             // Collapsed editor stays around 120–128 dp including its toolbar. Text scrolls; no text is discarded.
-            enabled = enabled, minLines = 2, maxLines = if(!expanded && workspaceExtra>0.dp) Int.MAX_VALUE else if(expanded) 18 else 3,
+            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 3,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        color = visuals.placeholder)
                     field()
                 }
             })
         val rules by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
         val warning=rules.value("prompt.softWarning",ruleScope).toLongOrNull() ?: 0
-        if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary)
+        if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=visuals.warning)
         rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space4, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().background(visuals.chromeSurface).padding(start = NexusTokens.space4, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
             com.vidadomu.nexus.ui.components.NexusHintedIconButton("Pegar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled,onClick={
                 val pasted=clipboard.getText()?.text
                 if(!pasted.isNullOrEmpty() && pasted!=value) {onValueChange(pasted);feedback.perform(NexusHapticEvent.SELECTION)}
-            }) {Icon(Icons.Default.ContentPaste,"Pegar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+            }) {Icon(Icons.Default.ContentPaste,"Pegar prompt",Modifier.size(NexusTokens.iconSmall),tint=toolbarTint)}
             com.vidadomu.nexus.ui.components.NexusHintedIconButton("Borrar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled && value.isNotEmpty(),onClick={
                 cleared=value;onValueChange("");feedback.perform(NexusHapticEvent.SELECTION)
-            }) {Icon(Icons.Default.Close,"Borrar prompt",Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+            }) {Icon(Icons.Default.Close,"Borrar prompt",Modifier.size(NexusTokens.iconSmall),tint=if(enabled && value.isNotEmpty()) toolbarTint else visuals.disabledText)}
             if(value.isEmpty() && cleared!=null) com.vidadomu.nexus.ui.components.NexusHintedIconButton("Restaurar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled,onClick={
                 onValueChange(cleared.orEmpty());cleared=null;feedback.perform(NexusHapticEvent.SELECTION)
-            }) {Icon(Icons.Default.Undo,"Restaurar prompt",Modifier.size(16.dp))}
+            }) {Icon(Icons.Default.Undo,"Restaurar prompt",Modifier.size(NexusTokens.iconSmall),tint=toolbarTint)}
             Spacer(Modifier.weight(1f))
             val measured=capability?.measured(value)
             Text(if(capability!=null) "${measured ?: "≈ ?"} / ${capability.maximum} ${capability.unitLabel}"
                 else value.codePointCount(0,value.length).let {n -> if(maximum!=null) "$n / $maximum caracteres" else "$n ${if(n==1) "carácter" else "caracteres"}"},
                 style=MaterialTheme.typography.labelSmall,
                 modifier=Modifier.weight(1f,fill=false),
-                color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else toolbarTint)
             com.vidadomu.nexus.ui.components.NexusHintedIconButton(if(expanded) "Reducir prompt" else "Expandir prompt",onClick = {
                 feedback.perform(NexusHapticEvent.SELECTION)
                 if(onExpand!=null) onExpand() else expanded = !expanded
             },enabled=enabled) {
                 Icon(if(expanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
                     if(expanded) "Reducir prompt" else "Expandir prompt", Modifier.size(NexusTokens.iconSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    tint = toolbarTint)
             }
         }
         attachments()
@@ -175,19 +178,21 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
     val scale by animateFloatAsState(if(pressed) .985f else 1f, tween(NexusTokens.pressDuration), label = "Generate press")
     val haptic = rememberNexusHaptics()
     val scheme = MaterialTheme.colorScheme
+    val visuals = LocalNexusVisuals.current
+    val busyInk = visuals.onProcessing
     val motionAllowed = rememberNexusMotionAllowed(requested = busy)
     Box(modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }) {
         Button(onClick = { haptic.perform(NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled && !busy, interactionSource = interactions,
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = NexusTokens.action,
             colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary,
-                disabledContainerColor = if(busy) scheme.primary else scheme.surfaceContainerHigh,
-                disabledContentColor = if(busy) scheme.onPrimary else scheme.onSurfaceVariant)) {
+                disabledContainerColor = if(busy) visuals.processing else scheme.surfaceContainerHigh,
+                disabledContentColor = if(busy) busyInk else visuals.disabledText)) {
             AnimatedContent(targetState = busy, label = "Generation state") { working ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     // The indeterminate spinner loops forever; with reduced motion or hidden, a static glyph keeps the busy label honest.
-                    if(working && motionAllowed) CircularProgressIndicator(Modifier.size(16.dp), color = scheme.onPrimary, strokeWidth = 2.dp)
-                    else if(working) Icon(Icons.Filled.Timelapse, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(16.dp))
+                    if(working && motionAllowed) CircularProgressIndicator(Modifier.size(16.dp), color = busyInk, strokeWidth = 2.dp)
+                    else if(working) Icon(Icons.Filled.Timelapse, contentDescription = null, tint = busyInk, modifier = Modifier.size(16.dp))
                     Text(if(working) busyLabel else if(!enabled && disabledLabel != null) disabledLabel else if(showCost) "$actionLabel · $cost" else actionLabel, style = MaterialTheme.typography.titleSmall.tabularMoney(),
                         modifier=Modifier.weight(1f,fill=false),maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -199,7 +204,7 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
             val glow = transition.animateFloat(.02f, .12f,
                 infiniteRepeatable(tween(950), RepeatMode.Reverse), label = "Generation pulse")
             Box(Modifier.matchParentSize().clip(NexusTokens.action)
-                .drawBehind { drawRect(Color.White.copy(alpha = glow.value)) })
+                .drawBehind { drawRect(busyInk.copy(alpha = glow.value)) })
         }
     }
 }

@@ -45,8 +45,8 @@ val NexusSurface: Color @Composable get() = MaterialTheme.colorScheme.surface
 val NexusSurfaceVariant: Color @Composable get() = MaterialTheme.colorScheme.surfaceVariant
 val NexusCyan: Color @Composable get() = MaterialTheme.colorScheme.primary
 val NexusPurple: Color @Composable get() = MaterialTheme.colorScheme.secondary
-val NexusSuccess: Color @Composable get() = MaterialTheme.colorScheme.primary
-val NexusAmber: Color @Composable get() = MaterialTheme.colorScheme.tertiary
+val NexusSuccess: Color @Composable get() = LocalNexusVisuals.current.success
+val NexusAmber: Color @Composable get() = LocalNexusVisuals.current.warning
 val NexusTextPrimary: Color @Composable get() = MaterialTheme.colorScheme.onSurface
 val NexusTextSecondary: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 val SurfaceHighlight: Color @Composable get() = MaterialTheme.colorScheme.outline
@@ -62,7 +62,9 @@ object StudioPalette {
 }
 
 /** Barras superior e inferior: un tono propio, claramente distinto del fondo del contenido y de las tarjetas. */
-internal fun chromeFor(theme: NexusAppearance): Color = Color(when (theme) {
+internal fun chromeFor(theme:NexusAppearance):Color = NexusThemeSpecs.forAppearance(theme).chrome
+internal fun palette(theme:NexusAppearance):ColorScheme = NexusThemeSpecs.forAppearance(theme).colors
+internal fun legacyChromeFor(theme: NexusAppearance): Color = Color(when (theme) {
     NexusAppearance.AURORA -> 0xFF182030
     NexusAppearance.OLED -> 0xFF121821
     NexusAppearance.QUARTZ -> 0xFF2A231D
@@ -71,11 +73,12 @@ internal fun chromeFor(theme: NexusAppearance): Color = Color(when (theme) {
     NexusAppearance.SAND -> 0xFFEAD9BC
     NexusAppearance.ROSE -> 0xFFEBCFCB
     NexusAppearance.LIGHT -> 0xFFDCE3F0
+    else -> 0xFF182030
 })
 
 val LocalChromeColor = androidx.compose.runtime.staticCompositionLocalOf { Color(0xFF182030) }
 
-internal fun palette(theme: NexusAppearance): ColorScheme {
+internal fun legacyPalette(theme: NexusAppearance): ColorScheme {
     if (theme == NexusAppearance.SAND || theme == NexusAppearance.ROSE) {
         val rose = theme == NexusAppearance.ROSE
         val bg = Color(if(rose) 0xFFFFF6F3 else 0xFFFFF8ED)

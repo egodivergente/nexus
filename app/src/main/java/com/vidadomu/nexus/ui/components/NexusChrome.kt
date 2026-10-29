@@ -126,7 +126,10 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     val iconOnlyBalance = density.fontScale >= 1.3f || LocalConfiguration.current.screenWidthDp < 360
     StudioChrome(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
-            TopAppBar(title=title,modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
+            TopAppBar(title={Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                if(!iconOnlyBalance) com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(NexusTokens.space24))
+                Box(Modifier.weight(1f)) {title()}
+            }},modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
                 windowInsets=windowInsets,scrollBehavior=scrollBehavior,
                 expandedHeight=topBarHeight,
                 actions={

@@ -30,6 +30,7 @@ fun NexusSheet(
     // Swipe, scrim and back all pass through confirmValueChange; while blocked the sheet cannot hide.
     val canDismiss by rememberUpdatedState(dismissEnabled)
     ModalBottomSheet(onDismissRequest = { if (canDismiss) onDismiss() }, shape = NexusTokens.sheet,
+        containerColor=com.vidadomu.nexus.ui.theme.LocalNexusVisuals.current.sheetSurface,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
             confirmValueChange = { it != SheetValue.Hidden || canDismiss })) {
         NexusSheetSystemBars()
@@ -37,6 +38,7 @@ fun NexusSheet(
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin),
                 verticalAlignment = Alignment.CenterVertically) {
+                if(icon==null) com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(NexusTokens.space24).padding(end=NexusTokens.space4))
                 icon?.let { Icon(it,null,tint=MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier=Modifier.padding(end=NexusTokens.space12)) }
                 Column(Modifier.weight(1f)) {

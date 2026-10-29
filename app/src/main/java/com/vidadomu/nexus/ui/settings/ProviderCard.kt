@@ -26,8 +26,8 @@ import com.vidadomu.nexus.ui.components.noticeMessage
 import com.vidadomu.nexus.ui.theme.*
 
 /** Verde de estado «conectado»; también es el color de los proveedores. */
-internal val ProviderConnected = Color(0xFF34D399)
-internal val ProviderTint = Color(0xFF34D399)
+internal val ProviderConnected:Color @Composable get()=LocalNexusVisuals.current.success
+internal val ProviderTint:Color @Composable get()=MaterialTheme.colorScheme.primary
 
 /** Baldosa de color con icono: identifica una categoría o un proveedor de un vistazo. */
 @Composable

@@ -13,9 +13,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.vidadomu.nexus.ui.theme.NexusTokens
-import com.vidadomu.nexus.ui.theme.NexusHapticEvent
-import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
+import com.vidadomu.nexus.ui.theme.*
 import com.vidadomu.nexus.settings.RuntimePreferences
 
 /** Everyday appearance controls write the same preferences as the advanced editor. */
@@ -25,6 +23,9 @@ import com.vidadomu.nexus.settings.RuntimePreferences
     val store=remember {RuntimePreferences.get(context)}
     val haptics=rememberNexusHaptics()
     val configuration by store.state.collectAsState()
+    val appearance=rememberAppearancePreferences()
+    val selected by appearance.selectionState()
+    var pickerOpen by remember {mutableStateOf(false)}
     var message by remember {mutableStateOf<String?>(null)}
     val photo=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {uri ->
         if(uri!=null) runCatching {
@@ -32,22 +33,29 @@ import com.vidadomu.nexus.settings.RuntimePreferences
             store.set("ui.photo",uri.toString())
         }.onFailure {message="No se pudo conservar esta foto. El fondo anterior se mantiene."}
     }
+    if(pickerOpen) PremiumAppearancePicker(appearance,onDismiss={pickerOpen=false})
     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-        listOf("ui.background" to "Fondo Nexus", "ui.motion" to "Animaciones", "ui.haptics" to "Respuesta háptica").forEach {(key,label) ->
-            val checked=configuration.value(key).toBoolean()
-            Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)
-                .toggleable(checked,role=Role.Switch,onValueChange={store.set(key,it.toString());haptics.perform(NexusHapticEvent.TOGGLE_DECISIVE,changed=it!=checked)}),
-                verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
-                Switch(checked,onCheckedChange=null)
+        FilledTonalButton(onClick={pickerOpen=true},modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field) {
+            Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.Start) {
+                Text("Temas y ambiente",style=MaterialTheme.typography.labelLarge)
+                Text("${selected.theme.label} · ${selected.ambientMode.label}",style=MaterialTheme.typography.bodySmall)
             }
         }
-        listOf(Triple("ui.backgroundOpacity","Intensidad del fondo",0f..1f),Triple("ui.photoBlur","Desenfoque de la foto",0f..100f)).forEach {(key,label,range) ->
-            val saved=configuration.value(key).toFloatOrNull() ?: range.start
+        val checked=configuration.value("ui.haptics").toBoolean()
+        Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)
+            .toggleable(checked,role=Role.Switch,onValueChange={store.set("ui.haptics",it.toString());haptics.perform(NexusHapticEvent.TOGGLE_DECISIVE,changed=it!=checked)}),
+            verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            Text("Respuesta háptica",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
+            Switch(checked,onCheckedChange=null)
+        }
+        if(!configuration.value("ui.background").toBoolean() || !configuration.value("ui.motion").toBoolean()) Text(
+            "Una regla avanzada limita el fondo o sus animaciones.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(configuration.value("ui.photo").isNotBlank()) {
+            val saved=configuration.value("ui.photoBlur").toFloatOrNull() ?: 0f
             var draft by remember(saved) {mutableFloatStateOf(saved)}
-            Text("$label · ${if(key.endsWith("Opacity")) (draft*100).toInt() else draft.toInt()} %",style=MaterialTheme.typography.labelLarge)
-            Slider(draft,{draft=it},valueRange=range,onValueChangeFinished={store.set(key,draft.toString())},
-                modifier=Modifier.semantics {contentDescription=label})
+            Text("Desenfoque de la foto · ${draft.toInt()} %",style=MaterialTheme.typography.labelLarge)
+            Slider(draft,{draft=it},valueRange=0f..100f,onValueChangeFinished={store.set("ui.photoBlur",draft.toString())},
+                modifier=Modifier.semantics {contentDescription="Desenfoque de la foto"})
         }
         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
             OutlinedButton(onClick={photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))}) {Text("Elegir foto")}

@@ -74,7 +74,8 @@ fun rememberNexusMotionAllowed(requested: Boolean = true): Boolean {
     val resumed = rememberLifecycleResumed()
     val animatorsEnabled = rememberSystemAnimatorsEnabled(refreshKey = resumed)
     val config by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
-    return NexusMotionPolicy.allowsInfiniteMotion(requested && config.value("ui.motion").toBoolean(), animatorsEnabled, resumed)
+    val appearance by rememberAppearancePreferences().selectionState()
+    return NexusMotionPolicy.allowsInfiniteMotion(requested && !appearance.reduceMotion && config.value("ui.motion").toBoolean(), animatorsEnabled, resumed)
 }
 
 private fun readAnimatorsEnabled(resolver: ContentResolver): Boolean = NexusMotionPolicy.animatorsEnabled(

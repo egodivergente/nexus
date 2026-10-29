@@ -42,6 +42,7 @@ internal fun libraryNoResultsMessage(filters: LibraryViewFilters): String = when
 internal fun LibraryNoResults(filters: LibraryViewFilters, onApply: (LibraryViewFilters) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.padding(NexusTokens.space32), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+        com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(NexusTokens.minimumTouch))
         Text(libraryNoResultsMessage(filters), style = MaterialTheme.typography.bodyLarge, color = TextSecondary, textAlign = TextAlign.Center)
         if (filters.narrowed) {
             FilledTonalButton(onClick = { onApply(filters.cleared()) }, Modifier.heightIn(min = NexusTokens.minimumTouch)) {

@@ -190,9 +190,9 @@ internal fun LiveVoiceDialog(ui: AssistantUiState, onSend: (String) -> Boolean, 
     }
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(Color(0xF2080C10)).safeDrawingPadding()) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
             Column(Modifier.align(Alignment.TopCenter).padding(top = NexusTokens.space32, start = NexusTokens.space24, end = NexusTokens.space24), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(agentLabel(ui.settings), style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = .6f))
+                Text(agentLabel(ui.settings), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             // The circle breathes with your voice while listening and pulses while it talks. Tap: cut it off and listen.
             // With reduced motion the circle stays still while it thinks or talks.
@@ -217,7 +217,7 @@ internal fun LiveVoiceDialog(ui: AssistantUiState, onSend: (String) -> Boolean, 
                     LiveState.THINKING -> "Pensando…"
                     LiveState.SPEAKING -> "Toca el círculo para cortarle y hablar"
                     LiveState.PAUSED -> "En pausa · toca el círculo para hablar"
-                }, style = MaterialTheme.typography.titleMedium, color = Color.White, textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis)
                 Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space32)) {
                     FilledTonalIconButton(onClick = {
                         if (state == LiveState.LISTENING) { recognizer.cancel(); level = 0f; state = LiveState.PAUSED } else listen()
