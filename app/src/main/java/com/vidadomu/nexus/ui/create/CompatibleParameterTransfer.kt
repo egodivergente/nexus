@@ -16,17 +16,20 @@ internal fun restoredParameterAdaptations(parameters: Map<String, String>, adapt
     if (it.key in editedKeys || it.requestedValue == actual) null else it.copy(actualValue = actual)
 }
 
-internal data class ParameterTransferSource(val capabilities: ModelUiCapabilities, val values: Map<String, String>) {
+internal data class ParameterTransferSource(val capabilities: ModelUiCapabilities, val values: Map<String, String>,
+    val adaptations: List<ParameterTransferAdaptation> = emptyList()) {
     /** An unresolved intermediate model cannot authorize aliases; exact declared keys still preserve explicit edits. */
     fun withEdits(editedValues: Map<String, String>): ParameterTransferSource {
         val declared = capabilities.declaredParameters.map { it.key }.toSet()
-        return copy(values = values + editedValues.filterKeys { it in declared })
+        val edits = editedValues.filterKeys { it in declared }
+        return copy(values = values + edits, adaptations = adaptations.filterNot { it.key in edits })
     }
 }
 internal fun parameterTransferSource(capabilities: ModelUiCapabilities, values: Map<String, String>,
     adaptations: List<ParameterTransferAdaptation>): ParameterTransferSource {
-    val adapted = adaptations.map { it.key }.toSet()
-    return ParameterTransferSource(capabilities, values.filterKeys { it !in adapted })
+    val retained = restoredParameterAdaptations(values, adaptations)
+    val adapted = retained.map { it.key }.toSet()
+    return ParameterTransferSource(capabilities, values.filterKeys { it !in adapted }, retained)
 }
 internal data class ParameterTransferResult(
     val parameters: Map<String, String>, val transferredKeys: Set<String>, val adaptations: List<ParameterTransferAdaptation>,
@@ -106,16 +109,20 @@ internal fun transferCompatibleParameters(
     val targetByKind = targetParameters.filter { portableParameter(it) != null }.groupBy(::portableParameter)
     val candidates = linkedMapOf<String, String>()
     val requested = linkedMapOf<String, Pair<ModelParameter, String>>()
+    val inherited = mutableListOf<ParameterTransferAdaptation>()
+    val sourceAdaptations = source.adaptations.associateBy { it.key }
     val reserved = setOf("model", "model_id", "provider", "provider_id", "endpoint")
     for (target in targetParameters) {
         if (target.key in editedValues || target.key.lowercase() in reserved || target.key.startsWith("__")) continue
         val kind = portableParameter(target)
         val exact = sourceByKey[target.key]
         val from = exact ?: kind?.takeIf { targetByKind[it]?.size == 1 }?.let { sourceByKind[it]?.singleOrNull() } ?: continue
-        val value = source.values[from.key] ?: continue
-        if (value.isBlank() || !acceptsTransferValue(from, value)) continue
         val sameMeaning = portableParameter(from)?.let { it == kind } == true
         if (!sameMeaning && valueFamily(from) != valueFamily(target)) continue
+        // Carry why a fallback exists through intermediate models, without transferring that fallback as intent.
+        sourceAdaptations[from.key]?.let { inherited += it.copy(key = target.key, label = target.displayName) }
+        val value = source.values[from.key] ?: continue
+        if (value.isBlank() || !acceptsTransferValue(from, value)) continue
         requested[target.key] = target to value
         if (acceptsTransferValue(target, value)) candidates[target.key] = value
     }
@@ -145,7 +152,7 @@ internal fun transferCompatibleParameters(
         ParameterTransferAdaptation(key, value.first.displayName, value.second, result[key].orEmpty(),
             "El contrato de destino conserva su ajuste compatible; el valor anterior sigue guardado en el modelo de origen.")
     }
-    val retained = restoredParameterAdaptations(result, fallbackAdaptations,
+    val retained = restoredParameterAdaptations(result, inherited + fallbackAdaptations,
         accepted.keys + editedValues.keys + adaptations.map { it.key })
     return ParameterTransferResult(result, accepted.keys, adaptations + retained)
 }

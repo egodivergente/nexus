@@ -132,6 +132,102 @@ class CompatibleParameterTransferTest {
         assertEquals("15", original["duration"])
     }
 
+    @Test fun threeModelRoundTripPreservesOriginalResolutionAcrossTwoAdaptedFallbacks() {
+        val a = caps("a", listOf(resolution(default = "1080p")))
+        val b = caps("b", listOf(resolution().copy(options = listOf("720p"))))
+        val c = caps("c", b.declaredParameters)
+        val original = mapOf("resolution" to "1080p")
+        val atB = transferCompatibleParameters(ParameterTransferSource(a, original), b, b.defaults)
+        val atC = transferCompatibleParameters(parameterTransferSource(b, atB.parameters, atB.adaptations), c, c.defaults)
+        assertEquals("720p", atC.parameters["resolution"])
+        assertFalse("resolution" in atC.transferredKeys)
+        assertEquals("1080p", atC.adaptations.single().requestedValue)
+        assertEquals("720p", atC.adaptations.single().actualValue)
+        val back = transferCompatibleParameters(parameterTransferSource(c, atC.parameters, atC.adaptations), a, original)
+        assertEquals(original, back.parameters)
+        assertTrue(back.adaptations.isEmpty())
+        assertEquals("1080p", original["resolution"])
+    }
+
+    @Test fun reopeningTheThirdModelPreservesAdaptationProvenanceAndTheOriginalDraft() {
+        val a = caps("a", listOf(resolution(default = "1080p")))
+        val b = caps("b", listOf(resolution().copy(options = listOf("720p"))))
+        val c = caps("c", b.declaredParameters)
+        val savedA = ModelWorkDraft(a.model.id, "Full original prompt", parameters = a.defaults,
+            providerId = a.key.providerId, endpoint = a.key.endpoint, modality = a.key.modality)
+        val atB = transferCompatibleParameters(ParameterTransferSource(a, savedA.parameters), b, b.defaults)
+        val atC = transferCompatibleParameters(parameterTransferSource(b, atB.parameters, atB.adaptations), c, c.defaults)
+        val current = CreationDraft(c.model.id, Modality.VIDEO, savedA.prompt, atC.parameters,
+            providerId = c.key.providerId, endpoint = c.key.endpoint, parameterAdaptations = atC.adaptations)
+        val reopened = Json.decodeFromString<CreationDraft>(Json.encodeToString(current))
+        val restoredA = ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(savedA))).single()
+        val values = FormContract.restoredValues(c.model, reopened.parameters)
+        val back = transferCompatibleParameters(parameterTransferSource(c, values, reopened.parameterAdaptations), a, restoredA.parameters)
+        assertEquals("1080p", back.parameters["resolution"])
+        assertTrue(back.adaptations.isEmpty())
+        assertEquals(savedA, restoredA)
+        assertEquals(savedA.prompt, reopened.prompt)
+    }
+
+    @Test fun explicitSameFallbackEditAtTheThirdModelBecomesNewIntentEvenDuringLoading() {
+        val a = caps("a", listOf(resolution(default = "1080p"), seed()))
+        val b = caps("b", listOf(resolution().copy(options = listOf("720p")), seed()))
+        val c = caps("c", b.declaredParameters)
+        val atB = transferCompatibleParameters(ParameterTransferSource(a, a.defaults), b, b.defaults)
+        val atC = transferCompatibleParameters(parameterTransferSource(b, atB.parameters, atB.adaptations), c, c.defaults)
+        val sourceC = parameterTransferSource(c, atC.parameters, atC.adaptations)
+        val unrelated = sourceC.withEdits(mapOf("seed" to "42"))
+        assertEquals(1, unrelated.adaptations.size)
+        val edited = unrelated.withEdits(mapOf("resolution" to "720p"))
+        assertTrue(edited.adaptations.isEmpty())
+        val back = transferCompatibleParameters(edited, a, a.defaults)
+        assertEquals("720p", back.parameters["resolution"])
+        assertEquals("42", back.parameters["seed"])
+        assertEquals(1, sourceC.adaptations.size)
+        assertFalse("resolution" in sourceC.values)
+    }
+
+    @Test fun adaptationMarkersFollowOnlyUnambiguousSemanticAliasesAcrossModels() {
+        val a = caps("a", listOf(resolution(default = "1080p")))
+        val b = caps("b", listOf(resolution(key = "output_resolution").copy(options = listOf("720p"))))
+        val c = caps("c", listOf(resolution(key = "target_resolution").copy(options = listOf("720p"))))
+        val atB = transferCompatibleParameters(ParameterTransferSource(a, a.defaults), b, b.defaults)
+        val atC = transferCompatibleParameters(parameterTransferSource(b, atB.parameters, atB.adaptations), c, c.defaults)
+        assertEquals("target_resolution", atC.adaptations.single().key)
+        assertEquals("1080p", atC.adaptations.single().requestedValue)
+        assertEquals("720p", atC.parameters["target_resolution"])
+        val back = transferCompatibleParameters(parameterTransferSource(c, atC.parameters, atC.adaptations), a, a.defaults)
+        assertEquals("1080p", back.parameters["resolution"])
+        assertTrue(back.adaptations.isEmpty())
+    }
+
+    @Test fun adaptationProvenanceDoesNotBypassTheIntermediateModelsJointConstraints() {
+        val a = caps("a", listOf(duration(), resolution(default = "1080p")))
+        val b = caps("b", listOf(duration(), resolution().copy(options = listOf("720p"))))
+        val c = caps("c", listOf(duration(), resolution()), listOf(
+            CapabilityConstraint("resolution", mapOf("duration" to setOf("10")), allowedValues = listOf("720p"))))
+        val original = mapOf("duration" to "10", "resolution" to "1080p")
+        val atB = transferCompatibleParameters(ParameterTransferSource(a, original), b, b.defaults)
+        val atC = transferCompatibleParameters(parameterTransferSource(b, atB.parameters, atB.adaptations), c, c.defaults)
+        assertEquals(mapOf("duration" to "10", "resolution" to "720p"), atC.parameters)
+        assertEquals("1080p", atC.adaptations.single().requestedValue)
+        assertTrue(CapabilityConstraintEngine.evaluate(c, "", atC.parameters, emptyList()).canSubmit)
+        val back = transferCompatibleParameters(parameterTransferSource(c, atC.parameters, atC.adaptations), a, original)
+        assertEquals(original, back.parameters)
+    }
+
+    @Test fun ambiguousAliasesNeverRebindAnAdaptationMarker() {
+        val b = caps("b", listOf(resolution().copy(options = listOf("720p")),
+            resolution(key = "target_resolution").copy(options = listOf("720p"))))
+        val c = caps("c", listOf(resolution(key = "output_resolution")))
+        val marker = ParameterTransferAdaptation("resolution", "Resolución", "1080p", "720p", "Contract limit")
+        val carried = parameterTransferSource(b, b.defaults, listOf(marker))
+        val atC = transferCompatibleParameters(carried, c, c.defaults)
+        assertEquals(c.defaults, atC.parameters)
+        assertTrue(atC.transferredKeys.isEmpty())
+        assertTrue(atC.adaptations.isEmpty())
+    }
+
     @Test fun reopeningAnAdaptedCurrentDraftStillRestoresTheOriginalSourceValue() {
         val a=caps("a",listOf(duration()))
         val b=caps("b",listOf(duration(6f)))
