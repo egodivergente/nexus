@@ -44,21 +44,28 @@ import com.vidadomu.nexus.ui.components.rememberPublishedPrice
 @Composable
 internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,toggleFavorite:(NexusModel)->Unit,
     onUse:(NexusModel)->Unit,onHide:((NexusModel)->Unit)?=null,modifier:Modifier=Modifier,
-    onUseWithMedia:((NexusModel,List<Pair<android.net.Uri,String>>)->Unit)?=null) {
+    onUseWithMedia:((NexusModel,List<Pair<android.net.Uri,String>>)->Unit)?=null,
+    mediaSelection:MutableState<List<CatalogMediaReference>>?=null,preferredModel:NexusModel?=null,
+    preferredWorkflow:CatalogWorkflow?=null,onSelectionChanged:(NexusModel,CatalogWorkflow)->Unit={_,_->},
+    familySelector:@Composable ()->Unit={},familyTitle:String?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val choices=remember {context.getSharedPreferences("catalog_choices_v1",0)}
     val rules by com.vidadomu.nexus.settings.RuntimePreferences.get(context).state.collectAsState()
     val workflowOrder=rules.value(if(com.vidadomu.nexus.core.model.Modality.VIDEO in group.routes.first().modalities) "catalog.videoOrder" else "catalog.imageOrder").split(',').map {it.trim()}
     val workflows=remember(group,workflowOrder) {workflowRoutes(group,workflowOrder)}
-    var taskKey by rememberSaveable(group.key) {mutableStateOf(restoredWorkflow(group,
-        choices.getString("task:${group.key}",null),choices.getString("use:${group.key}",null),workflowOrder).name)}
+    val preferred=preferredModel?.takeIf {candidate -> group.routes.any {modelBookmark(it)==modelBookmark(candidate)}}
+    var taskKey by rememberSaveable(group.key) {mutableStateOf(
+        preferredWorkflow?.takeIf {it in workflows.keys}?.name ?: restoredWorkflow(group,
+            choices.getString("task:${group.key}",null),choices.getString("use:${group.key}",null),workflowOrder).name)}
     val workflow=workflows.keys.firstOrNull {it.name==taskKey} ?: workflows.keys.first()
     val routes=workflows.getValue(workflow)
-    var savedRoute by rememberSaveable(group.key,workflow) {mutableStateOf(choices.getString("task-route:${group.key}:${workflow.name}",null)
+    var savedRoute by rememberSaveable(group.key,workflow) {mutableStateOf(preferred?.takeIf {candidate -> routes.any {modelBookmark(it)==modelBookmark(candidate)}}?.let(::modelBookmark)
+        ?: choices.getString("task-route:${group.key}:${workflow.name}",null)
         ?: choices.getString("route:${group.key}:${choices.getString("use:${group.key}",null)}",null))}
     val priceRevision by AtlasPublishedPrice.revision.collectAsState()
     val selected=routes.firstOrNull {modelBookmark(it)==savedRoute} ?: routes.first()
+    LaunchedEffect(group.key,modelBookmark(selected),workflow) {onSelectionChanged(selected,workflow)}
     val logicalRoutes=remember(routes,selected,workflow) {
         com.vidadomu.nexus.routing.logicalVariantRepresentatives(routes,selected,workflow in setOf(CatalogWorkflow.ANIMATE,CatalogWorkflow.FRAMES,CatalogWorkflow.EDIT_IMAGE,CatalogWorkflow.REFERENCES))
     }
@@ -85,16 +92,19 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
     val imageField=remember(selected,verifiedSelected) {
         com.vidadomu.nexus.ui.create.CanvasInputPlan.fields(verifiedSelected ?: selected).firstOrNull {it.mime.startsWith("image/")}
     }
-    // Images sent from the Library arrive already picked (up to what this model accepts).
-    var pickedImages by remember(group.key,modelBookmark(selected)) {mutableStateOf(
-        if(imageField==null) emptyList() else ArtBoxInbox.images.value.take((imageField.maximum).coerceIn(1,50)))}
-    LaunchedEffect(imageField,modelBookmark(selected)) {
-        if(imageField!=null && pickedImages.isEmpty()) pickedImages=ArtBoxInbox.images.value.take(imageField.maximum.coerceIn(1,50))
+    val localMedia=rememberSaveable(stateSaver=CatalogMediaSelectionSaver) {mutableStateOf(
+        ArtBoxInbox.images.value.map {CatalogMediaReference(it.first.toString(),it.second)})}
+    val selection=mediaSelection ?: localMedia
+    var pickedImages by selection
+    val inbox=ArtBoxInbox.images.value
+    LaunchedEffect(inbox) {
+        if(mediaSelection==null) pickedImages=mergeCatalogMediaReferences(pickedImages,
+            inbox.map {CatalogMediaReference(it.first.toString(),it.second)})
     }
+    val mediaPartition=remember(pickedImages,imageField) {catalogMediaPartition(pickedImages,imageField)}
     fun addImages(uris:List<android.net.Uri>) {
-        val limit=(imageField?.maximum ?: 1).coerceIn(1,50)
-        val extra=uris.map {it to (context.contentResolver.getType(it) ?: "image/jpeg")}
-        pickedImages=(if(limit==1) extra.take(1) else (pickedImages+extra).distinctBy {it.first}.take(limit))
+        val extra=uris.map {CatalogMediaReference(it.toString(),context.contentResolver.getType(it) ?: "image/jpeg")}
+        pickedImages=addCatalogMediaReferences(pickedImages,extra,imageField?.maximum==1)
     }
     val galleryPicker=androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems=(imageField?.maximum ?: 1).coerceIn(2,50))) {uris -> addImages(uris)}
@@ -114,8 +124,15 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     if(!estimate.hasPrice) estimate.retry?.let {retry -> IconButton(onClick=retry) {Icon(Icons.Default.Refresh,"Volver a consultar el precio")}}
                 }
                 Button(onClick={
-                    ArtBoxInbox.images.value=emptyList()
-                    if(pickedImages.isNotEmpty() && onUseWithMedia!=null) onUseWithMedia(selected,pickedImages) else onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
+                    val resources=pickedImages.map {android.net.Uri.parse(it.uriString) to it.mimeType}
+                    if(resources.isNotEmpty() && onUseWithMedia!=null) {
+                        onUseWithMedia(selected,resources)
+                        ArtBoxInbox.images.value=emptyList()
+                    } else {
+                        if(resources.isNotEmpty()) ArtBoxInbox.images.value=resources
+                        onUse(selected)
+                        if(resources.isEmpty()) ArtBoxInbox.images.value=emptyList()
+                    }},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
                     Text("Crear con este modelo",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(NexusTokens.iconMedium))
                 }
@@ -125,10 +142,12 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState())
             .padding(horizontal=NexusTokens.space16).padding(top=NexusTokens.space12,bottom=padding.calculateBottomPadding()+NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
+            familySelector()
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                CatalogGlyph("group:"+group.key,56.dp,labels) {size -> BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=size,bare=true)}
+                CatalogGlyph(familyTitle?.let {"family:$it"} ?: "group:"+group.key,56.dp,labels) {size -> BrandLogo(family=catalogFamily(selected),modelId=selected.id,size=size,bare=true)}
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                    Text(labels.name("group:"+group.key,group.title),style=MaterialTheme.typography.titleLarge,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
+                    Text(familyTitle?.let {labels.name("family:$it",it)} ?: labels.name("group:"+group.key,group.title),
+                        style=MaterialTheme.typography.titleLarge,color=colors.onSurface,maxLines=3,overflow=TextOverflow.Clip)
                     Text(listOfNotNull(creator(selected).takeIf {it.isNotBlank()},release?.label).joinToString(" · "),
                         style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
@@ -173,25 +192,35 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     }
                 }
             }
-            if(imageField!=null) Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
+            if(imageField!=null || pickedImages.isNotEmpty()) Surface(shape=NexusTokens.card,color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                     Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
-                        Text(imageField.label,style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
-                        Text((if(imageField.required) "Obligatoria" else "Opcional")+if(imageField.maximum>1) " · hasta ${imageField.maximum} imágenes" else " · una imagen",
+                        Text(imageField?.label ?: "Archivos conservados",style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
+                        Text(imageField?.let {(if(it.required) "Obligatoria" else "Opcional")+if(it.maximum>1) " · hasta ${it.maximum} imágenes" else " · una imagen"}
+                            ?: "Esta variante no admite estas imágenes. Se conservan para otra variante o para Lanzadera.",
+                            style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                        if(pickedImages.isNotEmpty()) Text("${mediaPartition.active.size} ${if(verifiedSelected==null) "previstos" else "preparados"} · ${mediaPartition.retained.size} conservados",
+                            style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)
+                        if(pickedImages.isNotEmpty() && verifiedSelected==null) Text("Lanzadera comprobará las entradas y sus límites antes de usarlos.",
+                            style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                        if(mediaPartition.retained.isNotEmpty() && imageField!=null) Text("Los archivos que exceden este límite o no son compatibles se conservan; no se enviarán con este ajuste.",
                             style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     }
                     if(pickedImages.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                        items(pickedImages,key={it.first.toString()}) {(uri,_)->
+                        items(pickedImages,key={it.uriString}) {resource ->
+                            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                             Box(Modifier.size(88.dp)) {
-                                coil.compose.AsyncImage(uri,contentDescription="Imagen elegida",contentScale=androidx.compose.ui.layout.ContentScale.Crop,
-                                    modifier=Modifier.fillMaxSize().clip(NexusTokens.thumbnail))
-                                IconButton(onClick={pickedImages=pickedImages.filterNot {it.first==uri}},Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
+                                coil.compose.AsyncImage(android.net.Uri.parse(resource.uriString),contentDescription="Imagen elegida",contentScale=androidx.compose.ui.layout.ContentScale.Fit,
+                                    modifier=Modifier.fillMaxSize().clip(NexusTokens.thumbnail).background(colors.surfaceContainerHigh))
+                                IconButton(onClick={pickedImages=removeCatalogMediaReference(pickedImages,resource.uriString)},Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
                                     Icon(Icons.Default.Close,"Quitar imagen",Modifier.size(NexusTokens.iconSmall).background(Color.Black.copy(alpha=.55f),androidx.compose.foundation.shape.CircleShape).padding(3.dp),tint=Color.White)
                                 }
                             }
+                            if(resource in mediaPartition.retained) Text("Conservado",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                            }
                         }
                     }
-                    Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    if(imageField!=null) Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                         OutlinedButton(onClick={
                             val request=androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)
                             if(imageField.maximum>1) galleryPicker.launch(request) else singleGalleryPicker.launch(request)

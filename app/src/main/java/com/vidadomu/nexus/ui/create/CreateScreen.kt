@@ -123,6 +123,8 @@ fun CreateScreen(
 
     var showPriceDetails by remember { mutableStateOf(false) }
     var showModelPickerSheet by remember { mutableStateOf(false) }
+    var pickerFamily by remember {mutableStateOf<String?>(null)}
+    var pickerProduct by remember {mutableStateOf<String?>(null)}
     var showBytePlus by remember {mutableStateOf(false)}
     var bytePlusOnly by remember {mutableStateOf(false)}
     var pickerModality by remember {mutableStateOf<Modality?>(null)}
@@ -182,7 +184,7 @@ fun CreateScreen(
                             style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(horizontal=NexusTokens.space12))
                         else TextButton(onClick={
                             when(readiness.fixTarget) {
-                                CreationFixTarget.MODEL -> showModelPickerSheet=true
+                                CreationFixTarget.MODEL -> {pickerFamily=null;pickerProduct=null;showModelPickerSheet=true}
                                 CreationFixTarget.PROMPT -> promptFocus.requestFocus()
                                 CreationFixTarget.MEDIA -> {showAdvanced=true}
                                 CreationFixTarget.PARAMETERS -> showParameters=true
@@ -217,7 +219,8 @@ fun CreateScreen(
             scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,promptVisible=capabilities?.promptVisible==true,
             header={LauncherWorkspaceHeader(state.selectedModality,viewModel::selectModality)},
             model={FlagshipStudioHeader(state.selectedModality,catalogModels,state.selectedModel,
-                viewModel::selectModality,chooseModel,{showModelPickerSheet=true},onOpenFlow)},
+                viewModel::selectModality,chooseModel,{pickerFamily=null;pickerProduct=null;showModelPickerSheet=true},onOpenFlow,
+                onVariants={group -> pickerFamily=com.vidadomu.nexus.ui.models.catalogFamily(group.routes.first());pickerProduct=group.key;showModelPickerSheet=true})},
             prompt={if(capabilities?.promptVisible==true) PromptEditor(state.prompt,viewModel::updatePrompt,
                 when(state.selectedModality) {Modality.VIDEO -> "Describe el movimiento, la acción y la cámara…";Modality.CHAT -> "Escribe tu consulta…";else -> "Describe lo que quieres crear o transformar…"},
                 focusRequester=promptFocus,enabled=!state.isSubmitting,
@@ -349,7 +352,7 @@ fun CreateScreen(
     }
 
     if(showBytePlus) BytePlusCanvasSheet(app,catalogModels,onDismiss={showBytePlus=false},onChoose={modality ->
-        showBytePlus=false;bytePlusOnly=true;pickerModality=modality;showModelPickerSheet=true
+        showBytePlus=false;bytePlusOnly=true;pickerModality=modality;pickerFamily=null;pickerProduct=null;showModelPickerSheet=true
     },onSettings={page -> showBytePlus=false;onBytePlusSettings(page)})
 
     // Modal Bottom Sheet para Seleccionar Modelo
@@ -360,11 +363,13 @@ fun CreateScreen(
             initialModality = pickerModality ?: state.selectedModality,
             media = state.attachedMedia+state.retainedMedia,
             currencyManager = currencyManager,
+            initialFamily = pickerFamily,
+            initialProduct = pickerProduct,
             onSelectModel = { model ->
                 chooseModel(model)
-                showModelPickerSheet = false;bytePlusOnly=false;pickerModality=null
+                showModelPickerSheet = false;bytePlusOnly=false;pickerModality=null;pickerFamily=null;pickerProduct=null
             },
-            onDismiss = { showModelPickerSheet = false;bytePlusOnly=false;pickerModality=null }
+            onDismiss = { showModelPickerSheet = false;bytePlusOnly=false;pickerModality=null;pickerFamily=null;pickerProduct=null }
         )
     }
 

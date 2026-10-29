@@ -22,8 +22,7 @@ import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.provider.atlas.AtlasPublishedPrice
 import com.vidadomu.nexus.provider.atlas.PublishedTariff
 import com.vidadomu.nexus.ui.components.BrandLogo
-import com.vidadomu.nexus.ui.models.catalogFamily
-import com.vidadomu.nexus.ui.models.modelUse
+import com.vidadomu.nexus.ui.models.*
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
@@ -36,7 +35,7 @@ import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 @Composable
 internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: NexusModel?,
     initialModality: Modality, media: List<AttachedMedia>, currencyManager: CurrencyManager,
-    onSelectModel: (NexusModel) -> Unit, onDismiss: () -> Unit) {
+    onSelectModel: (NexusModel) -> Unit, onDismiss: () -> Unit, initialFamily:String?=null,initialProduct:String?=null) {
     var query by rememberSaveable { mutableStateOf("") }
     var org by rememberSaveable { mutableStateOf<String?>(null) }
     var modality by rememberSaveable { mutableStateOf<Modality?>(initialModality) }
@@ -44,6 +43,8 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
     var compatibleOnly by rememberSaveable { mutableStateOf(false) }
     var favoritesOnly by rememberSaveable { mutableStateOf(false) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    var family by rememberSaveable {mutableStateOf(initialFamily)}
+    var productKey by rememberSaveable {mutableStateOf(initialProduct)}
     val feedback=rememberNexusHaptics()
     val context=LocalContext.current
     val favoritesStore=remember(context) {StudioFavoritesStore(context)}
@@ -66,7 +67,17 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
         filterCanvasModels(availableModels, modality, selectionMedia, compatibleOnly, org, query)
             .filter {!favoritesOnly || it.studioKey() in favoriteKeys}
     }
-    val families = remember(filtered) { filtered.groupBy(::catalogFamily).toSortedMap() }
+    val catalogFavorites=remember(availableModels,favoriteKeys) {
+        availableModels.filter {it.studioKey() in favoriteKeys}.map(::modelBookmark).toSet()
+    }
+    val families=remember(filtered,catalogFavorites) {catalogSections(filtered,catalogFavorites)}
+    val familyModels=remember(filtered,family) {filtered.filter {family==null || catalogFamily(it)==family}}
+    val products=remember(familyModels,catalogFavorites) {catalogModelGroups(familyModels,catalogFavorites)}
+    val product=products.firstOrNull {it.key==productKey}
+    fun openVariant(group:CatalogModelGroup) {
+        val continuation=catalogVariantContinuation(group,selectedModel)
+        if(continuation!=null) onSelectModel(continuation) else productKey=group.key
+    }
     val orgs = remember(availableModels, modality) {
         availableModels.filter { modality == null || modality in it.modalities }.map { it.organization }.distinct().sorted()
     }
@@ -76,8 +87,11 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             item {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    if(family!=null) IconButton(onClick={
+                        if(productKey!=null) productKey=null else family=null
+                    }) {Icon(Icons.Default.ArrowBack,if(productKey!=null) "Volver a variantes" else "Todas las familias")}
                     Column(Modifier.weight(1f)) {
-                        Text("Cambiar modelo",style=MaterialTheme.typography.titleLarge)
+                        Text(family ?: "Familias de modelos",style=MaterialTheme.typography.titleLarge)
                         Text("Conservas prompt, archivos y ajustes compatibles",style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -112,45 +126,84 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                 }
             }
             item {
-                Text("${filtered.size} modelos"+if(media.isNotEmpty()) " · Los archivos incompatibles quedan guardados" else "",
+                Text((if(family==null) "${families.size} familias" else "${products.size} variantes")+
+                    if(media.isNotEmpty()) " · Tus archivos se conservan" else "",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if(filtered.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space16)) {
                     Text("No hay modelos con estos filtros",style=MaterialTheme.typography.titleMedium)
-                    TextButton(onClick={query="";org=null;modality=null;compatibleOnly=false;favoritesOnly=false}) {Text("Ver todo el catálogo")}
+                    TextButton(onClick={query="";org=null;modality=null;compatibleOnly=false;favoritesOnly=false;family=null;productKey=null}) {Text("Ver todo el catálogo")}
                 }
             }
-            families.forEach { (family,models) ->
-                item(key="family:$family") {
-                    Text("$family · ${models.size}",Modifier.padding(top=NexusTokens.space12).semantics {heading()},
-                        style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.primary)
-                }
-                items(models,key={"model:${it.providerId}:${it.id}"}) {model ->
-                    val isSelected=model.id==selectedModel?.id && model.providerId==selectedModel?.providerId
-                    val tariff=remember(model) {AtlasPublishedPrice.cached(model) ?: PublishedTariff.quote(model)}
-                    val price=tariff?.takeIf {it.unit!=null && it.usd.isFinite() && it.usd>=0}?.let {"${if(it.baseTariff) "Desde " else ""}${currencyManager.formatUnitPrice(it.unitUsd ?: it.usd)} / ${it.unit}"} ?: "Por confirmar"
-                    Surface(color=if(isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-                        shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
-                            .semantics(mergeDescendants=true) {selected=isSelected}
-                            .clickable(role=Role.RadioButton) {
-                                feedback.perform(NexusHapticEvent.SELECTION,changed=!isSelected)
-                                onSelectModel(model)
-                            }) {
-                        Row(Modifier.padding(NexusTokens.space12).heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically,
-                            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-                            BrandLogo(model.organization,model.family,model.id,size=24.dp,containerSize=40.dp)
-                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                                Text(canvasModelIdentity(model).title,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.SemiBold,
-                                    maxLines=2,overflow=TextOverflow.Ellipsis)
-                                Text("${canvasModelIdentity(model).detail} · $price",style=MaterialTheme.typography.bodySmall,
-                                    color=MaterialTheme.colorScheme.onSurfaceVariant)
+            if(family==null) {
+                items(families,key={"family:${it.family}"}) {section ->
+                    val variants=remember(section,catalogFavorites) {catalogModelGroups(section.models,catalogFavorites)}
+                    val active=catalogFamilyVariantForModel(variants,selectedModel)
+                    PickerSummaryRow(section.family,
+                        listOfNotNull(active?.let {"Actual · ${catalogVariantTitle(it)}"},"${variants.size} variantes").joinToString(" · "),
+                        section.models.first(),active!=null,onClick={
+                            feedback.perform(NexusHapticEvent.SELECTION)
+                            if(section.models.size==1) onSelectModel(section.models.single()) else {
+                                family=section.family;productKey=variants.singleOrNull()?.key
                             }
-                            if(isSelected) Icon(Icons.Default.Check,null,tint=MaterialTheme.colorScheme.primary)
-                        }
-                    }
+                        })
+                }
+            } else if(product==null) {
+                items(products,key={"variant:${it.key}"}) {group ->
+                    val isSelected=group.routes.any {modelBookmark(it)==selectedModel?.let(::modelBookmark)}
+                    PickerSummaryRow(catalogVariantTitle(group),groupPurpose(group),group.routes.first(),isSelected,onClick={
+                        feedback.perform(NexusHapticEvent.SELECTION,changed=!isSelected)
+                        openVariant(group)
+                    })
+                }
+            } else {
+                item {
+                    CatalogVariantSelector(products,product,::openVariant)
+                    Text("Elige el flujo y proveedor de esta variante",Modifier.padding(top=NexusTokens.space8),
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                items(product.routes,key={"model:${it.providerId}:${it.id}"}) {model ->
+                    val isSelected=modelBookmark(model)==selectedModel?.let(::modelBookmark)
+                    val tariff=remember(model) {AtlasPublishedPrice.cached(model) ?: PublishedTariff.quote(model)}
+                    val price=tariff?.takeIf {it.unit!=null && it.usd.isFinite() && it.usd>=0}?.let {
+                        "${if(it.baseTariff) "Desde " else ""}${currencyManager.formatUnitPrice(it.unitUsd ?: it.usd)} / ${it.unit}"
+                    } ?: "Precio por confirmar"
+                    val label=listOf(modelUse(model).label,optionVariantLabel(model,product.title)).distinct().joinToString(" · ")
+                    val ambiguousLabel=product.routes.count {other -> other.providerId==model.providerId &&
+                        modelUse(other)==modelUse(model) && optionVariantLabel(other,product.title)==optionVariantLabel(model,product.title)}>1
+                    val detail="${providerName(model.providerId)} · $price"+
+                        if(ambiguousLabel) " · ${model.providerModelId ?: model.id}" else ""
+                    PickerSummaryRow(label,detail,model,isSelected,onClick={
+                        feedback.perform(NexusHapticEvent.SELECTION,changed=!isSelected);onSelectModel(model)
+                    })
                 }
             }
+            if(filtered.isNotEmpty() && family!=null && products.isEmpty()) item {
+                Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space16)) {
+                    Text("No hay variantes con estos filtros",style=MaterialTheme.typography.titleMedium)
+                    TextButton(onClick={query="";org=null;modality=null;compatibleOnly=false;favoritesOnly=false;productKey=null}) {Text("Ver variantes de $family")}
+                    TextButton(onClick={family=null;productKey=null}) {Text("Todas las familias")}
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickerSummaryRow(title:String,detail:String,model:NexusModel,isSelected:Boolean,onClick:()->Unit) {
+    Surface(color=if(isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+        shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
+            .semantics(mergeDescendants=true) {selected=isSelected}
+            .clickable(role=Role.Button,onClick=onClick)) {
+        Row(Modifier.padding(NexusTokens.space12).heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+            BrandLogo(model.organization,model.family,model.id,size=NexusTokens.iconDefault,containerSize=NexusTokens.minimumTouch)
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                Text(title,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
+                if(detail.isNotBlank()) Text(detail,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(if(isSelected) Icons.Default.Check else Icons.Default.ChevronRight,null,tint=MaterialTheme.colorScheme.primary)
         }
     }
 }

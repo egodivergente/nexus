@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -66,6 +67,12 @@ import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 import com.vidadomu.nexus.ui.components.BrandLogo
+import com.vidadomu.nexus.ui.models.catalogFamily
+import com.vidadomu.nexus.ui.models.catalogModelGroups
+import com.vidadomu.nexus.ui.models.catalogFamilyVariantForModel
+import com.vidadomu.nexus.ui.models.catalogVariantContinuation
+import com.vidadomu.nexus.ui.models.CatalogModelGroup
+import com.vidadomu.nexus.ui.models.CatalogVariantSelector
 import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
@@ -150,12 +157,19 @@ internal fun FlagshipStudioHeader(
     onChoose: (NexusModel) -> Unit,
     onAllModels: () -> Unit,
     onOpenFlow: () -> Unit,
+    onVariants: (CatalogModelGroup) -> Unit = {onAllModels()},
 ) {
     val animate = rememberSystemAnimatorsEnabled()
     val haptics = rememberNexusHaptics()
     val context = LocalContext.current
     var showIdentity by remember {mutableStateOf(false)}
     val identity=selectedModel?.let(::canvasModelIdentity)
+    val family=selectedModel?.let(::catalogFamily)
+    val variants=remember(catalog,modality,family) {
+        catalogModelGroups(catalog.filter {modality in it.modalities && catalogFamily(it)==family})
+    }
+    val currentVariant=catalogFamilyVariantForModel(variants,selectedModel) ?:
+        selectedModel?.let {catalogModelGroups(listOf(it)).singleOrNull()}
     if(showIdentity && selectedModel!=null && identity!=null) AlertDialog(onDismissRequest={showIdentity=false},
         title={Text(identity.title)},text={Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Text(identity.detail)
@@ -168,9 +182,13 @@ internal fun FlagshipStudioHeader(
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(organization=selectedModel?.organization, modelId=selectedModel?.id, size=28.dp)
                 Column(Modifier.weight(1f)) {
-                    Text(identity?.detail ?: "Elegir modelo",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(identity?.title ?: "Elegir modelo", style=MaterialTheme.typography.titleSmall)
+                    Text(family ?: "Elegir familia",style=MaterialTheme.typography.titleSmall,maxLines=2)
+                    Text(identity?.detail ?: "Elegir modelo",style=MaterialTheme.typography.labelSmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
                 }
+                if(currentVariant!=null) CatalogVariantSelector(variants,currentVariant,{group ->
+                    catalogVariantContinuation(group,selectedModel)?.let(onChoose) ?: onVariants(group)
+                },modifier=Modifier.widthIn(max=NexusTokens.minimumTouch*2+NexusTokens.space16),compact=true)
                 if(selectedModel!=null) IconButton(onClick={showIdentity=true}) {Icon(Icons.Default.Info,"Identidad exacta del modelo",Modifier.size(NexusTokens.iconSmall))}
                 Icon(Icons.Default.SwapHoriz,"Cambiar modelo",Modifier.size(NexusTokens.iconMedium))
             }

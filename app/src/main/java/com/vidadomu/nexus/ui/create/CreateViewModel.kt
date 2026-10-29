@@ -835,17 +835,60 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Wait for the real media contract before attaching a frame or animating an image. */
     private var reuseImageJob: kotlinx.coroutines.Job? = null
-    /** From the ArtBox sheet: pick the model, wait for its real contract, then attach the chosen images to its image field. Nothing is sent. */
+    /** ArtBox transfers the whole selection; incompatible/excess files remain conserved. Nothing is sent. */
     fun prepareWithMedia(model: NexusModel, selection: List<Pair<Uri, String>>) {
         selectModality(model.modalities.first())
         selectModel(model)
+        if (selection.isEmpty()) return
+        val initial = _uiState.value
+        val destination = initial.selectedModel ?: return
+        val expected = ModelCapabilityRegistry.key(destination, initial.selectedModality)
+        val request = schemaRequest
+        val configurationJob = schemaJob
+        val token = mediaSession.begin(MediaSlotType.REFERENCE_IMAGE, append = true)
+        val previous = initial.attachedMedia + initial.retainedMedia
+        val incoming = selection.distinctBy { it.first.toString() }.map { (uri, mime) ->
+            previous.firstOrNull { it.uriString == uri.toString() } ?: AttachedMedia(uriString = uri.toString(),
+                mimeType = mime, slotType = MediaSlotType.REFERENCE_IMAGE)
+        }
+        val previousIds = previous.map { it.id }.toSet()
+        val newlyStagedIds = incoming.map { it.id }.filterNot { it in previousIds }.toSet()
+        beginMediaCopy()
         viewModelScope.launch {
-            schemaJob?.join()
-            val state = _uiState.value
-            val active = state.selectedModel ?: return@launch
-            if (active.id != model.id || !state.schemaReady) return@launch
-            val field = CanvasInputPlan.fields(active, state.parameters).firstOrNull { it.mime.startsWith("image/") || it.mime == "*/*" } ?: return@launch
-            addCanvasMedia(field.key, active.providerId + "/" + active.id, selection.take(field.maximum.coerceAtLeast(1)))
+            val preparedIds = mutableListOf<String>()
+            var failures = 0
+            try {
+                configurationJob?.join()
+                _uiState.update { stageArtBoxMedia(it, incoming) }
+                for (original in incoming) {
+                    try {
+                        val (uri, mime) = persistMediaUri(Uri.parse(original.uriString), original.mimeType).getOrThrow()
+                        if (uri.scheme == "file") withContext(Dispatchers.IO) { LocalMediaInspector.inspect(app, uri, mime) }
+                        val prepared = original.copy(uriString = uri.toString(), mimeType = mime,
+                            fileName = original.fileName ?: extractFileName(uri, mime))
+                        // Record each successful copy before preparing the next, protecting it from cache eviction.
+                        _uiState.update { completeArtBoxMedia(it, original, prepared, original.id in newlyStagedIds) }
+                        preparedIds += original.id
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) {
+                        failures++
+                        _uiState.update { completeArtBoxMedia(it, original, null, original.id in newlyStagedIds) }
+                    }
+                }
+                _uiState.update { current ->
+                    val valid = mediaSession.accepts(token) && schemaRequest == request
+                    val result = finishArtBoxMediaImport(current, expected, valid, preparedIds, newlyStagedIds, ::isMediaAvailable)
+                    val retained = result.retainedMedia.count { it.id in preparedIds }
+                    result.copy(errorMessage = when {
+                        failures > 0 -> "Se prepararon ${preparedIds.size} de ${incoming.size} archivos; $failures no pudieron copiarse o validarse. Los archivos preparados y el trabajo anterior se conservan." +
+                            if (retained > 0) " $retained quedan en Conservados." else ""
+                        !valid -> "La selección se conserva sin adjuntarla: cambiaste de modelo o formulario durante la importación."
+                        !current.schemaReady -> "Los archivos se conservan. Carga la configuración del modelo para asignar sus entradas."
+                        retained > 0 -> "$retained archivos quedan en Conservados por los tipos o límites del modelo; la selección completa sigue en el borrador."
+                        else -> null
+                    })
+                }
+            } finally { endMediaCopy() }
         }
     }
 

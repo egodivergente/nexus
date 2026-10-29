@@ -73,6 +73,13 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     var modality by rememberSaveable { mutableStateOf(runCatching { Modality.valueOf(prefs.getString("browser_modality", "VIDEO")!!) }.getOrDefault(Modality.VIDEO)) }
     var family by rememberSaveable { mutableStateOf<String?>(null) }
     var groupKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val inboxMedia=ArtBoxInbox.images.value
+    val familyMedia=rememberSaveable(stateSaver=CatalogMediaSelectionSaver) {mutableStateOf(
+        inboxMedia.map {CatalogMediaReference(it.first.toString(),it.second)})}
+    LaunchedEffect(inboxMedia) {
+        familyMedia.value=mergeCatalogMediaReferences(familyMedia.value,
+            inboxMedia.map {CatalogMediaReference(it.first.toString(),it.second)})
+    }
     var query by rememberSaveable { mutableStateOf("") }
     var searchVisible by rememberSaveable {mutableStateOf(false)}
     var favorites by remember { mutableStateOf(prefs.getStringSet("model_favorites", emptySet())!!.toSet()) }
@@ -137,6 +144,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         }
     }
     val activeGroup = groups.firstOrNull { it.key == groupKey }
+    val familyDetail=family!=null && !toolsView && !personalizing && groups.isNotEmpty()
     // Tools ignore provider/use/reference filters, so they never count (or show) there.
     val activeFilterItems = buildList {
         if(!toolsView) {
@@ -156,7 +164,10 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         if(!canReorder || index<0) return null to null
         return (if(index>0) ({moveBy(key,-1)}) else null) to (if(index<displayedKeys.lastIndex) ({moveBy(key,1)}) else null)
     }
-    fun back() { if(groupKey != null) groupKey = null else family = null }
+    fun back() {
+        if(familyDetail) {groupKey=null;family=null}
+        else if(groupKey != null) groupKey = null else family = null
+    }
     BackHandler(family != null || groupKey != null) { back() }
     // Inside a family or a model sheet the sideways swipe from the edge means «Atrás»; it must not slide to the previous tab.
     val nested = family != null || groupKey != null
@@ -175,7 +186,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         HorizontalDivider()
                         // Organizar
                         if(personalizing) DropdownMenuItem(text={Text("Terminar personalización")},onClick={personalizing=false;moreMenu=false})
-                        DropdownMenuItem(text={Text("Personalizar y ordenar")},leadingIcon={Icon(Icons.Default.DragHandle,null)},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;moreMenu=false})
+                        DropdownMenuItem(text={Text("Personalizar y ordenar")},leadingIcon={Icon(Icons.Default.DragHandle,null)},onClick={catalogSort=CatalogSort.PERSONAL;prefs.edit().putString("sort",catalogSort.name).apply();personalizing=true;groupKey=null;moreMenu=false})
                         if(groupKey==null) DropdownMenuItem(text={Text(if(filters) "Ocultar filtros" else "Filtros y orden")},leadingIcon={Icon(Icons.Default.FilterList,null)},onClick={filters=!filters;moreMenu=false})
                         DropdownMenuItem(text={Text("Modelos ocultos (${hiddenEntries.size})")},leadingIcon={Icon(Icons.Default.VisibilityOff,null)},onClick={manageHidden=true;moreMenu=false})
                         HorizontalDivider()
@@ -203,10 +214,14 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 catalogMenu()
             })
     }) { padding ->
-        if(activeGroup!=null) {
+        if(familyDetail) {
+            FamilyModelOptionsScreen(family.orEmpty(),groups,activeGroup,{groupKey=it.key},favorites,::toggleFavorite,
+                onSelectModelAndCreate,modifier=Modifier.fillMaxSize().padding(padding),
+                onUseWithMedia=onSelectModelWithMedia,mediaSelection=familyMedia)
+        } else if(activeGroup!=null) {
             ModelOptionsScreen(activeGroup,favorites,::toggleFavorite,onSelectModelAndCreate,
                 if(personalizing) ({model -> pendingHide=routeVisibilityKey(model) to (model.displayName+" · "+providerName(model.providerId))}) else null,
-                modifier=Modifier.fillMaxSize().padding(padding),onUseWithMedia=onSelectModelWithMedia)
+                modifier=Modifier.fillMaxSize().padding(padding),onUseWithMedia=onSelectModelWithMedia,mediaSelection=familyMedia)
         } else {
         key(modality, family, groupKey) {
         LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding).pinchColumns(columns=if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1,max=6) {c->userColumns=c;prefs.edit().putInt("columns_user",c).apply()}, state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -249,7 +264,11 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                     })
                 }
                 val inbox=ArtBoxInbox.images.value
-                if(inbox.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {ArtBoxInboxNotice(inbox.size) {ArtBoxInbox.images.value=emptyList()}}
+                if(inbox.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) {ArtBoxInboxNotice(inbox.size) {
+                    val discarded=inbox.map {it.first.toString()}.toSet()
+                    familyMedia.value=familyMedia.value.filterNot {it.uriString in discarded}
+                    ArtBoxInbox.images.value=emptyList()
+                }}
                 item(span={GridItemSpan(maxLineSpan)}) {
                     ArtBoxSearchBar(query,{query=it},filters || activeFilters.isNotEmpty(),filterButtonDescription(activeFilters.size),{filters=!filters})
                 }
@@ -279,7 +298,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { isDragging ->
                         val (moveUp,moveDown)=reorderActions(section.family)
-                        ArtBoxFamilyCard(section,onOpen={family=section.family;filters=false},onOptions={contextTarget=Triple(if(toolsView) toolVisibilityKey(section.family) else familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView,
+                        ArtBoxFamilyCard(section,onOpen={family=section.family;groupKey=null;filters=false},onOptions={contextTarget=Triple(if(toolsView) toolVisibilityKey(section.family) else familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView,
                             dragModifier=if(canReorder) Modifier.longPressDraggableHandle(
                                 onDragStarted={dragMoved[0]=false;DragHaptics.lift(dragView)},
                                 onDragStopped={DragHaptics.drop(dragView)
