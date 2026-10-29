@@ -3,6 +3,8 @@ package com.vidadomu.nexus.ui.create.capability
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.provider.atlas.NativeModelSchema
 import com.vidadomu.nexus.provider.flow.FlowReferences
+import com.vidadomu.nexus.ui.create.CreateUiState
+import com.vidadomu.nexus.ui.create.creationReadiness
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -82,6 +84,107 @@ class CapabilityDrivenUiTest {
         assertTrue(evaluate(model, listOf(image(), video()), values).canSubmit)
         assertFalse(evaluate(model, listOf(image()), values).canSubmit)
         assertFalse(evaluate(model, listOf(image(), video().copy(mimeType = "image/png")), values).canSubmit)
+    }
+
+    // Synthetic regression schema decoded by the production parser, not a claim about a provider's limits.
+    private fun optionalMediaContract(minimum: Int = 1, requiredAudio: Boolean = false,
+        conditionalAudio: Boolean = false): NexusModel {
+        val id = "optional-media-regression-$minimum-$requiredAudio-$conditionalAudio"
+        val base = NexusModel(id, "Optional media engine fixture", "atlas_cloud", organization = "Test fixture",
+            modalities = listOf(Modality.VIDEO), capabilities = emptyList(), parameters = emptyList(), schemaUrl = "fixture:$id")
+        val required = if (requiredAudio) "[\"prompt\",\"images\",\"reference_audios\"]" else "[\"prompt\",\"images\"]"
+        val conditional = if (conditionalAudio) """,
+          "allOf":[{"if":{"properties":{"use_audio":{"const":true}},"required":["use_audio"]},
+            "then":{"required":["reference_audios"]}}]
+        """ else ""
+        val payload = """{"components":{"schemas":{"Input":{
+          "properties":{
+            "model":{"type":"string","default":"$id"},
+            "prompt":{"type":"string"},
+            "images":{"type":"array","items":{"type":"string"},"minItems":1,"maxItems":3},
+            "reference_videos":{"type":"array","items":{"type":"string"},"minItems":$minimum,"maxItems":3},
+            "reference_audios":{"type":"array","items":{"type":"string"},"minItems":$minimum,"maxItems":3},
+            "use_audio":{"type":"boolean","default":false}
+          },"required":$required $conditional
+        }}}}"""
+        return NativeModelSchema.decode(base, payload).model
+    }
+
+    private fun referenceAudio() = AttachedMedia(uriString = "content://fixture/${java.util.UUID.randomUUID()}",
+        mimeType = "audio/mpeg", slotType = MediaSlotType.REFERENCE_IMAGE, fieldKey = "reference_audios")
+    private fun referenceVideo() = video().copy(slotType = MediaSlotType.VIDEO_REFERENCE)
+
+    @Test fun absentOptionalAudioAndVideoMinimaDoNotBlockRealReadinessWithRequiredImage() {
+        val model = optionalMediaContract()
+        val media = listOf(image(MediaSlotType.REFERENCE_IMAGE))
+        val cap = capabilities(model, media = media)
+        for (key in listOf("reference_audios", "reference_videos")) {
+            val input = cap.inputs.single {it.field.key == key}
+            assertFalse(input.field.required)
+            assertEquals(1, input.minimum)
+        }
+        val validation = evaluate(model, media)
+        assertTrue(validation.issues.toString(), validation.canSubmit)
+        val readiness = creationReadiness(CreateUiState(selectedModality = Modality.VIDEO, selectedModel = model,
+            prompt = "A calm scene", attachedMedia = media, schemaReady = true))
+        assertTrue(readiness.message, readiness.canSubmit)
+        assertNull(NativeModelSchema.validate(model, validation.configuration.parameters + ("prompt" to "A calm scene")))
+        val missingImage = evaluate(model)
+        assertTrue(missingImage.issues.any {it.kind == CapabilityIssueKind.MEDIA && it.fieldKey == "images"})
+        assertFalse(missingImage.issues.any {it.fieldKey in setOf("reference_audios", "reference_videos")})
+    }
+
+    @Test fun presentOptionalMediaStillEnforcesItsPublishedMinimumWithoutDroppingFiles() {
+        val model = optionalMediaContract(minimum = 2)
+        val requiredImage = image(MediaSlotType.REFERENCE_IMAGE)
+        for (optional in listOf(listOf(referenceAudio(), referenceAudio()), listOf(referenceVideo(), referenceVideo()))) {
+            val incompleteMedia = listOf(requiredImage, optional.first())
+            val incomplete = evaluate(model, incompleteMedia)
+            val key = if (optional.first().mimeType.startsWith("audio/")) "reference_audios" else "reference_videos"
+            assertFalse(incomplete.canSubmit)
+            assertTrue(incomplete.issues.any {it.kind == CapabilityIssueKind.MEDIA && it.fieldKey == key})
+            assertEquals(incompleteMedia, incomplete.configuration.media)
+            val complete = evaluate(model, listOf(requiredImage) + optional)
+            assertTrue(complete.issues.toString(), complete.canSubmit)
+        }
+    }
+
+    @Test fun explicitlyRequiredMediaRemainsRequiredWithTheSameMinimum() {
+        val model = optionalMediaContract(requiredAudio = true)
+        val media = listOf(image(MediaSlotType.REFERENCE_IMAGE))
+        assertTrue(capabilities(model).inputs.single {it.field.key == "reference_audios"}.field.required)
+        val absent = evaluate(model, media)
+        assertFalse(absent.canSubmit)
+        assertTrue(absent.issues.any {it.kind == CapabilityIssueKind.MEDIA && it.fieldKey == "reference_audios"})
+        val supplied = evaluate(model, media + referenceAudio())
+        assertTrue(supplied.issues.toString(), supplied.canSubmit)
+    }
+
+    @Test fun conditionalRequiredMediaStillBlocksOnlyWhenItsBranchApplies() {
+        val model = optionalMediaContract(conditionalAudio = true)
+        val media = listOf(image(MediaSlotType.REFERENCE_IMAGE))
+        assertTrue(evaluate(model, media, mapOf("use_audio" to "false")).canSubmit)
+        val values = mapOf("use_audio" to "true")
+        assertTrue(capabilities(model, values, media).inputs.single {it.field.key == "reference_audios"}.field.required)
+        val absent = evaluate(model, media, values)
+        assertFalse(absent.canSubmit)
+        assertTrue(absent.issues.any {it.kind == CapabilityIssueKind.MEDIA && it.fieldKey == "reference_audios"})
+        val supplied = evaluate(model, media + referenceAudio(), values)
+        assertTrue(supplied.issues.toString(), supplied.canSubmit)
+    }
+
+    @Test fun optionalMediaMaximumAndMimeRemainValidatedWhenPresent() {
+        val model = optionalMediaContract()
+        val requiredImage = image(MediaSlotType.REFERENCE_IMAGE)
+        for (optional in listOf(List(4) {referenceAudio()}, List(4) {referenceVideo()})) {
+            val media = listOf(requiredImage) + optional
+            val overflow = evaluate(model, media)
+            assertFalse(overflow.canSubmit)
+            assertEquals(media, overflow.configuration.media)
+            val wrongMime = evaluate(model, listOf(requiredImage, optional.first().copy(mimeType = "image/png")))
+            assertFalse(wrongMime.canSubmit)
+            assertTrue(wrongMime.issues.any {it.kind == CapabilityIssueKind.MEDIA && "tipo de archivo" in it.message})
+        }
     }
 
     @Test fun publishedDependenciesKeepLegacyDefaultReconciliationButRejectChosenInvalidValues() {

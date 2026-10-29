@@ -65,7 +65,8 @@ internal object CapabilityConstraintEngine {
         }
         for (input in capabilities.inputs) {
             val attached = media.filter(input.field::contains)
-            if (attached.size < input.minimum) issue(CapabilityIssueKind.MEDIA, input.field.key,
+            // minItems constrains a present optional property; it does not make an absent property required.
+            if ((input.field.required || attached.isNotEmpty()) && attached.size < input.minimum) issue(CapabilityIssueKind.MEDIA, input.field.key,
                 "${input.field.label}: necesita al menos ${input.minimum}; has añadido ${attached.size}.")
             if (input.maximum != null && attached.size > input.maximum) issue(CapabilityIssueKind.MEDIA, input.field.key,
                 "${input.field.label}: admite como máximo ${input.maximum}; has añadido ${attached.size}. Los archivos se conservan.")
