@@ -31,12 +31,16 @@ internal object ModelWorkDrafts {
     fun remember(drafts:List<ModelWorkDraft>,draft:ModelWorkDraft,max:Int=MAX_MODELS):List<ModelWorkDraft> =
         (listOf(draft)+drafts.filterNot {key(it)==key(draft)}).take(max)
 
-    fun plan(leaving:ModelWorkDraft,target:ModelWorkDraft?,isAvailable:(AttachedMedia)->Boolean):ModelSwitchPlan {
+    fun plan(leaving:ModelWorkDraft,target:ModelWorkDraft?,isAvailable:(AttachedMedia)->Boolean):ModelSwitchPlan =
+        plan(leaving,target,null,isAvailable)
+
+    fun plan(leaving:ModelWorkDraft,target:ModelWorkDraft?,targetModel:NexusModel?,isAvailable:(AttachedMedia)->Boolean):ModelSwitchPlan {
         if(target==null) return ModelSwitchPlan(leaving.prompt,leaving.negativePrompt,emptyMap(),leaving.media,0,false)
         val missing=target.media.count { !isAvailable(it) && leaving.media.none { source -> source.id==it.id } }
         // Parameters belong to the target configuration. Text and resources belong to this work session.
         // Keep unavailable references too: the user may recover them, and their absence must stay explicit.
-        val targetById=target.media.associateBy {it.id}
+        val targetById=target.media.filter {item -> targetModel==null ||
+            compatibleModelMedia(targetModel,listOf(item)).any {it.id==item.id}}.associateBy {it.id}
         val retained=(leaving.media.map {targetById[it.id] ?: it}+target.media).distinctBy {it.id}
         return ModelSwitchPlan(leaving.prompt,leaving.negativePrompt,target.parameters,retained,missing,true)
     }
@@ -49,19 +53,23 @@ internal object ModelWorkDrafts {
 /** Exact state before a model switch, so "Volver" can put it back untouched. */
 internal data class ModelSwitchSnapshot(val model:NexusModel,val modality:Modality,val availableModels:List<NexusModel>,
     val prompt:String,val negativePrompt:String,val parameters:Map<String,String>,val media:List<AttachedMedia>,
-    val retainedMedia:List<AttachedMedia> = emptyList())
+    val retainedMedia:List<AttachedMedia> = emptyList(),val parameterAdaptations:List<ParameterTransferAdaptation> = emptyList())
 
-data class ModelSwitchNotice(val id:Long,val modelName:String,val parkedMedia:Int) {
-    val message:String get() = "Cambiado a $modelName"+when(parkedMedia) {
+data class ModelSwitchNotice(val id:Long,val modelName:String,val parkedMedia:Int,val adaptedSettings:Int=0) {
+    val message:String get() = "Modelo cambiado"+when(parkedMedia) {
         0 -> ""
-        1 -> " · 1 referencia guardada"
-        else -> " · $parkedMedia referencias guardadas"
+        1 -> " · 1 archivo guardado"
+        else -> " · $parkedMedia archivos guardados"
+    }+when(adaptedSettings) {
+        0 -> ""
+        1 -> " · 1 ajuste adaptado"
+        else -> " · $adaptedSettings ajustes adaptados"
     }
 }
 
 internal object ModelSwitchUndo {
     fun snapshot(state:CreateUiState):ModelSwitchSnapshot? = state.selectedModel?.let {
-        ModelSwitchSnapshot(it,state.selectedModality,state.availableModels,state.prompt,state.negativePrompt,state.parameters,state.attachedMedia,state.retainedMedia)
+        ModelSwitchSnapshot(it,state.selectedModality,state.availableModels,state.prompt,state.negativePrompt,state.parameters,state.attachedMedia,state.retainedMedia,state.parameterAdaptations)
     }
 
     /** Media carried to the new model that it cannot use; they stay in the previous model's draft. */
@@ -73,6 +81,7 @@ internal object ModelSwitchUndo {
     fun restore(state:CreateUiState,snapshot:ModelSwitchSnapshot):CreateUiState = state.copy(selectedModel=snapshot.model,
         selectedModality=snapshot.modality,availableModels=snapshot.availableModels,prompt=snapshot.prompt,
         negativePrompt=snapshot.negativePrompt,parameters=snapshot.parameters,attachedMedia=snapshot.media,retainedMedia=snapshot.retainedMedia,
+        parameterAdaptations=snapshot.parameterAdaptations,
         showAdvanced=false,errorMessage=null)
 }
 

@@ -38,13 +38,14 @@ import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 internal fun CanvasAttachmentEditor(
     field: CanvasInputField, media: List<AttachedMedia>, enabled: Boolean,
     onAdd: (List<Pair<Uri, String>>) -> Unit, onRemove: (String) -> Unit, compact: Boolean = false,
-    onReorder: ((String, Int) -> Unit)? = null, frameColumn: Boolean = false
+    onReorder: ((String, Int) -> Unit)? = null, frameColumn: Boolean = false, summaryMode: Boolean = false
 ) {
     val context = LocalContext.current
     val selected = media.filter(field::contains)
     val remaining = minOf(CanvasInputPlan.PICKER_BATCH, field.remaining(media))
     var sourcesOpen by remember(field.key) { mutableStateOf(false) }
     var allReferencesVisible by remember(field.key) {mutableStateOf(false)}
+    var managing by remember(field.key) {mutableStateOf(false)}
     val deliver by rememberUpdatedState(onAdd)
     val accept: (List<Uri>) -> Unit = { uris ->
         deliver(uris.map { it to (projectMediaMimeType(context, it) ?: "application/octet-stream") })
@@ -79,7 +80,34 @@ internal fun CanvasAttachmentEditor(
         field.maximum == Int.MAX_VALUE -> "${selected.size} seleccionados" + if(field.required) " · obligatorio" else ""
         else -> "${selected.size} / ${field.maximum}" + if(field.required) " · obligatorio" else ""
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+    if(summaryMode) {
+        Surface(onClick={if(selected.isEmpty()) sourcesOpen=true else managing=true},enabled=enabled,shape=NexusTokens.field,
+            color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,colors.outlineVariant),
+            modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription=field.label+". "+countLabel}) {
+            Column(Modifier.padding(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    Icon(icon,null,Modifier.size(NexusTokens.iconSmall),tint=colors.onSurfaceVariant)
+                    Text(field.label+if(field.required) " *" else "",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,maxLines=2,
+                        overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if(selected.isEmpty()) Icon(Icons.Default.Add,null,Modifier.size(NexusTokens.iconSmall),tint=colors.primary)
+                    else Text(selected.size.toString(),style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
+                }
+                if(selected.isNotEmpty()) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                    selected.take(if(field.maximum==1) 1 else 3).forEach {item -> key(item.id) {
+                        CanvasAttachmentTile(item,field.label,enabled=false,thumbnailSize=56.dp,showLabel=false) {}
+                    }}
+                    if(selected.size>3) TextButton(onClick={managing=true},contentPadding=PaddingValues(NexusTokens.space4)) {
+                        Text("+${selected.size-3}",style=MaterialTheme.typography.labelLarge)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick={sourcesOpen=true},enabled=canImport) {
+                        Icon(if(field.maximum==1) Icons.Default.SwapHoriz else Icons.Default.Add,
+                            if(field.maximum==1) "Cambiar ${field.label}" else "Añadir a ${field.label}",Modifier.size(NexusTokens.iconSmall))
+                    }
+                }
+            }
+        }
+    } else Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         if(selected.isEmpty() && !field.required && !frameColumn) {
             Surface(onClick={sourcesOpen=true},enabled=canImport,shape=NexusTokens.field,
                 color=colors.surfaceContainerLow,border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,colors.outlineVariant),
@@ -146,6 +174,9 @@ internal fun CanvasAttachmentEditor(
         }
         if(selected.size>field.maximum) Text("Este borrador conserva ${selected.size} archivos; el modelo admite ${field.maximum}. Revisa la selección antes de generar.",
             style=MaterialTheme.typography.bodySmall,color=colors.error)
+    }
+    if(managing) CanvasSheet(field.label,{managing=false}) {
+        CanvasAttachmentEditor(field,media,enabled,onAdd,onRemove,compact=false,onReorder=onReorder)
     }
     if(sourcesOpen) ModalBottomSheet(onDismissRequest={sourcesOpen=false},shape=NexusTokens.sheet,
         sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {

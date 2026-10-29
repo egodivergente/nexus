@@ -9,8 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import com.vidadomu.nexus.ui.components.rememberPriceEstimate
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,6 +32,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.AnnotatedString
@@ -77,10 +76,10 @@ fun CreateScreen(
     val configuration = LocalConfiguration.current
     val horizontalActions = configuration.screenWidthDp >= 600
     val compactTyping = WindowInsets.isImeVisible
-    val canvasScroll = rememberLazyListState()
+    val canvasScroll = rememberScrollState()
     val promptFocus = remember { FocusRequester() }
-    var promptFocused by remember {mutableStateOf(false)}
-    LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollToItem(0) }
+    var mainPromptFocused by remember {mutableStateOf(false)}
+    LaunchedEffect(state.selectedModel?.id) { canvasScroll.scrollTo(0) }
     val inputVideo = state.attachedMedia.singleOrNull { it.mimeType.startsWith("video/") }
     var videoSeconds by remember(inputVideo?.uriString) { mutableStateOf<Double?>(null) }
     LaunchedEffect(inputVideo?.uriString) {
@@ -130,7 +129,8 @@ fun CreateScreen(
     var showRequestInspector by remember { mutableStateOf(false) }
     var showPersonalPresets by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
-    var showToolMenu by remember { mutableStateOf(false) }
+    var showAdvanced by remember {mutableStateOf(false)}
+    var showPromptEditor by remember {mutableStateOf(false)}
     val catalogModels by app.modelCatalogRepository.models.collectAsState()
     // A model change preserves the prompt and all files; incompatible media stays in Conservados.
     val chooseModel: (NexusModel) -> Unit = { model ->
@@ -139,7 +139,6 @@ fun CreateScreen(
         }
     }
     var showInspiration by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
     var showBatch by remember { mutableStateOf(false) }
     val batchSnackbar = remember { SnackbarHostState() }
     val batchScope = rememberCoroutineScope()
@@ -147,7 +146,7 @@ fun CreateScreen(
     LaunchedEffect(switchNotice?.id) {
         val notice = switchNotice ?: return@LaunchedEffect
         batchSnackbar.currentSnackbarData?.dismiss()
-        if (batchSnackbar.showSnackbar(notice.message, actionLabel = "Volver", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed)
+        if (batchSnackbar.showSnackbar(notice.message, actionLabel = "Volver", duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed)
             viewModel.undoModelSwitch()
     }
     if(showBatch) PromptBatchSheet(state, estimate.amount, estimate.usd, viewModel, { showBatch=false }) { summary ->
@@ -166,13 +165,8 @@ fun CreateScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
     // The parent already reserves the IME. Use the remaining height, including large text, rather than a device/orientation name.
-    val compactEditor=compactTyping && maxHeight < 480.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)
-    LaunchedEffect(compactEditor,promptFocused) {
-        if(compactEditor && promptFocused) {
-            withFrameNanos { }
-            canvasScroll.scrollToItem(2)
-        }
-    }
+    val compactEditor=compactTyping && mainPromptFocused && LocalWindowInfo.current.isWindowFocused &&
+        maxHeight < 480.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(batchSnackbar) },
@@ -189,8 +183,8 @@ fun CreateScreen(
                         else TextButton(onClick={
                             when(readiness.fixTarget) {
                                 CreationFixTarget.MODEL -> showModelPickerSheet=true
-                                CreationFixTarget.PROMPT -> batchScope.launch {canvasScroll.animateScrollToItem(2);promptFocus.requestFocus()}
-                                CreationFixTarget.MEDIA -> batchScope.launch { canvasScroll.animateScrollToItem(3) }
+                                CreationFixTarget.PROMPT -> promptFocus.requestFocus()
+                                CreationFixTarget.MEDIA -> {showAdvanced=true}
                                 CreationFixTarget.PARAMETERS -> showParameters=true
                                 CreationFixTarget.RETRY_CONFIGURATION -> viewModel.retryConfiguration()
                                 null -> Unit
@@ -217,150 +211,121 @@ fun CreateScreen(
         containerColor=ScreenBackground,
         topBar={}
     ) { innerPadding ->
-        // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
-        LazyColumn(state=canvasScroll, contentPadding=PaddingValues(bottom=innerPadding.calculateBottomPadding()+NexusTokens.space8),
-            modifier=Modifier.fillMaxSize().padding(top=innerPadding.calculateTopPadding()).consumeWindowInsets(innerPadding).padding(horizontal=screenMargin),
-            verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-            item(key="launcher-title") {
-                if(!compactEditor) Row(Modifier.fillMaxWidth().statusBarsPadding(),verticalAlignment=Alignment.CenterVertically) {
-                    Text("Lanzadera",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
-                    com.vidadomu.nexus.ui.components.NexusSettingsButton()
-
-                    Box {
-                        IconButton(onClick={showMenu=true}) { Icon(Icons.Default.MoreVert, "Más opciones del Lienzo", tint=TextSecondary) }
-                        DropdownMenu(expanded=showMenu,onDismissRequest={showMenu=false}) {
-                            DropdownMenuItem(text={Text("Todos los modelos")}, onClick={showMenu=false;onBrowseModels()})
-                            if(state.selectedModality != Modality.CHAT)
-                                DropdownMenuItem(text={Text("Lote desde archivo…")}, onClick={showMenu=false;showBatch=true})
-                            if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality != Modality.CHAT) {
-                                DropdownMenuItem(text={Text("Diagnóstico local")}, onClick={showMenu=false;showRequestInspector=true})
-                                DropdownMenuItem(text={Text("Copiar diagnóstico")}, onClick={
-                                    showMenu=false
-                                    clipboard.setText(AnnotatedString(maskedRequestPreview(state)))
-                                    Toast.makeText(context,"Diagnóstico copiado",Toast.LENGTH_SHORT).show()
-                                })
-                            }
-                        }
-                    }
-
-                }
-            }
-            item(key="studio-header") {
-                if(!compactEditor) FlagshipStudioHeader(state.selectedModality, catalogModels, state.selectedModel,
-                    viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
-            }
-            item(key="composer") {
-                Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    val selected=state.selectedModel
-                    val textRoute=selected?.let {current ->
-                        if(current.pairedEditModelId!=null) current else catalogModels.firstOrNull {
-                            it.providerId==current.providerId && it.pairedEditModelId==current.id
-                        }
-                    }
-                    val editRoute=textRoute?.pairedEditModelId?.let {id -> catalogModels.firstOrNull {it.id==id && it.providerId==textRoute.providerId}}
-                    if(!compactEditor && state.selectedModality==Modality.IMAGE && textRoute!=null && editRoute!=null) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected=selected?.id==textRoute.id,onClick={chooseModel(textRoute)},shape=SegmentedButtonDefaults.itemShape(0,2)) {Text("Desde texto")}
-                        SegmentedButton(selected=selected?.id==editRoute.id,onClick={chooseModel(editRoute)},shape=SegmentedButtonDefaults.itemShape(1,2)) {Text("Con referencias")}
-                    }
-                    if(capabilities?.promptVisible==true) PromptEditor(state.prompt,viewModel::updatePrompt,
-                        when(state.selectedModality) {Modality.VIDEO -> "Describe el movimiento, la acción y la cámara…";Modality.CHAT -> "Escribe tu consulta…";else -> "Describe lo que quieres crear o transformar…"},
-                        focusRequester=promptFocus,enabled=!state.isSubmitting,
-                        capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),
-                        ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,
-                            model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),
-                        onFocusChanged={promptFocused=it})
-                }
-            }
-            item(key="capability-inputs") {
-                capabilities?.let {resolved -> DynamicFormRenderer(resolved,state.parameters,state.attachedMedia,
-                    enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,countKey=countParam?.key,
-                    onAdd={field,items ->
-                        val modelKey=state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty()
-                        viewModel.addCanvasMedia(field.key,modelKey,items)
-                    },onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia,onChange=viewModel::updateParameter) }
-            }
-            if(state.retainedMedia.isNotEmpty()) item(key="retained-media") {
-                ConservedMediaSection(state.retainedMedia,!state.isSubmitting,viewModel::removeRetainedMedia)
-            }
-
-            // 3. Preparación local y subida: nunca se muestra un adjunto hasta tener copia privada estable.
-            if (state.isPreparingMedia || state.isUploading) {
-                item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = NexusTokens.thumbnail,
-                        color = PrimaryNeon.copy(alpha = 0.08f),
-                        border = null
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = PrimaryNeon
-                            )
-                            Text(
-                                text = if (state.isPreparingMedia) {
-                                    "Guardando copia privada del archivo..."
-                                } else {
-                                    "Subiendo multimedia a ${state.selectedModel?.let { app.providerRegistry.getProviderById(it.providerId)?.displayName } ?: "proveedor"}..."
-                                },
-                                style = MaterialTheme.typography.bodySmall.copy(color = PrimaryNeon)
-                            )
-                        }
-                    }
-                }
-            }
-
-
-            if(state.schemaReady && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && capabilities?.promptVisible==true) item(key="generation-quantity") {
-                GenerationQuantityControl(quantity.count,!state.isSubmitting,onCount={count ->
-                    batchCount=count
-                    if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")
-                },onModels={viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},
-                    allowed={count -> countParam==null || nativeCountAllowed(countParam,count) || nativeCountAllowed(countParam,1)},
-                    choices=(BATCH_COUNTS+listOf(quantity.count)+countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0}.distinct().sorted())
-            }
-            item(key="creation-tools") {
-                StudioToolRow {
-                    if(comparisonState.phase==ComparisonPhase.SENDING) StudioToolChip("Ver lote") {showComparison=true}
-                    Box {
-                        StudioToolChip("Más", "Más herramientas de Lanzadera") {showToolMenu=true}
-                        DropdownMenu(expanded=showToolMenu,onDismissRequest={showToolMenu=false}) {
-                            DropdownMenuItem(text={Text("Todos los parámetros")},enabled=state.schemaReady,
-                                onClick={showToolMenu=false;showParameters=true})
-                            DropdownMenuItem(text={Text("Comparar modelos")},enabled=state.schemaReady && !state.isSubmitting,
-                                onClick={showToolMenu=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true})
-                            DropdownMenuItem(text={Text("Mis ajustes")},enabled=state.schemaReady && !state.isSubmitting,
-                                onClick={showToolMenu=false;showPersonalPresets=true})
-                            DropdownMenuItem(text={Text("Usar mi cuenta BytePlus")},onClick={showToolMenu=false;showBytePlus=true})
-                        }
-                    }
-                }
-            }
-            if(state.isLoadingSchema) item {
-                Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        FixedLauncherWorkspace(
+            modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)
+                .padding(horizontal=screenMargin,vertical=NexusTokens.space4),
+            scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,
+            header={LauncherWorkspaceHeader(state.selectedModality,viewModel::selectModality)},
+            model={FlagshipStudioHeader(state.selectedModality,catalogModels,state.selectedModel,
+                viewModel::selectModality,chooseModel,{showModelPickerSheet=true},onOpenFlow)},
+            prompt={if(capabilities?.promptVisible==true) PromptEditor(state.prompt,viewModel::updatePrompt,
+                when(state.selectedModality) {Modality.VIDEO -> "Describe el movimiento, la acción y la cámara…";Modality.CHAT -> "Escribe tu consulta…";else -> "Describe lo que quieres crear o transformar…"},
+                focusRequester=promptFocus,enabled=!state.isSubmitting,
+                capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),
+                ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,
+                    model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),
+                onFocusChanged={mainPromptFocused=it},onExpand={showPromptEditor=true})},
+            inputs={CompactCapabilityMediaInputs(inputFields,state.selectedModel,state.attachedMedia,
+                enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
+                onAdd={field,items ->
+                    val modelKey=state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty()
+                    viewModel.addCanvasMedia(field.key,modelKey,items)
+                },onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)},
+            parameters={state.selectedModel?.let {model -> CompactPrimaryParameterControls(model,
+                capabilities?.primaryParameters.orEmpty().filter {it.key!=countParam?.key},state.parameters,viewModel::updateParameter)}},
+            status={
+                if(state.isLoadingSchema || state.isPreparingMedia || state.isUploading) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("Cargando opciones del modelo…",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+                    Text(when {state.isPreparingMedia -> "Preparando archivos…";state.isUploading -> "Subiendo archivos…";else -> "Cargando opciones…"},
+                        style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+                }
+                if(!state.schemaReady) state.schemaMessage?.let {raw ->
+                    InlineNotice(noticeMessage(raw,"No se han podido cargar las opciones del modelo."),technicalDetails=raw,
+                        actionLabel="Reintentar",onAction=if(state.isLoadingSchema) null else viewModel::retryConfiguration)
+                }
+                state.errorMessage?.let {raw ->
+                    val failure=state.submitFailure?.takeIf {it.message==raw}
+                    if(failure!=null) InlineNotice(failure.message,technicalDetails=failure.technicalDetails,
+                        actionLabel="Revisar conexión",onAction=if(state.selectedModel?.providerId?.contains("flow",true)==true) onOpenFlow else onBrowseModels)
+                    else InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa los detalles antes de volver a generar."),technicalDetails=raw)
+                }
+            },
+            advanced={
+                FilledTonalButton(onClick={showAdvanced=true},modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),
+                    shape=NexusTokens.field) {
+                    Icon(Icons.Default.Tune,null,Modifier.size(NexusTokens.iconSmall))
+                    Spacer(Modifier.width(NexusTokens.space8))
+                    Text("Avanzado"+if(state.retainedMedia.isNotEmpty()) " · ${state.retainedMedia.size} conservados" else "",
+                        style=MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.weight(1f))
+                    if(capabilities?.promptVisible==true && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO))
+                        Text("×${quantity.count}",style=MaterialTheme.typography.labelMedium)
+                    Icon(Icons.Default.ExpandMore,null,Modifier.size(NexusTokens.iconSmall))
+                }
+            })
+    }
+    }
+    if(showPromptEditor) CanvasSheet("Prompt",{showPromptEditor=false}) {
+        val fullPromptFocus=remember {FocusRequester()}
+        LaunchedEffect(Unit) {fullPromptFocus.requestFocus()}
+        StudioPromptField(state.prompt,viewModel::updatePrompt,"Describe tu creación…",focusRequester=fullPromptFocus,
+            enabled=!state.isSubmitting,capability=state.selectedModel?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt),
+            ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,
+                model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),initiallyExpanded=true)
+    }
+    if(showAdvanced) CanvasSheet("Avanzado",{showAdvanced=false}) {
+        val selected=state.selectedModel
+        val primaryKeys=capabilities?.primaryParameters.orEmpty().map {it.key}.toSet()
+        val extras=capabilities?.advancedParameters.orEmpty().filter {it.key!=countParam?.key && it.key !in primaryKeys}
+        if(selected!=null) {
+            if(extras.isNotEmpty()) {
+                Text("Opciones del modelo",style=MaterialTheme.typography.titleSmall)
+                extras.forEach {parameter -> key(selected.providerId,selected.id,parameter.key) {
+                    RegisteredParameterControl(parameter,state.parameters[parameter.key] ?: parameter.defaultValue) {viewModel.updateParameter(parameter.key,it)}
+                }}
+            }
+            if(state.parameterAdaptations.isNotEmpty()) {
+                Text("Ajustes adaptados",style=MaterialTheme.typography.titleSmall)
+                state.parameterAdaptations.forEach {adapted ->
+                    Text("${adapted.label}: ${adapted.requestedValue} → ${adapted.actualValue}. ${adapted.reason}",
+                        style=MaterialTheme.typography.bodySmall,color=TextSecondary)
                 }
             }
-            if(!state.schemaReady) state.schemaMessage?.let { raw -> item {
-                InlineNotice(noticeMessage(raw,"No se han podido cargar las opciones del modelo."),technicalDetails=raw,
-                    actionLabel="Reintentar",onAction=if(state.isLoadingSchema) null else viewModel::retryConfiguration)
-            } }
-            state.errorMessage?.let { raw -> item {
-                val failure=state.submitFailure?.takeIf { it.message==raw }
-                if(failure!=null) {
-                    val viaFlow=state.selectedModel?.providerId?.contains("flow",ignoreCase=true)==true
-                    InlineNotice(failure.message,technicalDetails=failure.technicalDetails,
-                        actionLabel="Revisar conexión",onAction=if(viaFlow) onOpenFlow else onBrowseModels)
-                } else InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa sus detalles antes de volver a generar."),technicalDetails=raw)
-            } }
+            val textRoute=if(selected.pairedEditModelId!=null) selected else catalogModels.firstOrNull {it.providerId==selected.providerId && it.pairedEditModelId==selected.id}
+            val editRoute=textRoute?.pairedEditModelId?.let {id -> catalogModels.firstOrNull {it.id==id && it.providerId==textRoute.providerId}}
+            if(state.selectedModality==Modality.IMAGE && textRoute!=null && editRoute!=null) {
+                Text("Modo de imagen",style=MaterialTheme.typography.titleSmall)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(selected=selected.id==textRoute.id,onClick={chooseModel(textRoute)},shape=SegmentedButtonDefaults.itemShape(0,2)) {Text("Desde texto")}
+                    SegmentedButton(selected=selected.id==editRoute.id,onClick={chooseModel(editRoute)},shape=SegmentedButtonDefaults.itemShape(1,2)) {Text("Con referencias")}
+                }
+            }
         }
-    }
+        if(inputFields.isNotEmpty()) {
+            Text("Gestionar entradas",style=MaterialTheme.typography.titleSmall)
+            CapabilityMediaInputs(inputFields,state.selectedModel,state.attachedMedia,!state.isSubmitting && !state.isPreparingMedia,
+                onAdd={field,items -> viewModel.addCanvasMedia(field.key,state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty(),items)},
+                onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)
+        }
+        if(state.retainedMedia.isNotEmpty()) ConservedMediaSection(state.retainedMedia,!state.isSubmitting,viewModel::removeRetainedMedia)
+        if(state.schemaReady && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && capabilities?.promptVisible==true)
+            GenerationQuantityControl(quantity.count,!state.isSubmitting,onCount={count ->
+                batchCount=count
+                if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")
+            },onModels={showAdvanced=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},
+                allowed={count -> countParam==null || nativeCountAllowed(countParam,count) || nativeCountAllowed(countParam,1)},
+                choices=(BATCH_COUNTS+listOf(quantity.count)+countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0}.distinct().sorted())
+        TextButton(onClick={showAdvanced=false;showParameters=true},enabled=state.schemaReady) {Text("Todos los parámetros")}
+        TextButton(onClick={showAdvanced=false;showPersonalPresets=true},enabled=state.schemaReady && !state.isSubmitting) {Text("Mis ajustes guardados")}
+        TextButton(onClick={showAdvanced=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},enabled=state.schemaReady && !state.isSubmitting) {Text("Comparar modelos")}
+        if(state.selectedModality!=Modality.CHAT) TextButton(onClick={showAdvanced=false;showBatch=true}) {Text("Lote desde archivo…")}
+        if(comparisonState.phase==ComparisonPhase.SENDING) TextButton(onClick={showAdvanced=false;showComparison=true}) {Text("Ver lote en curso")}
+        TextButton(onClick={showAdvanced=false;showBytePlus=true}) {Text("Usar mi cuenta BytePlus")}
+        TextButton(onClick={showAdvanced=false;onBrowseModels()}) {Text("Todo el catálogo")}
+        if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality!=Modality.CHAT) {
+            TextButton(onClick={showAdvanced=false;showRequestInspector=true}) {Text("Diagnóstico local")}
+            TextButton(onClick={clipboard.setText(AnnotatedString(maskedRequestPreview(state)));Toast.makeText(context,"Diagnóstico copiado",Toast.LENGTH_SHORT).show()}) {Text("Copiar diagnóstico")}
+        }
     }
     if(showParameters) CanvasSheet("Parámetros",{showParameters=false}) {
         if(state.isLoadingSchema) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -393,7 +358,7 @@ fun CreateScreen(
             availableModels = if(bytePlusOnly) catalogModels.filter {it.providerId==BYTEPLUS_MEDIA_PROVIDER} else catalogModels,
             selectedModel = state.selectedModel,
             initialModality = pickerModality ?: state.selectedModality,
-            media = state.attachedMedia,
+            media = state.attachedMedia+state.retainedMedia,
             currencyManager = currencyManager,
             onSelectModel = { model ->
                 chooseModel(model)
@@ -826,9 +791,10 @@ private fun CreativePresetsRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable ColumnScope.()->Unit) {
+internal fun CanvasSheet(title:String,onDismiss:()->Unit,content:@Composable ColumnScope.()->Unit) {
     ModalBottomSheet(onDismissRequest=onDismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
         shape=NexusTokens.sheet,containerColor=MaterialTheme.colorScheme.surface) {
+        NexusSheetSystemBars()
         Column(Modifier.fillMaxWidth().fillMaxHeight(.88f).verticalScroll(rememberScrollState())
             .padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {

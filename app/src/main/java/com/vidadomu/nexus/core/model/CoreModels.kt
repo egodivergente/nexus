@@ -90,6 +90,9 @@ enum class MediaSlotType {
 }
 
 @Serializable
+data class MediaBindingOwner(val providerId: String, val modelId: String, val endpoint: String? = null)
+
+@Serializable
 data class AttachedMedia(
     val id: String = java.util.UUID.randomUUID().toString(),
     val uriString: String,
@@ -97,7 +100,9 @@ data class AttachedMedia(
     val slotType: MediaSlotType,
     val fileName: String? = null,
     val remoteUrl: String? = null,
-    val fieldKey: String? = null
+    val fieldKey: String? = null,
+    /** Draft-only ownership for a non-portable field binding; never part of MediaInput/provider payloads. */
+    val bindingOwner: MediaBindingOwner? = null
 )
 
 @Serializable

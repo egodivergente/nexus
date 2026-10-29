@@ -32,6 +32,24 @@ class ModelSwitchUndoTest {
     @Test fun snapshotIsNullWithoutModel() {
         assertNull(ModelSwitchUndo.snapshot(CreateUiState()))
     }
+    @Test fun undoRestoresTheSourceAdaptationsAndClearsUnrelatedDestinationAnnotations() {
+        val previous=ParameterTransferAdaptation("duration","Duración","15","5","Contrato anterior")
+        val destination=ParameterTransferAdaptation("resolution","Resolución","1080p","720p","Otro contrato")
+        val before=working().copy(parameterAdaptations=listOf(previous))
+        val changed=before.copy(selectedModel=model("b"),parameterAdaptations=listOf(destination))
+        val restored=ModelSwitchUndo.restore(changed,ModelSwitchUndo.snapshot(before)!!)
+        assertEquals(listOf(previous),restored.parameterAdaptations)
+        val clean=ModelSwitchUndo.restore(changed,ModelSwitchUndo.snapshot(working())!!)
+        assertTrue(clean.parameterAdaptations.isEmpty())
+    }
+    @Test fun pendingUndoCarriesExactAnnotationsOnlyToTheRequestedConfiguration() {
+        val adaptation=ParameterTransferAdaptation("duration","Duración","15","5","Contrato")
+        val key=com.vidadomu.nexus.ui.create.capability.CapabilityKey("fixture","same",null,Modality.VIDEO)
+        val pending=PendingWorkParameters(key,mapOf("duration" to "5"),listOf(adaptation))
+        assertTrue(pending.matches(key.copy(endpoint="/resolved")))
+        assertEquals(listOf(adaptation),pending.adaptations)
+        assertFalse(pending.matches(key.copy(providerId="other")))
+    }
     @Test fun parkedCountsOnlyIncompatibleMediaEvenWhenReSlotted() {
         val carried=listOf(image("r1"),image("r2"),image("r3"))
         val compatible=listOf(image("r1").copy(slotType=MediaSlotType.PRIMARY_IMAGE),image("r2"))
@@ -39,8 +57,9 @@ class ModelSwitchUndoTest {
         assertTrue(ModelSwitchUndo.parked(carried,carried).isEmpty())
     }
     @Test fun noticeMentionsSavedReferences() {
-        assertEquals("Cambiado a Kling 3.0 Pro",ModelSwitchNotice(1,"Kling 3.0 Pro",0).message)
-        assertEquals("Cambiado a Kling 3.0 Pro · 1 referencia guardada",ModelSwitchNotice(1,"Kling 3.0 Pro",1).message)
-        assertEquals("Cambiado a Kling 3.0 Pro · 2 referencias guardadas",ModelSwitchNotice(1,"Kling 3.0 Pro",2).message)
+        assertEquals("Modelo cambiado",ModelSwitchNotice(1,"Modelo",0).message)
+        assertEquals("Modelo cambiado · 1 archivo guardado",ModelSwitchNotice(1,"Modelo",1).message)
+        assertEquals("Modelo cambiado · 2 archivos guardados",ModelSwitchNotice(1,"Modelo",2).message)
+        assertEquals("Modelo cambiado · 2 ajustes adaptados",ModelSwitchNotice(1,"Modelo",0,2).message)
     }
 }

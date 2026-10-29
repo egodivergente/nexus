@@ -95,6 +95,15 @@ internal object DynamicControlRegistry {
         DynamicInputKind.NATIVE -> CanvasAttachmentEditor(field,media,enabled,onAdd,onRemove,compact=true,onReorder=onReorder)
     }
 }
+/** Fixed-workspace summaries reuse the same key/kind extension points and picker state as the detailed editor. */
+@Composable internal fun RegisteredSummaryMediaControl(field:CanvasInputField,media:List<AttachedMedia>,enabled:Boolean,
+    onAdd:(List<Pair<Uri,String>>)->Unit,onRemove:(String)->Unit,onReorder:(String,Int)->Unit) {
+    val registered=LocalDynamicControlRenderers.current
+    val custom=registered.inputKeys[field.key] ?: registered.inputKinds[DynamicControlRegistry.inputKind(field)]
+    if(custom!=null) custom(field,media,enabled,onAdd,onRemove,onReorder)
+    else CanvasAttachmentEditor(field,media,enabled,onAdd,onRemove,compact=true,onReorder=onReorder,summaryMode=true)
+}
+
 @Composable internal fun InputImageSlot(f:CanvasInputField,m:List<AttachedMedia>,enabled:Boolean,add:(List<Pair<Uri,String>>)->Unit,remove:(String)->Unit,reorder:(String,Int)->Unit) = CanvasAttachmentEditor(f,m,enabled,add,remove,compact=true,onReorder=reorder)
 @Composable internal fun ReferenceMediaPicker(f:CanvasInputField,m:List<AttachedMedia>,enabled:Boolean,add:(List<Pair<Uri,String>>)->Unit,remove:(String)->Unit,reorder:(String,Int)->Unit) = CanvasAttachmentEditor(f,m,enabled,add,remove,compact=true,onReorder=reorder)
 @Composable internal fun VideoInputSelector(f:CanvasInputField,m:List<AttachedMedia>,enabled:Boolean,add:(List<Pair<Uri,String>>)->Unit,remove:(String)->Unit,reorder:(String,Int)->Unit) = CanvasAttachmentEditor(f,m,enabled,add,remove,compact=true,onReorder=reorder)
@@ -102,9 +111,9 @@ internal object DynamicControlRegistry {
 
 @Composable internal fun PromptEditor(value:String,onValueChange:(String)->Unit,placeholder:String,
     focusRequester:FocusRequester?,enabled:Boolean,capability:com.vidadomu.nexus.agent.core.registry.PromptCapability?,
-    ruleScope:com.vidadomu.nexus.agent.core.config.RuleScope,onFocusChanged:(Boolean)->Unit = {}) {
+    ruleScope:com.vidadomu.nexus.agent.core.config.RuleScope,onFocusChanged:(Boolean)->Unit = {},onExpand:(()->Unit)?=null) {
     StudioPromptField(value,onValueChange,placeholder,focusRequester=focusRequester,enabled=enabled,capability=capability,
-        ruleScope=ruleScope,onEditorFocusChanged=onFocusChanged)
+        ruleScope=ruleScope,onEditorFocusChanged=onFocusChanged,onExpand=onExpand)
 }
 
 /** All dynamic controls in one flow. Values/callbacks remain owned by CreateViewModel. */

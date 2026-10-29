@@ -163,7 +163,6 @@ internal fun FlagshipStudioHeader(
             androidx.compose.foundation.text.selection.SelectionContainer {Text(identity.exactId,style=MaterialTheme.typography.bodySmall)}
         }},confirmButton={TextButton(onClick={showIdentity=false}) {Text("Cerrar")}})
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        StudioModalitySegments(modality, animate, onModality)
         Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
             Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8), verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
@@ -177,6 +176,17 @@ internal fun FlagshipStudioHeader(
             }
         }
 
+    }
+}
+
+/** Title and modality share the same 48 dp toolbar; model selection occupies its own compact row below. */
+@Composable
+internal fun LauncherWorkspaceHeader(modality:Modality,onModality:(Modality)->Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,
+        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        Text("Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+        Box(Modifier.width(176.dp)) {StudioModalitySegments(modality,rememberSystemAnimatorsEnabled(),onModality)}
+        com.vidadomu.nexus.ui.components.NexusSettingsButton()
     }
 }
 

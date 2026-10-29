@@ -64,4 +64,50 @@ class ComposerMediaStateTest {
         assertEquals(MediaSlotType.LAST_FRAME,plan.media.first().slotType)
         assertEquals(listOf("final","new"),plan.media.map {it.id})
     }
+
+    @Test fun sourceAwareContractSwitchRetainsOverflowAndReactivatesItOnTheNextModel() {
+        fun contract(id:String,key:String,capacity:Int)=model(id).copy(contractEndpoint="/$id",imagesArrayField=key,maxImages=capacity,
+            contractMedia=listOf(ContractMediaField(key,"References","image/*",maximum=capacity,encoding="array")))
+        val source=contract("source","source_refs",4)
+        val native=model("native").copy(imagesArrayField="images",maxImages=2)
+        val target=contract("target","target_refs",4)
+        val refs=(1..4).map {image("$it").copy(fieldKey="source_refs")}
+        val prompt="Original prompt with all details"
+        val narrowed=CreateUiState(selectedModel=native,prompt=prompt,attachedMedia=canonicalModelMedia(source,refs)).withModelMedia(native)
+        assertEquals(listOf("1","2"),narrowed.attachedMedia.map {it.id})
+        assertEquals(listOf("3","4"),narrowed.retainedMedia.map {it.id})
+        val carried=canonicalModelMedia(native,narrowed.attachedMedia)+narrowed.retainedMedia
+        val expanded=narrowed.copy(selectedModel=target,attachedMedia=carried,retainedMedia=emptyList()).withModelMedia(target)
+        assertEquals(refs.map {it.id},expanded.attachedMedia.map {it.id})
+        assertEquals(refs.map {it.uriString},expanded.attachedMedia.map {it.uriString})
+        assertTrue(expanded.attachedMedia.all {it.fieldKey=="target_refs"})
+        assertTrue(expanded.retainedMedia.isEmpty())
+        assertEquals(prompt,expanded.prompt)
+        assertTrue(refs.all {it.fieldKey=="source_refs"})
+    }
+
+    @Test fun returningToTheSourceRestoresItsSavedContractBindingsExactly() {
+        val source=model("source").copy(contractEndpoint="/source",firstFrameField="source_head",lastFrameField="source_tail",
+            contractMedia=listOf(ContractMediaField("source_head","Initial","image/*"),ContractMediaField("source_tail","Final","image/*")))
+        val original=listOf(image("head").copy(fieldKey="source_head"),image("tail").copy(fieldKey="source_tail"))
+        val native=model("native").copy(firstFrameField="image",lastFrameField="last")
+        val nativeMedia=compatibleModelMedia(native,canonicalModelMedia(source,original))
+        val leaving=ModelWorkDraft(native.id,"Current prompt",media=nativeMedia)
+        val saved=ModelWorkDraft(source.id,"Old prompt",media=original)
+        val plan=ModelWorkDrafts.plan(leaving,saved) {true}
+        val restored=CreateUiState(selectedModel=source,prompt=plan.prompt,attachedMedia=plan.media).withModelMedia(source)
+        assertEquals(original,restored.attachedMedia)
+        assertTrue(restored.retainedMedia.isEmpty())
+        assertEquals("Current prompt",restored.prompt)
+    }
+
+    @Test fun bindingOwnershipRoundTripsInDraftsAndOldMediaStillDecodes() {
+        val owner=MediaBindingOwner("fixture","source","/source")
+        val saved=ModelWorkDraft("source","Original prompt",media=listOf(image("mask").copy(fieldKey="input",bindingOwner=owner)))
+        assertEquals(listOf(saved),ModelWorkDrafts.decode(ModelWorkDrafts.encode(listOf(saved))))
+        val old="""[{"modelId":"source","prompt":"Original prompt","media":[{"id":"old","uriString":"file:///old.png","mimeType":"image/png","slotType":"REFERENCE_IMAGE","fieldKey":"input"}]}]"""
+        val decoded=ModelWorkDrafts.decode(old).single().media.single()
+        assertEquals("input",decoded.fieldKey)
+        assertNull(decoded.bindingOwner)
+    }
 }

@@ -89,8 +89,8 @@ internal fun StudioToolRow(content: @Composable () -> Unit) {
 @Composable
 internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     placeholder: String, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null,
-    enabled: Boolean = true, maximum: Int? = null, capability: com.vidadomu.nexus.agent.core.registry.PromptCapability? = null, ruleScope: com.vidadomu.nexus.agent.core.config.RuleScope = com.vidadomu.nexus.agent.core.config.RuleScope(), onEditorFocusChanged:(Boolean)->Unit = {}, attachments: @Composable ColumnScope.() -> Unit = {}) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    enabled: Boolean = true, maximum: Int? = null, capability: com.vidadomu.nexus.agent.core.registry.PromptCapability? = null, ruleScope: com.vidadomu.nexus.agent.core.config.RuleScope = com.vidadomu.nexus.agent.core.config.RuleScope(), onEditorFocusChanged:(Boolean)->Unit = {}, onExpand:(()->Unit)?=null, initiallyExpanded:Boolean=false, attachments: @Composable ColumnScope.() -> Unit = {}) {
+    var expanded by rememberSaveable { mutableStateOf(initiallyExpanded) }
     var focused by remember { mutableStateOf(false) }
     val bringPromptIntoView=remember {BringIntoViewRequester()}
     val imeVisible=WindowInsets.isImeVisible
@@ -151,7 +151,8 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
                 modifier=Modifier.weight(1f,fill=false),
                 color=if(capability?.exceeds(value)==true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             com.vidadomu.nexus.ui.components.NexusHintedIconButton(if(expanded) "Reducir prompt" else "Expandir prompt",onClick = {
-                feedback.perform(NexusHapticEvent.SELECTION); expanded = !expanded
+                feedback.perform(NexusHapticEvent.SELECTION)
+                if(onExpand!=null) onExpand() else expanded = !expanded
             },enabled=enabled) {
                 Icon(if(expanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
                     if(expanded) "Reducir prompt" else "Expandir prompt", Modifier.size(NexusTokens.iconSmall),

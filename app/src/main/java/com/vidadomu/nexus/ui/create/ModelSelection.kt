@@ -4,25 +4,43 @@ import com.vidadomu.nexus.core.model.*
 
 /** The same routing used after schema loading. Never guesses support from a display name. */
 internal fun compatibleModelMedia(model: NexusModel, attached: List<AttachedMedia>): List<AttachedMedia> {
-        if(model.contractEndpoint!=null) return attached.filter { media -> model.contractMedia.any { it.key==media.fieldKey } }
-        val images = attached.filter { it.fieldKey==null && it.mimeType.startsWith("image/") }
-        val videos = attached.filter { it.fieldKey==null && it.mimeType.startsWith("video/") }
-        return buildList {
-            addAll(attached.filter {media -> media.fieldKey!=null && model.contractMedia.any {it.key==media.fieldKey}})
-            val remaining=images.toMutableList()
-            fun take(preferred:MediaSlotType,allowLast:Boolean):AttachedMedia? {
-                val match=remaining.firstOrNull {it.slotType==preferred}
-                    ?: remaining.firstOrNull {allowLast || it.slotType!=MediaSlotType.LAST_FRAME}
-                if(match!=null) remaining.remove(match)
-                return match
+    val fields = modelMediaHandoffFields(model)
+    val roles = fields.associate { it.key to modelMediaRole(model, it) }
+    val unique = roles.values.filterNotNull().groupingBy { it }.eachCount()
+    val remaining = attached.distinctBy { it.id }.toMutableList()
+    return buildList {
+        // A foreign non-null key is never reinterpreted without canonicalModelMedia's source context.
+        for (field in fields) {
+            val bound = remaining.filter { field.contract != null && it.fieldKey == field.key &&
+                mediaBindingMatches(model, it) && field.acceptsMime(it.mimeType) }
+                .take(field.maximum)
+            addAll(bound)
+            remaining.removeAll { item -> bound.any { it.id == item.id } }
+        }
+        for (field in fields) {
+            val role = roles[field.key]?.takeIf { unique[it] == 1 } ?: continue
+            val occupied = count { field.contains(it) }
+            val room = (field.maximum - occupied).coerceAtLeast(0)
+            if (room == 0) continue
+            val initialPresent = any { item -> fields.any { roles[it.key] == MediaSlotType.PRIMARY_IMAGE && it.contains(item) } }
+            val preferred = remaining.filter { it.fieldKey == null && mediaBindingMatches(model, it) &&
+                it.slotType == role && field.acceptsMime(it.mimeType) }
+            val fallbacks = remaining.filter { item ->
+                item.fieldKey == null && mediaBindingMatches(model, item) && item !in preferred && field.acceptsMime(item.mimeType) && when (role) {
+                    MediaSlotType.PRIMARY_IMAGE -> item.slotType == MediaSlotType.REFERENCE_IMAGE
+                    MediaSlotType.LAST_FRAME -> item.slotType in setOf(MediaSlotType.PRIMARY_IMAGE, MediaSlotType.REFERENCE_IMAGE) &&
+                        initialPresent
+                    MediaSlotType.REFERENCE_IMAGE -> item.slotType == MediaSlotType.PRIMARY_IMAGE
+                    MediaSlotType.VIDEO_INPUT -> item.slotType == MediaSlotType.VIDEO_REFERENCE
+                    MediaSlotType.VIDEO_REFERENCE -> item.slotType == MediaSlotType.VIDEO_INPUT
+                }
             }
-            if (model.firstFrameField != null) take(MediaSlotType.PRIMARY_IMAGE,false)?.let { add(it.copy(slotType = MediaSlotType.PRIMARY_IMAGE)) }
-            if (model.lastFrameField != null) take(MediaSlotType.LAST_FRAME,true)?.let { add(it.copy(slotType = MediaSlotType.LAST_FRAME)) }
-            if (model.imagesArrayField != null) addAll(remaining.take(model.maxImages).map { it.copy(slotType = MediaSlotType.REFERENCE_IMAGE) })
-            if (model.videoField != null) videos.firstOrNull()?.let { add(it.copy(slotType = MediaSlotType.VIDEO_INPUT)) }
-            if (model.videosArrayField != null) addAll(videos.drop(if(model.videoField != null) 1 else 0).take(model.maxVideos).map { it.copy(slotType = MediaSlotType.VIDEO_REFERENCE) })
+            val selected = (preferred + fallbacks).take(room)
+            addAll(selected.map { it.copy(fieldKey = field.contract?.key, slotType = role) })
+            remaining.removeAll { item -> selected.any { it.id == item.id } }
         }
     }
+}
 
 internal fun retainsAllReferences(model: NexusModel, media: List<AttachedMedia>): Boolean {
     val kept=compatibleModelMedia(model,media).map {it.id}.toSet()

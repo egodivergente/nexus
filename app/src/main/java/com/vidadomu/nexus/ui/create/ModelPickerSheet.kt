@@ -25,6 +25,8 @@ import com.vidadomu.nexus.ui.components.BrandLogo
 import com.vidadomu.nexus.ui.models.catalogFamily
 import com.vidadomu.nexus.ui.models.modelUse
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 
 /** One scrolling surface, including filters: still reachable with IME or large text.
  * Material's sheet consumes the system insets; the footer is just breathing room.
@@ -38,8 +40,11 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
     var query by rememberSaveable { mutableStateOf("") }
     var org by rememberSaveable { mutableStateOf<String?>(null) }
     var modality by rememberSaveable { mutableStateOf<Modality?>(initialModality) }
-    var compatibleOnly by rememberSaveable { mutableStateOf(media.isNotEmpty()) }
+    // Switching is safe even when a target uses fewer inputs: the composer keeps the rest.
+    var compatibleOnly by rememberSaveable { mutableStateOf(false) }
     var favoritesOnly by rememberSaveable { mutableStateOf(false) }
+    var showFilters by rememberSaveable { mutableStateOf(false) }
+    val feedback=rememberNexusHaptics()
     val context=LocalContext.current
     val favoritesStore=remember(context) {StudioFavoritesStore(context)}
     var favoritesRevision by remember {mutableIntStateOf(0)}
@@ -56,8 +61,9 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
         },onDismiss={editingFavorites=false})
         return
     }
-    val filtered = remember(availableModels, modality, media, compatibleOnly, org, query, favoritesOnly, favoriteKeys) {
-        filterCanvasModels(availableModels, modality, media, compatibleOnly, org, query)
+    val selectionMedia=remember(selectedModel,media) {selectedModel?.let {canonicalModelMedia(it,media)} ?: media}
+    val filtered = remember(availableModels, modality, selectionMedia, compatibleOnly, org, query, favoritesOnly, favoriteKeys) {
+        filterCanvasModels(availableModels, modality, selectionMedia, compatibleOnly, org, query)
             .filter {!favoritesOnly || it.studioKey() in favoriteKeys}
     }
     val families = remember(filtered) { filtered.groupBy(::catalogFamily).toSortedMap() }
@@ -71,8 +77,9 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
             item {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Elige tu modelo",style=MaterialTheme.typography.titleLarge)
-                        Text("${filtered.size} ${if(filtered.size==1) "modelo" else "modelos"} · ${families.size} ${if(families.size==1) "familia" else "familias"}",style=MaterialTheme.typography.bodySmall)
+                        Text("Cambiar modelo",style=MaterialTheme.typography.titleLarge)
+                        Text("Conservas prompt, archivos y ajustes compatibles",style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick={editingFavorites=true}) {Icon(Icons.Default.StarOutline,"Editar modelos favoritos")}
                     IconButton(onClick=onDismiss) {Icon(Icons.Default.Close,"Cerrar selector de modelos")}
@@ -86,26 +93,26 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
             item {
                 LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     item {FilterChip(favoritesOnly,{favoritesOnly=!favoritesOnly},label={Text("Favoritos")},leadingIcon={Icon(Icons.Default.Star,null,Modifier.size(NexusTokens.iconSmall))})}
+                    if(media.isNotEmpty()) item {FilterChip(compatibleOnly,{compatibleOnly=!compatibleOnly},label={Text("Todas mis referencias")})}
+                    item {FilterChip(showFilters,{showFilters=!showFilters},label={Text("Filtros")},leadingIcon={Icon(Icons.Default.Tune,null,Modifier.size(NexusTokens.iconSmall))})}
+                }
+            }
+            if(showFilters) item {
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio",Modality.CHAT to "Chat")) { (value,label) ->
                         FilterChip(modality==value,{modality=value;org=null},label={Text(label)})
                     }
                     item {FilterChip(modality==null,{modality=null;org=null;compatibleOnly=false},label={Text("Todo el catálogo")})}
                 }
             }
-            if(media.isNotEmpty()) item {
-                Column {
-                    FilterChip(compatibleOnly,{compatibleOnly=!compatibleOnly},label={Text("Admite mis ${media.size} referencias")})
-                    Text("Según las entradas declaradas. Si falta un modelo, prueba Todo el catálogo. Revisarás la configuración final antes de generar.",style=MaterialTheme.typography.bodySmall)
-                }
-            }
-            if(orgs.size>1) item {
+            if(showFilters && orgs.size>1) item {
                 LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     item {FilterChip(org==null,{org=null},label={Text("Todas las marcas")})}
                     items(orgs,key={it}) {brand -> FilterChip(org==brand,{org=if(org==brand) null else brand},label={Text(brand)})}
                 }
             }
             item {
-                Text("Tarifas guardadas, no un coste final. El precio se consulta al elegir y configurar el modelo.",
+                Text("${filtered.size} modelos"+if(media.isNotEmpty()) " · Los archivos incompatibles quedan guardados" else "",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if(filtered.isEmpty()) item {
@@ -126,7 +133,10 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                     Surface(color=if(isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
                         shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
                             .semantics(mergeDescendants=true) {selected=isSelected}
-                            .clickable(role=Role.RadioButton) {onSelectModel(model)}) {
+                            .clickable(role=Role.RadioButton) {
+                                feedback.perform(NexusHapticEvent.SELECTION,changed=!isSelected)
+                                onSelectModel(model)
+                            }) {
                         Row(Modifier.padding(NexusTokens.space12).heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically,
                             horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                             BrandLogo(model.organization,model.family,model.id,size=24.dp,containerSize=40.dp)

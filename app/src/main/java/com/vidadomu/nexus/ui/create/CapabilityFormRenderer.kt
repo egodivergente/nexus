@@ -13,6 +13,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -140,4 +142,75 @@ internal fun ConservedMediaSection(media: List<AttachedMedia>, enabled: Boolean,
             }
         }
     }
+}
+
+/** A bounded summary keeps normal creation on one screen; complete media management lives in its sheet. */
+@Composable
+internal fun CompactCapabilityMediaInputs(fields:List<CanvasInputField>,model:NexusModel?,media:List<AttachedMedia>,enabled:Boolean,
+    onAdd:(CanvasInputField,List<Pair<Uri,String>>)->Unit,onRemove:(String)->Unit,onReorder:(String,Int)->Unit) {
+    val pair=declaredFramePair(fields,model)
+    val primary=fields.filter {it.required || media.any(it::contains) || it.mime.startsWith("image/")}
+    val secondary=fields.filterNot {it in primary}
+    val render: @Composable (CanvasInputField)->Unit = {field -> key(model?.providerId,model?.id,field.key) {
+        RegisteredSummaryMediaControl(field,media,enabled,{onAdd(field,it)},onRemove,onReorder)
+    }}
+    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val parallel=CanvasInputPlan.pairedFrames(pair,model,maxWidth.value,LocalDensity.current.fontScale)
+            Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                if(parallel) Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                    pair.forEach {field -> Box(Modifier.weight(1f)) {render(field)}}
+                }
+                primary.filterNot {parallel && it in pair}.forEach {render(it)}
+            }
+        }
+        secondary.chunked(if(LocalDensity.current.fontScale>1.3f) 1 else 2).forEach {row ->
+            Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                row.forEach {field -> Box(Modifier.weight(1f)) {render(field)}}
+                if(row.size==1 && LocalDensity.current.fontScale<=1.3f) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** Common settings remain one short line of launchers; an editor opens only for the chosen setting. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun CompactPrimaryParameterControls(model:NexusModel,parameters:List<ModelParameter>,values:Map<String,String>,onChange:(String,String)->Unit) {
+    var editing by remember(model.providerId,model.id) {mutableStateOf<String?>(null)}
+    val focusManager=LocalFocusManager.current
+    FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+        verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+        parameters.forEach {parameter ->
+            val title=ParameterPresentation.title(parameter)
+            val value=values[parameter.key] ?: parameter.defaultValue
+            val kind=DynamicControlRegistry.parameterKind(parameter)
+            val icon=when(kind) {
+                DynamicParameterKind.DURATION -> Icons.Default.Timer
+                DynamicParameterKind.RESOLUTION -> Icons.Default.HighQuality
+                DynamicParameterKind.ASPECT_RATIO -> Icons.Default.AspectRatio
+                DynamicParameterKind.FPS -> Icons.Default.Speed
+                DynamicParameterKind.AUDIO -> Icons.Default.VolumeUp
+                DynamicParameterKind.SEED -> Icons.Default.Casino
+                else -> Icons.Default.Tune
+            }
+            val label=when(kind) {
+                DynamicParameterKind.DURATION -> value.takeIf {it.isNotBlank()} ?: "Duración"
+                DynamicParameterKind.AUDIO -> if(parameter.key.lowercase()=="generate_audio") {
+                    if(value=="true") "Con audio" else if(value=="false") "Sin audio" else "Audio auto"
+                } else "$title · ${ParameterPresentation.label(parameter,value).primary}"
+                else -> ParameterPresentation.label(parameter,value).primary
+            }
+            FilledTonalButton(onClick={focusManager.clearFocus();editing=parameter.key},shape=NexusTokens.pill,
+                contentPadding=PaddingValues(horizontal=NexusTokens.space12,vertical=NexusTokens.space4),
+                modifier=Modifier.heightIn(min=NexusTokens.minimumTouch).semantics {contentDescription="$title: $label. Cambiar"}) {
+                Icon(icon,null,Modifier.size(NexusTokens.iconSmall))
+                Spacer(Modifier.width(NexusTokens.space4))
+                Text(label,style=MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+    parameters.firstOrNull {it.key==editing}?.let {parameter -> CanvasSheet(ParameterPresentation.title(parameter),{editing=null}) {
+        RegisteredParameterControl(parameter,values[parameter.key] ?: parameter.defaultValue) {onChange(parameter.key,it)}
+    }}
 }
