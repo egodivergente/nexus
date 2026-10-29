@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
                     startupFailed = false
                     try {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                            com.vidadomu.nexus.assistant.AssistantRuntime.get(this@MainActivity)
+                            com.vidadomu.nexus.assistant.AssistantRuntime.get(application as NexusApplication)
                         }
                         runtimeReady = true
                     } catch (e: kotlinx.coroutines.CancellationException) { throw e }
