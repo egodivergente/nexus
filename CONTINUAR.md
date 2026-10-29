@@ -1,3 +1,28 @@
+# Nexus Agent premium — entrega del 29/10/2026
+
+Rama propia `codex/nexus-premium-20261029`; fuente de la APK `2abd8d732fa686aff954bcf95516a67cd76feb8d`,
+publicada y verificada en remoto. APK **1.9.125-agent-preview / vc161**, compilada
+en AXELPC e instalada como actualización en Pixel 8 Pro y S25 Ultra. Versión,
+arranque y hash instalado comprobados en ambos, con certificado existente.
+SHA-256 `f94b544b2ee05495936342d7698eb7a088ade1d40d8883b43b566f8ef47ad05a`. **209 pruebas seleccionadas PASS**
+(205 app + 4 núcleo), sin omitidas; cinco ARM64 idénticas a vc155 y alineación 16 KiB.
+
+Lanzadera principal fija adaptativa: controles habituales, miniaturas resumidas y
+chips; gestión extensa en hojas y Avanzado. Scroll de respaldo para IME, fuente
+grande o desbordamiento real. Cambio de modelo conserva prompt/archivos y ajustes
+compatibles, con valores incompatibles guardados por configuración y persistencia
+al reabrir. Comprobados Pixel ancho+IME, hoja numérica, importación y recorrido
+Kling → MiniMax H3 Ref → Kling; borrador original restaurado tras retirar la
+referencia QA. S25: cuatro secciones y Lanzadera con su borrador actual comprobados.
+
+Ver `docs/AUDIT_REPORT.md`, `docs/AUDIT_PLAN.md` y `docs/CAPABILITY_UI.md` para
+cobertura exacta, conservación y límites. Sin pagos, borrado de datos/originales,
+desinstalación ni cambios de firma. No equiparar con certificación subjetiva 10/10,
+120 Hz sostenidos, TalkBack auditivo, S Pen o sensación háptica física. Los hashes
+de preferencias seguras cambiaron: no se acredita igualdad de credenciales.
+Los avisos de no instalar/no publicar inferiores son históricos; esta entrega
+tenía autorización explícita para actualizar ambos móviles y publicar la rama propia.
+
 # Segunda entrega ArtBox - 2026-10-24
 
 Rama segura `codex/artbox-integral-2-20261024`, base local `13fa404`.

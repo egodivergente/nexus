@@ -3,7 +3,7 @@
 ## Flujo real
 
 `ModelCatalog → ModelCapabilityRegistry → ComposerState / CreateUiState →
-CapabilityConstraintEngine → DynamicFormRenderer → GenerationDispatcher →
+CapabilityConstraintEngine → FixedLauncherWorkspace / renderers compactos → GenerationDispatcher →
 NativeGenerationRequest / adaptadores existentes`.
 
 El catálogo sigue siendo el repositorio existente. El registro adapta `NexusModel`,
@@ -44,15 +44,39 @@ asignaciones de recursos de esa configuración. No se restaura silenciosamente u
 prompt antiguo. El cambio es reversible. Aplicar presets, restaurar parámetros y
 cambiar modalidad reconcilia las dos particiones sin borrar archivos.
 
+El cambio conserva los ajustes actuales que el contrato de destino admite, sobre
+su borrador o preferencias guardadas. Se comprueba primero la combinación completa
+y sus dependencias; si no es válida se conserva un subconjunto válido, sin
+aproximaciones, redondeos ni conversiones de unidades. Las equivalencias se limitan
+a claves nativas y semánticas inequívocas. Los ajustes adaptados se explican en
+Avanzado; un valor de respaldo no sustituye la preferencia original al volver, salvo
+que el usuario lo haya editado. Las respuestas de esquemas anteriores no pueden
+sobrescribir el destino o las ediciones actuales.
+
+Los archivos se trasladan por su rol declarado, MIME y cardinalidad, aunque cambie
+la clave de entrada entre proveedores. El borrador original conserva sus bindings.
+Máscaras y campos ambiguos mantienen un propietario de binding con proveedor,
+modelo y endpoint; una coincidencia accidental de nombres no los convierte en
+otra entrada. Esta metadata es privada del borrador y no se proyecta a MediaInput
+ni a los payloads del proveedor.
+
 Las preferencias y presets nuevos se separan por identidad completa. Se conserva
 lectura de los formatos anteriores; los originales no se borran. La eliminación
 explícita de una referencia del borrador no borra el archivo original.
 
 ## Presentación y extensiones
 
-`DynamicFormRenderer` organiza entradas y parámetros. `PromptEditor` y
+`DynamicFormRenderer` y la presentación compacta comparten los controles de entradas
+y parámetros. `FixedLauncherWorkspace` organiza la principal; `PromptEditor` y
 `GenerateActionBar` completan el flujo modelo → prompt → entradas → parámetros →
 generar. Los controles reciben esquemas y valores; no identifican marcas.
+
+La principal usa una composición fija con resúmenes de entradas y chips de ajustes
+comunes. La gestión completa de archivos, el editor ampliado del prompt y Avanzado
+se abren en hojas. El desplazamiento de la principal se habilita solo ante teclado,
+texto ampliado o desbordamiento medido; en ancho suficiente se usan dos columnas.
+El prompt conserva su nodo y foco al reorganizarse. Los propietarios de hojas no
+se retiran por el teclado de otro editor.
 
 `DynamicControlRegistry.Provide` registra renderers por clave nativa o tipo
 semántico mediante un `CompositionLocal` acotado. Incluye imagen, inicio/final,

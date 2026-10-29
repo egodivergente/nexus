@@ -1,4 +1,37 @@
 ﻿{
+    "premiumAndroid20261029": {
+        "branch": "codex/nexus-premium-20261029",
+        "sourceCommit": "2abd8d732fa686aff954bcf95516a67cd76feb8d",
+        "versionCode": 161,
+        "versionName": "1.9.125-agent-preview",
+        "status": "INSTALLED_BOTH_AUDIT_VERIFIED_BOUNDED_ACCEPTANCE",
+        "apkSha256": "f94b544b2ee05495936342d7698eb7a088ade1d40d8883b43b566f8ef47ad05a",
+        "signingCertificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "buildHost": "AXELPC",
+        "installedDevices": [
+            "Pixel 8 Pro",
+            "SM-S938B"
+        ],
+        "installedApkHashesMatch": true,
+        "selectedUnitTestsPassed": 209,
+        "appSelectedTestsPassed": 205,
+        "coreSelectedTestsPassed": 4,
+        "zipalign16KiB": true,
+        "nativeArm64LibrariesIdenticalTo155": 5,
+        "newDependencies": 0,
+        "paidOperationsByThisAudit": 0,
+        "currentDraftFingerprintPreservedOnInstallBoth": true,
+        "preservationBaselines": {
+            "Pixel 8 Pro": 156,
+            "SM-S938B": 155
+        },
+        "originalGenerationAndOutputRowsPreserved": true,
+        "credentialValuesUnchangedVerification": "NOT_ESTABLISHED: secure preference hashes differ; no agent edits to credential files",
+        "documentation": "docs/AUDIT_REPORT.md",
+        "plan": "docs/AUDIT_PLAN.md",
+        "architecture": "docs/CAPABILITY_UI.md",
+        "note": "Physical scope and remaining acceptance are explicit in the report. Historical entries below do not describe this delivery."
+    },
     "flowConnectionRepair20261024": {
         "branch": "codex/nexus-master-artbox-20261023",
         "sourceCommit": "5a450cff40b972f0526fd074f84110bf09c1b96a",
