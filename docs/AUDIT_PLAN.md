@@ -1,5 +1,15 @@
 # Auditoría premium de Nexus Agent — 29/10/2026
 
+## U08 — familias y variantes, CÓDIGO RESUELTO / QA FINAL PARCIAL vc169
+
+- Implementado y publicado: familia única, selector compartido, rutas exactas, pool íntegro, Inbox con prioridad y conservación; audio/vídeo opcionales, identidad de flujo y procedencia de ajustes corregidos.
+- AXELPC vc169/1.9.133, fuente712ae1c86def5594ae20aaf5137b934de612ac81: 288 app ejecutadas PASS +4 núcleo UP-TO-DATE. Umbral de ocultamiento400ms intacto, PASS tras cache de snapshot/revisión. Firma/nativas/16KiB PASS, cero dependencias.
+- Instalada como actualización en ambos: hash/versión/foreground y borradores inmediatos iguales. Pixel169 ciclo2.5→Mini→Fast→2.5 recupera1080p, prompt y dos imágenes exactos; opcionales ausentes no bloquean.
+- ArtBox169: Pro2 preparados→Lite2 conservados y reapertura conservados PASS. Traspaso/retorno final pendiente, interrumpido por cambio de pantalla. Su prueba166 es histórica.
+- S25169: arranque/Biblioteca comprobados; QA restante interrumpida por Samsung Notes. Borrador147chars/1imagen igual durante install; después texto vacío sin causa atribuible demostrada. No se restauró sobre el estado actual.
+- PENDIENTE aceptación: resto QA S25, traspaso ArtBox final, retirar dos referencias QA Pixel/restaurar su borrador inicial sin interferir, fuente grande/IME selector169, TalkBack/háptica física/120Hz. No se declara cierre global10/10. Motivos, ventanas de log y resultados exactos en AUDIT_REPORT.md.
+- Sin pagos, cambios de firma, borrado de originales/datos ni refactors ajenos. Registros históricos inferiores conservados.
+
 ## Corrección posterior: aprovechar el marco disponible — U07
 
 - **U07 — IMPLEMENTADO, QA PIXEL PASS / S25 VISUAL PENDIENTE por Keyguard,

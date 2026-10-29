@@ -1,6 +1,71 @@
 ﻿{
     "premiumAndroid20261029": {
         "branch": "codex/nexus-premium-20261029",
+        "sourceCommit": "712ae1c86def5594ae20aaf5137b934de612ac81",
+        "sourceRemoteVerification": "VERIFIED_GIT_LS_REMOTE",
+        "versionCode": 169,
+        "versionName": "1.9.133-agent-preview",
+        "status": "INSTALLED_BOTH_QA_PARTIAL_INTERRUPTED",
+        "buildHost": "AXELPC",
+        "apkSha256": "93a24ba6810c664a71b53bba5525510c52e7030c21afe1232dd5d1d846454f9d",
+        "signingCertificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "installedDevices": [
+            "Pixel 8 Pro",
+            "SM-S938B"
+        ],
+        "installedApkHashesMatch": true,
+        "appSelectedTestsPassed": 288,
+        "coreSelectedTestsPassed": 4,
+        "coreSelectedTestExecution": "UP_TO_DATE_VALID_REUSED",
+        "currentDraftFingerprintPreservedOnInstallBoth": true,
+        "pixelVariantCycleExactRestored": true,
+        "s25Qa": "START_LIBRARY_PASS_OTHER_FLOWS_NOT_TESTED_NOTES_FOREGROUND",
+        "s25PostInstallPromptChange": "147_TO_0_CAUSE_NOT_ATTRIBUTED_NO_RESTORE",
+        "pixelQaMediaCleanup": "PENDING_TWO_REFERENCES_NO_ORIGINAL_FILE_DELETION",
+        "globalAcceptance": "PARTIAL_NOT_COMPLETE",
+        "finalLogWindows": {
+            "pixel": {
+                "logcatExit": 0,
+                "requestedSinceEpoch": 1793263822,
+                "availableFirstEpoch": 1793271760.529,
+                "availableLastEpoch": 1793296267.546,
+                "linesReviewed": 24599,
+                "crashOrAnr": [],
+                "fontScale": "1.0",
+                "screenOffTimeout": "300000",
+                "accelerometerRotation": "1",
+                "userRotation": "0",
+                "size": "Physical size: 1344x2992",
+                "density": "Physical density: 480",
+                "appearance": {
+                    "theme": "LIGHT"
+                }
+            },
+            "s25": {
+                "logcatExit": 0,
+                "requestedSinceEpoch": 1793296061,
+                "availableFirstEpoch": 1793296061.023,
+                "availableLastEpoch": 1793296275.346,
+                "linesReviewed": 121475,
+                "crashOrAnr": [],
+                "fontScale": "1.0",
+                "screenOffTimeout": "300000",
+                "accelerometerRotation": "1",
+                "userRotation": "0",
+                "size": "Physical size: 1440x3120",
+                "density": "Physical density: 600\r\nOverride density: 560",
+                "appearance": {
+                    "font_scale": "0.95000005",
+                    "theme": "AURORA"
+                }
+            }
+        },
+        "documentation": "docs/AUDIT_REPORT.md",
+        "plan": "docs/AUDIT_PLAN.md",
+        "architecture": "docs/CAPABILITY_UI.md"
+    },
+    "premiumAndroid20261029_vc164Checkpoint": {
+        "branch": "codex/nexus-premium-20261029",
         "sourceCommit": "d2616d2cde9f44cf81e48c47e8dbb28a53345dc1",
         "sourceRemoteVerification": "VERIFIED_GIT_LS_REMOTE_ON_WORK_BRANCH",
         "versionCode": 164,

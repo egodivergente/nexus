@@ -1,3 +1,88 @@
+# Nexus Agent — familias y variantes vc169, 29/10/2026
+
+Rama `codex/nexus-premium-20261029`. **APK 1.9.133-agent-preview / vc169 instalada
+como actualización en Pixel 8 Pro y S25 Ultra**. Hash, versión y Nexus foreground
+comprobados en cada uno. Fuente [712ae1c86def5594ae20aaf5137b934de612ac81](https://github.com/egodivergente/nexus/commit/712ae1c86def5594ae20aaf5137b934de612ac81)
+publicada y verificada mediante `git ls-remote`. La aceptación física queda acotada
+abajo; no se declara una certificación global 10/10.
+
+| Entrega | Comprobación |
+|---|---|
+| Compilación | AXELPC, PASS |
+| APK | `Nexus-Agent-1.9.133-v169.apk`, carpeta privada Documents/Codex/nexus-premium-20261029 |
+| SHA-256 | `93a24ba6810c664a71b53bba5525510c52e7030c21afe1232dd5d1d846454f9d` |
+| Certificado existente | `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127` |
+| Integridad | zipalign 16 KiB PASS; cinco ARM64 idénticas a vc155 |
+| Pruebas | **288 app ejecutadas PASS**, cero fallos/errores/omitidas; **4 núcleo UP-TO-DATE** reutilizadas |
+| Instalación | `adb install -r -t`, paquete original y sin borrar datos; ambos hashes instalados coinciden |
+| Borrador inmediato antes/después | Ambos: prompt, negativo, parámetros, IDs, URI y conteos iguales |
+
+Una tarjeta por familia en ArtBox y Lanzadera; selector compartido de variantes.
+Seedance reúne 11 variantes bajo una entrada en el selector observado. Las rutas
+reales, proveedor, flujo, precios y contratos conservan su identidad. El cambio
+rápido continúa automáticamente solo si hay una ruta inequívoca; Standard y
+Enterprise siguen accesibles por separado. Búsqueda/favoritos conservan familias;
+Personalizar/Herramientas mantienen sus identidades anteriores.
+
+El pool completo de imágenes se conserva entre variantes y navegación; los límites
+solo determinan activos/conservados. El traspaso a Lanzadera conserva previos,
+prepara todas las URI y asigna únicamente el primer campo real de imagen; no usa
+excedentes como fotograma final/máscara. Fallos de importación se notifican.
+Se priorizan importaciones nuevas sin borrar anteriores ni reproducir un Inbox ya
+procesado tras recrear la pantalla. El compositor sigue generado por contratos,
+sin formularios fijos por familia ni nuevas dependencias.
+
+Corregidos tres defectos reproducidos: alias compartidos ocultaban el flujo real;
+un `minItems` de audio/vídeo opcional obligaba a aportar un archivo ausente; y se
+perdía la procedencia del respaldo de resolución al encadenar varios modelos.
+Una edición explícita conserva prioridad. La prueba de ocultamiento falló en vc168
+con 620 ms frente al umbral de 400; la caché de snapshots completos y revisión de
+colocación elimina el recálculo y vc169 pasa **sin cambiar el umbral**.
+
+| Evidencia física | Pixel 8 Pro | S25 Ultra |
+|---|---|---|
+| vc169 instalación y arranque | PASS, hash/version/foreground | PASS, hash/version/foreground; arranque frío 1287 ms |
+| Borrador al actualizar | Seedance 2.5 Ref, 72 caracteres, 2 referencias QA; igualdad completa | Seedream 5 Pro Edit, 147 caracteres y 1 imagen; igualdad completa |
+| Cambio 2.5 → Mini → Fast → 2.5 | PASS vc169: mismo prompt y dos IDs/URI; 1080→720→720→1080 y fingerprint completo final igual | No probado |
+| Opcionales ausentes | Mini/Fast con 0 audio/0 vídeo: Generar habilitado; no se pulsó | No probado |
+| ArtBox vc169 | Dos preparados en Pro → dos conservados en Lite; pool conservado al reabrir. Retorno/traspaso final interrumpido; no se declara PASS | No probado en este recorrido |
+| ArtBox vc166 histórico | Pro/Lite y traspaso de dos imágenes a Lanzadera comprobados; no se atribuyen a vc169 | No probado |
+| Navegación final | Capturas de ArtBox/Lanzadera; no recorrido completo vc169 | Biblioteca visible y cargada; resto interrumpido por Samsung Notes foreground |
+
+La QA encontró cambios de foco/estado posteriores en ambos dispositivos y detuvo
+las entradas. En S25 el prompt pasó de 147 caracteres a vacío después de la
+comparación de instalación; modelo, parámetros e imagen conservaron sus huellas.
+No se atribuye este cambio a una causa demostrada y no se restauró el texto sobre
+el estado actual. Las dos referencias QA añadidas al Pixel quedan pendientes de
+retirada y restauración de su borrador inicial (Kling, sin referencias) cuando pueda
+hacerse sin interferir; sus archivos originales nunca se borraron. El intento final
+ArtBox encontró Biblioteca y después un picker de foto de ajustes; se canceló ese
+picker una vez y se confirmó el panel de apariencia, sin seguir enviando entradas.
+
+Los XML null-root del S25 se descartaron; la evidencia visual procede de capturas
+propias y foco. La segunda miniatura negra coincide con su original: 640×359,
+RGB íntegramente cero, no un fallo demostrado de decoder.
+
+| Logs disponibles posteriores a instalar | Pixel | S25 |
+|---|---|---|
+| Líneas / Fatal o ANR Nexus detectados | 24599 / 0 | 121475 / 0 |
+| Intervalo epoch disponible | 1793271760.529 → 1793296267.546 | 1793296061.023 → 1793296275.346 |
+
+Estas ventanas no prueban ausencia de fallos fuera del intervalo. Configuración
+comprobada: fuente Android1.0, timeout300000, autoRot1/user0; Pixel1344×2992@480,
+S251440×3120/override560, tema LIGHT/AURORA y fuente S25≈0.95 conservados.
+
+**Pendientes de aceptación:** recorrido completo final S25, retorno/traspaso final
+ArtBox, limpieza de referencias QA Pixel, fuente grande/IME del nuevo selector,
+TalkBack auditivo, sensación háptica y 60/120 Hz sostenidos. Los resultados vc164 de
+fuente1.5 y wide/IME siguen históricos, sin presentarlos como prueba vc169.
+**Descartados:** pagos/generaciones/LLM, borrar originales/datos, cambiar firma,
+secretos en Git, nuevas dependencias y refactors ajenos. Sin acción irreversible
+pendiente de decisión humana. No se declara terminado el criterio global de QA.
+Evidencia privada fuera de Git; arquitectura en CAPABILITY_UI.md.
+
+---
+
 # Nexus Agent — entrega vc164 y checkpoint histórico vc161
 
 Fecha: 29/10/2026. Rama: `codex/nexus-premium-20261029`.

@@ -1,3 +1,11 @@
+# Checkpoint vc169 - 29/10/2026
+
+APK 1.9.133-agent-preview compilada en AXELPC e instalada en Pixel y S25. Hash, version y foreground verificados. Fuente 712ae1c86def5594ae20aaf5137b934de612ac81 publicada/verificada. 288 pruebas app PASS; 4 de nucleo UP-TO-DATE. Detalle y SHA256 en docs/AUDIT_REPORT.md.
+
+QA PARCIAL: Pixel ciclo 2.5/Mini/Fast/2.5 recupera 1080p y conserva prompt/archivos. S25 arranque/Biblioteca PASS; resto interrumpido por Samsung Notes. Prompt S25 cambio tras comparar instalacion: causa no atribuida, no restaurar copia antigua sobre estado actual. Dos referencias QA Pixel pendientes de retirar sin interferir ni borrar originales. Retorno/traspaso final ArtBox y aceptacion fisica completa pendientes. No certificar global 10/10.
+
+---
+
 # Nexus Agent premium — corrección vc164 del 29/10/2026
 
 Rama `codex/nexus-premium-20261029`; fuente de la APK
