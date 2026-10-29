@@ -68,7 +68,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     var userColumns by remember {mutableStateOf(prefs.getInt("columns_user",0))}
     var moreMenu by remember {mutableStateOf(false)}
     LaunchedEffect(models) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {models.forEach {modelSearchText(it)}}
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {warmCatalogSearch(models)}
     }
     var modality by rememberSaveable { mutableStateOf(runCatching { Modality.valueOf(prefs.getString("browser_modality", "VIDEO")!!) }.getOrDefault(Modality.VIDEO)) }
     var family by rememberSaveable { mutableStateOf<String?>(null) }
