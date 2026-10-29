@@ -321,6 +321,7 @@ def browser_acceptance(root, sources, output):
                 check('Historical and indexed aliases deduplicate to one visible file', len(owners('asset:asset-variant-a')) == 1 and owners('asset:asset-variant-a')[0]['id'] == va[0]['id'])
                 check('A deleted remote original stays out of the real library grid', not owners('job:job-deleted-remote:0'))
                 check('Normalized file count matches the visible grid', page.locator('.gallery-grid .gallery-piece').count() == len(items))
+                page.wait_for_function('()=>[...document.querySelectorAll(".gallery-grid img[data-gallery-preview=thumbnail]")].filter(i=>i.complete&&i.naturalWidth>100).length===4')
                 page.screenshot(path=str(output/'complete-library-real-media.png'))
                 a_card = page.locator('[data-job="'+va[0]['id']+'"]')
                 a_card.locator('[data-gallery-group]').click()
@@ -385,6 +386,7 @@ def browser_acceptance(root, sources, output):
                 page.wait_for_function('()=>document.querySelector("[data-originals-count=archived]")?.textContent!=="—"')
                 check('Originals UI separates local verification from unconfirmed Drive backup', page.locator('[data-originals-count=cloudVerified]').inner_text() == '0' and int(page.locator('[data-originals-count=pendingCloud]').inner_text()) >= 4)
                 check('Originals UI reports unavailable originals instead of claiming completion', 'pendientes' in page.locator('[data-originals-status]').inner_text().lower())
+                page.locator('.workspace-resume').scroll_into_view_if_needed()
                 page.screenshot(path=str(output/'explicit-resume-point.png'))
                 phase['name'] = 'explicit-resume'
                 page.locator('[data-workspace-open="'+workspace_id+'"]').click()
