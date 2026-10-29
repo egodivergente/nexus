@@ -1,7 +1,7 @@
 package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.NexusModel
-import com.vidadomu.nexus.ui.models.modelUse
+import com.vidadomu.nexus.ui.models.catalogWorkflows
 import com.vidadomu.nexus.ui.models.providerName
 
 internal data class CanvasModelIdentity(val title: String, val detail: String, val exactId: String)
@@ -28,7 +28,7 @@ internal fun canvasModelIdentity(model: NexusModel): CanvasModelIdentity {
         listOf("Grok",kind,version,variant).filter {it.isNotBlank()}.joinToString(" ")
     } else withoutVendorPrefix(model.displayName.substringBefore(" · proyecto activo"))
     val provider=if(model.providerId=="usr_byteplus-media") "BytePlus" else providerName(model.providerId)
-    return CanvasModelIdentity(title, listOf(modelUse(model).label,provider).filter {it.isNotBlank()}.distinct().joinToString(" · "),model.providerModelId ?: model.id)
+    return CanvasModelIdentity(title, (catalogWorkflows(model).map {it.label}+provider).filter {it.isNotBlank()}.distinct().joinToString(" · "),model.providerModelId ?: model.id)
 }
 
 /** Catalog names sometimes start with the vendor in capitals («BLACKFORESTLABS FLUX 3 Edit Image»); the logo already says it. */

@@ -165,11 +165,11 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                     val price=tariff?.takeIf {it.unit!=null && it.usd.isFinite() && it.usd>=0}?.let {
                         "${if(it.baseTariff) "Desde " else ""}${currencyManager.formatUnitPrice(it.unitUsd ?: it.usd)} / ${it.unit}"
                     } ?: "Precio por confirmar"
-                    val label=listOf(modelUse(model).label,optionVariantLabel(model,product.title)).distinct().joinToString(" · ")
+                    val label=catalogRouteTitle(model,product)
                     val ambiguousLabel=product.routes.count {other -> other.providerId==model.providerId &&
-                        modelUse(other)==modelUse(model) && optionVariantLabel(other,product.title)==optionVariantLabel(model,product.title)}>1
+                        catalogRouteTitle(other,product)==label}>1
                     val detail="${providerName(model.providerId)} · $price"+
-                        if(ambiguousLabel) " · ${model.providerModelId ?: model.id}" else ""
+                        if(ambiguousLabel) " · ${model.id}" else ""
                     PickerSummaryRow(label,detail,model,isSelected,onClick={
                         feedback.perform(NexusHapticEvent.SELECTION,changed=!isSelected);onSelectModel(model)
                     })

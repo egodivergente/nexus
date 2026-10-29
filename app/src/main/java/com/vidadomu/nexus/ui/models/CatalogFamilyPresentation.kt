@@ -16,6 +16,17 @@ internal fun catalogFamilyVariantForModel(groups:List<CatalogModelGroup>,model:N
     return groups.singleOrNull {group -> group.routes.any {modelBookmark(it)==bookmark}}
 }
 
+/** A product can share an upstream model alias across text/image/video endpoints. Name its real workflow. */
+internal fun catalogRouteTitle(model:NexusModel,group:CatalogModelGroup):String {
+    val tasks=catalogWorkflows(model).map {it.label}
+    val options=optionVariantLabel(model,group.title).split(" · ").filter {part ->
+        part.isNotBlank() && !part.equals("Estándar",true) && !part.equals(catalogFamily(model),true) &&
+            tasks.none {it.equals(part,true)} &&
+            !(part.all {it.isDigit() || it.isWhitespace() || it in "._-"} && group.title.contains(part))
+    }
+    return (tasks+options).distinctBy {it.lowercase(java.util.Locale.ROOT)}.joinToString(" · ")
+}
+
 /** Continue a variant only when its native provider, modalities and complete workflow set identify one route. */
 internal fun catalogVariantContinuation(group:CatalogModelGroup,current:NexusModel?):NexusModel? {
     if(current==null) return group.routes.singleOrNull()

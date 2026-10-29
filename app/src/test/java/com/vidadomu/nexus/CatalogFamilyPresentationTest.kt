@@ -82,4 +82,33 @@ class CatalogFamilyPresentationTest {
         assertNull(catalogVariantContinuation(group("Empty"),null))
         assertNull(catalogVariantContinuation(group("Seedance 2",route.copy(providerId="crun")),route))
     }
+
+    @Test fun sharedUpstreamAliasDoesNotMergeTextAndVideoEditingLabels() {
+        val text=model("runway/seedance2_5/t2v","runway").copy(providerModelId="seedance2_5",
+            displayName="Seedance2 5 · Crear vídeo",inputMode=ModelInputMode.TEXT_ONLY)
+        val video=text.copy(id="runway/seedance2_5/v2v",displayName="Seedance2 5 · Editar vídeo")
+        val product=group("Seedance 2.5",text,video)
+        assertEquals("Desde texto",catalogRouteTitle(text,product))
+        assertEquals("Editar vídeo",catalogRouteTitle(video,product))
+        assertNotEquals(catalogRouteTitle(text,product),catalogRouteTitle(video,product))
+    }
+
+    @Test fun repeatedFamilyAndWorkflowDoNotAddFragmentsToTheRouteTitle() {
+        val image=model("runway/seedance2_5/i2v","runway",capabilities=listOf(ModelCapability.IMAGE_TO_VIDEO))
+            .copy(providerModelId="seedance2_5",displayName="Seedance2 5 · Animar imagen")
+        assertEquals("Animar imagen",catalogRouteTitle(image,group("Seedance 2.5",image)))
+        val reference=model("bytedance/seedance-2.5/reference-to-video",capabilities=listOf(ModelCapability.REFERENCE_TO_VIDEO))
+            .copy(displayName="Seedance 2.5 Seedance")
+        assertEquals("Con referencias",catalogRouteTitle(reference,group("Seedance 2.5",reference)))
+    }
+
+    @Test fun exactResolutionVariantsRemainNamed() {
+        val small=model("bytedance/seedance-v1-pro/image-to-video-720p",capabilities=listOf(ModelCapability.IMAGE_TO_VIDEO))
+            .copy(displayName="Seedance 1 Pro 720p")
+        val large=small.copy(id="bytedance/seedance-v1-pro/image-to-video-1080p",displayName="Seedance 1 Pro 1080p")
+        val product=group("Seedance 1 Pro",small,large)
+        assertTrue(catalogRouteTitle(small,product).contains("720p"))
+        assertTrue(catalogRouteTitle(large,product).contains("1080p"))
+        assertNotEquals(catalogRouteTitle(small,product),catalogRouteTitle(large,product))
+    }
 }
