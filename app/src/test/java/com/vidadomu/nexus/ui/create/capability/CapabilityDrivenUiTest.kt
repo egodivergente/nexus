@@ -289,4 +289,35 @@ class CapabilityDrivenUiTest {
         assertFalse(rejected.canSubmit)
         assertEquals("1.6", rejected.configuration.parameters["duration"])
     }
+
+    @Test fun foreignBindingOwnerBlocksDirectStatesEvenWhenFieldAndMimeMatch() {
+        val model=NexusModel("target","Target","fixture",organization="Fixture",modalities=listOf(Modality.IMAGE),
+            capabilities=emptyList(),parameters=emptyList(),contractEndpoint="/target",contractPromptField="prompt",
+            contractMedia=listOf(ContractMediaField("input","Photo","image/*",required=true)))
+        val media=image(key="input").copy(bindingOwner=MediaBindingOwner("fixture","mask-source","/source"))
+        val owners=listOf(media.bindingOwner!!,MediaBindingOwner("other",model.id,"/target"),
+            MediaBindingOwner(model.providerId,model.id,"/another-endpoint"))
+        for(owner in owners) {
+            val input=media.copy(bindingOwner=owner)
+            val result=CapabilityConstraintEngine.evaluate(capabilities(model,media=listOf(input)),"Original prompt",emptyMap(),listOf(input))
+            assertFalse(result.canSubmit)
+            assertTrue(result.issues.any {it.kind==CapabilityIssueKind.MEDIA && it.fieldKey=="input"})
+            assertEquals(listOf(input),result.configuration.media)
+            assertEquals(owner,result.configuration.media.single().bindingOwner)
+        }
+    }
+
+    @Test fun owningModelAcceptsItsDeclaredMaskAndLegacyUnownedMedia() {
+        val model=NexusModel("mask-owner","Mask owner","fixture",organization="Fixture",modalities=listOf(Modality.IMAGE),
+            capabilities=emptyList(),parameters=listOf(ModelParameter("input","Mask",ParameterType.MASK)),
+            contractEndpoint="/mask",contractPromptField="prompt",
+            contractMedia=listOf(ContractMediaField("input","Mask","image/*",required=true)))
+        val owner=MediaBindingOwner(model.providerId,model.id,model.contractEndpoint)
+        val owned=image(key="input").copy(bindingOwner=owner)
+        for(input in listOf(owned,owned.copy(bindingOwner=null))) {
+            val result=CapabilityConstraintEngine.evaluate(capabilities(model,media=listOf(input)),"Original prompt",emptyMap(),listOf(input))
+            assertTrue(result.issues.toString(),result.canSubmit)
+            assertEquals(listOf(input),result.configuration.media)
+        }
+    }
 }

@@ -50,6 +50,26 @@ class ComparisonPlanTest {
         val target = model().copy(contractEndpoint = "edit", contractMedia = listOf(ContractMediaField("image", "Imagen", "image/*", required = true)))
         assertThrows(IllegalArgumentException::class.java) { ComparisonPlan.adapt(s, target) }
     }
+    @Test fun comparisonRejectsForeignBindingBeforeRemappingAndKeepsMatchingOrLegacyOwnership() {
+        val target=model("target").copy(contractEndpoint="/target",
+            contractMedia=listOf(ContractMediaField("input","References","image/*",maximum=2,encoding="array")))
+        val foreign=image().copy(fieldKey="input",bindingOwner=MediaBindingOwner("fixture","mask-owner","/mask"))
+        val problem=ComparisonPlan.referenceProblem(target,listOf(foreign))
+        assertNotNull(problem)
+        assertTrue(problem!!.isNotBlank())
+        assertThrows(IllegalArgumentException::class.java) {
+            ComparisonPlan.adapt(source().copy(attachedMedia=listOf(foreign)),target)
+        }
+        assertEquals("input",foreign.fieldKey)
+        assertNotNull(foreign.bindingOwner)
+        val matching=foreign.copy(bindingOwner=MediaBindingOwner(target.providerId,target.id,target.contractEndpoint))
+        for(input in listOf(matching,matching.copy(bindingOwner=null))) {
+            assertNull(ComparisonPlan.referenceProblem(target,listOf(input)))
+            val prepared=ComparisonPlan.adapt(source().copy(attachedMedia=listOf(input)),target)
+            assertEquals(input.bindingOwner,prepared.state.attachedMedia.single().bindingOwner)
+            assertEquals(input.id,prepared.state.attachedMedia.single().id)
+        }
+    }
     @Test fun exactAtlasImageArrayAndRunwayPayloadsRemainIndependent() {
         val atlas = NativeModelSchema.decode(model("atlas-image").copy(providerId = "atlas_cloud"),
             """{"components":{"schemas":{"Input":{"required":["prompt","images"],"properties":{"prompt":{"type":"string"},"images":{"type":"array","items":{"type":"string"},"maxItems":4},"aspect_ratio":{"type":"string","enum":["1:1","16:9"],"default":"1:1"}}}}}}""").model

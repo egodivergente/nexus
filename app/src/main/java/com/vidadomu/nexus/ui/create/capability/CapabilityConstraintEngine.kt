@@ -3,6 +3,7 @@ package com.vidadomu.nexus.ui.create.capability
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.provider.atlas.NativeModelSchema
 import com.vidadomu.nexus.ui.create.CanvasInputPlan
+import com.vidadomu.nexus.ui.create.mediaBindingMatches
 import java.math.BigDecimal
 
 internal enum class CapabilityIssueKind { MODEL, PROMPT, MEDIA, PARAMETER, DEPENDENCY, UNKNOWN }
@@ -57,6 +58,10 @@ internal object CapabilityConstraintEngine {
                     "${model.displayName}: longitud de prompt fuera del contrato (${contract.minimum ?: 0}–${contract.maximum ?: "sin máximo publicado"}, ${contract.unit}). El original se conserva.")
             if (count == null && (contract.minimum != null || contract.maximum != null))
                 issue(CapabilityIssueKind.UNKNOWN, contract.fieldKey, "La unidad del límite de prompt no está confirmada.")
+        }
+        media.filterNot { mediaBindingMatches(model, it) }.forEach { item ->
+            issue(CapabilityIssueKind.MEDIA, item.fieldKey,
+                "Este archivo está vinculado a una entrada específica de otro modelo. Se conserva sin reinterpretarlo.")
         }
         for (input in capabilities.inputs) {
             val attached = media.filter(input.field::contains)

@@ -112,6 +112,9 @@ object ComparisonPlan {
 
     private fun mapImages(model: NexusModel, source: List<AttachedMedia>): List<AttachedMedia> {
         if(source.isEmpty()) return emptyList()
+        require(source.all { mediaBindingMatches(model, it) }) {
+            "Hay archivos vinculados a entradas específicas de otro modelo. Se conservan y no se pueden reinterpretar como referencias."
+        }
         if(model.providerId == "atlas_cloud") {
             val minimumProblem = com.vidadomu.nexus.provider.atlas.NativeModelSchema.referenceCountProblem(model, source.size)
             require(minimumProblem == null) { minimumProblem ?: "Revisa las referencias." }
