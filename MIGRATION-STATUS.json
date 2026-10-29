@@ -1,4 +1,19 @@
 ﻿{
+    "chatVisualHierarchy20261030": {
+        "branch": "codex/chat-visual-hierarchy-20261030",
+        "sourceCommit": "d481edde8363a6e988f284814f44c8dcd1bd3619",
+        "sourceRemoteVerification": "VERIFIED_GIT_LS_REMOTE",
+        "versionCode": 172,
+        "versionName": "1.9.136-agent-preview",
+        "buildHost": "AXELPC",
+        "apkSha256": "dd1acf5241e699ca97de9ca55ef98b781b9607e279d76eb31ad13be0760a26ef",
+        "installedBothHashesVersionsLaunchVerified": true,
+        "selectedTestsExecutedPassed": 32,
+        "draftsAndAppearancePreservedBoth": true,
+        "s25Qa": "ORIGINAL_REPLY_VISUAL_PASS_KEYBOARD_INTERRUPTED_EXTERNAL_APPS",
+        "pixelQa": "LAUNCH_PASS_CHAT_BLOCKED_KEYGUARD_FONT150_IME_NOT_TESTED",
+        "report": "docs/CHAT_VISUAL_HIERARCHY.md"
+    },
     "appearanceAndroid20261029": {
         "branch": "codex/nexus-axel-appearance-20261029",
         "sourceCommit": "4961c5a7d1383ae924073d2fcdce7c9260b66d95",

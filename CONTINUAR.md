@@ -1,3 +1,11 @@
+# Chat: jerarquia visual vc172 - 30/10/2026
+
+Rama codex/chat-visual-hierarchy-20261030. Fuente APK d481edde8363a6e988f284814f44c8dcd1bd3619 publicada/verificada. APK1.9.136-agent-preview vc172 compilada en AXELPC,32pruebas ejecutadas PASS(9app+23core),firma existente/16KiB/5ARM64 intactas. SHA256 dd1acf5241e699ca97de9ca55ef98b781b9607e279d76eb31ad13be0760a26ef.
+
+Instalada como actualizacion en Pixel yS25,hash/version/arranque foreground comprobados. Borradores de Lanzadera/chat y preferencias de apariencia conservados. S25 comparacion real de la respuesta original PASS; teclado interrumpido por Chrome/Termux. Pixel QAchat bloqueada por pantallaOff/Keyguard; noIME/fuente150 verificados172. Cero crash/ANR detectados en ventanas de log posteriores, no certificacion global. Lapiz flotante: overlay externo xyz.inspoapps.spenpro, no modificar. Ver docs/CHAT_VISUAL_HIERARCHY.md. Historial inferior no es la entrega actual.
+
+---
+
 # Apariencia Axel vc171 - 29/10/2026
 
 Rama codex/nexus-axel-appearance-20261029. Fuente 4961c5a7d1383ae924073d2fcdce7c9260b66d95 publicada/verificada. APK1.9.135-agent-preview, hash b7da59716343f2413f3c38c04a31ebb02670534e669edc046261a042adb654b9, firma original y5ARM64 intactas. Build AXELPC PASS;303pruebasapp ejecutadas PASS+4core UP-TO-DATE. Instalada como actualizacion en Pixel yS25 conhash/version verificados yborradores iguales durante install.
