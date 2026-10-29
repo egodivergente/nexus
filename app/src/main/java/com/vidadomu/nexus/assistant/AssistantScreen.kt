@@ -91,6 +91,8 @@ import com.vidadomu.nexus.ui.create.CreateUiState
 import com.vidadomu.nexus.ui.theme.*
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun AssistantScreen(
@@ -139,7 +141,11 @@ fun AssistantScreen(
         androidx.compose.foundation.lazy.LazyListState(draftPrefs.getInt("scroll:${ui.conversationId}",0),draftPrefs.getInt("offset:${ui.conversationId}",0))
     }
     LaunchedEffect(ui.conversationId,listState) {
-        snapshotFlow {listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset}.collect {(index,offset)->
+        // Persist the settled position, rather than scheduling a preferences write on every scroll frame.
+        snapshotFlow {
+            if (listState.isScrollInProgress) null
+            else listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.filterNotNull().distinctUntilChanged().collect {(index,offset)->
             draftPrefs.edit().putInt("scroll:${ui.conversationId}",index).putInt("offset:${ui.conversationId}",offset).apply()
         }
     }
@@ -147,7 +153,7 @@ fun AssistantScreen(
     val boardPicker = rememberProjectMediaPicker { uris -> vm.addBoard(uris) }
     // Cámara: la foto va a la caché (FileProvider) y se adjunta como cualquier referencia.
     val context = LocalContext.current
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val haptic = rememberNexusHaptics()
     var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
     val camera = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.TakePicture()) { ok ->
         cameraUri?.takeIf { ok }?.let { vm.attach(listOf(it)) }
@@ -238,10 +244,13 @@ fun AssistantScreen(
         } }) {showProject=false}
 
     val latestFailure=ui.items.filterIsInstance<ChatItem.Notice>().lastOrNull {it.error}
-    var shownFailure by rememberSaveable {mutableStateOf(latestFailure?.id)}
-    LaunchedEffect(latestFailure?.id) {
+    // History is restored asynchronously. Only errors created during this visit may interrupt the
+    // screen; old notices remain in the conversation, including when returning to another chat.
+    val failureSince=remember(ui.conversationId) {System.currentTimeMillis()}
+    var shownFailure by rememberSaveable(ui.conversationId) {mutableStateOf(latestFailure?.id)}
+    LaunchedEffect(ui.conversationId,latestFailure?.id) {
         val failure=latestFailure ?: return@LaunchedEffect
-        if(failure.id!=shownFailure) {
+        if(shouldAnnounceChatFailure(failure,failureSince,shownFailure)) {
             shownFailure=failure.id
             val result=snackbar.showSnackbar(noticeMessage(failure.text),actionLabel=if(vm.canRetryTurn()) "Reintentar" else null,withDismissAction=true)
             if(result==SnackbarResult.ActionPerformed) vm.retryTurn()
@@ -255,7 +264,7 @@ fun AssistantScreen(
     ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
         gesturesEnabled = drawer.isOpen) {
     Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
-        Snackbar(data,modifier=Modifier.padding(12.dp),shape=NexusTokens.card,
+        Snackbar(data,modifier=Modifier.padding(NexusTokens.space12),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={}) {pad ->
@@ -305,8 +314,8 @@ fun AssistantScreen(
                     val item = row as ChatItem
                     EntranceSpring(item.id, seenRows, if (motion) Modifier.animateItem() else Modifier) {
                     when (item) {
-                        is ChatItem.User -> Box(Modifier.animateItem()) { UserBubble(item) }
-                        is ChatItem.Assistant -> Box(Modifier.animateItem()) {
+                        is ChatItem.User -> Box { UserBubble(item) }
+                        is ChatItem.Assistant -> Box {
                             AssistantBubble(item, onOpenHistory,
                                 answered = if ("nexus-ui" in item.text) answerAfter(visibleItems, item) else null,
                                 onReply = { vm.send(it) })
@@ -378,7 +387,9 @@ fun AssistantScreen(
             Column(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 // «Ver encargos» moved to the header: only the scroll-down button floats over the reading area.
-                AnimatedVisibility(!following, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                AnimatedVisibility(!following,
+                    enter = if (motion) fadeIn() + scaleIn() else androidx.compose.animation.EnterTransition.None,
+                    exit = if (motion) fadeOut() + scaleOut() else androidx.compose.animation.ExitTransition.None) {
                     SmallFloatingActionButton(onClick = { following = true; scope.launch { followLast() } }, shape = NexusTokens.pill,
                         containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
                         Icon(Icons.Default.KeyboardArrowDown, "Bajar al final")
@@ -396,11 +407,12 @@ fun AssistantScreen(
                 Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)).clickable(onClickLabel = "Abrir ajustes", onClick = onOpenSettings)
-                    .semantics { contentDescription = "Ajustes" }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Settings, null, Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                IconButton(onClick = onOpenSettings, modifier = Modifier.size(NexusTokens.minimumTouch)) {
+                    Box(Modifier.size(NexusTokens.space32).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .72f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Settings, "Ajustes", Modifier.size(NexusTokens.iconSmall), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
             ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
@@ -426,7 +438,7 @@ fun AssistantScreen(
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
-                onSend = { if(vm.sendWithBoards(input.text)) {haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
+                onSend = { if(vm.sendWithBoards(input.text)) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 reasoningControl = { ReasoningPicker(ui, vm) })
             }
@@ -519,7 +531,7 @@ private fun OrdersSheet(cards: List<ChatItem.PlanCard>, ui: AssistantUiState, on
                 Row(Modifier.fillMaxWidth().clickable { onPick(card.id) }.heightIn(min = NexusTokens.minimumTouch)
                     .padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space8),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                    Icon(icon, label, tint = tint, modifier = Modifier.size(20.dp))
+                    Icon(icon, label, tint = tint, modifier = Modifier.size(NexusTokens.iconMedium))
                     Column(Modifier.weight(1f)) {
                         Text(plan?.modelName ?: "Encargo", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
@@ -533,7 +545,7 @@ private fun OrdersSheet(cards: List<ChatItem.PlanCard>, ui: AssistantUiState, on
 
 @Composable
 private fun QuickLink(text: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = NexusTokens.space8), modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)) {
         Text(text, style = MaterialTheme.typography.labelMedium)
     }
 }
@@ -739,7 +751,7 @@ internal fun UserBubble(item:ChatItem.User) {
         Row(Modifier.padding(end=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
             Box {
                 IconButton(onClick={actions=true},modifier=Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreHoriz,"Acciones del mensaje",Modifier.size(18.dp),tint=TextSecondary)
+                    Icon(Icons.Default.MoreHoriz,"Acciones del mensaje",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
                 }
                 DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
                     DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, leadingIcon={Icon(Icons.Default.ContentCopy,null)}, onClick = {
@@ -857,7 +869,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
             MessageMeta(item.at,item.tookMs,Modifier.weight(1f),item.by)
             Box {
                 IconButton(onClick={actionsExpanded=true},modifier=Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreHoriz,"Acciones de la respuesta",Modifier.size(18.dp),tint=TextSecondary)
+                    Icon(Icons.Default.MoreHoriz,"Acciones de la respuesta",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
                 }
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
@@ -976,7 +988,7 @@ private fun NoticeRow(
 @Composable
 private fun HistoryLinkButton(onOpenHistory: () -> Unit) {
     TextButton(onClick=onOpenHistory) {
-        Icon(Icons.Default.Timelapse,null,Modifier.size(18.dp))
+        Icon(Icons.Default.Timelapse,null,Modifier.size(NexusTokens.iconSmall))
         Spacer(Modifier.width(NexusTokens.space4))
         Text("Abrir Historial")
     }
@@ -1185,7 +1197,7 @@ private fun AttachmentThumb(a: Attachment, onRemove: (() -> Unit)? = null) {
     var failed by remember(a.uri) { mutableStateOf(false) }
     // Si el archivo ya no está (borrado de la biblioteca o permiso perdido) se muestra un hueco visible, no un cuadro vacío.
     Box(Modifier.size(64.dp).clip(NexusTokens.thumbnail).then(Modifier.background(MaterialTheme.colorScheme.surfaceVariant))) {
-        if (a.mimeType.startsWith("image/") && failed) Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        if (a.mimeType.startsWith("image/") && failed) Column(Modifier.fillMaxSize().padding(NexusTokens.space4), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Icon(Icons.Default.BrokenImage, "Imagen no disponible", tint = TextSecondary, modifier = Modifier.size(22.dp))
             Text(a.name ?: "Imagen", style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
@@ -1290,7 +1302,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                                         style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                                 }
                                 Surface(shape = NexusTokens.filter, color = if (ready) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer) {
-                                    Text(if (ready) "Clave lista" else "Falta la clave", Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium,
+                                    Text(if (ready) "Clave lista" else "Falta la clave", Modifier.padding(horizontal = 10.dp, vertical = NexusTokens.space4), style = MaterialTheme.typography.labelMedium,
                                         color = if (ready) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer)
                                 }
                             }

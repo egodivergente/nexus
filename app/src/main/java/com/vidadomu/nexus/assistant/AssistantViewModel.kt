@@ -51,7 +51,9 @@ sealed interface ChatItem {
     @kotlinx.serialization.Serializable
     data class Proposal(override val id: String, val actionId: String, val description: String, val state: ProposalState = ProposalState.PENDING, val result: String? = null) : ChatItem
     @kotlinx.serialization.Serializable
-    data class Notice(override val id: String, val text: String, val error: Boolean = false) : ChatItem
+    data class Notice(override val id: String, val text: String, val error: Boolean = false,
+        /** Legacy notices have no event time: restoring them must not announce a fresh error. */
+        val at: Long = 0L) : ChatItem
     /** Persisted by 1.8.2; opening history never changes the current mode. */
     @kotlinx.serialization.Serializable
     data class ModeSwitch(override val id: String, val text: String, val resolved: Boolean = false) : ChatItem
@@ -1225,7 +1227,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun consumeMessage() = _ui.update { it.copy(message = null) }
 
     private fun notice(text: String, error: Boolean = false, chatId: String = _ui.value.conversationId) =
-        updateChat(chatId) { it.copy(items = it.items + ChatItem.Notice(newId(), text, error)) }
+        updateChat(chatId) { it.copy(items = it.items + ChatItem.Notice(newId(), text, error, at = System.currentTimeMillis())) }
 
     private fun msg(text: String) = (++msgSeq) to text
 

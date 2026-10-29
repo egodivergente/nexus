@@ -1,6 +1,9 @@
 package com.vidadomu.nexus
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.systemGestures
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -102,6 +105,29 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             NexusTheme {
+                // Runtime construction reads the asset index, skills and rate tables. Await its
+                // synchronized warm-up off main before creating the ViewModel; keep the first
+                // frame responsive instead of waiting for that lock during composition.
+                var runtimeReady by remember { mutableStateOf(false) }
+                var startupFailed by remember { mutableStateOf(false) }
+                var startupAttempt by remember { mutableIntStateOf(0) }
+                LaunchedEffect(startupAttempt) {
+                    startupFailed = false
+                    try {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                            com.vidadomu.nexus.assistant.AssistantRuntime.get(this@MainActivity)
+                        }
+                        runtimeReady = true
+                    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (e: Exception) {
+                        android.util.Log.e("NexusStartup", e.javaClass.simpleName)
+                        startupFailed = true
+                    }
+                }
+                if (!runtimeReady) {
+                    com.vidadomu.nexus.ui.components.NexusStartupState(startupFailed) { startupAttempt++ }
+                    return@NexusTheme
+                }
                 val navController = rememberNavController()
                 val activeEntry by navController.currentBackStackEntryAsState()
                 val tabs=remember {Screen.bottomNavItems}
@@ -185,7 +211,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    modifier = Modifier.fillMaxSize().imePadding().revealBarOnSwipeUp(),
+                    modifier = Modifier.fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                        .imePadding().revealBarOnSwipeUp(),
                     containerColor = ScreenBackground,
                     bottomBar = {
                         if(!WindowInsets.isImeVisible) {
@@ -489,7 +517,7 @@ private fun NexusStartupOnboardingOverlay(epoch: Int) {
             contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
             androidx.compose.foundation.layout.Column(
-                modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp),
+                modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = NexusTokens.space24),
                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
             ) {
@@ -521,7 +549,7 @@ private fun NexusStartupOnboardingOverlay(epoch: Int) {
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.height(20.dp))
                 androidx.compose.material3.Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                    shape = NexusTokens.pill,
                     color = colors.primary.copy(alpha = 0.14f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary.copy(alpha = 0.35f)),
                     modifier = Modifier.graphicsLayer { alpha = textAlpha }
