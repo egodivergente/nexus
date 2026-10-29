@@ -18,7 +18,7 @@ internal data class LauncherContentSizing(val promptExtra:Dp=0.dp,val mediaExtra
 internal val LocalLauncherContentSizing=staticCompositionLocalOf {LauncherContentSizing()}
 private enum class WorkspacePart { HEADER, MODEL, PROMPT, INPUTS, PARAMETERS, STATUS, ADVANCED }
 
-/** A fixed composition for everyday creation. Scrolling is a fallback for IME, large text or insufficient height. */
+/** A fixed composition for everyday creation. Scrolling is a fallback for IME or insufficient measured height. */
 @Composable
 internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisible:Boolean,compactEditor:Boolean,
     promptVisible:Boolean=true,
@@ -42,7 +42,7 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
         val chrome=height(WorkspacePart.HEADER)+height(WorkspacePart.STATUS)+height(WorkspacePart.ADVANCED)+gap*3
         val base=if(wide) chrome+maxOf(leftBase,rightBase) else baseHeights.values.sum()+gap*6
         val measured=baseHeights.size==WorkspacePart.entries.size
-        val fallback=imeVisible || density.fontScale>1.25f || (measured && base>available)
+        val fallback=imeVisible || (measured && base>available)
         val canExpand=measured && !fallback && !compactEditor
         val free=if(canExpand) (available-base).coerceAtLeast(0) else 0
         val capacity=with(density) {mediaCapacity.roundToPx()}
