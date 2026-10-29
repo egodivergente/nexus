@@ -170,31 +170,31 @@ internal fun FlagshipStudioHeader(
     var showIdentity by remember {mutableStateOf(false)}
     val identity=selectedModel?.let(::canvasModelIdentity)
     if(showIdentity && selectedModel!=null && identity!=null) AlertDialog(onDismissRequest={showIdentity=false},
-        title={Text(identity.title)},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        title={Text(identity.title)},text={Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Text(identity.detail)
             Text(selectedModel.displayName)
             androidx.compose.foundation.text.selection.SelectionContainer {Text(identity.exactId,style=MaterialTheme.typography.bodySmall)}
         }},confirmButton={TextButton(onClick={showIdentity=false}) {Text("Cerrar")}})
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         StudioModalitySegments(modality, animate, onModality)
         Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                 BrandLogo(organization=selectedModel?.organization, modelId=selectedModel?.id, size=28.dp)
                 Column(Modifier.weight(1f)) {
                     Text(identity?.detail ?: "Elegir modelo",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(identity?.title ?: "Elegir modelo", style=MaterialTheme.typography.titleSmall)
                 }
-                if(selectedModel!=null) IconButton(onClick={showIdentity=true}) {Icon(Icons.Default.Info,"Identidad exacta del modelo",Modifier.size(18.dp))}
-                Icon(Icons.Default.SwapHoriz,"Cambiar modelo",Modifier.size(20.dp))
+                if(selectedModel!=null) IconButton(onClick={showIdentity=true}) {Icon(Icons.Default.Info,"Identidad exacta del modelo",Modifier.size(NexusTokens.iconSmall))}
+                Icon(Icons.Default.SwapHoriz,"Cambiar modelo",Modifier.size(NexusTokens.iconMedium))
             }
         }
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             TextButton(onClick={expanded=!expanded}) { Text(if(expanded) "Ocultar favoritos" else "Modelos favoritos") }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick={editingFavorites=true}) { Icon(Icons.Default.Tune,"Personalizar modelos destacados",Modifier.size(20.dp)) }
+            IconButton(onClick={editingFavorites=true}) { Icon(Icons.Default.Tune,"Personalizar modelos destacados",Modifier.size(NexusTokens.iconMedium)) }
         }
-        if(expanded) LazyRow(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        if(expanded) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             items(matches,key={it.model.providerId+"/"+it.model.id}) { match ->
                 FlagshipCard(match, match.model.id==selectedModel?.id && match.model.providerId==selectedModel?.providerId, animate) {
                     onChoose(match.model)
@@ -261,7 +261,7 @@ private fun FlagshipCard(match: FlagshipMatch, active: Boolean, animate: Boolean
                 BrandLogo(organization = match.model.organization, family = match.model.family, modelId = match.model.id,
                     size = 22.dp, containerSize = 32.dp)
                 Spacer(Modifier.weight(1f))
-                if (active) Icon(Icons.Default.Check, null, tint = scheme.primary, modifier = Modifier.size(20.dp))
+                if (active) Icon(Icons.Default.Check, null, tint = scheme.primary, modifier = Modifier.size(NexusTokens.iconMedium))
             }
             Spacer(Modifier.weight(1f))
             Text(canvasModelIdentity(match.model).title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
@@ -285,7 +285,7 @@ private fun AllModelsCard(onClick: () -> Unit) {
             Icon(Icons.Default.Add, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(NexusTokens.space8))
             Text("Ver todos", style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
-            Icon(Icons.Default.ChevronRight, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.ChevronRight, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(NexusTokens.iconSmall))
         }
     }
 }

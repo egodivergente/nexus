@@ -159,7 +159,7 @@ internal fun FolderTile(name:String,count:Int,previews:List<Pair<String,Boolean>
                 Spacer(Modifier.weight(1f))
                 Text(folderCount(count),style=MaterialTheme.typography.labelSmall,color=com.vidadomu.nexus.ui.theme.TextSecondary,maxLines=1)
             }
-            if(previews.isNotEmpty()) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            if(previews.isNotEmpty()) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                 // Vista previa del contenido sin abrir la carpeta: hasta tres miniaturas.
                 repeat(3) {i ->
                     val item=previews.getOrNull(i)

@@ -250,7 +250,7 @@ fun FlowStudioScreen(
     }
     LaunchedEffect(Unit) { refreshConnection() }
     if(connectionSheet) ModalBottomSheet(onDismissRequest={connectionSheet=false}) {
-        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             com.vidadomu.nexus.ui.settings.FlowRecoverySettings(onCreateInFlow={connectionSheet=false}, inStudio=true)
             OutlinedButton(onClick={scope.launch {refreshConnection()}}) {Text("Comprobar conexión")}
             TextButton(onClick={connectionSheet=false}) {Text("Volver al lienzo de Flow")}
@@ -627,15 +627,15 @@ fun FlowStudioScreen(
                                 if(remainingReferences == 1) pickReference.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                 else pickReferences.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             },onLibrary={libraryReferences.launch(arrayOf("image/*"),remainingReferences)},onRemove={references.remove(it)})
-                            if(importingReferences) Text("Preparando imágenes…",Modifier.padding(horizontal=12.dp),style=MaterialTheme.typography.bodySmall)
+                            if(importingReferences) Text("Preparando imágenes…",Modifier.padding(horizontal=NexusTokens.space12),style=MaterialTheme.typography.bodySmall)
                         }
                     }
                 )
     }
     if(composerExpanded) ModalBottomSheet(onDismissRequest={composerExpanded=false},sheetState=androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Text("Prompts de Flow",style=MaterialTheme.typography.titleLarge)
-            LazyColumn(Modifier.weight(1f,false),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            LazyColumn(Modifier.weight(1f,false),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
                 items(drafts,key={it.id}) {draft -> draftEditor(draft)}
                 item {OutlinedButton(onClick={drafts+=FlowStudioDraft(modality=drafts.lastOrNull()?.modality ?: Modality.IMAGE)},enabled=drafts.size<maximumDrafts && !isSubmitting,modifier=Modifier.fillMaxWidth()) {Text("Añadir prompt")}}
             }
@@ -655,9 +655,9 @@ fun FlowStudioScreen(
         topBar = {},
         bottomBar = {
             com.vidadomu.nexus.ui.components.FloatingActionDock {
-                Column(Modifier.fillMaxWidth().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                     Column(Modifier.fillMaxWidth().heightIn(max=if(WindowInsets.isImeVisible) 220.dp else if (directCaps != null) 460.dp else 340.dp)
-                        .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                         val capabilities = directCaps
                         val kind = if (drafts.firstOrNull()?.modality == Modality.VIDEO) "video" else "image"
                         val settings = (if (kind == "video") videoSettings else imageSettings).let { s -> capabilities?.let { s.normalized(it, kind) } }
@@ -731,7 +731,7 @@ fun FlowStudioScreen(
             }
             if (flowJobs.isNotEmpty()) {
                 item(key = "grid_title") {
-                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                         Text("Trabajos de Flow", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
 
                     }
@@ -876,7 +876,7 @@ private fun FlowExportSheet(
             }
             Button(onClick = { if (isVideo) onSave(FlowExportFormat.ORIGINAL, FlowExportSize.ORIGINAL) else onSave(format, size) },
                 modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(NexusTokens.iconSmall))
                 Spacer(Modifier.width(NexusTokens.space8))
                 Text("Guardar")
             }
@@ -915,7 +915,7 @@ private fun StudioConnectionCard(connection: FlowStudioConnection, onRefresh: ()
                 Text(connection.status.projectName ?: "Proyecto de Flow abierto",style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
                 Text(listOfNotNull(connection.status.modelName,connection.status.aspectRatio).joinToString(" · ").ifBlank {"Modelo y formato: consultar en Flow"},style=MaterialTheme.typography.labelSmall,color=TextMuted)
             }
-            IconButton(onClick=onRefresh) {Icon(Icons.Default.Refresh,"Actualizar conexión Flow",Modifier.size(18.dp))}
+            IconButton(onClick=onRefresh) {Icon(Icons.Default.Refresh,"Actualizar conexión Flow",Modifier.size(NexusTokens.iconSmall))}
         }
         is FlowStudioConnection.Unavailable -> InlineNotice(
             noticeMessage(connection.message, "Flow no está listo. Abre el proyecto desde Ajustes y comprueba la conexión."),
@@ -932,14 +932,14 @@ private fun DraftCard(
 ) {
     var countMenu by remember {mutableStateOf(false)}
     val feedback=rememberNexusHaptics()
-    Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         if(canRemove) Row(verticalAlignment=Alignment.CenterVertically) {
             Text("Prompt $number",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
             IconButton(onClick=onRemove,enabled=enabled) {Icon(Icons.Default.Close,"Quitar prompt $number",Modifier.size(16.dp))}
         }
         StudioPromptField(draft.prompt,{onChange(draft.copy(prompt=it))},"Una escena, estilo, luz, movimiento…",
             enabled=enabled,maximum=promptLimit,attachments=attachments)
-        if(!WindowInsets.isImeVisible) Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+        if(!WindowInsets.isImeVisible) Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
             FilterChip(draft.modality==Modality.IMAGE,onClick={
                 feedback.perform(NexusHapticEvent.SELECTION,changed=draft.modality!=Modality.IMAGE)
                 onChange(draft.copy(modality=Modality.IMAGE))
@@ -953,7 +953,7 @@ private fun DraftCard(
                 TextButton(onClick={countMenu=true},enabled=enabled,
                     modifier=Modifier.semantics {contentDescription="Resultados por prompt: ${draft.count}"}) {
                     Text("${draft.count} ${if(draft.count==1) "resultado" else "resultados"}")
-                    Icon(Icons.Default.ArrowDropDown,null,Modifier.size(20.dp))
+                    Icon(Icons.Default.ArrowDropDown,null,Modifier.size(NexusTokens.iconMedium))
                 }
                 DropdownMenu(countMenu,{countMenu=false}) {
                     (FlowStudioPlan.MIN_COUNT..FlowStudioPlan.MAX_COUNT).forEach {value ->
@@ -979,7 +979,7 @@ private fun ReferencesSection(
 ) {
     val config by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
     val maximumReferences=config.value("flow.references").toIntOrNull()?.takeIf {it>0} ?: Int.MAX_VALUE
-    Column(Modifier.padding(horizontal=12.dp),verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.padding(horizontal=NexusTokens.space12),verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Adjuntos · ${references.size}" + if(maximumReferences<Int.MAX_VALUE) "/$maximumReferences" else "", style = MaterialTheme.typography.labelSmall,
                 color = TextPrimary, modifier = Modifier.weight(1f))
@@ -991,7 +991,7 @@ private fun ReferencesSection(
                 enabled = canAdd, description = "Adjuntar desde la Biblioteca")
         }
         if(references.isNotEmpty() && !WindowInsets.isImeVisible) Text("Para todos los prompts",style=MaterialTheme.typography.labelSmall,color=TextMuted)
-        LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             items(references, key={it.uri}) { ref ->
                 com.vidadomu.nexus.ui.create.CanvasAttachmentTile(
                     com.vidadomu.nexus.core.model.AttachedMedia(id=ref.uri,uriString=ref.uri,mimeType=ref.mimeType,fileName=ref.fileName,
@@ -1105,7 +1105,7 @@ private fun ResultCell(output: GenerationOutput, onOpen: () -> Unit, onDownload:
             }
         }
         TextButton(onClick = { onDownload(output) }, enabled = output.localUri != null, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(NexusTokens.iconSmall))
             Spacer(Modifier.width(NexusTokens.space4))
             Text("Descargar")
         }

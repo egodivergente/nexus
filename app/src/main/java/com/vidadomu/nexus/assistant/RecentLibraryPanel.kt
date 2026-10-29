@@ -85,15 +85,15 @@ internal fun LibraryAttachmentButton(
 internal fun ReasoningIcon(current: String, enabled: Boolean, onClick: () -> Unit) {
     // Una píldora con el modo actual en vez de un icono mudo: se ve de un vistazo qué esfuerzo está activo.
     val colors = MaterialTheme.colorScheme
-    Surface(onClick = onClick, enabled = enabled, shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+    Surface(onClick = onClick, enabled = enabled, shape = NexusTokens.filter,
         color = colors.surfaceContainerHighest.copy(alpha = if (enabled) 1f else .5f),
-        modifier = Modifier.heightIn(min = 32.dp)
+        modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
             .semantics {
                 contentDescription = "Modo de razonamiento: $current"
                 stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
             }) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
             Icon(Icons.Default.Speed, null, Modifier.size(14.dp), tint = colors.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
             Text(current, style = MaterialTheme.typography.labelMedium, maxLines = 1,
                 color = colors.onSurface.copy(alpha = if (enabled) 1f else .38f))
@@ -116,7 +116,7 @@ internal fun RecentLibraryPanel(expanded: Boolean, onClose: () -> Unit, content:
                 .padding(bottom = NexusTokens.space8)) {
                 Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically) {
                     Text("Archivos recientes", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Ocultar archivos recientes", Modifier.size(18.dp)) }
+                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Ocultar archivos recientes", Modifier.size(NexusTokens.iconSmall)) }
                 }
                 content()
             }

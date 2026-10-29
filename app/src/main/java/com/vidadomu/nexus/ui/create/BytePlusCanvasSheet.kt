@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.create
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,8 +30,8 @@ internal fun BytePlusCanvasSheet(app: NexusApplication, models: List<NexusModel>
     val direct = models.filter { it.providerId == BYTEPLUS_MEDIA_PROVIDER }
     ModalBottomSheet(onDismissRequest=onDismiss,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=24.dp),
-            verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=NexusTokens.space24),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Tu cuenta BytePlus",style=MaterialTheme.typography.titleLarge)
@@ -40,7 +42,7 @@ internal fun BytePlusCanvasSheet(app: NexusApplication, models: List<NexusModel>
             }
             Text("Elige aquí Seedream o Seedance para usar tu cuenta de BytePlus. El mismo modelo a través de Atlas o Crun se factura en ese proveedor.",
                 style=MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 OutlinedButton(onClick={onChoose(Modality.IMAGE)},enabled=direct.any {Modality.IMAGE in it.modalities},modifier=Modifier.weight(1f)) {Text("Crear imagen")}
                 OutlinedButton(onClick={onChoose(Modality.VIDEO)},enabled=direct.any {Modality.VIDEO in it.modalities},modifier=Modifier.weight(1f)) {Text("Crear vídeo")}
             }

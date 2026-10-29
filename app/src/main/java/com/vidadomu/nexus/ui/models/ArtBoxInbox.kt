@@ -25,7 +25,7 @@ internal fun ArtBoxInboxNotice(count: Int, onClear: () -> Unit) {
     Surface(shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = NexusTokens.space12), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Icon(Icons.Default.PhotoLibrary, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.PhotoLibrary, null, Modifier.size(NexusTokens.iconSmall), tint = MaterialTheme.colorScheme.primary)
             Text(if (count == 1) "1 imagen de la Biblioteca · elige un modelo" else "$count imágenes de la Biblioteca · elige un modelo",
                 Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
             IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Descartar las imágenes", tint = TextSecondary) }

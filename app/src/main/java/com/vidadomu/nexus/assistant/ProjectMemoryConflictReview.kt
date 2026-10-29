@@ -22,10 +22,10 @@ internal fun ProjectMemoryConflictReview(current: Project, draft: ProjectMemoryD
     val plan = draft.reviewPlan(current)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(shape = NexusTokens.sheet, modifier = Modifier.fillMaxWidth(.94f).fillMaxHeight(.9f)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 Text("Revisar cambios de memoria", style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                     Text("La memoria de «${current.name}» cambió mientras editabas. Compara el contenido actual con tu borrador. Nada se guarda al abrir o cerrar esta revisión.")
                     if (plan.keptCurrent.isNotEmpty()) Text("No tocaste ${plan.keptCurrent.joinToString(", ") { it.label() }}: " +
                         "se conserva el contenido actual de ${if (plan.keptCurrent.size == 1) "ese campo" else "esos campos"}.")

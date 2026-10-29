@@ -77,23 +77,23 @@ import java.util.Date
                 }
                 IconButton(onClick={pinned=if(isPinned) pinned-project.id else pinned+project.id;prefs.edit().putStringSet("pinned",pinned).apply()}) {
                     Icon(if(isPinned) Icons.Default.PushPin else Icons.Outlined.OutlinedPushPin,if(isPinned) "Desfijar ${project.name}" else "Fijar ${project.name}",
-                        Modifier.size(18.dp),tint=if(isPinned) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Modifier.size(NexusTokens.iconSmall),tint=if(isPinned) accent else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
     val sectionLabel: @Composable (String) -> Unit = {label ->
         Text(label,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier=Modifier.padding(top=4.dp,start=4.dp).semantics {heading()})
+            modifier=Modifier.padding(top=NexusTokens.space4,start=NexusTokens.space4).semantics {heading()})
     }
     container {
         Box(Modifier.fillMaxSize()) {
             // Onboarding: the fox is the backdrop of the choice, not a block above it, so the projects get the screen.
             if(showFox && embedded) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.nexus_logo),null,
-                Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f).padding(16.dp).blur(14.dp).alpha(.14f),
+                Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f).padding(NexusTokens.space16).blur(14.dp).alpha(.14f),
                 contentScale=androidx.compose.ui.layout.ContentScale.Fit)
         LazyColumn(Modifier.fillMaxSize().then(if(embedded) Modifier else Modifier.safeDrawingPadding()),
-            contentPadding=PaddingValues(horizontal=if(embedded) 20.dp else 24.dp,vertical=if(embedded) 12.dp else 24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            contentPadding=PaddingValues(horizontal=if(embedded) 20.dp else NexusTokens.space24,vertical=if(embedded) NexusTokens.space12 else NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(showFox && !embedded) item {
                 androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.nexus_logo),"Logo oficial de NEXUS",
                     Modifier.fillMaxWidth().height(if(shared==null) 104.dp else 56.dp),
@@ -106,13 +106,13 @@ import java.util.Date
                 }
                 IconButton(onClick=onDismiss) {Icon(Icons.Default.Close,"Continuar en el proyecto actual")}
             }} else item {
-                Row(Modifier.fillMaxWidth().padding(bottom=4.dp),verticalAlignment=Alignment.Bottom) {
+                Row(Modifier.fillMaxWidth().padding(bottom=NexusTokens.space4),verticalAlignment=Alignment.Bottom) {
                     Text("Elige un proyecto",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f).semantics {heading()})
                     Text("${projects.size}",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if(shared!=null) item {
-                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     items(shared.files) {f->coil.compose.AsyncImage(model=f.attachment?.uri ?: f.uri,contentDescription=f.attachment?.name ?: "Archivo compartido",modifier=Modifier.size(64.dp),contentScale=androidx.compose.ui.layout.ContentScale.Crop)}
                 }
                 shared.files.firstOrNull {it.error!=null}?.error?.let {Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick=onRetryShare) {Text("Volver a importar")}}
@@ -132,7 +132,7 @@ import java.util.Date
                 Text("Ningún proyecto contiene «${search.trim()}».",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if(search.isBlank() && matching.size>shown.size) item {TextButton(onClick={all=true}) {Text("Todos los proyectos (${projects.size})")}}
-            item {OutlinedButton(onClick={creating=true},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=4.dp)) {Icon(Icons.Default.Add,null);Spacer(Modifier.width(8.dp));Text("Nuevo proyecto")}}
+            item {OutlinedButton(onClick={creating=true},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=NexusTokens.space4)) {Icon(Icons.Default.Add,null);Spacer(Modifier.width(NexusTokens.space8));Text("Nuevo proyecto")}}
             // Embedded: typing in the composer or choosing a card already continues; no extra link is needed.
             if(!embedded) ui.activeProjectId?.let {id->item {TextButton(onClick={onChoose(id)},enabled=!busy && shared?.ready!=false,modifier=Modifier.fillMaxWidth()) {Text("Abrir último proyecto")}}}
         }

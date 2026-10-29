@@ -104,7 +104,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .semantics { contentDescription = "Prompt de creación" }
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space12),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             // Crece con el texto: vacío ocupa 2 líneas, no un bloque fijo de 4.
             enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 5,
@@ -117,10 +117,10 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             })
         val rules by com.vidadomu.nexus.settings.RuntimePreferences.get(LocalContext.current).state.collectAsState()
         val warning=rules.value("prompt.softWarning",ruleScope).toLongOrNull() ?: 0
-        if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary)
-        rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary)
+        rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
         attachments()
-        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space4, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
             com.vidadomu.nexus.ui.components.NexusHintedIconButton("Pegar prompt",modifier=Modifier.size(48.dp),enabled=enabled,onClick={
                 val pasted=clipboard.getText()?.text
                 if(!pasted.isNullOrEmpty() && pasted!=value) {onValueChange(pasted);feedback.perform(NexusHapticEvent.SELECTION)}
@@ -142,7 +142,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
                 feedback.perform(NexusHapticEvent.SELECTION); expanded = !expanded
             },enabled=enabled) {
                 Icon(if(expanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                    if(expanded) "Reducir prompt" else "Expandir prompt", Modifier.size(18.dp),
+                    if(expanded) "Reducir prompt" else "Expandir prompt", Modifier.size(NexusTokens.iconSmall),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

@@ -145,8 +145,8 @@ internal fun ChatBoardCard(boardId: String) {
                     val board = current
                     commit(if (owner.isEmpty()) board.copy(strokes = board.strokes.dropLast(1))
                         else board.copy(images = board.images.map { if (it.id == owner) it.copy(strokes = it.strokes.dropLast(1)) else it }))
-                }, "Deshacer el último trazo", false) { Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(18.dp)) }
-                if(annotations) BoardButton({annotations=false},"Terminar anotaciones",true) {Icon(Icons.Default.Check,null,Modifier.size(18.dp))}
+                }, "Deshacer el último trazo", false) { Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(NexusTokens.iconSmall)) }
+                if(annotations) BoardButton({annotations=false},"Terminar anotaciones",true) {Icon(Icons.Default.Check,null,Modifier.size(NexusTokens.iconSmall))}
                 DropdownMenu(expanded=imageMenu,onDismissRequest={imageMenu=false}) {
                     DropdownMenuItem(text={Text(if(annotations) "Terminar anotaciones" else "Anotaciones")},
                         leadingIcon={Icon(Icons.Default.Draw,null)},onClick={imageMenu=false;annotations=!annotations})
@@ -155,7 +155,7 @@ internal fun ChatBoardCard(boardId: String) {
         }
         if(annotations) Text("Anotaciones activas · termina con ✓",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
         if (current.dirty) Text("Se enviará al agente con tu próximo mensaje", style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = NexusTokens.space8))
     }
 }
 

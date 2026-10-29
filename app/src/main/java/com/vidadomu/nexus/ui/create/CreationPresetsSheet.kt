@@ -1,4 +1,6 @@
 package com.vidadomu.nexus.ui.create
+
+import com.vidadomu.nexus.ui.theme.NexusTokens
 import androidx.compose.foundation.layout.*
 import com.vidadomu.nexus.ui.components.StudioTextField
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,7 +29,7 @@ import androidx.compose.ui.unit.dp
         .take(5).joinToString(" · ") {p->"${p.displayName}: ${values[p.key]}"}
         .ifBlank {"Valores del modelo"}
     ModalBottomSheet(onDismissRequest=onDismiss) {
-        LazyColumn(Modifier.fillMaxWidth().imePadding(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        LazyColumn(Modifier.fillMaxWidth().imePadding(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             item {Text("Mis ajustes",style=MaterialTheme.typography.headlineSmall);Text(model.displayName,style=MaterialTheme.typography.bodyMedium)}
             item {Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {Text("Recordar últimos parámetros");Text("Si hay un ajuste marcado con la estrella, manda ese.",style=MaterialTheme.typography.bodySmall)}
@@ -38,7 +40,7 @@ import androidx.compose.ui.unit.dp
             items(entries,key={it.name}) {entry ->
                 val isDefault=defaultName==entry.name
                 OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                         Row(verticalAlignment=Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(entry.name,style=MaterialTheme.typography.titleMedium)
@@ -48,7 +50,7 @@ import androidx.compose.ui.unit.dp
                                 Icon(if(isDefault) Icons.Filled.Star else Icons.Outlined.StarBorder,if(isDefault) "Quitar de «al abrir»" else "Aplicar siempre al abrir este modelo")
                             }
                         }
-                        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                        Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                             FilledTonalButton(onClick={vm.applyPreset(entry);onDismiss()}) {Text("Aplicar")}
                             TextButton(onClick={prefs.savePreset(model,entry.name,state.parameters);entries=prefs.presets(model)}) {Text("Actualizar")}
                             TextButton(onClick={deleting=entry}) {Text("Eliminar")}

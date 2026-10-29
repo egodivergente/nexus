@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.create
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,7 +62,7 @@ internal fun ParameterSheetContent(model: NexusModel, parameters: List<ModelPara
     val primary = (shown.filter {it.isRequired} + shown.filter { !it.isAdvanced }.take(4)).distinctBy {it.key}
     val optional = shown.filter { it !in primary }
     var advanced by rememberSaveable(model.providerId, model.id) { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
         primary.forEach { param ->
             key(model.id, param.key) { NativeParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }
         }
@@ -71,14 +73,14 @@ internal fun ParameterSheetContent(model: NexusModel, parameters: List<ModelPara
             val sections = ParameterSections.split(optional)
             sections.forEach { section ->
                 Text(section.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp).semantics { heading() })
+                    modifier = Modifier.padding(top = NexusTokens.space4).semantics { heading() })
                 if (section.title == "Escala y tamaño" && section.parameters.any { it.key == "width" } && section.parameters.any { it.key == "long_side" })
                     Text("Indica ancho y alto, o bien lado largo y corto.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ParameterSections.rows(section.parameters).forEach { row ->
                     if (row.size == 1) key(model.id, row[0].key) {
                         NativeParameterControl(row[0], values[row[0].key] ?: row[0].defaultValue) { onChange(row[0].key, it) }
-                    } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                    } else Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.Top) {
                         row.forEach { param ->
                             Box(Modifier.weight(1f)) {
                                 key(model.id, param.key) { NativeParameterControl(param, values[param.key] ?: param.defaultValue) { onChange(param.key, it) } }

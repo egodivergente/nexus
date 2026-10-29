@@ -76,7 +76,7 @@ internal fun ProjectSection(icon: ImageVector, title: String, content: @Composab
     Column(Modifier.fillMaxWidth().padding(top = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
             modifier = Modifier.semantics(mergeDescendants = true) { heading() }) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(NexusTokens.iconMedium))
             Text(title, style = MaterialTheme.typography.titleMedium)
         }
         content()
@@ -175,7 +175,7 @@ internal fun ProjectMemoryForm(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(n.text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                     IconButton(onClick = { edit(draft.copy(removedNotes = draft.removedNotes + n.at)) }, enabled = enabled) {
-                        Icon(Icons.Default.Delete, "Borrar nota", Modifier.size(18.dp))
+                        Icon(Icons.Default.Delete, "Borrar nota", Modifier.size(NexusTokens.iconSmall))
                     }
                 }
             }

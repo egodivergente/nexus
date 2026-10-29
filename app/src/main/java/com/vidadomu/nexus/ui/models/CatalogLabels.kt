@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.models
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import com.vidadomu.nexus.ui.theme.stylusHover
 
 import android.content.Context
@@ -166,11 +168,11 @@ internal fun CatalogLabelEditor(key: String, originalName: String, originalDescr
     }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Personalizar") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 if (withDescription) OutlinedTextField(description, { description = it }, label = { Text("Descripción") }, minLines = 3, modifier = Modifier.fillMaxWidth())
                 Text("Icono", style = MaterialTheme.typography.labelLarge)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     item {
                         FilterChip(icon == null, { icon = null }, label = { Text("Original") })
                     }
@@ -184,7 +186,7 @@ internal fun CatalogLabelEditor(key: String, originalName: String, originalDescr
                     }
                 }
                 OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(6.dp))
                     Text(if (icon?.startsWith("image:") == true) "Cambiar mi imagen" else "Usar una imagen mía")
                 }
                 Text("Tamaño del logo · ${(scale * 100).toInt()} %", style = MaterialTheme.typography.labelLarge)

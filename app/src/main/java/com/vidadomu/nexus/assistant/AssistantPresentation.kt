@@ -2,6 +2,8 @@
 
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.*
@@ -64,10 +66,10 @@ internal fun AssistantPresentationStore.state(): State<AssistantPresentation> {
 internal fun AssistantPresentationSettings() {
     val store = rememberAssistantPresentationStore()
     val presentation by store.state()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Tu espacio de creación", style = MaterialTheme.typography.titleMedium)
         Text("Tamaño de las tarjetas del agente", style = MaterialTheme.typography.bodyMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             AssistantCardSize.entries.forEach { size ->
                 FilterChip(selected = presentation.cardSize == size, onClick = { store.setCardSize(size) }, label = { Text(size.label) })
             }

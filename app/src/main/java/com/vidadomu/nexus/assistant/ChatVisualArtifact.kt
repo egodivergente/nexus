@@ -45,15 +45,15 @@ import java.io.ByteArrayInputStream
     }
     Surface(Modifier.fillMaxWidth(),shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerLow) {
         Column {
-            Row(Modifier.fillMaxWidth().padding(start=12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(start=NexusTokens.space12),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                 Text(title,Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                 IconButton(onClick={code=!code}) {Icon(Icons.Default.Code,if(code) "Ver contenido renderizado" else "Ver código")}
                 IconButton(onClick={save.launch(if(language=="mermaid") "diagrama.html" else "interactivo.html")}) {Icon(Icons.Default.Download,"Guardar contenido")}
                 IconButton(onClick={full=true}) {Icon(Icons.Default.Fullscreen,"Ampliar contenido")}
             }
-            if(code) androidx.compose.foundation.text.selection.SelectionContainer {Text(source,Modifier.fillMaxWidth().heightIn(max=360.dp).verticalScroll(rememberScrollState()).padding(12.dp),fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,style=MaterialTheme.typography.bodySmall)}
+            if(code) androidx.compose.foundation.text.selection.SelectionContainer {Text(source,Modifier.fillMaxWidth().heightIn(max=360.dp).verticalScroll(rememberScrollState()).padding(NexusTokens.space12),fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,style=MaterialTheme.typography.bodySmall)}
             else ChatVisualWebView(language,source,dark,motion,Modifier.fillMaxWidth().height(if(language=="mermaid") 200.dp else 360.dp))
-            message?.let {Text(it,Modifier.padding(12.dp),style=MaterialTheme.typography.bodySmall)}
+            message?.let {Text(it,Modifier.padding(NexusTokens.space12),style=MaterialTheme.typography.bodySmall)}
         }
     }
     if(full) Dialog(onDismissRequest={full=false},properties=DialogProperties(usePlatformDefaultWidth=false)) {

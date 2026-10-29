@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -61,7 +63,7 @@ import java.util.concurrent.TimeUnit
         }
     }
     ModalBottomSheet(onDismissRequest={if(!busy) onDismiss()}) {
-        Column(Modifier.fillMaxWidth().padding(20.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Text(name ?: "Enlace",style=MaterialTheme.typography.titleLarge)
             Text(if(uri.scheme in setOf("http","https")) uri.host.orEmpty()+uri.path.orEmpty() else fileName,style=MaterialTheme.typography.bodySmall,maxLines=3)
             if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())

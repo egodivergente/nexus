@@ -121,7 +121,7 @@ fun SplitWipeCompare(
                 .size(36.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Compare, contentDescription = "Deslizar cortinilla A/B", modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Compare, contentDescription = "Deslizar cortinilla A/B", modifier = Modifier.size(NexusTokens.iconMedium))
             }
         }
 
@@ -137,7 +137,7 @@ fun SplitWipeCompare(
                 leftLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = MediaForeground,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
             )
         }
         Surface(
@@ -151,7 +151,7 @@ fun SplitWipeCompare(
                 rightLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = MediaForeground,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)
             )
         }
     }

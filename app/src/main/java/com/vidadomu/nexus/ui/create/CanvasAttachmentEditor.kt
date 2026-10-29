@@ -63,7 +63,7 @@ internal fun CanvasAttachmentEditor(
     }
     val haptics = rememberNexusHaptics()
     if (frameColumn) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
             Text(field.label, style = MaterialTheme.typography.labelLarge)
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 if (selected.isNotEmpty()) CanvasAttachmentTile(selected.first(), field.label, enabled, thumbnailSize = maxWidth, showLabel = false) {
@@ -82,37 +82,37 @@ internal fun CanvasAttachmentEditor(
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 IconButton(onClick = pickGallery, enabled = enabled, modifier = Modifier.size(48.dp).stylusHover(enabled)) {
-                    Icon(Icons.Default.AddPhotoAlternate, "Cambiar ${field.label}", Modifier.size(20.dp))
+                    Icon(Icons.Default.AddPhotoAlternate, "Cambiar ${field.label}", Modifier.size(NexusTokens.iconMedium))
                 }
                 IconButton(onClick = { library.launch(arrayOf(field.mime), 1) }, enabled = enabled,
                     modifier = Modifier.size(48.dp).stylusHover(enabled)) {
-                    Icon(Icons.Default.PhotoLibrary, "Biblioteca para ${field.label}", Modifier.size(20.dp))
+                    Icon(Icons.Default.PhotoLibrary, "Biblioteca para ${field.label}", Modifier.size(NexusTokens.iconMedium))
                 }
             }
         }
         return
     }
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = if(compact) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow) {
-        if (compact && field.maximum == 1 && selected.size == 1) Row(Modifier.padding(12.dp),
+        if (compact && field.maximum == 1 && selected.size == 1) Row(Modifier.padding(NexusTokens.space12),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
             CanvasAttachmentTile(selected[0], "${field.label} 1", enabled, thumbnailSize = 168.dp) { onRemove(selected[0].id) }
-            Column(Modifier.weight(1f).heightIn(min = 168.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f).heightIn(min = 168.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(field.label, style = MaterialTheme.typography.titleSmall)
                         if (field.required) Text("Obligatorio", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Icon(Icons.Default.CheckCircle, "Archivo preparado", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.CheckCircle, "Archivo preparado", Modifier.size(NexusTokens.iconMedium), tint = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.weight(1f))
                 FilledTonalButton(onClick = pickGallery, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Cambiar")
+                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(6.dp)); Text("Cambiar")
                 }
                 OutlinedButton(onClick = { library.launch(arrayOf(field.mime), remaining) }, enabled = enabled,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Biblioteca") }
             }
         } else
-        Column(Modifier.padding(if(compact) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(if(compact) NexusTokens.space12 else NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(field.label, style = if(compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall)
@@ -136,9 +136,9 @@ internal fun CanvasAttachmentEditor(
                     }
                 }
             }
-            if (remaining > 0) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (remaining > 0) Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 FilledTonalButton(onClick = pickGallery, enabled = enabled, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(18.dp))
+                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(NexusTokens.iconSmall))
                     Spacer(Modifier.width(6.dp))
                     Text(if (field.mime.startsWith("audio/")) "Archivos" else if (selected.isNotEmpty() && field.maximum == 1) "Cambiar" else "Galería")
                 }
@@ -162,19 +162,19 @@ internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: 
             .decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) }.build()
         else Uri.parse(media.uriString)
     }
-    Column(Modifier.width(thumbnailSize), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.width(thumbnailSize), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
         Box(Modifier.size(thumbnailSize).clip(NexusTokens.thumbnail).background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(enabled = visual) { preview = true }.semantics { contentDescription = "Revisar $label" }) {
             if (visual) AsyncImage(imageModel, label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
                 onError = { imageFailed = true }, onSuccess = { imageFailed = false })
             else Icon(Icons.Default.GraphicEq, label, Modifier.align(Alignment.Center))
-            if (imageFailed) Text("No se pudo abrir", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Center).padding(8.dp))
+            if (imageFailed) Text("No se pudo abrir", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Center).padding(NexusTokens.space8))
             if (enabled) StudioRemoveMediaButton(onRemove, Modifier.align(Alignment.TopEnd))
         }
         if(showLabel && thumbnailSize>=72.dp) Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2)
     }
     if (preview) AlertDialog(onDismissRequest = { preview = false }, title = { Text(label) },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        text = { Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             AsyncImage(imageModel, label, Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 380.dp), contentScale = ContentScale.Fit)
             media.fileName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             Text("${media.mimeType} · preparado en el dispositivo", style = MaterialTheme.typography.bodySmall)

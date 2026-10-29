@@ -313,7 +313,7 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
                 onError={if(useLocal){useLocal=false}else{loading=false;failed=true}})
         }
         if(loading && !failed) CircularProgressIndicator(Modifier.testTag("output_loading"))
-        if(failed) Column(Modifier.padding(NexusTokens.space24),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        if(failed) Column(Modifier.padding(NexusTokens.space24),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Icon(Icons.Default.BrokenImage,null,modifier=Modifier.size(40.dp),tint=TextSecondary)
             Text("No se puede cargar la imagen",style=MaterialTheme.typography.titleMedium)
             Text("El enlace puede haber caducado o no estar disponible. La tarea sigue guardada en Historial.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
@@ -394,7 +394,7 @@ internal fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)
                         }
                     }
                 },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space4)
             ) {
                 Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MediaForeground, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))

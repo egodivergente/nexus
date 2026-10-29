@@ -117,7 +117,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     ArtBoxInbox.images.value=emptyList()
                     if(pickedImages.isNotEmpty() && onUseWithMedia!=null) onUseWithMedia(selected,pickedImages) else onUse(selected)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=NexusTokens.field) {
                     Text("Crear con este modelo",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(NexusTokens.iconMedium))
                 }
             }
         }
@@ -186,7 +186,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                                 coil.compose.AsyncImage(uri,contentDescription="Imagen elegida",contentScale=androidx.compose.ui.layout.ContentScale.Crop,
                                     modifier=Modifier.fillMaxSize().clip(NexusTokens.thumbnail))
                                 IconButton(onClick={pickedImages=pickedImages.filterNot {it.first==uri}},Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
-                                    Icon(Icons.Default.Close,"Quitar imagen",Modifier.size(18.dp).background(Color.Black.copy(alpha=.55f),androidx.compose.foundation.shape.CircleShape).padding(3.dp),tint=Color.White)
+                                    Icon(Icons.Default.Close,"Quitar imagen",Modifier.size(NexusTokens.iconSmall).background(Color.Black.copy(alpha=.55f),androidx.compose.foundation.shape.CircleShape).padding(3.dp),tint=Color.White)
                                 }
                             }
                         }
@@ -196,16 +196,16 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                             val request=androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)
                             if(imageField.maximum>1) galleryPicker.launch(request) else singleGalleryPicker.launch(request)
                         },modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field) {
-                            Icon(Icons.Default.AddPhotoAlternate,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Galería",maxLines=1)
+                            Icon(Icons.Default.AddPhotoAlternate,null,Modifier.size(NexusTokens.iconSmall));Spacer(Modifier.width(6.dp));Text("Galería",maxLines=1)
                         }
                         OutlinedButton(onClick={libraryPicker.launch(arrayOf("image/*"),imageField.maximum.coerceIn(1,50))},
                             modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field) {
-                            Icon(Icons.Default.PhotoLibrary,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Biblioteca",maxLines=1)
+                            Icon(Icons.Default.PhotoLibrary,null,Modifier.size(NexusTokens.iconSmall));Spacer(Modifier.width(6.dp));Text("Biblioteca",maxLines=1)
                         }
                     }
                 }
             }
-            TextButton(onClick={infoOpen=true}) {Icon(Icons.Default.Info,null);Spacer(Modifier.width(8.dp));Text("Información y evaluación")}
+            TextButton(onClick={infoOpen=true}) {Icon(Icons.Default.Info,null);Spacer(Modifier.width(NexusTokens.space8));Text("Información y evaluación")}
             Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clickable(role=Role.Button,onClickLabel=if(details) "Plegar detalles" else "Desplegar detalles") {details=!details}
                     .semantics { stateDescription=if(details) "Desplegado" else "Plegado" },verticalAlignment=Alignment.CenterVertically) {
@@ -229,7 +229,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
         }
     }
     if(infoOpen) ModalBottomSheet(onDismissRequest={infoOpen=false},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(NexusTokens.space16).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             Text(com.vidadomu.nexus.ui.create.canvasModelIdentity(selected).title,style=MaterialTheme.typography.titleLarge)
             ModelEvaluation(verifiedSelected ?: selected,group.routes)
             val promptCapability=verifiedSelected?.let(com.vidadomu.nexus.settings.ModelCapabilities::prompt)

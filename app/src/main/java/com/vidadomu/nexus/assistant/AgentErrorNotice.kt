@@ -55,7 +55,7 @@ internal fun AgentErrorNotice(
         color = colors.errorContainer.copy(alpha = .55f), contentColor = colors.onSurface) {
         Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.Top) {
-                Icon(Icons.Outlined.WarningAmber, contentDescription = "Error del agente", tint = colors.error, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.WarningAmber, contentDescription = "Error del agente", tint = colors.error, modifier = Modifier.size(NexusTokens.iconMedium))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     Text(content.cause, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.semantics { heading() })
@@ -64,16 +64,16 @@ internal fun AgentErrorNotice(
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                 if (onRetry != null) FilledTonalButton(onClick = onRetry, shape = NexusTokens.filter, modifier = touch) {
-                    Icon(Icons.Default.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
+                    Icon(Icons.Default.Refresh, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
                 }
                 if (onNewChat != null) FilledTonalButton(onClick = onNewChat, shape = NexusTokens.filter, modifier = touch) {
-                    Icon(Icons.Default.AddComment, null, Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Continuar en chat nuevo")
+                    Icon(Icons.Default.AddComment, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(NexusTokens.space4)); Text("Continuar en chat nuevo")
                 }
                 if (onChangeModel != null) TextButton(onClick = onChangeModel, modifier = touch) {
-                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Cambiar modelo")
+                    Icon(Icons.Default.Tune, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(NexusTokens.space4)); Text("Cambiar modelo")
                 }
                 if (onOpenHistory != null) TextButton(onClick = onOpenHistory, modifier = touch) {
-                    Icon(Icons.Default.Timelapse, null, Modifier.size(18.dp)); Spacer(Modifier.width(NexusTokens.space4)); Text("Abrir Historial")
+                    Icon(Icons.Default.Timelapse, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(NexusTokens.space4)); Text("Abrir Historial")
                 }
                 TextButton(onClick = { expanded = !expanded },
                     modifier = touch.semantics { stateDescription = if (expanded) "Detalle técnico visible" else "Detalle técnico oculto" }) {

@@ -10,6 +10,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
 import com.vidadomu.nexus.ui.theme.NexusTokens
 
@@ -31,13 +33,14 @@ fun NexusSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
             confirmValueChange = { it != SheetValue.Hidden || canDismiss })) {
         NexusSheetSystemBars()
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin),
                 verticalAlignment = Alignment.CenterVertically) {
                 icon?.let { Icon(it,null,tint=MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier=Modifier.padding(end=NexusTokens.space12)) }
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleLarge)
+                    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
@@ -63,7 +66,7 @@ fun NexusSheetGroup(title: String, icon: ImageVector, content: @Composable Colum
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             }
             content()
         }

@@ -97,14 +97,14 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
       val barPinned = com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned.value
       val grabber: @Composable BoxScope.() -> Unit = {
           if (!barPinned) Box(Modifier.align(Alignment.TopCenter).offset(y = (-24).dp).size(width = 96.dp, height = 48.dp)
-              .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+              .clip(NexusTokens.radiusLarge)
               .recentLibraryGesture(opening = !barShown) { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = !barShown }
               .clickable(onClickLabel = if (barShown) "Ocultar pestañas" else "Mostrar pestañas") {
                   com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = !barShown }
               .semantics { contentDescription = if (barShown) "Ocultar pestañas" else "Mostrar pestañas" },
               contentAlignment = Alignment.Center) {
               Icon(if (barShown) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                  contentDescription = null, modifier = Modifier.size(20.dp),
+                  contentDescription = null, modifier = Modifier.size(NexusTokens.iconMedium),
                   tint = MaterialTheme.colorScheme.onSurfaceVariant)
           }
       }
@@ -138,6 +138,11 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                 }}
             }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // Keep a useful writing width on phones and at large font scales. The same selector
+            // stays visible in its own row; no model setting is hidden or changed.
+            val separateReasoning = maxWidth < 480.dp || androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
+            Column {
             Row(verticalAlignment = Alignment.Bottom) {
                 LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
                     onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera)
@@ -150,14 +155,14 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
                     decorationBox = { inner ->
-                        Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.padding(vertical = NexusTokens.space12), contentAlignment = Alignment.CenterStart) {
                             // Quién contestará: proveedor y modelo activos (AGY, Bedrock, un cerebro propio…).
                             if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             inner()
                         }
                     })
-                reasoningControl()
+                if (!separateReasoning) reasoningControl()
                 if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
                 else {
                     // Micro y enviar siempre juntos a la derecha: el dictado se inserta en el campo SIN enviarlo.
@@ -181,10 +186,14 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
                         else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
                     }
-                    FilledIconButton(onClick = onSend, enabled = canSend, modifier = Modifier.padding(end = 4.dp).size(40.dp)) {
+                    FilledIconButton(onClick = onSend, enabled = canSend, modifier = Modifier.padding(end = NexusTokens.space4).size(NexusTokens.minimumTouch)) {
                         Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje")
                     }
                 }
+            }
+            if (separateReasoning) Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12),
+                horizontalArrangement = Arrangement.End) { reasoningControl() }
+            }
             }
         }
         }
@@ -297,7 +306,7 @@ internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
 }
 
 /** Forma única del cuadro de texto: no cambia con el contenido, así los adjuntos y los iconos nunca chocan con una esquina. */
-internal val ComposerShape = RoundedCornerShape(28.dp)
+internal val ComposerShape = NexusTokens.action
 
 /** Miniatura del adjunto pendiente: imagen o primer fotograma del vídeo; audio y documentos, icono y nombre. */
 @Composable
@@ -305,7 +314,7 @@ internal fun AttachmentTile(att: Attachment, onRemove: () -> Unit) {
     val context = LocalContext.current
     val label = att.name ?: "Archivo"
     val visual = att.mimeType.startsWith("image/") || att.mimeType.startsWith("video/")
-    Box(Modifier.size(width = 76.dp, height = 76.dp).padding(top = 4.dp, end = 4.dp)) {
+    Box(Modifier.size(width = 76.dp, height = 76.dp).padding(top = NexusTokens.space4, end = NexusTokens.space4)) {
         Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
             .semantics { contentDescription = "Adjunto: $label" }, contentAlignment = Alignment.Center) {
             if (visual) {
@@ -319,7 +328,7 @@ internal fun AttachmentTile(att: Attachment, onRemove: () -> Unit) {
                 if (att.mimeType.startsWith("video/")) Icon(Icons.Default.PlayArrow, null, tint = androidx.compose.ui.graphics.Color.White,
                     modifier = Modifier.size(26.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f), androidx.compose.foundation.shape.CircleShape))
             } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(NexusTokens.space4)) {
                     Icon(if (att.mimeType.startsWith("audio/")) Icons.Default.GraphicEq else Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary)
                     Text(label, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -327,7 +336,7 @@ internal fun AttachmentTile(att: Attachment, onRemove: () -> Unit) {
             }
         }
         // Quitar: círculo pequeño en la esquina, con zona de toque ampliada.
-        Box(Modifier.align(Alignment.TopEnd).size(32.dp).clickable(onClick = onRemove).semantics { contentDescription = "Quitar $label" }, contentAlignment = Alignment.Center) {
+        Box(Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch).clickable(onClick = onRemove).semantics { contentDescription = "Quitar $label" }, contentAlignment = Alignment.Center) {
             Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Close, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurface)
             }

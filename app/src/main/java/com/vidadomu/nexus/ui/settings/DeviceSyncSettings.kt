@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,14 +30,14 @@ fun DeviceSyncSettings(onDismiss: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     val status by sync.status.collectAsState()
     NexusSheet("Sincronización entre móviles", onDismiss) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = NexusTokens.space24), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
             Text(status, style = MaterialTheme.typography.bodyMedium)
             Text("Los dos móviles deben estar vinculados y conectados. Puedes usar sus direcciones Tailscale para continuar fuera de casa. Los cambios pendientes se recuperan al reconectar.")
             SyncToggle("Sincronización automática", options.enabled) { options = options.copy(enabled = it) }
             SyncToggle("Aceptar cambios enviados desde Nexus Windows", options.desktop) { options = options.copy(desktop = it) }
             OutlinedTextField(peer, { peer = it }, label = { Text("Dirección del otro móvil") }, placeholder = { Text("http://100.x.x.x:8795") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(key, { key = it.trim() }, label = { Text("Misma clave de vinculación en ambos") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 TextButton({ key = SyncCrypto.newKey() }) { Text("Crear clave") }
                 val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
                 TextButton({ clipboard.setText(androidx.compose.ui.text.AnnotatedString(key)) }, enabled = key.isNotEmpty()) { Text("Copiar clave") }
@@ -71,7 +73,7 @@ fun DeviceSyncSettings(onDismiss: () -> Unit) {
 
 @Composable
 private fun SyncToggle(title: String, checked: Boolean, change: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         Text(title, modifier = Modifier.weight(1f)); Switch(checked, change)
     }
 }

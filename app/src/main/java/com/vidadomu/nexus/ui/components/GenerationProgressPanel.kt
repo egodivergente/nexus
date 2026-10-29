@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.components
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,7 +47,7 @@ fun GenerationProgressPanel(job: GenerationJob, modifier: Modifier = Modifier, c
         }
     }
     Surface(modifier,color=MaterialTheme.colorScheme.surfaceContainer,shape=MaterialTheme.shapes.medium) {
-        Column(Modifier.padding(if(compact) 12.dp else 18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(if(compact) NexusTokens.space12 else 18.dp),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Text(stage,style=MaterialTheme.typography.titleSmall)
             if(active && progress!=null) {
                 LinearProgressIndicator(progress={progress},modifier=Modifier.fillMaxWidth())

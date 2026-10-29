@@ -3,8 +3,6 @@ package com.vidadomu.nexus.ui.navigation
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import com.vidadomu.nexus.ui.components.StudioChrome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,13 +15,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -34,24 +32,24 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
     val entry by navController.currentBackStackEntryAsState()
     val currentRoute=selectedRoute ?: entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
-    val haptic = LocalHapticFeedback.current
-    val context=androidx.compose.ui.platform.LocalContext.current
+    val haptic = rememberNexusHaptics()
     // Visible by default; the optional hidden mode retains the edge-swipe shortcut.
     val visible = ChromeVisibility.shown
     androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
     StudioChrome(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
-            HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
-            Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical=1.dp),
+            HorizontalDivider(thickness=NexusTokens.divider,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
+            Row(Modifier.fillMaxWidth().navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                .padding(vertical=NexusTokens.space4),
                 verticalAlignment=Alignment.CenterVertically) {
                 Screen.bottomNavItems.forEach { screen ->
                     val selected=currentRoute==screen.route
                     val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
-                    Column(Modifier.weight(1f).heightIn(min=48.dp)
+                    Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
                         .semantics { contentDescription=screen.title }
                         .selectable(selected=selected,role=Role.Tab,onClick={
                             if(currentRoute!=screen.route) {
-                            if(com.vidadomu.nexus.settings.RuntimePreferences.get(context).bool("ui.haptics")) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             // Settings/Flow are pushed over the current tab. Return to that exact
                             // tab when possible; restoring a saved tab stack here could put Settings
                             // back on top and make the tab appear not to respond.
@@ -66,6 +64,7 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                                 restoreState = fromTab && screen.route !in setOf(Screen.Models.route, Screen.Assistant.route)
                             }
                             }
+                            haptic.perform(NexusHapticEvent.SELECTION)
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(0.dp)) {
@@ -74,17 +73,13 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                             contentAlignment=Alignment.Center) {
                             Icon(screen.icon,contentDescription=null,
                                 tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier=Modifier.size(20.dp))
+                                modifier=Modifier.size(NexusTokens.iconMedium))
                         }
-                        // «Biblioteca» cabe entera en 1/5 de 360 dp; solo con letra grande del sistema se abrevia.
-                        // El texto no se anuncia: la pestaña ya lleva su nombre (antes se leía «Biblioteca Biblio»).
-                        // Con letra grande el rótulo deja de crecer a partir de 1,15×: el nombre completo cabe siempre.
-                        val fontScale=LocalDensity.current.fontScale
-                        val base=MaterialTheme.typography.labelMedium
-                        val capped=if(fontScale>1.15f) base.copy(fontSize=(base.fontSize.value*1.15f/fontScale).sp) else base
-                        Text(screen.title,style=capped,
+                        // Let labels wrap at the user's font scale; TalkBack reads the tab name once.
+                        Text(screen.title,style=MaterialTheme.typography.labelMedium,
                             color=if(selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines=1,softWrap=false,modifier=Modifier.clearAndSetSemantics {})
+                            textAlign=TextAlign.Center,maxLines=2,overflow=TextOverflow.Ellipsis,
+                            modifier=Modifier.padding(horizontal=NexusTokens.space4).clearAndSetSemantics {})
                     }
                 }
             }

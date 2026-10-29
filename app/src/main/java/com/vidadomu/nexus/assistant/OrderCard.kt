@@ -167,7 +167,7 @@ internal fun OrderCard(
                 }
             }
             if (compact && presentation.cardSize == AssistantCardSize.COMPACT) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
                     ResultThumb(outputs.first(), plan.modality, onOpenOutput, presentation.cardSize)
                     ProviderMark(plan.ref.providerId, plan.ref.modelId, plan.modelName)
                     Column(Modifier.weight(1f)) {
@@ -242,7 +242,7 @@ internal fun OrderCard(
                         CardAction.SENDING, CardAction.NONE -> ({})
                     }
                     Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
-                        contentPadding = PaddingValues(horizontal = NexusTokens.space16, vertical = 8.dp)) {
+                        contentPadding = PaddingValues(horizontal = NexusTokens.space16, vertical = NexusTokens.space8)) {
                         Text(shown.actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
                     }
                 }
@@ -271,7 +271,7 @@ private fun ResultThumb(uri: String, modality: String, onOpen: () -> Unit, size:
             modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
         )
         if (video) Surface(shape = NexusTokens.filter, color = MaterialTheme.colorScheme.scrim.copy(alpha = .55f), contentColor = com.vidadomu.nexus.ui.theme.MediaForeground) {
-            Icon(Icons.Default.PlayArrow, null, Modifier.padding(8.dp).size(28.dp))
+            Icon(Icons.Default.PlayArrow, null, Modifier.padding(NexusTokens.space8).size(28.dp))
         }
     }
 }
@@ -281,7 +281,7 @@ private fun StatusPill(text: String, error: Boolean) {
     val colors = MaterialTheme.colorScheme
     Surface(shape = NexusTokens.filter, color = if (error) colors.errorContainer else colors.secondaryContainer,
         contentColor = if (error) colors.onErrorContainer else colors.onSecondaryContainer) {
-        Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(text, Modifier.padding(horizontal = 10.dp, vertical = NexusTokens.space4), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

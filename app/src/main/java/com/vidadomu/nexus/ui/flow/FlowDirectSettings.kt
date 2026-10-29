@@ -178,7 +178,7 @@ private fun <T> ChipRow(title: String, options: List<T>, selected: T, label: (T)
 @Composable
 private fun FrameSlot(title: String, frame: FlowStudioReference?, enabled: Boolean, onPick: () -> Unit, onClear: () -> Unit) {
     val context = LocalContext.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
         Box(Modifier.size(width = 96.dp, height = 54.dp).clip(NexusTokens.field)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .border(.5.dp, MaterialTheme.colorScheme.outlineVariant, NexusTokens.field)

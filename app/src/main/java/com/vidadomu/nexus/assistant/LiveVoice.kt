@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -189,7 +191,7 @@ internal fun LiveVoiceDialog(ui: AssistantUiState, onSend: (String) -> Boolean, 
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color(0xF2080C10)).safeDrawingPadding()) {
-            Column(Modifier.align(Alignment.TopCenter).padding(top = 32.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.align(Alignment.TopCenter).padding(top = NexusTokens.space32, start = NexusTokens.space24, end = NexusTokens.space24), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(agentLabel(ui.settings), style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = .6f))
             }
             // The circle breathes with your voice while listening and pulses while it talks. Tap: cut it off and listen.
@@ -208,7 +210,7 @@ internal fun LiveVoiceDialog(ui: AssistantUiState, onSend: (String) -> Boolean, 
             Box(Modifier.align(Alignment.Center).size(190.dp).scale(scale).clip(CircleShape)
                 .background(Brush.radialGradient(listOf(accent, accent.copy(alpha = if (state == LiveState.PAUSED) .25f else .55f), Color.Transparent)))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Hablar ahora") { listen() })
-            Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp, start = 24.dp, end = 24.dp),
+            Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp, start = NexusTokens.space24, end = NexusTokens.space24),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text(problem ?: when (state) {
                     LiveState.LISTENING -> heard.ifBlank { "Te escucho…" }
@@ -216,7 +218,7 @@ internal fun LiveVoiceDialog(ui: AssistantUiState, onSend: (String) -> Boolean, 
                     LiveState.SPEAKING -> "Toca el círculo para cortarle y hablar"
                     LiveState.PAUSED -> "En pausa · toca el círculo para hablar"
                 }, style = MaterialTheme.typography.titleMedium, color = Color.White, textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space32)) {
                     FilledTonalIconButton(onClick = {
                         if (state == LiveState.LISTENING) { recognizer.cancel(); level = 0f; state = LiveState.PAUSED } else listen()
                     }, modifier = Modifier.size(64.dp)) {

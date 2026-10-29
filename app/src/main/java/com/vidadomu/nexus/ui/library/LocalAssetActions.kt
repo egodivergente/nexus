@@ -56,7 +56,7 @@ internal fun LocalAssetTile(asset:Asset,loader:ImageLoader,showDetails:Boolean,m
                     Thumb.Loading -> Unit
                 }
             }
-            else Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(8.dp).padding(bottom=if(showDetails) 24.dp else 0.dp)) {
+            else Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(NexusTokens.space8).padding(bottom=if(showDetails) NexusTokens.space24 else 0.dp)) {
                 Icon(if(asset.type==AssetType.AUDIO) Icons.Default.GraphicEq else Icons.Default.Description,null)
                 Text(asset.displayName,style=MaterialTheme.typography.labelMedium,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }

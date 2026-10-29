@@ -15,6 +15,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
@@ -28,14 +31,14 @@ import com.vidadomu.nexus.ui.theme.stylusHover
 fun NexusTonalAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     icon: ImageVector? = null, enabled: Boolean = true, description: String = label) {
     FilledTonalButton(onClick = onClick, enabled = enabled, shape = NexusTokens.filter,
-        contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
         colors = ButtonDefaults.filledTonalButtonColors(
             // Accent tint instead of a grey tone: stays visible on cards, fields and the composer dock alike.
             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = .14f),
             contentColor = MaterialTheme.colorScheme.primary),
-        modifier = modifier.heightIn(min = 36.dp).semantics { contentDescription = description }) {
-        icon?.let { Icon(it, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
-        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        modifier = modifier.heightIn(min = NexusTokens.minimumTouch).semantics { contentDescription = description }) {
+        icon?.let { Icon(it, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(NexusTokens.space8)) }
+        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -50,18 +53,26 @@ fun NexusDropdownSelector(caption: String, value: String, choices: List<String>,
     Box(modifier) {
         OutlinedButton(onClick = { open = true }, shape = NexusTokens.filter,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            contentPadding = PaddingValues(start = NexusTokens.space12, end = NexusTokens.space8, top = 6.dp, bottom = 6.dp),
-            modifier = Modifier.heightIn(min = 40.dp).semantics { contentDescription = caption; stateDescription = value }) {
-            icon?.let { Icon(it, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(6.dp)) }
-            Text("$caption: ", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(Icons.Default.ArrowDropDown, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            contentPadding = PaddingValues(start = NexusTokens.space12, end = NexusTokens.space8,
+                top = NexusTokens.space8, bottom = NexusTokens.space8),
+            modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
+                .semantics { contentDescription = caption; stateDescription = value }) {
+            icon?.let {
+                Icon(it, null, Modifier.size(NexusTokens.iconSmall), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(NexusTokens.space8))
+            }
+            // Measure the caption and value together so a long value cannot push the arrow off screen.
+            Text(buildAnnotatedString {
+                withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("$caption: ") }
+                append(value)
+            }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Icon(Icons.Default.ArrowDropDown, null, Modifier.size(NexusTokens.iconMedium), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(open, { open = false }) {
             choices.forEach { choice ->
                 DropdownMenuItem(text = { Text(choice) }, onClick = { open = false; onValue(choice) },
-                    trailingIcon = if (choice == value) ({ Icon(Icons.Default.Check, "Seleccionado", Modifier.size(18.dp)) }) else null)
+                    trailingIcon = if (choice == value) ({ Icon(Icons.Default.Check, "Seleccionado", Modifier.size(NexusTokens.iconSmall)) }) else null)
             }
         }
     }
@@ -74,7 +85,7 @@ fun NexusStatusTag(label: String, emphasized: Boolean = false) {
     Surface(shape = NexusTokens.filter,
         color = if (emphasized) colors.primary.copy(alpha = .16f) else colors.surfaceContainerHigh,
         contentColor = if (emphasized) colors.primary else colors.onSurfaceVariant) {
-        Text(label, Modifier.padding(horizontal = 8.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(label, Modifier.padding(horizontal = NexusTokens.space8, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
 }
 
@@ -83,7 +94,8 @@ fun NexusStatusTag(label: String, emphasized: Boolean = false) {
 fun NexusStepper(value: Int, onValue: (Int) -> Unit, minimum: Int, maximum: Int?, label: String,
     zeroLabel: String? = null, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalIconButton(onClick = { onValue(value - 1) }, enabled = value > minimum) {
+        FilledTonalIconButton(onClick = { onValue(value - 1) }, enabled = value > minimum,
+            modifier = Modifier.size(NexusTokens.minimumTouch)) {
             Icon(Icons.Default.Remove, "Reducir $label")
         }
         Text(if (value == 0 && zeroLabel != null) zeroLabel else value.toString(),
@@ -91,7 +103,8 @@ fun NexusStepper(value: Int, onValue: (Int) -> Unit, minimum: Int, maximum: Int?
             modifier = Modifier.widthIn(min = 56.dp).padding(horizontal = NexusTokens.space8)
                 .semantics { contentDescription = "$label: " + (if (value == 0 && zeroLabel != null) zeroLabel else value.toString()) },
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        FilledTonalIconButton(onClick = { onValue(value + 1) }, enabled = maximum == null || value < maximum) {
+        FilledTonalIconButton(onClick = { onValue(value + 1) }, enabled = maximum == null || value < maximum,
+            modifier = Modifier.size(NexusTokens.minimumTouch)) {
             Icon(Icons.Default.Add, "Aumentar $label")
         }
     }

@@ -75,14 +75,14 @@ internal fun AspectFormatChip(param: ModelParameter, value: String, onChange: (S
                     }
                 }
         ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.padding(horizontal = NexusTokens.space12, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 ShapeGlyph(ratio, colors.onSurface)
                 Text(aspectLabel(param, value) + if (quantity > 1) " · ×$quantity" else "", style = MaterialTheme.typography.labelMedium, maxLines = 1)
             }
         }
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Column(Modifier.width(320.dp).padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.width(320.dp).padding(horizontal = NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 AspectFormatPicker(param, value) { onChange(it); if (quickParams.isEmpty() && onQuantity == null) open = false }
                 // Calidad, resolución y duración en el mismo panel, solo si el modelo las ofrece.
                 quickParams.forEach { p ->
@@ -106,7 +106,7 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
     val scrollable = options.size > 8
     Surface(shape = NexusTokens.card, color = colors.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
-            Modifier.padding(4.dp).then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+            Modifier.padding(NexusTokens.space4).then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             options.forEach { option ->
@@ -147,15 +147,15 @@ internal fun AspectFormatPicker(param: ModelParameter, value: String, onChange: 
 @Composable
 private fun QuickRow(title: String, options: List<String>, selected: String, text: (String) -> String, onPick: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+        Text(title, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = NexusTokens.space4))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
             options.forEach { option ->
                 val on = option == selected
                 Surface(shape = NexusTokens.field, color = if (on) colors.surfaceContainerHighest else colors.surface,
                     modifier = Modifier.semantics { contentDescription = "$title ${text(option)}"; stateDescription = if (on) "Seleccionado" else "No seleccionado" }
                         .clickable(role = Role.RadioButton) { onPick(option) }) {
-                    Text(text(option), Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium,
+                    Text(text(option), Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8), style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
                 }
             }

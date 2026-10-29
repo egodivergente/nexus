@@ -50,7 +50,7 @@ private fun AssistantImageForeground(media: Attachment, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically) {
                     Text(media.name ?: "Imagen del agente", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 2)
                     IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar imagen ampliada") }
                 }
@@ -74,11 +74,11 @@ private fun AssistantImageForeground(media: Attachment, onClose: () -> Unit) {
                     when (imageState) {
                         is AsyncImagePainter.State.Loading -> Text("Cargando imagen…", style = MaterialTheme.typography.bodyMedium)
                         is AsyncImagePainter.State.Error -> Text("No se pudo cargar la imagen. Cierra el visor y comprueba que el archivo sigue disponible.",
-                            modifier = Modifier.padding(24.dp), color = MaterialTheme.colorScheme.error)
+                            modifier = Modifier.padding(NexusTokens.space24), color = MaterialTheme.colorScheme.error)
                         else -> Unit
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically) {
                     Text("Pellizca o toca dos veces para ampliar", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { scale = 1f; offset = Offset.Zero }) { Text("Ajustar") }
                 }

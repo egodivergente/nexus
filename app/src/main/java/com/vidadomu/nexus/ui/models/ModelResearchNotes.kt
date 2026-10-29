@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.models
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,7 +70,7 @@ internal fun researchedModelNote(model: NexusModel): ResearchedModelNote? {
     val note=remember(model) {researchedModelNote(model)} ?: return
     val uri=LocalUriHandler.current
     var open by remember {mutableStateOf(false)}
-    Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
         Text(note.evidence,style=MaterialTheme.typography.bodySmall)
         Text(note.implication,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick={open=!open},contentPadding=PaddingValues(0.dp)) {Text(if(open) "Ocultar procedencia" else "Fuente y criterio")}

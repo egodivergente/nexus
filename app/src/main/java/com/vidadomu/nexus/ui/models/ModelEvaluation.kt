@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.models
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -43,8 +45,8 @@ private val evaluationCriteria=listOf("Calidad","Fotorealismo","Identidad","Fís
     val colors=MaterialTheme.colorScheme
     Surface(shape=com.vidadomu.nexus.ui.theme.NexusTokens.card,color=colors.surfaceContainerLow,
         border=androidx.compose.foundation.BorderStroke(.5.dp,colors.outlineVariant.copy(alpha=.7f)),modifier=Modifier.fillMaxWidth()) {
-    Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+        Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                 Text("Evaluación técnica",style=MaterialTheme.typography.titleSmall)
                 Text("Controles que expone este endpoint. No mide la calidad visual.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
@@ -68,22 +70,22 @@ private val evaluationCriteria=listOf("Calidad","Fotorealismo","Identidad","Fís
             Text("Descripción del proveedor",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
             Text(model.description,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
         }
-        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             evaluation.facts.take(if(factsOpen) Int.MAX_VALUE else 0).forEach {(label,value)->
-                Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth().semantics(mergeDescendants=true) {},horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                     Text(label,Modifier.weight(.42f),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     Text(value,Modifier.weight(.58f),style=MaterialTheme.typography.bodyMedium)
                 }
             }
         }
         ModelResearchNotes(model)
-        if(differences.isNotEmpty()) Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+        if(differences.isNotEmpty()) Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
             Text("En esta variante",style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)
             differences.take(2).forEach {Text(it.removePrefix("Diferencia de esta variante · "),style=MaterialTheme.typography.bodySmall,color=colors.primary)}
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick={factsOpen=!factsOpen},contentPadding=PaddingValues(horizontal=8.dp)) {Text(if(factsOpen) "Menos detalle" else "Ver detalle y fuentes")}
-            TextButton(onClick={open=true},contentPadding=PaddingValues(horizontal=8.dp)) {Text(if(known.isEmpty()) "Mi evaluación" else "Editar mi evaluación")}
+        Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+            TextButton(onClick={factsOpen=!factsOpen},contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {Text(if(factsOpen) "Menos detalle" else "Ver detalle y fuentes")}
+            TextButton(onClick={open=true},contentPadding=PaddingValues(horizontal=NexusTokens.space8)) {Text(if(known.isEmpty()) "Mi evaluación" else "Editar mi evaluación")}
         }
         if(factsOpen) {
             evaluation.axes.forEach {axis->Text("${axis.title}: ${"%.1f".format(axis.score)}/10 · ${axis.reason}",style=MaterialTheme.typography.bodySmall)}
@@ -101,7 +103,7 @@ private val evaluationCriteria=listOf("Calidad","Fotorealismo","Identidad","Fís
         val draft=remember(key) {mutableStateMapOf<String,String>().apply {evaluationCriteria.forEach {put(it,values[it].orEmpty())}}}
         var source by remember(key) {mutableStateOf(prefs.getString("$key:source","").orEmpty())}
         val valid=draft.values.all {it.isBlank() || it.toDoubleOrNull()?.let {v->v.isFinite() && v in 0.0..10.0}==true}
-        AlertDialog(onDismissRequest={open=false},title={Text("Evaluación editorial · 0–10")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        AlertDialog(onDismissRequest={open=false},title={Text("Evaluación editorial · 0–10")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Text("Puntúa solo lo que hayas probado; deja el resto vacío. Estas notas son personales.",style=MaterialTheme.typography.bodySmall)
             evaluationCriteria.forEach {criterion->OutlinedTextField(draft[criterion].orEmpty(),{draft[criterion]=it},label={Text(criterion)},singleLine=true,modifier=Modifier.fillMaxWidth())}
             OutlinedTextField(source,{source=it},label={Text("Resultado o fuente de tu evaluación")},modifier=Modifier.fillMaxWidth())

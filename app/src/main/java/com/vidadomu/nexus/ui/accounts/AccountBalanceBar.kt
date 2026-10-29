@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.accounts
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.app.Application
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -71,8 +73,8 @@ fun AccountBalanceBar(onSettings: () -> Unit = {}, vm: AccountBalanceViewModel =
     val balances by vm.balances.collectAsState()
     val busy by vm.busy.collectAsState()
     Surface(color = MaterialTheme.colorScheme.surface) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = NexusTokens.space16, end = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = NexusTokens.space8), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 if (balances.isEmpty()) Text("Saldos: sin proveedores configurados", style = MaterialTheme.typography.labelSmall)
                 balances.forEach { item ->
                     Column {

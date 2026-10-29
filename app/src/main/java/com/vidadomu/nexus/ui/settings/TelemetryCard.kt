@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
@@ -31,12 +33,12 @@ private fun tokens(n: Long): String = when {
 
 @Composable
 private fun Stat(title: String, detail: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.labelMedium, color = TextSecondary, maxLines = 2)
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(NexusTokens.space8))
         Text(value, style = MaterialTheme.typography.titleSmall)
     }
 }
@@ -53,7 +55,7 @@ internal fun TelemetryCard() {
     var revision by remember { mutableStateOf(0) }
     val jobs by app.generationRepository.allJobs.collectAsState()
     val turns = remember(open, revision) { if (open) TurnTelemetry.all(context) else emptyList() }
-    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Telemetría", style = MaterialTheme.typography.bodyLarge)

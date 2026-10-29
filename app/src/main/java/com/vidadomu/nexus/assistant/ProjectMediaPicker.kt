@@ -254,7 +254,7 @@ private fun ImportTile(enabled: Boolean, onClick: () -> Unit) {
             modifier = Modifier.fillMaxWidth().aspectRatio(1f).semantics { contentDescription = "Importar desde el dispositivo" }) {
             Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary) }
         }
-        Text("Importar", style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+        Text("Importar", style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.padding(top = NexusTokens.space4))
     }
 }
 
@@ -278,7 +278,7 @@ private fun MediaTile(asset: Asset, checked: Boolean, enabled: Boolean, onToggle
             else Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxSize()) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Description, null, Modifier.size(28.dp)) }
             }
-            if (video) Row(Modifier.align(Alignment.BottomStart).padding(4.dp).clip(NexusTokens.filter)
+            if (video) Row(Modifier.align(Alignment.BottomStart).padding(NexusTokens.space4).clip(NexusTokens.filter)
                 .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .55f)).padding(horizontal = 5.dp, vertical = 1.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.PlayArrow, null, Modifier.size(12.dp), tint = androidx.compose.ui.graphics.Color.White)
@@ -291,6 +291,6 @@ private fun MediaTile(asset: Asset, checked: Boolean, enabled: Boolean, onToggle
             }
         }
         Text(asset.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = NexusTokens.space4))
     }
 }

@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,6 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.components.InlineNotice
@@ -30,7 +32,7 @@ internal val ProviderTint = Color(0xFF34D399)
 /** Baldosa de color con icono: identifica una categoría o un proveedor de un vistazo. */
 @Composable
 internal fun CategoryTile(icon: ImageVector, tint: Color, size: Dp = 44.dp) {
-    Box(Modifier.size(size).background(tint.copy(alpha = .16f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(size).background(tint.copy(alpha = .16f), NexusTokens.card), contentAlignment = Alignment.Center) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(size * .45f))
     }
 }
@@ -40,7 +42,7 @@ internal fun CategoryTile(icon: ImageVector, tint: Color, size: Dp = 44.dp) {
 internal fun StatusPill(connected: Boolean, label: String) {
     Surface(shape = NexusTokens.filter,
         color = if (connected) ProviderConnected.copy(alpha = .14f) else MaterialTheme.colorScheme.surfaceVariant) {
-        Row(Modifier.padding(horizontal = NexusTokens.space12, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).background(if (connected) ProviderConnected else TextSecondary, CircleShape))
             Spacer(Modifier.width(NexusTokens.space8))
             Text(label, style = MaterialTheme.typography.labelMedium, color = if (connected) ProviderConnected else TextSecondary)
@@ -56,14 +58,16 @@ internal fun ProviderCard(name: String, subtitle: String, icon: ImageVector, tin
     var open by androidx.compose.runtime.saveable.rememberSaveable(name) { androidx.compose.runtime.mutableStateOf(false) }
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 2.dp) {
         Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-            Row(Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Plegar $name" else "Desplegar $name") { open = !open },
+            Row(Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch)
+                .semantics { stateDescription = if (open) "Desplegado" else "Plegado" }
+                .clickable(role = Role.Button, onClickLabel = if (open) "Plegar $name" else "Desplegar $name") { open = !open },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 CategoryTile(icon, tint)
-                Column(Modifier.weight(1f)) {
-                    Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+                    Text(name, style = MaterialTheme.typography.titleMedium)
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    StatusPill(connected, if (connected) "Conectado" else idleLabel)
                 }
-                StatusPill(connected, if (connected) "Conectado" else idleLabel)
                 Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = TextSecondary)
             }
             if (open) {

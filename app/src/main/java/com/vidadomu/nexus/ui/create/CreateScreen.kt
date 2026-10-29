@@ -166,13 +166,13 @@ fun CreateScreen(
         bottomBar = {
             com.vidadomu.nexus.ui.components.FloatingActionDock {
                 Column(Modifier.fillMaxWidth().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
-                    .padding(horizontal=screenMargin, vertical=4.dp),
+                    .padding(horizontal=screenMargin, vertical=NexusTokens.space4),
                     verticalArrangement=Arrangement.spacedBy(2.dp)) {
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
                     val inlineReason=readiness.fixTarget==CreationFixTarget.MEDIA || readiness.fixTarget==CreationFixTarget.PROMPT
                     if(!busy && !inlineReason) readiness.message?.let { reason ->
                         if(readiness.fixTarget==null) Text(reason, color=MaterialTheme.colorScheme.onSurface,
-                            style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(horizontal=12.dp))
+                            style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(horizontal=NexusTokens.space12))
                         else TextButton(onClick={
                             when(readiness.fixTarget) {
                                 CreationFixTarget.MODEL -> showModelPickerSheet=true
@@ -241,7 +241,7 @@ fun CreateScreen(
                     viewModel::selectModality, chooseModel, { showModelPickerSheet=true }, onOpenFlow)
             }
             item(key="composer") {
-                Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     val selected=state.selectedModel
                     val textRoute=selected?.let {current ->
                         if(current.pairedEditModelId!=null) current else catalogModels.firstOrNull {
@@ -266,10 +266,10 @@ fun CreateScreen(
                             // Use available dp, not physical pixels or a device-name check. Large text,
                             // split screen and landscape retain the readable vertical layout.
                             if (CanvasInputPlan.pairedFrames(inputFields, state.selectedModel, maxWidth.value, LocalDensity.current.fontScale)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                                     inputFields.forEach { field -> Box(Modifier.weight(1f)) { renderField(field, true) } }
                                 }
-                            } else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            } else Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                                 inputFields.forEach { renderField(it, false) }
                             }
                         }
@@ -549,14 +549,14 @@ private fun RequestInspectorSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
                 ) {
-                    Icon(Icons.Default.Terminal, contentDescription = null, tint = PrimaryNeon, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Terminal, contentDescription = null, tint = PrimaryNeon, modifier = Modifier.size(NexusTokens.iconMedium))
                     Text(
                         text = "Diagnóstico local",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(NexusTokens.minimumTouch)) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary, modifier = Modifier.size(NexusTokens.iconSmall))
                 }
             }
 

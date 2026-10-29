@@ -45,13 +45,13 @@ internal fun ArtBoxTabs(tabs: List<ArtBoxTab>, modifier: Modifier = Modifier) {
     FlowRow(container, horizontalArrangement = Arrangement.spacedBy(2.dp), maxLines = if (wrap) 3 else 1) {
         tabs.forEach { tab ->
             val tint = if (tab.selected) colors.primary else colors.onSurfaceVariant
-            Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+            Surface(shape = NexusTokens.filter,
                 color = if (tab.selected) colors.primary.copy(alpha = .16f) else androidx.compose.ui.graphics.Color.Transparent,
                 modifier = Modifier.selectable(tab.selected, role = Role.Tab, onClick = tab.onClick).heightIn(min = 40.dp)) {
-                Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                Row(Modifier.padding(horizontal = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     tab.icon?.let {
                         Icon(it, null, Modifier.size(16.dp), tint = tint)
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(NexusTokens.space4))
                     }
                     Text(tab.label, style = MaterialTheme.typography.titleSmall, color = tint, maxLines = 1,
                         fontWeight = if (tab.selected) FontWeight.SemiBold else FontWeight.Normal)
@@ -70,7 +70,7 @@ internal fun ArtBoxSearchBar(query: String, onQuery: (String) -> Unit, filtersAc
     Surface(shape = NexusTokens.filter, color = colors.surfaceContainerHighest,
         modifier = modifier.fillMaxWidth().heightIn(min = 48.dp)) {
         Row(Modifier.padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Search, null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
+            Icon(Icons.Default.Search, null, Modifier.size(NexusTokens.iconMedium), tint = colors.onSurfaceVariant)
             Box(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 10.dp)) {
                 if (query.isEmpty()) Text("Buscar modelo o función", style = MaterialTheme.typography.bodyLarge,
                     color = colors.onSurfaceVariant, maxLines = 1)
@@ -80,7 +80,7 @@ internal fun ArtBoxSearchBar(query: String, onQuery: (String) -> Unit, filtersAc
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Buscar modelo o función" })
             }
             if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) {
-                Icon(Icons.Default.Close, "Borrar búsqueda", Modifier.size(18.dp), tint = colors.onSurfaceVariant)
+                Icon(Icons.Default.Close, "Borrar búsqueda", Modifier.size(NexusTokens.iconSmall), tint = colors.onSurfaceVariant)
             }
             IconButton(onClick = onFilters, modifier = Modifier.semantics { contentDescription = filterDescription }) {
                 Icon(Icons.Default.Tune, null, tint = if (filtersActive) colors.primary else colors.onSurfaceVariant)

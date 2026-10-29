@@ -51,7 +51,7 @@ fun InlineNotice(message: String, modifier: Modifier = Modifier, technicalDetail
             Row(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 Icon(if(isError) Icons.Outlined.WarningAmber else Icons.Outlined.Info,
                     contentDescription=if(isError) "Aviso" else "Información",
-                    tint=if(isError) colors.error else colors.onSurfaceVariant, modifier=Modifier.size(20.dp))
+                    tint=if(isError) colors.error else colors.onSurfaceVariant, modifier=Modifier.size(NexusTokens.iconMedium))
                 Text(message, style=MaterialTheme.typography.bodyMedium, modifier=Modifier.weight(1f))
             }
             if(onAction != null || !technicalDetails.isNullOrBlank()) {

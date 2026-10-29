@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -118,15 +119,20 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     settingsEntries: List<Pair<String, () -> Unit>> = emptyList(),
     showBalance: Boolean = true) {
     val chrome=LocalChrome.current
+    val density = LocalDensity.current
+    val titleLineHeight = with(density) { MaterialTheme.typography.titleLarge.lineHeight.toDp() }
+    val topBarHeight = maxOf(NexusTokens.topBarHeight, titleLineHeight + NexusTokens.space16)
+    // Preserve the title's space at large font sizes; the wallet still announces the full amount.
+    val iconOnlyBalance = density.fontScale >= 1.3f || LocalConfiguration.current.screenWidthDp < 360
     StudioChrome(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
             TopAppBar(title=title,modifier=Modifier,navigationIcon=navigationIcon,colors=colors.copy(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent),
                 windowInsets=windowInsets,scrollBehavior=scrollBehavior,
-                expandedHeight=if(LocalDensity.current.fontScale>=1.3f) NexusTokens.minimumTouch+NexusTokens.space8 else NexusTokens.topBarHeight,
+                expandedHeight=topBarHeight,
                 actions={
                     actions()
                     chrome?.let {
-                        if (showBalance) NexusBalanceChip()
+                        if (showBalance) NexusBalanceChip(iconOnly = iconOnlyBalance)
                         it.openSettings?.let { open ->
                             if(settingsEntries.isEmpty()) IconButton(onClick=open) {
                                 Icon(Icons.Outlined.Settings,contentDescription="Ajustes de Nexus")
@@ -143,34 +149,38 @@ fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
                         }
                     }
                 })
-            HorizontalDivider(thickness=0.5.dp,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
+            HorizontalDivider(thickness=NexusTokens.divider,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
         }
     }
 }
 
 @Composable
-fun NexusBalanceChip(compact:Boolean=false) {
+fun NexusBalanceChip(compact:Boolean=false, iconOnly: Boolean = false) {
     LocalChrome.current?.let { chrome ->
-        StudioBalanceChip(chrome.balance,chrome.openBalance,compact)
+        StudioBalanceChip(chrome.balance,chrome.openBalance,compact,iconOnly)
     }
 }
 
 @Composable
-internal fun StudioBalanceChip(balance:String,onClick:()->Unit,compact:Boolean=false) {
+internal fun StudioBalanceChip(balance:String,onClick:()->Unit,compact:Boolean=false,iconOnly:Boolean=false) {
     Box(
         contentAlignment=androidx.compose.ui.Alignment.Center,
-        modifier=Modifier.widthIn(max=148.dp).heightIn(min=if(compact) 32.dp else NexusTokens.minimumTouch)
+        modifier=Modifier.widthIn(min=NexusTokens.minimumTouch,max=if(iconOnly) NexusTokens.minimumTouch else 148.dp)
+            .heightIn(min=NexusTokens.minimumTouch)
             .semantics(mergeDescendants=true) { contentDescription="Saldo y gasto"; stateDescription=balance }
             .clickable(role=androidx.compose.ui.semantics.Role.Button,onClick=onClick)
     ) {
         // Saldo discreto: texto sin fondo, para que la cabecera no cargue otro botón-pastilla.
         Surface(shape=NexusTokens.filter,color=Color.Transparent) {
             // Wallet glyph: the amount is recognisable as saldo/gasto without a label; tapping opens the breakdown.
-            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,modifier=Modifier.padding(horizontal=if(compact) NexusTokens.space8 else NexusTokens.space12,vertical=6.dp)) {
-                Icon(Icons.Outlined.AccountBalanceWallet,null,Modifier.size(16.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(4.dp))
-                Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines=1,overflow=TextOverflow.Ellipsis)
+            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,modifier=Modifier.padding(
+                horizontal=if(compact || iconOnly) NexusTokens.space8 else NexusTokens.space12,vertical=NexusTokens.space8)) {
+                Icon(Icons.Outlined.AccountBalanceWallet,null,Modifier.size(NexusTokens.space16),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                if(!iconOnly) {
+                    Spacer(Modifier.width(NexusTokens.space4))
+                    Text(balance,style=MaterialTheme.typography.labelMedium.tabularMoney(),color=MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines=2,overflow=TextOverflow.Ellipsis)
+                }
             }
         }
     }
@@ -178,10 +188,9 @@ internal fun StudioBalanceChip(balance:String,onClick:()->Unit,compact:Boolean=f
 
 /** Compact headings in chrome; the user's font scale still applies in full. */
 @Composable
-fun nexusScreenTitleStyle():TextStyle = if(LocalDensity.current.fontScale>=1.3f)
-    MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleMedium
+fun nexusScreenTitleStyle():TextStyle = MaterialTheme.typography.titleMedium
 
-@Composable fun NexusSettingsButton() {LocalChrome.current?.openSettings?.let {go->IconButton(onClick=go) {Icon(Icons.Outlined.Settings,"Ajustes de Nexus",Modifier.size(20.dp))}}}
+@Composable fun NexusSettingsButton() {LocalChrome.current?.openSettings?.let {go->IconButton(onClick=go) {Icon(Icons.Outlined.Settings,"Ajustes de Nexus",Modifier.size(NexusTokens.iconMedium))}}}
 /** «Ajustes de Nexus» como entrada de un menú, para no duplicar un engranaje junto al menú ⋮. */
 @Composable fun NexusSettingsMenuItem(onClick: () -> Unit) {
     LocalChrome.current?.openSettings?.let { go ->

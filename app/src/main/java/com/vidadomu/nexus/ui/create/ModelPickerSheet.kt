@@ -47,8 +47,8 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
     }
     ModalBottomSheet(onDismissRequest=onDismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
-        LazyColumn(Modifier.fillMaxWidth(), contentPadding=PaddingValues(start=16.dp,end=16.dp,bottom=24.dp),
-            verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.fillMaxWidth(), contentPadding=PaddingValues(start=NexusTokens.space16,end=NexusTokens.space16,bottom=NexusTokens.space24),
+            verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             item {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -64,7 +64,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                     trailingIcon={if(query.isNotEmpty()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Limpiar búsqueda de modelos")}})
             }
             item {
-                LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio",Modality.CHAT to "Chat")) { (value,label) ->
                         FilterChip(modality==value,{modality=value;org=null},label={Text(label)})
                     }
@@ -78,7 +78,7 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                 }
             }
             if(orgs.size>1) item {
-                LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     item {FilterChip(org==null,{org=null},label={Text("Todas las marcas")})}
                     items(orgs,key={it}) {brand -> FilterChip(org==brand,{org=if(org==brand) null else brand},label={Text(brand)})}
                 }
@@ -88,14 +88,14 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if(filtered.isEmpty()) item {
-                Column(Modifier.fillMaxWidth().padding(vertical=16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space16)) {
                     Text("No hay modelos con estos filtros",style=MaterialTheme.typography.titleMedium)
                     TextButton(onClick={query="";org=null;modality=null;compatibleOnly=false}) {Text("Ver todo el catálogo")}
                 }
             }
             families.forEach { (family,models) ->
                 item(key="family:$family") {
-                    Text("$family · ${models.size}",Modifier.padding(top=12.dp).semantics {heading()},
+                    Text("$family · ${models.size}",Modifier.padding(top=NexusTokens.space12).semantics {heading()},
                         style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.primary)
                 }
                 items(models,key={"model:${it.providerId}:${it.id}"}) {model ->
@@ -106,10 +106,10 @@ internal fun ModelPickerSheet(availableModels: List<NexusModel>, selectedModel: 
                         shape=NexusTokens.field,modifier=Modifier.fillMaxWidth()
                             .semantics(mergeDescendants=true) {selected=isSelected}
                             .clickable(role=Role.RadioButton) {onSelectModel(model)}) {
-                        Row(Modifier.padding(12.dp).heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically,
-                            horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.padding(NexusTokens.space12).heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically,
+                            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                             BrandLogo(model.organization,model.family,model.id,size=24.dp,containerSize=40.dp)
-                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
                                 Text(canvasModelIdentity(model).title,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.SemiBold,
                                     maxLines=2,overflow=TextOverflow.Ellipsis)
                                 Text("${canvasModelIdentity(model).detail} · $price",style=MaterialTheme.typography.bodySmall,

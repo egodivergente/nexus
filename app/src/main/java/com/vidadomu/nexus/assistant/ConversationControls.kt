@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -62,15 +64,15 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
     var query by remember {mutableStateOf("")}
     val canCarry=!ui.thinking && !ui.carrying && ui.workingIn==null && ui.items.any {it is ChatItem.User}
     ModalDrawerSheet(Modifier.widthIn(max=320.dp)) {
-        Text("Conversaciones",Modifier.padding(start=28.dp,top=24.dp,bottom=12.dp),style=MaterialTheme.typography.titleMedium)
+        Text("Conversaciones",Modifier.padding(start=28.dp,top=NexusTokens.space24,bottom=NexusTokens.space12),style=MaterialTheme.typography.titleMedium)
         NavigationDrawerItem(label={Text("Nueva conversación")},icon={Icon(Icons.Default.Add,null)},selected=false,
-            onClick={onClose();vm.newConversation()},modifier=Modifier.padding(horizontal=12.dp))
+            onClick={onClose();vm.newConversation()},modifier=Modifier.padding(horizontal=NexusTokens.space12))
         if(canCarry || ui.carrying) NavigationDrawerItem(label={Text(if(ui.carrying) "Preparando el resumen…" else "Nueva con este contexto")},
             icon={if(ui.carrying) CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.Forum,null)},selected=false,
-            onClick={if(canCarry) {vm.newConversationWithContext();onClose()}},modifier=Modifier.padding(horizontal=12.dp))
-        HorizontalDivider(Modifier.padding(vertical=8.dp,horizontal=28.dp))
-        com.vidadomu.nexus.ui.components.StudioTextField(query,{query=it},Modifier.padding(horizontal=16.dp),singleLine=true,placeholder={Text("Buscar conversación")})
-        if(closed.isNotEmpty()) TextButton(onClick={showClosed=!showClosed},modifier=Modifier.padding(horizontal=16.dp)) {Text(if(showClosed) "Ocultar cerradas" else "Ver cerradas · ${closed.size}")}
+            onClick={if(canCarry) {vm.newConversationWithContext();onClose()}},modifier=Modifier.padding(horizontal=NexusTokens.space12))
+        HorizontalDivider(Modifier.padding(vertical=NexusTokens.space8,horizontal=28.dp))
+        com.vidadomu.nexus.ui.components.StudioTextField(query,{query=it},Modifier.padding(horizontal=NexusTokens.space16),singleLine=true,placeholder={Text("Buscar conversación")})
+        if(closed.isNotEmpty()) TextButton(onClick={showClosed=!showClosed},modifier=Modifier.padding(horizontal=NexusTokens.space16)) {Text(if(showClosed) "Ocultar cerradas" else "Ver cerradas · ${closed.size}")}
         val shown=remember(chats,titleRevision,closed,showClosed,query) {
             chats.map {it.copy(title=titles.display(it.id,it.title))}
                 .filter {(showClosed || it.id !in closed) && (it.title.contains(query,true) || it.preview.contains(query,true))}
@@ -86,7 +88,7 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
                         IconButton(onClick={renaming=chats.firstOrNull {it.id==chat.id} ?: chat}) {Icon(Icons.Default.Edit,"Cambiar el nombre de la conversación",Modifier.size(16.dp))}
                         IconButton(onClick={tabs.close(chat.id);closed=tabs.closed()}) {Icon(Icons.Default.Close,"Cerrar conversación de la lista; conservar historial",Modifier.size(16.dp))}
                     }},
-                    modifier=Modifier.padding(horizontal=12.dp).semantics {
+                    modifier=Modifier.padding(horizontal=NexusTokens.space12).semantics {
                         if(chat.id==ui.workingIn) contentDescription="${chat.title}: Nexus sigue trabajando aquí"
                     })
             }
@@ -121,10 +123,10 @@ private fun entries(ui: AssistantUiState, vm: AssistantViewModel) =
     var theme by remember {mutableStateOf(appearance.theme())}
     var scale by remember {mutableFloatStateOf(appearance.fontScale())}
     ModalBottomSheet(onDismissRequest=onDismiss,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Text("Apariencia",style=MaterialTheme.typography.titleLarge)
             Text("Tema",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 items(com.vidadomu.nexus.ui.theme.NexusAppearance.entries.toList(),key={option -> option.name}) {option ->
                     FilterChip(theme==option,{theme=option;appearance.setTheme(option)},label={Text(option.label)})
                 }

@@ -35,7 +35,7 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
     val range = ParameterPresentation.range(param, LocalConfiguration.current.locales[0])
     Surface(shape = NexusTokens.field, color = colors.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Column(Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val icon = when (param.key.lowercase()) {
                     "generate_audio", "sound", "audio", "enable_audio", "keep_original_sound" -> Icons.Default.VolumeUp
@@ -46,8 +46,8 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                     else -> null
                 }
                 if (icon != null) {
-                    Icon(icon, null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
-                    Spacer(Modifier.width(8.dp))
+                    Icon(icon, null, Modifier.size(NexusTokens.iconMedium), tint = colors.onSurfaceVariant)
+                    Spacer(Modifier.width(NexusTokens.space8))
                 }
                 Text(title + if (param.isRequired) " *" else "", Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall)
@@ -89,7 +89,7 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                             }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(NexusTokens.space8))
                 }
                 else -> {
                     // Blank is «no se envía», visibly different from a typed value or the provider's automatic choice.
@@ -98,13 +98,13 @@ internal fun NativeParameterControl(param: ModelParameter, value: String, onChan
                         placeholder = { Text(if (param.isRequired) "Introduce un valor" else "Sin indicar") },
                         supportingText = rangeLine?.let { line -> { Text(line, maxLines = 1) } },
                         shape = NexusTokens.field)
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(NexusTokens.space8))
                 }
             }
         }
     }
     if (showDetails) AlertDialog(onDismissRequest = { showDetails = false }, title = { Text(title) },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        text = { Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             Text("Actual: ${ParameterPresentation.describe(param, value)}")
             Text("Predeterminado: ${ParameterPresentation.describe(param, param.defaultValue)}")
             Text(ParameterPresentation.help(param))
@@ -141,9 +141,9 @@ private fun ParameterChip(param: ModelParameter, option: String, value: String,
         } },
         leadingIcon = when {
             selected && hasPreview -> {{ Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Check, null, Modifier.size(18.dp)); FormatPreview(param, option)
+                Icon(Icons.Default.Check, null, Modifier.size(NexusTokens.iconSmall)); FormatPreview(param, option)
             } }}
-            selected -> {{ Icon(Icons.Default.Check, null, Modifier.size(18.dp)) }}
+            selected -> {{ Icon(Icons.Default.Check, null, Modifier.size(NexusTokens.iconSmall)) }}
             hasPreview -> {{ FormatPreview(param, option) }}
             else -> null
         },

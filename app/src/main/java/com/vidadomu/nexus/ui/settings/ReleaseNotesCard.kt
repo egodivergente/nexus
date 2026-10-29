@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.settings
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -67,7 +69,7 @@ internal fun ReleaseNotesCard() {
         }.getOrDefault("—")
     }
     var open by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Última actualización: $updated", style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
             Text("Cambios por versión y pendientes", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
@@ -78,7 +80,7 @@ internal fun ReleaseNotesCard() {
                 Text(note.version, style = MaterialTheme.typography.labelLarge)
                 note.items.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
             }
-            Text("Pendiente", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+            Text("Pendiente", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = NexusTokens.space8))
             pending.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
         }
     }

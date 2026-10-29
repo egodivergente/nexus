@@ -52,12 +52,12 @@ internal fun AgentControlButton(
         }) {
         Row(Modifier.padding(start = NexusTokens.space12, end = NexusTokens.space8, top = NexusTokens.space4, bottom = NexusTokens.space4),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-            Icon(icon, null, Modifier.size(18.dp), tint = if (enabled) colors.primary else colors.onSurfaceVariant)
+            Icon(icon, null, Modifier.size(NexusTokens.iconSmall), tint = if (enabled) colors.primary else colors.onSurfaceVariant)
             Column(Modifier.weight(1f, fill = false)) {
                 Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                 Text(value, style = MaterialTheme.typography.labelLarge)
             }
-            Icon(Icons.Default.ArrowDropDown, null, Modifier.size(20.dp))
+            Icon(Icons.Default.ArrowDropDown, null, Modifier.size(NexusTokens.iconMedium))
         }
     }
 }

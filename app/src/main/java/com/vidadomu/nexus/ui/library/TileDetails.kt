@@ -90,7 +90,7 @@ internal fun TileDetailsCaption(quality: String?, bytes: Long?, epochMillis: Lon
         shadow = Shadow(Color.Black.copy(alpha = .6f), Offset(0f, 1f), 3f)).tabularMoney()
     Column(modifier.fillMaxWidth()
         .background(Brush.verticalGradient(0f to Color.Transparent, .3f to Color.Black.copy(alpha = .5f), 1f to Color.Black.copy(alpha = .8f)))
-        .padding(start = 6.dp, end = 6.dp, top = 14.dp, bottom = 4.dp)) {
+        .padding(start = 6.dp, end = 6.dp, top = 14.dp, bottom = NexusTokens.space4)) {
         if (first.isNotEmpty()) Text(first, style = style, color = MediaForeground, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (second != null) Text(second, style = style, color = MediaForeground.copy(alpha = .8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

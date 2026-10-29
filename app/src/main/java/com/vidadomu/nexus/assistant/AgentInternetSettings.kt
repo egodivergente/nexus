@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.assistant
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +27,7 @@ internal fun AgentInternetSettings() {
     var busy by remember {mutableStateOf(false)}
     var message by remember {mutableStateOf<String?>(null)}
     FoldHeader("Internet y herramientas MCP","${servers.size} servidor(es)",expanded) {expanded=!expanded}
-    if(expanded) Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    if(expanded) Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
         Text("Búsqueda, lectura web y herramientas MCP de consulta disponibles desde el chat. Puedes pedir al agente que conecte un servidor MCP o añadirlo aquí.",style=MaterialTheme.typography.bodySmall)
         servers.forEach {(name,url) -> Row(Modifier.fillMaxWidth()) {
             Column(Modifier.weight(1f)) {Text(name);Text(url,style=MaterialTheme.typography.bodySmall)}

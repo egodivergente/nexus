@@ -53,6 +53,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     val currencyManager = app.currencyManager
     val scope = rememberCoroutineScope()
     val appearance = rememberAppearancePreferences()
+    val haptics = rememberNexusHaptics()
     val selectedTheme by appearance.themeState()
     val currencyState by currencyManager.state.collectAsState()
 
@@ -103,7 +104,8 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
     var assistantSettingsOpen by remember { mutableStateOf(false) }
     var advancedAppearance by rememberSaveable {mutableStateOf(false)}
-    androidx.activity.compose.BackHandler(enabled = page != null) { closePage() }
+    val goBack: () -> Unit = { if(page==SettingsPage.VISUAL && advancedAppearance) advancedAppearance=false else closePage() }
+    androidx.activity.compose.BackHandler(enabled = page != null) { goBack() }
     val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured", app.secureStorage.getMaskedProviderApiKey("fal") != "Not configured").count { it }
     }
@@ -112,7 +114,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 // Same pattern as the tabs: the root «Ajustes» is a screen title; sub-pages are a level below.
                 Text(page?.title ?: "Ajustes",style=if(page==null) MaterialTheme.typography.headlineSmall else com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         showBalance=page != SettingsPage.BYTEPLUS,
-        navigationIcon={ if(page != null) IconButton(onClick=closePage) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
+        navigationIcon={ if(page != null) IconButton(onClick=goBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(page==SettingsPage.VISUAL && advancedAppearance) "Volver a Fondo, movimiento y háptica" else if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
         if(page in setOf(SettingsPage.RULES,SettingsPage.PROJECTS,SettingsPage.CATALOG,SettingsPage.AUTOMATION) || page==SettingsPage.VISUAL && advancedAppearance) {
             Box(Modifier.padding(padding)) {com.vidadomu.nexus.settings.RuntimeSettingsEditor(when(page) {SettingsPage.PROJECTS->"Proyectos y conversaciones";SettingsPage.CATALOG->"Catálogo y workflows";SettingsPage.AUTOMATION->"Automatización";SettingsPage.VISUAL->"Personalización";else->null})}
         } else LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -120,7 +122,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 SettingsPage.RULES, SettingsPage.PROJECTS, SettingsPage.CATALOG, SettingsPage.AUTOMATION -> Unit
                 SettingsPage.VISUAL -> item {SettingsCard {AppearanceControls {advancedAppearance=true}}}
                 null -> {
-                    item {com.vidadomu.nexus.ui.components.StudioTextField(settingsSearch,{settingsSearch=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Buscar en Ajustes")},leadingIcon={Icon(Icons.Default.Search,null)})}
+                    item {com.vidadomu.nexus.ui.components.StudioTextField(settingsSearch,{settingsSearch=it},Modifier.fillMaxWidth().semantics {contentDescription="Buscar en Ajustes"},singleLine=true,placeholder={Text("Buscar en Ajustes")},leadingIcon={Icon(Icons.Default.Search,null)})}
                     val sections=listOf(
                         SettingsPage.APPEARANCE to "Tema, tipografía, fondo, movimiento y háptica",
                         SettingsPage.PROJECTS to "Inicio, conversaciones y destino al compartir",
@@ -129,7 +131,14 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                         SettingsPage.AUTOMATION to "Concurrencia y ejecución",
                         // «Seguridad» ya no aparece en el menú (se oculta, su código se conserva).
                         SettingsPage.SYSTEM to "Diagnóstico y administración")
-                    sections.filter {settingsSearch.isBlank() || "${it.first.title} ${it.second}".contains(settingsSearch,true)}.forEach {(target,summary)->
+                    val matches=sections.filter {settingsSearch.isBlank() || "${it.first.title} ${it.second}".contains(settingsSearch.trim(),true)}
+                    if(matches.isEmpty()) item {
+                        Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                            Text("No hay secciones para «${settingsSearch.trim()}».",style=MaterialTheme.typography.bodyLarge)
+                            TextButton(onClick={settingsSearch=""}) {Text("Ver todos los ajustes")}
+                        }
+                    }
+                    matches.forEach {(target,summary)->
                         item {HubRow(target,summary) {pageName=target.name}}
                     }
                     if(settingsSearch.isNotBlank()) item {TextButton(onClick={pageName=SettingsPage.RULES.name}) {Text("Buscar también en todas las reglas")}}
@@ -140,7 +149,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     item {SettingsCard {SettingRow("Sincronización entre dispositivos","Chats, memoria y archivos",{syncOpen=true})}}
                 }
                 SettingsPage.SECURITY -> {
-                    item {SettingsCard {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    item {SettingsCard {Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
                         Text("Permisos de Android",style=MaterialTheme.typography.titleMedium)
                         Text("Micrófono, notificaciones y acceso a archivos se gestionan desde el sistema.",style=MaterialTheme.typography.bodyMedium)
                         TextButton(onClick={context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")))}) {Text("Abrir permisos de Nexus")}
@@ -226,7 +235,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
             NexusSheetGroup("Tema", Icons.Default.Palette) {
             NexusAppearance.entries.forEach {option->
                 val preview = remember(option) { palette(option) }
-                Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={appearance.setTheme(option)})
+                Row(Modifier.fillMaxWidth().selectable(selectedTheme==option,role=Role.RadioButton,onClick={val changed=selectedTheme!=option;appearance.setTheme(option);haptics.perform(NexusHapticEvent.SELECTION,changed=changed)})
                     .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
                     RadioButton(selectedTheme==option,null)
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
@@ -252,11 +261,14 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     if(currencyOpen) NexusSheet("Moneda", {currencyOpen=false}, icon=Icons.Default.CurrencyExchange) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=NexusTokens.screenMargin).padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
             NexusSheetGroup("Preferencia de moneda", Icons.Default.CurrencyExchange) {
-            CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth().clickable { currencyManager.setPreference(pref) }
+            Column(Modifier.selectableGroup()) {
+            CurrencyPreference.entries.forEach {pref->Row(Modifier.fillMaxWidth()
+                .selectable(currencyState.preference==pref,role=Role.RadioButton,onClick={val changed=currencyState.preference!=pref;currencyManager.setPreference(pref);haptics.perform(NexusHapticEvent.SELECTION,changed=changed)})
                 .heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically) {
-                RadioButton(currencyState.preference==pref,{currencyManager.setPreference(pref)})
+                RadioButton(currencyState.preference==pref,onClick=null)
                 Column(Modifier.weight(1f)) {Text(pref.displayName,style=MaterialTheme.typography.bodyLarge);Text(pref.description,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
             }}
+            }
             }
             NexusSheetGroup("Conversión", Icons.Default.Sync) {
             Text(currencyState.rateSummaryText,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
@@ -456,7 +468,7 @@ private fun HubRow(page: SettingsPage, summary: String, onClick: () -> Unit) {
             CategoryTile(page.icon, page.tint)
             Column(Modifier.weight(1f)) {
                 Text(page.title, style = MaterialTheme.typography.titleMedium)
-                Text(summary, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 2)
+                Text(summary, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             }
             Icon(Icons.Default.ChevronRight, null, tint = page.tint)
         }
@@ -474,7 +486,7 @@ private fun SettingRow(title:String,subtitle:String,onClick:()->Unit) {
 @Composable
 private fun SettingsHeader(title:String,icon:androidx.compose.ui.graphics.vector.ImageVector,top:androidx.compose.ui.unit.Dp=0.dp) {
     Row(Modifier.fillMaxWidth().padding(top=top,start=NexusTokens.space4),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        Icon(icon,null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.size(18.dp))
+        Icon(icon,null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.size(NexusTokens.iconSmall))
         Text(title,style=MaterialTheme.typography.titleLarge,color=TextPrimary)
     }
 }
@@ -493,12 +505,13 @@ private fun FontScaleRow(appearance:AppearancePreferences) {
     val saved by appearance.fontScaleState()
     var draft by remember(saved) {mutableStateOf(saved)}
     Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space4)) {
-        Row(verticalAlignment=Alignment.CenterVertically) {
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Text("Tamaño de letra",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
             Text("${(draft*100).toInt()} %",style=MaterialTheme.typography.labelLarge.tabularMoney(),color=TextSecondary)
-            TextButton(onClick={draft=1f;appearance.setFontScale(1f)},enabled=saved!=1f||draft!=1f) {Text("Restablecer")}
         }
-        Slider(draft,{draft=it},valueRange=.8f..1.4f,steps=11,onValueChangeFinished={appearance.setFontScale(draft)})
+        Slider(draft,{draft=it},valueRange=.8f..1.4f,steps=11,onValueChangeFinished={appearance.setFontScale(draft)},
+            modifier=Modifier.semantics {contentDescription="Tamaño de letra de Nexus"})
+        TextButton(onClick={draft=1f;appearance.setFontScale(1f)},enabled=saved!=1f||draft!=1f) {Text("Restablecer tamaño de letra")}
         Text("Así se verá el texto de Nexus.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         // Más espacio para el chat: la barra de pestañas se esconde al bajar y vuelve al subir.
         val context=LocalContext.current

@@ -142,7 +142,7 @@ fun LiveRenderPill(
                 }
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -176,7 +176,7 @@ fun LiveRenderPill(
                             Icons.Default.CheckCircle,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(NexusTokens.iconDefault)
                         )
                     }
                 }
@@ -212,11 +212,11 @@ fun LiveRenderPill(
                                 dismissedIds = dismissedIds + job.id
                                 onSendToAgent(job.id, firstOutputId)
                             },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = 0.dp),
                             modifier = Modifier.heightIn(min = 48.dp)
                         ) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(NexusTokens.space4))
                             Text("Al chat", style = MaterialTheme.typography.labelMedium)
                         }
                     }

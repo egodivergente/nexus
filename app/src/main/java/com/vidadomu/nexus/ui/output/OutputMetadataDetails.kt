@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.output
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
@@ -111,7 +113,7 @@ internal fun OutputMetadataDetails(job: GenerationJob, output: GenerationOutput,
         }
         MetadataRow("Tamaño", facts.bytes?.let(::formatMegabytes) ?: if (localUri == null) "Sin copia local" else "No disponible")
         MetadataRow("Formato", output.mimeType.ifBlank { output.type.name.lowercase(Locale.ROOT) })
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(NexusTokens.space8))
     }
 }
 
@@ -140,7 +142,7 @@ private fun formatOutputDuration(seconds: Float?): String? = seconds?.takeIf { i
 
 @Composable
 private fun MetadataRow(label: String, value: String) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = NexusTokens.space4)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }

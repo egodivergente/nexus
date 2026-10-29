@@ -1,5 +1,7 @@
 package com.vidadomu.nexus.ui.create
 
+import com.vidadomu.nexus.ui.theme.NexusTokens
+
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -72,7 +74,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
             },
             bottomBar = {
                 com.vidadomu.nexus.ui.components.FloatingActionDock {
-                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                         state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if(state.phase in setOf(ComparisonPhase.REVIEW, ComparisonPhase.PREPARING)) {
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -115,12 +117,12 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
         ) { padding ->
             // El contenido pasa por debajo del botón flotante y se desvanece; no termina en un corte recto.
             LazyColumn(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = padding.calculateBottomPadding() + 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = NexusTokens.space12, bottom = padding.calculateBottomPadding() + NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 item {
                     // The prompt is context here, not the task: a compact card instead of four lines of large white text.
                     Surface(shape = com.vidadomu.nexus.ui.theme.NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                             Text(state.source.prompt.ifBlank { "Vuelve al lienzo y escribe un prompt para comparar sus interpretaciones." },
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -132,16 +134,16 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                 if(BuildConfig.OFFLINE_QA) item { Text("LABORATORIO · tarifas simuladas · envíos bloqueados", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                 if(state.phase == ComparisonPhase.CHOOSE) {
                     item {
-                        if(groups.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(groups) {name->AssistChip(onClick={controller.loadGroup(name)},label={Text(name)})}}
+                        if(groups.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(groups) {name->AssistChip(onClick={controller.loadGroup(name)},label={Text(name)})}}
                         com.vidadomu.nexus.ui.components.NexusTonalAction(if(saveGroup) "Cerrar grupos" else "Mis grupos",{saveGroup=!saveGroup},
                             icon=Icons.Default.Bookmarks,description="Guardar o cargar grupos de modelos")
-                        if(saveGroup) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        if(saveGroup) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                             OutlinedTextField(groupName,{groupName=it},Modifier.weight(1f),singleLine=true,placeholder={Text("Guardar selección como grupo")})
                             TextButton(onClick={controller.saveGroup(groupName.trim());groups=controller.savedGroups();groupName=""},enabled=groupName.isNotBlank() && state.selected.isNotEmpty()) {Text("Guardar")}
                         }
                     }
                     item {
-                        if(state.source.attachedMedia.isEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if(state.source.attachedMedia.isEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                             FilterChip(state.withReferences, { controller.setReferenceMode(true) }, label = { Text("Con referencias") })
                             FilterChip(!state.withReferences, { controller.setReferenceMode(false) }, label = { Text("Desde texto") })
                         }
@@ -171,8 +173,8 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                         Surface(shape = com.vidadomu.nexus.ui.theme.NexusTokens.card,
                             color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha = .08f) else androidx.compose.ui.graphics.Color.Transparent,
                             border = if(selected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .35f)) else null) {
-                        Column(Modifier.padding(horizontal = 8.dp)) {
-                        Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { controller.toggle(model) }.heightIn(min = 64.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.padding(horizontal = NexusTokens.space8)) {
+                        Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { controller.toggle(model) }.heightIn(min = 64.dp).padding(vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                             com.vidadomu.nexus.ui.components.BrandLogo(organization=model.organization,modelId=model.id,size=28.dp,bare=true)
                             Column(Modifier.weight(1f)) {
                                 Text(canvasModelIdentity(model).title, style = MaterialTheme.typography.titleSmall)
@@ -220,7 +222,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                     items(state.entries, key = { ComparisonPlan.key(it.model) }) { entry ->
                         var details by rememberSaveable(ComparisonPlan.key(entry.model)) { mutableStateOf(false) }
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                                 Column(Modifier.weight(1f)) {
                                     Text(canvasModelIdentity(entry.model).title, style = MaterialTheme.typography.titleSmall)
                                     Text(providerName(entry.model.providerId), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -251,7 +253,7 @@ fun ComparisonScreen(controller: ComparisonController, onDismiss: () -> Unit, on
                                     entry.cost?.let { Text(it.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 }
                             }
-                            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            HorizontalDivider(Modifier.padding(vertical = NexusTokens.space8), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         }
                     }
                     if(completed) item { Text("Los resultados quedan agrupados en Historial. Los envíos pendientes no se reanudan automáticamente si cierras Nexus.", style = MaterialTheme.typography.bodySmall) }
@@ -274,11 +276,11 @@ fun ComparisonResultsDialog(batchId: String, onDismiss: () -> Unit, onOpenOutput
         Scaffold(Modifier.fillMaxSize().safeDrawingPadding(), topBar = {
             TopAppBar(title = { Text("Resultados del lote") }, navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Cerrar resultados del lote") } })
         }) { padding ->
-            LazyVerticalGrid(GridCells.Adaptive(152.dp), Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyVerticalGrid(GridCells.Adaptive(152.dp), Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(NexusTokens.space16),
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
                 item(span = { GridItemSpan(maxLineSpan) }) { Column {
                     Text(jobs.firstOrNull()?.prompt.orEmpty(), maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                    if(jobs.size < expected) Text("${jobs.size} de $expected solicitudes registradas. Las restantes no se reanudan automáticamente.", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall)
+                    if(jobs.size < expected) Text("${jobs.size} de $expected solicitudes registradas. Las restantes no se reanudan automáticamente.", Modifier.padding(top = NexusTokens.space8), style = MaterialTheme.typography.bodySmall)
                 } }
                 items(jobs, key = { it.id }) { job ->
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -292,7 +294,7 @@ fun ComparisonResultsDialog(batchId: String, onDismiss: () -> Unit, onOpenOutput
                                 if(output.type==Modality.VIDEO) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}
                             }.build(),
                                 contentDescription = "Resultado de ${job.parameters[ComparisonPlan.NAME] ?: job.modelId}", contentScale = ContentScale.Fit)
-                            else Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                            else Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                                 val active = job.status !in setOf(GenerationStatus.FAILED, GenerationStatus.CANCELLED, GenerationStatus.COMPLETED)
                                 if(active) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                                 else Icon(if(job.status == GenerationStatus.COMPLETED) Icons.Default.ImageNotSupported else Icons.Default.ErrorOutline, null)
@@ -301,7 +303,7 @@ fun ComparisonResultsDialog(batchId: String, onDismiss: () -> Unit, onOpenOutput
                                     GenerationStatus.CANCELLED -> "Cancelado"
                                     GenerationStatus.COMPLETED -> "Sin vista previa"
                                     else -> "Generando…"
-                                }, Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelMedium)
+                                }, Modifier.padding(top = NexusTokens.space8), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                         Text(job.parameters[ComparisonPlan.NAME] ?: job.modelId, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
