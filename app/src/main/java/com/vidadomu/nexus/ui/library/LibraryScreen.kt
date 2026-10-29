@@ -21,8 +21,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -97,7 +95,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     BackHandler(enabled=openFolder!=null && !selecting) {openFolder=null}
     val scope=rememberCoroutineScope()
     val snackbar=remember {SnackbarHostState()}
-    val haptic=LocalHapticFeedback.current
+    val haptic=com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val runtime=remember(app) {AssistantRuntime.get(app)}
     var showLocalEdits by rememberSaveable {mutableStateOf(false)}
     if(showLocalEdits) LocalMediaEditsSheet {showLocalEdits=false}
@@ -137,7 +135,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
     // Sin preferencia guardada, las columnas se adaptan al ancho (miniaturas de ~120 dp); el zoom las fija luego.
     val widthDp=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
-    var columns by remember {mutableStateOf(prefs.getInt("grid_cols",(widthDp/120).coerceIn(3,6)).coerceIn(2,6))}
+    var columns by remember(widthDp) {mutableStateOf(prefs.getInt("grid_cols",(widthDp/120).coerceIn(3,6)).coerceIn(2,6))}
     val viewFilters=LibraryViewFilters(query,filter,originFilter,favoriteOnly,showHidden,emptySet())
     val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
     fun applyFilters(next:LibraryViewFilters) {
@@ -350,27 +348,37 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             onFavorite={
                 favorites=if(token in favorites) favorites-token else favorites+token
                 prefs.edit().putStringSet("favorites",favorites).apply()
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
             },onHide={
                 val wasHidden=token in hidden
                 hidden=if(wasHidden) hidden-token else hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
                 scope.launch {if(snackbar.showSnackbar(if(wasHidden) "Archivo restaurado" else "Archivo ocultado","Deshacer",withDismissAction=true)==SnackbarResult.ActionPerformed) {
                     hidden=if(wasHidden) hidden+token else hidden-token;prefs.edit().putStringSet("hidden",hidden).apply()
                 }}
-            },onDelete={scope.launch {
-                when(entry) {
-                    is LibraryEntry.Local -> {
-                        runtime.assets.deleteLibraryAssets(setOf(entry.asset.id))
-                        snackbar.showSnackbar("Eliminado de la biblioteca (los originales se conservan)")
-                    }
-                    is LibraryEntry.Out -> {
-                        val output=entry.job.outputs[entry.index]
-                        runtime.assets.deleteLibraryAssets(index.assets.filter {it.uri==output.url || it.uri==output.localUri}.map {it.id}.toSet())
-                        hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()
-                        snackbar.showSnackbar("Eliminado de la biblioteca; el historial se conserva")
+            },onDelete={
+                // Close the viewer so the reversible action remains visible above the library.
+                viewerAt=null
+                val ids=when(entry) {
+                    is LibraryEntry.Local -> setOf(entry.asset.id).takeUnless {entry.asset.libraryDeleted}.orEmpty()
+                    is LibraryEntry.Out -> entry.job.outputs[entry.index].let {output ->
+                        index.assets.filter {!it.libraryDeleted && (it.uri==output.url || it.uri==output.localUri)}.map {it.id}.toSet()
                     }
                 }
-            }},onMessage=::message,
+                val wasHidden=token in hidden
+                scope.launch {
+                    try {
+                        runtime.assets.deleteLibraryAssets(ids)
+                        if(entry is LibraryEntry.Out) {hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()}
+                        if(snackbar.showSnackbar("Eliminado de la biblioteca; los originales se conservan","Deshacer",withDismissAction=true)==SnackbarResult.ActionPerformed) {
+                            // Restore only the removed flag: names/project edits made meanwhile survive.
+                            runtime.assets.restoreLibraryAssets(ids)
+                            hidden=if(wasHidden) hidden+token else hidden-token
+                            prefs.edit().putStringSet("hidden",hidden).apply()
+                        }
+                    } catch(e:kotlinx.coroutines.CancellationException) {throw e}
+                    catch(e:Exception) {snackbar.showSnackbar("No se pudo completar la acción en la biblioteca")}
+                }
+            },onMessage=::message,
             onAddToChat=when(entry) {
                 is LibraryEntry.Local -> onSendToAgent?.let {send -> leaving {send(entry.asset)}}
                 is LibraryEntry.Out -> onSendResultToAgent?.let {send -> leaving {send(entry.job.id,entry.job.outputs[entry.index].id)}}
@@ -447,13 +455,20 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             val allFav=markedVisible.all {it in favorites}
             favorites=if(allFav) favorites-markedVisible else favorites+markedVisible
             prefs.edit().putStringSet("favorites",favorites).apply()
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
         },onHide={
             val hide=!showHidden
-            hidden=if(hide) hidden+markedVisible else hidden-markedVisible
+            val tokens=markedVisible.toSet()
+            val previouslyHidden=hidden.intersect(tokens)
+            hidden=if(hide) hidden+tokens else hidden-tokens
             prefs.edit().putStringSet("hidden",hidden).apply()
-            val count=markedVisible.size;marked=emptySet()
-            scope.launch {snackbar.showSnackbar(if(hide) "$count ocultados" else "$count restaurados")}
+            val count=tokens.size;marked=emptySet()
+            scope.launch {
+                if(snackbar.showSnackbar(if(hide) "$count ocultados" else "$count restaurados","Deshacer",withDismissAction=true)==SnackbarResult.ActionPerformed) {
+                    hidden=(hidden-tokens)+previouslyHidden
+                    prefs.edit().putStringSet("hidden",hidden).apply()
+                }
+            }
         },onOptions={
             val token=markedVisible.first()
             optionsFor=flat.firstOrNull {tokenOf(it)==token}
@@ -469,7 +484,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 }
             }
             marked=emptySet();open()
-        }}}) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=if(openFolder!=null) 4.dp else 16.dp),verticalAlignment=Alignment.CenterVertically) {
+        }}}) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=if(openFolder!=null) NexusTokens.space4 else NexusTokens.space16),verticalAlignment=Alignment.CenterVertically) {
         // Dentro de una carpeta: flecha atrás y su nombre en lugar de «Biblioteca».
         if(openFolder!=null) IconButton(onClick={openFolder=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a la Biblioteca")}
         // Título, recuento y saldo comparten una sola cabecera: ya no hay una fila entera solo para «N archivos · saldo».
@@ -595,7 +610,7 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
     val context=LocalContext.current
     val interaction=remember {MutableInteractionSource()}
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if(pressed) .96f else 1f,tween(120),label="Media press")
+    val scale by animateFloatAsState(if(pressed) .96f else 1f,tween(NexusTokens.pressDuration),label="Media press")
     val duration=mediaDuration(output.durationSeconds)
     val type=when(output.type) {Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.IMAGE->"Imagen";else->"Texto"}
     Box(Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer {scaleX=scale;scaleY=scale}.background(MaterialTheme.colorScheme.surfaceContainer)
@@ -622,7 +637,7 @@ private fun LibraryTile(job:GenerationJob,output:GenerationOutput,conflicts:Set<
         } else Icon(if(output.type==Modality.AUDIO) Icons.Default.GraphicEq else Icons.Default.TextSnippet,null,Modifier.size(NexusTokens.space32),tint=TextSecondary)
         // Sin ⋮ encima de la imagen ni etiqueta de origen: las opciones están en el visor.
         if(mark!=null) TileMark(mark,Modifier.align(Alignment.TopStart))
-        else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(18.dp),tint=MaterialTheme.colorScheme.primary)
+        else if(favorite) Icon(Icons.Default.Star,"Favorito",Modifier.align(Alignment.TopStart).padding(NexusTokens.space8).size(NexusTokens.iconSmall),tint=MaterialTheme.colorScheme.primary)
         Column(modifier=Modifier.align(Alignment.TopEnd),horizontalAlignment=Alignment.End) {
             if(output.type in listOf(Modality.VIDEO,Modality.AUDIO)) TileMediaBadge(output.type==Modality.VIDEO,duration)
             if(duplicate) TileDuplicateBadge()
@@ -657,7 +672,9 @@ private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit,onRefresh:()->Unit,o
     var now by remember {mutableStateOf(System.currentTimeMillis())}
     LaunchedEffect(job.id) {while(true) {kotlinx.coroutines.delay(1000);now=System.currentTimeMillis()}}
     val elapsed=((now-job.startedAt)/1000).coerceAtLeast(0).let {s -> if(s>=60) "${s/60} min" else "$s s"}
-    Row(Modifier.fillMaxWidth().clickable(onClick=onOpen).padding(horizontal=NexusTokens.screenMargin,vertical=6.dp),
+    val stuck=(now-job.startedAt)>=STUCK_AFTER_MS
+    Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch).clickable(role=Role.Button,onClick=onOpen)
+        .padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),
         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
         val progress=job.progress
         if(progress!=null) CircularProgressIndicator(progress={progress.coerceIn(0f,1f)},modifier=Modifier.size(18.dp),strokeWidth=2.dp)
@@ -668,17 +685,15 @@ private fun PendingJobRow(job:GenerationJob,onOpen:()->Unit,onRefresh:()->Unit,o
             job.prompt.trim().takeIf {it.isNotEmpty()}?.let {
                 Text(it,style=MaterialTheme.typography.labelSmall,color=TextSecondary,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
+            Text(if(stuck) "Tarda más de lo normal · $elapsed" else "${com.vidadomu.nexus.ui.components.generationStatusLabel(job)} · $elapsed",
+                style=MaterialTheme.typography.labelMedium,color=if(stuck) AccentAmber else TextSecondary)
             progress?.takeIf {it.isFinite() && it>0f}?.let {
-                LinearProgressIndicator(progress={it.coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().padding(top=4.dp).height(3.dp))
+                LinearProgressIndicator(progress={it.coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().padding(top=NexusTokens.space4).height(3.dp))
             }
         }
-        // Pasados ~10 min el trabajo «tarda más de lo normal»: se tiñe de ámbar y ofrece consultar o dejar de seguirlo.
-        val stuck=(now-job.startedAt)>=STUCK_AFTER_MS
-        Text(if(stuck) "Tarda más de lo normal · $elapsed" else "${com.vidadomu.nexus.ui.components.generationStatusLabel(job)} · $elapsed",
-            style=MaterialTheme.typography.labelMedium,color=if(stuck) AccentAmber else TextSecondary,maxLines=1)
         if(stuck) {
-            IconButton(onClick=onRefresh,Modifier.size(40.dp)) {Icon(Icons.Default.Refresh,"Consultar estado en el proveedor",Modifier.size(20.dp),tint=AccentAmber)}
-            IconButton(onClick=onStopTracking,Modifier.size(40.dp)) {Icon(Icons.Default.Close,"Dejar de seguir este trabajo",Modifier.size(20.dp),tint=TextSecondary)}
+            IconButton(onClick=onRefresh,Modifier.size(NexusTokens.minimumTouch)) {Icon(Icons.Default.Refresh,"Consultar estado en el proveedor",Modifier.size(NexusTokens.iconMedium),tint=AccentAmber)}
+            IconButton(onClick=onStopTracking,Modifier.size(NexusTokens.minimumTouch)) {Icon(Icons.Default.Close,"Dejar de seguir este trabajo",Modifier.size(NexusTokens.iconMedium),tint=TextSecondary)}
         }
     }
 }

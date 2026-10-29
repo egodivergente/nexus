@@ -389,6 +389,12 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         d.copy(assets=d.assets.map {if(it.id in targets) it.copy(libraryDeleted=true) else it}) to targets.size
     }
 
+    /** Undo a library removal atomically; retain current metadata, file references and identities. */
+    suspend fun restoreLibraryAssets(ids: Set<String>): Int = edit { d ->
+        val targets = d.assets.filter { it.id in ids && it.libraryDeleted }.map { it.id }.toSet()
+        d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = false) else it }) to targets.size
+    }
+
     suspend fun deleteFromLibrary(projectId: String, ids: Set<String>): Int = edit { d ->
         val targets = d.assets.filter { it.id in ids && it.projectId == projectId && !it.libraryDeleted }.map { it.id }.toSet()
         d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = true) else it }) to targets.size

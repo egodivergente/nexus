@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -28,15 +29,18 @@ internal fun LibrarySelectionBar(count: Int, single: Boolean, favoritesOn: Boole
     onMove: () -> Unit, onRename: () -> Unit, onCrop: (() -> Unit)?, onArtBox: (() -> Unit)?) {
     var menu by remember { mutableStateOf(false) }
     NexusTopAppBar(title = {
-        Text(if (count == 1) "1 marcado" else "$count marcados", style = nexusScreenTitleStyle(), maxLines = 1)
-    }, actions = {
+        Text(if (count == 1) "1 marcado" else "$count marcados", style = nexusScreenTitleStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }, showBalance = false, navigationIcon = {
         IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Salir de la selección") }
-        IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Marcar todo lo visible") }
-        IconButton(onClick = onMove) { Icon(Icons.Default.DriveFileMove, "Cambiar de proyecto") }
+    }, actions = {
         IconButton(onClick = onExport) { Icon(Icons.Default.Download, "Exportar en ZIP") }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más acciones sobre lo marcado") }
             DropdownMenu(menu, { menu = false }) {
+                DropdownMenuItem(text = { Text("Marcar todo lo visible") },
+                    leadingIcon = { Icon(Icons.Default.SelectAll, null) }, onClick = { menu = false; onSelectAll() })
+                DropdownMenuItem(text = { Text("Cambiar de proyecto") },
+                    leadingIcon = { Icon(Icons.Default.DriveFileMove, null) }, onClick = { menu = false; onMove() })
                 DropdownMenuItem(text = { Text("Cambiar el nombre") },
                     leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onRename() })
                 onCrop?.let { crop -> DropdownMenuItem(text = { Text("Recortar") },
