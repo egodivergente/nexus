@@ -141,6 +141,18 @@ class MainActivity : ComponentActivity() {
                 var tabRequest by remember {mutableStateOf<Int?>(null)}
                 val rules by RuntimePreferences.get(this).state.collectAsState()
                 LaunchedEffect(pager.settledPage) {tabPrefs.edit().putInt("page",pager.settledPage).apply()}
+                val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+                val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+                var previousPage by remember(pager) { mutableIntStateOf(pager.settledPage) }
+                LaunchedEffect(pager.settledPage) {
+                    if (previousPage != pager.settledPage) {
+                        // A swipe can change tabs while the chat/search field still owns focus.
+                        // Release that focus without changing its persisted draft.
+                        focusManager.clearFocus(force = true)
+                        keyboard?.hide()
+                        previousPage = pager.settledPage
+                    }
+                }
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
                 // One path for «Continuar en…» whether it is drawn inside the Agent tab or as the full sheet used for shared files.
