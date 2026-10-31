@@ -24,7 +24,13 @@ internal class AssistantChatStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "assistant/chat-v1.json").apply { parentFile?.mkdirs() })
     private val json = Json { ignoreUnknownKeys = true }
     private var previous: SavedAssistantChat? = null
-    private val lock = kotlinx.coroutines.sync.Mutex()
+    private val lock get() = writers
+
+    companion object {
+        /** Shared by every instance: «Liberar espacio» rewrites saved chats while holding it, so no save interleaves. */
+        private val writers = kotlinx.coroutines.sync.Mutex()
+        suspend fun <T> exclusive(block: suspend () -> T): T = writers.withLock { block() }
+    }
 
     fun load(): SavedAssistantChat? = runCatching {
         json.decodeFromString<SavedAssistantChat>(file.openRead().bufferedReader().use { it.readText() })

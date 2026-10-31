@@ -39,11 +39,17 @@ class NativeOperationsDeviceTest {
         var exported: File? = null
         try {
             val result = operations.run("rename_asset_file", buildJsonObject { put("asset_id", asset.id); put("file_name", named.name) }, AgentSession("qa", AgentMode.AGENT))
-            assertTrue(result["file_renamed"]!!.jsonPrimitive.boolean)
             assertTrue(result["old_uri_preserved"]!!.jsonPrimitive.boolean)
             assertArrayEquals(originalBytes, original.readBytes())
-            assertArrayEquals(originalBytes, named.readBytes())
-            assertEquals(Uri.fromFile(named).toString(), runtime.assets.asset(asset.id)!!.uri)
+            if (result["file_renamed"]!!.jsonPrimitive.boolean) {
+                assertArrayEquals(originalBytes, named.readBytes())
+                assertEquals(Uri.fromFile(named).toString(), runtime.assets.asset(asset.id)!!.uri)
+            } else {
+                // Without link() only the visible name changes: never a second copy of the file.
+                assertTrue(result["display_name_changed"]!!.jsonPrimitive.boolean)
+                assertFalse(named.exists())
+                assertEquals(named.name, runtime.assets.asset(asset.id)!!.displayName)
+            }
             val converted = operations.run("convert_image_asset", buildJsonObject {
                 put("asset_id", asset.id); put("format", "jpeg"); put("max_dimension", 128); put("aspect_ratio", "1:1")
             }, AgentSession("qa", AgentMode.AGENT))
@@ -51,7 +57,7 @@ class NativeOperationsDeviceTest {
             val decoded = BitmapFactory.decodeFile(exported!!.path)
             assertEquals(128, decoded.width); assertEquals(128, decoded.height); decoded.recycle()
             assertTrue(converted["original_preserved"]!!.jsonPrimitive.boolean)
-            assertArrayEquals(originalBytes, named.readBytes())
+            assertArrayEquals(originalBytes, File(Uri.parse(runtime.assets.asset(asset.id)!!.uri).path!!).readBytes())
             val before = folder.listFiles()!!.map { it.name }.toSet()
             try {
                 operations.run("rename_asset_file", buildJsonObject { put("asset_id", asset.id); put("file_name", "../outside.png") }, AgentSession("qa", AgentMode.AGENT))

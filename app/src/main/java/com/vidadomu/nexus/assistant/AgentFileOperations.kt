@@ -36,6 +36,7 @@ internal class AgentFileOperations(private val app: NexusApplication, private va
         var compatibilityAlias = false
         var newUri = uri
         var rollback: (() -> Unit)? = null
+        var visibleNameOnly = false
         if (uri.scheme == "file") {
             val file = File(uri.path ?: throw ToolInputException("Ruta inválida."))
             // Do not grant access to preferences, credentials, databases or arbitrary private files.
@@ -52,29 +53,16 @@ internal class AgentFileOperations(private val app: NexusApplication, private va
             try {
                 // Keep an old-path hard link: persisted chats/plans/history still refer to that path.
                 Os.link(target.absolutePath, file.absolutePath)
+                compatibilityAlias = true
+                newUri = Uri.fromFile(target)
+                rollback = { target.delete() } // old hard link holds the original bytes
             } catch (error: Exception) {
-                // Some Android filesystems/SELinux policies reject link(). Keep a synced copy instead.
-                val temporary = File(file.parentFile, ".compat_${UUID.randomUUID()}.part")
-                try {
-                    if (file.parentFile!!.usableSpace < target.length() + 2L * 1024 * 1024)
-                        throw ToolInputException("No hay espacio para conservar los adjuntos anteriores.")
-                    target.inputStream().use { input ->
-                        java.io.FileOutputStream(temporary).use { output ->
-                            input.copyTo(output)
-                            output.fd.sync()
-                        }
-                    }
-                    check(temporary.length() == target.length() && temporary.renameTo(file))
-                } catch (copyError: Exception) {
-                    temporary.delete()
-                    if (file.exists()) file.delete()
-                    check(target.renameTo(file)) { "No se pudo restaurar el nombre original." }
-                    throw ToolInputException("No se pudo conservar la referencia anterior; el archivo original sigue intacto.")
-                }
+                // Some Android filesystems/SELinux policies reject link(). Keeping the old path would then need a
+                // second full copy of the file (renamed exports filled the phone that way), so the move is undone
+                // and only the name shown in Nexus changes.
+                if (!target.renameTo(file)) throw ToolInputException("No se pudo restaurar el nombre original.")
+                visibleNameOnly = true
             }
-            compatibilityAlias = true
-            newUri = Uri.fromFile(target)
-            rollback = { target.delete() } // old hard link holds the original bytes
         } else if (uri.scheme == "content" && uri.authority == MediaStore.AUTHORITY) {
             val previous = app.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)
                 ?.use { if (it.moveToFirst()) it.getString(0) else null }
@@ -91,6 +79,15 @@ internal class AgentFileOperations(private val app: NexusApplication, private va
             }
             rollback = { app.contentResolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, previous) }, null, null) }
         } else throw ToolInputException("El archivo no es una copia privada ni un MediaStore modificable. No puedo renombrar una URL remota.")
+        if (visibleNameOnly) {
+            val updated = assets.updateAsset(asset.id) { it.copy(displayName = name) }
+            session.attachments.replaceAll { if (it.assetId == asset.id || it.uri == asset.uri) it.copy(name = name) else it }
+            return@withLock buildJsonObject {
+                put("asset_id", updated.id); put("file_name", name); put("uri", updated.uri)
+                put("file_renamed", false); put("display_name_changed", true); put("old_uri_preserved", true)
+                put("note", "Android no permite renombrar sin duplicar el archivo; cambió el nombre visible en Nexus.")
+            }
+        }
         try {
             val updated = assets.relocateAsset(asset.id, asset.uri, newUri.toString(), name)
             session.attachments.replaceAll { if (it.assetId == asset.id || it.uri == asset.uri) it.copy(uri = updated.uri, name = name) else it }

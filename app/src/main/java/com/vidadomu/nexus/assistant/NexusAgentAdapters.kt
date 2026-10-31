@@ -307,6 +307,7 @@ object AgentMediaStore {
         }
         val dir = File(context.filesDir, "agent_media").apply { mkdirs() }
         val target = File(dir, "agent_${UUID.randomUUID()}.$ext")
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
         try {
             (context.contentResolver.openInputStream(uri) ?: error("Android no permitió leer el archivo.")).use { input ->
                 target.outputStream().use { out ->
@@ -314,11 +315,22 @@ object AgentMediaStore {
                     while (true) {
                         val n = input.read(buf); if (n < 0) break
                         total += n; require(total <= byteLimit) { "El archivo supera tu límite local de $importMB MB. Puedes cambiarlo en Ajustes." }
-                        out.write(buf, 0, n)
+                        out.write(buf, 0, n); digest.update(buf, 0, n)
                     }
                 }
             }
         } catch (e: Exception) { target.delete(); throw e }
+        // The same bytes already stored and in the library (same project): reuse that file instead of a new copy.
+        // Re-sharing or re-attaching a photo used to add another full copy each time.
+        val sha = digest.digest().joinToString("") { "%02x".format(it) }
+        runtime.hashes.find(sha, target.length()) { it != target && NexusStorage.reusableCopy(context, it) }?.let { twin ->
+            val owner = runtime.assets.assetByUri(Uri.fromFile(twin).toString())
+            if (owner != null && !owner.libraryDeleted && (projectId == null || owner.projectId == projectId)) {
+                target.delete()
+                return@withContext Attachment(owner.id, owner.uri, owner.mimeType ?: resolved, owner.displayName, owner.width, owner.height, owner.durationSec, assetId = owner.id)
+            }
+        }
+        runtime.hashes.record(target, sha)
         var w: Int? = null; var h: Int? = null
         if (resolved.startsWith("image/")) {
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }

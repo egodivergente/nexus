@@ -211,6 +211,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
             item {SettingsCard {SettingRow("Reglas y límites","Preferencias por ámbito, exportar e importar",{pageName=SettingsPage.RULES.name})}}
             item {SettingsCard {SettingRow("Catálogo y workflows","Densidad, antigüedad y orden de workflows",{pageName=SettingsPage.CATALOG.name})}}
             item {SettingsCard {com.vidadomu.nexus.assistant.MediaEditingSettings()}}
+            item {SettingsCard {StorageCard()}}
             item {SettingsCard {ReleaseNotesCard()}}
             item {SettingsCard {TelemetryCard()}}
             item {SettingsCard {

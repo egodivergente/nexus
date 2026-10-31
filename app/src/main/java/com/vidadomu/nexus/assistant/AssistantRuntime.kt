@@ -411,6 +411,8 @@ class AssistantRuntime(private val app: NexusApplication) {
     val llmBudget = com.vidadomu.nexus.agent.core.llm.LlmBudgetLedger(File(app.filesDir, "assistant/llm-budget.json"))
     val registry = NexusModelRegistry(app)
     val assets = AssetIndex(File(app.filesDir, "assistant/index.json"))
+    /** One SHA-256 cache for Drive sync, imports and «Liberar espacio» (two instances would overwrite each other). */
+    val hashes by lazy { com.vidadomu.nexus.agent.core.storage.ContentHashes(File(app.filesDir, "storage/hashes.json")) }
     val guard = SpendGuard()
     /** Encargos del chat actual: estado compartido por UI, agente y envío (sobrevive a recargar skills). */
     val orders = com.vidadomu.nexus.agent.core.orders.OrderBook()

@@ -21,6 +21,12 @@ import java.util.Locale
 private data class ReleaseNote(val version: String, val items: List<String>)
 
 private val releaseNotes = listOf(
+    ReleaseNote("1.9.138", listOf(
+        "Sistema → Almacenamiento: espacio por zona, «Buscar duplicados» y «Liberar» con confirmación; siempre queda una copia de cada archivo.",
+        "La copia en Google Drive ya no duplica en el teléfono los adjuntos y exportaciones: los sube desde donde están.",
+        "Importar o compartir otra vez el mismo archivo reutiliza el que ya tienes; renombrar nunca crea una copia.",
+        "Si el índice de la Biblioteca se daña, Nexus abre con la copia anterior y guarda el dañado aparte.",
+    )),
     ReleaseNote("1.9.119", listOf("Ajustes: la página «Seguridad» ya no aparece en el menú.")),
     ReleaseNote("1.9.118", listOf(
         "Ajustes: una sola lista de motores del agente (Bedrock, Claude, OpenAI, Proxy, Antigravity, BytePlus ModelArk y los tuyos).",

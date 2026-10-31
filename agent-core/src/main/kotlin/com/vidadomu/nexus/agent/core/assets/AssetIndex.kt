@@ -134,6 +134,9 @@ data class IndexData(
 
 data class PeerIndexMerge(val snapshot: IndexData, val conflicts: List<String>)
 
+/** [source]: file the index was restored from (null: started empty). [quarantined]: name the unreadable file was kept as. */
+data class IndexRecovery(val source: String?, val quarantined: String?, val reason: String)
+
 @Serializable
 data class AssetQuery(
     val text: String? = null,
@@ -154,7 +157,15 @@ data class AssetQuery(
 class AssetIndex(private val file: File?, private val clock: () -> Long = System::currentTimeMillis) {
 
     private val mutex = Mutex()
-    private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
+    private val loaded = load(file, clock)
+    /**
+     * Non-null when index.json could not be read at start-up. The unreadable file is kept aside (never overwritten)
+     * and the previous copy is used, so a damaged index no longer stops the app from opening.
+     */
+    val recovery: IndexRecovery? = loaded.recovery
+    private var data: IndexData = loaded.data
+    // Only a file this process has read or written may become the backup copy.
+    private var mainIsGood = loaded.mainIsGood
 
     private val mutableChanges = MutableStateFlow(data)
     val changes = mutableChanges.asStateFlow()
@@ -221,13 +232,34 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
                 output.write(JSON.encodeToString(IndexData.serializer(), snapshot).toByteArray(Charsets.UTF_8))
                 output.fd.sync()
             }
-            try {
-                java.nio.file.Files.move(tmp.toPath(), f.toPath(),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            }
+            // The version being replaced becomes index.json.bak (a rename: no copy of the 4 MB file per edit). A crash
+            // between both renames leaves the complete .tmp and the .bak, and load() picks the newest readable one.
+            if (mainIsGood && f.isFile) move(f, backupOf(f))
+            move(tmp, f)
+            mainIsGood = true
         } finally { tmp.delete() }
+    }
+
+    private fun move(from: File, to: File) {
+        try {
+            java.nio.file.Files.move(from.toPath(), to.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            java.nio.file.Files.move(from.toPath(), to.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
+    /**
+     * Rewrites stored media references (asset URIs, generation references and any other text in the index) in one
+     * atomic edit. Used after removing an exact duplicate, to point to the copy that stays.
+     */
+    suspend fun rewriteReferences(transform: (String) -> String): Int = edit { current ->
+        var changed = 0
+        val encoded = JSON.encodeToJsonElement(IndexData.serializer(), current)
+        val rewritten = com.vidadomu.nexus.agent.core.sync.SyncBlobs.rewrite(encoded) { value ->
+            transform(value).also { if (it != value) changed++ }
+        }
+        (if (changed == 0) current else JSON.decodeFromJsonElement(IndexData.serializer(), rewritten)) to changed
     }
 
     // ---------- proyectos y estructura ----------
@@ -502,6 +534,30 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         const val MAX_MODEL_LENGTH = 120
         const val MAX_NOTES = 80
         val JSON = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = false }
+
+        fun backupOf(file: File) = File(file.parentFile, file.name + ".bak")
+
+        internal class Loaded(val data: IndexData, val recovery: IndexRecovery?, val mainIsGood: Boolean)
+
+        internal fun load(file: File?, clock: () -> Long): Loaded {
+            if (file == null) return Loaded(IndexData(), null, false)
+            fun read(candidate: File): IndexData? = candidate.takeIf { it.isFile }?.let { runCatching { JSON.decodeFromString<IndexData>(it.readText()) }.getOrNull() }
+            val pending = File(file.parentFile, file.name + ".tmp")
+            val backup = backupOf(file)
+            if (file.isFile) {
+                val error = runCatching { JSON.decodeFromString<IndexData>(file.readText()) }
+                error.getOrNull()?.let { return Loaded(it, null, true) }
+                val aside = File(file.parentFile, file.name + ".corrupt-" + clock())
+                val moved = runCatching { java.nio.file.Files.move(file.toPath(), aside.toPath()) }.isSuccess
+                val reason = error.exceptionOrNull()?.javaClass?.simpleName ?: "error"
+                read(backup)?.let { return Loaded(it, IndexRecovery(backup.name, aside.name.takeIf { moved }, reason), false) }
+                return Loaded(IndexData(), IndexRecovery(null, aside.name.takeIf { moved }, reason), false)
+            }
+            // index.json missing: an interrupted save leaves the newer complete .tmp and the previous .bak.
+            read(pending)?.let { return Loaded(it, IndexRecovery(pending.name, null, "interrupted_save"), false) }
+            read(backup)?.let { return Loaded(it, IndexRecovery(backup.name, null, "missing_index"), false) }
+            return Loaded(IndexData(), null, false)
+        }
         fun newId(prefix: String) = prefix + "_" + UUID.randomUUID().toString().replace("-", "").take(12)
         /** Minúsculas y sin tildes: «Julián» encuentra «julian». */
         fun norm(s: String): String = Normalizer.normalize(s, Normalizer.Form.NFD)

@@ -51,7 +51,7 @@ object NativeOperationTools {
                 boolean("remember_parameters", "Recordar parámetros del Lienzo.")
             }),
         NativeTool(operations, "rename_asset_file", ToolCategory.ORGANIZE,
-            "Renombra físicamente un archivo del índice: copias privadas Nexus o MediaStore modificable. Conserva compatibilidad de URIs y devuelve el resultado real.",
+            "Renombra un archivo del índice (copias privadas Nexus o MediaStore modificable) sin duplicarlo y conservando las URIs anteriores. Si Android no lo permite sin copia, cambia solo el nombre visible (file_renamed=false, display_name_changed=true). Devuelve el resultado real.",
             schema { string("asset_id", "Id del archivo indexado.", required = true); string("file_name", "Nombre sin rutas; conserva extensión.", required = true) }),
         NativeTool(operations, "convert_image_asset", ToolCategory.ORGANIZE,
             "Crea una imagen PNG/JPEG/WebP local desde un asset, opcionalmente redimensionada o recortada al centro. Conserva el original e indexa el resultado.",

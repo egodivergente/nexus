@@ -6,17 +6,22 @@ import java.io.File
 import java.io.InputStream
 import kotlinx.serialization.json.*
 
-data class SyncInput(val extension:String,val stream:InputStream)
+/** [file]: the local file behind [stream], when there is one; lets [SyncBlobs] avoid copying stored media. */
+data class SyncInput(val extension:String,val stream:InputStream,val file:File?=null)
 
 /** The same adapter is used by Android and the Windows JVM process. */
 class SyncWorkspace(
     private val index:AssetIndex,private val directory:File,private val remote:SyncRemote,
     private val open:(String)->SyncInput?,private val localUri:(File)->String={it.toURI().toString()},deviceLabel:String="Dispositivo",
+    private val hashes:com.vidadomu.nexus.agent.core.storage.ContentHashes?=null,adoptable:(File)->Boolean={false},
 ) {
-    private val blobs=SyncBlobs(File(directory,"blobs"),remote)
+    private val blobs=SyncBlobs(File(directory,"blobs"),remote,hashes,adoptable)
     private val journal=SyncJournal(File(directory,"journal.json"),remote,deviceLabel)
     private val collections=listOf("projects","scenes","shots","characters","assets","generations")
-    suspend fun cycle(downloadProjects:Set<String>?,extras:Map<String,JsonObject> = emptyMap(),applyExtras:(Map<String,JsonObject>)->Unit = {}):JsonObject {
+    suspend fun cycle(downloadProjects:Set<String>?,extras:Map<String,JsonObject> = emptyMap(),applyExtras:(Map<String,JsonObject>)->Unit = {}):JsonObject =
+        try { exchange(downloadProjects,extras,applyExtras) } finally { runCatching { hashes?.flush() } }
+
+    private suspend fun exchange(downloadProjects:Set<String>?,extras:Map<String,JsonObject>,applyExtras:(Map<String,JsonObject>)->Unit):JsonObject {
         val expected=index.snapshot()
         val encoded=AssetIndex.JSON.encodeToJsonElement(IndexData.serializer(),expected).jsonObject
         val missing=linkedSetOf<String>();val replacements=mutableMapOf<String,String>()
@@ -25,7 +30,7 @@ class SyncWorkspace(
             replacements[uri]?.let {return it}
             return try {
                 val input=open(uri)?:return uri.also {missing+=uri}
-                blobs.capture(input.stream,input.extension).also {replacements[uri]=it}
+                blobs.capture(input).also {replacements[uri]=it}
             }catch(e:java.io.IOException){missing+=uri;uri}
         }
         val rows=linkedMapOf<String,JsonObject>()

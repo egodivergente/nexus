@@ -138,11 +138,13 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
                 val mime=runCatching {app.contentResolver.getType(uri)}.getOrNull()
                 val ext=when(mime){"image/png"->"png";"image/jpeg"->"jpg";"image/webp"->"webp";"video/mp4"->"mp4";"audio/mpeg"->"mp3";else->uri.lastPathSegment?.substringAfterLast('.',"")?.lowercase()?.takeIf {it.matches(Regex("[a-z0-9]{1,8}"))}?:"bin"}
                 when(uri.scheme){
-                    "content","file"->runCatching {app.contentResolver.openInputStream(uri)?.let {SyncInput(ext,it)}}.getOrNull()
+                    "content","file"->runCatching {app.contentResolver.openInputStream(uri)?.let {SyncInput(ext,it,if(uri.scheme=="file")uri.path?.let(::File) else null)}}.getOrNull()
                     "https"->{val response=http.newCall(Request.Builder().url(value).build()).execute();if(!response.isSuccessful){response.close();null}else {val body=response.body!!;SyncInput(ext,object:java.io.FilterInputStream(body.byteStream()){override fun close(){super.close();response.close()}})}}
                     else->null
                 }
-            },localUri={Uri.fromFile(it).toString()},deviceLabel=android.os.Build.MODEL)
+            },localUri={Uri.fromFile(it).toString()},deviceLabel=android.os.Build.MODEL,
+                // Attachments and exports are uploaded from where they are instead of being copied into blobs/.
+                hashes=AssistantRuntime.get(app).hashes,adoptable={file->com.vidadomu.nexus.assistant.NexusStorage.ownedOriginal(app,file)})
             val documents=SyncDocuments(directory)
             val conversationDir=File(app.filesDir,"assistant/conversations")
             val chatFiles=conversationDir.listFiles().orEmpty().filter {it.extension=="json" && !it.name.startsWith("sync_")}+listOf(File(app.filesDir,"assistant/chat-v1.json")).filter {it.exists()}
