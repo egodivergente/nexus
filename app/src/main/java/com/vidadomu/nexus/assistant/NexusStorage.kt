@@ -47,9 +47,27 @@ internal object NexusStorage {
         StorageCleanup(scan(app), runtime(app).hashes).analyse(indexText(app), cancelled = { job?.isActive == false }, progress = progress)
     }
 
-    /** True while «Liberar» runs: imports then keep their own copy instead of reusing one that may be going away. */
-    @Volatile var running = false
-        private set
+    /**
+     * While «Liberar» runs, imports keep their own copy instead of reusing one that may be going away; and the
+     * cleanup starts only after every import that was already reusing a copy has finished.
+     */
+    private val reuseLock = Object()
+    private var running = false
+    private var reusing = 0
+
+    /** Runs [block] (an import reusing a stored copy) unless a cleanup is running; then returns null. */
+    fun <T> reusing(block: () -> T?): T? {
+        synchronized(reuseLock) { if (running) return null; reusing++ }
+        try { return block() } finally { synchronized(reuseLock) { reusing--; reuseLock.notifyAll() } }
+    }
+
+    /** A second «Liberar» (say, after rotating the screen) waits for the first one, as it did on the sync locks. */
+    private fun startCleanup() = synchronized(reuseLock) {
+        while (running) reuseLock.wait(5000)
+        running = true
+        while (reusing > 0) reuseLock.wait(5000)
+    }
+    private fun endCleanup() = synchronized(reuseLock) { running = false; reuseLock.notifyAll() }
 
     /** Copies a cleanup moved aside when the app was closed in the middle go back to their place. Called at start-up. */
     fun restorePending(app: Context) = runCatching { StorageCleanup.restorePending(dataDir(app)) }.getOrDefault(0)
@@ -59,10 +77,10 @@ internal object NexusStorage {
      * while saved chats are rewritten. Then frees [analysis] (see [StorageCleanup.free] for the order and checks).
      */
     suspend fun free(app: Context, analysis: StorageAnalysis): CleanupResult = withContext(Dispatchers.IO) {
-        NexusDriveSync.gate.withLock {
-            com.vidadomu.nexus.sync.DeviceSync.get(app).exclusive {
-                running = true
-                try {
+        startCleanup()
+        try {
+            NexusDriveSync.gate.withLock {
+                com.vidadomu.nexus.sync.DeviceSync.get(app).exclusive {
                     val runtime = runtime(app)
                     StorageCleanup(scan(app), runtime.hashes).free(analysis.plan,
                         rewriteIndex = { transform -> runtime.assets.rewriteReferences(transform) },
@@ -70,9 +88,9 @@ internal object NexusStorage {
                         reportDir = File(app.filesDir, "storage"),
                         rewriteOther = { transform -> rewriteRecent(app, transform) },
                         chatsPaused = { block -> AssistantChatStore.exclusive { block() } })
-                } finally { running = false }
+                }
             }
-        }
+        } finally { endCleanup() }
     }
 
     /** The media picker's last-use time, keyed by URI: moved to the copy that stays so the order is kept. */

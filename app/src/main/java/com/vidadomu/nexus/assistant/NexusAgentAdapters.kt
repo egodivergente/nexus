@@ -323,13 +323,13 @@ object AgentMediaStore {
         // The same bytes already stored and in the library (same project): reuse that file instead of a new copy.
         // Re-sharing or re-attaching a photo used to add another full copy each time.
         val sha = digest.digest().joinToString("") { "%02x".format(it) }
-        if (!NexusStorage.running) runtime.hashes.find(sha, target.length()) { it != target && NexusStorage.reusableCopy(context, it) }?.let { twin ->
-            val owner = runtime.assets.assetByUri(Uri.fromFile(twin).toString())
-            if (owner != null && !owner.libraryDeleted && (projectId == null || owner.projectId == projectId)) {
-                target.delete()
-                return@withContext Attachment(owner.id, owner.uri, owner.mimeType ?: resolved, owner.displayName, owner.width, owner.height, owner.durationSec, assetId = owner.id)
+        NexusStorage.reusing {
+            runtime.hashes.find(sha, target.length()) { it != target && NexusStorage.reusableCopy(context, it) }?.let { twin ->
+                runtime.assets.assetByUri(Uri.fromFile(twin).toString())
+                    ?.takeIf { owner -> !owner.libraryDeleted && (projectId == null || owner.projectId == projectId) }
+                    ?.let { owner -> Attachment(owner.id, owner.uri, owner.mimeType ?: resolved, owner.displayName, owner.width, owner.height, owner.durationSec, assetId = owner.id) }
             }
-        }
+        }?.let { reused -> target.delete(); return@withContext reused }
         runtime.hashes.record(target, sha)
         var w: Int? = null; var h: Int? = null
         if (resolved.startsWith("image/")) {

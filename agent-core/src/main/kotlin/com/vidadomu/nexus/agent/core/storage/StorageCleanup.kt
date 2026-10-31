@@ -101,11 +101,13 @@ class StorageCleanup(private val scan: StorageScan, private val hashes: ContentH
                 else -> null
             }
             if (reason != null) { keep(removal, reason); continue }
-            pendingDir.mkdirs()
             val aside = File(pendingDir, "${clock()}-${staged.size}-${file.name}")
             if (aside.exists()) { keep(removal, "move_failed"); continue }
             manifest[scan.relative(aside)] = removal.file.path
-            writeManifest(scan.dataDir, manifest)
+            // A full disk can make even this small file fail: stop setting copies aside, finish with those already aside.
+            if (runCatching { pendingDir.mkdirs(); writeManifest(scan.dataDir, manifest) }.isFailure) {
+                manifest.remove(scan.relative(aside)); keep(removal, "no_space_for_manifest"); continue
+            }
             if (!file.renameTo(aside)) { manifest.remove(scan.relative(aside)); keep(removal, "move_failed"); continue }
             staged += removal to aside
         }
@@ -116,15 +118,17 @@ class StorageCleanup(private val scan: StorageScan, private val hashes: ContentH
                 val reason = last(removal)
                 val original = File(scan.dataDir, removal.file.path)
                 if (reason != null) {
-                    keep(removal, if (aside.renameTo(original)) "mentioned_during_cleanup" else "restore_failed_see_pending")
-                    if (original.isFile) manifest.remove(scan.relative(aside))
+                    // If it cannot go back, its manifest entry stays: the next start tries again, and the report says where it is.
+                    if (aside.renameTo(original)) { manifest.remove(scan.relative(aside)); keep(removal, "mentioned_during_cleanup") }
+                    else keep(removal, "restore_failed_kept_at:" + scan.relative(aside))
                 } else if (aside.delete()) {
                     manifest.remove(scan.relative(aside))
                     hashes.forget(original); removed++; bytes += removal.file.length
                     entries += Entry(removal.file.path, removal.keep.path, removal.file.length, removal.file.sha256, "removed")
                 } else keep(removal, "delete_failed_see_pending")
             }
-            writeManifest(scan.dataDir, manifest)
+            // If this fails, the previous manifest only lists files already back or deleted: restorePending skips them.
+            runCatching { writeManifest(scan.dataDir, manifest) }
         }
         runCatching { hashes.flush() }
         val report = runCatching {
