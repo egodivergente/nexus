@@ -37,7 +37,7 @@ object CrunTextCatalog {
     fun validateSuno(model:NexusModel,request:GenerationRequest) {
         if(model.providerModelId!="suno/music-generate") return
         val p=model.parameters.associate { it.key to it.defaultValue }+request.parameters
-        if(p["mode"]=="simple") require(request.prompt.isNotBlank() && request.prompt.length<=500) { "Describe la canción con entre 1 y 500 caracteres." }
+        if(p["mode"]=="simple") { if(request.prompt.isBlank() || request.prompt.length>500) throw PromptContractViolation("Describe la canción con entre 1 y 500 caracteres.") }
         else {
             require(!p["title"].isNullOrBlank() && p["title"]!!.length<=100) { "Añade un título de hasta 100 caracteres." }
             val v4=model.contractDefaults["model"]=="v4"

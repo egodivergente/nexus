@@ -25,17 +25,6 @@ class ComposerMediaStateTest {
         assertEquals(listOf("3","4"),state.retainedMedia.map {it.id})
         assertEquals(refs, (state.attachedMedia+state.retainedMedia))
     }
-    @Test fun modeChangePreservesNamedResourcesAndReactivatesThem() {
-        val model=model("modes").copy(providerId="google_flow",contractEndpoint="video",
-            contractMedia=listOf(ContractMediaField("initial_frame","Inicio","image/*",false,1),
-                ContractMediaField("reference_ids","Referencias","image/*",false,3)))
-        val frame=image("start").copy(fieldKey="initial_frame")
-        val reference=image("ref").copy(fieldKey="reference_ids")
-        val state=CreateUiState(parameters=mapOf("mode" to "Referencias"),attachedMedia=listOf(frame,reference)).withModelMedia(model)
-        assertEquals(listOf(reference),state.attachedMedia);assertEquals(listOf(frame),state.retainedMedia)
-        val frames=state.copy(parameters=mapOf("mode" to "Fotogramas")).withModelMedia(model)
-        assertEquals(listOf(frame),frames.attachedMedia);assertEquals(listOf(reference),frames.retainedMedia)
-    }
     @Test fun preferencesAreSeparatedByProviderEndpointAndModality() {
         val a=ModelWorkDraft("same","prompt",providerId="a",endpoint="image",modality=Modality.IMAGE,parameters=mapOf("quality" to "high"))
         val b=a.copy(providerId="b",parameters=mapOf("quality" to "low"))

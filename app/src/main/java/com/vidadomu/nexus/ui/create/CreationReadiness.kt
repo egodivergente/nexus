@@ -42,6 +42,8 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
                 effective.requestPrompt.orEmpty(),parameters=effective.parameters)
             com.vidadomu.nexus.provider.runway.ContractPayload.validate(model,request)
             com.vidadomu.nexus.provider.crun.CrunTextCatalog.validateSuno(model,request)
+        } catch(error:PromptContractViolation) {
+            return result(CreationPhase.INVALID,error.message ?: "Revisa el prompt.",CreationFixTarget.PROMPT)
         } catch(error:IllegalArgumentException) {
             return result(CreationPhase.INVALID,error.message ?: "Revisa las opciones del modelo.",CreationFixTarget.PARAMETERS)
         }

@@ -5,7 +5,7 @@ import kotlinx.serialization.json.*
 
 object ContractPayload {
     fun validate(model:NexusModel,request:GenerationRequest) {
-        require(!model.promptRequired || request.prompt.isNotBlank()) { "Escribe las instrucciones." }
+        if(model.promptRequired && request.prompt.isBlank()) throw PromptContractViolation("Escribe las instrucciones.")
         model.parameters.forEach { p ->
             val value=(request.parameters[p.key] ?: p.defaultValue).trim()
             require(!p.isRequired || value.isNotEmpty()) { "Falta ${p.displayName}" }
