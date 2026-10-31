@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel? = null,
+fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantViewModel? = null,
     initialPage: String? = null, onCloseInitialPage: (() -> Unit)? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
@@ -109,7 +109,6 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
     val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured", app.secureStorage.getMaskedProviderApiKey("fal") != "Not configured").count { it }
     }
-    val flowLinked = remember(providerKeyRevision) { app.secureStorage.getProviderApiKey(FLOW_RECOVERY_KEY).isNotBlank() }
     Scaffold(containerColor=ScreenBackground,topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) { page?.let { CategoryTile(it.icon,it.tint,size=32.dp) }
                 // Same pattern as the tabs: the root «Ajustes» is a screen title; sub-pages are a level below.
                 Text(page?.title ?: "Ajustes",style=if(page==null) MaterialTheme.typography.headlineSmall else com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
@@ -144,7 +143,6 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     if(settingsSearch.isNotBlank()) item {TextButton(onClick={pageName=SettingsPage.RULES.name}) {Text("Buscar también en todas las reglas")}}
                 }
                 SettingsPage.CONNECTIONS -> {
-                    item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
                     item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
                     item {SettingsCard {SettingRow("Sincronización entre dispositivos","Chats, memoria y archivos",{syncOpen=true})}}
                 }
@@ -181,7 +179,7 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                     item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
                     item {val atlasPill=providerPill(maskedApiKey!="Not configured",atlasCheck)
                         ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=atlasPill.healthy,idleLabel=atlasPill.label) {
-                        ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null;atlasCheck=ProviderCheck.NotChecked})
+                        ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null;atlasCheck=ProviderCheck.NotChecked},providerName="Atlas Cloud")
                         ProviderBalance(accountBalance?.let{currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",accountBalance?.let{"${currencyManager.formatUsdDetails(it.availableUsd)} · Efectivo ${currencyManager.formatBalance(it.cashUsd)} · Bonos ${currencyManager.formatBalance(it.bonusUsd)} · ${readingAge(it.lastUpdated,System.currentTimeMillis(),java.time.ZoneId.systemDefault())}"},isRefreshingBalance,{refreshBalance()})
                         (atlasCheck as? ProviderCheck.Failed)?.takeIf {connectionStatusMessage==null}?.let {InlineNotice(it.message)}
                         ProviderTest(enabled=maskedApiKey!="Not configured",testing=isTestingConnection,result=connectionStatusMessage?.let{isConnectionSuccess to it},onTest={
@@ -205,7 +203,6 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                             }
                         }
                     }
-                    // Google Flow ya no ocupa una tarjeta aquí: el puente sigue activo y se gestiona en Conexiones.
                 }
                 SettingsPage.CUSTOM -> {
             item {SettingsCard {MediaProvidersSettingsSection()}}
@@ -213,7 +210,6 @@ fun SettingsScreen(onCreateInFlow: () -> Unit = {}, assistantViewModel: com.vida
                 SettingsPage.SYSTEM -> {
             item {SettingsCard {SettingRow("Reglas y límites","Preferencias por ámbito, exportar e importar",{pageName=SettingsPage.RULES.name})}}
             item {SettingsCard {SettingRow("Catálogo y workflows","Densidad, antigüedad y orden de workflows",{pageName=SettingsPage.CATALOG.name})}}
-            item {SettingsCard {FlowRecoverySettings(onCreateInFlow)}}
             item {SettingsCard {com.vidadomu.nexus.assistant.MediaEditingSettings()}}
             item {SettingsCard {ReleaseNotesCard()}}
             item {SettingsCard {TelemetryCard()}}
@@ -396,7 +392,7 @@ private fun ProviderCredentialCard(
     val pill = providerPill(hasKey, lastCheck)
     ProviderCard(name = provider.displayName, subtitle = provider.description, icon = Icons.Default.CloudQueue,
         tint = ProviderTint, connected = pill.healthy, idleLabel = pill.label) {
-        ProviderKeyRow(if (hasKey) maskedKey else null, onEdit, if (hasKey) onClear else null)
+        ProviderKeyRow(if (hasKey) maskedKey else null, onEdit, if (hasKey) onClear else null, providerName = provider.displayName)
         if (accountStatus != null || loadingBalance) ProviderBalance(
             value = accountStatus?.balanceLabel?.let { presentBalance(it, app.currencyManager) } ?: "Consultando…",
             detail = accountStatus?.details,

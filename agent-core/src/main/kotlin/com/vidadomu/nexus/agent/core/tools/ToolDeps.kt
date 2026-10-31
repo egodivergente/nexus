@@ -43,7 +43,6 @@ class ToolDeps(
     val assets: AssetIndex,
     val history: GenerationHistorySource? = null,
     val clock: () -> Long = System::currentTimeMillis,
-    val directFlow: Boolean = false,
     val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
     val nativeOperations: NativeOperations? = null,
     /** Encargos visibles: estado compartido por UI, agente y envío. Sobrevive a reconstruir las deps. */

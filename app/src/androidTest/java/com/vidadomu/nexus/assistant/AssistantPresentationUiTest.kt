@@ -155,4 +155,30 @@ class AssistantPresentationUiTest {
             screenshot("generation-${value.name.lowercase()}")
         }
     }
+    @Test fun retiredFlowOrderOffersNoResendButKeepsDiscardAndHistory() {
+        guard()
+        val ref = ModelRef("google_flow", "veo")
+        val plan = GenerationPlan(id = "p-flow", ref = ref, modelName = "Veo histórico", modality = "VIDEO", prompt = "Plano Flow antiguo",
+            params = emptyMap(), effectiveParams = emptyMap(), createdAt = 1)
+        var status by mutableStateOf(OrderStatus.AWAITING_CONFIRMATION)
+        var resends = 0
+        var canvas = 0
+        compose.setContent { NexusTheme {
+            OrderCard(Order(id = "o-flow", planId = plan.id, status = status, modelName = plan.modelName,
+                modelRef = ref.toString(), modality = "VIDEO", createdAt = 1, updatedAt = 2),
+                PlanUi(plan, false, PlanState.AWAITING_CONFIRMATION), emptyList(), false,
+                { resends++ }, {}, {}, {}, {}, { canvas++ }, {}, {}, onPrepareRetry = { resends++ })
+        } }
+        compose.onNodeWithText("Generar", substring = true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Más opciones").performClick()
+        compose.onNodeWithText("Abrir en el Lienzo").assertDoesNotExist()
+        compose.onNodeWithText("Descartar").assertIsDisplayed()
+        compose.onNodeWithText("Abrir Historial").assertIsDisplayed().performClick()
+        compose.runOnIdle { status = OrderStatus.FAILED }
+        compose.onNodeWithContentDescription("Más opciones").performClick()
+        compose.onNodeWithText("Revisar reintento").assertDoesNotExist()
+        compose.onNodeWithText("Reintentar").assertDoesNotExist()
+        compose.onNodeWithText("Eliminar tarjeta · conservar medios").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, resends); assertEquals(0, canvas) }
+    }
 }

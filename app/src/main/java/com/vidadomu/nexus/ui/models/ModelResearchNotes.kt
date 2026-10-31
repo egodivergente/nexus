@@ -55,7 +55,7 @@ internal fun researchedModelNote(model: NexusModel): ResearchedModelNote? {
             "Para tipografía crítica distingue Quality 48 de Default 20 y Turbo 12; el proveedor documenta colas de pulido y tiempos distintos. Esos benchmarks no prueban que todas las variantes rindan igual.","https://ideogram.ai/blog/ideogram-4.0/")
         "veo3.1" in id || "veo-3.1" in id || "veo3-1" in id -> ResearchedModelNote(
             "En Gemini, 1080p/4K y referencias exigen 8 s; la extensión queda en 720p. La semilla no garantiza determinismo.",
-            "No mezcles resolución, duración y referencias como opciones independientes. Flow y otros proveedores pueden exponer combinaciones distintas: consulta los ajustes de esta ruta.","https://ai.google.dev/gemini-api/docs/veo")
+            "No mezcles resolución, duración y referencias como opciones independientes. Los proveedores pueden exponer combinaciones distintas: consulta los ajustes de esta ruta.","https://ai.google.dev/gemini-api/docs/veo")
         "pixverse" in id && ("v6" in id || "/6" in id) -> ResearchedModelNote(
             "V6 Omni admite hasta 10 imágenes y 2 vídeos con duración conjunta de hasta 15 s. Con referencia de vídeo, duration=0 adapta la salida al vídeo más largo.",
             "La referencia de vídeo cambia duración y tarifa; no es solo otra imagen adjunta. Extender, Mimic y Lip Sync son operaciones separadas.","https://docs.platform.pixverse.ai/fusion-reference-to-video-v6-video-reference-integration-guide-2269890m0")

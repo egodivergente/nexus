@@ -14,7 +14,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.vidadomu.nexus.core.model.*
-import com.vidadomu.nexus.provider.flow.FlowReferences
 import com.vidadomu.nexus.ui.create.*
 import com.vidadomu.nexus.ui.theme.NexusTheme
 import kotlinx.coroutines.runBlocking
@@ -80,7 +79,7 @@ class CanvasRedesignDeviceTest {
 
     @Test fun upscaleCanvasHasOneSourceAndNoPromptOrReferenceControls() {
         val vm=vm(model(source))
-        compose.setContent {NexusTheme {CreateScreen({}, {}, vm, {})}}
+        compose.setContent {NexusTheme {CreateScreen({}, {}, vm)}}
         compose.onNodeWithText("Imagen de origen").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Galería").assertIsDisplayed()
         compose.onNodeWithText("Biblioteca").assertIsDisplayed()
@@ -129,19 +128,6 @@ class CanvasRedesignDeviceTest {
         assertEquals(1,vm.uiState.value.attachedMedia.size)
     }
 
-    @Test fun flowModeSwitchClearsIncompatibleIngredients() {
-        val flow=FlowReferences.model(Modality.VIDEO)
-        val vm=vm(flow)
-        val uri=image(Color.RED)
-        compose.runOnUiThread {
-            vm.updateParameter("mode","Referencias")
-            vm.addCanvasMedia("reference_ids",flow.providerId+"/"+flow.id,listOf(uri to "image/png"))
-        }
-        awaitMedia(vm,1)
-        compose.runOnUiThread {vm.updateParameter("mode","Fotogramas")}
-        assertTrue(vm.uiState.value.attachedMedia.isEmpty())
-        assertEquals(listOf("initial_frame","end_frame"),CanvasInputPlan.fields(flow,vm.uiState.value.parameters).map {it.key})
-    }
     private fun capture(name: String) {
         val bitmap=compose.onRoot().captureToImage().asAndroidBitmap()
         val dir=File(app.getExternalFilesDir(null),"canvas-qa").apply {mkdirs()}

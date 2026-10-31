@@ -99,10 +99,6 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val runtime=remember(app) {AssistantRuntime.get(app)}
     var showLocalEdits by rememberSaveable {mutableStateOf(false)}
     if(showLocalEdits) LocalMediaEditsSheet {showLocalEdits=false}
-    var showFlowImport by rememberSaveable {mutableStateOf(false)}
-    if(showFlowImport) FlowImportSheet(onDismiss={showFlowImport=false}) {summary ->
-        showFlowImport=false;scope.launch {snackbar.showSnackbar(summary)}
-    }
     val index by runtime.assets.changes.collectAsState()
     val projectLibrary=rememberProjectMediaPicker(managementOnly=true) {}
     LaunchedEffect(jobs) {kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {runtime.importHistory()}}
@@ -484,7 +480,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 }
             }
             marked=emptySet();open()
-        }}}) else Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start=if(openFolder!=null) NexusTokens.space4 else NexusTokens.space16),verticalAlignment=Alignment.CenterVertically) {
+        }}}) else Row(Modifier.fillMaxWidth().windowInsetsPadding(NexusInsets.top).padding(start=if(openFolder!=null) NexusTokens.space4 else NexusTokens.space16),verticalAlignment=Alignment.CenterVertically) {
         // Dentro de una carpeta: flecha atrás y su nombre en lugar de «Biblioteca».
         if(openFolder!=null) IconButton(onClick={openFolder=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a la Biblioteca")}
         // Título, recuento y saldo comparten una sola cabecera: ya no hay una fila entera solo para «N archivos · saldo».
@@ -508,7 +504,6 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         DropdownMenuItem(text={Text(if(showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas")},leadingIcon={Icon(Icons.Default.Info,null)},onClick={
             moreVisible=false;showDetails=!showDetails;prefs.edit().putBoolean("tile_details",showDetails).apply()})
         DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
-        DropdownMenuItem(text={Text("Importar de Flow")},leadingIcon={Icon(Icons.Default.CloudDownload,null)},onClick={moreVisible=false;showFlowImport=true})
         DropdownMenuItem(text={Text("Imágenes del proyecto")},leadingIcon={Icon(Icons.Default.PhotoLibrary,null)},onClick={moreVisible=false;projectLibrary.launch(arrayOf("image/*"))})
         }
         }

@@ -22,9 +22,8 @@ class OutputExportSpecTest {
     @Test fun unknownMimeDoesNotInventAnImageExtension() {
         assertTrue(outputExportSpec(output(Modality.IMAGE, "application/octet-stream")).fileName.endsWith(".bin"))
     }
-    @Test fun studioNavigationKeepsSettingsAndFlowOffTheBar() {
+    @Test fun studioNavigationKeepsSettingsOffTheBar() {
         assertEquals(4, com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems.size)
         assertFalse(com.vidadomu.nexus.ui.navigation.Screen.Settings in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
-        assertFalse(com.vidadomu.nexus.ui.navigation.Screen.Flow in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
     }
 }

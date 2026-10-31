@@ -115,7 +115,7 @@ internal fun MediaProvidersSettingsSection() {
         }
         if (providers.isEmpty()) Text("Aún no has añadido ninguno.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         TextButton(onClick = { adding = true }, contentPadding = PaddingValues(0.dp)) { Text("+ Añadir proveedor API") }
-        Text("Describe un servicio REST/JSON (rutas, petición, respuesta) y sus modelos aparecen en el Lienzo y para el agente. Atlas, Crun, Runway y Flow siguen como están.",
+        Text("Describe un servicio REST/JSON (rutas, petición, respuesta) y sus modelos aparecen en el Lienzo y para el agente. Atlas, Crun y Runway siguen como están.",
             style = MaterialTheme.typography.bodySmall, color = TextSecondary)
     }
     if (adding || editing != null) MediaProviderEditorDialog(editing, store) { _ -> adding = false; editing = null; tick++ }

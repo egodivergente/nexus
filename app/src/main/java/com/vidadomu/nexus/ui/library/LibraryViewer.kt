@@ -27,6 +27,7 @@ import com.vidadomu.nexus.ui.output.NativeVideoPlayer
 import com.vidadomu.nexus.ui.output.TextOutputViewer
 import com.vidadomu.nexus.ui.output.ZoomableImageViewer
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.NexusInsets
 import kotlinx.coroutines.launch
 
 /** What the viewer shows for an entry: the file to load (local copy first) and what kind it is. */
@@ -77,7 +78,7 @@ internal fun LibraryViewer(entries: List<LibraryEntry>, start: Int, conflicts: S
                 }
             }
             val entry = entries.getOrNull(pager.currentPage)
-            Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .45f)).statusBarsPadding(),
+            Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .45f)).windowInsetsPadding(NexusInsets.chromeOnly),
                 verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás", tint = Color.White) }
                 Text(entry?.let(name).orEmpty(), Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.titleMedium,

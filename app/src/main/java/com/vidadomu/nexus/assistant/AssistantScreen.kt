@@ -1053,6 +1053,7 @@ internal fun PlanCardView(
     val currencyState by currency.state.collectAsState()
     var expanded by rememberSaveable(p.plan.id) {mutableStateOf(false)}
     val plan = p.plan
+    val retired = com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(plan.ref.providerId)
     val editable = p.state != PlanState.SUBMITTED && p.state != PlanState.DISCARDED && p.state != PlanState.UNCERTAIN
     // El texto que edita el usuario no se pisa si el asistente cambia el plan a la vez.
     var prompt by rememberSaveable(plan.id) { mutableStateOf(plan.prompt) }
@@ -1078,7 +1079,7 @@ internal fun PlanCardView(
                     Text(remember(plan.estimate,currencyState) {plan.estimate?.amountUsd?.let(currency::formatCost) ?: "Por confirmar"},style=MaterialTheme.typography.bodyMedium.tabularMoney(),color=TextSecondary)
                     Text(stateLabel(p),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
-                if(editable) {
+                if(editable && !retired) {
                     val enabled=p.executable && !p.busy && !dirty && !assistantBusy
                     if(primaryAction) Button(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar")}
                     else FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar")}
@@ -1118,7 +1119,7 @@ internal fun PlanCardView(
                     TextButton(onClick=onOpenOutput) {Text("Ver detalle",color=TextSecondary)}
                 }
             } else if(p.state!=PlanState.DISCARDED) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                TextButton(onClick=onOpenCanvas,enabled=!p.busy) {Text("Abrir en el Lienzo",color=TextSecondary)}
+                if(!retired) TextButton(onClick=onOpenCanvas,enabled=!p.busy) {Text("Abrir en el Lienzo",color=TextSecondary)}
                 if(showDiscard) TextButton(onClick=onDiscard,enabled=!p.busy) {Text("Descartar",color=TextSecondary)}
             }
             TextButton(onClick={expanded=!expanded},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {

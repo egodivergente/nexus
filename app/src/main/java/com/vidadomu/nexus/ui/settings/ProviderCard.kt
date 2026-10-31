@@ -78,9 +78,15 @@ internal fun ProviderCard(name: String, subtitle: String, icon: ImageVector, tin
     }
 }
 
-/** Clave guardada (enmascarada) con Añadir/Cambiar y, si la hay, Borrar. */
+/** Clave guardada (enmascarada) con Añadir/Cambiar y, si la hay, Borrar tras confirmarlo. */
 @Composable
-internal fun ProviderKeyRow(maskedKey: String?, onChange: () -> Unit, onClear: (() -> Unit)?) {
+internal fun ProviderKeyRow(maskedKey: String?, onChange: () -> Unit, onClear: (() -> Unit)?, providerName: String? = null) {
+    // Solo se recuerda si el diálogo está abierto: la clave no se copia a memoria para un posible «deshacer».
+    // Con clave por proveedor y clave enmascarada, una fila reutilizada para otro destino descarta la confirmación pendiente.
+    var confirmClear by androidx.compose.runtime.saveable.rememberSaveable(providerName, maskedKey) { androidx.compose.runtime.mutableStateOf(false) }
+    if (confirmClear && maskedKey != null && onClear != null) {
+        ClearProviderKeyDialog(providerName, onConfirm = { confirmClear = false; onClear() }, onDismiss = { confirmClear = false })
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = TextSecondary)
         Spacer(Modifier.width(NexusTokens.space8))
@@ -89,10 +95,22 @@ internal fun ProviderKeyRow(maskedKey: String?, onChange: () -> Unit, onClear: (
             fontFamily = if (maskedKey != null) FontFamily.Monospace else null,
             color = if (maskedKey != null) MaterialTheme.colorScheme.onSurface else TextSecondary)
         TextButton(onClick = onChange) { Text(if (maskedKey == null) "Añadir" else "Cambiar") }
-        if (maskedKey != null && onClear != null) TextButton(onClick = onClear) {
+        if (maskedKey != null && onClear != null) TextButton(onClick = { confirmClear = true }) {
             Text("Borrar", color = MaterialTheme.colorScheme.error)
         }
     }
+}
+
+@Composable
+private fun ClearProviderKeyDialog(providerName: String?, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val provider = providerName?.takeIf { it.isNotBlank() }
+    AlertDialog(onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Lock, null) },
+        title = { Text(if (provider != null) "¿Borrar la clave de $provider?" else "¿Borrar la clave API?") },
+        text = { Text("Se eliminará de este dispositivo y no se puede recuperar desde Nexus. " +
+            "Para volver a usar ${provider ?: "este proveedor"} tendrás que pegarla de nuevo.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Borrar clave", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
 }
 
 /** Saldo del proveedor, con su detalle y un botón para actualizarlo. */

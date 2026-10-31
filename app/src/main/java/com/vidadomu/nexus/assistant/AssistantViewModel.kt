@@ -128,7 +128,7 @@ data class AssistantUiState(
 )
 
 /**
- * Chat de creación con planes individuales, envíos por bloque y Flow directo.
+ * Chat de creación con planes individuales y envíos por bloque.
  * La recuperación de historial no repite herramientas ni envíos.
  */
 class AssistantViewModel(application: Application) : AndroidViewModel(application) {
@@ -151,7 +151,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private val chatStore = AssistantChatStore(app)
     private val chatsReady=kotlinx.coroutines.CompletableDeferred<Unit>()
     private val submitSlots = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentGenerations)
-    private val flowLane = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentFlowGenerations)
     // StateFlow can emit synchronously in init; callbacks need initialized state.
     private val synced = mutableSetOf<String>()
     private var completedSeen = -1
@@ -163,7 +162,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         viewModelScope.launch {runtime.settings.limitsState.collect { limits ->
             submitSlots.setLimit(limits.maxConcurrentGenerations)
-            flowLane.setLimit(limits.maxConcurrentFlowGenerations)
         }}
         val s = runtime.settings.load()
         orchestrator = runtime.orchestrator(s)
@@ -190,7 +188,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         } }
         viewModelScope.launch { app.modelCatalogRepository.models.collect { models ->
             // Summarizing hundreds of models is CPU work: keep it off the main thread.
-            val catalog = withContext(Dispatchers.Default) { (models + app.flowBridgeProvider.getModels()).distinctBy { it.id }.map(NexusModelRegistry::summary) }
+            val catalog = withContext(Dispatchers.Default) { models.distinctBy { it.id }.map(NexusModelRegistry::summary) }
             _ui.update { it.copy(catalog = catalog) }
         } }
         removeOrderListener = runtime.orders.onChange { publishOrders() }
@@ -1070,8 +1068,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         chatStore.save(_ui.value, runtime.orders.snapshot())
                         return runtime.deps.lifecycle.confirmAndSubmit(planId, shownFingerprint)
                     }
-                    if (p.plan.ref.providerId == "google_flow") flowLane.withPermit { submitNow() }
-                    else submitNow()
+                    submitNow()
                 }
                 val sent = runtime.guard.plan(planId) ?: p.plan
                 setPlan(planId) { it.copy(plan = sent, busy = false, submitting = false, state = PlanState.SUBMITTED, jobId = r.jobId, jobStatus = "PENDING") }

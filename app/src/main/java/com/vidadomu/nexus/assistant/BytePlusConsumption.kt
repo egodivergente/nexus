@@ -34,7 +34,7 @@ class BytePlusConsumption private constructor(private val app: NexusApplication)
         prefs.edit().putLong("attempt_$period", System.currentTimeMillis()).apply()
         try {
             val token = app.secureStorage.getProviderApiKey("nexus_flow_recovery")
-            check(token.isNotBlank()) { "Vincula el puente privado de ASUS en Ajustes → Proveedores → Google Flow. No se necesita una clave de facturación en la APK." }
+            check(token.isNotBlank()) { "Falta vincular el puente privado de ASUS para consultar el consumo de BytePlus. No se necesita una clave de facturación en la APK." }
             val request = Request.Builder().url("http://100.112.57.2:8899/api/byteplus/usage?period=$period&refresh=${if (force) 1 else 0}")
                 .header("Authorization", "Bearer $token").get().build()
             val snapshot = client.newCall(request).execute().use { response ->

@@ -26,28 +26,6 @@ internal fun GenerationPlan.cardJson(state: PlanState?): JsonObject = buildJsonO
     if (warnings.isNotEmpty()) put("warnings", strings(warnings))
 }
 
-private suspend fun submitAccountFlow(d: ToolDeps, plan: GenerationPlan, session: AgentSession, orderId: String? = null): ToolOutcome {
-    val count = (plan.params["count"] ?: plan.effectiveParams["count"] ?: "1").toIntOrNull()
-        ?: throw ToolInputException("Cantidad no válida.")
-    // El máximo es un ajuste del usuario (Ajustes → Límites), no una cifra fija.
-    val flowMax = d.limits().flowMaxResults
-    if (count < 1 || (flowMax > 0 && (count > flowMax || session.flowSubmittedResults.toLong() + count > flowMax)))
-        throw ToolInputException("Tu límite actual es de $flowMax resultados de Flow por encargo (se cambia en Ajustes → Límites).")
-    if (d.guard.state(plan.id) in listOf(PlanState.SUBMITTED, PlanState.UNCERTAIN, PlanState.DISCARDED, PlanState.CONFIRMED))
-        throw ToolInputException("Este trabajo ya se envió o se descartó; consulta su estado.")
-    val job = try { d.lifecycle.confirmAndSubmit(plan.id, plan.fingerprint()) }
-        catch(error: com.vidadomu.nexus.agent.core.spend.SubmissionUncertain) {
-            session.flowSubmittedResults += count
-            throw error
-        }
-    session.flowSubmittedResults += count
-    val order = orderId ?: d.orders.byPlan(plan.id)?.id
-    return ok(buildJsonObject {
-        put("plan_id", plan.id); order?.let { put("order_id", it) }; put("job_id", job.jobId); put("submitted", true)
-        put("state", "PROCESSING"); put("message", "Aceptado por Flow y en proceso. No está terminado: consulta get_generation_status.")
-    }, listOf(UiEvent.GenerationSubmitted(plan, job.jobId, order)))
-}
-
 private fun SchemaBuilder.mediaArray() = objectArray("media", "Archivos de entrada: adjuntos de la conversación o assets del índice.") {
     string("role", "Papel del archivo.", required = true, enum = PlanBuilder.ROLES)
     string("attachment_id", "Id de un adjunto de esta conversación.")
@@ -93,7 +71,7 @@ class PrepareImageUpscaleTool(private val d: ToolDeps) : BaseTool(
 
 class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
     "prepare_generation", ToolCategory.PLAN,
-    "Valida modelo, prompt, parámetros y medios contra el schema real y muestra UNA tarjeta por encargo (order_id persistente). Repetir con el mismo modelo y archivos actualiza la tarjeta existente; nunca la duplica. Para Google Flow con acceso directo y una petición de generar, execute=true envía sin confirmación; count permite hasta el máximo de resultados que el usuario haya configurado (ver LÍMITES CONFIGURADOS). Para proveedores de pago la tarjeta queda PREPARADA (no enviada) hasta que el usuario pulse su botón.",
+    "Valida modelo, prompt, parámetros y medios contra el schema real y muestra UNA tarjeta por encargo (order_id persistente). Repetir con el mismo modelo y archivos actualiza la tarjeta existente; nunca la duplica. La tarjeta queda PREPARADA (no enviada) hasta que el usuario pulse su botón.",
     schema {
         string("model_id", "Id exacto del registro.", required = true)
         string("provider_id", "Proveedor del modelo.")
@@ -101,7 +79,6 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         string("prompt", "Prompt final según el schema: obligatorio solo cuando promptRequired=true; omitir si el modelo no tiene campo prompt (upscalers, herramientas). Nunca metas parámetros de API en el prompt.")
         string("negative_prompt", "Solo si el schema tiene negative_prompt.")
         freeObject("params", "Parámetros del schema (sin prompt ni medios).")
-        boolean("execute", "Google Flow: true cuando el usuario ha pedido generar; envía directamente con su cuenta.")
         boolean("new_copy", "Solo true si el usuario pide otra generación idéntica; normalmente se reutiliza el encargo pendiente.")
         mediaArray()
         string("task", "Tarea (image_to_video…).")
@@ -155,15 +132,6 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
                 val newCopy = input["new_copy"]?.toString() == "true"
                 if (requestedOrder != null && !requestedOrder.status.editable)
                     return fail("El encargo ${requestedOrder.id} no se puede modificar: ${com.vidadomu.nexus.agent.core.orders.OrderBook.describeStatus(requestedOrder)}.")
-                val hasUncertainDuplicate = !newCopy && d.guard.plans().any { p ->
-                    d.guard.state(p.id) == PlanState.UNCERTAIN &&
-                        p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
-                        p.sceneCode == candidate.sceneCode && p.shotCode == candidate.shotCode &&
-                        p.characters == candidate.characters && p.parentGenerationId == candidate.parentGenerationId && p.task == candidate.task
-                }
-                if (d.directFlow && candidate.ref.providerId == "google_flow" && input["execute"]?.toString() == "true" && hasUncertainDuplicate) {
-                    return fail("Un envío idéntico de Flow quedó en estado incierto; comprueba Historial antes de reenviar con execute=true.")
-                }
                 val existing = if (newCopy) null else d.guard.plans().firstOrNull { p ->
                     d.guard.state(p.id) in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION) &&
                         p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
@@ -180,8 +148,6 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
                     ?.let { d.guard.discard(it) }
                 val order = if (target?.planId == plan.id && target.issues.isEmpty() && target.status != com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED) target
                     else d.orders.upsertPlan(plan, target?.id)
-                if (d.directFlow && plan.ref.providerId == "google_flow" && input["execute"]?.toString() == "true")
-                    return submitAccountFlow(d, plan, session, order.id)
                 ok(
                     buildJsonObject {
                         put("order_id", order.id)
@@ -190,8 +156,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
                         put("reused", existing != null)
                         put("updated_existing_card", target != null)
                         ModelGuidance.forPlan(d, plan.ref.modelId, plan.task, session)?.let { put("model_guidance", it) }
-                        put("next", if (d.directFlow && plan.ref.providerId == "google_flow") "Si el usuario pidió generar, llama a submit_generation: Flow se envía directamente sin confirmación."
-                            else "Tarjeta ${order.id} ${if (target != null) "actualizada en su sitio" else "mostrada"}: PREPARADA, NO enviada. El envío solo ocurre cuando el usuario pulsa el botón de la tarjeta. Para cambiarla usa update_plan(order_id=${order.id}).")
+                        put("next", "Tarjeta ${order.id} ${if (target != null) "actualizada en su sitio" else "mostrada"}: PREPARADA, NO enviada. El envío solo ocurre cuando el usuario pulsa el botón de la tarjeta. Para cambiarla usa update_plan(order_id=${order.id}).")
                     },
                     listOf(UiEvent.PlanReady(plan, executable = true, orderId = order.id)),
                 )
@@ -252,13 +217,12 @@ class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
 
 class SubmitGenerationTool(private val d: ToolDeps) : BaseTool(
     "submit_generation", ToolCategory.PLAN,
-    "Google Flow con acceso directo: envía el plan solicitado sin tarjeta ni confirmación adicional. Otros proveedores: pide revisión y confirmación de coste antes del envío.",
+    "Pide la revisión y confirmación de coste del usuario antes del envío; no envía nada por sí sola.",
     schema { string("plan_id", "Plan preparado con prepare_generation."); string("order_id", "Encargo (alternativa a plan_id).") },
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val id = input.str("plan_id") ?: input.str("order_id")?.let { d.orders.get(it)?.planId } ?: throw ToolInputException("Indica plan_id u order_id.")
         val plan = d.guard.plan(id) ?: throw ToolInputException("Plan desconocido «$id».")
-        if (d.directFlow && plan.ref.providerId == "google_flow") return submitAccountFlow(d, plan, session)
         d.orders.byPlan(id)?.let { o ->
             if (o.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.DRAFT) return fail("El encargo ${o.id} tiene datos pendientes y no se puede enviar: ${o.issues.joinToString("; ")}")
             if (o.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED) return fail("El encargo ${o.id} falló: ${o.lastFailure?.message}. Corrígelo con update_plan(order_id=${o.id}) antes de pedir confirmación.")

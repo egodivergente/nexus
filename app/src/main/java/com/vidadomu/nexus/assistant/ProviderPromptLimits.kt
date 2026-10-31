@@ -11,7 +11,6 @@ internal object ProviderPromptLimits {
             TextLimit("unicode_code_points", maximum=it, source=model.contractSource ?: "Atlas Input schema")
         }
         if(model.providerId == "crun") return model.promptMaxLength?.let {TextLimit("unicode_code_points",minimum=if(model.promptRequired) 1 else 0,maximum=it,source="Contrato OpenAPI de Crun")}
-        if(model.providerId == "google_flow") return null
         if(model.providerId != "runway") return null
         val known = when(model.contractEndpoint) {
             "image_to_video" -> mapOf("gen4.5" to 1000,"gen4_turbo" to 1000,"veo3.1" to 1000,"veo3.1_fast" to 1000,"happyhorse_1_0" to 2500)

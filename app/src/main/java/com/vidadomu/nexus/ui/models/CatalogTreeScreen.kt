@@ -46,7 +46,7 @@ import com.vidadomu.nexus.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
-    onSelectModelWithMedia: ((NexusModel, List<Pair<android.net.Uri, String>>) -> Unit)? = null, onLocalInpaint: () -> Unit = {}) {
+    onSelectModelWithMedia: ((NexusModel, List<Pair<android.net.Uri, String>>) -> Unit)? = null) {
     val app = LocalContext.current.applicationContext as NexusApplication
     val models by app.modelCatalogRepository.models.collectAsState()
     val loading by app.modelCatalogRepository.isLoading.collectAsState()
@@ -208,7 +208,6 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                             onClick={showSecondary=!showSecondary;moreMenu=false})
                         HorizontalDivider()
                         // Catálogo y herramientas
-                        DropdownMenuItem(text={Text("Editar región · local")},leadingIcon={Icon(Icons.Default.Brush,null)},onClick={moreMenu=false;onLocalInpaint()})
                         DropdownMenuItem(text={Text("Actualizar catálogo")},leadingIcon={Icon(Icons.Default.Refresh,null)},enabled=!loading,onClick={app.modelCatalogRepository.refreshModels(true);moreMenu=false})
                     }
                 }
@@ -234,7 +233,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         LazyVerticalGrid(columns=GridCells.Fixed(if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1),modifier=Modifier.fillMaxSize().padding(padding).pinchColumns(columns=if(rootLevel) rootColumns else if(userColumns>0) userColumns else if(useGrid) 2 else 1,max=6) {c->userColumns=c;prefs.edit().putInt("columns_user",c).apply()}, state=listState, contentPadding = PaddingValues(horizontal=NexusTokens.space12, vertical=NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8), horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(family==null) item(span={GridItemSpan(maxLineSpan)}) {
                 // Logo y nombre a la izquierda; un único menú a la derecha (ahí también están los ajustes).
-                Row(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().windowInsetsPadding(NexusInsets.top).heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically) {
                     Icon(androidx.compose.ui.res.painterResource(com.vidadomu.nexus.R.drawable.artbox_mark),null,tint=androidx.compose.ui.graphics.Color.Unspecified,modifier=Modifier.size(40.dp))
                     Text("ArtBox",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(start=10.dp).weight(1f))
                     catalogMenu()
@@ -247,12 +246,6 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 Text(if(family != null) family.orEmpty()
                     else "Favoritos · $sectionName", color = TextSecondary, fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                     modifier = Modifier.semantics { heading() })
-            }
-            // A quiet entry, not a full-width «máscaras» button that breaks the hierarchy; the main way in is
-            // Biblioteca/visor → «Editar foto».
-            if(toolsView && family==null) item(span={GridItemSpan(maxLineSpan)}) {
-                AssistChip(onClick=onLocalInpaint,label={Text("Editar una foto en el móvil")},
-                    leadingIcon={Icon(Icons.Default.Brush,null,Modifier.size(NexusTokens.iconSmall))})
             }
             if(personalizing) item(span={GridItemSpan(maxLineSpan)}) {
                 Text("Arrastra el asa, mantén pulsada una tarjeta o toca el asa para subirla o bajarla. Tu orden se guarda.",color=TextSecondary,fontSize = MaterialTheme.typography.bodyMedium.fontSize)

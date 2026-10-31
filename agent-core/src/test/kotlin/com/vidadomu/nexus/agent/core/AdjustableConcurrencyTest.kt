@@ -39,7 +39,7 @@ class AdjustableConcurrencyTest {
 
     @Test fun `counts can exceed former ceilings and zero has no artificial maximum`() {
         val limits=AgentLimits(maxToolResults=500,maxRecommendations=60,maxGenerationsPerBatch=1000,
-            maxConcurrentGenerations=100,maxConcurrentFlowGenerations=80,maxConcurrentSubagents=100,maxSubagentDepth=40,flowMaxResults=0)
+            maxConcurrentGenerations=100,maxConcurrentSubagents=100,maxSubagentDepth=40)
         assertTrue(limits.problems().isEmpty())
         assertEquals(200,limits.queryLimit(200,20))
         assertEquals(50,limits.boundedCount(50,3,limits.maxRecommendations))

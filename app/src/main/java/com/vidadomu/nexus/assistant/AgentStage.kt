@@ -56,6 +56,7 @@ import com.vidadomu.nexus.agent.core.orders.OrderStatus
 import com.vidadomu.nexus.agent.core.tools.Attachment
 import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.NexusInsets
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import kotlinx.coroutines.delay
 
@@ -185,7 +186,7 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
     val pager = rememberPagerState(initialPage = initial.coerceIn(0, results.lastIndex)) { results.size }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().systemBarsPadding()) {
+            Box(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
                 HorizontalPager(pager, Modifier.fillMaxSize(), key = { results[it].id }) { page ->
                     Box(Modifier.fillMaxSize().padding(horizontal = NexusTokens.space8), contentAlignment = Alignment.Center) {
                         AssistantMediaPreview(results[page])

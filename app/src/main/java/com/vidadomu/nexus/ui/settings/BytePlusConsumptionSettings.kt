@@ -48,6 +48,7 @@ import java.util.Locale
         Text(if (period == "day") "Hoy · $today" else "Mes · ${today.take(7)}", style = MaterialTheme.typography.titleMedium)
         LocalUsageCard(store, data, period)
         OfficialUsageCard(store, official, period, busy, refresh)
+        BridgeConnectionCard { revision++ }
         SyncSettingsCard(store)
         LocalLimitsCard(store) { revision++ }
     }
@@ -123,6 +124,33 @@ import java.util.Locale
             }
 
         }
+}
+
+@Composable private fun BridgeConnectionCard(onSaved: () -> Unit) {
+    val storage = (LocalContext.current.applicationContext as NexusApplication).secureStorage
+    var masked by remember { mutableStateOf(storage.getMaskedProviderApiKey(BYTEPLUS_BRIDGE_KEY).takeUnless { it == "Not configured" }) }
+    var editing by remember { mutableStateOf(false) }
+    var token by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    SettingsCard {
+        Text("Puente privado", style = MaterialTheme.typography.titleMedium)
+        Text("Clave privada del puente que consulta el consumo oficial. No es una clave de facturación.", style = MaterialTheme.typography.bodySmall)
+        ProviderKeyRow(masked, { token = ""; editing = true }, null)
+        error?.let { InlineNotice(it) }
+    }
+    if (editing) AlertDialog(
+        onDismissRequest = { editing = false; token = "" },
+        title = { Text("Clave del puente privado") },
+        text = { com.vidadomu.nexus.ui.components.StudioCredentialField(token, { token = it.trim() }, label = { Text("Clave privada del puente") }) },
+        confirmButton = {
+            TextButton(enabled = token.matches(Regex("[A-Za-z0-9_-]{43}")), onClick = {
+                error = runCatching { storage.saveProviderApiKey(BYTEPLUS_BRIDGE_KEY, token) }
+                    .fold({ masked = storage.getMaskedProviderApiKey(BYTEPLUS_BRIDGE_KEY); onSaved(); null }, { "No se pudo guardar la clave de forma segura." })
+                token = ""; editing = false
+            }) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = { editing = false; token = "" }) { Text("Cancelar") } }
+    )
 }
 
 @Composable private fun SyncSettingsCard(store: BytePlusConsumption) {

@@ -29,17 +29,10 @@ internal object CanvasInputPlan {
     fun fields(model: NexusModel, parameters: Map<String, String> = emptyMap()): List<CanvasInputField> {
         val fields = mutableListOf<CanvasInputField>()
         model.contractMedia.filter { it.maximum > 0 }.forEach { field ->
-            if (model.providerId == "google_flow" && Modality.VIDEO in model.modalities) {
-                val mode = parameters["mode"] ?: "Texto"
-                if (mode == "Texto" || (mode == "Fotogramas" && field.key == "reference_ids") ||
-                    (mode == "Referencias" && field.key != "reference_ids")) return@forEach
-            }
-            fields += CanvasInputField(field.key, field.label, field.mime, field.required ||
-                (model.providerId == "google_flow" && Modality.VIDEO in model.modalities &&
-                    (field.key == "initial_frame" && parameters["mode"] == "Fotogramas" || field.key == "reference_ids" && parameters["mode"] == "Referencias")), field.maximum,
+            fields += CanvasInputField(field.key, field.label, field.mime, field.required, field.maximum,
                 MediaSlotType.REFERENCE_IMAGE, field)
         }
-        if (model.contractEndpoint != null || model.providerId == "google_flow") return fields
+        if (model.contractEndpoint != null) return fields
         fun add(key: String?, label: String, mime: String, maximum: Int, slot: MediaSlotType) {
             if (key != null && maximum > 0 && fields.none { it.key == key }) fields += CanvasInputField(
                 key, label, mime, key in model.nativeRequiredFields ||

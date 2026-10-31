@@ -40,16 +40,4 @@ class SettingsMinimalUiTest {
             compose.runOnIdle {assertEquals(jobs,app.generationRepository.allJobs.value.map {it.id})}
         } finally {AppearancePreferences(app).setTheme(original)}
     }
-    @Test fun flowKeepsPromptOutputAndCostWithoutSubmitting() {
-        val app=app();val jobs=app.generationRepository.allJobs.value.map {it.id}
-        compose.setContent {NexusTheme {NexusChrome({}, {}) {FlowCreateScreen({}, {})}}}
-        compose.onNodeWithText("Generar en Flow").assertIsNotEnabled()
-        compose.onNodeWithText("Describe lo que quieres crear").performTextInput("Escena de prueba local")
-        compose.onNodeWithText("Imagen").assertExists()
-        compose.onNodeWithText("Vídeo").performScrollTo().performClick()
-        compose.onNodeWithText("Ajustes y coste · Detalles").performScrollTo().performClick()
-        compose.onNodeWithText("Aquí no hay una estimación de coste verificable.",substring=true).performScrollTo().assertExists()
-        compose.onNodeWithText("Generar en Flow").assertIsNotEnabled()
-        compose.runOnIdle {assertEquals(jobs,app.generationRepository.allJobs.value.map {it.id})}
-    }
 }

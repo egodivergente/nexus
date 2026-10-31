@@ -46,7 +46,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
-import com.vidadomu.nexus.BuildConfig
 import com.vidadomu.nexus.core.model.GenerationJob
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.core.model.Modality
@@ -57,7 +56,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, String?)->Unit,initialOutputIndex:Int=0,onOpenHistory:(()->Unit)?=null,onOpenFlow:(()->Unit)?=null) {
+fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, String?)->Unit,initialOutputIndex:Int=0,onOpenHistory:(()->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
@@ -94,16 +93,6 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
     var details by remember(jobId) {mutableStateOf(false)}
     var immersive by remember {mutableStateOf(false)}
     val scope=rememberCoroutineScope()
-    var refreshingFlow by remember(jobId) {mutableStateOf(false)}
-    val refreshExistingFlow: suspend () -> Unit = {
-        if(!refreshingFlow && !BuildConfig.OFFLINE_QA) {
-            refreshingFlow=true
-            try {app.generationRepository.pollJob(jobId,refreshFailed=true)} finally {refreshingFlow=false}
-        }
-    }
-    val existingFlow=job?.let {it.providerId=="google_flow" && it.providerJobId?.matches(Regex("[as]\\.[A-Za-z0-9_-]{16,96}"))==true &&
-        it.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)}==true
-    LaunchedEffect(job?.id) {if(existingFlow) refreshExistingFlow()}
     val chosenOutput=job?.outputs?.getOrNull(selectedOutput) ?: job?.outputs?.firstOrNull()
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val trustedLocal=chosenOutput?.let {OutputFiles.trustedLocalUri(it,conflicts)}
@@ -153,15 +142,10 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
                 }} else if(job.status !in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)) {
                     Column(Modifier.fillMaxWidth().padding(NexusTokens.screenMargin)) {
                         GenerationProgressPanel(job,Modifier.fillMaxWidth())
-                        if(existingFlow) TextButton(enabled=!refreshingFlow,onClick={scope.launch {refreshExistingFlow()}}) {
-                            Text(if(refreshingFlow) "Consultando Flow…" else "Consultar Flow")
-                        }
                     }
                 } else com.vidadomu.nexus.ui.components.InlineNotice(
                     job.error?.takeIf {it.isNotBlank()} ?: "No hay un resultado disponible.",
-                    Modifier.padding(NexusTokens.screenMargin),technicalDetails=job.technicalDetails,
-                    actionLabel=if(job.providerId=="google_flow" && onOpenFlow!=null) "Conexión de Flow" else null,
-                    onAction=onOpenFlow.takeIf {job.providerId=="google_flow"})
+                    Modifier.padding(NexusTokens.screenMargin),technicalDetails=job.technicalDetails)
             }
             if(output?.type==Modality.IMAGE && galleryIndex>=0) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
                 IconButton(enabled=previous!=null,onClick={movePhoto(-1)}) {Icon(Icons.Default.ChevronLeft,"Imagen anterior")}
@@ -215,7 +199,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
         properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             ZoomableImageViewer(chosenOutput.url,trustedLocal,onNavigate=movePhoto,onOpenHistory=onOpenHistory,onTap={immersive=false})
-            IconButton(onClick={immersive=false},modifier=Modifier.align(Alignment.TopEnd).statusBarsPadding()) {Icon(Icons.Default.Close,"Cerrar pantalla completa",tint=Color.White)}
+            IconButton(onClick={immersive=false},modifier=Modifier.align(Alignment.TopEnd).windowInsetsPadding(NexusInsets.chromeOnly)) {Icon(Icons.Default.Close,"Cerrar pantalla completa",tint=Color.White)}
         }
     }
 }

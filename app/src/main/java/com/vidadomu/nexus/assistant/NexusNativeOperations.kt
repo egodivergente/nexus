@@ -8,7 +8,7 @@ import com.vidadomu.nexus.agent.core.tools.assetJson
 import com.vidadomu.nexus.core.model.GenerationJob
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.core.work.GenerationPollingWorker
-import com.vidadomu.nexus.provider.flow.FlowBridgeProvider
+import com.vidadomu.nexus.provider.registry.RetiredProviders
 import com.vidadomu.nexus.ui.create.CreationPreferences
 import com.vidadomu.nexus.ui.theme.AppearancePreferences
 import com.vidadomu.nexus.ui.theme.NexusAppearance
@@ -71,9 +71,6 @@ class NexusNativeOperations(
                 "web_search", "read_web_page", "list_mcp_servers", "connect_mcp_server", "list_mcp_tools", "call_mcp_tool", "disconnect_mcp_server" -> internet.run(operation,input)
                 "get_active_generations" -> active(input)
                 "recover_generation" -> recover(input.requiredText("job_id"))
-                "flow_agent_send", "flow_agent_read" -> FlowAgentOperations(app).run(operation, input)
-                "diagnose_flow" -> flow(false)
-                "repair_flow" -> flow(true)
                 "get_nexus_settings" -> settings()
                 "update_nexus_settings" -> updateSettings(input)
                 "rename_asset_file" -> media.rename(input, session)
@@ -104,6 +101,10 @@ class NexusNativeOperations(
 
     private suspend fun recover(id: String): JsonObject {
         val current = app.generationRepository.getJob(id) ?: throw ToolInputException("Trabajo desconocido.")
+        if (RetiredProviders.isRetired(current.providerId)) return buildJsonObject {
+            put("job", jobInfo(current)); put("resubmitted", false); put("tracking_restored", false)
+            put("action", RetiredProviders.TRACKING_MESSAGE)
+        }
         if (!canQueryExisting(current)) return buildJsonObject {
             put("job", jobInfo(current)); put("resubmitted", false); put("tracking_restored", false)
             put("action", if (current.providerJobId?.startsWith("queue_") == true)
@@ -119,27 +120,6 @@ class NexusNativeOperations(
             put("job", jobInfo(latest)); put("resubmitted", false); put("tracking_restored", tracking)
             put("provider_checked", result.isSuccess)
             if (result.isFailure) put("action", "La consulta falló; conserva el estado y se reintentará el seguimiento.")
-        }
-    }
-
-    private suspend fun flow(repair: Boolean): JsonObject {
-        val status = app.flowBridgeProvider.bridgeStatus()
-        app.database.loading.firstReady()
-        val jobs = app.generationRepository.allJobs.value.filter { it.providerId == FlowBridgeProvider.PROVIDER_ID && it.status in ACTIVE }
-        val recoverable = jobs.filter(::canQueryExisting)
-        if (repair) recoverable.forEach { GenerationPollingWorker.enqueue(app, it.id) }
-        val s = status.getOrNull()
-        return buildJsonObject {
-            put("connected", s?.connected ?: false); put("generation_ready", s?.isReady ?: false)
-            put("status_checked", status.isSuccess)
-            put("jobs", JsonArray(jobs.take(50).map(::jobInfo)))
-            put("tracking_restored_count", if (repair) recoverable.size else 0)
-            put("resubmitted", false); put("browser_restarted", false)
-            put("action", when {
-                status.isFailure -> "No se pudo contactar con Flow. Revisa Tailscale y el emparejamiento en Ajustes."
-                s?.isReady == true -> if (repair) "Seguimiento local recuperado. Flow está listo." else "Flow está listo."
-                else -> s?.detail ?: "Abre el acceso de Flow, inicia sesión y deja un proyecto abierto."
-            })
         }
     }
 

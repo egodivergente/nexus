@@ -4,12 +4,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.*
-import com.vidadomu.nexus.MainActivity
+import com.vidadomu.nexus.ui.navigation.NotificationNavigation
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.R
 import com.vidadomu.nexus.core.model.GenerationStatus
@@ -26,6 +25,9 @@ class GenerationPollingWorker(
         val app = applicationContext as? NexusApplication ?: return Result.failure()
         app.ready.await()
         val repository = app.generationRepository
+        // WorkManager can restore old scheduled work after an update. Retired jobs stay local.
+        if (com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(repository.getJob(jobId)?.providerId))
+            return Result.success()
 
         var attempts = 0
         val maxAttempts = 60 // Max 5-10 minutes with backoff
@@ -75,10 +77,7 @@ class GenerationPollingWorker(
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createChannel(notificationManager)
 
-        val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(EXTRA_NAVIGATE_JOB_ID, jobId)
-        }
+        val intent = NotificationNavigation.intent(applicationContext, jobId)
 
         val pendingIntent = PendingIntent.getActivity(
             applicationContext,
@@ -114,7 +113,7 @@ class GenerationPollingWorker(
 
     companion object {
         const val KEY_JOB_ID = "nexus_polling_job_id"
-        const val EXTRA_NAVIGATE_JOB_ID = "extra_navigate_job_id"
+        const val EXTRA_NAVIGATE_JOB_ID = NotificationNavigation.EXTRA_JOB_ID
         private const val CHANNEL_ID = "nexus_generations_channel"
 
         fun enqueue(context: Context, jobId: String) {

@@ -12,12 +12,12 @@ class AgentLimitFormTest {
         val edited=all.toMutableMap().apply {
             this["maxConcurrentSubagents"]="90";this["maxSubagentDepth"]="0"
             this["maxConcurrentGenerations"]="200";this["maxGenerationsPerBatch"]="100000"
-            this["flowMaxResults"]="0";this["allowSubagentGeneration"]="false"
+            this["allowSubagentGeneration"]="false"
         }
         val saved=AgentLimitForm.parse(current,edited)
         assertEquals(90,saved.maxConcurrentSubagents);assertEquals(0,saved.maxSubagentDepth)
         assertEquals(200,saved.maxConcurrentGenerations);assertEquals(100000,saved.maxGenerationsPerBatch)
-        assertEquals(0,saved.flowMaxResults);assertFalse(saved.allowSubagentGeneration)
+        assertFalse(saved.allowSubagentGeneration)
         assertEquals(saved,AgentLimitForm.parse(saved,AgentLimitForm.values(saved)))
         assertEquals(12345,AgentLimitForm.parse(current.copy(maxTokens=12345),edited).maxTokens)
     }

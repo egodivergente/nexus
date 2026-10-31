@@ -109,13 +109,6 @@ class SearchModelsTool(private val d: ToolDeps) : BaseTool(
             .take(limit).toList()
         return ok {
             put("count", hits.size)
-            if (com.vidadomu.nexus.agent.core.agent.ExternalServices.mentionsFlow(input.req("query"))) put("external_service", buildJsonObject {
-                put("name", "Google Flow")
-                put("generation_available_in_nexus", true)
-                put("requires_explicit_confirmation", false)
-                put("authentication_status", "check_in_app")
-                put("details", com.vidadomu.nexus.agent.core.agent.ExternalServices.FLOW_INFO)
-            })
             put("items", JsonArray(hits.map { it.first.compact(d.skills.forModel(it.first.ref.modelId)) }))
             if (hits.isEmpty()) put("note", "Ningún modelo del registro coincide. No propongas modelos que no estén aquí.")
         }

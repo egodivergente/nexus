@@ -179,7 +179,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         val d=AgentLimits()
         val base=AgentLimits(
             maxToolRounds=prefs.getInt("lim_rounds",d.maxToolRounds),turnTimeoutSeconds=prefs.getInt("lim_turn_timeout_s",d.turnTimeoutSeconds),
-            maxTokens=prefs.getInt("max_tokens",d.maxTokens).coerceAtLeast(1),flowMaxResults=prefs.getInt("lim_flow_results",d.flowMaxResults),
+            maxTokens=prefs.getInt("max_tokens",d.maxTokens).coerceAtLeast(1),
             maxImagesPerTurn=prefs.getInt("lim_images",d.maxImagesPerTurn),maxVideosPerTurn=prefs.getInt("lim_videos",d.maxVideosPerTurn),
             maxDocumentsPerTurn=prefs.getInt("lim_documents",d.maxDocumentsPerTurn),maxMessages=prefs.getInt("lim_messages",d.maxMessages),
             maxToolResultChars=prefs.getInt("lim_tool_chars",d.maxToolResultChars),maxUiContextChars=prefs.getInt("lim_ui_chars",d.maxUiContextChars),
@@ -198,7 +198,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         val values=limitsJson.encodeToJsonElement(AgentLimits.serializer(),l) as kotlinx.serialization.json.JsonObject
         val extras=kotlinx.serialization.json.JsonObject(values.filterKeys {it !in legacyLimitKeys})
         check(prefs.edit().putInt("lim_rounds",l.maxToolRounds).putInt("lim_turn_timeout_s",l.turnTimeoutSeconds).putInt("max_tokens",l.maxTokens)
-            .putInt("lim_flow_results",l.flowMaxResults).putInt("lim_images",l.maxImagesPerTurn).putInt("lim_videos",l.maxVideosPerTurn)
+            .putInt("lim_images",l.maxImagesPerTurn).putInt("lim_videos",l.maxVideosPerTurn)
             .putInt("lim_documents",l.maxDocumentsPerTurn).putInt("lim_messages",l.maxMessages).putInt("lim_tool_chars",l.maxToolResultChars)
             .putInt("lim_ui_chars",l.maxUiContextChars).putInt("lim_tracking_min",l.jobTrackingMinutes).putString("lim_extra_json",extras.toString()).commit()) {"No se pudieron guardar los límites."}
         com.vidadomu.nexus.core.model.TrackingPolicy.windowMinutes=l.jobTrackingMinutes
@@ -439,7 +439,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         cost = ChainedCostEstimator(listOf(NexusQuoteEstimator(registry), published)),
         // El router ordena con la tabla publicada (sin llamadas de red por candidato); el plan usa la calculadora.
         router = ModelRouter(registry, skills, published, excludedFamilies = { settings.excludedFamilies() }, schemaCheckLimit = { settings.limits().let { it.maximum(it.maxRecommendationSchemaChecks) } }),
-        guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app), directFlow = true,
+        guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app),
         nativeOperations = NexusNativeOperations(app, this),
         orders = orders,
         probeFrameRate = { uri -> AgentMediaStore.frameRate(app, uri) },

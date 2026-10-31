@@ -17,7 +17,6 @@ class RuntimeNetworkInterceptor(context: Context): Interceptor {
             "api.atlascloud.ai" -> "atlas_cloud"
             "api.dev.runwayml.com" -> "runway"
             "api.crun.ai" -> "crun"
-            "100.72.111.97", "100.112.57.2" -> "google_flow"
             else -> null
         }
         val scope=request.tag(RuleScope::class.java) ?: RuleScope(provider=provider)

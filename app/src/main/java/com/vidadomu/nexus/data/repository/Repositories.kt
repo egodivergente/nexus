@@ -163,7 +163,9 @@ class GenerationRepository(
         database.loading.first { !it }
         if(database.loadError.value == null) {
             database.jobsFlow.value.forEach { job ->
-                val recovered = job.recoverInterruptedComparison().recoverInterruptedSubmission()
+                val recovered = if(com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(job.providerId))
+                    com.vidadomu.nexus.provider.registry.RetiredProviders.pauseTracking(job)
+                else job.recoverInterruptedComparison().recoverInterruptedSubmission()
                 if(recovered != job) database.insertOrUpdateJob(recovered)
                 else if(context != null && !com.vidadomu.nexus.BuildConfig.OFFLINE_QA && !job.providerJobId.isNullOrBlank() &&
                     job.status in setOf(GenerationStatus.QUEUED, GenerationStatus.GENERATING, GenerationStatus.PROCESSING, GenerationStatus.RENDERING)) {
@@ -186,6 +188,8 @@ class GenerationRepository(
         try { LocalJobMetadata.validate(localMetadata) }
         catch (e: IllegalArgumentException) { return Result.failure(e) }
         database.getJobById(request.id)?.let { return SubmissionSafety.reuse(it, request) }
+        if (com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(request.providerId))
+            return Result.failure(ProviderError(com.vidadomu.nexus.provider.registry.RetiredProviders.SUBMIT_MESSAGE))
         val provider = providerRegistry.getProviderById(request.providerId)
             ?: return Result.failure(ProviderError("No existe un adaptador ejecutable para ${request.providerId}."))
         if(com.vidadomu.nexus.BuildConfig.OFFLINE_QA) return Result.failure(ProviderError("Laboratorio local: envío bloqueado."))
@@ -313,6 +317,12 @@ class GenerationRepository(
             return Result.success(currentJob)
         }
 
+        if (com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(currentJob.providerId)) {
+            val paused = com.vidadomu.nexus.provider.registry.RetiredProviders.pauseTracking(currentJob)
+            if (paused != currentJob) database.insertOrUpdateJob(paused)
+            return Result.success(paused)
+        }
+
         val persistedJob = currentJob
         if (refreshFailed && currentJob.parameters["__tracking_paused"] == "true") {
             currentJob = currentJob.copy(parameters = (currentJob.parameters - "__tracking_paused") + ("__tracking_started_at" to System.currentTimeMillis().toString()))
@@ -348,8 +358,11 @@ class GenerationRepository(
     suspend fun refreshConfirmedCost(jobId:String):Result<GenerationJob> =
         pollLocks.getOrPut(jobId) { kotlinx.coroutines.sync.Mutex() }.withLock {
             val current=database.getJobById(jobId) ?: return@withLock Result.failure(ProviderError("Resultado no encontrado"))
-            if (current.providerId == "google_flow" || current.providerJobId?.startsWith("queue_") == true) {
-                return@withLock Result.failure(ProviderError("Flow utiliza créditos de suscripción y no expone consulta de importe final por tarea."))
+            if (com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(current.providerId)) {
+                return@withLock Result.failure(ProviderError(com.vidadomu.nexus.provider.registry.RetiredProviders.TRACKING_MESSAGE))
+            }
+            if (current.providerJobId?.startsWith("queue_") == true) {
+                return@withLock Result.failure(ProviderError("Este trabajo no tiene un identificador remoto para consultar su importe final."))
             }
             if (current.status != GenerationStatus.COMPLETED) {
                 return@withLock Result.failure(ProviderError("Solo se puede consultar el coste confirmado de generaciones completadas."))

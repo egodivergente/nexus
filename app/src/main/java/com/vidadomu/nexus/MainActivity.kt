@@ -65,8 +65,8 @@ import com.vidadomu.nexus.ui.navigation.tabExit
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.vidadomu.nexus.ui.navigation.Screen
 import com.vidadomu.nexus.ui.navigation.openHistoryTab
+import com.vidadomu.nexus.ui.navigation.NotificationNavigation
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
-import com.vidadomu.nexus.ui.settings.FlowCreateScreen
 import com.vidadomu.nexus.ui.settings.SettingsScreen
 import com.vidadomu.nexus.ui.theme.BackgroundDark
 import com.vidadomu.nexus.ui.theme.ScreenBackground
@@ -101,6 +101,8 @@ class MainActivity : ComponentActivity() {
         val rules=RuntimePreferences.get(this)
         // Al arrancar solo si llevabas fuera el tiempo de ausencia (4 h por defecto) o es la primera vez, no cada vez que Android reinicia la app.
         projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && (rules.bool("startup.cold") || awayLongEnough(rules))
+        // Keep a pending result across recreation while startup is still warming up.
+        initialDeepLinkJobId = savedInstanceState?.getString(STATE_PENDING_JOB)
         if(savedInstanceState==null || intent?.action !in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)) handleIntent(intent)
 
         setContent {
@@ -211,7 +213,7 @@ class MainActivity : ComponentActivity() {
                 // Deep link from notification
                 LaunchedEffect(initialDeepLinkJobId) {
                     initialDeepLinkJobId?.let { jobId ->
-                        navController.navigate("output/$jobId")
+                        navController.navigate("output/${Uri.encode(jobId)}") { launchSingleTop = true }
                         initialDeepLinkJobId = null
                     }
                 }
@@ -231,10 +233,7 @@ class MainActivity : ComponentActivity() {
                         if(!WindowInsets.isImeVisible) {
                             androidx.compose.foundation.layout.Column {
                                 val currentRoute = activeEntry?.destination?.route
-                                // Flow already lists its live jobs above its own composer dock; a second floating layer
-                                // there stacked two fixed bars over the content.
-                                val onFlowTab = currentRoute == "workspace" && tabs[pager.currentPage] == Screen.Flow
-                                if (currentRoute?.startsWith("output") != true && !onFlowTab) {
+                                if (currentRoute?.startsWith("output") != true) {
                                     com.vidadomu.nexus.ui.components.LiveRenderPill(
                                         onOpenOutput = { id -> navController.navigate("output/$id") },
                                         onSendToAgent = { jobId, outputId ->
@@ -255,7 +254,7 @@ class MainActivity : ComponentActivity() {
                         modifier=Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
                         composable("workspace") {
                             LaunchedEffect(tabRequest) {tabRequest?.let {pager.scrollToPage(it);tabRequest=null}}
-                            // Predictable Back (revision video 1, 00:31): an edge swipe on ArtBox, Lanzadera, Flow or Biblioteca
+                            // Predictable Back (revision video 1, 00:31): an edge swipe on ArtBox, Lanzadera or Biblioteca
                             // returns to Agente instead of leaving Nexus; only Back from Agente exits. Screens inside a tab
                             // (a family, a sheet) register their own handlers later, so they still take precedence.
                             val workspaceScope = rememberCoroutineScope()
@@ -295,7 +294,6 @@ class MainActivity : ComponentActivity() {
                             Screen.Create -> {
                             CreateScreen(
                                 onBrowseModels = { navController.navigate(Screen.Models.route) { launchSingleTop = true } },
-                                onOpenFlow = { navController.navigate(Screen.Flow.route) { launchSingleTop = true } },
                                 onBytePlusSettings = {page -> navController.navigate("byteplus/$page") {launchSingleTop=true}},
                                 onNavigateToOutput = { jobId ->
                                     navController.navigate("output/$jobId")
@@ -305,7 +303,6 @@ class MainActivity : ComponentActivity() {
                         }
                             Screen.Models -> {
                             ModelsScreen(
-                                onLocalInpaint = { navController.navigate("local-inpaint") { launchSingleTop=true } },
                                 onSelectModelAndCreate = { model ->
                                     createViewModel.selectModality(model.modalities.first())
                                     createViewModel.selectModel(model)
@@ -319,7 +316,6 @@ class MainActivity : ComponentActivity() {
                         }
                             Screen.Library -> {
                             LibraryScreen(
-                                onEditPhoto={uri -> navController.navigate("local-inpaint?uri=${Uri.encode(uri)}") {launchSingleTop=true}},
                                 onOpenHistory={navController.navigate(Screen.Generations.route)},
                                 onOpenArtBox={tabRequest=tabs.indexOf(Screen.Models)},
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
@@ -343,13 +339,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                            Screen.Flow -> {
-                            FlowCreateScreen(
-                                onBack = {tabRequest=0},
-                                onOpenModels = { tabRequest=2 },
-                                onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") }
-                            )
-                        }
                                     else -> Unit
                                 }
                                 }
@@ -371,13 +360,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable("local-inpaint?uri={uri}", arguments=listOf(androidx.navigation.navArgument("uri") {nullable=true;defaultValue=null})) {entry ->
-                            com.vidadomu.nexus.inpaint.LocalInpaintScreen(onBack={navController.popBackStack()}, initialUri=entry.arguments?.getString("uri"))
-                        }
                         composable(Screen.Settings.route) {
-                            SettingsScreen(assistantViewModel = assistantViewModel, onCreateInFlow = {
-                                navController.navigate(Screen.Flow.route) { launchSingleTop = true }
-                            })
+                            SettingsScreen(assistantViewModel = assistantViewModel)
                         }
                         composable("byteplus/{page}",arguments=listOf(navArgument("page") {type=NavType.StringType})) {entry ->
                             SettingsScreen(initialPage=entry.arguments?.getString("page"),onCloseInitialPage={navController.popBackStack()},assistantViewModel=assistantViewModel)
@@ -392,7 +376,6 @@ class MainActivity : ComponentActivity() {
                                 initialOutputIndex = backStackEntry.arguments?.getInt("index") ?: 0,
                                 onBack = { navController.popBackStack() },
                                 onOpenHistory = { navController.openHistoryTab() },
-                                onOpenFlow = {navController.navigate(Screen.Flow.route) {launchSingleTop=true}},
                                 onReuseAsInput = { content, mimeType ->
                                     if (mimeType != null) {
                                         // Media and prompt reuse are explicit, including prompts that happen to be URLs.
@@ -430,6 +413,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        initialDeepLinkJobId?.let { outState.putString(STATE_PENDING_JOB, it) }
+        super.onSaveInstanceState(outState)
+    }
+
+    private companion object {
+        const val STATE_PENDING_JOB = "nexus_pending_notification_job"
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -454,8 +446,9 @@ class MainActivity : ComponentActivity() {
         }
 
         // 1. Notification deep link
-        val deepLinkJobId = intent.getStringExtra(GenerationPollingWorker.EXTRA_NAVIGATE_JOB_ID)
+        val deepLinkJobId = NotificationNavigation.takeJobId(intent)
         if (deepLinkJobId != null) {
+            projectChooser = false
             initialDeepLinkJobId = deepLinkJobId
             return
         }
@@ -485,7 +478,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         val rules=RuntimePreferences.get(this)
         val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
-        if(left>0 && rules.bool("startup.enabled") && awayLongEnough(rules)) projectChooser=true
+        if(initialDeepLinkJobId == null && left>0 && rules.bool("startup.enabled") && awayLongEnough(rules)) projectChooser=true
     }
 
     /** First launch, or away at least «startup.idleMinutes» (0 = never by absence). */

@@ -25,7 +25,6 @@ object RuntimeRules {
             help="0 = conversión desconocida: no se compara ese proveedor con tarifas en USD. Usa el coste de tu compra.", scoped=true),
         RuleDefinition("ui.motion", "Animaciones", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("ui.haptics", "Respuesta háptica", "Personalización", RuleType.BOOLEAN, "true"),
-        RuleDefinition("flow.connectionTimeout", "Espera de conexión Flow (segundos)", "Reglas y límites", RuleType.INTEGER, "20", 0.0, help="Margen para comprobar el navegador del puente principal antes de usar el respaldo.", scoped=true),
         RuleDefinition("ui.background", "Fondo aurora dinámico", "Personalización", RuleType.BOOLEAN, "true"),
         RuleDefinition("ui.backgroundOpacity", "Intensidad del fondo", "Personalización", RuleType.DECIMAL, "0.28", 0.0, 1.0),
         RuleDefinition("ui.photo", "Foto de fondo", "Personalización", RuleType.TEXT, "", help="Selecciona una imagen desde la vista Personalización."),
@@ -57,10 +56,9 @@ object RuntimeRules {
         RuleDefinition("generation.costWarning", "Confirmar gasto desde (€)", "Reglas y límites", RuleType.DECIMAL, "0", 0.0, help="0 desactiva este aviso. Los costes desconocidos siempre requieren aceptación.", scoped=true),
         RuleDefinition("prompt.softWarning", "Aviso opcional de longitud", "Reglas y límites", RuleType.INTEGER, "0", 0.0, help="0 sin aviso. No representa un máximo remoto y no bloquea.", scoped=true),
         RuleDefinition("prompt.observation", "Observación manual de prompt", "Reglas y límites", RuleType.TEXT, "", help="Hipótesis sin verificar; nunca bloquea ni sustituye al contrato.", scoped=true),
-        RuleDefinition("flow.drafts", "Instrucciones en un lote de Flow", "Flow", RuleType.INTEGER, "12", 1.0),
-        RuleDefinition("flow.references", "Adjuntos locales de Flow", "Flow", RuleType.INTEGER, "0", 0.0, help="0 = sin límite; sujeto a la interfaz de Google"),
-        RuleDefinition("flow.connectionTimeout", "Comprobación del puente (segundos)", "Flow", RuleType.INTEGER, "20", 0.0, help="Espera para elegir AXELPC antes de probar el respaldo. 0 sin corte local.", scoped=true),
     )
+    // Saved settings may still carry these retired keys; they are kept untouched so older exports round-trip.
+    val retiredKeys = setOf("flow.connectionTimeout", "flow.drafts", "flow.references")
     fun definition(key: String) = definitions.first { it.key == key }
 }
 
@@ -88,7 +86,7 @@ object RuntimeRules {
         require(schemaVersion == 1) { "Versión de ajustes no compatible" }
         overrides.forEach { (scope, values) ->
             require(scope.split('|').size == 4) { "Ámbito no válido" }
-            values.forEach { (key,value) -> require(RuntimeRules.definition(key).validate(value) && (scope==RuleScope().key || RuntimeRules.definition(key).scoped)) { "Valor o ámbito no válido: $key" } }
+            values.filterKeys { it !in RuntimeRules.retiredKeys }.forEach { (key,value) -> require(RuntimeRules.definition(key).validate(value) && (scope==RuleScope().key || RuntimeRules.definition(key).scoped)) { "Valor o ámbito no válido: $key" } }
         }
         return this
     }

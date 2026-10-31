@@ -50,19 +50,6 @@ import com.vidadomu.nexus.ui.theme.LocalNexusVisuals
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import com.vidadomu.nexus.ui.theme.tabularMoney
 
-/** The same two workspaces stay visible in both Canvas and Flow. */
-@Composable
-internal fun CanvasWorkspaceSwitch(flow: Boolean, onModels: () -> Unit, onFlow: () -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        SegmentedButton(selected = !flow, onClick = onModels, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
-            Text("Modelos")
-        }
-        SegmentedButton(selected = flow, onClick = onFlow, shape = SegmentedButtonDefaults.itemShape(1, 2)) {
-            Text("Google Flow")
-        }
-    }
-}
-
 @Composable
 internal fun GenerationQuantityControl(count: Int, enabled: Boolean, onCount: (Int) -> Unit, onModels: () -> Unit, allowed: (Int) -> Boolean = {true}, choices: List<Int> = BATCH_COUNTS) {
     var menu by remember {mutableStateOf(false)}

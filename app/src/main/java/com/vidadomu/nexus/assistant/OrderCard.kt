@@ -89,7 +89,7 @@ internal fun billingLabel(providerId: String): String = when (providerId) {
     "atlas_cloud" -> "Atlas Cloud"
     "crun" -> "Crun"
     "runway" -> "Runway"
-    "google_flow" -> "Google Flow · tu cuenta"
+    "google_flow" -> "Google Flow (retirado)"
     else -> providerId
 }
 
@@ -121,6 +121,7 @@ internal fun OrderCard(
     val currency = app.currencyManager
     val currencyState by currency.state.collectAsState()
     val plan = p.plan
+    val retired = com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(plan.ref.providerId)
     var expanded by rememberSaveable(order.id) { mutableStateOf(false) }
     var prompt by rememberSaveable(order.id, plan.id) { mutableStateOf(plan.prompt) }
     LaunchedEffect(plan.prompt) { prompt = plan.prompt }
@@ -156,10 +157,10 @@ internal fun OrderCard(
                     IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.MoreVert, "Más opciones", tint = TextSecondary) }
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text(if (expanded) "Ocultar detalles" else "Detalles") }, { menu = false; expanded = !expanded })
-                        if (order.status.editable) DropdownMenuItem({ Text("Abrir en el Lienzo") }, { menu = false; onOpenCanvas() }, enabled = !p.busy)
+                        if (order.status.editable && !retired) DropdownMenuItem({ Text("Abrir en el Lienzo") }, { menu = false; onOpenCanvas() }, enabled = !p.busy)
                         if (order.status.editable) DropdownMenuItem({ Text("Descartar") }, { menu = false; onDiscard() }, enabled = !p.busy && !assistantBusy)
                         if (order.status == OrderStatus.FAILED) {
-                            DropdownMenuItem({ Text("Revisar reintento") }, { menu = false; onPrepareRetry() }, enabled = !p.busy && !assistantBusy)
+                            if (!retired) DropdownMenuItem({ Text("Revisar reintento") }, { menu = false; onPrepareRetry() }, enabled = !p.busy && !assistantBusy)
                             DropdownMenuItem({ Text("Eliminar tarjeta · conservar medios") }, { menu = false; onRemove() }, enabled = !p.busy && !assistantBusy)
                         }
                         DropdownMenuItem({ Text("Abrir Historial") }, { menu = false; onOpenHistory() })
@@ -224,7 +225,8 @@ internal fun OrderCard(
                 if (order.status == OrderStatus.AWAITING_CONFIRMATION && !p.busy && !assistantBusy && !dirty) {
                     QuickOrderParamStrip(plan = plan, onEdit = onEdit, onCustomEdit = { k, v -> editParam = k to v })
                 }
-                if (shown.actionLabel != null && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
+                val resends = shown.action == CardAction.GENERATE || shown.action == CardAction.RETRY
+                if (shown.actionLabel != null && !(retired && resends) && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
                     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                     val click: () -> Unit = when (shown.action) {
                         CardAction.GENERATE, CardAction.RETRY -> ({

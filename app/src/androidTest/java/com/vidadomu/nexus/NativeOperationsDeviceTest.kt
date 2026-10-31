@@ -85,7 +85,7 @@ class NativeOperationsDeviceTest {
         } finally { file.delete(); output?.delete() }
     }
 
-    @Test fun recoveryChecksTheOriginalProviderAndDoesNotSubmitFlowQueue() = runBlocking {
+    @Test fun recoveryChecksTheOriginalProviderAndNeverQueriesARetiredProvider() = runBlocking {
         check(BuildConfig.OFFLINE_QA)
         val runtime = AssistantRuntime.get(app)
         val operations = NexusNativeOperations(app, runtime)
@@ -110,6 +110,7 @@ class NativeOperationsDeviceTest {
             assertFalse(queued["resubmitted"]!!.jsonPrimitive.boolean)
             assertFalse(queued["tracking_restored"]!!.jsonPrimitive.boolean)
             assertEquals("QUEUED", queued["job"]!!.jsonObject["status"]!!.jsonPrimitive.content)
+            assertEquals(com.vidadomu.nexus.provider.registry.RetiredProviders.TRACKING_MESSAGE, queued["action"]!!.jsonPrimitive.content)
         } finally { app.generationRepository.deleteJob(id) }
     }
 

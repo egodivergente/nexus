@@ -15,10 +15,9 @@ enum class Screen(
     Models("models", "ArtBox", Icons.Default.GridView),
     Generations("generations", "Historial", Icons.Default.Timelapse),
     Library("library", "Biblioteca", Icons.Default.Collections),
-    Settings("settings", "Ajustes", Icons.Default.Tune),
-    Flow("flow", "Flow", Icons.Default.Waves);
+    Settings("settings", "Ajustes", Icons.Default.Tune);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Create, Library) // Flow oculto de momento: la pantalla sigue en el código
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Create, Library)
     }
 }

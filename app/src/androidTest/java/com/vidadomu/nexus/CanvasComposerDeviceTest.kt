@@ -15,10 +15,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.ui.create.*
-import com.vidadomu.nexus.ui.flow.*
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
 import com.vidadomu.nexus.ui.theme.NexusTheme
 import kotlinx.coroutines.runBlocking
@@ -48,19 +46,18 @@ class CanvasComposerDeviceTest {
         File(dir,name).outputStream().use {bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
         bitmap.recycle()
     }
-    @Test fun failedFlowShowsItsCauseAndConnectionActionWithoutOpeningDetails() {
+    @Test fun failedRetiredFlowJobKeepsItsCauseWithoutFlowActions() {
         val id="qa-flow-expired-credential"
         val message="El acceso temporal guardado ha caducado. Abre la conexión de Flow e inicia sesión en Google; este pedido no se ha enviado."
         runBlocking {app.database.insertOrUpdateJob(GenerationJob(id,providerId="google_flow",modelId="current_project",
             modality=Modality.IMAGE,prompt="Prueba local sin envío",status=GenerationStatus.FAILED,
             error=message,technicalDetails="credential_expired"))}
         compose.waitUntil(10_000) {app.generationRepository.allJobs.value.any {it.id==id}}
-        var opened=false
-        compose.setContent {NexusTheme {OutputViewerScreen(id,{}, {_,_->},onOpenFlow={opened=true})}}
+        compose.setContent {NexusTheme {OutputViewerScreen(id,{}, {_,_->})}}
         compose.onNodeWithText(message).assertIsDisplayed()
         compose.onNodeWithText("No hay un resultado disponible.").assertDoesNotExist()
-        compose.onNodeWithText("Conexión de Flow").performClick()
-        compose.runOnIdle {assertTrue(opened)}
+        compose.onNodeWithText("Conexión de Flow").assertDoesNotExist()
+        compose.onNodeWithText("Consultar Flow").assertDoesNotExist()
         capture("flow-error-visible.png")
     }
     @Test fun clearUndoAndPasteKeepVisualAttachmentsAndComfortableTouchTargets() {
@@ -118,23 +115,6 @@ class CanvasComposerDeviceTest {
         compose.onAllNodesWithText("H3 Max Turbo").onLast().assertExists()
         assertEquals(Modality.VIDEO,vm.comparison.state.value.source.selectedModality)
         assertTrue(vm.comparison.state.value.catalog.all {Modality.VIDEO in it.modalities})
-    }
-    @Test fun flowUsesSameComposerWithSharedThumbnailsAndPersistsCount() {
-        val store=FlowWorkspaceStore(app,AssistantRuntime.get(app).settings.activeProjectId())
-        store.write(listOf(FlowStudioDraft(prompt="Luz de tarde sobre las dunas",modality=Modality.VIDEO)),media().map {FlowStudioReference(it.uriString,it.mimeType,"Referencia")})
-        compose.setContent {NexusTheme {FlowStudioScreen({}, {})}}
-        compose.onNodeWithContentDescription("Borrar prompt").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Revisar Referencia 1").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Restaurar prompt").performClick()
-        compose.onNodeWithText("×1 ▾").performScrollTo().performClick()
-        compose.onNodeWithText("×3").performClick()
-        compose.onNodeWithText("×3 ▾").assertIsDisplayed()
-        capture("composer-flow.png")
-        compose.runOnIdle {
-            val saved=FlowWorkspaceStore(app,AssistantRuntime.get(app).settings.activeProjectId()).read()
-            assertEquals(3,saved.drafts.single().count);assertEquals(2,saved.references.size)
-            assertEquals("Luz de tarde sobre las dunas",saved.drafts.single().prompt)
-        }
     }
     @Test fun byteplusHelpShowsOwnBillingRouteAndAccessibleActionsWithLargeText() {
         var chosen: Modality?=null;var page: String?=null

@@ -11,7 +11,7 @@ import java.io.File
 /**
  * Proveedores multimedia definidos por el usuario. La configuración (sin secretos) va en preferencias; la CLAVE se cifra
  * aparte con SecureStorage, una por proveedor. Guardar o borrar recarga el registro y el catálogo sin reiniciar la app,
- * y no toca Atlas, Crun, Runway, Flow ni el simulado.
+ * y no toca Atlas, Crun, Runway ni el simulado.
  */
 class CustomMediaStore(private val app: NexusApplication, private val client: OkHttpClient) {
     private val prefs = app.getSharedPreferences("media_providers_v1", Context.MODE_PRIVATE)

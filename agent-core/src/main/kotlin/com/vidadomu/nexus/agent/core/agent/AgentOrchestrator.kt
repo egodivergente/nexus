@@ -125,7 +125,6 @@ class AgentOrchestrator(
         if (conv.reasoningModelId != null && conv.messages.size > config.limits.messages)
             throw LlmException(LlmException.Kind.BAD_REQUEST, "Este chat ha alcanzado su límite de contexto. Abre una nueva conversación; el proyecto y sus archivos se conservan.")
         val session = conv.session
-        session.flowSubmittedResults = 0
         val start = conv.messages.size
         newAttachments.forEach { a -> if (session.attachment(a.id) == null) session.attachments += a }
 

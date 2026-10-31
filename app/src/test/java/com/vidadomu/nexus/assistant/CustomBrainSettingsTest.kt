@@ -48,11 +48,10 @@ class CustomBrainSettingsTest {
 
     @Test fun `los limites del usuario llegan a la configuracion del agente`() {
         val cfg = AssistantSettings(awsAccessKeyId = "AKIA", maskedAwsSecret = "••••",
-            limits = AgentLimits(maxToolRounds = 0, maxTokens = 123_456, maxImagesPerTurn = 9, flowMaxResults = 3)).toConfig()
+            limits = AgentLimits(maxToolRounds = 0, maxTokens = 123_456, maxImagesPerTurn = 9)).toConfig()
         assertTrue("0 = sin límite", cfg.maxToolRounds > 1_000_000)
         assertEquals(123_456, cfg.maxTokens)
         assertEquals(9, cfg.limits.maxImagesPerTurn)
-        assertEquals(3, cfg.limits.flowMaxResults)
     }
 
     @Test fun `un cerebro puede sustituir los limites globales y lo que no define hereda`() {

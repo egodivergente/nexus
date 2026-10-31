@@ -194,17 +194,18 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                             }},
                             variantLabels=variantLabels,
                             menu={ close ->
+                                val retired = com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(job.providerId)
                                 if(job.outputs.isNotEmpty() && onSendResultToAgent!=null) DropdownMenuItem(text={Text("Añadir al chat")},onClick={close();attachJob=job})
-                                if(job.parameters["__tracking_paused"]=="true") DropdownMenuItem(text={Text("Recuperar seguimiento")},onClick={close();scope.launch {
+                                if(!retired && job.parameters["__tracking_paused"]=="true") DropdownMenuItem(text={Text("Recuperar seguimiento")},onClick={close();scope.launch {
                                     val recovered=app.generationRepository.pollJob(job.id,refreshFailed=true)
                                     if(recovered.getOrNull()?.status in setOf(GenerationStatus.QUEUED,GenerationStatus.GENERATING,GenerationStatus.PROCESSING,GenerationStatus.RENDERING))
                                         com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context,job.id)
                                     android.widget.Toast.makeText(context,if(recovered.isSuccess) "Estado consultado sin volver a generar" else "No se pudo consultar; se conserva el trabajo",android.widget.Toast.LENGTH_LONG).show()
                                 }})
-                                DropdownMenuItem(text={Text("Preparar de nuevo")},onClick={close();onPrepareAgain(job)})
+                                if(!retired) DropdownMenuItem(text={Text("Preparar de nuevo")},onClick={close();onPrepareAgain(job)})
                                 val isTerminal = job.status in setOf(GenerationStatus.COMPLETED,GenerationStatus.FAILED,GenerationStatus.CANCELLED)
-                                val canCheckCost = job.status==GenerationStatus.COMPLETED && job.providerId !in setOf("mock_provider","google_flow") && job.providerJobId!=null && !job.providerJobId.startsWith("queue_")
-                                val canPollStatus = !isTerminal && job.providerId!="mock_provider" && job.providerJobId!=null
+                                val canCheckCost = !retired && job.status==GenerationStatus.COMPLETED && job.providerId !in setOf("mock_provider","google_flow") && job.providerJobId!=null && !job.providerJobId.startsWith("queue_")
+                                val canPollStatus = !retired && !isTerminal && job.providerId!="mock_provider" && job.providerJobId!=null
                                 if(canCheckCost || canPollStatus) DropdownMenuItem(text={Text(if(canCheckCost) "Consultar coste" else "Actualizar estado")},onClick={close();
                                     scope.launch {
                                         val result=if(canCheckCost) app.generationRepository.refreshConfirmedCost(job.id) else app.generationRepository.pollJob(job.id)
@@ -215,7 +216,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                             else "Coste actualizado",android.widget.Toast.LENGTH_LONG).show()
                                     }
                                 })
-                                if(!isTerminal) {
+                                if(!retired && !isTerminal) {
                                     DropdownMenuItem(text={Text("Detener seguimiento")},onClick={close();
                                         scope.launch {
                                             val stopped = app.generationRepository.stopTrackingJob(job.id)

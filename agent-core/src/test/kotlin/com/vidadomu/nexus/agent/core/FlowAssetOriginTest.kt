@@ -32,8 +32,8 @@ class FlowAssetOriginTest {
         assertFalse("provider_id" in item);assertFalse("nexus_job_id" in item)
     }
     @Test fun `preparar postproceso sin prompt respeta schema y no envia`() = runTest {
-        val ref=ModelRef("google_flow","google-flow/image_upscale")
-        val model=ModelSummary(ref,"Escalar imagen Flow",modalities=setOf("IMAGE"),capabilities=setOf("UPSCALE"))
+        val ref=ModelRef(ATLAS,"test/image_upscale")
+        val model=ModelSummary(ref,"Escalar imagen",modalities=setOf("IMAGE"),capabilities=setOf("UPSCALE"))
         val schema=ModelSchema(ref,listOf(
             ParamSpec("source_request_id",uiType="TEXT",nativeType="string",required=true),
             ParamSpec("resolution",uiType="ENUM",nativeType="string",options=listOf("2k","4k"),required=true)
@@ -41,7 +41,7 @@ class FlowAssetOriginTest {
         val h=Harness(registry=FakeRegistry(listOf(model),mapOf(ref to schema)))
         val result=PrepareGenerationTool(h.deps).run(buildJsonObject {
             put("provider_id",ref.providerId);put("model_id",ref.modelId)
-            put("params",buildJsonObject { put("source_request_id","flow-job-one");put("resolution","2k") })
+            put("params",buildJsonObject { put("source_request_id","job-one");put("resolution","2k") })
         },AgentSession("test",AgentMode.AGENT))
         assertFalse(result.isError,result.result.toString())
         assertEquals("",h.guard.plans().single().prompt)

@@ -2,8 +2,8 @@
 id: shot_planner
 kind: expertise
 title: Planificador de planos
-version: 2
-updated: 2026-10-08
+version: 3
+updated: 2026-10-31
 applies_to: [VIDEO]
 triggers: [plan de rodaje, desglose de escena, cuántos planos, planifica la secuencia]
 ---
@@ -34,7 +34,7 @@ Descompone una escena o secuencia narrativa en una lista de planos individuales,
 - Pasar a generación sin presentar antes el plan completo al usuario.
 
 ## Ejemplo breve
-Para una estrofa de 15 segundos: Plano 1 (0-5s, general, estático, establece la azotea de noche) → Plano 2 (5-10s, medio, dolly in, Mateo empieza a cantar) → Plano 3 (10-15s, primer plano, estático, microexpresión en el estribillo). Entrega los planos a `video_generation_expert` como un conjunto con sus prompts y parámetros. El usuario puede generar el bloque con una sola acción; Flow directo no añade confirmaciones.
+Para una estrofa de 15 segundos: Plano 1 (0-5s, general, estático, establece la azotea de noche) → Plano 2 (5-10s, medio, dolly in, Mateo empieza a cantar) → Plano 3 (10-15s, primer plano, estático, microexpresión en el estribillo). Entrega los planos a `video_generation_expert` como un conjunto con sus prompts y parámetros. El usuario revisa y confirma el coste del bloque antes del envío.
 
 ## Cuándo delegar en otra skill
 Si la petición del usuario cae claramente en el ámbito de otra skill de esta lista (p. ej. elección de modelo, coste, continuidad entre planos, movimiento de cámara), delega explícitamente en ella con `load_skill` en vez de improvisar ese criterio aquí.

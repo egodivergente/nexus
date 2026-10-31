@@ -113,7 +113,7 @@ fun NexusChrome(onSettings: () -> Unit, onNavigateToOutput: (String) -> Unit,
 fun NexusTopAppBar(title: @Composable () -> Unit, modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {}, actions: @Composable RowScope.() -> Unit = {},
     colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(),
-    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
+    windowInsets: WindowInsets = NexusInsets.chromeOnly,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     /** Entradas propias de la pantalla dentro del único botón de ajustes (p. ej. modelo y conexión del asistente). */
     settingsEntries: List<Pair<String, () -> Unit>> = emptyList(),

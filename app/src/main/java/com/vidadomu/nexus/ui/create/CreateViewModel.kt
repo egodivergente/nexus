@@ -70,10 +70,6 @@ data class CreateUiState(
                     } else if(prompt.isBlank()) add("Descripción de la canción")
                 }
                 model.contractMedia.filter { it.required && attachedMedia.none { media -> media.fieldKey==it.key } }.forEach { add(it.label) }
-                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Fotogramas" &&
-                    attachedMedia.none { it.fieldKey=="initial_frame" }) add("Fotograma Inicio")
-                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Referencias" &&
-                    attachedMedia.none { it.fieldKey=="reference_ids" }) add("Imágenes de referencia")
                 model.parameters.filter { it.isRequired && parameters[it.key].isNullOrBlank() }.forEach { add(it.displayName) }
             }
             else buildList<String> {
@@ -97,10 +93,6 @@ data class CreateUiState(
                     model.videoField, model.videosArrayField -> "Vídeo de entrada"
                     else -> model.parameters.find { it.key == field }?.displayName ?: field
                 } })
-                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Fotogramas" &&
-                    attachedMedia.none { it.fieldKey=="initial_frame" }) add("Fotograma Inicio")
-                if(model.providerId=="google_flow" && model.modalities.contains(Modality.VIDEO) && parameters["mode"]=="Referencias" &&
-                    attachedMedia.none { it.fieldKey=="reference_ids" }) add("Imágenes de referencia")
             }
         }.orEmpty()
     val inputMediaUri: Uri?
@@ -337,6 +329,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update {it.copy(parameters=model.parameters.associate {p->p.key to p.defaultValue},parameterAdaptations=emptyList(),errorMessage=null).withModelMedia(model,::isMediaAvailable)}
     }
     fun preparePrevious(job:com.vidadomu.nexus.core.model.GenerationJob) { forgetModelSwitch();
+        if(com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(job.providerId)) {_uiState.update {it.copy(errorMessage=com.vidadomu.nexus.provider.registry.RetiredProviders.SUBMIT_MESSAGE)};return}
         val model=modelCatalogRepo.getModelById(job.modelId)
         if(model==null) {_uiState.update {it.copy(errorMessage="El modelo de esta creación ya no está disponible.")};return}
         selectModality(job.modality); selectModel(model); updatePrompt(job.prompt)
@@ -386,19 +379,6 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             parameters=model.parameters.associate {it.key to it.defaultValue},attachedMedia=media,schemaReady=true)
         restoreDraftIfMatching(model)
         _uiState.update {it.copy(attachedMedia=(it.attachedMedia+media).distinctBy {item->Triple(item.slotType,item.fieldKey,item.uriString)})}
-    }
-
-    fun swapFlowFrames() { forgetModelSwitch();
-        _uiState.update { state ->
-            val start = state.attachedMedia.firstOrNull { it.fieldKey == "initial_frame" } ?: return@update state
-            val end = state.attachedMedia.firstOrNull { it.fieldKey == "end_frame" } ?: return@update state
-            val (swappedStart, swappedEnd) = com.vidadomu.nexus.provider.flow.FlowReferences.swapFrames(start, end)
-            state.copy(attachedMedia = state.attachedMedia.map { media -> when (media.id) {
-                start.id -> swappedStart
-                end.id -> swappedEnd
-                else -> media
-            }})
-        }
     }
 
     fun selectModality(modality: Modality) {
@@ -919,10 +899,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase()) else null)
                 ?: MediaSniffer.resolve(if (remote) null else withContext(Dispatchers.IO) { sniffHeader(uri) })
             val selected = _uiState.value.selectedModel!!
-            if (selected.providerId == "google_flow") {
-                updateParameter("mode", "Fotogramas")
-                selected.contractMedia.firstOrNull { it.key == "initial_frame" }?.let { setContractMedia(it, uri, resolved) }
-            } else if (selected.contractEndpoint != null) {
+            if (selected.contractEndpoint != null) {
                 selected.contractMedia.firstOrNull { it.mime.startsWith("image/") }?.let { setContractMedia(it, uri, resolved) }
             } else setMediaInput(uri, resolved)
         }

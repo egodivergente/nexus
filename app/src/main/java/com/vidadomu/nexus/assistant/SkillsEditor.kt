@@ -21,6 +21,7 @@ import com.vidadomu.nexus.agent.core.skills.Skill
 import com.vidadomu.nexus.agent.core.skills.SkillParser
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.NexusInsets
 import com.vidadomu.nexus.ui.theme.TextSecondary
 import java.io.File
 
@@ -72,7 +73,7 @@ internal fun SkillsEditorDialog(vm: AssistantViewModel, app: NexusApplication, o
     var editing by remember { mutableStateOf<Skill?>(null) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().systemBarsPadding().imePadding().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8),
+            Column(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen).imePadding().padding(horizontal = NexusTokens.screenMargin, vertical = NexusTokens.space8),
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 val current = editing
                 if (current == null) {

@@ -88,7 +88,7 @@ class UiAuditScreenshotsTest {
             else listOf(NexusAppearance.LIGHT)
         val scales = when(phase) { "before" -> listOf(1f,1.3f); "after" -> listOf(1f,1.3f,1.5f,2f); else -> listOf(1.3f) }
         val scenes=args.getString("audit_scenes")?.split(",")
-            ?: listOf("lienzo","historial","modelos","modelo-opciones","biblioteca","visor","asistente","proyecto","ajustes","flow","comparacion","costes")
+            ?: listOf("lienzo","historial","modelos","modelo-opciones","biblioteca","visor","asistente","proyecto","ajustes","comparacion","costes")
         val folder = File(app.getExternalFilesDir(null),"ui-audit/$phase").apply { mkdirs() }
         compose.setContent {
             // Inside the theme: NexusTheme multiplies by the saved font preference and would skew the audit scale.
@@ -108,8 +108,7 @@ class UiAuditScreenshotsTest {
                             "biblioteca" -> LibraryScreen({})
                             "visor" -> OutputViewerScreen(id, {}, { _, _ -> })
                             "asistente", "proyecto" -> AssistantScreen(onOpenInCanvas = {}, onNavigateToOutput = {}, onOpenSettings = {}, vm = assistant)
-                            "ajustes" -> SettingsScreen({})
-                            "flow" -> FlowCreateScreen({}, {})
+                            "ajustes" -> SettingsScreen()
                             "comparacion" -> ComparisonScreen(comparison, {}, {})
                             "costes" -> BillingLedgerScreen(app.generationRepository.allJobs.value,null,app.currencyManager,{}, {},Modifier.fillMaxSize())
                         }

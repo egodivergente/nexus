@@ -25,9 +25,6 @@ internal fun providerPill(hasKey: Boolean, check: ProviderCheck): ProviderPill =
     else -> ProviderPill(false, "Sin comprobar")
 }
 
-/** El puente de Flow no expone una comprobación aquí: vincular no es estar en línea. */
-internal fun flowPill(linked: Boolean): ProviderPill = ProviderPill(false, if (linked) "Vinculado" else "Sin vincular")
-
 internal fun checkTime(atMillis: Long, nowMillis: Long, zone: ZoneId): String {
     val at = Instant.ofEpochMilli(atMillis).atZone(zone)
     val sameDay = at.toLocalDate() == Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
@@ -68,7 +65,6 @@ internal fun providersHubSummary(
     atlasHasKey: Boolean,
     atlasCheck: ProviderCheck,
     atlasCachedReadingMillis: Long?,
-    flowLinked: Boolean,
     nowMillis: Long,
     zone: ZoneId,
 ): String {
@@ -79,7 +75,6 @@ internal fun providersHubSummary(
         add("$keysConfigured de $totalProviders con clave")
         if (atlasCheck !is ProviderCheck.Failed && atlas != null) add(atlas)
         if (othersWithKey > 0) add("otros sin comprobar aquí")
-        add(if (flowLinked) "Google Flow vinculado" else "Google Flow sin vincular")
     }
     return parts.joinToString(" · ")
 }

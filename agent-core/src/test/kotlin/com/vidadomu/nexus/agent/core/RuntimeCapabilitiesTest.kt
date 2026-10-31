@@ -47,4 +47,18 @@ class RuntimeCapabilitiesTest {
         assertFails {restored.set("ui.motion","false",provider)}
         assertFails {restored.copy(schemaVersion=2).validated()}
     }
+    @Test fun `retired Flow rules leave the registry but stored overrides are kept and ignored`() {
+        assertTrue(RuntimeRules.definitions.none { it.key.startsWith("flow.") || it.section == "Flow" || "Flow" in it.title })
+        assertEquals(RuntimeRules.definitions.size, RuntimeRules.definitions.map { it.key }.distinct().size)
+        val stored = """{"overrides":{"|||":{"flow.drafts":"12","flow.references":"0","prompt.softWarning":"500"},"|p|m|edit":{"flow.connectionTimeout":"20","prompt.softWarning":"900"}}}"""
+        val restored = Json.decodeFromString<RuntimeConfiguration>(stored).validated()
+        assertEquals("500", restored.value("prompt.softWarning"))
+        assertEquals("900", restored.value("prompt.softWarning", RuleScope(provider="p", model="m", workflow="edit")))
+        assertEquals("12", restored.overrides.getValue("|||")["flow.drafts"])
+        assertEquals("20", restored.overrides.getValue("|p|m|edit")["flow.connectionTimeout"])
+        assertEquals(restored, Json.decodeFromString<RuntimeConfiguration>(Json.encodeToString(restored)))
+        assertFails { restored.value("flow.drafts") }
+        assertFails { restored.set("flow.drafts", "3") }
+        assertFails { Json.decodeFromString<RuntimeConfiguration>("""{"overrides":{"|||":{"other.unknown":"1"}}}""").validated() }
+    }
 }

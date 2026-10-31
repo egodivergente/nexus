@@ -7,13 +7,12 @@ import com.vidadomu.nexus.provider.atlas.AtlasModelCatalog
 import com.vidadomu.nexus.provider.atlas.NativeModelSchema
 import com.vidadomu.nexus.ui.create.ParameterPresentation
 import com.vidadomu.nexus.ui.create.ParameterSections
-import com.vidadomu.nexus.ui.flow.FlowStudioPlan
 import com.vidadomu.nexus.ui.models.catalogPriceNote
 import com.vidadomu.nexus.ui.models.toolCategoryIcon
 import org.junit.Assert.*
 import org.junit.Test
 
-/** Regression tests for the UX correction pack of 2026-10-24 (Lanzadera upscaler form, Flow jobs, ArtBox labels). */
+/** Regression tests for the UX correction pack of 2026-10-24 (Lanzadera upscaler form, ArtBox labels). */
 class UxCorrectionsTest {
     private val base = AtlasModelCatalog.curatedModels.first()
 
@@ -99,35 +98,6 @@ class UxCorrectionsTest {
         val rows = ParameterSections.rows(sections[1].parameters).map { row -> row.map { it.key } }
         assertTrue(listOf("width", "height") in rows)
         assertTrue(listOf("long_side", "short_side") in rows)
-    }
-
-    private fun job(status: GenerationStatus, error: String? = null, progress: Float? = null, prompt: String = "p") = GenerationJob(
-        id = "j1", providerId = "google_flow", modelId = "m", modality = Modality.VIDEO, prompt = prompt,
-        parameters = mapOf("count" to "3"), status = status, progress = progress, error = error)
-
-    @Test fun flowNeverInventsAPercentage() {
-        val active = job(GenerationStatus.GENERATING)
-        val line = FlowStudioPlan.progressLine(active, "2 min 3 s")!!
-        assertTrue(line, line.contains("progreso porcentual no disponible"))
-        assertFalse(line.contains("%"))
-        assertTrue(FlowStudioPlan.progressLine(active.copy(progress = .4f), "5 s")!!.contains("40 %"))
-        assertNull(FlowStudioPlan.progressLine(job(GenerationStatus.COMPLETED), "1 s"))
-    }
-
-    @Test fun flowCountsAndDraftConflictAreDetectedFromRealJobs() {
-        val conflict = job(GenerationStatus.FAILED, "Hay un borrador escrito en Flow. Revísalo o bórralo antes de enviar desde Nexus.")
-        assertTrue(FlowStudioPlan.isDraftConflict(conflict))
-        assertFalse(FlowStudioPlan.isDraftConflict(job(GenerationStatus.FAILED, "otro error")))
-        val counts = FlowStudioPlan.counts(listOf(conflict, job(GenerationStatus.QUEUED), job(GenerationStatus.COMPLETED)))
-        assertEquals(FlowStudioPlan.JobCounts(active = 1, ready = 1, failed = 1), counts)
-    }
-
-    @Test fun reusingAFailedFlowPromptKeepsTheTextWhole() {
-        val long = "x".repeat(6_000)
-        val draft = FlowStudioPlan.reuseDraft(job(GenerationStatus.FAILED, prompt = long))
-        assertEquals(long, draft.prompt)
-        assertEquals(3, draft.count)
-        assertEquals(Modality.VIDEO, draft.modality)
     }
 
     @Test fun priceNoteNamesAUnitOnlyWhenEveryModelSharesIt() {

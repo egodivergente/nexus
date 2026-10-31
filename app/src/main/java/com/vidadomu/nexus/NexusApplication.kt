@@ -10,7 +10,6 @@ import com.vidadomu.nexus.data.repository.SettingsRepository
 import com.vidadomu.nexus.provider.atlas.AtlasCloudProvider
 import com.vidadomu.nexus.provider.mock.MockNexusProvider
 import com.vidadomu.nexus.provider.crun.CrunProvider
-import com.vidadomu.nexus.provider.flow.FlowBridgeProvider
 import com.vidadomu.nexus.provider.runway.RunwayProvider
 import com.vidadomu.nexus.provider.registry.ProviderRegistry
 
@@ -57,8 +56,6 @@ class NexusApplication : Application() {
         private set
     lateinit var runwayProvider: RunwayProvider
         private set
-    lateinit var flowBridgeProvider: FlowBridgeProvider
-        private set
     lateinit var settingsRepository: SettingsRepository
         private set
     /** Proveedores multimedia añadidos por el usuario (Ajustes → Generadores). */
@@ -91,14 +88,12 @@ class NexusApplication : Application() {
         atlasProvider = AtlasCloudProvider(okHttpClient, secureStorage)
         crunProvider = CrunProvider(this, okHttpClient, secureStorage)
         runwayProvider = RunwayProvider(okHttpClient, secureStorage)
-        flowBridgeProvider = FlowBridgeProvider(okHttpClient, secureStorage, this)
         val mockProvider = MockNexusProvider()
 
         providerRegistry = ProviderRegistry(
             atlasProvider,
             crunProvider,
             runwayProvider,
-            flowBridgeProvider,
             mockProvider,
             secureStorage,
             com.vidadomu.nexus.provider.fal.FalProvider(okHttpClient,

@@ -59,7 +59,6 @@ fun CreateScreen(
     onNavigateToOutput: (String) -> Unit,
     onBrowseModels: () -> Unit,
     viewModel: CreateViewModel = viewModel(),
-    onOpenFlow: () -> Unit = {},
     onBytePlusSettings: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -219,7 +218,7 @@ fun CreateScreen(
             scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,promptVisible=capabilities?.promptVisible==true,
             header={LauncherWorkspaceHeader(state.selectedModality,viewModel::selectModality)},
             model={FlagshipStudioHeader(state.selectedModality,catalogModels,state.selectedModel,
-                viewModel::selectModality,chooseModel,{pickerFamily=null;pickerProduct=null;showModelPickerSheet=true},onOpenFlow,
+                viewModel::selectModality,chooseModel,{pickerFamily=null;pickerProduct=null;showModelPickerSheet=true},
                 onVariants={group -> pickerFamily=com.vidadomu.nexus.ui.models.catalogFamily(group.routes.first());pickerProduct=group.key;showModelPickerSheet=true})},
             prompt={if(capabilities?.promptVisible==true) PromptEditor(state.prompt,viewModel::updatePrompt,
                 when(state.selectedModality) {Modality.VIDEO -> "Describe el movimiento, la acción y la cámara…";Modality.CHAT -> "Escribe tu consulta…";else -> "Describe lo que quieres crear o transformar…"},
@@ -249,7 +248,7 @@ fun CreateScreen(
                 state.errorMessage?.let {raw ->
                     val failure=state.submitFailure?.takeIf {it.message==raw}
                     if(failure!=null) InlineNotice(failure.message,technicalDetails=failure.technicalDetails,
-                        actionLabel="Revisar conexión",onAction=if(state.selectedModel?.providerId?.contains("flow",true)==true) onOpenFlow else onBrowseModels)
+                        actionLabel="Revisar conexión",onAction=onBrowseModels)
                     else InlineNotice(noticeMessage(raw,"No se ha podido completar la solicitud. Revisa los detalles antes de volver a generar."),technicalDetails=raw)
                 }
             },

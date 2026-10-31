@@ -9,7 +9,6 @@ internal object AgentLimitForm {
     val labels=mapOf(
         "maxToolRounds" to "Pasos de herramientas por mensaje",
         "turnTimeoutSeconds" to "Duración por mensaje (s)",
-        "flowMaxResults" to "Resultados de Flow por encargo",
         "maxImagesPerTurn" to "Imágenes que ve el agente por mensaje",
         "maxVideosPerTurn" to "Vídeos que ve el agente por mensaje",
         "maxDocumentsPerTurn" to "Documentos por mensaje",
@@ -19,7 +18,6 @@ internal object AgentLimitForm {
         "maxToolResultChars" to "Caracteres por resultado de herramienta",
         "maxGenerationsPerBatch" to "Encargos por lote",
         "maxConcurrentGenerations" to "Envíos simultáneos",
-        "maxConcurrentFlowGenerations" to "Envíos simultáneos a Flow",
         "maxToolResults" to "Resultados por consulta de modelos, biblioteca e historial",
         "maxRecommendations" to "Candidatos por recomendación",
         "maxRecommendationSchemaChecks" to "Modelos cuyo esquema se consulta por recomendación",
@@ -30,8 +28,6 @@ internal object AgentLimitForm {
         "maxOverviewPromptChars" to "Caracteres de prompt en la vista de proyecto",
         "maxMemorySearchResults" to "Coincidencias de memoria del proyecto",
         "maxMemoryExcerptChars" to "Caracteres por coincidencia de memoria",
-        "maxFlowMedia" to "Archivos recuperados por respuesta de Flow",
-        "maxFlowWaitSeconds" to "Espera máxima por consulta al agente de Flow (s)",
         "maxConcurrentSubagents" to "Subagentes simultáneos",
         "maxSubagentDepth" to "Niveles de delegación",
         "allowSubagentGeneration" to "Permitir que los subagentes preparen generaciones"

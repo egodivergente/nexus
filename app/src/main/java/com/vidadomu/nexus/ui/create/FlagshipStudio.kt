@@ -156,7 +156,6 @@ internal fun FlagshipStudioHeader(
     onModality: (Modality) -> Unit,
     onChoose: (NexusModel) -> Unit,
     onAllModels: () -> Unit,
-    onOpenFlow: () -> Unit,
     onVariants: (CatalogModelGroup) -> Unit = {onAllModels()},
 ) {
     val animate = rememberSystemAnimatorsEnabled()

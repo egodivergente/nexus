@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 /**
  * Lote desde archivo: lee prompts de un CSV, TXT o Excel y lanza un trabajo por prompt con el modelo
  * y ajustes actuales del Lienzo. El botón muestra el número de trabajos y el coste total estimado;
- * pulsarlo es la confirmación del lote (Flow utiliza las condiciones de tu cuenta).
+ * pulsarlo es la confirmación del lote.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,7 +59,6 @@ internal fun PromptBatchSheet(state:CreateUiState,unitCost:String,unitUsd:Double
         }
     }
     val model=state.selectedModel
-    val isFlow=model?.providerId=="google_flow"
     val readiness=creationReadiness(state.copy(prompt=prompts.firstOrNull() ?: "x"))
     val sending=progress!=null
     ModalBottomSheet(onDismissRequest={if(!sending) onDismiss()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
@@ -89,7 +88,6 @@ internal fun PromptBatchSheet(state:CreateUiState,unitCost:String,unitUsd:Double
             if (attempted && !sending) Text("Revisa los trabajos enviados en Historial antes de iniciar otro lote.",style=MaterialTheme.typography.bodyMedium)
             if(prompts.isNotEmpty() && !readiness.canSubmit) readiness.message?.let {Text(it,style=MaterialTheme.typography.labelMedium)}
             val total=when {
-                isFlow -> "cuenta de Flow"
                 unitUsd!=null -> "${prompts.size} × $unitCost"
                 else -> "coste por trabajo: $unitCost"
             }

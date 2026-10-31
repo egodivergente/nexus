@@ -50,7 +50,7 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                         .semantics { contentDescription=screen.title }
                         .selectable(selected=selected,role=Role.Tab,onClick={
                             if(currentRoute!=screen.route) {
-                            // Settings/Flow are pushed over the current tab. Return to that exact
+                            // Settings is pushed over the current tab. Return to that exact
                             // tab when possible; restoring a saved tab stack here could put Settings
                             // back on top and make the tab appear not to respond.
                             if(onSelect!=null) onSelect(screen) else {

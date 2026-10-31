@@ -2,7 +2,6 @@ package com.vidadomu.nexus.ui.create
 
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.provider.atlas.*
-import com.vidadomu.nexus.provider.flow.FlowReferences
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -61,15 +60,6 @@ class CanvasInputPlanTest {
         val fields=CanvasInputPlan.fields(model)
         assertEquals(listOf(MediaSlotType.PRIMARY_IMAGE,MediaSlotType.LAST_FRAME),fields.map {it.slot})
         assertEquals(listOf(true,false),fields.map {it.required})
-    }
-
-    @Test fun flowVideoOnlyShowsInputsForItsSelectedMode() {
-        val model=FlowReferences.model(Modality.VIDEO)
-        assertTrue(CanvasInputPlan.fields(model,mapOf("mode" to "Texto")).isEmpty())
-        assertEquals(listOf("initial_frame","end_frame"),CanvasInputPlan.fields(model,mapOf("mode" to "Fotogramas")).map {it.key})
-        val refs=CanvasInputPlan.fields(model,mapOf("mode" to "Referencias")).single()
-        assertEquals("reference_ids",refs.key)
-        assertTrue(refs.maximum>1)
     }
 
     @Test fun textOnlySchemaDoesNotOfferMediaEvenWithStaleCatalogHints() {

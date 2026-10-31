@@ -2,7 +2,6 @@ package com.vidadomu.nexus.ui.create.capability
 
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.provider.atlas.NativeModelSchema
-import com.vidadomu.nexus.provider.flow.FlowReferences
 import com.vidadomu.nexus.ui.create.CreateUiState
 import com.vidadomu.nexus.ui.create.creationReadiness
 import kotlinx.serialization.json.*
@@ -11,9 +10,15 @@ import org.junit.Test
 
 /** Uses the repository's reviewed provider snapshots; never calls a provider or generates media. */
 class CapabilityDrivenUiTest {
+    private fun declaredAdapter() = NexusModel("local_adapter_image", "Adaptador local · Imagen", "mock_provider", organization = "Fixture",
+        modalities = listOf(Modality.IMAGE), capabilities = listOf(ModelCapability.TEXT_TO_IMAGE, ModelCapability.IMAGE_TO_IMAGE),
+        parameters = listOf(ModelParameter("count", "Resultados solicitados", ParameterType.INTEGER, "4", minValue = 1f, maxValue = 40f, nativeType = "integer")),
+        inputMode = ModelInputMode.MULTI_IMAGE, imagesArrayField = "reference_ids", supportsImageInput = true, supportsReferenceImages = true,
+        maxImages = Int.MAX_VALUE, isMediaRequired = false,
+        contractMedia = listOf(ContractMediaField("reference_ids", "Imágenes de referencia", "image/*", required = false, maximum = Int.MAX_VALUE, encoding = "array")))
     @Test fun malformedAdapterStepsAreUnknownRatherThanSilentlyIgnored() {
         for(step in listOf(0f,-1f,Float.NaN,Float.POSITIVE_INFINITY)) {
-            val model=FlowReferences.model(Modality.IMAGE).copy(parameters=listOf(
+            val model=declaredAdapter().copy(parameters=listOf(
                 ModelParameter("duration","Duración",ParameterType.FLOAT,step=step)))
             val cap=capabilities(model)
             assertEquals(CapabilitySupport.UNKNOWN,cap.support)
@@ -270,7 +275,7 @@ class CapabilityDrivenUiTest {
     }
 
     @Test fun declaredNonAtlasAdapterRemainsUsableWithoutInventedRemoteVerification() {
-        val model = FlowReferences.model(Modality.IMAGE)
+        val model = declaredAdapter()
         val cap = capabilities(model)
         assertEquals(CapabilitySupport.CONFIRMED, cap.support)
         assertEquals(CapabilityVerification.DECLARED_ADAPTER, cap.provenance.verification)
