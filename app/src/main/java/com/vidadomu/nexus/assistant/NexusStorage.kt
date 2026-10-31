@@ -32,7 +32,8 @@ internal object NexusStorage {
     }.getOrDefault(false)
 
     private fun scan(app: Context) = dataDir(app).let { dir ->
-        StorageScan(dir, app.packageName, setOfNotNull(StorageScan.activeConversation(dir)),
+        // The open chat is read on every check: one opened during the cleanup is never rewritten.
+        StorageScan(dir, app.packageName, { setOfNotNull(StorageScan.activeConversation(dir)) },
             linkCount = { file -> android.system.Os.stat(file.path).st_nlink.toInt() }, databaseText = ::databaseText)
     }
 
@@ -46,19 +47,30 @@ internal object NexusStorage {
         StorageCleanup(scan(app), runtime(app).hashes).analyse(indexText(app), cancelled = { job?.isActive == false }, progress = progress)
     }
 
+    /** True while «Liberar» runs: imports then keep their own copy instead of reusing one that may be going away. */
+    @Volatile var running = false
+        private set
+
+    /** Copies a cleanup moved aside when the app was closed in the middle go back to their place. Called at start-up. */
+    fun restorePending(app: Context) = runCatching { StorageCleanup.restorePending(dataDir(app)) }.getOrDefault(0)
+
     /**
-     * Waits for any Drive copy in progress and for the chat to finish saving, then frees [analysis]. The scan is made
-     * again inside both locks, so a chat opened since the analysis is treated as open (never rewritten).
+     * Waits for any Drive copy and peer sync in progress and holds them for the whole run; chat saves are paused only
+     * while saved chats are rewritten. Then frees [analysis] (see [StorageCleanup.free] for the order and checks).
      */
     suspend fun free(app: Context, analysis: StorageAnalysis): CleanupResult = withContext(Dispatchers.IO) {
         NexusDriveSync.gate.withLock {
-            AssistantChatStore.exclusive {
-                val runtime = runtime(app)
-                StorageCleanup(scan(app), runtime.hashes).free(analysis.plan,
-                    rewriteIndex = { transform -> runtime.assets.rewriteReferences(transform) },
-                    indexText = { indexText(app) },
-                    reportDir = File(app.filesDir, "storage"),
-                    rewriteOther = { transform -> rewriteRecent(app, transform) })
+            com.vidadomu.nexus.sync.DeviceSync.get(app).exclusive {
+                running = true
+                try {
+                    val runtime = runtime(app)
+                    StorageCleanup(scan(app), runtime.hashes).free(analysis.plan,
+                        rewriteIndex = { transform -> runtime.assets.rewriteReferences(transform) },
+                        indexText = { indexText(app) },
+                        reportDir = File(app.filesDir, "storage"),
+                        rewriteOther = { transform -> rewriteRecent(app, transform) },
+                        chatsPaused = { block -> AssistantChatStore.exclusive { block() } })
+                } finally { running = false }
             }
         }
     }

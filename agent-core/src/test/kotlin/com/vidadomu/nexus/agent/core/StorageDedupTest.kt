@@ -280,4 +280,53 @@ class StorageDedupTest {
         assertTrue(analysis.plan.removals.isEmpty())
         assertEquals(x.bytes.length.toLong() * 2 + x.bytes.length / 2, analysis.usage.single { it.area == StorageArea.ATTACHMENTS }.bytes + analysis.usage.single { it.area == StorageArea.EXPORTS }.bytes)
     }
+
+    @Test fun aCacheOrDraftCopyIsNeverTheOneThatStays() {
+        val cache = f("cache/camera_1.jpg", StorageArea.CACHE, length = 7)
+        val draft = f("files/draft_media/nexus_media_1.jpg", StorageArea.DRAFTS, length = 7)
+        val attachment = f("files/agent_media/agent_1.jpg", StorageArea.ATTACHMENTS, length = 7)
+        val plan = DuplicatePlanner.plan(listOf(cache, draft, attachment), emptySet())
+        assertTrue(plan.removals.isEmpty())
+        assertEquals(2, plan.protectedCopies)
+        val onlyTemporary = DuplicatePlanner.plan(listOf(cache, draft), emptySet())
+        assertTrue(onlyTemporary.removals.isEmpty()); assertEquals(1, onlyTemporary.protectedCopies)
+    }
+
+    @Test fun damagedIndexWithoutBackupStillFailsAndIsLeftUntouched() {
+        val dir = root(); val file = File(dir, "index.json")
+        file.writeText("{\"projects\": [ trunc")
+        assertFails { AssetIndex(file) }
+        assertEquals("{\"projects\": [ trunc", file.readText())
+        assertEquals(listOf("index.json"), dir.list()!!.toList())
+    }
+
+    @Test fun aMentionWrittenWhileCopiesAreAsideBringsThemBack() = runTest {
+        val x = Fixture(root(), pkg)
+        x.index.addAsset(Asset("a", "file:///data/user/0/$pkg/files/agent_media/agent_2.mp4", AssetType.VIDEO, displayName = "Plano.mp4", createdAt = 1))
+        val plan = x.cleanup.analyse(x.encoded()).plan
+        // linkCount runs while each copy is being set aside: a draft starts using the file at that moment.
+        val scan = StorageScan(x.dir, pkg, setOf("open"), linkCount = { x.write("shared_prefs/nexus_creation_v1.xml", "agent_2.mp4"); 1 }) { sequenceOf(it.readText(Charsets.ISO_8859_1)) }
+        val result = StorageCleanup(scan, x.hashes).free(plan, { t -> x.index.rewriteReferences(t) }, x::encoded, File(x.dir, "files/storage"))
+        assertEquals(0, result.removed); assertTrue(x.other.isFile)
+        assertTrue(result.report!!.readText().contains("mentioned_during_cleanup"))
+        assertFalse(File(x.dir, "files/storage/pending.json").exists())
+    }
+
+    @Test fun copiesLeftAsideByACrashAreRestored() {
+        val dir = root()
+        val aside = File(dir, "files/storage/pending/1-agent_9.mp4").apply { parentFile.mkdirs(); writeText("bytes") }
+        File(dir, "files/storage/pending.json").writeText("""{"files/storage/pending/1-agent_9.mp4":"files/agent_media/agent_9.mp4"}""")
+        assertEquals(1, StorageCleanup.restorePending(dir))
+        assertEquals("bytes", File(dir, "files/agent_media/agent_9.mp4").readText())
+        assertFalse(aside.exists()); assertFalse(File(dir, "files/storage/pending.json").exists())
+    }
+
+    @Test fun theIndexBackupIsRewrittenToo() = runTest {
+        val x = Fixture(root(), pkg)
+        x.index.addAsset(Asset("a", "file:///data/user/0/$pkg/files/agent_media/agent_2.mp4", AssetType.VIDEO, displayName = "Plano.mp4", createdAt = 1))
+        x.index.addAsset(Asset("b", "https://example.com/x.png", AssetType.IMAGE, displayName = "x.png", createdAt = 2))
+        val result = x.free(x.cleanup.analyse(x.encoded()).plan)
+        assertEquals(1, result.removed)
+        assertFalse(AssetIndex.backupOf(File(x.dir, "files/assistant/index.json")).readText().contains("agent_2.mp4"))
+    }
 }

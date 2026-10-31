@@ -134,7 +134,7 @@ data class IndexData(
 
 data class PeerIndexMerge(val snapshot: IndexData, val conflicts: List<String>)
 
-/** [source]: file the index was restored from (null: started empty). [quarantined]: name the unreadable file was kept as. */
+/** [source]: file the index was restored from. [quarantined]: name the unreadable file was kept as. */
 data class IndexRecovery(val source: String?, val quarantined: String?, val reason: String)
 
 @Serializable
@@ -547,11 +547,13 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
             if (file.isFile) {
                 val error = runCatching { JSON.decodeFromString<IndexData>(file.readText()) }
                 error.getOrNull()?.let { return Loaded(it, null, true) }
+                // Without a readable previous copy, fail as before. Starting empty would let Drive and peer sync take
+                // the empty library as «everything was deleted» and spread it; the damaged file stays untouched.
+                val previous = read(backup) ?: throw error.exceptionOrNull()!!
                 val aside = File(file.parentFile, file.name + ".corrupt-" + clock())
                 val moved = runCatching { java.nio.file.Files.move(file.toPath(), aside.toPath()) }.isSuccess
                 val reason = error.exceptionOrNull()?.javaClass?.simpleName ?: "error"
-                read(backup)?.let { return Loaded(it, IndexRecovery(backup.name, aside.name.takeIf { moved }, reason), false) }
-                return Loaded(IndexData(), IndexRecovery(null, aside.name.takeIf { moved }, reason), false)
+                return Loaded(previous, IndexRecovery(backup.name, aside.name.takeIf { moved }, reason), false)
             }
             // index.json missing: an interrupted save leaves the newer complete .tmp and the previous .bak.
             read(pending)?.let { return Loaded(it, IndexRecovery(pending.name, null, "interrupted_save"), false) }

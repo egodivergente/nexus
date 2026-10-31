@@ -40,6 +40,8 @@ class DeviceSync private constructor(private val app: NexusApplication) {
     private val blobs = File(root, "blobs").apply { mkdirs() }
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val mutex = Mutex()
+    /** «Liberar espacio» holds this so no peer exchange records a file while copies are being removed. */
+    internal suspend fun <T> exclusive(block: suspend () -> T): T = mutex.withLock { block() }
     private val sources = java.util.concurrent.ConcurrentHashMap<String, File>()
     private val secretSources = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
     @Volatile private var agyAvailable = false

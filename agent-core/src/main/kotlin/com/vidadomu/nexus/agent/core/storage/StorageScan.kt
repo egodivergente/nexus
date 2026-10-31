@@ -15,8 +15,12 @@ import java.io.File
  * [databaseText] turns a database file into its text and blob contents (SQLite on Android, raw bytes elsewhere).
  * [linkCount] returns a file's hard link count (Os.stat on Android).
  */
-class StorageScan(val dataDir: File, packageName: String, private val openConversations: Set<String>,
+class StorageScan(val dataDir: File, packageName: String, private val openConversations: () -> Set<String>,
                   private val linkCount: (File) -> Int = { 1 }, private val databaseText: (File) -> Sequence<String>) {
+    /** [openConversations] fixed at construction (tests, dry runs); Android reads chat-v1.json on every check. */
+    constructor(dataDir: File, packageName: String, openConversations: Set<String>, linkCount: (File) -> Int = { 1 },
+                databaseText: (File) -> Sequence<String>) : this(dataDir, packageName, { openConversations }, linkCount, databaseText)
+
     val references = MediaReferences(packageName)
 
     /** [links] > 1: a hard link (a renamed export keeps its old name that way). Never removed: it frees nothing. */
@@ -49,7 +53,7 @@ class StorageScan(val dataDir: File, packageName: String, private val openConver
         }
     }
 
-    private fun isText(file: File) = file.extension.lowercase() in setOf("json", "xml", "txt", "md", "csv", "html", "enc", "skill", "yaml", "yml")
+    private fun isText(file: File) = file.extension.lowercase() in setOf("json", "xml", "txt", "md", "csv", "html", "enc", "skill", "yaml", "yml", "bak")
     private fun isDatabase(file: File) = file.name.endsWith(".db") || file.name.endsWith(".db-wal") || file.name.endsWith("workdb") || file.name.endsWith("workdb-wal")
 
     fun ignored(path: String): Boolean =
@@ -57,10 +61,12 @@ class StorageScan(val dataDir: File, packageName: String, private val openConver
             path.startsWith("files/storage/") || path.startsWith("files/device-sync/conflicts/") ||
             // Last-use time per URI, only to sort the media picker; the app moves those entries itself (RECENT_MEDIA).
             path == "shared_prefs/$RECENT_MEDIA.xml" ||
-            Regex("files/assistant/index\\.json(\\.bak|\\.tmp|\\.corrupt-\\d+)?").matches(path)
+            Regex("files/assistant/index\\.json(\\.tmp|\\.corrupt-\\d+)?").matches(path)
 
     fun rewritable(path: String): Boolean {
-        Regex("files/assistant/conversations/([A-Za-z0-9_-]+)\\.json").matchEntire(path)?.let { return it.groupValues[1] !in openConversations }
+        Regex("files/assistant/conversations/([A-Za-z0-9_-]+)\\.json").matchEntire(path)?.let { return it.groupValues[1] !in openConversations() }
+        // The previous library index (kept by every save): rewritten too, so a recovery never points to removed copies.
+        if (path == "files/assistant/index.json.bak") return true
         return path.startsWith("files/assistant/migration-v2-originals/") && path.endsWith(".json")
     }
 

@@ -2,6 +2,8 @@ package com.vidadomu.nexus.agent.core.storage
 
 import java.io.File
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 data class AreaUsage(val area: StorageArea, val files: Int, val bytes: Long)
@@ -16,13 +18,15 @@ data class CleanupResult(val removed: Int, val bytes: Long, val kept: Int, val r
 /**
  * «Liberar espacio»: removes exact duplicate copies that Nexus made of the same file, keeping one.
  *
- * Order in [free], with every writer of conversations and Drive sync held by the caller:
+ * Order in [StorageCleanup.free], with Drive sync and peer sync held by the caller:
  * 1. A removal is dropped if its file or the copy that stays changed since the analysis.
- * 2. The library index and the saved conversations that are not open are rewritten to point to the copy that stays
- *    (identical bytes, so nothing that opens them can tell).
- * 3. Every store is read again. A copy whose path is still referenced, or whose name appears in a store Nexus cannot
- *    rewrite (preferences, databases, open chats, peer sync...), is kept.
- * 4. Only then are files deleted, and a report of each one (path, copy kept, size, SHA-256) is written.
+ * 2. The library index, its backup and the saved conversations that are not open are rewritten to point to the copy
+ *    that stays (identical bytes, so nothing that opens them can tell). Chat saves are paused only for this step.
+ * 3. Every store is read again; a copy still referenced, or whose name appears in a store Nexus cannot rewrite
+ *    (preferences, databases, open chats, drafts, background jobs, peer sync...), is kept.
+ * 4. The rest are moved aside (`files/storage/pending/`), every store is read once more, and only copies nobody
+ *    mentioned in between are deleted; the others go back. A crash leaves `pending.json`, and [restorePending] puts the
+ *    files back on the next start. A report of each file (path, copy kept, size, SHA-256) is written.
  */
 class StorageCleanup(private val scan: StorageScan, private val hashes: ContentHashes, private val clock: () -> Long = System::currentTimeMillis) {
 
@@ -55,7 +59,9 @@ class StorageCleanup(private val scan: StorageScan, private val hashes: ContentH
      * to stores only the app can edit safely (the picker's last-use order).
      */
     suspend fun free(plan: DuplicatePlan, rewriteIndex: suspend ((String) -> String) -> Int, indexText: () -> String, reportDir: File,
-                     rewriteOther: suspend ((String) -> String) -> Int = { 0 }): CleanupResult {
+                     rewriteOther: suspend ((String) -> String) -> Int = { 0 },
+                     chatsPaused: suspend (suspend () -> Unit) -> Unit = { it() }): CleanupResult {
+        restorePending(scan.dataDir)
         val entries = ArrayList<Entry>()
         fun keep(removal: Removal, reason: String) { entries += Entry(removal.file.path, removal.keep.path, removal.file.length, removal.file.sha256, reason) }
         fun unchanged(stored: StoredFile): Boolean {
@@ -75,25 +81,50 @@ class StorageCleanup(private val scan: StorageScan, private val hashes: ContentH
             val transform = { value: String -> scan.references.rewrite(value, replacements).first }
             rewrites += rewriteIndex(transform)
             rewrites += rewriteOther(transform)
-            for (file in scan.rewritableFiles()) rewrites += rewriteFile(file, replacements)
+            chatsPaused { for (file in scan.rewritableFiles()) rewrites += rewriteFile(file, replacements) }
         }
         // Read everything again after the rewrite: anything that still mentions a copy keeps it.
-        val fixed = if (valid.isEmpty()) emptySet() else scan.fixedNames()
-        val stillReferenced = if (valid.isEmpty()) emptySet() else scan.referenced(sequenceOf(indexText()))
-        var removed = 0; var bytes = 0L
+        fun mentioned(): (Removal) -> String? {
+            val fixed = scan.fixedNames(); val referenced = scan.referenced(sequenceOf(indexText()))
+            return { r -> when { DuplicatePlanner.name(r.file.path) in fixed -> "mentioned_in_fixed_store"; r.file.path in referenced -> "still_referenced"; else -> null } }
+        }
+        val nothing: (Removal) -> String? = { null }
+        val first = if (valid.isEmpty()) nothing else mentioned()
+        val pendingDir = File(scan.dataDir, PENDING_DIR)
+        val staged = ArrayList<Pair<Removal, File>>()
+        val manifest = LinkedHashMap<String, String>()
         for (removal in valid) {
             val file = File(scan.dataDir, removal.file.path)
-            when {
-                DuplicatePlanner.name(removal.file.path) in fixed -> keep(removal, "mentioned_in_fixed_store")
-                removal.file.path in stillReferenced -> keep(removal, "still_referenced")
-                scan.links(file) > 1 -> keep(removal, "hard_link")
-                !unchanged(removal.keep) -> keep(removal, "kept_copy_changed")
-                !file.delete() -> keep(removal, "delete_failed")
-                else -> {
-                    hashes.forget(file); removed++; bytes += removal.file.length
-                    entries += Entry(removal.file.path, removal.keep.path, removal.file.length, removal.file.sha256, "removed")
-                }
+            val reason = first(removal) ?: when {
+                scan.links(file) > 1 -> "hard_link"
+                !unchanged(removal.keep) -> "kept_copy_changed"
+                else -> null
             }
+            if (reason != null) { keep(removal, reason); continue }
+            pendingDir.mkdirs()
+            val aside = File(pendingDir, "${clock()}-${staged.size}-${file.name}")
+            if (aside.exists()) { keep(removal, "move_failed"); continue }
+            manifest[scan.relative(aside)] = removal.file.path
+            writeManifest(scan.dataDir, manifest)
+            if (!file.renameTo(aside)) { manifest.remove(scan.relative(aside)); keep(removal, "move_failed"); continue }
+            staged += removal to aside
+        }
+        var removed = 0; var bytes = 0L
+        if (staged.isNotEmpty()) {
+            val last = mentioned()
+            for ((removal, aside) in staged) {
+                val reason = last(removal)
+                val original = File(scan.dataDir, removal.file.path)
+                if (reason != null) {
+                    keep(removal, if (aside.renameTo(original)) "mentioned_during_cleanup" else "restore_failed_see_pending")
+                    if (original.isFile) manifest.remove(scan.relative(aside))
+                } else if (aside.delete()) {
+                    manifest.remove(scan.relative(aside))
+                    hashes.forget(original); removed++; bytes += removal.file.length
+                    entries += Entry(removal.file.path, removal.keep.path, removal.file.length, removal.file.sha256, "removed")
+                } else keep(removal, "delete_failed_see_pending")
+            }
+            writeManifest(scan.dataDir, manifest)
         }
         runCatching { hashes.flush() }
         val report = runCatching {
@@ -127,5 +158,33 @@ class StorageCleanup(private val scan: StorageScan, private val hashes: ContentH
 
     companion object {
         private val JSON = Json { prettyPrint = true }
+        private const val PENDING_DIR = "files/storage/pending"
+        private const val MANIFEST = "files/storage/pending.json"
+        private val MAP = MapSerializer(String.serializer(), String.serializer())
+
+        private fun writeManifest(dataDir: File, entries: Map<String, String>) {
+            val target = File(dataDir, MANIFEST)
+            if (entries.isEmpty()) { target.delete(); return }
+            target.parentFile?.mkdirs()
+            val temporary = File(target.parentFile, target.name + ".tmp")
+            java.io.FileOutputStream(temporary).use { it.write(JSON.encodeToString(MAP, entries).toByteArray(Charsets.UTF_8)); it.fd.sync() }
+            java.nio.file.Files.move(temporary.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+
+        /** Puts back copies a cleanup moved aside and could not finish (the app was closed in the middle). Returns how many. */
+        fun restorePending(dataDir: File): Int {
+            val target = File(dataDir, MANIFEST)
+            if (!target.isFile) return 0
+            val entries = runCatching { JSON.decodeFromString(MAP, target.readText()) }.getOrNull() ?: return 0
+            var restored = 0; val left = LinkedHashMap<String, String>()
+            for ((aside, original) in entries) {
+                val from = File(dataDir, aside); val to = File(dataDir, original)
+                if (!from.isFile) continue
+                to.parentFile?.mkdirs()
+                if (!to.exists() && from.renameTo(to)) restored++ else left[aside] = original
+            }
+            writeManifest(dataDir, left)
+            return restored
+        }
     }
 }
