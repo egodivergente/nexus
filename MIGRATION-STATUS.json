@@ -1,4 +1,23 @@
 ﻿{
+    "generatorSelection20261101": {
+        "branch": "codex/generator-selection-20261101",
+        "baseCommit": "42914c91a53f03b86077dc53eb7877e15ce145d7",
+        "sourceCommit": "e773482285fce178f6927caf450456f385024678",
+        "versionCode": 176,
+        "versionName": "1.9.140-agent-preview",
+        "buildHost": "AWS_CODEBUILD",
+        "buildId": "vidal-android-build:18b242e9-19f1-4745-b2e2-6f805dd81a77",
+        "unitTests": {"total": 874, "failed": 6, "curatedVideoSelectionTestPassed": 9, "preexistingFailuresConfirmedOnBase": "vidal-android-build:9b57dcdc-5467-4e19-9744-f5b6aa40c777"},
+        "apkSha256": "c05d2f2b91914fe71a4d04158620f90641b9463bfaf0306cf1869da16a32bb8c",
+        "signingCertSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "s25InstalledAsUpdate": true,
+        "installedHashVerified": true,
+        "unchangedAppDataFiles": 39,
+        "launchVerified": true,
+        "luma": "descartado por el usuario (2026-11-01)",
+        "paidGenerationTested": false,
+        "report": "docs/GENERATOR_SELECTION_20261101.md"
+    },
     "byteplusSeedance25_20261101": {
         "branch": "codex/byteplus-seedance25-20261101",
         "sourceCommit": "fc100bf6bf7f11bc9ff9a3e50cc234e071723076",

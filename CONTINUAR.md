@@ -1,3 +1,17 @@
+# Seleccion de generadores vc176 - 01/11/2026
+
+Rama `codex/generator-selection-20261101` sobre `42914c9`. Fuente APK
+`e773482285fce178f6927caf450456f385024678`. Catalogo de video recortado a la
+seleccion acordada (sin texto a video), herramientas movidas a Herramientas,
+BytePlus ultimo en automatico y primero si se elige a mano. Luma descartado por
+el usuario. AWS CodeBuild `18b242e9`: 874 pruebas, 868 PASS; las 6 que fallan ya
+fallaban en la base (build `9b57dcdc`). APK 1.9.140-agent-preview / vc176
+firmada con la identidad existente, SHA256 c05d2f2b...bb8c, instalada como
+actualizacion en SM-S938B; hash instalado comprobado, 39 ficheros de datos
+identicos, arranque correcto. Sin generaciones de pago. Detalle y limites en
+`docs/GENERATOR_SELECTION_20261101.md`.
+
+
 # BytePlus Seedance 2.5 vc175 - 01/11/2026
 
 Rama `codex/byteplus-seedance25-20261101`, basada en vc173 instalado en S25.
