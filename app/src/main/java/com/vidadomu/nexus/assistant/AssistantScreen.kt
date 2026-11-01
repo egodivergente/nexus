@@ -293,7 +293,8 @@ fun AssistantScreen(
                 }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
             // Vidal 01-11 (vídeo, 00:26): el texto no se corta en seco a 56 dp; la lista llega hasta arriba y se
-            // desvanece con un degradado suave bajo los iconos flotantes. El primer mensaje sigue empezando debajo.
+            // desvanece con un degradado suave bajo los iconos flotantes. El primer mensaje sigue empezando debajo:
+            // el degradado acaba justo en 56 dp (donde empieza el contenido en reposo) para no atenuar el primer mensaje.
             LazyColumn(Modifier.fillMaxSize()
                 .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                 .drawWithContent {
@@ -304,7 +305,7 @@ fun AssistantScreen(
                         .50f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f),
                         .78f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .86f),
                         1f to androidx.compose.ui.graphics.Color.Black,
-                        startY = 0f, endY = 96.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                        startY = 0f, endY = 56.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
                 }, state = listState,
                 contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 56.dp,
                     // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.

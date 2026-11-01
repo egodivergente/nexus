@@ -252,6 +252,14 @@ internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, 
     }
     var preview by remember { mutableStateOf<LibraryPick?>(null) }
     var previewCenterX by remember { mutableIntStateOf(0) }
+    // A preview opened by the S Pen closes only after the pen has left both the thumbnail and the preview for a moment,
+    // so the pen can travel up from the thumbnail and tap the preview. A long-press preview stays until dismissed.
+    var hoverThumb by remember { mutableStateOf<LibraryPick?>(null) }
+    var hoverPopup by remember { mutableStateOf(false) }
+    var openedByHover by remember { mutableStateOf(false) }
+    LaunchedEffect(hoverThumb, hoverPopup, openedByHover) {
+        if (openedByHover && hoverThumb == null && !hoverPopup) { delay(350); preview = null; openedByHover = false }
+    }
     Box(modifier.fillMaxWidth()) {
         LazyRow(contentPadding = PaddingValues(horizontal = NexusTokens.space12), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(recent, key = { it.jobId + ":" + it.outputId }) { pick ->
@@ -259,11 +267,12 @@ internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, 
                 StageThumbnail(pick.uri, pick.video, null, Modifier.size(64.dp)
                     .onGloballyPositioned { centerX = it.boundsInWindow().center.x.roundToInt() }
                     .onStylusHover { inside ->
-                        if (inside) { previewCenterX = centerX; preview = pick } else if (preview == pick) preview = null
+                        if (inside) { previewCenterX = centerX; preview = pick; openedByHover = true; hoverThumb = pick }
+                        else if (hoverThumb == pick) hoverThumb = null
                     }
                     .clip(RoundedCornerShape(12.dp))
                     .combinedClickable(enabled = enabled, onLongClickLabel = "Vista previa",
-                        onLongClick = { previewCenterX = centerX; preview = pick },
+                        onLongClick = { previewCenterX = centerX; preview = pick; openedByHover = false },
                         onClick = { preview = null; onPick(pick.jobId, pick.outputId) })
                     .semantics { contentDescription = "Adjuntar de la Biblioteca: ${pick.label}" })
             }
@@ -284,7 +293,9 @@ internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, 
             val gap = with(LocalDensity.current) { NexusTokens.space8.roundToPx() }
             Popup(popupPositionProvider = remember(previewCenterX, gap) { AboveAnchorPosition(previewCenterX, gap) },
                 onDismissRequest = { preview = null }, properties = PopupProperties(focusable = false, dismissOnClickOutside = true)) {
-                LibraryHoverPreview(pick, onClick = { preview = null; if (enabled) onPick(pick.jobId, pick.outputId) })
+                DisposableEffect(Unit) { onDispose { hoverPopup = false } }
+                LibraryHoverPreview(pick, onClick = { preview = null; if (enabled) onPick(pick.jobId, pick.outputId) },
+                    modifier = Modifier.onStylusHover { hoverPopup = it })
             }
         }
     }
@@ -292,10 +303,10 @@ internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, 
 
 /** Large preview of one recent item, shown above the strip; it fits the whole frame instead of cropping it. */
 @Composable
-private fun LibraryHoverPreview(pick: LibraryPick, onClick: () -> Unit) {
+private fun LibraryHoverPreview(pick: LibraryPick, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Surface(onClick = onClick, shape = NexusTokens.card, shadowElevation = 12.dp, color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        modifier = Modifier.width(248.dp).semantics { contentDescription = "Vista previa: ${pick.label}. Toca para adjuntar" }) {
+        modifier = modifier.width(248.dp).semantics { contentDescription = "Vista previa: ${pick.label}. Toca para adjuntar" }) {
         Column {
             Box(Modifier.fillMaxWidth().height(280.dp).background(Color.Black), contentAlignment = Alignment.Center) {
                 AsyncImage(remember(pick.uri, pick.video) {

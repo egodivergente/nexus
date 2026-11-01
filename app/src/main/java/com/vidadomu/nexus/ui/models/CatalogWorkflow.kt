@@ -93,10 +93,13 @@ internal fun workflowRoutes(group:CatalogModelGroup, order: List<String> = defau
     val byTask=group.routes.flatMap {model -> catalogWorkflows(model).map {it to model}}.groupBy({it.first},{it.second})
     // An image-to-video route whose last frame is optional also animates one image. When another provider of the same
     // model only offers «Animar imagen», both meet there with a provider choice (Vidal 01-11: Atlas Cloud y Crun).
+    // Only providers missing from «Animar imagen» join it, so a provider that already animates never shows twice.
     val animate=byTask[CatalogWorkflow.ANIMATE]
     val frames=byTask[CatalogWorkflow.FRAMES]
+    val animateProviders=animate.orEmpty().map {it.providerId}.toSet()
     val tasks=if(animate==null || frames==null) byTask else byTask+(CatalogWorkflow.ANIMATE to animate+frames.filter {route ->
-        route !in animate && IMAGE_INPUT_ROUTE.containsMatchIn(listOfNotNull(route.providerModelId,route.id).joinToString("/").lowercase())})
+        route !in animate && route.providerId !in animateProviders &&
+            IMAGE_INPUT_ROUTE.containsMatchIn(listOfNotNull(route.providerModelId,route.id).joinToString("/").lowercase())})
     return tasks.toSortedMap(compareBy<CatalogWorkflow> {order.indexOf(workflowOrderKey(it)).takeIf {i->i>=0} ?: Int.MAX_VALUE}.thenBy {it.ordinal})
 }
 
