@@ -1,4 +1,19 @@
 ﻿{
+    "byteplusSeedance25_20261101": {
+        "branch": "codex/byteplus-seedance25-20261101",
+        "sourceCommit": "fc100bf6bf7f11bc9ff9a3e50cc234e071723076",
+        "versionCode": 175,
+        "versionName": "1.9.139-agent-preview",
+        "buildHost": "AWS_CODEBUILD",
+        "buildId": "vidal-android-build:8990e640-98b1-4b13-be0c-40848c0dcaad",
+        "focusedTestsPassed": 6,
+        "apkSha256": "532b55afd4091a3672e8fdd4c8ecb6715de5b4e55a6fac26a8fe1a2d354d733c",
+        "s25InstalledAndLiveCatalogVerified": true,
+        "unchangedPreferenceFingerprints": 10,
+        "pixelUpdated": false,
+        "paidGenerationTested": false,
+        "report": "docs/BYTEPLUS_SEEDANCE_25.md"
+    },
     "chatVisualHierarchy20261030": {
         "branch": "codex/chat-visual-hierarchy-20261030",
         "sourceCommit": "d481edde8363a6e988f284814f44c8dcd1bd3619",

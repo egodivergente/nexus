@@ -1,3 +1,17 @@
+# BytePlus Seedance 2.5 vc175 - 01/11/2026
+
+Rama `codex/byteplus-seedance25-20261101`, basada en vc173 instalado en S25.
+Fuente APK `fc100bf6bf7f11bc9ff9a3e50cc234e071723076`. Build y seis pruebas
+especificas PASS en AWS CodeBuild. APK 1.9.139-agent-preview / vc175 instalada
+como actualizacion en SM-S938B; hash instalado, certificado y tres ARM64 originales
+comprobados. Catalogo real devuelve Seedance 2.5 texto y desde imagen en BytePlus.
+Diez preferencias (incluidas claves cifradas y borradores) intactas; historial,
+proyectos y recursos cargados conservan sus cantidades. Sin generaciones de pago.
+No incorpora los cambios de almacenamiento vc174 de la otra rama. Detalle y
+limites en `docs/BYTEPLUS_SEEDANCE_25.md`. Pixel no actualizado en esta tarea.
+
+---
+
 # Chat: jerarquia visual vc172 - 30/10/2026
 
 Rama codex/chat-visual-hierarchy-20261030. Fuente APK d481edde8363a6e988f284814f44c8dcd1bd3619 publicada/verificada. APK1.9.136-agent-preview vc172 compilada en AXELPC,32pruebas ejecutadas PASS(9app+23core),firma existente/16KiB/5ARM64 intactas. SHA256 dd1acf5241e699ca97de9ca55ef98b781b9607e279d76eb31ad13be0760a26ef.
