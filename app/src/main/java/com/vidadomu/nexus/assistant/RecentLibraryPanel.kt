@@ -14,7 +14,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,7 +63,9 @@ internal fun LibraryAttachmentButton(
     onCamera: (() -> Unit)? = null, onLive: (() -> Unit)? = null,
     additionalOptions: @Composable () -> Unit = {},
 ) {
-    // Un solo «+»: abre el menú con archivos, cámara, recientes y conversación por voz.
+    // Un solo «+»: abre el menú con archivos, cámara, Biblioteca y conversación por voz.
+    // Vidal 01-11 (vídeo, 02:26): cada opción hace una sola cosa. «Archivo o galería» abre directamente el selector
+    // del móvil (antes pasaba por otra hoja con un segundo «Importar») y la Biblioteca aparece una sola vez.
     var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Box {
         Box(Modifier.size(NexusTokens.minimumTouch)
@@ -77,7 +79,7 @@ internal fun LibraryAttachmentButton(
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(text = { Text("Archivo o galería") }, leadingIcon = { Icon(Icons.Default.AttachFile, null) }, onClick = { menu = false; onAttach() })
             onCamera?.let { DropdownMenuItem(text = { Text("Hacer una foto") }, leadingIcon = { Icon(Icons.Default.PhotoCamera, null) }, onClick = { menu = false; it() }) }
-            onShowLibrary?.let { DropdownMenuItem(text = { Text("Recientes de la Biblioteca") }, leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) }, onClick = { menu = false; it() }) }
+            onShowLibrary?.let { DropdownMenuItem(text = { Text("Biblioteca") }, leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) }, onClick = { menu = false; it() }) }
             onLive?.let { DropdownMenuItem(text = { Text("Conversación por voz") }, leadingIcon = { Icon(Icons.Default.GraphicEq, null) }, onClick = { menu = false; it() }) }
             HorizontalDivider()
             additionalOptions()
@@ -94,11 +96,12 @@ internal fun ReasoningIcon(current: String, enabled: Boolean, onClick: () -> Uni
                 contentDescription = "Modo de razonamiento: $current"
                 stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
             },
+        // Vidal 01-11 (vídeo, 02:13): el velocímetro parecía un cronómetro. Un icono de «pensar» y una línea que dice qué hace.
         text = { Column {
-            Text("Razonamiento", style = MaterialTheme.typography.bodyMedium)
-            Text(current, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Razonamiento: $current", style = MaterialTheme.typography.bodyMedium)
+            Text("Cuánto piensa antes de responder", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } },
-        leadingIcon = { Icon(Icons.Default.Speed, null, Modifier.size(NexusTokens.iconMedium)) })
+        leadingIcon = { Icon(Icons.Default.Psychology, null, Modifier.size(NexusTokens.iconMedium)) })
 }
 
 @Composable
@@ -115,7 +118,7 @@ internal fun RecentLibraryPanel(expanded: Boolean, onClose: () -> Unit, content:
             Column(Modifier.fillMaxWidth().recentLibraryGesture(opening = false, onChange = onClose)
                 .padding(bottom = NexusTokens.space8)) {
                 Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Archivos recientes", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                    Text("Recientes de la Biblioteca", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                     IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Ocultar archivos recientes", Modifier.size(NexusTokens.iconSmall)) }
                 }
                 content()

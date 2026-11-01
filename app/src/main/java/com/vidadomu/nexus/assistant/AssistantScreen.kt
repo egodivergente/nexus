@@ -62,6 +62,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -290,9 +292,21 @@ fun AssistantScreen(
                     }
                 }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
-            // Keep the scrolling viewport below the floating controls, not just its first item.
-            LazyColumn(Modifier.fillMaxSize().padding(top = 56.dp), state = listState,
-                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin,
+            // Vidal 01-11 (vídeo, 00:26): el texto no se corta en seco a 56 dp; la lista llega hasta arriba y se
+            // desvanece con un degradado suave bajo los iconos flotantes. El primer mensaje sigue empezando debajo.
+            LazyColumn(Modifier.fillMaxSize()
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to androidx.compose.ui.graphics.Color.Transparent,
+                        .22f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .08f),
+                        .50f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f),
+                        .78f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .86f),
+                        1f to androidx.compose.ui.graphics.Color.Black,
+                        startY = 0f, endY = 96.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                }, state = listState,
+                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 56.dp,
                     // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
                     bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
@@ -397,11 +411,8 @@ fun AssistantScreen(
                 }
             }
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
-            // The header icons float over the conversation: a short fade keeps scrolled text from colliding with them
-            // («Expandir» under the gear, revision video 1, 08:48) without adding a heavy bar.
-            val headerFade = MaterialTheme.colorScheme.background
-            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp)
-                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(headerFade.copy(alpha = .94f), headerFade.copy(alpha = .70f), headerFade.copy(alpha = 0f)))))
+            // The header icons float over the conversation; the list itself fades out under them (see the LazyColumn mask),
+            // so scrolled text never collides with them («Expandir» under the gear, revision video 1, 08:48) nor ends in a hard edge.
             // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
             IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
                 Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -430,11 +441,14 @@ fun AssistantScreen(
                 LibraryCarousel(onPick = { jobId, outputId ->
                     vm.attachLibraryResult(jobId, outputId)
                     libraryExpanded = false
-                }, enabled = !ui.attaching && !ui.thinking)
+                }, enabled = !ui.attaching && !ui.thinking, onBrowseAll = {
+                    libraryExpanded = false
+                    picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE)
+                })
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
-            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launch(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
+            InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
                 onSend = { if(vm.sendWithBoards(input.text)) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 reasoningControl = { ReasoningPicker(ui, vm) })

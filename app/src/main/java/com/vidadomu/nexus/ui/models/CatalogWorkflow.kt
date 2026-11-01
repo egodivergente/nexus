@@ -89,9 +89,16 @@ private fun workflowOrderKey(workflow: CatalogWorkflow) = when(workflow) {
 }
 internal val defaultWorkflowOrder = listOf("reference_to_video","image_to_video","start_end_frame_video","text_to_video","reference_edit","compose_multi_reference","image_to_image","text_to_image")
 
-internal fun workflowRoutes(group:CatalogModelGroup, order: List<String> = defaultWorkflowOrder):Map<CatalogWorkflow,List<NexusModel>> =
-    group.routes.flatMap {model -> catalogWorkflows(model).map {it to model}}
-        .groupBy({it.first},{it.second}).toSortedMap(compareBy<CatalogWorkflow> {order.indexOf(workflowOrderKey(it)).takeIf {i->i>=0} ?: Int.MAX_VALUE}.thenBy {it.ordinal})
+internal fun workflowRoutes(group:CatalogModelGroup, order: List<String> = defaultWorkflowOrder):Map<CatalogWorkflow,List<NexusModel>> {
+    val byTask=group.routes.flatMap {model -> catalogWorkflows(model).map {it to model}}.groupBy({it.first},{it.second})
+    // An image-to-video route whose last frame is optional also animates one image. When another provider of the same
+    // model only offers «Animar imagen», both meet there with a provider choice (Vidal 01-11: Atlas Cloud y Crun).
+    val animate=byTask[CatalogWorkflow.ANIMATE]
+    val frames=byTask[CatalogWorkflow.FRAMES]
+    val tasks=if(animate==null || frames==null) byTask else byTask+(CatalogWorkflow.ANIMATE to animate+frames.filter {route ->
+        route !in animate && IMAGE_INPUT_ROUTE.containsMatchIn(listOfNotNull(route.providerModelId,route.id).joinToString("/").lowercase())})
+    return tasks.toSortedMap(compareBy<CatalogWorkflow> {order.indexOf(workflowOrderKey(it)).takeIf {i->i>=0} ?: Int.MAX_VALUE}.thenBy {it.ordinal})
+}
 
 internal fun restoredWorkflow(group:CatalogModelGroup,savedKey:String?,legacyLabel:String?,order:List<String> = defaultWorkflowOrder):CatalogWorkflow {
     val available=workflowRoutes(group,order).keys
@@ -118,8 +125,10 @@ internal fun optionVariantLabel(model:NexusModel, groupTitle:String):String {
     val text=model.displayName.replace(groupTitle,"",ignoreCase=true)
         .replace(Regex("(?i)^"+Regex.escape(catalogFamily(model))+"\\s*[- ]?v?[oh]?\\d+(?:[._]\\d+)*\\s*"),"")
         .replace(Regex("(?i)\\s*[·—]\\s*(?:crear y editar|editar|crear) (?:imagen|vídeo)\\s*$"),"")
-        .replace(Regex("(?i)\\b(?:text[- ]to[- ](?:image|video)|image[- ]to[- ](?:image|video)|reference[- ]to[- ](?:image|video)|layer[- ]decomposition|motion[- ]control|edit|sequential)\\b")," ")
+        .replace(Regex("(?i)\\b(?:text[- ]to[- ](?:image|video)|image[- ]to[- ](?:image|video)|reference[- ]to[- ](?:image|video)|layer[- ]decomposition|motion[- ]control|edit|sequential|i2v|r2v|t2v)\\b")," ")
         .trim(' ','-','·','/').replace(Regex("\\s+")," ")
+        // «Video» alone says nothing on a video model (Crun «MiniMax H3 Video»): it is the standard variant.
+        .let {if(it.equals("video",true) || it.equals("vídeo",true)) "" else it}
     val batch="sequential" in (model.providerModelId ?: model.id).lowercase()
     return listOfNotNull(text.takeIf {it.isNotBlank()},"Serie de imágenes".takeIf {batch}).joinToString(" · ").ifBlank {"Estándar"}
 }

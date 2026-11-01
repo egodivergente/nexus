@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -144,37 +145,38 @@ internal fun MoveToFolderSheet(count:Int,folders:List<com.vidadomu.nexus.agent.c
     }
 }
 
-/** A project shown as a folder in the Library. */
+/**
+ * A project shown as an album in the Library, as Google Fotos or the Samsung gallery do: one large cover
+ * (its latest photo or video, generated or imported) with the name and the count underneath.
+ */
 @Composable
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-internal fun FolderTile(name:String,count:Int,previews:List<Pair<String,Boolean>> = emptyList(),onLongClick:(()->Unit)?=null,onOpen:()->Unit) {
-    // Uniform tiles: the name always reserves two lines and the count is a short badge beside the icon,
-    // so «950 archivos» no longer wraps and makes one folder taller than its neighbours.
-    Surface(shape=NexusTokens.thumbnail,color=MaterialTheme.colorScheme.surfaceContainer,
-        modifier=Modifier.fillMaxWidth().semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}
-            .combinedClickable(onClickLabel="Abrir carpeta",onLongClickLabel="Opciones de la carpeta",onClick=onOpen,onLongClick=onLongClick)) {
-        Column(Modifier.padding(NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Icon(Icons.Default.Folder,null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.weight(1f))
-                Text(folderCount(count),style=MaterialTheme.typography.labelSmall,color=com.vidadomu.nexus.ui.theme.TextSecondary,maxLines=1)
-            }
-            if(previews.isNotEmpty()) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-                // Vista previa del contenido sin abrir la carpeta: hasta tres miniaturas.
-                repeat(3) {i ->
-                    val item=previews.getOrNull(i)
-                    Surface(Modifier.weight(1f).aspectRatio(1f),shape=NexusTokens.field,color=MaterialTheme.colorScheme.surfaceContainerHigh) {
-                        if(item!=null) when(val thumb=rememberThumb(item.first,item.second)) {
-                            is Thumb.Ready -> androidx.compose.foundation.Image(thumb.bitmap.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
-                            else -> Unit
-                        }
-                    }
+internal fun FolderTile(name:String,count:Int,previews:List<Pair<String,Boolean>> = emptyList(),modifier:Modifier=Modifier,
+    onLongClick:(()->Unit)?=null,onOpen:()->Unit) {
+    // La portada es el archivo más reciente que se pueda abrir: si uno falla queda marcado y pasa al siguiente;
+    // sin ninguno, la portada muestra el icono de carpeta.
+    val cover=previews.firstOrNull {!LibraryUnavailable.isUnavailable(it.first)}
+    Column(modifier.clip(AlbumCover).semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}
+        .combinedClickable(onClickLabel="Abrir carpeta",onLongClickLabel="Opciones de la carpeta",onClick=onOpen,onLongClick=onLongClick)) {
+        Surface(Modifier.fillMaxWidth().aspectRatio(1f),shape=AlbumCover,color=MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Box(contentAlignment=Alignment.Center) {
+                val thumb=rememberThumb(cover?.first,cover?.second==true)
+                when(thumb) {
+                    is Thumb.Ready -> androidx.compose.foundation.Image(thumb.bitmap.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
+                    Thumb.Loading -> Unit
+                    else -> Icon(Icons.Default.Folder,null,Modifier.size(40.dp),tint=MaterialTheme.colorScheme.primary)
                 }
+                if(thumb is Thumb.Ready && cover?.second==true)
+                    Icon(Icons.Default.PlayArrow,null,Modifier.align(Alignment.BottomStart).padding(6.dp).size(20.dp),tint=androidx.compose.ui.graphics.Color.White)
             }
-            Text(name,style=MaterialTheme.typography.labelLarge,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis)
         }
+        Text(name,Modifier.padding(top=NexusTokens.space8,start=2.dp,end=2.dp),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+        Text(if(count==1) "1 archivo" else "${folderCount(count)} archivos",Modifier.padding(horizontal=2.dp),
+            style=MaterialTheme.typography.labelSmall,color=com.vidadomu.nexus.ui.theme.TextSecondary,maxLines=1)
     }
 }
+
+private val AlbumCover=androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
 
 @Composable
 private fun Option(icon:ImageVector,label:String,action:()->Unit) {

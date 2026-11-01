@@ -38,8 +38,11 @@ import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-internal class ProjectMediaPicker(private val open: (Array<String>, Int) -> Unit) {
+internal class ProjectMediaPicker(private val open: (Array<String>, Int) -> Unit, private val openDevice: (Array<String>, Int) -> Unit = open) {
+    /** «Fotos y archivos»: the project library with an «Importar» tile. */
     fun launch(mimeTypes: Array<String>, maxSelection: Int = 50) = open(mimeTypes, maxSelection)
+    /** Straight to the system picker; the private copy and delivery are the same as the sheet's «Importar». */
+    fun launchDevice(mimeTypes: Array<String>, maxSelection: Int = 50) = openDevice(mimeTypes, maxSelection)
 }
 
 internal fun projectMediaMimeType(context: Context, uri: Uri): String? =
@@ -127,13 +130,16 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
             },
         )
     }
-    return ProjectMediaPicker { types, maximum ->
-        if (!busy) {
-            val projectId = runtime.settings.activeProjectId()
-            request = MediaPickerRequest(projectId, projectId?.let { runtime.assets.findProject(it)?.name }, types.toList(), maximum.coerceAtLeast(1))
-            visible = true
-        }
+    fun prepare(types: Array<String>, maximum: Int): MediaPickerRequest {
+        val projectId = runtime.settings.activeProjectId()
+        return MediaPickerRequest(projectId, projectId?.let { runtime.assets.findProject(it)?.name }, types.toList(), maximum.coerceAtLeast(1))
+            .also { request = it }
     }
+    return ProjectMediaPicker(open = { types, maximum ->
+        if (!busy) { prepare(types, maximum); visible = true }
+    }, openDevice = { types, maximum ->
+        if (!busy) { val current = prepare(types, maximum); visible = false; documents.launch(current.types.toTypedArray()) }
+    })
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

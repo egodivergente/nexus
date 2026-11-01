@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.ui.models
 
+import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.core.model.NexusModel
 
 /** Navigation groups, not interchangeable API routes. Every leaf retains its original ID. */
@@ -55,10 +56,71 @@ private fun computeGroupTitle(family: String, text: String, displayName: String)
 }
 
 internal fun catalogModelGroups(models: List<NexusModel>, favorites: Set<String> = emptySet()): List<CatalogModelGroup> =
-    recentModels(models).distinctBy(::modelBookmark)
+    mergeProviderTwinGroups(recentModels(models).distinctBy(::modelBookmark)
         .groupBy { catalogFamily(it) + ":" + modelGroupTitle(it).lowercase(java.util.Locale.ROOT) }
-        .map { (key, routes) -> CatalogModelGroup(key, modelGroupTitle(routes.first()), routes) }
+        .map { (key, routes) -> CatalogModelGroup(key, modelGroupTitle(routes.first()), routes) })
         .sortedByDescending { group -> group.routes.any { modelBookmark(it) in favorites } }
+
+private val PROVIDER_WORKFLOW_SUFFIX = Regex("([/_-](?:image|reference|text|start-end|first-last-frame)-to-video|[/_-](?:i2v|r2v|t2v))$")
+
+/**
+ * Provider-neutral names of a published route, letters and digits only and without the workflow suffix: Atlas
+ * «minimax/h3/image-to-video» and Crun «minimax/h3-i2v» are both «minimaxh3». The last path segment also counts when it
+ * carries a version («bytedance/seedance-2.0» and «seedance2-0» meet as «seedance20»). Only for grouping, never for requests.
+ */
+internal fun providerNeutralStems(model: NexusModel): Set<String> {
+    val id = (model.providerModelId?.takeIf { it.isNotBlank() } ?: model.id).lowercase(java.util.Locale.ROOT)
+        .removePrefix("crun/").removePrefix("runway/").replace(PROVIDER_WORKFLOW_SUFFIX, "")
+    val full = id.filter(Char::isLetterOrDigit)
+    val last = id.substringAfterLast('/').filter(Char::isLetterOrDigit).takeIf { it.length >= 3 && it.any(Char::isDigit) }
+    return setOfNotNull(full.takeIf { it.length >= 3 }, last)
+}
+
+/** Routes of one variant published by different providers, in their original order; a provider never appears twice in one. */
+internal fun providerTwinClusters(routes: List<NexusModel>): List<List<NexusModel>> {
+    val clusters = mutableListOf<MutableList<NexusModel>>()
+    val stems = mutableListOf<MutableSet<String>>()
+    for (route in routes) {
+        val own = providerNeutralStems(route)
+        val index = clusters.indices.firstOrNull { i -> stems[i].any { it in own } && clusters[i].none { it.providerId == route.providerId } }
+        if (index == null) { clusters += mutableListOf(route); stems += own.toMutableSet() }
+        else { clusters[index] += route; stems[index] += own }
+    }
+    return clusters
+}
+
+/**
+ * The same video model on another provider joins its card instead of becoming a second variant (Vidal 01-11: «MiniMax H3»
+ * and «Video» were Atlas Cloud and Crun). Only within one family, only video, and only when no provider repeats, so two
+ * products of the same provider never merge. The shorter (base) title and its key are kept.
+ */
+private fun mergeProviderTwinGroups(groups: List<CatalogModelGroup>): List<CatalogModelGroup> {
+    val stemCache = HashMap<String, Set<String>>()
+    fun stems(model: NexusModel) = stemCache.getOrPut(modelBookmark(model)) { providerNeutralStems(model) }
+    fun video(group: CatalogModelGroup) = group.routes.all { Modality.VIDEO in it.modalities && Modality.CHAT !in it.modalities }
+    fun twins(a: CatalogModelGroup, b: CatalogModelGroup): Boolean {
+        if (a.key.substringBefore(':') != b.key.substringBefore(':') || !video(a) || !video(b)) return false
+        if (a.routes.any { r -> b.routes.any { it.providerId == r.providerId } }) return false
+        val own = a.routes.flatMapTo(HashSet()) { stems(it) }
+        return b.routes.any { route -> stems(route).any { it in own } }
+    }
+    val out = groups.toMutableList()
+    var i = 0
+    while (i < out.size) {
+        var j = i + 1
+        while (j < out.size) {
+            if (twins(out[i], out[j])) {
+                val a = out[i]; val b = out[j]
+                val (keep, other) = if (b.title.length < a.title.length) b to a else a to b
+                out[i] = keep.copy(routes = keep.routes + other.routes)
+                out.removeAt(j)
+                j = i + 1
+            } else j++
+        }
+        i++
+    }
+    return out
+}
 
 internal fun groupPurpose(group: CatalogModelGroup): String = workflowRoutes(group).keys.joinToString(" · ") {it.label}
 

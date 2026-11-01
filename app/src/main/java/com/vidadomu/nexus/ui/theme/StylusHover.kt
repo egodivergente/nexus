@@ -12,6 +12,25 @@ import androidx.compose.ui.unit.dp
 /** Observed once by NexusTheme; a catalog of logos must not register one settings observer per icon. */
 internal val LocalNexusDecorativeMotion = staticCompositionLocalOf { false }
 
+/**
+ * Reports when an S Pen starts or stops hovering over this element (without touching the screen).
+ * Passive like [stylusHover]: it observes on the Initial pass and never consumes the events.
+ */
+fun Modifier.onStylusHover(onChange: (Boolean) -> Unit): Modifier = composed {
+    val current by rememberUpdatedState(onChange)
+    this.pointerInput(Unit) {
+        var inside = false
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val hovering = event.type in setOf(PointerEventType.Enter, PointerEventType.Move) &&
+                    event.changes.any { it.type == PointerType.Stylus && !it.pressed }
+                if (hovering != inside) { inside = hovering; current(hovering) }
+            }
+        }
+    }
+}
+
 /** S Pen hover is local and passive. It never consumes touch, clicks, dragging or emits vibration. */
 fun Modifier.stylusHover(enabled: Boolean = true): Modifier = composed {
     val motion = enabled && LocalNexusDecorativeMotion.current

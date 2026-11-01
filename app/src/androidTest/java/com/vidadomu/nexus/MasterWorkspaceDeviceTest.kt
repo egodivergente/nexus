@@ -32,7 +32,7 @@ class MasterWorkspaceDeviceTest {
     }
     @Test fun fiveDestinationsAndLongFlowPromptRemainAccessible() {
         enter()
-        listOf("Agente","ArtBox","Lanzadera","Flow","Biblioteca").forEach {compose.onNodeWithContentDescription(it).assertExists()}
+        listOf("Agente","ArtBox","Biblioteca").forEach {compose.onNodeWithContentDescription(it).assertExists()}
         compose.onNodeWithContentDescription("ArtBox").performClick()
         compose.waitUntil(10000) {compose.onAllNodesWithText("Herramientas").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Herramientas").assertIsDisplayed()

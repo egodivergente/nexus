@@ -1,0 +1,43 @@
+package com.vidadomu.nexus.ui.models
+
+import com.vidadomu.nexus.core.model.Modality
+import com.vidadomu.nexus.provider.atlas.AtlasModelMapper
+import org.junit.Assert.*
+import org.junit.Test
+
+/** Vidal 01-11: «MiniMax H3» and «Video» were the same model on Atlas Cloud and Crun; one card with a provider choice. */
+class ProviderTwinMergeTest {
+    private val media = AtlasModelMapper.parseModelsResponse(javaClass.getResource("/native/catalog-public.json")!!.readText())
+        .filter { Modality.IMAGE in it.modalities || Modality.VIDEO in it.modalities }
+    private val atlasH3 = media.filter { it.id.startsWith("minimax/h3") }
+    private fun atlas(id: String) = atlasH3.first { it.id == id }
+    private fun crun(nativeId: String) = atlas("minimax/h3/image-to-video")
+        .copy(id = "crun/$nativeId", providerModelId = nativeId, displayName = "MiniMax H3 Video", providerId = "crun")
+
+    @Test fun atlasAndCrunH3ShareOneProviderNeutralStem() {
+        assertEquals(setOf("minimaxh3"), providerNeutralStems(atlas("minimax/h3/image-to-video")))
+        assertEquals(setOf("minimaxh3"), providerNeutralStems(crun("minimax/h3-i2v")))
+        assertFalse("minimaxh3" in providerNeutralStems(atlas("minimax/h3-developer/image-to-video")))
+    }
+
+    @Test fun crunH3JoinsTheAtlasCardWithoutLosingRoutes() {
+        val routes = atlasH3 + crun("minimax/h3-i2v") + crun("minimax/h3-r2v")
+        val groups = catalogModelGroups(routes)
+        val h3 = groups.single { g -> g.routes.any { it.id == "minimax/h3/image-to-video" } }
+        assertTrue(h3.routes.map { it.id }.toString(), h3.routes.count { it.providerId == "crun" } == 2)
+        // Other products of the family (Developer, Fast, Max) keep their own cards.
+        assertFalse(h3.routes.any { listOf("h3-developer", "h3-fast", "h3-max").any { tier -> tier in it.id } })
+        assertEquals(routes.map(::modelBookmark).toSet(), groups.flatMap { it.routes }.map(::modelBookmark).toSet())
+        assertEquals(groups.size, groups.map { it.key }.distinct().size)
+    }
+
+    @Test fun twinClustersPairProvidersButNeverTwoRoutesOfOneProvider() {
+        val i2v = atlas("minimax/h3/image-to-video")
+        assertEquals(1, providerTwinClusters(listOf(i2v, crun("minimax/h3-i2v"))).size)
+        assertEquals(2, providerTwinClusters(listOf(i2v, atlas("minimax/h3/reference-to-video"))).size)
+    }
+
+    @Test fun aLoneVideoWordIsTheStandardVariant() {
+        assertEquals("Estándar", optionVariantLabel(crun("minimax/h3-i2v"), "MiniMax H3"))
+    }
+}

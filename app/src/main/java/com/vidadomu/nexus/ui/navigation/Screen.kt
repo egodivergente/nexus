@@ -18,6 +18,7 @@ enum class Screen(
     Settings("settings", "Ajustes", Icons.Default.Tune);
 
     companion object {
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Create, Library)
+        // Vidal 01-11: sin Lanzadera en la barra; ArtBox queda en el centro. Create sigue siendo un destino propio.
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Library)
     }
 }

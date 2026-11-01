@@ -21,6 +21,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +44,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
+import com.vidadomu.nexus.ui.theme.onStylusHover
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -213,32 +226,98 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
 
 internal data class LibraryPick(val jobId: String, val outputId: String, val uri: String, val video: Boolean, val label: String)
 
-/** Recent local outputs above the composer; a tap attaches one to the chat. */
+/**
+ * Recent local outputs above the composer; a tap attaches one to the chat.
+ * Vidal 01-11 (vídeo, 01:40): al acercar el S Pen cada miniatura se amplía en una vista previa grande
+ * (con el dedo, pulsación larga). «Ver todo» abre la Biblioteca completa, para no depender de lo muy reciente.
+ */
 @Composable
-internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, enabled: Boolean, modifier: Modifier = Modifier) {
+internal fun LibraryCarousel(onPick: (jobId: String, outputId: String) -> Unit, enabled: Boolean, modifier: Modifier = Modifier,
+    onBrowseAll: (() -> Unit)? = null) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
     val recent = remember(jobs) {
         jobs.sortedByDescending { it.completedAt ?: it.startedAt }.asSequence().flatMap { job ->
             job.outputs.asSequence().filter { !it.localUri.isNullOrBlank() && (it.type == Modality.IMAGE || it.type == Modality.VIDEO) }
-                .map { LibraryPick(job.id, it.id, it.localUri!!, it.type == Modality.VIDEO, job.prompt.take(40).ifBlank { "Resultado" }) }
-        }.take(24).toList()
+                .map { LibraryPick(job.id, it.id, it.localUri!!, it.type == Modality.VIDEO, job.prompt.take(80).ifBlank { "Resultado" }) }
+        }.take(48).toList()
     }
     if (recent.isEmpty()) {
-        Text("Aún no hay imágenes o vídeos descargados en la Biblioteca.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = modifier.padding(NexusTokens.space12))
+        Row(modifier.fillMaxWidth().padding(NexusTokens.space12), verticalAlignment = Alignment.CenterVertically) {
+            Text("Aún no hay imágenes o vídeos descargados en la Biblioteca.", Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            onBrowseAll?.let { TextButton(onClick = it) { Text("Ver todo") } }
+        }
         return
     }
-    Column(modifier.fillMaxWidth()) {
-        Text("De tu Biblioteca", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = NexusTokens.space12, bottom = 2.dp))
+    var preview by remember { mutableStateOf<LibraryPick?>(null) }
+    var previewCenterX by remember { mutableIntStateOf(0) }
+    Box(modifier.fillMaxWidth()) {
         LazyRow(contentPadding = PaddingValues(horizontal = NexusTokens.space12), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
             items(recent, key = { it.jobId + ":" + it.outputId }) { pick ->
-                StageThumbnail(pick.uri, pick.video, null, Modifier.size(52.dp).clip(RoundedCornerShape(12.dp))
-                    .clickable(enabled = enabled) { onPick(pick.jobId, pick.outputId) }
+                var centerX by remember { mutableIntStateOf(0) }
+                StageThumbnail(pick.uri, pick.video, null, Modifier.size(64.dp)
+                    .onGloballyPositioned { centerX = it.boundsInWindow().center.x.roundToInt() }
+                    .onStylusHover { inside ->
+                        if (inside) { previewCenterX = centerX; preview = pick } else if (preview == pick) preview = null
+                    }
+                    .clip(RoundedCornerShape(12.dp))
+                    .combinedClickable(enabled = enabled, onLongClickLabel = "Vista previa",
+                        onLongClick = { previewCenterX = centerX; preview = pick },
+                        onClick = { preview = null; onPick(pick.jobId, pick.outputId) })
                     .semantics { contentDescription = "Adjuntar de la Biblioteca: ${pick.label}" })
             }
+            onBrowseAll?.let { browse ->
+                item(key = "library_browse_all") {
+                    Surface(onClick = { preview = null; browse() }, shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(64.dp)
+                            .semantics { contentDescription = "Ver toda la Biblioteca" }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Icon(Icons.Default.GridView, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Ver todo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
         }
+        preview?.let { pick ->
+            val gap = with(LocalDensity.current) { NexusTokens.space8.roundToPx() }
+            Popup(popupPositionProvider = remember(previewCenterX, gap) { AboveAnchorPosition(previewCenterX, gap) },
+                onDismissRequest = { preview = null }, properties = PopupProperties(focusable = false, dismissOnClickOutside = true)) {
+                LibraryHoverPreview(pick, onClick = { preview = null; if (enabled) onPick(pick.jobId, pick.outputId) })
+            }
+        }
+    }
+}
+
+/** Large preview of one recent item, shown above the strip; it fits the whole frame instead of cropping it. */
+@Composable
+private fun LibraryHoverPreview(pick: LibraryPick, onClick: () -> Unit) {
+    val context = LocalContext.current
+    Surface(onClick = onClick, shape = NexusTokens.card, shadowElevation = 12.dp, color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = Modifier.width(248.dp).semantics { contentDescription = "Vista previa: ${pick.label}. Toca para adjuntar" }) {
+        Column {
+            Box(Modifier.fillMaxWidth().height(280.dp).background(Color.Black), contentAlignment = Alignment.Center) {
+                AsyncImage(remember(pick.uri, pick.video) {
+                    coil.request.ImageRequest.Builder(context).data(pick.uri).crossfade(150).size(1024)
+                        .apply { if (pick.video) decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) } }
+                        .build()
+                }, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                if (pick.video) Icon(Icons.Default.PlayArrow, null, tint = Color.White,
+                    modifier = Modifier.size(36.dp).background(Color.Black.copy(alpha = .45f), CircleShape))
+            }
+            Text(pick.label, style = MaterialTheme.typography.labelMedium, maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8))
+        }
+    }
+}
+
+/** Places a popup centred on [centerX] (window coordinates) just above its anchor, kept inside the window. */
+private class AboveAnchorPosition(private val centerX: Int, private val gap: Int) : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+        val x = (centerX - popupContentSize.width / 2).coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+        val y = (anchorBounds.top - popupContentSize.height - gap).coerceAtLeast(0)
+        return IntOffset(x, y)
     }
 }

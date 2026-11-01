@@ -121,12 +121,12 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var originFilter by rememberSaveable {mutableStateOf(LibraryOriginFilter.ALL)}
     var originMenu by remember {mutableStateOf(false)}
     val projectIndex=remember(index) {LibraryProjectIndex(index)}
-    // Cada proyecto es una carpeta. La vista principal muestra las carpetas y solo lo que no tiene proyecto;
-    // dentro de una carpeta, solo lo suyo. Buscar desde la vista principal busca en todo.
+    // Cada proyecto es una carpeta. La vista principal lo muestra todo, tenga proyecto o no: lo que generas aparece
+    // aquí aunque el Agente lo guarde en un proyecto. Las carpetas quedan arriba como atajo; dentro, solo lo suyo.
     val folderIds=remember(index) {index.projects.map {it.id}.toSet()}
     fun inScope(projects:Set<String>):Boolean {
         val known=projects.filter {it in folderIds}
-        return openFolder?.let {it in known} ?: (query.isNotBlank() || known.isEmpty())
+        return openFolder?.let {it in known} ?: true
     }
     // Zoom con dos dedos como Google Fotos: 2–6 columnas, recordado entre sesiones.
     // Sin preferencia guardada, las columnas se adaptan al ancho (miniaturas de ~120 dp); el zoom las fija luego.
@@ -176,12 +176,6 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }
     // Los proyectos archivados solo aparecen como carpeta si aún tienen archivos.
     val folders=remember(index,folderCounts) {index.projects.filter {!it.archived || (folderCounts[it.id] ?: 0)>0}.sortedBy {it.name.lowercase()}}
-    // Hasta tres archivos locales (los más recientes) por carpeta, para la vista previa de la tarjeta.
-    val folderPreviews=remember(index) {
-        index.assets.filter {!it.libraryDeleted && it.projectId!=null && !it.uri.startsWith("http") && (it.type==AssetType.IMAGE || it.type==AssetType.VIDEO)}
-            .sortedByDescending {it.createdAt}.groupBy {it.projectId!!}
-            .mapValues {(_,list) -> list.take(3).map {it.uri to (it.type==AssetType.VIDEO)}}
-    }
     val showFolders=openFolder==null && query.isBlank() && !showHidden && !favoriteOnly && folders.isNotEmpty()
     val folderName=openFolder?.let {id -> index.projects.firstOrNull {it.id==id}?.name}
     // Si la carpeta abierta desaparece (borrada desde el Agente, p. ej.), se vuelve a la vista principal.
@@ -194,6 +188,22 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var cropTarget by remember {mutableStateOf<LibraryEntry?>(null)}
     var cropping by remember {mutableStateOf(false)}
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
+    // Portada de cada carpeta: sus fotos y vídeos más recientes, generados o importados, con copia en el móvil.
+    // Se guardan varios por si el primero ya no se puede abrir.
+    val folderPreviews=remember(jobs,index,removed,hidden,projectIndex,conflicts) {
+        val candidates=mutableListOf<Triple<String,String,Pair<Long,Boolean>>>()
+        val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
+        jobs.filter {it.status==GenerationStatus.COMPLETED}.forEach {job -> job.outputs.forEach {o ->
+            val local=OutputFiles.trustedLocalUri(o,conflicts)
+            if(local!=null && o.type in listOf(Modality.IMAGE,Modality.VIDEO) && o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden)
+                projectIndex.projects(job,o).forEach {candidates+=Triple(it,local,(job.completedAt ?: job.startedAt) to (o.type==Modality.VIDEO))}
+        }}
+        index.assets.filter {!it.libraryDeleted && it.projectId!=null && it.uri !in generatedUris && !it.uri.startsWith("http") &&
+            "asset:"+it.id !in hidden && (it.type==AssetType.IMAGE || it.type==AssetType.VIDEO)}
+            .forEach {candidates+=Triple(it.projectId!!,it.uri,it.createdAt to (it.type==AssetType.VIDEO))}
+        candidates.sortedByDescending {it.third.first}.groupBy {it.first}
+            .mapValues {(_,list) -> list.distinctBy {it.second}.take(4).map {it.second to it.third.second}}
+    }
     val timeline=remember(completed,localAssets) {
         val day=SimpleDateFormat("d MMMM yyyy",Locale("es","ES"))
         (completed.flatMap {job -> job.outputs.indices.map {LibraryEntry.Out(job,it)}}+localAssets.map {LibraryEntry.Local(it)})
@@ -563,12 +573,18 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         snackbar.showSnackbar(if(stopped) "Dejas de seguirlo aquí. No se ha cancelado en el proveedor: puede terminar y cobrarse."
                             else "No se pudo dejar de seguir este trabajo")
                     }})}
-                // Carpetas arriba, como en el explorador de archivos: una por proyecto.
+                // Carpetas arriba en una fila que se desliza, como los álbumes de Google Fotos: no empujan la línea de tiempo.
                 if(showFolders) {
                     item(key="folders:title",span={GridItemSpan(maxLineSpan)}) {Text("Carpetas",style=MaterialTheme.typography.labelMedium,color=TextSecondary,
                         modifier=Modifier.padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12))}
-                    items(folders,key={"folder:"+it.id},span={GridItemSpan((maxLineSpan/3).coerceAtLeast(1))}) {folder ->
-                        FolderTile(folder.name,folderCounts[folder.id] ?: 0,folderPreviews[folder.id].orEmpty(),onLongClick={deletingFolder=folder.id}) {openFolder=folder.id}
+                    item(key="folders:row",span={GridItemSpan(maxLineSpan)}) {
+                        LazyRow(Modifier.fillMaxWidth().padding(bottom=NexusTokens.space8),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin),
+                            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                            items(folders,key={"folder:"+it.id}) {folder ->
+                                FolderTile(folder.name,folderCounts[folder.id] ?: 0,folderPreviews[folder.id].orEmpty(),Modifier.width(124.dp),
+                                    onLongClick={deletingFolder=folder.id}) {openFolder=folder.id}
+                            }
+                        }
                     }
                 }
                 // Una sola línea de tiempo: lo generado y lo importado se ordenan juntos por fecha (lo último arriba).

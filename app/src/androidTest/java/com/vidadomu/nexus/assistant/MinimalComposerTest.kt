@@ -36,12 +36,12 @@ class MinimalComposerTest {
 
     @Test fun hiddenByDefaultAndLongPressDoesNotLaunchAttachmentPicker() {
         showComposer()
-        compose.onNodeWithText("Archivos recientes").assertDoesNotExist()
+        compose.onNodeWithText("Recientes de la Biblioteca").assertDoesNotExist()
         compose.onNodeWithContentDescription("Adjuntar").performTouchInput { longClick() }
-        compose.onNodeWithText("Archivos recientes").assertIsDisplayed()
+        compose.onNodeWithText("Recientes de la Biblioteca").assertIsDisplayed()
         assertEquals(0, attachmentPickerCalls)
         compose.onNodeWithContentDescription("Ocultar archivos recientes").performClick()
-        compose.onNodeWithText("Archivos recientes").assertDoesNotExist()
+        compose.onNodeWithText("Recientes de la Biblioteca").assertDoesNotExist()
         compose.onNodeWithText("Mi borrador").assertExists()
         compose.onNodeWithContentDescription("Modo de razonamiento: Medio").assertIsDisplayed()
     }
@@ -50,7 +50,7 @@ class MinimalComposerTest {
         showComposer()
         compose.onNodeWithContentDescription("Adjuntar").performClick()
         assertEquals(1, attachmentPickerCalls)
-        compose.onNodeWithText("Archivos recientes").assertDoesNotExist()
+        compose.onNodeWithText("Recientes de la Biblioteca").assertDoesNotExist()
     }
 
     @Test fun upwardSwipeRevealsAndDownwardSwipeCloses() {
@@ -58,11 +58,11 @@ class MinimalComposerTest {
         compose.onNodeWithContentDescription("Mensaje para Nexus").performTouchInput {
             swipe(center, center + Offset(0f, -180f), 300)
         }
-        compose.onNodeWithText("Archivos recientes").assertIsDisplayed()
-        compose.onNodeWithText("Archivos recientes").performTouchInput {
+        compose.onNodeWithText("Recientes de la Biblioteca").assertIsDisplayed()
+        compose.onNodeWithText("Recientes de la Biblioteca").performTouchInput {
             swipe(center, center + Offset(0f, 180f), 300)
         }
-        compose.onNodeWithText("Archivos recientes").assertDoesNotExist()
+        compose.onNodeWithText("Recientes de la Biblioteca").assertDoesNotExist()
         compose.onNodeWithText("Mi borrador").assertExists()
     }
 }

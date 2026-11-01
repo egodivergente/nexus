@@ -98,9 +98,8 @@ class MainActivity : ComponentActivity() {
         }
 
         pendingShares=PendingShares(this).pending()
-        val rules=RuntimePreferences.get(this)
-        // Al arrancar solo si llevabas fuera el tiempo de ausencia (4 h por defecto) o es la primera vez, no cada vez que Android reinicia la app.
-        projectChooser=savedInstanceState==null && rules.bool("startup.enabled") && (rules.bool("startup.cold") || awayLongEnough(rules))
+        // Vidal 01-11: el chat del Agente abre directo, sin la lista «Elige un proyecto» encima. Solo se elige destino al compartir archivos.
+        projectChooser=false
         // Keep a pending result across recreation while startup is still warming up.
         initialDeepLinkJobId = savedInstanceState?.getString(STATE_PENDING_JOB)
         if(savedInstanceState==null || intent?.action !in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)) handleIntent(intent)
@@ -138,11 +137,12 @@ class MainActivity : ComponentActivity() {
                 val barShown by com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar
                 LaunchedEffect(barShown) {if(barShown) {kotlinx.coroutines.delay(5_000);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false}}
                 val tabPrefs=remember {getSharedPreferences("nexus_workspace",0)}
-                val pager=rememberPagerState(initialPage=tabPrefs.getInt("page",0).coerceIn(0,tabs.lastIndex),pageCount={tabs.size})
+                // The open tab is remembered by route: removing Lanzadera from the bar (Vidal 01-11) shifted every index.
+                val pager=rememberPagerState(initialPage=tabs.indexOfFirst {it.route==tabPrefs.getString("pageRoute",null)}.coerceAtLeast(0),pageCount={tabs.size})
                 val holder=rememberSaveableStateHolder()
                 var tabRequest by remember {mutableStateOf<Int?>(null)}
                 val rules by RuntimePreferences.get(this).state.collectAsState()
-                LaunchedEffect(pager.settledPage) {tabPrefs.edit().putInt("page",pager.settledPage).apply()}
+                LaunchedEffect(pager.settledPage) {tabPrefs.edit().putString("pageRoute",tabs[pager.settledPage].route).apply()}
                 val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
                 val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
                 var previousPage by remember(pager) { mutableIntStateOf(pager.settledPage) }
@@ -284,21 +284,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToOutput = { jobId -> navController.navigate("output/$jobId") },
                                 onOpenSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
                                 onOpenHistory = { navController.openHistoryTab() },
-                                projectPicker = if(projectChooser && pendingShares.firstOrNull()==null) ({
-                                    ContinueProjectChooser(assistantViewModel,null,onChoose={id -> chooseProject(id,null)},onDismiss={projectChooser=false},embedded=true)
-                                }) else null,
+                                projectPicker = null,
                                 onPickerDismiss = { projectChooser = false },
                                 vm = assistantViewModel
-                            )
-                        }
-                            Screen.Create -> {
-                            CreateScreen(
-                                onBrowseModels = { navController.navigate(Screen.Models.route) { launchSingleTop = true } },
-                                onBytePlusSettings = {page -> navController.navigate("byteplus/$page") {launchSingleTop=true}},
-                                onNavigateToOutput = { jobId ->
-                                    navController.navigate("output/$jobId")
-                                },
-                                viewModel = createViewModel
                             )
                         }
                             Screen.Models -> {
@@ -348,6 +336,18 @@ class MainActivity : ComponentActivity() {
                         tabs.forEach {tab ->composable(tab.route) {
                             LaunchedEffect(tab.route) {tabRequest=tabs.indexOf(tab).takeIf {it>=0};navController.popBackStack("workspace",false)}
                         }}
+                        // Vidal 01-11 (vídeo, 08:01): Lanzadera ya no es una pestaña. Solo se abre encima cuando algo la necesita
+                        // («Crear con este modelo», «Abrir en el lienzo», «Reutilizar»…) y Atrás vuelve a donde estabas.
+                        composable(Screen.Create.route) {
+                            CreateScreen(
+                                onBrowseModels = { navController.navigate(Screen.Models.route) { launchSingleTop = true } },
+                                onBytePlusSettings = {page -> navController.navigate("byteplus/$page") {launchSingleTop=true}},
+                                onNavigateToOutput = { jobId ->
+                                    navController.navigate("output/$jobId")
+                                },
+                                viewModel = createViewModel
+                            )
+                        }
                         composable(Screen.Generations.route) {
                             GenerationsScreen(
                                 onNavigateToOutput = { jobId ->
@@ -473,19 +473,6 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         getSharedPreferences("nexus_workspace",0).edit().putLong("leftAt",System.currentTimeMillis()).apply()
         super.onStop()
-    }
-    override fun onStart() {
-        super.onStart()
-        val rules=RuntimePreferences.get(this)
-        val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
-        if(initialDeepLinkJobId == null && left>0 && rules.bool("startup.enabled") && awayLongEnough(rules)) projectChooser=true
-    }
-
-    /** First launch, or away at least «startup.idleMinutes» (0 = never by absence). */
-    private fun awayLongEnough(rules: RuntimePreferences): Boolean {
-        val left=getSharedPreferences("nexus_workspace",0).getLong("leftAt",0)
-        val minutes=rules.int("startup.idleMinutes")
-        return left==0L || (minutes>0 && System.currentTimeMillis()-left>=minutes*60_000L)
     }
 
 }
