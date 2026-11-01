@@ -76,12 +76,17 @@ class CustomMediaStore(private val app: NexusApplication, private val client: Ok
 
     /** Instala BytePlus (Seedance y Seedream) una sola vez; si el usuario lo borra, no vuelve a aparecer. */
     fun ensureBytePlus() {
-        if (prefs.getBoolean(SEEDED, false)) return
-        if (get(BytePlusMediaPreset.ID) == null) runCatching {
-            val next = all() + BytePlusMediaPreset.config()
-            prefs.edit().putString(KEY, json.encodeToString(serializer, next)).commit()
+        if (!prefs.getBoolean(SEEDED, false)) {
+            val current = all()
+            val next = if (current.any { it.id == BytePlusMediaPreset.ID }) current else current + BytePlusMediaPreset.config()
+            if (!prefs.edit().putString(KEY, json.encodeToString(serializer, next)).putBoolean(SEEDED, true).commit()) return
         }
-        prefs.edit().putBoolean(SEEDED, true).apply()
+        // One-time additive migration. Deleting a provider or these routes afterwards is respected.
+        if (!prefs.getBoolean(SEEDANCE_25_MIGRATED, false)) {
+            val next = all().map(BytePlusMediaPreset::withSeedance25)
+            prefs.edit().putString(KEY, json.encodeToString(serializer, next))
+                .putBoolean(SEEDANCE_25_MIGRATED, true).commit()
+        }
     }
 
     /** Comprueba la conexión de una configuración aún sin guardar, con la clave que se está escribiendo. */
@@ -97,6 +102,7 @@ class CustomMediaStore(private val app: NexusApplication, private val client: Ok
     companion object {
         private const val KEY = "configs"
         private const val SEEDED = "byteplus_media_seeded"
+        private const val SEEDANCE_25_MIGRATED = "byteplus_seedance_25_migrated"
         fun keyId(id: String) = "nexus_media_key_$id"
     }
 }

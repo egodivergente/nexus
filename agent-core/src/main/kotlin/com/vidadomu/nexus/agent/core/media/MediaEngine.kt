@@ -44,6 +44,15 @@ object MediaEngine {
         if (m.capability.needsImage && input.imageUrls.isEmpty()) add("Este modelo necesita una imagen.")
         if (m.capability.needsVideo && input.videoUrl == null) add("Este modelo necesita un vídeo.")
         if (input.imageUrls.size > m.maxImages.coerceAtLeast(if (m.capability.needsImage) 1 else 0)) add("Este modelo admite como máximo ${m.maxImages} imagen(es).")
+        m.params.filter { it.type in setOf("integer", "float", "duration") }.forEach { p ->
+            val raw = input.params[p.key] ?: p.default
+            if (raw.isNotBlank()) {
+                val n = raw.toDoubleOrNull()
+                if (n == null || !n.isFinite() || (p.min != null && n < p.min) || (p.max != null && n > p.max) ||
+                    (p.type in setOf("integer", "duration") && raw.toLongOrNull() == null))
+                    add("Valor fuera de contrato: ${p.label.ifBlank { p.key }}.")
+            }
+        }
         if (m.falQueue) {
             if (FalCuratedModels.isMiniMax(m.id) && (input.prompt.isBlank() || input.prompt.length > 50_000))
                 add("MiniMax requiere un prompt de 1 a 50000 caracteres.")

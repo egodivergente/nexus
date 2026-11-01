@@ -17,6 +17,35 @@ import com.vidadomu.nexus.agent.core.media.MediaProviderConfig
  */
 object BytePlusMediaPreset {
     const val ID = "byteplus-media"
+    const val SEEDANCE_25_MODEL = "dreamina-seedance-2-5-260628"
+
+    /** Official ModelArk contract, checked 2026-11-01. First-frame ratio must be adaptive. */
+    fun seedance25Models(): List<MediaModelConfig> = listOf(false, true).map { withImage ->
+        seedance(
+            if (withImage) "seedance-2-5-i2v" else "seedance-2-5",
+            if (withImage) "Seedance 2.5 (desde imagen)" else "Seedance 2.5",
+            SEEDANCE_25_MODEL, withImage,
+        ).let { model ->
+            model.copy(
+                requestTemplate = if (withImage) model.requestTemplate.replace(
+                    "\"image_url\":{\"url\":\"{{image_url}}\"}",
+                    "\"image_url\":{\"url\":\"{{image_url}}\"},\"role\":\"first_frame\"",
+                ) else model.requestTemplate,
+                params = listOf(
+                    if (withImage) ratio.copy(default = "adaptive", options = listOf("adaptive")) else ratio,
+                    resolution, duration.copy(min = 4f, max = 30f), audio, watermark,
+                ),
+            )
+        }
+    }
+
+    /** Add only this release; preserve existing routes, edits, ordering and provider settings. */
+    internal fun withSeedance25(config: MediaProviderConfig): MediaProviderConfig {
+        if (config.id != ID) return config
+        val existing = config.models.map { it.id }.toSet()
+        val additions = seedance25Models().filter { it.id !in existing }
+        return if (additions.isEmpty()) config else config.copy(models = config.models + additions)
+    }
 
     private val ratio = MediaParam("ratio", "Formato", "enum", "16:9", listOf("16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"))
     private val resolution = MediaParam("resolution", "Calidad", "enum", "1080p", listOf("480p", "720p", "1080p"))
@@ -55,7 +84,7 @@ object BytePlusMediaPreset {
         id = ID, name = "BytePlus", baseUrl = BrainPresets.BYTEPLUS_BASE_URL,
         auth = BrainAuth(BrainAuthMode.HEADER, "Authorization", "Bearer "),
         pollIntervalSeconds = 5, maxWaitMinutes = 30, httpTimeoutSeconds = 120,
-        models = listOf(
+        models = seedance25Models() + listOf(
             seedance("seedance-2-0", "Seedance 2.0", "dreamina-seedance-2-0-260128", false),
             seedance("seedance-2-0-i2v", "Seedance 2.0 (desde imagen)", "dreamina-seedance-2-0-260128", true),
             seedance("seedance-2-0-fast", "Seedance 2.0 Fast", "dreamina-seedance-2-0-fast-260128", false),
