@@ -34,6 +34,8 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
         } else issue.message
         return result(CreationPhase.INVALID,message,target)
     }
+    if(com.vidadomu.nexus.data.repository.CuratedVideoSelection.needsVisualInput(model,state.attachedMedia))
+        return result(CreationPhase.INVALID,com.vidadomu.nexus.data.repository.CuratedVideoSelection.VISUAL_INPUT_MESSAGE,CreationFixTarget.MEDIA)
     // Specialized compatibility checks stay in the existing API adapters.
     if(model.contractEndpoint!=null) {
         val effective=validation.configuration

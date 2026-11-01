@@ -71,7 +71,10 @@ class ModelCatalogRepository(
             hiddenRoutes.forEach { (key, routes) -> putStringSet("routes:$key", routes) }
         }?.apply()
         _allModels.value = models
-        _models.value = visibleCatalog(models, hidden, hiddenRoutes)
+        // Curated video selection only narrows what new generations offer; _allModels keeps every route for history and drafts.
+        val offered = if (catalogPreferences?.getBoolean(CuratedVideoSelection.PREFERENCE_KEY, true) == false) models
+            else CuratedVideoSelection.filter(models)
+        _models.value = visibleCatalog(offered, hidden, hiddenRoutes)
     }
 
     private val _isLoading = MutableStateFlow(true)

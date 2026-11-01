@@ -37,7 +37,8 @@ class GenerationDispatcher(private val app: NexusApplication) {
                 effective.parameters,localInputs,jobId)
             val routes=routePlan.routes.map { route ->
                 val target=requireNotNull(route.state.selectedModel)
-                com.vidadomu.nexus.routing.GenerationRoute(target.providerId,target.id,route.quote.totalUsd,route.quote.checkedAt+300_000) {
+                com.vidadomu.nexus.routing.GenerationRoute(target.providerId,target.id,route.quote.totalUsd,route.quote.checkedAt+300_000,
+                    bytePlusLast=com.vidadomu.nexus.routing.SeedanceBytePlusPolicy.reachesBytePlus(target,route.state.parameters)) {
                     prepareRequest(route.state,jobId,onProgress)
                 }
             }

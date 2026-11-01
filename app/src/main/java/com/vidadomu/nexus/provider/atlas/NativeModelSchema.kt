@@ -74,8 +74,10 @@ object NativeModelSchema {
         fun field(vararg names: String): String? = names.firstOrNull { name ->
             props[name] is JsonObject && (props[name]?.jsonObject?.get("type") as? JsonPrimitive)?.contentOrNull == "string"
         }
-        val first = field("image","image_url","input_image","input_image_url","reference_image_url","first_frame_image","start_image")
-        val last = field("end_image","last_image","last_frame_image")
+        // FLUX 3 first-last-frame publishes start_image_url/end_image_url; UGC Ads publishes a single product_image string.
+        val first = field("image","image_url","input_image","input_image_url","reference_image_url","first_frame_image","start_image",
+            "start_image_url","product_image")
+        val last = field("end_image","last_image","last_frame_image","end_image_url")
         val video = field("video","video_url","input_video","input_video_url","source_video","source_video_url")
         fun arrayField(vararg names: String): String? = names.firstOrNull { name ->
             (props[name] as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == "array"

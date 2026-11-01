@@ -133,6 +133,8 @@ internal fun toolCategoryIcon(category: String): ImageVector = when(category) {
     "Edición de imagen" -> Icons.Default.Brush
     "Upscale vídeo" -> Icons.Default.HighQuality
     "Sincronización labial" -> Icons.Default.RecordVoiceOver
+    "Avatares y personajes" -> Icons.Default.Face
+    "Publicidad y producto" -> Icons.Default.Campaign
     else -> Icons.Default.Build
 }
 
@@ -148,6 +150,9 @@ internal fun toolCategory(model: NexusModel): String? {
 }
 
 internal fun automaticToolCategory(model: NexusModel): String? {
+    // Curated video selection: kept tools have a fixed section and kept generators always stay under Vídeos.
+    com.vidadomu.nexus.data.repository.CuratedVideoSelection.toolCategory(model)?.let { return it }
+    if(com.vidadomu.nexus.data.repository.CuratedVideoSelection.isGenerator(model)) return null
     val tasks=catalogWorkflows(model)
     return when {
         CatalogWorkflow.MOTION in tasks -> "Movimiento y pose"

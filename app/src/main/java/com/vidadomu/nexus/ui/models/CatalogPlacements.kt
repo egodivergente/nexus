@@ -16,7 +16,7 @@ object CatalogPlacements {
     val revision = mutableIntStateOf(0)
 
     val toolCategories = listOf("Edición de vídeo", "Movimiento y pose", "Extender vídeo", "Sincronización labial", "Upscale vídeo",
-        "Edición de imagen", "Upscale imagen", "Audio, música y voz")
+        "Edición de imagen", "Upscale imagen", "Audio, música y voz", "Avatares y personajes", "Publicidad y producto")
 
     @Synchronized fun init(context: Context) {
         if (prefs != null) return

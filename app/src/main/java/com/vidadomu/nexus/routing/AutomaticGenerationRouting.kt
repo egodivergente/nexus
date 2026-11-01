@@ -18,6 +18,11 @@ class AutomaticGenerationRouting(private val app: NexusApplication) {
     suspend fun prepare(original: CreateUiState, acceptedUsd:Double): AutomaticRoutePlan? {
         if(!RuntimePreferences.get(app).bool("routing.enabled")) return null
         val source=original.selectedModel ?: return null
+        // A manual BytePlus choice (direct or through Crun) is submitted as chosen and never re-routed first.
+        if(SeedanceBytePlusPolicy.reachesBytePlus(source,original.parameters)) {
+            RoutingDiagnostics.save(app,source.id,0,0,"Se conserva BytePlus: proveedor elegido manualmente.")
+            return null
+        }
         val images=original.attachedMedia.any { it.mimeType.startsWith("image/") }
         val identity=ExactRouteCompatibility.identity(source,images) ?: return null
         val candidates=app.modelCatalogRepository.models.value.filter {
@@ -49,7 +54,8 @@ class AutomaticGenerationRouting(private val app: NexusApplication) {
             val ceiling=minOf(sourceQuote.totalUsd,acceptedCeiling)
             val options=(listOf(QuotedGenerationRoute(original,sourceQuote))+mapped.awaitAll().filterNotNull())
             val ordered=options.filter { it.quote.funded && it.quote.totalUsd<=ceiling }
-                .sortedWith(compareBy<QuotedGenerationRoute> { it.quote.totalUsd }.thenBy { it.state.selectedModel!!.providerId })
+                .sortedWith(compareBy<QuotedGenerationRoute> { SeedanceBytePlusPolicy.reachesBytePlus(it.state.selectedModel,it.state.parameters) }
+                    .thenBy { it.quote.totalUsd }.thenBy { it.state.selectedModel!!.providerId })
             RoutingDiagnostics.save(app,source.id,candidates.size,ordered.size,
                 if(ordered.isEmpty()) "Ninguna alternativa acreditada dentro del importe aceptado." else "Selección por total de la petición y saldo; cuota no expuesta por la API, pendiente de admisión.")
             if(ordered.isEmpty() || ordered.size==1 && ordered.first().state.selectedModel==source) return@coroutineScope null

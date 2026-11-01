@@ -65,7 +65,8 @@ class ComparisonController(private val app: NexusApplication, private val scope:
         val catalog = candidates.filter {ComparisonPlan.eligible(it,source.selectedModality)}.filter {
             if(source.selectedModality==Modality.IMAGE) {
                 if(references) ImageModelChoices.acceptsReferences(it) else ImageModelChoices.acceptsText(it)
-            } else if(references) ComparisonPlan.referenceLimit(it)>0 else !it.isMediaRequired && it.contractMedia.none {field->field.required}
+            } else if(references) ComparisonPlan.referenceLimit(it)>0 else !it.isMediaRequired && it.contractMedia.none {field->field.required} &&
+                !com.vidadomu.nexus.data.repository.CuratedVideoSelection.isGenerator(it)
         }.distinctBy(ComparisonPlan::key).sortedWith(ImageModelChoices.comparator)
         val keys = catalog.map(ComparisonPlan::key).toSet()
         val previous = preferences.getStringSet("models", emptySet()).orEmpty()

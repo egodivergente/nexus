@@ -5,7 +5,7 @@ import java.math.BigDecimal
 
 /** Request construction uploads only to the provider about to receive this attempt. */
 data class GenerationRoute(val providerId: String, val modelId: String, val totalUsd: BigDecimal,
-    val validUntil: Long, val prepareRequest: suspend () -> GenerationRequest)
+    val validUntil: Long, val bytePlusLast: Boolean = false, val prepareRequest: suspend () -> GenerationRequest)
 
 object RoutingSubmissionPolicy {
     fun recoverableBeforeAcceptance(error: Throwable?): Boolean = when {
@@ -20,5 +20,5 @@ object RoutingSubmissionPolicy {
     fun ordered(routes: List<GenerationRoute>, ceiling: BigDecimal, now: Long): List<GenerationRoute> =
         routes.filter { it.totalUsd.signum()>=0 && it.totalUsd<=ceiling && it.validUntil>now }
             .distinctBy { it.providerId to it.modelId }
-            .sortedWith(compareBy<GenerationRoute> { it.totalUsd }.thenBy { it.providerId })
+            .sortedWith(compareBy<GenerationRoute> { it.bytePlusLast }.thenBy { it.totalUsd }.thenBy { it.providerId })
 }
