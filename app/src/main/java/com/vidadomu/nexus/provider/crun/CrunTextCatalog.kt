@@ -34,10 +34,11 @@ object CrunTextCatalog {
                 ModelParameter("lyrics","Letra (modo custom)",ParameterType.LONG_TEXT,"",nativeType="string")
             ),contractEndpoint="/api/v1/client/job/CreateTask",contractDefaults=mapOf("model" to version),contractPromptField="prompt",promptRequired=false)
     }
+    const val SUNO_DESCRIPTION_MESSAGE="Describe la canción con entre 1 y 500 caracteres."
     fun validateSuno(model:NexusModel,request:GenerationRequest) {
         if(model.providerModelId!="suno/music-generate") return
         val p=model.parameters.associate { it.key to it.defaultValue }+request.parameters
-        if(p["mode"]=="simple") require(request.prompt.isNotBlank() && request.prompt.length<=500) { "Describe la canción con entre 1 y 500 caracteres." }
+        if(p["mode"]!="custom") require(request.prompt.isNotBlank() && request.prompt.length<=500) { SUNO_DESCRIPTION_MESSAGE }
         else {
             require(!p["title"].isNullOrBlank() && p["title"]!!.length<=100) { "Añade un título de hasta 100 caracteres." }
             val v4=model.contractDefaults["model"]=="v4"

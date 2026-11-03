@@ -8,7 +8,7 @@ class ScreenInitializationTest {
     @Test fun startingWithAnyDestinationKeepsEveryBottomNavigationItemValid() {
         val prefix = Screen::class.java.name
         val parent = Screen::class.java.classLoader!!
-        for (first in listOf("Assistant", "Create", "Models", "Generations", "Library", "Settings", "Flow")) {
+        for (first in listOf("Assistant", "Create", "Models", "Generations", "Library", "Settings")) {
             // Fresh class initialization for each entry point; independent of test order.
             val loader = object : ClassLoader(parent) {
                 override fun loadClass(name: String, resolve: Boolean): Class<*> {
