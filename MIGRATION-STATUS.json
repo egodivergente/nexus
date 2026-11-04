@@ -1,4 +1,24 @@
 ﻿{
+    "videoFeedback20261101": {
+        "branch": "aki/video-feedback-20261101",
+        "baseCommit": "fe64efe",
+        "sourceCommit": "60d53bdbd98261f8ee51f21741d96a12542a1c74",
+        "versionCode": 177,
+        "versionName": "1.9.141-agent-preview",
+        "buildHost": "AWS_CODEBUILD",
+        "buildId": "vidal-android-build:cbe778bc-5a4f-4870-bd0e-488eae54f9a9",
+        "buildRecipe": "igual que vc176: -I aws-native.init.gradle + prebuilt-jni ARM64 de vc176; solo :app:assembleAgentPreview",
+        "unitTests": "no ejecutados (solo APK, por indicacion del usuario)",
+        "apkSha256": "0973a2d4a9fb19ed6ed3b91847ca843e90dc7cc06ba4b3baacafc644a9a3ecc4",
+        "signingCertSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "s25InstalledAsUpdate": true,
+        "installedHashVerified": true,
+        "unchangedAppDataFiles": 39,
+        "launchVerified": "MainActivity resumed con pantalla bloqueada; 0 crashes; UI sin revisar",
+        "uiQaOnDevice": false,
+        "paidGenerationTested": false,
+        "report": "CONTINUAR.md"
+    },
     "generatorSelection20261101": {
         "branch": "codex/generator-selection-20261101",
         "baseCommit": "42914c91a53f03b86077dc53eb7877e15ce145d7",

@@ -1,3 +1,19 @@
+# Feedback en video vc177 - 04/11/2026
+
+Rama `aki/video-feedback-20261101` sobre vc176 (`fe64efe`). Fuente APK
+`60d53bdbd98261f8ee51f21741d96a12542a1c74`: los 15 puntos del video de Vidal del
+01-11 (sin selector de proyecto en el chat, degradado superior, vista previa con
+S Pen en el carrusel, ArtBox compacta sin Informacion/Detalles/evaluaciones,
+MiniMax H3 Atlas+Crun en una tarjeta con selector de proveedor, un solo boton
+Anadir, barra Agente/ArtBox/Biblioteca sin Lanzadera, Biblioteca sin filtro de
+proyecto, carpetas estilo album) mas 3 arreglos de revision. AWS CodeBuild
+`cbe778bc` (solo :app:assembleAgentPreview, misma receta nativa que vc176; tests
+no ejecutados). APK 1.9.141-agent-preview / vc177 firmada con la identidad
+existente, SHA256 0973a2d4...ecc4, instalada como actualizacion en SM-S938B; hash
+instalado comprobado, 39 ficheros de datos identicos, MainActivity arranca sin
+crash (movil bloqueado: UI sin revisar). Sin generaciones de pago.
+
+
 # Seleccion de generadores vc176 - 01/11/2026
 
 Rama `codex/generator-selection-20261101` sobre `42914c9`. Fuente APK
