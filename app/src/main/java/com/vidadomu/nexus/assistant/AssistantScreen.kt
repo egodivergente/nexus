@@ -809,6 +809,7 @@ private val SPANISH_NAMES = mapOf("argon" to "Argón", "neon" to "Neón", "xenon
 internal fun agentLabel(s: AssistantSettings): String {
     val provider = when {
         s.backend == AssistantSettings.BACKEND_ANTIGRAVITY -> "AGY"
+        s.backend == AssistantSettings.BACKEND_CODEX -> "Codex"
         s.isCustom -> s.brain?.name?.ifBlank { null } ?: "Cerebro propio"
         s.backend == AssistantSettings.BACKEND_ANTHROPIC -> "Claude API"
         s.backend == AssistantSettings.BACKEND_OPENAI -> "OpenAI"
@@ -818,7 +819,7 @@ internal fun agentLabel(s: AssistantSettings): String {
     val model = (if (s.isCustom) s.brain?.modelId else s.modelId).orEmpty()
         .substringAfterLast('/').substringBefore(':').let { id -> if (id.count { it == '.' } >= 2 && id.substringAfterLast('.').any(Char::isLetter)) id.substringAfterLast('.') else id }
         .removeSuffix("-v1").removeSuffix("-v2").split('-', '_').filter { it.isNotBlank() }
-        .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+        .joinToString(" ") { part -> if (part.equals("gpt", ignoreCase = true)) "GPT" else part.replaceFirstChar { it.uppercase() } }
     return listOf(provider, model).filter { it.isNotBlank() }.joinToString(" · ")
 }
 
@@ -1243,6 +1244,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var inputRate by remember { mutableStateOf(s.inputUsdPerM?.toString().orEmpty()) }
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
     var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
+    var nativeImages by remember { mutableStateOf(s.nativeImages) }
     // Cerebros personalizados y BytePlus: el selector los muestra junto a los de siempre.
     val brainStore = vm.runtime.settings.brains
     var brainTick by remember { mutableStateOf(0) }
@@ -1265,7 +1267,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
         error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
             maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
             llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate,
-            antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }), newToken, newSecret, newApiKey)
+            antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }, nativeImages = nativeImages), newToken, newSecret, newApiKey)
         if (error == null) onDismiss()
     }
     NexusSheet("Ajustes del asistente", onDismiss, icon = Icons.Default.AutoAwesome,
@@ -1282,6 +1284,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                             AssistantSettings.BACKEND_OPENAI to "Compatible OpenAI",
                             AssistantSettings.BACKEND_PROXY to "Proxy",
                             AssistantSettings.BACKEND_ANTIGRAVITY to "Antigravity",
+                            AssistantSettings.BACKEND_CODEX to "Codex",
                         ).forEach { (value, label) ->
                             StudioFilterChip(backend == value, {
                                 if (backend != value) { backend = value; apiKey = ""; clearApiKey = false
@@ -1340,11 +1343,21 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                             }
                         }
-                    } else if (backend == AssistantSettings.BACKEND_ANTIGRAVITY) {
-                        Text("Conecta con el puente local de Antigravity CLI (AGY) en el dispositivo o por túnel (127.0.0.1:8788).",
+                    } else if (backend == AssistantSettings.BACKEND_ANTIGRAVITY || backend == AssistantSettings.BACKEND_CODEX) {
+                        val codex = backend == AssistantSettings.BACKEND_CODEX
+                        Text(if (codex) "Codex CLI por el mismo puente local de Termux (127.0.0.1:8788), con tu cuenta de Codex."
+                            else "Conecta con el puente local de Antigravity CLI (AGY) en el dispositivo o por túnel (127.0.0.1:8788).",
                             style = MaterialTheme.typography.bodySmall, color = TextMuted)
                         StudioTextField(agyEndpoint, { agyEndpoint = it.trim() }, shape = NexusTokens.field,
-                            label = { Text("Endpoint del puente AGY (http://127.0.0.1:8788)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            label = { Text(if (codex) "Endpoint del puente (http://127.0.0.1:8788)" else "Endpoint del puente AGY (http://127.0.0.1:8788)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Crear imágenes con su motor", style = MaterialTheme.typography.bodyLarge)
+                                Text(if (codex) "GPT Image de Codex. Se guardan en la Biblioteca." else "Nano Banana de AGY (el que asigne AGY; Lite se descarta). Se guardan en la Biblioteca.",
+                                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                            }
+                            Switch(nativeImages, { nativeImages = it })
+                        }
                     } else if (backend != AssistantSettings.BACKEND_PROXY) {
                         Text("La app firma y llama a Bedrock con tus claves de AWS (guardadas cifradas en el teléfono).", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                         StudioCredentialField(accessKey, { accessKey = it.trim() }, shape = NexusTokens.field, label = { Text("AWS Access Key ID") }, singleLine = true)
@@ -1364,17 +1377,19 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                             AssistantSettings.BACKEND_OPENAI -> "Modelo (id exacto en tu proveedor)"
                             AssistantSettings.BACKEND_ANTHROPIC -> "Modelo de Claude"
                             AssistantSettings.BACKEND_ANTIGRAVITY -> "Modelo de Antigravity (AGY)"
+                            AssistantSettings.BACKEND_CODEX -> "Modelo de Codex"
                             else -> "Model ID / inference profile"
                         }) })
                     val modelChips = when (backend) {
                         AssistantSettings.BACKEND_ANTHROPIC -> AssistantSettings.ANTHROPIC_MODELS
                         AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
+                        AssistantSettings.BACKEND_CODEX -> AssistantSettings.CODEX_MODELS
                         AssistantSettings.BACKEND_OPENAI -> emptyList()
                         else -> AssistantSettings.KNOWN_MODELS
                     }
                     if (!isCustom && modelChips.isNotEmpty()) {
                         // Los modelos de generaciones anteriores no se borran: quedan plegados salvo que uno esté elegido.
-                        val legacyModel = Regex("4-[56]|claude-.*4-6|3\\.[67]-flash")
+                        val legacyModel = Regex("4-[56]|claude-.*4-6|3\\.[67]-flash|gpt-5\\.")
                         val (older, current) = modelChips.partition { legacyModel.containsMatchIn(it.first) }
                         var showOlder by remember(backend) { mutableStateOf(false) }
                         val selectedIsOlder = older.any { it.first == modelId }

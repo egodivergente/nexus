@@ -18,5 +18,7 @@ class ConversationContextTest {
     @Test fun theAgentNameSaysProviderAndModel() {
         assertEquals("AGY · Gemini 3.8 Flash", agentLabel(AssistantSettings(backend = AssistantSettings.BACKEND_ANTIGRAVITY, modelId = "gemini-3.8-flash")))
         assertEquals("Bedrock · Claude Sonnet 4 6", agentLabel(AssistantSettings(modelId = "us.anthropic.claude-sonnet-4-6")))
+        assertEquals("Codex · GPT 6.1 Sol", agentLabel(AssistantSettings(backend = AssistantSettings.BACKEND_CODEX, modelId = "gpt-6.1-sol")))
+        assertEquals("Sol", shortModelName("Codex · GPT 6.1 Sol"))
     }
 }

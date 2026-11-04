@@ -35,6 +35,7 @@ internal fun AssistantImagePreview(media: Attachment) {
     Column {
         AsyncImage(model = media.uri, contentDescription = "Ampliar ${media.name ?: "imagen del agente"}", contentScale = ContentScale.Fit,
             modifier = Modifier.width(280.dp).height(220.dp).clip(NexusTokens.card).clickable { opened = true })
+        media.caption?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
         com.vidadomu.nexus.ui.components.NexusTonalAction("Ampliar", { opened = true }, icon = Icons.Default.ZoomIn, description = "Ampliar imagen")
     }
     if (opened) AssistantImageForeground(media) { opened = false }

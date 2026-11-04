@@ -4,6 +4,7 @@ import com.vidadomu.nexus.agent.core.assets.AssetIndex
 import com.vidadomu.nexus.agent.core.config.AgentConfig
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.llm.ContentBlock
+import com.vidadomu.nexus.agent.core.llm.GeneratedMedia
 import com.vidadomu.nexus.agent.core.llm.LlmException
 import com.vidadomu.nexus.agent.core.llm.LlmMessage
 import com.vidadomu.nexus.agent.core.llm.LlmProvider
@@ -42,6 +43,11 @@ fun interface AttachmentDocumentLoader {
 /** Sampled visual frames and their timestamps; never audio or the original video. */
 fun interface AttachmentVideoLoader {
     suspend fun load(attachment: Attachment): List<ContentBlock>
+}
+
+/** Keeps an image the brain made with its own engine (library file + asset) and returns what the chat shows. */
+fun interface GeneratedMediaStore {
+    suspend fun save(media: GeneratedMedia, session: AgentSession): Attachment
 }
 
 /** Una conversación con el asistente: historial para el LLM + estado compartido por las herramientas. */
@@ -97,6 +103,7 @@ class AgentOrchestrator(
     private val uiContext: (() -> String?)? = null,
     /** Encargos verificados para contrastar lo que el agente afirma. */
     private val verifiedOrders: (() -> List<com.vidadomu.nexus.agent.core.orders.Order>)? = null,
+    private val generatedMedia: GeneratedMediaStore? = null,
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -239,8 +246,11 @@ class AgentOrchestrator(
                 throw e
             }
             input += response.usage.inputTokens; output += response.usage.outputTokens
+            response.notices.forEach { onEvent(UiEvent.Info(it)) }
+            val keptMedia = keepGeneratedMedia(response.generatedMedia, session, onEvent)
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
-            conv.messages += msg
+            // The library ids stay in the history so later turns can reuse the image with Nexus tools.
+            conv.messages += keptMedia?.let { msg.copy(content = msg.content + ContentBlock.Text(it)) } ?: msg
             if (msg.content.any { it is ContentBlock.Reasoning }) conv.reasoningModelId = config.modelId
             msg.text().takeIf { it.isNotBlank() }?.let { turnTexts += it }
             if (readingDocuments) {
@@ -337,6 +347,28 @@ class AgentOrchestrator(
         TurnResult(finalText, events, Usage(input, output), rounds, calls, stop,
             verifiedNotes = unresolved.map { "Estado verificado: ${it.truth}" }.distinct(), selfCorrected = selfCorrected)
     } }
+
+    private suspend fun keepGeneratedMedia(media: List<GeneratedMedia>, session: AgentSession, onEvent: (UiEvent) -> Unit): String? {
+        if (media.isEmpty()) return null
+        val store = generatedMedia ?: run {
+            onEvent(UiEvent.Info("${media.first().engine} creó ${media.size} imagen(es), pero este cerebro no tiene dónde guardarlas."))
+            return null
+        }
+        val kept = mutableListOf<String>()
+        for (item in media) {
+            try {
+                val attachment = store.save(item, session)
+                session.showMedia(attachment)
+                kept += "asset_id=${attachment.id} «${attachment.name ?: item.filename}»"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.log("W", "imagen de ${item.engine} sin guardar: ${e.javaClass.simpleName}: ${Redactor.redact(e.message ?: "")}")
+                onEvent(UiEvent.Info("No se pudo guardar la imagen «${item.filename}» de ${item.engine}: ${Redactor.redact(e.message ?: e.javaClass.simpleName).take(160)}"))
+            }
+        }
+        return kept.takeIf { it.isNotEmpty() }?.let { "[Nexus guardó en la Biblioteca y mostró en el chat: ${it.joinToString("; ")}]" }
+    }
 
     private fun verificationPrompt(c: List<ClaimVerifier.Contradiction>): String = buildString {
         appendLine("[Verificación automática de Nexus — no es un mensaje del usuario]")

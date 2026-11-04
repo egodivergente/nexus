@@ -37,7 +37,8 @@ import okhttp3.Response
 
 /**
  * Proveedor LLM que reutiliza el puente local de AXEL (`/root/axel-native-v2/bridge/server.ts`)
- * hacia Antigravity CLI (`/root/.local/bin/agy --mode agent --output-format stream-json`).
+ * hacia Antigravity CLI (`/root/.local/bin/agy --mode agent --output-format stream-json`) o, con [BridgeEngine.CODEX],
+ * hacia Codex CLI (`codex exec`).
  *
  * Compatible tanto con el contrato actual de AXEL Native (`POST /v1/chat`, SSE `text_delta` + `final`,
  * `POST /v1/jobs/cancel`, `GET /health`) como con el endpoint legado (`POST /v1/chat/stream`, SSE `done`).
@@ -50,8 +51,25 @@ class AntigravityProvider(
     endpoint: String = DEFAULT_ENDPOINT,
     private val sessionId: () -> String = { DEFAULT_CONVERSATION_ID },
     private val client: OkHttpClient = defaultHttpClient(),
+    private val engine: BridgeEngine = BridgeEngine.ANTIGRAVITY,
+    /** The brain may create images with its own engine; the bridge hands them over as `artifact` events. */
+    private val nativeImages: Boolean = false,
 ) : StreamingLlmProvider {
-    override val id: String = "antigravity"
+    /** The same AXEL bridge serves several CLIs; [bridgeProvider] is the name it routes by. */
+    enum class BridgeEngine(
+        val providerId: String,
+        val bridgeProvider: String,
+        val label: String,
+        val shortLabel: String,
+        val jobPrefix: String,
+        val defaultModel: String,
+        val imageTool: String,
+    ) {
+        ANTIGRAVITY("antigravity", "gemini", "Antigravity (AGY)", "AGY", "nexus-agy-", AntigravityProvider.DEFAULT_MODEL, "generate_image (Nano Banana)"),
+        CODEX("codex", "codex", "Codex", "Codex", "nexus-codex-", AntigravityProvider.CODEX_DEFAULT_MODEL, "generación de imágenes de Codex (GPT Image)"),
+    }
+
+    override val id: String = engine.providerId
     private val baseUrl = endpoint.trim().trimEnd('/').ifBlank { DEFAULT_ENDPOINT }
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -69,7 +87,7 @@ class AntigravityProvider(
         onTextDelta: (String) -> Unit,
     ): LlmResponse = withContext(Dispatchers.IO) {
         val conversationId = request.conversationId?.takeIf { it.isNotBlank() } ?: sessionId()
-        val jobId = "nexus-agy-${UUID.randomUUID()}"
+        val jobId = "${engine.jobPrefix}${UUID.randomUUID()}"
         val payload = encodeStreamRequest(request, conversationId, jobId)
         val bodyBytes = payload.toString().toByteArray(StandardCharsets.UTF_8)
         val activeCalls = java.util.Collections.synchronizedList(mutableListOf<Call>())
@@ -102,7 +120,7 @@ class AntigravityProvider(
                 }
                 val body = res.body ?: throw LlmException(
                     LlmException.Kind.PROTOCOL,
-                    "El puente Antigravity cerró la respuesta sin contenido.",
+                    "El puente de ${engine.label} cerró la respuesta sin contenido.",
                 )
                 try {
                     BufferedReader(InputStreamReader(body.byteStream(), StandardCharsets.UTF_8)).use { reader ->
@@ -120,7 +138,7 @@ class AntigravityProvider(
                     }
                     throw LlmException(
                         LlmException.Kind.NETWORK,
-                        "Conexión interrumpida con el puente Antigravity: ${Redactor.redact(e.message ?: "stream cerrado")}",
+                        "Conexión interrumpida con el puente de ${engine.label}: ${Redactor.redact(e.message ?: "stream cerrado")}",
                     )
                 }
             }
@@ -151,12 +169,12 @@ class AntigravityProvider(
         } catch (e: ConnectException) {
             throw LlmException(
                 LlmException.Kind.NETWORK,
-                "Antigravity (AGY) no está disponible en $baseUrl. Verifica que el puente de Termux esté activo o elige otro proveedor LLM.",
+                "${engine.label} no está disponible en $baseUrl. Verifica que el puente de Termux esté activo o elige otro proveedor LLM.",
             )
         } catch (e: SocketTimeoutException) {
             throw LlmException(
                 LlmException.Kind.NETWORK,
-                "Tiempo de espera agotado conectando con Antigravity (AGY) en $baseUrl.",
+                "Tiempo de espera agotado conectando con ${engine.label} en $baseUrl.",
             )
         } catch (e: IOException) {
             if (!coroutineContext.isActive) {
@@ -165,7 +183,7 @@ class AntigravityProvider(
             }
             throw LlmException(
                 LlmException.Kind.NETWORK,
-                "No se pudo conectar con Antigravity (AGY) en $baseUrl: ${Redactor.redact(e.message ?: "error de red")}",
+                "No se pudo conectar con ${engine.label} en $baseUrl: ${Redactor.redact(e.message ?: "error de red")}",
             )
         }
     }
@@ -177,10 +195,10 @@ class AntigravityProvider(
                 if (!res.isSuccessful) return@use false
                 val obj = json.parseToJsonElement(res.body?.string().orEmpty()).jsonObject
                 val ok = obj["ok"]?.jsonPrimitive?.contentOrNull == "true"
-                val geminiReady = obj["providers"]?.jsonObject
-                    ?.get("gemini")?.jsonObject
+                val engineReady = obj["providers"]?.jsonObject
+                    ?.get(engine.bridgeProvider)?.jsonObject
                     ?.get("ready")?.jsonPrimitive?.contentOrNull
-                ok && (geminiReady == null || geminiReady == "true")
+                ok && (engineReady == null || engineReady == "true")
             }
         }.getOrDefault(false)
     }
@@ -238,6 +256,7 @@ class AntigravityProvider(
         var lastEmittedVisible = ""
         var inputTokens = 0
         var outputTokens = 0
+        val artifacts = linkedMapOf<String, BridgeArtifact>()
 
         fun flushEvent() {
             if (dataLines.isEmpty()) {
@@ -263,6 +282,10 @@ class AntigravityProvider(
                         }
                     }
                 }
+                "artifact" -> if (nativeImages) {
+                    val artifact = parseArtifact(payload)
+                    if (artifact != null && artifact.fetchPath !in artifacts) artifacts[artifact.fetchPath] = artifact
+                }
                 "usage" -> {
                     inputTokens = payload["input_tokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: inputTokens
                     outputTokens = payload["output_tokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: outputTokens
@@ -270,7 +293,7 @@ class AntigravityProvider(
                 "error" -> {
                     val msg = payload["message"]?.jsonPrimitive?.contentOrNull
                         ?: payload["error"]?.jsonPrimitive?.contentOrNull
-                        ?: "Antigravity devolvió un error."
+                        ?: "${engine.label} devolvió un error."
                     val code = payload["code"]?.jsonPrimitive?.contentOrNull.orEmpty()
                     streamError = mapBridgeError(code, msg)
                 }
@@ -281,7 +304,7 @@ class AntigravityProvider(
                     when (status) {
                         "cancelled", "canceled" -> cancelledByBridge = true
                         "failed", "error" -> {
-                            streamError = mapBridgeError("final_failed", errorMsg ?: "El puente Antigravity no pudo completar la respuesta.")
+                            streamError = mapBridgeError("final_failed", errorMsg ?: "El puente de ${engine.label} no pudo completar la respuesta.")
                         }
                         else -> {
                             val current = fullText.toString()
@@ -343,17 +366,83 @@ class AntigravityProvider(
             content += ContentBlock.Text(parsed.visibleText)
         }
         content += parsed.toolUses
-        if (content.isEmpty() || parsed.toolUses.isEmpty() && parsed.visibleText.trim() in setOf("…", "...")) {
+        val notices = mutableListOf<String>()
+        val media = artifacts.values.mapNotNull { artifact -> receiveArtifact(artifact, notices) }
+        if (content.isEmpty() && media.isNotEmpty()) content += ContentBlock.Text("Imagen creada.")
+        if (content.isEmpty() || parsed.toolUses.isEmpty() && media.isEmpty() && parsed.visibleText.trim() in setOf("…", "...")) {
             throw LlmException(LlmException.Kind.PROTOCOL,
-                "Antigravity terminó sin devolver texto ni herramientas. El mensaje se conserva; puedes reintentar la respuesta.")
+                "${engine.label} terminó sin devolver texto ni herramientas. El mensaje se conserva; puedes reintentar la respuesta.")
         }
         val stopReason = if (parsed.toolUses.isNotEmpty()) StopReason.TOOL_USE else StopReason.END_TURN
         return LlmResponse(
             message = LlmMessage(Role.ASSISTANT, content),
             stopReason = stopReason,
             usage = Usage(inputTokens, outputTokens),
+            generatedMedia = media,
+            notices = notices,
         )
     }
+
+    internal data class BridgeArtifact(
+        val fetchPath: String,
+        val mimeType: String?,
+        val filename: String,
+        val model: String?,
+        val width: Int?,
+        val height: Int?,
+    )
+
+    /** Only images created by the engine's image tool: a tool that merely reads an image also yields an artifact. */
+    private fun parseArtifact(payload: JsonObject): BridgeArtifact? {
+        fun text(key: String) = (payload[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() && it != "null" }
+        val mime = text("mimeType")
+        if (text("kind") != "image" && mime?.startsWith("image/") != true) return null
+        if (!IMAGE_TOOL.containsMatchIn(text("originatingTool").orEmpty())) return null
+        val fetchPath = text("fetchPath")?.takeIf { it.startsWith("/v1/artifacts/") && ".." !in it } ?: return null
+        return BridgeArtifact(
+            fetchPath = fetchPath,
+            mimeType = mime,
+            filename = text("filename") ?: fetchPath.substringAfterLast('/'),
+            model = text("model") ?: text("imageModel"),
+            width = text("width")?.toIntOrNull(),
+            height = text("height")?.toIntOrNull(),
+        )
+    }
+
+    private fun receiveArtifact(artifact: BridgeArtifact, notices: MutableList<String>): GeneratedMedia? {
+        val modelName = NativeImageModels.label(artifact.model)
+        if (NativeImageModels.isRejected(artifact.model)) {
+            notices += "Imagen descartada: ${engine.shortLabel} la generó con $modelName (${artifact.model}), que tienes vetado. Pídela de nuevo."
+            return null
+        }
+        return try {
+            val req = Request.Builder().url("$baseUrl${artifact.fetchPath}").get().build()
+            downloadClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) throw IOException("HTTP ${res.code}")
+                val body = res.body ?: throw IOException("respuesta vacía")
+                if (body.contentLength() > MAX_ARTIFACT_BYTES) throw IOException("supera ${MAX_ARTIFACT_BYTES / 1_000_000} MB")
+                val bytes = body.byteStream().use { input ->
+                    val out = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        out.write(buffer, 0, n)
+                        if (out.size() > MAX_ARTIFACT_BYTES) throw IOException("supera ${MAX_ARTIFACT_BYTES / 1_000_000} MB")
+                    }
+                    out.toByteArray()
+                }
+                val mime = artifact.mimeType ?: body.contentType()?.let { "${it.type}/${it.subtype}" }
+                if (bytes.isEmpty() || mime?.startsWith("image/") != true) throw IOException("no es una imagen")
+                GeneratedMedia(bytes, mime, artifact.filename, engine.shortLabel, artifact.model, artifact.width, artifact.height)
+            }
+        } catch (e: IOException) {
+            notices += "No se recibió la imagen «${artifact.filename}» de ${engine.shortLabel}: ${Redactor.redact(e.message ?: "error de red").take(160)}. Sigue en el puente."
+            null
+        }
+    }
+
+    private val downloadClient by lazy { client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build() }
 
     internal fun encodeStreamRequest(
         request: LlmRequest,
@@ -397,8 +486,8 @@ class AntigravityProvider(
         return buildJsonObject {
             put("jobId", jobId)
             put("conversationId", conversationId)
-            put("provider", "gemini")
-            put("model", request.modelId.ifBlank { DEFAULT_MODEL })
+            put("provider", engine.bridgeProvider)
+            put("model", request.modelId.ifBlank { engine.defaultModel })
             put("prompt", promptForTurn)
             put("messages", buildJsonArray { encodedMessages.forEach { add(it) } })
         }
@@ -440,6 +529,10 @@ class AntigravityProvider(
         }
         appendLine("IMPORTANTE: Estás ejecutándote como el cerebro integrado de la aplicación Android Nexus.")
         appendLine("NO ejecutes comandos bash del servidor ni herramientas de escritorio para responder sobre Nexus; utiliza exclusivamente las herramientas Android de Nexus descritas a continuación.")
+        if (nativeImages) {
+            appendLine("EXCEPCIÓN — imágenes con tu propio motor: puedes usar tu herramienta nativa ${engine.imageTool} para crear o editar imágenes cuando el usuario pida una imagen sin nombrar un modelo del catálogo de Nexus, o cuando pida expresamente tu motor.")
+            appendLine("Nexus recibe el archivo, lo guarda en su Biblioteca y lo muestra en el chat: no lo copies a otras carpetas ni inventes rutas. Si el usuario nombra un modelo del catálogo (Seedream, Flux, Kling…) o pide vídeo o audio, usa las herramientas de Nexus.")
+        }
         if (tools.isNotEmpty()) {
             appendLine()
             appendLine("## Herramientas Android de Nexus disponibles")
@@ -513,7 +606,7 @@ class AntigravityProvider(
                 LlmException.Kind.UPSTREAM
             else -> LlmException.Kind.UPSTREAM
         }
-        return LlmException(kind, "Antigravity (AGY): $clean")
+        return LlmException(kind, "${engine.label}: $clean")
     }
 
     private fun mapHttpError(status: Int, rawBody: String): LlmException {
@@ -530,13 +623,16 @@ class AntigravityProvider(
             in 500..599 -> LlmException.Kind.UPSTREAM
             else -> LlmException.Kind.PROTOCOL
         }
-        return LlmException(kind, "Antigravity (AGY) devolvió HTTP $status: $clean", status)
+        return LlmException(kind, "${engine.label} devolvió HTTP $status: $clean", status)
     }
 
     companion object {
         const val DEFAULT_ENDPOINT = "http://127.0.0.1:8788"
         const val DEFAULT_MODEL = "gemini-3.8-flash"
+        const val CODEX_DEFAULT_MODEL = "gpt-6-astra"
         private const val DEFAULT_CONVERSATION_ID = "nexus-agy-default"
+        private const val MAX_ARTIFACT_BYTES = 40_000_000L
+        private val IMAGE_TOOL = Regex("(?i)(generat|creat|edit|gen).*image|image.*(generat|creat|edit|gen)")
         private const val TOOL_OPEN_TAG = "<NEXUS_TOOL_CALL>"
         /** Document formats whose bytes are UTF-8 text and can travel inside the prompt. */
         val TEXT_DOCUMENTS = setOf("txt", "md", "csv", "html")

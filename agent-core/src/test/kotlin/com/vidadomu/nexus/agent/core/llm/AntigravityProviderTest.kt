@@ -162,6 +162,108 @@ class AntigravityProviderTest {
         }
     }
 
+    private fun userTurn(text: String, model: String = "gemini-3.8-flash") = LlmRequest(
+        modelId = model,
+        system = listOf("Eres Nexus."),
+        messages = listOf(LlmMessage(Role.USER, listOf(ContentBlock.Text(text)))),
+        tools = emptyList(),
+        maxTokens = 1024,
+        conversationId = "conv-img",
+    )
+
+    private fun artifactEvent(model: String?, tool: String = "generate_image", fetchPath: String = "/v1/artifacts/abc123") =
+        """data: {"type":"artifact","artifactId":"abc123","originatingTool":"$tool","kind":"image","mimeType":"image/png","filename":"gato.png",""" +
+            """"fetchPath":"$fetchPath","sizeBytes":4,"width":1024,"height":768${model?.let { ",\"model\":\"$it\"" }.orEmpty()},"status":"completed"}""" + "\n\n"
+
+    private fun imageServer(sse: String, png: ByteArray = byteArrayOf(1, 2, 3, 4)): MockWebServer = MockWebServer().apply {
+        dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/v1/artifacts/abc123" -> MockResponse().setHeader("Content-Type", "image/png").setBody(okio.Buffer().write(png))
+                else -> MockResponse().setHeader("Content-Type", "text/event-stream").setBody(sse)
+            }
+        }
+    }
+
+    @Test fun `codex usa el mismo puente con su proveedor, modelo y jobId propios`() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"type\":\"text_delta\",\"text\":\"Hola desde Codex.\"}\n\n" +
+                    "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Hola desde Codex.\",\"provider\":\"codex\",\"error\":null}\n\n"))
+            val provider = AntigravityProvider(server.url("/").toString(), engine = AntigravityProvider.BridgeEngine.CODEX)
+            val response = provider.complete(userTurn("Hola", model = ""))
+            val body = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+            assertEquals("codex", provider.id)
+            assertEquals("codex", body["provider"]?.jsonPrimitive?.content)
+            assertEquals(AntigravityProvider.CODEX_DEFAULT_MODEL, body["model"]?.jsonPrimitive?.content)
+            assertTrue(body["jobId"]!!.jsonPrimitive.content.startsWith("nexus-codex-"))
+            assertEquals("Hola desde Codex.", response.message.text())
+            assertTrue(response.generatedMedia.isEmpty())
+        }
+    }
+
+    @Test fun `la imagen del motor propio llega con su modelo y se descarga del puente`() = runTest {
+        val png = byteArrayOf(-119, 80, 78, 71)
+        val sse = artifactEvent("gemini-3.1-flash-image") +
+            "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Aquí tienes el gato.\",\"error\":null}\n\n"
+        imageServer(sse, png).use { server ->
+            val response = AntigravityProvider(server.url("/").toString(), nativeImages = true).complete(userTurn("Hazme un gato"))
+            val sent = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+            assertTrue(sent["prompt"]!!.jsonPrimitive.content.contains("generate_image"), "AGY debe saber que puede usar su motor")
+            val image = response.generatedMedia.single()
+            assertTrue(image.bytes.contentEquals(png))
+            assertEquals("AGY", image.engine)
+            assertEquals("gemini-3.1-flash-image", image.model)
+            assertEquals("gato.png", image.filename)
+            assertEquals(1024, image.width)
+            assertEquals("Aquí tienes el gato.", response.message.text())
+            assertTrue(response.notices.isEmpty())
+        }
+    }
+
+    @Test fun `una imagen de Nano Banana Lite se descarta sin descargarla`() = runTest {
+        val sse = artifactEvent("gemini-3.1-flash-image-lite") +
+            "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Listo.\",\"error\":null}\n\n"
+        imageServer(sse).use { server ->
+            val response = AntigravityProvider(server.url("/").toString(), nativeImages = true).complete(userTurn("Hazme un gato"))
+            assertTrue(response.generatedMedia.isEmpty())
+            assertTrue(response.notices.single().contains("Nano Banana 2 Lite"))
+            assertEquals(1, server.requestCount, "No se descarga una imagen vetada")
+        }
+    }
+
+    @Test fun `sin permiso de imagenes o si la herramienta solo lee una imagen no se importa nada`() = runTest {
+        val sse = artifactEvent("gemini-3.1-flash-image") + artifactEvent(null, tool = "view_file", fetchPath = "/v1/artifacts/other") +
+            "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Listo.\",\"error\":null}\n\n"
+        imageServer(sse).use { server ->
+            val response = AntigravityProvider(server.url("/").toString()).complete(userTurn("Hola"))
+            val sent = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+            assertTrue("EXCEPCIÓN" !in sent["prompt"]!!.jsonPrimitive.content)
+            assertTrue(response.generatedMedia.isEmpty())
+            assertEquals(1, server.requestCount)
+        }
+        imageServer(artifactEvent(null, tool = "view_file") + "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Listo.\",\"error\":null}\n\n").use { server ->
+            val response = AntigravityProvider(server.url("/").toString(), nativeImages = true).complete(userTurn("Mira esta foto"))
+            assertTrue(response.generatedMedia.isEmpty())
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun `si el puente no entrega la imagen el texto llega y se avisa`() = runTest {
+        MockWebServer().use { server ->
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                    "/v1/artifacts/abc123" -> MockResponse().setResponseCode(404).setBody("""{"error":"artifact_missing"}""")
+                    else -> MockResponse().setHeader("Content-Type", "text/event-stream").setBody(artifactEvent(null) +
+                        "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Hecho.\",\"error\":null}\n\n")
+                }
+            }
+            val response = AntigravityProvider(server.url("/").toString(), nativeImages = true).complete(userTurn("Hazme un gato"))
+            assertEquals("Hecho.", response.message.text())
+            assertTrue(response.generatedMedia.isEmpty())
+            assertTrue(response.notices.single().contains("HTTP 404"))
+        }
+    }
+
     @Test fun `cancelar turno invoca v1 jobs cancel en el puente AGY`() = runTest {
         val cancelRequests = mutableListOf<String>()
         MockWebServer().use { server ->

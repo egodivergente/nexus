@@ -27,6 +27,8 @@ data class Attachment(
     val height: Int? = null,
     val durationSec: Double? = null,
     val assetId: String? = null,
+    /** Shown under the media in the chat, e.g. who created an image («AGY · Nano Banana 2»). */
+    val caption: String? = null,
 )
 
 /** Eventos para la UI: tarjetas de plan, propuestas a aplicar, etc. */

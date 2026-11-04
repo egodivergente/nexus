@@ -56,7 +56,29 @@ enum class StopReason { END_TURN, TOOL_USE, MAX_TOKENS, STOP_SEQUENCE, GUARDRAIL
 
 data class Usage(val inputTokens: Int, val outputTokens: Int)
 
-data class LlmResponse(val message: LlmMessage, val stopReason: StopReason, val usage: Usage)
+/** Image created by the brain's own engine during the turn (AGY generate_image, Codex image generation). */
+class GeneratedMedia(
+    val bytes: ByteArray,
+    val mimeType: String,
+    val filename: String,
+    /** «AGY», «Codex». */
+    val engine: String,
+    /** Image model reported by the bridge; null when it does not say. */
+    val model: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+) {
+    override fun toString() = "GeneratedMedia($engine, $mimeType, ${bytes.size} bytes)"
+}
+
+data class LlmResponse(
+    val message: LlmMessage,
+    val stopReason: StopReason,
+    val usage: Usage,
+    val generatedMedia: List<GeneratedMedia> = emptyList(),
+    /** Facts the user must see about this response (an image discarded or not received). */
+    val notices: List<String> = emptyList(),
+)
 
 interface LlmProvider {
     val id: String

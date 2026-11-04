@@ -51,7 +51,7 @@ internal object AlexiaBrandAssets {
             "luma" in text -> R.drawable.alexia_luma
             "pika" in text -> R.drawable.alexia_pika
             "runway" in text -> R.drawable.alexia_runway
-            "gpt" in text || "openai" in text -> R.drawable.alexia_openai
+            "gpt" in text || "openai" in text || "codex" in text -> R.drawable.alexia_openai
             "veo" in text || "gemini" in text || "google" in text || "imagen" in text -> R.drawable.alexia_google
             "claude" in text || "anthropic" in text -> R.drawable.alexia_claude
             "deepseek" in text -> R.drawable.alexia_deepseek

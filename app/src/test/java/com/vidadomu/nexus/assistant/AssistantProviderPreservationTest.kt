@@ -38,6 +38,18 @@ class AssistantProviderPreservationTest {
         assertTrue(agyBlankEndpoint.offline)
     }
 
+    @Test fun codexSharesTheLocalBridgeAndCreatesImagesByDefault() {
+        val codex = AssistantSettings(backend = AssistantSettings.BACKEND_CODEX, modelId = AssistantSettings.DEFAULT_CODEX_MODEL)
+        assertFalse(codex.offline)
+        assertTrue(codex.bridge)
+        assertTrue(codex.nativeImages)
+        assertEquals("codex", codex.toConfig().provider)
+        assertEquals(AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT, codex.toConfig().endpoint)
+        assertTrue(codex.copy(antigravityEndpoint = "").offline)
+        assertTrue(AssistantSettings.CODEX_MODELS.any { it.first == AssistantSettings.DEFAULT_CODEX_MODEL })
+        assertFalse(AssistantSettings().bridge)
+    }
+
     @Test fun existingProvidersKeepTheirOfflineAndCredentialRules() {
         assertTrue(AssistantSettings(backend = AssistantSettings.BACKEND_DIRECT, awsAccessKeyId = "", maskedAwsSecret = "").offline)
         assertFalse(AssistantSettings(backend = AssistantSettings.BACKEND_DIRECT, awsAccessKeyId = "AKIA123", maskedAwsSecret = "••••").offline)

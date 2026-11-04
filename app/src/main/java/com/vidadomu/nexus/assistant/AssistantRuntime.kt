@@ -50,6 +50,7 @@ import java.io.File
  *  - «openai»: cualquier endpoint compatible con OpenAI.
  *  - «proxy»: APK → proxy → Bedrock con un token de dispositivo.
  *  - «antigravity»: puente local AXEL/Termux hacia Antigravity CLI (`127.0.0.1:8788`).
+ *  - «codex»: el mismo puente hacia Codex CLI.
  * Sin credenciales del backend elegido se usa el planificador local (sin LLM).
  */
 data class AssistantSettings(
@@ -75,6 +76,8 @@ data class AssistantSettings(
     val outputUsdPerM: Double? = null,
     /** Endpoint del puente local de Antigravity CLI (por defecto http://127.0.0.1:8788). */
     val antigravityEndpoint: String = DEFAULT_ANTIGRAVITY_ENDPOINT,
+    /** AGY y Codex pueden crear imágenes con su propio motor (Nano Banana / GPT Image); llegan a la Biblioteca. */
+    val nativeImages: Boolean = true,
     /** Cerebro personalizado activo (backend «custom:<id>»): BytePlus o uno añadido por el usuario. */
     val brain: BrainProfile? = null,
     val brainHasKey: Boolean = false,
@@ -84,6 +87,8 @@ data class AssistantSettings(
     val excludedSet: Set<String> get() = parseFamilies(excludedFamilies)
     val direct: Boolean get() = backend == BACKEND_DIRECT
     val antigravity: Boolean get() = backend == BACKEND_ANTIGRAVITY
+    /** Cerebros servidos por el puente local de Termux (AGY o Codex). */
+    val bridge: Boolean get() = backend == BACKEND_ANTIGRAVITY || backend == BACKEND_CODEX
     val isCustom: Boolean get() = backend.startsWith(BrainStore.PREFIX)
     /** Límites efectivos: los globales con lo que defina el cerebro activo por encima. */
     val effectiveLimits: AgentLimits get() = brain?.let { limits.with(it.limits) } ?: limits
@@ -96,7 +101,7 @@ data class AssistantSettings(
         BACKEND_ANTHROPIC -> maskedApiKey.isBlank()
         // Un servidor local puede no pedir clave; uno remoto sí.
         BACKEND_OPENAI -> llmBaseUrl.isBlank() || (maskedApiKey.isBlank() && !LOCAL_URL.matches(llmBaseUrl.trim()))
-        BACKEND_ANTIGRAVITY -> antigravityEndpoint.isBlank()
+        BACKEND_ANTIGRAVITY, BACKEND_CODEX -> antigravityEndpoint.isBlank()
         else -> awsAccessKeyId.isBlank() || maskedAwsSecret.isBlank() || region.isBlank()
     }
 
@@ -108,10 +113,11 @@ data class AssistantSettings(
             backend == BACKEND_ANTHROPIC -> "anthropic"
             backend == BACKEND_OPENAI -> "openai-compatible"
             backend == BACKEND_ANTIGRAVITY -> "antigravity"
+            backend == BACKEND_CODEX -> "codex"
             else -> "bedrock-direct"
         },
         modelId = modelId.ifBlank { "offline" }, region = region,
-        endpoint = if (backend == BACKEND_ANTIGRAVITY) antigravityEndpoint else endpoint,
+        endpoint = if (bridge) antigravityEndpoint else endpoint,
         temperature = brain?.temperature ?: temperature, maxTokens = effectiveLimits.maxTokens, maxToolRounds = effectiveLimits.rounds,
         mode = AgentMode.AGENT, sendImagesToLlm = visionEnabled, limits = effectiveLimits,
     )
@@ -122,6 +128,8 @@ data class AssistantSettings(
         const val BACKEND_ANTHROPIC = "anthropic"
         const val BACKEND_OPENAI = "openai"
         const val BACKEND_ANTIGRAVITY = "antigravity"
+        const val BACKEND_CODEX = "codex"
+        const val DEFAULT_CODEX_MODEL = AntigravityProvider.CODEX_DEFAULT_MODEL
         const val DEFAULT_ANTIGRAVITY_ENDPOINT = AntigravityProvider.DEFAULT_ENDPOINT
         const val DEFAULT_ANTIGRAVITY_MODEL = AntigravityProvider.DEFAULT_MODEL
         val LOCAL_URL = Regex("^http://(127\\.0\\.0\\.1|localhost)(:\\d+)?(/.*)?$")
@@ -138,6 +146,17 @@ data class AssistantSettings(
             "claude-sonnet-4-6" to "Claude Sonnet 4.6",
             "claude-opus-4-6-thinking" to "Opus 4.6 Thinking",
             "gemini-fast" to "Auto (Rápido)",
+        )
+        /** Modelos de Codex CLI que anuncia el puente (`/health` → providers.codex.models). */
+        val CODEX_MODELS = listOf(
+            DEFAULT_CODEX_MODEL to "GPT-6 Astra",
+            "gpt-6.1-sol" to "GPT-6.1 Sol",
+            "gpt-6.1-terra" to "GPT-6.1 Terra",
+            "gpt-6-sol" to "GPT-6 Sol",
+            "gpt-6-luna" to "GPT-6 Luna",
+            "gpt-5.6-sol" to "GPT-5.6 Sol",
+            "gpt-5.6-terra" to "GPT-5.6 Terra",
+            "gpt-5.6-luna" to "GPT-5.6 Luna",
         )
         /** Puntos de acceso compatibles con OpenAI más habituales; el modelo lo escribe el usuario. */
         val OPENAI_PRESETS = listOf(
@@ -265,12 +284,15 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         outputUsdPerM = prefs.getString("llm_output_usd_m", null)?.toDoubleOrNull(),
         antigravityEndpoint = prefs.getString("antigravity_endpoint", AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT)
             .orEmpty().ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
+        nativeImages = prefs.getBoolean("native_images", true),
     )
 
     /** Devuelve el último modelo guardado para [backend] sin perder la configuración de los demás proveedores. */
     fun savedModelFor(backend: String): String = when (backend) {
         AssistantSettings.BACKEND_ANTIGRAVITY ->
             prefs.getString("model_id_antigravity", AssistantSettings.DEFAULT_ANTIGRAVITY_MODEL).orEmpty().ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_MODEL }
+        AssistantSettings.BACKEND_CODEX ->
+            prefs.getString("model_id_codex", AssistantSettings.DEFAULT_CODEX_MODEL).orEmpty().ifBlank { AssistantSettings.DEFAULT_CODEX_MODEL }
         AssistantSettings.BACKEND_ANTHROPIC ->
             prefs.getString("model_id_anthropic", AssistantSettings.ANTHROPIC_MODELS.first().first).orEmpty().ifBlank { AssistantSettings.ANTHROPIC_MODELS.first().first }
         AssistantSettings.BACKEND_OPENAI ->
@@ -339,7 +361,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
             .putString("model_id_${s.backend}", trimmedModel)
             .putString("region", s.region.trim())
             .putString("temperature", s.temperature?.toString()).putInt("max_tokens", s.maxTokens.coerceAtLeast(1))
-            .putString("mode", s.mode.name).putBoolean("send_images", s.sendImages)
+            .putString("mode", s.mode.name).putBoolean("send_images", s.sendImages).putBoolean("native_images", s.nativeImages)
             .putString("excluded_families", AssistantSettings.parseFamilies(s.excludedFamilies).joinToString(", ")).apply()
         val access = s.awsAccessKeyId.trim()
         if (access.isBlank()) secure.clearProviderApiKey(AWS_ACCESS_ID) else secure.saveProviderApiKey(AWS_ACCESS_ID, access)
@@ -362,7 +384,8 @@ class AssistantSettingsStore(private val app: NexusApplication) {
             require(
                 AssistantSettings.KNOWN_MODELS.any { pair -> pair.first == it } ||
                     AssistantSettings.ANTHROPIC_MODELS.any { pair -> pair.first == it } ||
-                    AssistantSettings.ANTIGRAVITY_MODELS.any { pair -> pair.first == it }
+                    AssistantSettings.ANTIGRAVITY_MODELS.any { pair -> pair.first == it } ||
+                    AssistantSettings.CODEX_MODELS.any { pair -> pair.first == it }
             )
             edit.putString("model_id", it)
         }
@@ -454,8 +477,10 @@ class AssistantRuntime(private val app: NexusApplication) {
     fun llm(s: AssistantSettings): LlmProvider =
         when {
             s.offline -> OfflinePlannerProvider()
-            s.backend == AssistantSettings.BACKEND_ANTIGRAVITY -> AntigravityProvider(
+            s.bridge -> AntigravityProvider(
                 s.antigravityEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
+                engine = if (s.backend == AssistantSettings.BACKEND_CODEX) AntigravityProvider.BridgeEngine.CODEX else AntigravityProvider.BridgeEngine.ANTIGRAVITY,
+                nativeImages = s.nativeImages,
             )
             // BytePlus y cerebros propios: todo sale del perfil (protocolo, auth, razonamiento, límites propios).
             s.isCustom -> s.brain!!.let { p ->
@@ -488,16 +513,43 @@ class AssistantRuntime(private val app: NexusApplication) {
 
     fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(
         llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
-        // El límite de 4,5 MB por documento es de Bedrock; Antigravity solo recibe texto y no tiene ese límite.
+        // El límite de 4,5 MB por documento es de Bedrock; el puente (AGY, Codex) solo recibe texto y no tiene ese límite.
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {
-            val agy = !s.offline && s.backend == AssistantSettings.BACKEND_ANTIGRAVITY
+            val agy = !s.offline && s.bridge
             AgentDocuments.load(it, textOnly = agy, maxBytes = if (agy) null else AgentDocuments.MAX_BYTES)
         },
         images = if (s.visionEnabled) AttachmentImageLoader { AgentMediaStore.thumbnail(app,it) } else null,
         videos = if (s.visionEnabled) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
         uiContext = { orders.turnContext(guard) },
         verifiedOrders = { orders.all() },
+        generatedMedia = com.vidadomu.nexus.agent.core.agent.GeneratedMediaStore { media, session -> saveGeneratedImage(media, session) },
     )
+
+    /** An image the brain made with its own engine: a private file and a generated asset in the active project. */
+    private suspend fun saveGeneratedImage(
+        media: com.vidadomu.nexus.agent.core.llm.GeneratedMedia,
+        session: com.vidadomu.nexus.agent.core.tools.AgentSession,
+    ): com.vidadomu.nexus.agent.core.tools.Attachment = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val ext = when (media.mimeType.lowercase()) { "image/jpeg", "image/jpg" -> "jpg"; "image/webp" -> "webp"; "image/gif" -> "gif"; else -> "png" }
+        val folder = File(app.filesDir, "agent_generated").apply { mkdirs() }
+        val file = File(folder, "${media.engine.lowercase()}_${java.util.UUID.randomUUID()}.$ext")
+        val stage = File(folder, file.name + ".part")
+        try {
+            stage.outputStream().use { it.write(media.bytes); it.fd.sync() }
+            check(stage.renameTo(file)) { "No se pudo guardar el archivo." }
+        } finally { stage.delete() }
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) { file.delete(); error("La imagen recibida no se puede abrir.") }
+        val caption = "${media.engine} · ${com.vidadomu.nexus.agent.core.llm.NativeImageModels.label(media.model) ?: "modelo no informado"}"
+        val asset = assets.addAsset(Asset(
+            id = "", uri = android.net.Uri.fromFile(file).toString(), type = AssetType.IMAGE, role = AssetRole.OUTPUT, source = AssetSource.GENERATED,
+            displayName = "$caption · ${media.filename.substringBeforeLast('.')}".take(120), mimeType = media.mimeType,
+            width = bounds.outWidth, height = bounds.outHeight, projectId = session.activeProjectId,
+            tags = listOfNotNull(media.engine.lowercase(), media.model), createdAt = System.currentTimeMillis(),
+        ))
+        com.vidadomu.nexus.agent.core.tools.Attachment(asset.id, asset.uri, media.mimeType, asset.displayName, asset.width, asset.height, null, asset.id, caption)
+    }
 
     /** Indexa (sin tocar nexus.db ni archivos) las creaciones ya terminadas, para buscarlas por prompt/modelo. */
     private val importLock = kotlinx.coroutines.sync.Mutex()

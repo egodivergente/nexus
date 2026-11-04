@@ -43,6 +43,7 @@ private val builtinEngines = listOf(
     BuiltinEngine(AssistantSettings.BACKEND_OPENAI, "Compatible OpenAI", "OpenAI, OpenRouter, Gemini, DeepSeek, local…"),
     BuiltinEngine(AssistantSettings.BACKEND_PROXY, "Proxy", "APK → proxy → Bedrock"),
     BuiltinEngine(AssistantSettings.BACKEND_ANTIGRAVITY, "Antigravity (AGY)", "Puente local de Antigravity CLI"),
+    BuiltinEngine(AssistantSettings.BACKEND_CODEX, "Codex", "Codex CLI por el mismo puente local"),
 )
 
 /**
@@ -69,7 +70,7 @@ internal fun BrainsSettingsSection(onOpenAssistantSettings: () -> Unit = {}) {
         AssistantSettings.BACKEND_ANTHROPIC -> settings.maskedApiKey(e.backend).isNotBlank()
         AssistantSettings.BACKEND_OPENAI -> current.llmBaseUrl.isNotBlank() && (settings.maskedApiKey(e.backend).isNotBlank() || AssistantSettings.LOCAL_URL.matches(current.llmBaseUrl.trim()))
         AssistantSettings.BACKEND_PROXY -> current.endpoint.isNotBlank() && current.maskedToken.isNotBlank()
-        AssistantSettings.BACKEND_ANTIGRAVITY -> current.antigravityEndpoint.isNotBlank()
+        AssistantSettings.BACKEND_ANTIGRAVITY, AssistantSettings.BACKEND_CODEX -> current.antigravityEndpoint.isNotBlank()
         else -> current.awsAccessKeyId.isNotBlank() && current.maskedAwsSecret.isNotBlank() && current.region.isNotBlank()
     }
     Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
