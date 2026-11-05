@@ -14,7 +14,9 @@
         "codeReview": "revision independiente OK antes de compilar",
         "apkSha256": "c72d65c535377543e386a4cd1cbd4bac7ebaa6f706a97f9b47a4bacb487cee29",
         "signingCertSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
-        "s25InstalledAsUpdate": false,
+        "s25InstalledAsUpdate": true,
+        "s25InstalledAt": "2026-11-05T18:39+01:00",
+        "s25InstallCheck": "adb install -r Success; dumpsys versionCode 179; base.apk sha256 = apkSha256; 40 archivos de datos con md5 identicos antes/despues; am start -W ok sin crashes de com.vidadomu",
         "uiQaOnDevice": false,
         "hapticsVerifiedOnDevice": false,
         "report": "auditoria en el workspace de Aki: deliverables/NEXUS_Auditoria_vc177_2026-11-05"
