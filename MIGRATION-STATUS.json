@@ -1,4 +1,24 @@
 ﻿{
+    "auditoriaVc17920261105": {
+        "branch": "aki/auditoria-vc179-20261105",
+        "baseCommit": "a31e2fa",
+        "sourceCommit": "0c87887888f84ed9e18d283f69c6d78236cd35ba",
+        "versionCode": 179,
+        "versionName": "1.9.143-agent-preview",
+        "note": "vc178 queda reservada para aki/codex-imagenes-20261104 (sin instalar)",
+        "scope": "arreglos de la auditoria visual y haptica del 05-11 sobre vc177: recorte del numero de archivos en carpetas, iconos del chat sobre el texto, texto de la tarjeta de espera, haptica de generacion terminada y de Generar, portadas de video",
+        "buildHost": "AWS_CODEBUILD",
+        "buildId": "vidal-android-build:23eef900-38a1-4c23-807c-1075b81787ae",
+        "buildRecipe": "igual que vc177: -I aws-native.init.gradle + prebuilt-jni ARM64 de vc176; solo :app:assembleAgentPreview",
+        "unitTests": "no ejecutados (solo APK, por indicacion del usuario)",
+        "codeReview": "revision independiente OK antes de compilar",
+        "apkSha256": "c72d65c535377543e386a4cd1cbd4bac7ebaa6f706a97f9b47a4bacb487cee29",
+        "signingCertSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "s25InstalledAsUpdate": false,
+        "uiQaOnDevice": false,
+        "hapticsVerifiedOnDevice": false,
+        "report": "auditoria en el workspace de Aki: deliverables/NEXUS_Auditoria_vc177_2026-11-05"
+    },
     "videoFeedback20261101": {
         "branch": "aki/video-feedback-20261101",
         "baseCommit": "fe64efe",
