@@ -19,12 +19,12 @@ class NativeImageModelsTest {
         assertNull(NativeImageModels.label(" "))
     }
 
-    @Test fun `only Lite models are vetoed`() {
-        assertTrue(NativeImageModels.isRejected("gemini-3.1-flash-image-lite"))
-        assertTrue(NativeImageModels.isRejected("gemini-3.1-flash-lite-image"))
-        assertFalse(NativeImageModels.isRejected("gemini-3.1-flash-image"))
-        assertFalse(NativeImageModels.isRejected("gemini-3-pro-image"))
-        assertFalse(NativeImageModels.isRejected("satellite-image"))
-        assertFalse(NativeImageModels.isRejected(null))
+    @Test fun `recognises Lite models and nothing else`() {
+        assertTrue(NativeImageModels.isLite("gemini-3.1-flash-image-lite"))
+        assertTrue(NativeImageModels.isLite("gemini-3.1-flash-lite-image"))
+        assertFalse(NativeImageModels.isLite("gemini-3.1-flash-image"))
+        assertFalse(NativeImageModels.isLite("gemini-3-pro-image"))
+        assertFalse(NativeImageModels.isLite("satellite-image"))
+        assertFalse(NativeImageModels.isLite(null))
     }
 }

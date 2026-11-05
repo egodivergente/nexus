@@ -1353,7 +1353,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                             Column(Modifier.weight(1f)) {
                                 Text("Crear imágenes con su motor", style = MaterialTheme.typography.bodyLarge)
-                                Text(if (codex) "GPT Image de Codex. Se guardan en la Biblioteca." else "Nano Banana de AGY (el que asigne AGY; Lite se descarta). Se guardan en la Biblioteca.",
+                                Text(if (codex) "GPT Image de Codex. Se guardan en la Biblioteca." else "Nano Banana de AGY: se le pide el de más calidad; si el servidor asigna Lite, la imagen llega igual. Se guardan en la Biblioteca.",
                                     style = MaterialTheme.typography.bodySmall, color = TextMuted)
                             }
                             Switch(nativeImages, { nativeImages = it })

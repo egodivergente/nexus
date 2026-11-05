@@ -410,12 +410,7 @@ class AntigravityProvider(
     }
 
     private fun receiveArtifact(artifact: BridgeArtifact, notices: MutableList<String>): GeneratedMedia? {
-        val modelName = NativeImageModels.label(artifact.model)
-        if (NativeImageModels.isRejected(artifact.model)) {
-            notices += "Imagen descartada: ${engine.shortLabel} la generó con $modelName (${artifact.model}), que tienes vetado. Pídela de nuevo."
-            return null
-        }
-        return try {
+        val media = try {
             val req = Request.Builder().url("$baseUrl${artifact.fetchPath}").get().build()
             downloadClient.newCall(req).execute().use { res ->
                 if (!res.isSuccessful) throw IOException("HTTP ${res.code}")
@@ -438,8 +433,12 @@ class AntigravityProvider(
             }
         } catch (e: IOException) {
             notices += "No se recibió la imagen «${artifact.filename}» de ${engine.shortLabel}: ${Redactor.redact(e.message ?: "error de red").take(160)}. Sigue en el puente."
-            null
+            return null
         }
+        if (NativeImageModels.isLite(artifact.model)) {
+            notices += "«${artifact.filename}» la hizo ${engine.shortLabel} con ${NativeImageModels.label(artifact.model)}, la versión ligera que asignó el servidor. Ya está en la Biblioteca; si quieres más calidad, pídela de nuevo."
+        }
+        return media
     }
 
     private val downloadClient by lazy { client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build() }
@@ -532,6 +531,9 @@ class AntigravityProvider(
         if (nativeImages) {
             appendLine("EXCEPCIÓN — imágenes con tu propio motor: puedes usar tu herramienta nativa ${engine.imageTool} para crear o editar imágenes cuando el usuario pida una imagen sin nombrar un modelo del catálogo de Nexus, o cuando pida expresamente tu motor.")
             appendLine("Nexus recibe el archivo, lo guarda en su Biblioteca y lo muestra en el chat: no lo copies a otras carpetas ni inventes rutas. Si el usuario nombra un modelo del catálogo (Seedream, Flux, Kling…) o pide vídeo o audio, usa las herramientas de Nexus.")
+            if (engine == BridgeEngine.ANTIGRAVITY) {
+                appendLine("Calidad de imagen: el usuario quiere la máxima calidad. Si puedes elegir o influir en el modelo de imagen, usa el más avanzado disponible (Nano Banana Pro o Nano Banana 2) y evita las variantes Lite; escribe prompts de imagen detallados y precisos. Si aun así te asignan Lite, entrega la imagen igualmente: nunca la descartes.")
+            }
         }
         if (tools.isNotEmpty()) {
             appendLine()

@@ -196,6 +196,7 @@ class AntigravityProviderTest {
             assertEquals("codex", body["provider"]?.jsonPrimitive?.content)
             assertEquals(AntigravityProvider.CODEX_DEFAULT_MODEL, body["model"]?.jsonPrimitive?.content)
             assertTrue(body["jobId"]!!.jsonPrimitive.content.startsWith("nexus-codex-"))
+            assertTrue("Nano Banana Pro" !in body["prompt"]!!.jsonPrimitive.content)
             assertEquals("Hola desde Codex.", response.message.text())
             assertTrue(response.generatedMedia.isEmpty())
         }
@@ -208,7 +209,9 @@ class AntigravityProviderTest {
         imageServer(sse, png).use { server ->
             val response = AntigravityProvider(server.url("/").toString(), nativeImages = true).complete(userTurn("Hazme un gato"))
             val sent = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
-            assertTrue(sent["prompt"]!!.jsonPrimitive.content.contains("generate_image"), "AGY debe saber que puede usar su motor")
+            val prompt = sent["prompt"]!!.jsonPrimitive.content
+            assertTrue(prompt.contains("generate_image"), "AGY debe saber que puede usar su motor")
+            assertTrue(prompt.contains("Nano Banana Pro") && prompt.contains("evita las variantes Lite"), "Se le pide el modelo de más calidad")
             val image = response.generatedMedia.single()
             assertTrue(image.bytes.contentEquals(png))
             assertEquals("AGY", image.engine)
@@ -220,14 +223,20 @@ class AntigravityProviderTest {
         }
     }
 
-    @Test fun `una imagen de Nano Banana Lite se descarta sin descargarla`() = runTest {
+    @Test fun `una imagen de Nano Banana Lite llega igual y solo se avisa`() = runTest {
+        val png = byteArrayOf(-119, 80, 78, 71)
         val sse = artifactEvent("gemini-3.1-flash-image-lite") +
             "data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Listo.\",\"error\":null}\n\n"
-        imageServer(sse).use { server ->
+        imageServer(sse, png).use { server ->
             val response = AntigravityProvider(server.url("/").toString(), nativeImages = true).complete(userTurn("Hazme un gato"))
-            assertTrue(response.generatedMedia.isEmpty())
-            assertTrue(response.notices.single().contains("Nano Banana 2 Lite"))
-            assertEquals(1, server.requestCount, "No se descarga una imagen vetada")
+            val image = response.generatedMedia.single()
+            assertTrue(image.bytes.contentEquals(png))
+            assertEquals("gemini-3.1-flash-image-lite", image.model)
+            assertEquals(2, server.requestCount, "La imagen Lite se descarga del puente")
+            val notice = response.notices.single()
+            assertTrue(notice.contains("Nano Banana 2 Lite") && notice.contains("Biblioteca"))
+            assertTrue("descartada" !in notice)
+            assertEquals("Listo.", response.message.text())
         }
     }
 
