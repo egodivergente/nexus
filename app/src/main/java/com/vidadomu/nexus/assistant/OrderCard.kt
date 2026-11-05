@@ -227,14 +227,14 @@ internal fun OrderCard(
                 }
                 val resends = shown.action == CardAction.GENERATE || shown.action == CardAction.RETRY
                 if (shown.actionLabel != null && !(retired && resends) && (order.status != OrderStatus.COMPLETED || outputs.isEmpty())) {
-                    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                    val haptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
                     val click: () -> Unit = when (shown.action) {
                         CardAction.GENERATE, CardAction.RETRY -> ({
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
                             onGenerate()
                         })
                         CardAction.APPLY_FIX -> ({
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
                             onApplyFix()
                         })
                         CardAction.ASK_AGENT -> onAskAgent
@@ -295,7 +295,7 @@ private fun QuickOrderParamStrip(
     onCustomEdit: (String, String) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val haptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     var schema by remember(plan.ref) { mutableStateOf<com.vidadomu.nexus.agent.core.registry.ModelSchema?>(null) }
     LaunchedEffect(plan.ref) {
         schema = try { AssistantRuntime.get(app).registry.schema(plan.ref) }
@@ -310,7 +310,7 @@ private fun QuickOrderParamStrip(
             var menu by remember(control.key) { mutableStateOf(false) }
             Box {
                 AssistChip(onClick = {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
                     if (control.options.isEmpty()) onCustomEdit(control.key, control.value) else menu = true
                 }, label = { Text("${control.label}: ${control.value}", style = MaterialTheme.typography.labelMedium) },
                     shape = NexusTokens.filter, modifier = Modifier.heightIn(min = 48.dp))

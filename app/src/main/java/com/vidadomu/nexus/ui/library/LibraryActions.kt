@@ -156,7 +156,7 @@ internal fun FolderTile(name:String,count:Int,previews:List<Pair<String,Boolean>
     // La portada es el archivo más reciente que se pueda abrir: si uno falla queda marcado y pasa al siguiente;
     // sin ninguno, la portada muestra el icono de carpeta.
     val cover=previews.firstOrNull {!LibraryUnavailable.isUnavailable(it.first)}
-    Column(modifier.clip(AlbumCover).semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}
+    Column(modifier.clip(FolderTileShape).semantics(mergeDescendants=true) {contentDescription="Carpeta $name, ${if(count==1) "1 archivo" else "$count archivos"}"}
         .combinedClickable(onClickLabel="Abrir carpeta",onLongClickLabel="Opciones de la carpeta",onClick=onOpen,onLongClick=onLongClick)) {
         Surface(Modifier.fillMaxWidth().aspectRatio(1f),shape=AlbumCover,color=MaterialTheme.colorScheme.surfaceContainerHigh) {
             Box(contentAlignment=Alignment.Center) {
@@ -177,6 +177,9 @@ internal fun FolderTile(name:String,count:Int,previews:List<Pair<String,Boolean>
 }
 
 private val AlbumCover=androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+// Recorte de la pulsacion sobre toda la tarjeta: arriba sigue la curva de la portada y abajo el radio es pequeno,
+// porque la esquina de 16 dp se comia el primer digito de «10 archivos» (auditoria 05-11).
+private val FolderTileShape=androidx.compose.foundation.shape.RoundedCornerShape(topStart=16.dp,topEnd=16.dp,bottomStart=4.dp,bottomEnd=4.dp)
 
 @Composable
 private fun Option(icon:ImageVector,label:String,action:()->Unit) {
