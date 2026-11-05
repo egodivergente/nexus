@@ -63,6 +63,7 @@ fun LiveRenderPill(
     val app = context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
     val haptic = LocalHapticFeedback.current
+    val nexusHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val conflicts = remember(jobs) { com.vidadomu.nexus.core.model.OutputFiles.conflictingLocalUris(jobs.flatMap { it.outputs }) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var dismissedIds by remember { mutableStateOf(setOf<String>()) }
@@ -87,11 +88,14 @@ fun LiveRenderPill(
         }
     }
 
+    // Aviso de «terminado» (auditoria 05-11): una confirmacion corta en vez de la vibracion de pulsacion larga, y solo
+    // con la app a la vista y un trabajo recien acabado; al volver a la app o recrearla no vibra por uno ya pasado.
     LaunchedEffect(recentCompleted?.id) {
-        val completedId = recentCompleted?.id ?: return@LaunchedEffect
-        if (completedId !in notifiedCompletedIds) {
-            notifiedCompletedIds = notifiedCompletedIds + completedId
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        val completed = recentCompleted ?: return@LaunchedEffect
+        if (completed.id !in notifiedCompletedIds) {
+            notifiedCompletedIds = notifiedCompletedIds + completed.id
+            val fresh = completed.completedAt?.let { System.currentTimeMillis() - it in 0L..5_000L } == true
+            if (resumed && fresh) nexusHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
         }
     }
 

@@ -73,7 +73,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.FileProvider
 import androidx.media3.common.MediaItem
@@ -294,20 +293,21 @@ fun AssistantScreen(
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
             // Vidal 01-11 (vídeo, 00:26): el texto no se corta en seco a 56 dp; la lista llega hasta arriba y se
             // desvanece con un degradado suave bajo los iconos flotantes. El primer mensaje sigue empezando debajo:
-            // el degradado acaba justo en 56 dp (donde empieza el contenido en reposo) para no atenuar el primer mensaje.
+            // el degradado acaba justo en 64 dp (donde empieza el contenido en reposo) para no atenuar el primer mensaje.
+            // Auditoria 05-11: bajo los iconos (hasta ~36 dp) el texto ya no se lee; de ahi a 64 dp aparece suave.
             LazyColumn(Modifier.fillMaxSize()
                 .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
                     drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(
                         0f to androidx.compose.ui.graphics.Color.Transparent,
-                        .22f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .08f),
-                        .50f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f),
-                        .78f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .86f),
+                        .56f to androidx.compose.ui.graphics.Color.Transparent,
+                        .70f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .30f),
+                        .86f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .78f),
                         1f to androidx.compose.ui.graphics.Color.Black,
-                        startY = 0f, endY = 56.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                        startY = 0f, endY = 64.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
                 }, state = listState,
-                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 56.dp,
+                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 64.dp,
                     // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
                     bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
@@ -418,7 +418,8 @@ fun AssistantScreen(
             IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
                 Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Row(Modifier.align(Alignment.TopEnd).padding(top = NexusTokens.space8, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
+            // Sin margen superior: el engranaje queda a la misma altura que la hamburguesa (auditoria 05-11).
+            Row(Modifier.align(Alignment.TopEnd).padding(end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 IconButton(onClick = onOpenSettings, modifier = Modifier.size(NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.Settings, "Ajustes", Modifier.size(NexusTokens.iconMedium), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -829,7 +830,7 @@ internal fun MessageMeta(at: Long, tookMs: Long, modifier: Modifier = Modifier, 
     if(at<=0L) return
     val time=remember(at) {java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at))}
     val label=listOfNotNull(shortModelName(by).ifBlank {null},time,formatTook(tookMs).takeIf {tookMs>0}).joinToString(" · ")
-    Text(label,modifier,style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,lineHeight=12.sp),
+    Text(label,modifier,style=MaterialTheme.typography.labelSmall,
         color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
 }
 

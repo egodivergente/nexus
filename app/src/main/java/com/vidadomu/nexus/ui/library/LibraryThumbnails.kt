@@ -71,11 +71,60 @@ internal object LibraryThumbnails {
         val retriever = MediaMetadataRetriever()
         return try {
             if (file != null) retriever.setDataSource(file.absolutePath) else retriever.setDataSource(context, Uri.parse(uri))
-            val frame = retriever.getFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                ?: retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
+            val frame = representativeFrame(retriever) ?: return null
             val scale = TARGET.toFloat() / maxOf(frame.width, frame.height)
             if (scale < 1f) Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt().coerceAtLeast(1), (frame.height * scale).toInt().coerceAtLeast(1), true) else frame
         } finally { runCatching { retriever.release() } }
+    }
+
+    /**
+     * Auditoria 05-11: el fotograma de 0,5 s con CLOSEST_SYNC caia en el primer fotograma clave, que en muchos videos es
+     * un fundido a negro o a blanco (portadas vacias en Biblioteca y carpetas). Se prueba el 10 % del video (fotograma
+     * clave, barato) y, solo si sale casi liso, el 30 % y el 60 % con decodificacion exacta; gana el de mas contraste.
+     */
+    private fun representativeFrame(retriever: MediaMetadataRetriever): Bitmap? {
+        val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0L }
+        var best: Bitmap? = null
+        var bestSpread = -1
+        for ((ms, option) in VideoFrameQuality.candidates(durationMs)) {
+            val frame = runCatching { retriever.getFrameAtTime(ms * 1000L, option) }.getOrNull() ?: continue
+            // Si no se puede medir, se acepta el fotograma: un fallo aqui no debe dejar el video sin portada ni ocultarlo.
+            val spread = runCatching { VideoFrameQuality.lumaSpread(frame) }.getOrDefault(VideoFrameQuality.MIN_SPREAD)
+            if (spread > bestSpread) { best?.recycle(); best = frame; bestSpread = spread } else frame.recycle()
+            if (bestSpread >= VideoFrameQuality.MIN_SPREAD) break
+        }
+        return best ?: retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+    }
+}
+
+/** Eleccion del fotograma de portada: momentos a probar y cuanto contraste tiene un fotograma. */
+internal object VideoFrameQuality {
+    /** Diferencia (0-255) entre los tonos del 5 % mas oscuro y del 5 % mas claro: por debajo, el fotograma es casi liso. */
+    const val MIN_SPREAD = 40
+
+    fun candidates(durationMs: Long?): List<Pair<Long, Int>> = if (durationMs == null) listOf(
+        500L to MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+        1_500L to MediaMetadataRetriever.OPTION_CLOSEST,
+        3_000L to MediaMetadataRetriever.OPTION_CLOSEST)
+    else listOf(
+        (durationMs / 10).coerceAtLeast(500L).coerceAtMost(durationMs) to MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+        durationMs * 3 / 10 to MediaMetadataRetriever.OPTION_CLOSEST,
+        durationMs * 6 / 10 to MediaMetadataRetriever.OPTION_CLOSEST)
+
+    fun lumaSpread(frame: Bitmap): Int {
+        val small = Bitmap.createScaledBitmap(frame, 16, 16, true)
+        val pixels = IntArray(16 * 16)
+        small.getPixels(pixels, 0, 16, 0, 0, 16, 16)
+        if (small !== frame) small.recycle()
+        return spreadOf(pixels)
+    }
+
+    internal fun spreadOf(pixels: IntArray): Int {
+        if (pixels.isEmpty()) return 0
+        val luma = pixels.map { ((it shr 16 and 0xFF) * 299 + (it shr 8 and 0xFF) * 587 + (it and 0xFF) * 114) / 1000 }.sorted()
+        val low = luma[luma.size * 5 / 100]
+        val high = luma[(luma.size * 95 / 100).coerceAtMost(luma.size - 1)]
+        return high - low
     }
 }
 

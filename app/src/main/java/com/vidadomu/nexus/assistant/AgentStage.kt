@@ -144,13 +144,18 @@ internal fun LiveRenderSurface(order: Order, modifier: Modifier = Modifier) {
                 drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = .22f), Color.Transparent),
                     start = Offset(x - w * .25f, 0f), end = Offset(x + w * .25f, h)))
             }
+            // Velo inferior bajo el texto (auditoria 05-11): el blanco fijo no se leia sobre los colores de los temas claros
+            // (~1,8:1); con el velo queda por encima de 5,3:1 en los 12 temas, tambien con el brillo animado encima.
+            drawRect(Brush.verticalGradient(0f to Color.Transparent,
+                .3f to com.vidadomu.nexus.ui.theme.MediaScrim.copy(alpha = .45f), 1f to com.vidadomu.nexus.ui.theme.MediaScrim.copy(alpha = .62f)))
         }
         .semantics(mergeDescendants = true) {},
         contentAlignment = Alignment.BottomStart) {
         Column(Modifier.padding(NexusTokens.space12)) {
-            Text(order.modelName, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = .85f), maxLines = 1)
-            Text(state, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
-            Text("Tiempo transcurrido $elapsed", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = .85f))
+            Text(order.modelName, style = MaterialTheme.typography.labelMedium, color = com.vidadomu.nexus.ui.theme.MediaForeground,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(state, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = com.vidadomu.nexus.ui.theme.MediaForeground)
+            Text("Tiempo transcurrido $elapsed", style = MaterialTheme.typography.labelMedium, color = com.vidadomu.nexus.ui.theme.MediaForeground)
         }
     }
 }
