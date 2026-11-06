@@ -109,6 +109,9 @@ fun AssistantScreen(
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    // Outputs can be downloaded after the order status changes: observe the repository too.
+    val generationJobs by (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication)
+        .generationRepository.allJobs.collectAsState()
     var libraryExpanded by remember { mutableStateOf(false) }
     val libraryHaptics = rememberNexusHaptics()
     fun openLibrary() {
@@ -172,27 +175,30 @@ fun AssistantScreen(
     var automaticScroll by remember { mutableStateOf(false) }
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
-    // Varios resultados terminados seguidos (3 o más) se agrupan en una tarjeta de miniaturas; «Ver tarjetas» las separa.
+    // Active and finished adjacent image/video orders share a live wall; failures keep their own actions.
     var expandedGroups by remember {mutableStateOf(setOf<String>())}
-    val rows=remember(visibleItems,ui.orders,ui.plans,expandedGroups) {
-        fun done(i:ChatItem):Boolean {
+    val rows=remember(visibleItems,ui.orders,ui.plans,expandedGroups,generationJobs) {
+        fun eligible(i:ChatItem):Boolean {
             if(i !is ChatItem.PlanCard) return false
             val order=i.orderId?.let {ui.orders[it]} ?: return false
-            return order.status==com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED && vm.outputs(ui.plans[i.planId]?.jobId ?: order.jobId).isNotEmpty()
+            val plan=ui.plans[i.planId] ?: return false
+            return mosaicEligible(order.status,order.modality)
         }
         val out=mutableListOf<Any>();var run=mutableListOf<ChatItem.PlanCard>()
         fun flush() {
-            if(run.size>=3 && run.first().id !in expandedGroups) out.add(CardGroup(run.toList()))
-            else {if(run.size>=3) out.add(GroupHeader(run.first().id,run.size));out.addAll(run)}
+            if(run.isNotEmpty()) {
+                if(run.first().id in expandedGroups) {out.add(GroupHeader(run.first().id,run.size));out.addAll(run)}
+                else out.add(CardGroup(run.toList()))
+            }
             run=mutableListOf()
         }
-        for(i in visibleItems) if(done(i)) run.add(i as ChatItem.PlanCard) else {flush();out.add(i)}
+        for(i in visibleItems) if(eligible(i)) run.add(i as ChatItem.PlanCard) else {flush();out.add(i)}
         flush();out
     }
-    val latestVisible by rememberUpdatedState(visibleItems)
+    val latestRows by rememberUpdatedState(rows)
     val latestUi by rememberUpdatedState(ui)
     suspend fun followLast() {
-        if(latestVisible.isEmpty() && latestUi.streamingText.isBlank()) return
+        if(latestRows.isEmpty() && latestUi.streamingText.isBlank()) return
         automaticScroll = true
         try {
             // Si el último elemento ya está en pantalla (lo normal mientras escribe), solo se desplaza lo que falta:
@@ -201,7 +207,7 @@ fun AssistantScreen(
             val alreadyLast=first.visibleItemsInfo.lastOrNull()?.index==first.totalItemsCount-1
             if(!alreadyLast) {
                 val extra = (if(latestUi.streamingText.isNotBlank()) 1 else 0) + (if(latestUi.thinking) 1 else 0)
-                listState.scrollToItem((latestVisible.size + extra - 1).coerceAtLeast(0))
+                listState.scrollToItem((latestRows.size + extra - 1).coerceAtLeast(0))
             }
             val layout=listState.layoutInfo
             layout.visibleItemsInfo.lastOrNull()?.let { last ->
@@ -314,17 +320,44 @@ fun AssistantScreen(
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is CardGroup) {
-                        GeneratedGroupCard(row.cards.mapNotNull { c ->
-                            val order = c.orderId?.let { ui.orders[it] } ?: return@mapNotNull null
-                            val plan = ui.plans[c.planId]
-                            val jobId = plan?.jobId ?: order.jobId
-                            val uri = vm.outputs(jobId).firstOrNull() ?: return@mapNotNull null
-                            GroupEntry(jobId, plan?.plan?.modelName ?: "Resultado", uri, plan?.plan?.modality ?: "IMAGE")
-                        }, onOpen = onNavigateToOutput, onExpand = { expandedGroups = expandedGroups + row.cards.first().id }, modifier = Modifier.animateItem())
+                        val tiles = row.cards.flatMap { c ->
+                            val order = c.orderId?.let { ui.orders[it] } ?: return@flatMap emptyList<MosaicTile>()
+                            val p = ui.plans[c.planId] ?: return@flatMap emptyList<MosaicTile>()
+                            val jobId = p.jobId ?: order.jobId
+                            val outputs = vm.outputs(jobId).filter { it.isNotBlank() }
+                            val media = if (outputs.isEmpty()) listOf<String?>(null) else outputs.map { it }
+                            media.mapIndexed { index, uri ->
+                                MosaicTile(key = "${c.id}:$index", orderId = order.id, jobId = jobId,
+                                    model = p.plan.modelName, provider = p.plan.ref.providerId,
+                                    modelId = p.plan.ref.modelId, modality = order.modality,
+                                    status = order.status, uri = uri, progress = measuredOrderProgress(order))
+                            }
+                        }
+                        // Tell the agent exactly which status and number of thumbnails the user sees.
+                        LaunchedEffect(tiles.map { Triple(it.orderId, it.status, it.uri != null) }) {
+                            tiles.groupBy { it.orderId }.forEach { (orderId, items) ->
+                                val count = items.count { it.uri != null }
+                                val label = if (items.first().status == com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED)
+                                    "Completado · $count resultado(s) visibles en mosaico"
+                                else if (items.first().status == com.vidadomu.nexus.agent.core.orders.OrderStatus.SUBMITTING)
+                                    "Enviando · mosaico en vivo"
+                                else "Procesando · mosaico en vivo"
+                                vm.cardRendered(orderId, label)
+                            }
+                        }
+                        GenerationMosaic(tiles, onOpen = { clicked ->
+                            val ready = tiles.filter { it.uri != null }
+                            stage = ready.mapIndexed { index, t ->
+                                Attachment(t.key, t.uri!!,
+                                    if (t.modality == "VIDEO") "video/mp4" else "image/*",
+                                    "${t.model} · ${index + 1}")
+                            } to ready.indexOfFirst { it.key == clicked.key }.coerceAtLeast(0)
+                        }, onExpand = { expandedGroups = expandedGroups + row.cards.first().id },
+                            modifier = Modifier.animateItem())
                         return@items
                     }
                     if (row is GroupHeader) {
-                        TextButton(onClick = { expandedGroups = expandedGroups - row.firstId }) { Text("Agrupar los ${row.count} resultados") }
+                        TextButton(onClick = { expandedGroups = expandedGroups - row.firstId }) { Text("Volver al mosaico (${row.count})") }
                         return@items
                     }
                     val item = row as ChatItem
