@@ -33,7 +33,7 @@ internal class MediaEditJobs(private val app:NexusApplication) {
         try {stream.write(Json.encodeToString(job).toByteArray());file.finishWrite(stream)}
         catch(e:Exception) {file.failWrite(stream);throw e}
     }
-    suspend fun start(action:String,input:JsonObject,session:AgentSession):JsonObject {
+    suspend fun start(action:String,input:JsonObject,session:AgentSession,waitSeconds:Int=START_WAIT_SECONDS):JsonObject {
         val spec=MediaEditSpec.parse(action,input,session.activeProjectId)
         val engine=AgentVideoOperations(app)
         engine.validate(spec) // all sources, interval and tracks checked before enqueuing
@@ -47,7 +47,7 @@ internal class MediaEditJobs(private val app:NexusApplication) {
             throw ToolInputException("No se pudo iniciar la edición.")
         }
         // Las ediciones cortas terminan aquí mismo: el agente recibe el resultado sin otro paso de consulta.
-        return status(job.id,START_WAIT_SECONDS,session)
+        return status(job.id,waitSeconds,session)
     }
     suspend fun status(id:String,waitSeconds:Int=0,session:AgentSession):JsonObject {
         var job=read(id)

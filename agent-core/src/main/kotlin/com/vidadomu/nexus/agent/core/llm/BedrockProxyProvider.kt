@@ -30,7 +30,9 @@ class BedrockProxyProvider(
 
     override val id: String = "bedrock-proxy"
 
-    override suspend fun complete(request: LlmRequest): LlmResponse = PromptCacheFallback.complete(request) { cache -> send(request, cache) }
+    // El proxy (agent-proxy/nexus_proxy.py) aún no admite cachePoint en herramientas ni sistema ni cuenta la caché en su
+    // presupuesto: se envía sin caché hasta adaptarlo.
+    override suspend fun complete(request: LlmRequest): LlmResponse = send(request, cache = false)
 
     private suspend fun send(request: LlmRequest, cache: Boolean): LlmResponse = withContext(Dispatchers.IO) {
         val body = ConverseCodec.encodeRequest(request, cache).toString()

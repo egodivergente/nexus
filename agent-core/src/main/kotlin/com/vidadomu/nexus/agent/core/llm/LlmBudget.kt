@@ -68,7 +68,8 @@ open class BudgetedLlmProvider(protected val delegate: LlmProvider, private val 
     private val limits: () -> LlmLimits,
 ) : LlmProvider {
     override val id = delegate.id
-    // Standard geo/in-region prices with a 20% margin over global list price; no cache discount assumed.
+    // Standard geo/in-region prices with a 20% margin over global list price. Prompt cache (Bedrock direct): settle at
+    // write 1.25x / read 0.1x of the input rate; reserve at the 1.25x worst case so limits cannot be exceeded.
     private fun rates(model: String): Pair<Double, Double> {
         val m = model.replace('.', '-')
         return when {
@@ -87,7 +88,8 @@ open class BudgetedLlmProvider(protected val delegate: LlmProvider, private val 
         val (inputRate, outputRate) = rates(request.modelId)
         val hasDocument = request.messages.any { m -> m.content.any { it is ContentBlock.Document } }
         val turn = request.turnId ?: kotlin.coroutines.coroutineContext[LlmTurnContext]?.turnId ?: UUID.randomUUID().toString()
-        fun reserve(input: Long) = ledger.reserve(turn, input * inputRate / 1_000_000 + request.maxTokens * outputRate / 1_000_000, input + request.maxTokens, limits())
+        val cacheWeight = if (delegate.id == "bedrock-direct" && request.cacheableSystemBlocks > 0 && ConverseCodec.supportsPromptCache(request.modelId)) 1.25 else 1.0
+        fun reserve(input: Long) = ledger.reserve(turn, input * inputRate * cacheWeight / 1_000_000 + request.maxTokens * outputRate / 1_000_000, input + request.maxTokens, limits())
         suspend fun counted(): Long? = delegate.countInputTokens(request)?.toLong()
         val ticket = if (hasDocument && delegate.id.startsWith("bedrock")) {
             // Con documentos, Bedrock cuenta siempre antes de enviar: el tamaño en bytes no sirve de cota.

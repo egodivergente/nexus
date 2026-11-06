@@ -136,7 +136,7 @@ class AgentOrchestrator(
         if (conv.reasoningModelId != null && conv.messages.size > config.limits.messages)
             throw LlmException(LlmException.Kind.BAD_REQUEST, "Este chat ha alcanzado su límite de contexto. Abre una nueva conversación; el proyecto y sus archivos se conservan.")
         val session = conv.session
-        val start = conv.messages.size
+        val before = conv.messages.toList()
         newAttachments.forEach { a -> if (session.attachment(a.id) == null) session.attachments += a }
 
         val blocks = mutableListOf<ContentBlock>()
@@ -238,7 +238,7 @@ class AgentOrchestrator(
                     temperature = config.temperature,
                     turnId = turnId,
                     conversationId = session.id,
-                    cacheableSystemBlocks = system.size,
+                    cacheableSystemBlocks = if (readingDocuments) 0 else system.size,
                 )
                 val t0 = System.nanoTime()
                 try {
@@ -251,7 +251,9 @@ class AgentOrchestrator(
                 } finally { llmNanos += System.nanoTime() - t0 }
             } catch (e: LlmException) {
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
-                if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)
+                // Deshace el turno entero, también el texto fusionado en el último mensaje (p. ej. tras suggest_replies),
+                // para que el reintento no lo duplique.
+                if (rounds == 0) { conv.messages.clear(); conv.messages.addAll(before) }
                 throw e
             }
             input += response.usage.promptTokens; output += response.usage.outputTokens
@@ -354,8 +356,11 @@ class AgentOrchestrator(
             if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
             // Botones de respuesta junto al texto final: el turno ya está contestado y no hace falta otra llamada
             // al modelo. El resultado queda en el historial, así que el siguiente mensaje sigue siendo válido.
+            // Si ese texto contradice el estado verificado, se sigue como antes para no saltarse la autocorrección.
             if (uses.all { it.name in TERMINAL_TOOLS } && results.none { it.isError } && loaded.isEmpty() &&
-                msg.text().trim().length >= MIN_FINAL_TEXT) { stop = "END_TURN"; break }
+                msg.text().trim().let { it.length >= MIN_FINAL_TEXT || (it.length >= 8 && '?' in it) } &&
+                runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(msg.text(), it) }.isNullOrEmpty()
+            ) { stop = "END_TURN"; break }
         }
         val finalText = turnTexts.lastOrNull().orEmpty()
         val unresolved = runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(finalText, it) }.orEmpty()
@@ -479,7 +484,7 @@ class AgentOrchestrator(
             return
         }
         // Imágenes solo en los dos últimos mensajes de usuario: ahorra tokens sin perder el contexto textual.
-        val recentTurnStart=m.indices.filter {isPlainUser(m[it])}.takeLast(2).firstOrNull() ?: 0
+        val recentTurnStart=m.indices.filter { startsTurn(m, it) }.takeLast(2).firstOrNull() ?: 0
         for(i in 0 until recentTurnStart) {
             m[i]=m[i].copy(content=m[i].content.map { block ->
                 if(block is ContentBlock.ToolResult && block.content.toString().length>6000) block.copy(content=buildJsonObject {
@@ -508,19 +513,30 @@ class AgentOrchestrator(
             }
             m[i] = m[i].copy(content = content)
         }
-        while (m.size > config.limits.messages || (m.isNotEmpty() && !isPlainUser(m.first()))) {
+        while (m.isNotEmpty() && (m.size > config.limits.messages || !isPlainUser(m.first()))) {
+            val first = m.first()
+            // Un mensaje de usuario con resultados y texto nuevo (p. ej. tras suggest_replies) abre turno: si queda
+            // primero, sus resultados se quedan sin la llamada que respondían y se quitan, pero el texto se conserva.
+            if (m.size <= config.limits.messages && first.role == Role.USER && first.content.any { it !is ContentBlock.ToolResult }) {
+                m[0] = first.copy(content = first.content.filterNot { it is ContentBlock.ToolResult })
+                break
+            }
             m.removeAt(0)
-            if (m.isEmpty()) break
         }
     }
 
     private fun isPlainUser(msg: LlmMessage) = msg.role == Role.USER && msg.content.none { it is ContentBlock.ToolResult }
 
+    /** Mensaje con el que empieza un turno del usuario. Tras suggest_replies, su texto va fusionado detrás del resultado. */
+    private fun startsTurn(m: List<LlmMessage>, i: Int) = isPlainUser(m[i]) || (m[i].role == Role.USER && i > 0 &&
+        m[i].content.any { it !is ContentBlock.ToolResult } &&
+        m[i - 1].toolUses().let { uses -> uses.isNotEmpty() && uses.all { it.name in TERMINAL_TOOLS } })
+
     companion object {
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
         /** Herramientas que solo acompañan a la respuesta final: tras ellas no se vuelve a llamar al modelo. */
         internal val TERMINAL_TOOLS = setOf("suggest_replies")
-        private const val MIN_FINAL_TEXT = 15
+        private const val MIN_FINAL_TEXT = 40
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

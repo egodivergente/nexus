@@ -39,12 +39,12 @@ data class Skill(
 
     fun isVerified(tag: String): Boolean = tag !in unverifiedTags
 
-    /** Primera línea útil del resumen, para el índice que ve el LLM. */
     /** Resumen acotado para el índice del prompt de sistema: basta para decidir qué skill cargar con load_skill. */
     fun shortLine(max: Int = 100): String = oneLiner().let { s ->
         if (s.length <= max) s else s.take(max).substringBeforeLast(' ').trimEnd(',', ';', ':', ' ') + "…"
     }
 
+    /** Primera línea útil del resumen. */
     fun oneLiner(): String = body.lineSequence().map { it.trim() }
         .firstOrNull { it.isNotEmpty() && !it.startsWith("#") }?.take(180) ?: title
 

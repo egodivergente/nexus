@@ -37,7 +37,7 @@ class LocalMediaEditingTest {
         val first=androidx.work.OneTimeWorkRequestBuilder<MediaEditWorker>().setInitialDelay(5,java.util.concurrent.TimeUnit.SECONDS)
             .setInputData(androidx.work.workDataOf("edit_job_id" to missing.id)).build()
         androidx.work.WorkManager.getInstance(app).enqueueUniqueWork("nexus-local-media-edits",androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,first).result.get()
-        val next=store.start("trim",input("""{"asset_id":"${source.id}","end_ms":1000}"""),com.vidadomu.nexus.agent.core.tools.AgentSession("media-qa-chain",com.vidadomu.nexus.agent.core.config.AgentMode.AGENT))
+        val next=store.start("trim",input("""{"asset_id":"${source.id}","end_ms":1000}"""),com.vidadomu.nexus.agent.core.tools.AgentSession("media-qa-chain",com.vidadomu.nexus.agent.core.config.AgentMode.AGENT),waitSeconds=0)
         val nextId=next["edit_job_id"]!!.jsonPrimitive.content
         assertEquals(androidx.work.WorkInfo.State.ENQUEUED,requireNotNull(androidx.work.WorkManager.getInstance(app).getWorkInfoById(first.id).get()).state)
         withTimeout(30000) {
