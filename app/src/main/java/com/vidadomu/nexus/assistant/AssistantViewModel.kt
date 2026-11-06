@@ -98,6 +98,8 @@ data class AssistantUiState(
     /** Estado verificado de cada encargo (misma fuente que ve el agente). */
     val orders: Map<String, com.vidadomu.nexus.agent.core.orders.Order> = emptyMap(),
     val thinking: Boolean = false,
+    /** Monotonic start of the current turn. Survives LazyColumn disposal and chat switching. */
+    val thinkingStartedAtElapsedMs: Long = 0L,
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     val streamingText: String = "",
     /** Pasos que el agente va haciendo en este turno (para «Pensando…»). */
@@ -214,7 +216,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** The per-conversation part of [chat] put on screen, keeping what is global (catalog, settings, projects…). */
     private fun AssistantUiState.showing(chat: AssistantUiState) = copy(items = chat.items, plans = chat.plans, pendingAttachments = chat.pendingAttachments,
-        thinking = chat.thinking, streamingText = chat.streamingText, activity = chat.activity, replies = chat.replies, conversationId = chat.conversationId,
+        thinking = chat.thinking, thinkingStartedAtElapsedMs = chat.thinkingStartedAtElapsedMs,
+        streamingText = chat.streamingText, activity = chat.activity, replies = chat.replies, conversationId = chat.conversationId,
         activeProjectId = chat.activeProjectId, workingIn = null, scrollRequest = scrollRequest + 1)
 
     private fun chatTitle(chat: AssistantUiState) = chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(40) ?: "Nueva conversación"
@@ -284,12 +287,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         // A summary carried from another conversation goes to the agent with the first message (not shown in the bubble).
         val carried = _ui.value.items.filterIsInstance<ChatItem.Context>().filter { !it.sent }
         val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
+        val started = android.os.SystemClock.elapsedRealtime()
         _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
-            ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", activity = emptyList(), replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, streamingText = "", activity = emptyList(), replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
-        val started = android.os.SystemClock.elapsedRealtime()
         // Everything this answer produces goes to its own conversation, even if the user has moved to another one.
         val chatId = _ui.value.conversationId
         turnChat = chatId
@@ -337,7 +340,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
-                    state.copy(thinking = false, streamingText = "", activity = emptyList(), lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
+                    state.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", activity = emptyList(), lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         lastTurnBreakdown = lastBreakdown, items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
@@ -434,7 +437,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if(current.thinking && !answering) return
         if(answering && background != null) return
         failedTurn = null
-        if(!answering) _ui.update { it.copy(thinking = true) }
+        if(!answering) _ui.update { it.copy(thinking = true, thinkingStartedAtElapsedMs = android.os.SystemClock.elapsedRealtime()) }
         viewModelScope.launch {
             try {
                 if(answering) {
@@ -452,14 +455,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 synced.clear()
                 if(background != null) parkedOrders = com.vidadomu.nexus.agent.core.orders.OrderBookState()
                 else runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, streamingText = "", replies = emptyList(),
+                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", replies = emptyList(),
                     workingIn = background?.conversationId, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
                 publishOrders()
                 refreshConversations()
                 if(retry != null) send(retry.first, retry.second)
             } catch(error: Exception) {
-                _ui.update { it.copy(thinking = false, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
+                _ui.update { it.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, message = msg("No se pudo cambiar de conversación. El historial se conserva.")) }
             }
         }
     }
@@ -870,8 +873,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val previousMode = conversation.session.mode
         val conv = conversation
         conv.session.mode = AgentMode.ASSISTANT
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList(), System.currentTimeMillis()), thinking = true, scrollRequest = it.scrollRequest + 1) }
         val started = android.os.SystemClock.elapsedRealtime()
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), visibleRequest, emptyList(), System.currentTimeMillis()), thinking = true, thinkingStartedAtElapsedMs = started, scrollRequest = it.scrollRequest + 1) }
         turnJob = viewModelScope.launch {
             try {
                 val result = AssistantTurnService.runTurn(app) {
@@ -892,7 +895,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 notice("No se pudo analizar el fallo: ${Redactor.redact(e.message?.take(200) ?: e.javaClass.simpleName)}", error = true)
             } finally {
                 conv.session.mode = previousMode
-                _ui.update { it.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started, lastTurnBreakdown = null) }
+                _ui.update { it.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started, lastTurnBreakdown = null) }
             }
         }
     }

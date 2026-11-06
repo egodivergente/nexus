@@ -429,7 +429,7 @@ fun AssistantScreen(
                         AssistantBubble(ChatItem.Assistant("streaming_assistant_preview", ui.streamingText, emptyList(), "STREAMING"), onOpenHistory)
                     }
                 }
-                if (ui.thinking) item(key = "thinking_indicator") { ThinkingIndicator(ui.activity) }
+                if (ui.thinking) item(key = "thinking_indicator") { ThinkingIndicator(ui.activity, ui.thinkingStartedAtElapsedMs) }
             }
             // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
             val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
@@ -1633,10 +1633,22 @@ internal fun MediaPageDots(count: Int, current: Int) {
 }
 
 
-/** «Pensando…» con el tiempo transcurrido, para saber que sigue trabajando y cuánto lleva; a partir de 30 s recuerda cómo pararlo. */
+/** Monotonic turn time: never depends on when a recycled LazyColumn indicator enters composition. */
+internal fun thinkingElapsedSeconds(nowElapsedMs: Long, startedAtElapsedMs: Long): Long =
+    if (startedAtElapsedMs <= 0L) 0L else ((nowElapsedMs - startedAtElapsedMs).coerceAtLeast(0L) / 1000L)
+
+/** «Pensando…» shows time from the ViewModel's turn start, not time since the row was composed. */
 @Composable
-private fun ThinkingIndicator(activity: List<String> = emptyList()) {
-    val seconds by produceState(0) { while (true) { kotlinx.coroutines.delay(1000); value += 1 } }
+private fun ThinkingIndicator(activity: List<String> = emptyList(), startedAtElapsedMs: Long) {
+    val seconds by produceState(
+        initialValue = thinkingElapsedSeconds(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs),
+        key1 = startedAtElapsedMs,
+    ) {
+        while (true) {
+            value = thinkingElapsedSeconds(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs)
+            kotlinx.coroutines.delay(1000L)
+        }
+    }
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
