@@ -10,6 +10,12 @@
         "bridgeRequired": "server.ts con -c model_reasoning_effort para Codex (copia parcheada fuera del repo); sin el, el puente ignora xhigh/max/ultra y solo anade una frase al prompt para low/medium/high",
         "review": "revisor independiente 06-11: sin bloqueantes; aplicado su punto de conservar el nivel al cambiar de modelo",
         "unitTests": "no ejecutados (solo APK)",
+        "apkSha256": "e7aa951e92160b652d4f5e80dd110bfefd99cee6c81c986dc356978a1fc72a6a",
+        "buildId": "vidal-android-build:ca58f91b-bf73-4ade-ab76-9769cb402e38",
+        "s25InstalledAsUpdate": true,
+        "s25InstalledAt": "2026-11-06T11:41+01:00",
+        "s25InstallCheck": "adb por Tailscale desde AXELPC; install -r Success; versionCode 181; base.apk sha256 = apkSha256; 4523 archivos de datos con md5 identicos antes/despues; am start -W ok, crash buffer vacio",
+        "bridgeDeployed": false,
         "realImageTest": false
     },
     "vc180CodexAuditoria20261105": {
