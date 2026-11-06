@@ -8,7 +8,12 @@
         "conflicts": "solo app/build.gradle.kts (versionCode); AssistantScreen.kt fusionado sin conflicto en bloques distintos",
         "bridgeRequired": "puente 8788 con artefactos de Codex y modelo de AGY (copia parcheada fuera del repo); sin el, no llegan imagenes",
         "unitTests": "no ejecutados en esta fusion (solo APK); vc178 paso AntigravityProviderTest 11/11 y NativeImageModelsTest 2/2",
-        "s25InstalledAsUpdate": false,
+        "apkSha256": "c810798702f86d79145890a01697c52b5d1d878850aa23aa1ec55d83c164e044",
+        "buildId": "vidal-android-build:d97669fe-2120-49c0-86a7-e6052ac1fc60",
+        "s25InstalledAsUpdate": true,
+        "s25InstalledAt": "2026-11-06T09:50+01:00",
+        "s25InstallCheck": "adb install -r Success; versionCode 180; base.apk sha256 = apkSha256; 4522 archivos de datos con md5 identicos antes/despues; am start -W ok sin crashes",
+        "bridgeDeployed": "2026-11-05T23:38+01:00, backup *.bak-vc180-20261105",
         "realImageTest": false
     },
     "auditoriaVc17920261105": {
