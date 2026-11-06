@@ -15,8 +15,8 @@
         "s25InstalledAsUpdate": true,
         "s25InstalledAt": "2026-11-06T11:41+01:00",
         "s25InstallCheck": "adb por Tailscale desde AXELPC; install -r Success; versionCode 181; base.apk sha256 = apkSha256; 4523 archivos de datos con md5 identicos antes/despues; am start -W ok, crash buffer vacio",
-        "bridgeDeployed": false,
-        "realImageTest": false
+        "bridgeDeployed": "2026-11-06T12:36+01:00, server.ts 34522c5d (backup server.ts.bak-vc181-20261106); Codex xhigh y Auto=low (gpt-6.1-sol) verificados en sesiones de Codex",
+        "realImageTest": "Codex OK 06-11 (con vc180); AGY pendiente"
     },
     "vc180CodexAuditoria20261105": {
         "branch": "aki/vc180-codex-auditoria-20261105",
