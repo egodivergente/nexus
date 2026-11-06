@@ -54,6 +54,8 @@ class AntigravityProvider(
     private val engine: BridgeEngine = BridgeEngine.ANTIGRAVITY,
     /** The brain may create images with its own engine; the bridge hands them over as `artifact` events. */
     private val nativeImages: Boolean = false,
+    /** Solo Codex: nivel de razonamiento (`model_reasoning_effort`); null = el del modelo. AGY lo lleva en el id del modelo. */
+    private val reasoningEffort: String? = null,
 ) : StreamingLlmProvider {
     /** The same AXEL bridge serves several CLIs; [bridgeProvider] is the name it routes by. */
     enum class BridgeEngine(
@@ -486,7 +488,9 @@ class AntigravityProvider(
             put("jobId", jobId)
             put("conversationId", conversationId)
             put("provider", engine.bridgeProvider)
-            put("model", request.modelId.ifBlank { engine.defaultModel })
+            val model = request.modelId.ifBlank { engine.defaultModel }
+            put("model", model)
+            if (engine == BridgeEngine.CODEX) CodexReasoning.effective(model, reasoningEffort)?.let { put("reasoningEffort", it) }
             put("prompt", promptForTurn)
             put("messages", buildJsonArray { encodedMessages.forEach { add(it) } })
         }

@@ -78,6 +78,8 @@ data class AssistantSettings(
     val antigravityEndpoint: String = DEFAULT_ANTIGRAVITY_ENDPOINT,
     /** AGY y Codex pueden crear imágenes con su propio motor (Nano Banana / GPT Image); llegan a la Biblioteca. */
     val nativeImages: Boolean = true,
+    /** Nivel de razonamiento de Codex (low…ultra); null = el que trae el modelo. AGY lo lleva en el id del modelo. */
+    val codexEffort: String? = null,
     /** Cerebro personalizado activo (backend «custom:<id>»): BytePlus o uno añadido por el usuario. */
     val brain: BrainProfile? = null,
     val brainHasKey: Boolean = false,
@@ -285,6 +287,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
         antigravityEndpoint = prefs.getString("antigravity_endpoint", AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT)
             .orEmpty().ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
         nativeImages = prefs.getBoolean("native_images", true),
+        codexEffort = prefs.getString("codex_effort", null)?.takeIf { it in com.vidadomu.nexus.agent.core.llm.CodexReasoning.efforts },
     )
 
     /** Devuelve el último modelo guardado para [backend] sin perder la configuración de los demás proveedores. */
@@ -362,6 +365,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
             .putString("region", s.region.trim())
             .putString("temperature", s.temperature?.toString()).putInt("max_tokens", s.maxTokens.coerceAtLeast(1))
             .putString("mode", s.mode.name).putBoolean("send_images", s.sendImages).putBoolean("native_images", s.nativeImages)
+            .putString("codex_effort", s.codexEffort?.takeIf { it in com.vidadomu.nexus.agent.core.llm.CodexReasoning.efforts })
             .putString("excluded_families", AssistantSettings.parseFamilies(s.excludedFamilies).joinToString(", ")).apply()
         val access = s.awsAccessKeyId.trim()
         if (access.isBlank()) secure.clearProviderApiKey(AWS_ACCESS_ID) else secure.saveProviderApiKey(AWS_ACCESS_ID, access)
@@ -481,6 +485,7 @@ class AssistantRuntime(private val app: NexusApplication) {
                 s.antigravityEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
                 engine = if (s.backend == AssistantSettings.BACKEND_CODEX) AntigravityProvider.BridgeEngine.CODEX else AntigravityProvider.BridgeEngine.ANTIGRAVITY,
                 nativeImages = s.nativeImages,
+                reasoningEffort = if (s.backend == AssistantSettings.BACKEND_CODEX) s.codexEffort else null,
             )
             // BytePlus y cerebros propios: todo sale del perfil (protocolo, auth, razonamiento, límites propios).
             s.isCustom -> s.brain!!.let { p ->

@@ -1,4 +1,17 @@
 ﻿{
+    "vc181CodexEsfuerzo20261106": {
+        "branch": "aki/vc181-codex-esfuerzo-20261106",
+        "base": "aki/vc180-codex-auditoria-20261105@41bb087 (vc180 instalada en el S25)",
+        "versionCode": 181,
+        "versionName": "1.9.145-agent-preview",
+        "request": "Vidal 06-11: en Codex no dejaba cambiar el nivel de esfuerzo ni el modelo",
+        "changes": ["Codex: selector de razonamiento Auto/Bajo/Medio/Alto/Muy alto/Maximo/Ultra (Ultra no en gpt-6-luna ni gpt-5.6-luna; ahi baja a Maximo al enviar), pref codex_effort, campo reasoningEffort en /v1/chat solo para Codex", "Menu + del chat: selector rapido de modelo para AGY y Codex (Argon conserva su nivel; Codex conserva el suyo)", "Ajustes: fila Razonar para Codex"],
+        "effortCatalog": "C:/Users/vidadomu/.codex/models_cache.json (cliente 0.166, 06-11); falta confirmar la version de Codex del S25",
+        "bridgeRequired": "server.ts con -c model_reasoning_effort para Codex (copia parcheada fuera del repo); sin el, el puente ignora xhigh/max/ultra y solo anade una frase al prompt para low/medium/high",
+        "review": "revisor independiente 06-11: sin bloqueantes; aplicado su punto de conservar el nivel al cambiar de modelo",
+        "unitTests": "no ejecutados (solo APK)",
+        "realImageTest": false
+    },
     "vc180CodexAuditoria20261105": {
         "branch": "aki/vc180-codex-auditoria-20261105",
         "merges": ["aki/codex-imagenes-20261104@c2dc67e (vc178: Codex por el puente + imagenes AGY/Codex)", "aki/auditoria-vc179-20261105@c0feb3a (vc179: arreglos de la auditoria 05-11)"],

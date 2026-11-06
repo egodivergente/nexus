@@ -22,6 +22,14 @@ internal fun agentReasoningModes(antigravity: Boolean): List<AgentReasoningMode>
         AgentReasoningMode("Auto", null, null), AgentReasoningMode("Rápido", null, "disabled"), AgentReasoningMode("Mínimo", "minimal", null),
         AgentReasoningMode("Bajo", "low", null), AgentReasoningMode("Medio", "medium", null), AgentReasoningMode("Alto", "high", null))
 
+/** Codex: «Auto» (el nivel del modelo) y los niveles que admite el modelo elegido. */
+internal fun codexReasoningModes(model: String): List<AgentReasoningMode> =
+    listOf(AgentReasoningMode("Auto", null, null)) + com.vidadomu.nexus.agent.core.llm.CodexReasoning.supported(model).map {
+        AgentReasoningMode(CODEX_EFFORT_NAMES.getValue(it), it, null)
+    }
+
+internal val CODEX_EFFORT_NAMES = mapOf("low" to "Bajo", "medium" to "Medio", "high" to "Alto", "xhigh" to "Muy alto", "max" to "Máximo", "ultra" to "Ultra")
+
 internal fun agentReasoningCurrent(modes: List<AgentReasoningMode>, effort: String?, thinking: String?): String =
     modes.firstOrNull { it.effort == effort && it.thinking == thinking }?.name ?: "Auto"
 

@@ -1197,6 +1197,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 return "Argon admite bajo, medio o alto."
             return saveSettings(current.copy(modelId = com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.model(effort!!)),null)
         }
+        if (current.backend == AssistantSettings.BACKEND_CODEX) {
+            if (thinking != null || (effort != null && effort !in com.vidadomu.nexus.agent.core.llm.CodexReasoning.supported(current.modelId)))
+                return "Este modelo de Codex no admite ese nivel."
+            return saveSettings(current.copy(codexEffort = effort), null)
+        }
         val brain = _ui.value.settings.brain ?: return "Este proveedor no tiene modo de razonamiento configurable."
         return try {
             runtime.settings.brains.save(brain.copy(reasoningEffort = effort, thinking = thinking), null)
@@ -1214,6 +1219,22 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val model = if (backend.startsWith(BrainStore.PREFIX)) runtime.settings.brains.get(backend.removePrefix(BrainStore.PREFIX))?.modelId.orEmpty()
             else runtime.settings.savedModelFor(backend)
         return saveSettings(current.copy(backend = backend, modelId = model), null)
+    }
+
+    /** Modelo de AGY o Codex elegido en el menú «+» del chat (Vidal 06-11). Argon conserva su nivel; Codex guarda el suyo tal cual (al enviar se ajusta al modelo). */
+    fun setBridgeModel(model: String): String? {
+        val current = _ui.value.settings
+        val options = when (current.backend) {
+            AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
+            AssistantSettings.BACKEND_CODEX -> AssistantSettings.CODEX_MODELS
+            else -> return "Este cerebro cambia de modelo en Ajustes del asistente."
+        }
+        if (options.none { it.first == model }) return "Ese modelo no está disponible para este cerebro."
+        val argon = com.vidadomu.nexus.agent.core.llm.AntigravityReasoning
+        val target = if (current.backend == AssistantSettings.BACKEND_ANTIGRAVITY && argon.effort(model) != null)
+            argon.effort(current.modelId)?.let(argon::model) ?: model else model
+        if (target == current.modelId) return null
+        return saveSettings(current.copy(modelId = target), null)
     }
 
     fun reloadSkills() {

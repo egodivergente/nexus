@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -102,6 +103,22 @@ internal fun ReasoningIcon(current: String, enabled: Boolean, onClick: () -> Uni
             Text("Cuánto piensa antes de responder", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } },
         leadingIcon = { Icon(Icons.Default.Psychology, null, Modifier.size(NexusTokens.iconMedium)) })
+}
+
+@Composable
+internal fun ModelMenuItem(current: String, enabled: Boolean, onClick: () -> Unit) {
+    // Vidal 06-11: el modelo de AGY y Codex se cambia aquí, junto a «Razonamiento», sin ir a Ajustes.
+    DropdownMenuItem(onClick = onClick, enabled = enabled,
+        modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
+            .semantics {
+                contentDescription = "Modelo: $current"
+                stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
+            },
+        text = { Column {
+            Text("Modelo: $current", style = MaterialTheme.typography.bodyMedium)
+            Text("Qué modelo contesta", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } },
+        leadingIcon = { Icon(Icons.Default.AutoAwesome, null, Modifier.size(NexusTokens.iconMedium)) })
 }
 
 @Composable

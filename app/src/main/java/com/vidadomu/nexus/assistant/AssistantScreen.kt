@@ -29,6 +29,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import com.vidadomu.nexus.agent.core.llm.AntigravityReasoning
+import com.vidadomu.nexus.agent.core.llm.CodexReasoning
 import com.vidadomu.nexus.agent.core.llm.BrainAuthMode
 import com.vidadomu.nexus.agent.core.llm.BrainProfile
 import com.vidadomu.nexus.agent.core.llm.BrainProtocol
@@ -453,7 +454,7 @@ fun AssistantScreen(
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
                 onSend = { if(vm.sendWithBoards(input.text)) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
-                reasoningControl = { ReasoningPicker(ui, vm) })
+                reasoningControl = { BridgeModelPicker(ui, vm); ReasoningPicker(ui, vm) })
             }
         }
     }
@@ -482,6 +483,7 @@ private fun CarriedContextCard(item: ChatItem.Context) {
 private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val brain = ui.settings.brain
     val argon = if(ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY) AntigravityReasoning.effort(ui.settings.modelId) else null
+    val codex = ui.settings.backend == AssistantSettings.BACKEND_CODEX
     // Sin soporte se muestra desactivado (no oculto) para que el control siga siendo reconocible.
     if (!reasoningAvailable(ui)) {
         ReasoningIcon("No disponible", enabled = false, onClick = {})
@@ -489,14 +491,15 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     }
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val modes = agentReasoningModes(antigravity = argon != null)
-    val current = agentReasoningCurrent(modes, argon ?: brain?.reasoningEffort, brain?.thinking)
+    val modes = if (codex) codexReasoningModes(ui.settings.modelId) else agentReasoningModes(antigravity = argon != null)
+    val current = if (codex) agentReasoningCurrent(modes, CodexReasoning.effective(ui.settings.modelId, ui.settings.codexEffort), null)
+        else agentReasoningCurrent(modes, argon ?: brain?.reasoningEffort, brain?.thinking)
     Box {
         ReasoningIcon(current, enabled = !ui.thinking, onClick = { open = true })
         DropdownMenu(open, { open = false }) {
             modes.forEach { (name, effort, thinking) ->
                 DropdownMenuItem(text = { Column { Text(name)
-                        reasoningHint(name)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } } },
+                        (if (codex && effort == null) codexAutoHint(ui.settings.modelId) else reasoningHint(name))?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } } },
                     trailingIcon = { if (name == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = { open = false; vm.setReasoning(effort, thinking)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
             }
@@ -511,11 +514,48 @@ private fun reasoningHint(name: String): String? = when (name.lowercase()) {
     "bajo" -> "Razonamiento ligero"
     "medio" -> "Equilibrio entre velocidad y calidad"
     "alto" -> "Más profundo, tarda más"
+    "muy alto" -> "Aún más profundo; bastante más lento"
+    "máximo" -> "Lo máximo que razona; muy lento"
+    "ultra" -> "Máximo y delega partes de la tarea por su cuenta; lo más lento"
     else -> null
+}
+
+private fun codexAutoHint(model: String): String =
+    CodexReasoning.defaultFor(model)?.let { "El que trae el modelo (${CODEX_EFFORT_NAMES[it]})" } ?: "El que trae el modelo"
+
+/** Como en Ajustes: los modelos de generaciones anteriores no se ofrecen salvo que sea el elegido. */
+private val LEGACY_BRIDGE_MODEL = Regex("4-[56]|claude-.*4-6|3\\.[67]-flash|gpt-5\\.")
+
+/** Modelo de AGY o Codex desde el menú «+», sin ir a Ajustes (Vidal 06-11). Los demás cerebros lo cambian en Ajustes. */
+@Composable
+private fun BridgeModelPicker(ui: AssistantUiState, vm: AssistantViewModel) {
+    val s = ui.settings
+    val all = when (s.backend) {
+        AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
+        AssistantSettings.BACKEND_CODEX -> AssistantSettings.CODEX_MODELS
+        else -> return
+    }
+    // Las variantes de Argon (bajo/medio/alto) son un solo modelo; el nivel se elige en «Razonamiento».
+    val selected = all.firstOrNull { it.first == s.modelId ||
+        (s.backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(it.first) != null && AntigravityReasoning.effort(s.modelId) != null) }
+    val options = all.filter { !LEGACY_BRIDGE_MODEL.containsMatchIn(it.first) || it == selected }
+    var open by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    Box {
+        ModelMenuItem(selected?.second ?: s.modelId, enabled = !ui.thinking, onClick = { open = true })
+        DropdownMenu(open, { open = false }) {
+            options.forEach { (id, name) ->
+                DropdownMenuItem(text = { Text(name) },
+                    trailingIcon = { if (selected?.first == id) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = { open = false; vm.setBridgeModel(id)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
+            }
+        }
+    }
 }
 
 private fun reasoningAvailable(ui: AssistantUiState): Boolean =
     (ui.settings.backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(ui.settings.modelId) != null) ||
+    ui.settings.backend == AssistantSettings.BACKEND_CODEX ||
     ui.settings.brain?.let { it.capabilities.reasoning && it.protocol != BrainProtocol.CUSTOM_REST } == true
 
 /** Los IDs internos (ord_…) no se enseñan en el chat; la tarjeta y su «Detalles» ya identifican el encargo. Copiar conserva el texto original. */
@@ -1246,6 +1286,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
     var outputRate by remember { mutableStateOf(s.outputUsdPerM?.toString().orEmpty()) }
     var agyEndpoint by remember { mutableStateOf(s.antigravityEndpoint) }
     var nativeImages by remember { mutableStateOf(s.nativeImages) }
+    var codexEffort by remember { mutableStateOf(s.codexEffort) }
     // Cerebros personalizados y BytePlus: el selector los muestra junto a los de siempre.
     val brainStore = vm.runtime.settings.brains
     var brainTick by remember { mutableStateOf(0) }
@@ -1268,7 +1309,8 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
         error = vm.saveSettings(s.copy(backend = backend, awsAccessKeyId = accessKey, endpoint = endpoint, modelId = modelId, region = region, temperature = temp,
             maxTokens = maxTokens.toIntOrNull() ?: s.maxTokens, sendImages = sendImages, excludedFamilies = excluded,
             llmBaseUrl = baseUrl, inputUsdPerM = inRate, outputUsdPerM = outRate,
-            antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }, nativeImages = nativeImages), newToken, newSecret, newApiKey)
+            antigravityEndpoint = agyEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT }, nativeImages = nativeImages,
+            codexEffort = codexEffort), newToken, newSecret, newApiKey)
         if (error == null) onDismiss()
     }
     NexusSheet("Ajustes del asistente", onDismiss, icon = Icons.Default.AutoAwesome,
@@ -1412,6 +1454,14 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                             listOf("low" to "Bajo","medium" to "Medio","high" to "Alto").forEach { (effort,label) ->
                                 StudioFilterChip(AntigravityReasoning.effort(modelId)==effort,{modelId=AntigravityReasoning.model(effort)},label={Text(label)})
+                            }
+                        }
+                    }
+                    if (backend == AssistantSettings.BACKEND_CODEX) {
+                        Text("Razonar", style = MaterialTheme.typography.titleSmall)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                            codexReasoningModes(modelId).forEach { mode ->
+                                StudioFilterChip(CodexReasoning.effective(modelId, codexEffort) == mode.effort, { codexEffort = mode.effort }, label = { Text(mode.name) })
                             }
                         }
                     }
