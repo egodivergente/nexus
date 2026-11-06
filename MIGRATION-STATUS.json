@@ -16,7 +16,8 @@
         "s25InstalledAt": "2026-11-06T11:41+01:00",
         "s25InstallCheck": "adb por Tailscale desde AXELPC; install -r Success; versionCode 181; base.apk sha256 = apkSha256; 4523 archivos de datos con md5 identicos antes/despues; am start -W ok, crash buffer vacio",
         "bridgeDeployed": "2026-11-06T12:36+01:00, server.ts 34522c5d (backup server.ts.bak-vc181-20261106); Codex xhigh y Auto=low (gpt-6.1-sol) verificados en sesiones de Codex",
-        "realImageTest": "Codex OK 06-11 (con vc180); AGY pendiente"
+        "bridgeAgySubagent": "2026-11-06T12:48+01:00, server.ts abdb8a99 (backup server.ts.bak-vc181b-20261106): imagenes de AGY hechas por subagente (invoke_subagent) se esperan hasta 180 s y se entregan como artifact generate_image con modelo; nota a AGY para no escribir rutas /root",
+        "realImageTest": "Codex OK 06-11 (con vc180); AGY 06-11 fallo (subagente, enlace /root): arreglado en el puente, falta repetir"
     },
     "vc180CodexAuditoria20261105": {
         "branch": "aki/vc180-codex-auditoria-20261105",
