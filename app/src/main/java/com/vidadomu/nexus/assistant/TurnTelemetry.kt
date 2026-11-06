@@ -16,6 +16,11 @@ data class TurnSample(
     val outputTokens: Int,
     val calls: Int,
     val rounds: Int,
+    /** Desde vc182: tiempo esperando al modelo y ejecutando herramientas, llamadas al modelo y tokens leídos de caché. */
+    val llmMs: Long = 0,
+    val toolMs: Long = 0,
+    val llmCalls: Int = 0,
+    val cacheReadTokens: Int = 0,
 )
 
 /** Registro local y acotado (últimos 1000 turnos) para la telemetría de Ajustes → Sistema. Nada sale del teléfono. */

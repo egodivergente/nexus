@@ -78,6 +78,10 @@ data class TurnResult(
     val verifiedNotes: List<String> = emptyList(),
     /** true si el agente tuvo que rehacer su respuesta por contradecir el estado verificado. */
     val selfCorrected: Boolean = false,
+    /** Tiempo esperando al modelo, tiempo ejecutando herramientas y llamadas al modelo de este turno. */
+    val llmMillis: Long = 0,
+    val toolMillis: Long = 0,
+    val llmCalls: Int = 0,
 )
 
 /**
@@ -195,6 +199,7 @@ class AgentOrchestrator(
         val turnId = kotlin.coroutines.coroutineContext[com.vidadomu.nexus.agent.core.llm.LlmTurnContext]!!.turnId
         var llmCalls = 0L
         var input = 0; var output = 0; var rounds = 0
+        var cacheRead = 0; var cacheWrite = 0; var llmNanos = 0L; var toolNanos = 0L
         var stop = "END_TURN"
         var selfCorrected = false
         val turnTexts = mutableListOf<String>()
@@ -233,19 +238,24 @@ class AgentOrchestrator(
                     temperature = config.temperature,
                     turnId = turnId,
                     conversationId = session.id,
+                    cacheableSystemBlocks = system.size,
                 )
-                if (llm is StreamingLlmProvider) {
-                    onEvent(UiEvent.StreamingText(""))
-                    llm.completeStreaming(req) { delta -> onEvent(UiEvent.StreamingText(delta)) }
-                } else {
-                    llm.complete(req)
-                }
+                val t0 = System.nanoTime()
+                try {
+                    if (llm is StreamingLlmProvider) {
+                        onEvent(UiEvent.StreamingText(""))
+                        llm.completeStreaming(req) { delta -> onEvent(UiEvent.StreamingText(delta)) }
+                    } else {
+                        llm.complete(req)
+                    }
+                } finally { llmNanos += System.nanoTime() - t0 }
             } catch (e: LlmException) {
                 logger.log("W", "LLM ${e.kind}: ${Redactor.redact(e.message ?: "")}")
                 if (rounds == 0) while (conv.messages.size > start) conv.messages.removeAt(conv.messages.lastIndex)
                 throw e
             }
-            input += response.usage.inputTokens; output += response.usage.outputTokens
+            input += response.usage.promptTokens; output += response.usage.outputTokens
+            cacheRead += response.usage.cacheReadTokens; cacheWrite += response.usage.cacheWriteTokens
             response.notices.forEach { onEvent(UiEvent.Info(it)) }
             val keptMedia = keepGeneratedMedia(response.generatedMedia, session, onEvent)
             val msg = response.message.let { if (it.content.isEmpty()) LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("…"))) else it.copy(role = Role.ASSISTANT) }
@@ -293,6 +303,7 @@ class AgentOrchestrator(
             }
             val knownAttachmentIds = session.attachments.map {it.id}.toSet()
             val results = mutableListOf<ContentBlock.ToolResult>()
+            val toolStart = System.nanoTime()
             try {
                 for (use in uses) {
                     onEvent(UiEvent.Activity(toolActivity(use.name)))
@@ -318,7 +329,7 @@ class AgentOrchestrator(
                 }
                 conv.messages += LlmMessage(Role.USER, results)
                 throw e
-            }
+            } finally { toolNanos += System.nanoTime() - toolStart }
             val loaded = mutableListOf<ContentBlock>()
             val requestedAssetIds = uses.filter { use ->
                 use.name in setOf("view_library_asset","inspect_image_quality") && results.any { it.toolUseId == use.id && !it.isError }
@@ -341,11 +352,16 @@ class AgentOrchestrator(
             conv.messages += LlmMessage(Role.USER, results + loaded)
             rounds++
             if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
+            // Botones de respuesta junto al texto final: el turno ya está contestado y no hace falta otra llamada
+            // al modelo. El resultado queda en el historial, así que el siguiente mensaje sigue siendo válido.
+            if (uses.all { it.name in TERMINAL_TOOLS } && results.none { it.isError } && loaded.isEmpty() &&
+                msg.text().trim().length >= MIN_FINAL_TEXT) { stop = "END_TURN"; break }
         }
         val finalText = turnTexts.lastOrNull().orEmpty()
         val unresolved = runCatching { verifiedOrders?.invoke() }.getOrNull()?.let { ClaimVerifier.verify(finalText, it) }.orEmpty()
-        TurnResult(finalText, events, Usage(input, output), rounds, calls, stop,
-            verifiedNotes = unresolved.map { "Estado verificado: ${it.truth}" }.distinct(), selfCorrected = selfCorrected)
+        TurnResult(finalText, events, Usage(input - cacheRead - cacheWrite, output, cacheRead, cacheWrite), rounds, calls, stop,
+            verifiedNotes = unresolved.map { "Estado verificado: ${it.truth}" }.distinct(), selfCorrected = selfCorrected,
+            llmMillis = llmNanos / 1_000_000, toolMillis = toolNanos / 1_000_000, llmCalls = llmCalls.toInt())
     } }
 
     private suspend fun keepGeneratedMedia(media: List<GeneratedMedia>, session: AgentSession, onEvent: (UiEvent) -> Unit): String? {
@@ -502,6 +518,9 @@ class AgentOrchestrator(
 
     companion object {
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
+        /** Herramientas que solo acompañan a la respuesta final: tras ellas no se vuelve a llamar al modelo. */
+        internal val TERMINAL_TOOLS = setOf("suggest_replies")
+        private const val MIN_FINAL_TEXT = 15
         private val FORBIDDEN_NAME = Regex("confirm|approve|pay|charge|execute_paid", RegexOption.IGNORE_CASE)
     }
 }

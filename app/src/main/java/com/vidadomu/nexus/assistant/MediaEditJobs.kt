@@ -46,11 +46,12 @@ internal class MediaEditJobs(private val app:NexusApplication) {
             write(job.copy(state="FAILED",error="No se pudo iniciar la edición. El original se conserva."))
             throw ToolInputException("No se pudo iniciar la edición.")
         }
-        return status(job.id,session=session)
+        // Las ediciones cortas terminan aquí mismo: el agente recibe el resultado sin otro paso de consulta.
+        return status(job.id,START_WAIT_SECONDS,session)
     }
     suspend fun status(id:String,waitSeconds:Int=0,session:AgentSession):JsonObject {
         var job=read(id)
-        val deadline=System.nanoTime()+waitSeconds.coerceIn(0,20)*1_000_000_000L
+        val deadline=System.nanoTime()+waitSeconds.coerceIn(0,MAX_WAIT_SECONDS)*1_000_000_000L
         while(job.state in setOf("QUEUED","PROCESSING") && System.nanoTime()<deadline) {delay(250);job=read(id)}
         val assets=AssistantRuntime.get(app).assets
         val outputAssets=job.outputAssetIds.mapNotNull(assets::asset)
@@ -81,10 +82,14 @@ internal class MediaEditJobs(private val app:NexusApplication) {
                 }
             }
             job.error?.let {put("error",it)}
-            if(job.state in setOf("QUEUED","PROCESSING")) put("next_action","Consulta get_media_edit_job; no vuelvas a crear el encargo para consultar su estado.")
+            if(job.state in setOf("QUEUED","PROCESSING")) put("next_action","Sigue en curso. Si necesitas el resultado para responder, consulta get_media_edit_job una vez (espera sola hasta $MAX_WAIT_SECONDS s); si no, dile al usuario que sigue procesándose. No vuelvas a crear el encargo.")
         }
     }
     companion object {
+        /** Espera al crear la edición y espera máxima al consultarla: evita que el agente consulte en bucle. */
+        const val START_WAIT_SECONDS=60
+        const val MAX_WAIT_SECONDS=180
+        const val DEFAULT_WAIT_SECONDS=90
         private val LOCK=Any()
         private fun requireId(id:String) {if(!id.matches(Regex("[0-9a-f-]{36}"))) throw ToolInputException("Identificador de edición no válido.")}
     }

@@ -106,6 +106,8 @@ data class AssistantUiState(
     val replies: List<com.vidadomu.nexus.agent.core.tools.SuggestedReply> = emptyList(),
     val scrollRequest: Long = 0,
     val lastLatencyMs: Long? = null,
+    /** «modelo 8,1 s · herramientas 0,4 s · 2 pasos» del último turno, para ver dónde se fue el tiempo. */
+    val lastTurnBreakdown: String? = null,
     val catalog: List<com.vidadomu.nexus.agent.core.registry.ModelSummary> = emptyList(),
     val projectAssets: List<com.vidadomu.nexus.agent.core.assets.Asset> = emptyList(),
     val settings: AssistantSettings = AssistantSettings(),
@@ -292,6 +294,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val chatId = _ui.value.conversationId
         turnChat = chatId
         turnJob = viewModelScope.launch {
+            var lastBreakdown: String? = null
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
                     orchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
@@ -302,7 +305,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 _ui.value.settings.let { st ->
                     TurnTelemetry.record(app, TurnSample(System.currentTimeMillis(), agentLabel(st), st.modelId.ifBlank { "sin modelo" },
-                        android.os.SystemClock.elapsedRealtime() - started, r.usage.inputTokens, r.usage.outputTokens, r.toolCalls.size, r.toolRounds))
+                        android.os.SystemClock.elapsedRealtime() - started, r.usage.promptTokens, r.usage.outputTokens, r.toolCalls.size, r.toolRounds,
+                        llmMs = r.llmMillis, toolMs = r.toolMillis, llmCalls = r.llmCalls, cacheReadTokens = r.usage.cacheReadTokens))
+                    lastBreakdown = turnBreakdown(r)
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
                     updateChat(chatId) { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
@@ -333,7 +338,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
                     state.copy(thinking = false, streamingText = "", activity = emptyList(), lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
-                        items = state.items.filterNot { it in cards } + cards)
+                        lastTurnBreakdown = lastBreakdown, items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
                 if (background?.conversationId == chatId) finishBackground()
@@ -887,7 +892,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 notice("No se pudo analizar el fallo: ${Redactor.redact(e.message?.take(200) ?: e.javaClass.simpleName)}", error = true)
             } finally {
                 conv.session.mode = previousMode
-                _ui.update { it.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started) }
+                _ui.update { it.copy(thinking = false, lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started, lastTurnBreakdown = null) }
             }
         }
     }
@@ -1256,4 +1261,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun msg(text: String) = (++msgSeq) to text
 
     private fun newId() = UUID.randomUUID().toString()
+}
+
+/** Desglose legible del tiempo de un turno; null si no hubo llamadas al modelo medidas. */
+internal fun turnBreakdown(r: com.vidadomu.nexus.agent.core.agent.TurnResult): String? {
+    if (r.llmCalls <= 0) return null
+    fun s(ms: Long) = "%.1f s".format(java.util.Locale("es", "ES"), ms / 1000.0)
+    return "modelo ${s(r.llmMillis)} · herramientas ${s(r.toolMillis)} · ${r.llmCalls} ${if (r.llmCalls == 1) "paso" else "pasos"}"
 }

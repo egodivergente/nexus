@@ -70,7 +70,7 @@ object NativeOperationTools {
         NativeTool(operations,"prepare_whisper_model",ToolCategory.ORGANIZE,
             "Descarga el modelo Whisper Base local de 148 MB por HTTPS y verifica su SHA-256. Sólo descarga pesos; no sube audio, no usa API de pago ni borra otros modelos. Úsalo cuando el usuario pida habilitar Whisper local y falte el modelo.",schema {}),
         NativeTool(operations,"edit_video_assets",ToolCategory.ORGANIZE,
-            "Edita medios locales sin coste de proveedor: recorta, une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Conserva originales. Devuelve edit_job_id: consulta get_media_edit_job hasta finalizar, sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
+            "Edita medios locales sin coste de proveedor: recorta, une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Conserva originales. Espera hasta 60 s y devuelve el resultado si ya terminó; si sigue en curso, consulta get_media_edit_job una vez (espera sola), sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
             schema {
                 string("action","Operación.",required=true,enum=listOf("trim","concat","remove_audio","replace_audio","mix_audio","extract_audio"))
                 stringArray("asset_ids","Ids indexados, de 1 a 12; concat conserva este orden.",required=true)
@@ -100,8 +100,8 @@ object NativeOperationTools {
                 integer("end_ms","Final opcional en milisegundos.")
             }),
         NativeTool(operations,"get_media_edit_job",ToolCategory.READ,
-            "Consulta estado, progreso y archivos resultantes de UN encargo local de edición o transcripción. No crea ni repite la edición.",
-            schema {string("edit_job_id","Id devuelto por la herramienta de edición.",required=true);integer("wait_seconds","Espera hasta 20 segundos por un resultado; defecto 5. Usa 20 para evitar consultas inmediatas repetidas.")}),
+            "Consulta estado, progreso y archivos resultantes de UN encargo local de edición o transcripción. Espera sola a que termine (hasta 180 s): llámala una vez, no en bucle. No crea ni repite la edición.",
+            schema {string("edit_job_id","Id devuelto por la herramienta de edición.",required=true);integer("wait_seconds","Segundos máximos de espera, de 0 a 180; defecto 90. Devuelve antes si termina.")}),
         NativeTool(operations, "atlas_get_balance", ToolCategory.READ,
             "Consulta saldo disponible, efectivo, bono y fondos retenidos en la API oficial de Atlas. No genera ni estima un saldo local.",
             schema {}),

@@ -36,7 +36,7 @@ private fun Stat(title: String, detail: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.labelMedium, color = TextSecondary, maxLines = 2)
+            if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.labelMedium, color = TextSecondary, maxLines = 3)
         }
         Spacer(Modifier.width(NexusTokens.space8))
         Text(value, style = MaterialTheme.typography.titleSmall)
@@ -66,11 +66,18 @@ internal fun TelemetryCard() {
         if (open) {
             Text("Agentes", style = MaterialTheme.typography.titleSmall)
             if (turns.isEmpty()) Text("Aún no hay respuestas registradas. Se anotan desde esta versión.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            if (turns.isNotEmpty()) Text("Mediana por respuesta. Desglose (modelo, herramientas, pasos) desde la versión 1.9.146.", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
             turns.groupBy { it.agent }.entries.sortedByDescending { it.value.size }.forEach { (agent, list) ->
-                val avg = list.map { it.durationMs }.average().toLong()
+                fun median(v: List<Long>) = v.sorted().let { if (it.isEmpty()) 0L else it[it.size / 2] }
                 val inTok = list.sumOf { it.inputTokens.toLong() }
                 val outTok = list.sumOf { it.outputTokens.toLong() }
-                Stat(agent, "${list.size} respuestas · ${list.sumOf { it.calls }} llamadas a herramientas · ${tokens(inTok)} entrada / ${tokens(outTok)} salida", seconds(avg))
+                val timed = list.filter { it.llmMs > 0 }
+                val split = if (timed.isEmpty()) "" else " · modelo ${seconds(median(timed.map { it.llmMs }))}, herramientas ${seconds(median(timed.map { it.toolMs }))}, " +
+                    "${median(timed.map { it.llmCalls.toLong() })} pasos" + timed.sumOf { it.cacheReadTokens.toLong() }.let { c ->
+                        val total = timed.sumOf { it.inputTokens.toLong() }
+                        if (c > 0 && total > 0) " · caché ${c * 100 / total} %" else ""
+                    }
+                Stat(agent, "${list.size} respuestas · ${list.sumOf { it.calls }} llamadas a herramientas · ${tokens(inTok)} entrada / ${tokens(outTok)} salida$split", seconds(median(list.map { it.durationMs })))
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             fun name(id: String) = app.modelCatalogRepository.getModelById(id)?.displayName ?: id

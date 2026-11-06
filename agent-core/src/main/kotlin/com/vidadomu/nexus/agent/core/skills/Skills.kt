@@ -40,6 +40,11 @@ data class Skill(
     fun isVerified(tag: String): Boolean = tag !in unverifiedTags
 
     /** Primera línea útil del resumen, para el índice que ve el LLM. */
+    /** Resumen acotado para el índice del prompt de sistema: basta para decidir qué skill cargar con load_skill. */
+    fun shortLine(max: Int = 100): String = oneLiner().let { s ->
+        if (s.length <= max) s else s.take(max).substringBeforeLast(' ').trimEnd(',', ';', ':', ' ') + "…"
+    }
+
     fun oneLiner(): String = body.lineSequence().map { it.trim() }
         .firstOrNull { it.isNotEmpty() && !it.startsWith("#") }?.take(180) ?: title
 
@@ -234,7 +239,8 @@ class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyL
 
     /** Índice compacto para el prompt de sistema: el LLM carga el cuerpo bajo demanda. */
     fun catalogText(): String = buildString {
-        expertise().forEach { appendLine("- ${it.id} (experto): ${it.oneLiner()}") }
-        models().forEach { appendLine("- ${it.id} (modelo, v${it.version}, ${it.updated ?: "s/f"}): ${it.oneLiner()}") }
+        // Una línea corta por skill: el índice va en cada llamada al modelo; list_skills y load_skill dan el detalle.
+        expertise().forEach { appendLine("- ${it.id} (experto): ${it.shortLine()}") }
+        models().forEach { appendLine("- ${it.id} (modelo v${it.version}): ${it.shortLine()}") }
     }.trim()
 }

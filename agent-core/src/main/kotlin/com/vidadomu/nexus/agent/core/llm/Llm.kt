@@ -50,11 +50,19 @@ data class LlmRequest(
     val temperature: Double? = null,
     val turnId: String? = null,
     val conversationId: String? = null,
+    /** Bloques iniciales de [system] que no cambian entre llamadas de la conversación: el proveedor puede cachearlos. */
+    val cacheableSystemBlocks: Int = 0,
 )
 
 enum class StopReason { END_TURN, TOOL_USE, MAX_TOKENS, STOP_SEQUENCE, GUARDRAIL, CONTENT_FILTERED, OTHER }
 
-data class Usage(val inputTokens: Int, val outputTokens: Int)
+/**
+ * [inputTokens] son los tokens de entrada sin caché. Con caché de prompt (Bedrock), los leídos y los escritos en
+ * caché llegan aparte: se facturan a otra tarifa y [promptTokens] da el total procesado.
+ */
+data class Usage(val inputTokens: Int, val outputTokens: Int, val cacheReadTokens: Int = 0, val cacheWriteTokens: Int = 0) {
+    val promptTokens: Int get() = inputTokens + cacheReadTokens + cacheWriteTokens
+}
 
 /** Image created by the brain's own engine during the turn (AGY generate_image, Codex image generation). */
 class GeneratedMedia(

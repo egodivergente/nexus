@@ -298,7 +298,7 @@ internal fun ProjectReferences(ui: AssistantUiState, vm: AssistantViewModel, exp
 internal fun AgentStatus(ui: AssistantUiState, onSettings: () -> Unit) {
     val active=ui.plans.values.count {it.busy || it.jobStatus in listOf("PENDING","PROCESSING")}
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        Text("${if(ui.thinking) "Agente trabajando" else "Agente listo"} · $active en curso"+(ui.lastLatencyMs?.let {" · Último turno ${it/1000.0}s"} ?: ""),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
+        Text("${if(ui.thinking) "Agente trabajando" else "Agente listo"} · $active en curso"+(ui.lastLatencyMs?.let {" · Último turno ${it/1000.0}s"} ?: "")+(ui.lastTurnBreakdown?.let {" ($it)"} ?: ""),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
         Text("${ui.catalog.size} modelos · ${ui.skillsCount} skills · ${ui.skillErrors.size} errores de skills. La latencia incluye herramientas.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
     }
 }

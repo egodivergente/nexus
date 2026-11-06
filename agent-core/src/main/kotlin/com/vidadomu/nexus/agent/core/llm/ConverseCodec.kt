@@ -22,12 +22,37 @@ import kotlinx.serialization.json.put
  */
 object ConverseCodec {
 
-    fun encodeRequest(request: LlmRequest): JsonObject = buildJsonObject {
+    /**
+     * Modelos Claude de Bedrock que admiten caché de prompt (cachePoint). Para el resto no se envía:
+     * otros modelos rechazarían la petición.
+     */
+    private val PROMPT_CACHE_MODELS = Regex("anthropic\\.claude-(3-7-sonnet|3-5-haiku|(opus|sonnet|haiku)-[4-9])")
+    fun supportsPromptCache(modelId: String): Boolean = PROMPT_CACHE_MODELS.containsMatchIn(modelId)
+    private fun cachePoint() = buildJsonObject { put("cachePoint", buildJsonObject { put("type", "default") }) }
+
+    /**
+     * [cache] añade puntos de caché (máx. 3 de los 4 permitidos): tras las herramientas, tras los bloques fijos del
+     * sistema y al final del último mensaje. Así cada paso del mismo turno reutiliza lo ya procesado en el anterior.
+     */
+    fun encodeRequest(request: LlmRequest, cache: Boolean = false): JsonObject = buildJsonObject {
         put("modelId", request.modelId)
         if (request.system.isNotEmpty()) {
-            put("system", buildJsonArray { request.system.forEach { add(buildJsonObject { put("text", it) }) } })
+            val fixed = if (cache) request.cacheableSystemBlocks.coerceIn(0, request.system.size) else 0
+            put("system", buildJsonArray {
+                request.system.forEachIndexed { i, text ->
+                    add(buildJsonObject { put("text", text) })
+                    if (fixed > 0 && i == fixed - 1) add(cachePoint())
+                }
+            })
         }
-        put("messages", buildJsonArray { request.messages.forEach { add(encodeMessage(it)) } })
+        put("messages", buildJsonArray {
+            request.messages.forEachIndexed { i, message ->
+                val encoded = encodeMessage(message)
+                if (cache && i == request.messages.lastIndex && message.content.isNotEmpty())
+                    add(JsonObject(encoded + ("content" to JsonArray(encoded["content"]!!.jsonArray + cachePoint()))))
+                else add(encoded)
+            }
+        })
         put("inferenceConfig", buildJsonObject {
             put("maxTokens", request.maxTokens)
             // Claude 5.5 rejects custom sampling parameters; use its model defaults.
@@ -45,6 +70,7 @@ object ConverseCodec {
                             })
                         })
                     }
+                    if (cache) add(cachePoint())
                 })
             })
         }
@@ -99,6 +125,8 @@ object ConverseCodec {
             usage = Usage(
                 inputTokens = usage?.get("inputTokens")?.jsonPrimitive?.intOrNull ?: 0,
                 outputTokens = usage?.get("outputTokens")?.jsonPrimitive?.intOrNull ?: 0,
+                cacheReadTokens = usage?.get("cacheReadInputTokens")?.jsonPrimitive?.intOrNull ?: 0,
+                cacheWriteTokens = usage?.get("cacheWriteInputTokens")?.jsonPrimitive?.intOrNull ?: 0,
             ),
         )
     }

@@ -83,7 +83,7 @@ class NexusNativeOperations(
                 "detect_video_scenes" -> AgentVideoOperations(app).detectScenes(input.requiredText("asset_id"),
                     input.integer("step_ms",1000,250..5000).toLong(),(input["threshold"] as? JsonPrimitive)?.content?.toDoubleOrNull()?.coerceIn(.05,.9) ?: .3)
                 "transcribe_media_asset" -> MediaEditJobs(app).start("transcribe",input,session)
-                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",5,0..20),session)
+                "get_media_edit_job" -> MediaEditJobs(app).status(input.requiredText("edit_job_id"),input.integer("wait_seconds",MediaEditJobs.DEFAULT_WAIT_SECONDS,0..MediaEditJobs.MAX_WAIT_SECONDS),session)
                 "atlas_get_balance" -> atlasBalance()
                 "corte_status", "corte_list_projects", "corte_read_project", "corte_find_silences", "corte_apply_ops", "corte_undo", "corte_import_media", "corte_create_project" ->
                     CorteBridge(app) { id -> AgentVideoOperations(app).source(id) }.run(operation, input)

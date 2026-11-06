@@ -78,4 +78,27 @@ class SuggestedRepliesTest {
         assertEquals("Tienes dos caminos. ¿Cuál prefieres?", result.text)
         assertEquals(listOf("Opción A", "Opción B"), events.filterIsInstance<UiEvent.Replies>().single().replies.map { it.label })
     }
+
+    @Test fun `texto final con botones cierra el turno sin otra llamada y el siguiente mensaje sigue valido`() = runTest {
+        val h = Harness()
+        val llm = ScriptedLlmProvider(listOf(
+            { tools(use("r1", "suggest_replies", """{"replies":[{"label":"Opción A"},{"label":"Opción B"}]}"""), text = "Tienes dos caminos. ¿Cuál prefieres?") },
+            { text("Vamos con la A.") },
+        ))
+        val o = AgentOrchestrator(llm, config, NexusToolkit.all(h.deps), h.skills, h.assets, today = { "2026-10-16" })
+        val conv = o.newConversation(mode = AgentMode.AGENT)
+        val events = mutableListOf<UiEvent>()
+        val first = o.send(conv, "Dime opciones") { events += it }
+        assertEquals(1, llm.requests.size, "no debe pedir otra respuesta al modelo tras los botones")
+        assertEquals(1, first.llmCalls)
+        assertEquals("Tienes dos caminos. ¿Cuál prefieres?", first.text)
+        assertEquals("END_TURN", first.stop)
+        assertEquals(listOf("Opción A", "Opción B"), events.filterIsInstance<UiEvent.Replies>().single().replies.map { it.label })
+        val second = o.send(conv, "La A")
+        assertEquals("Vamos con la A.", second.text)
+        // El resultado de la herramienta y el nuevo texto van en el mismo mensaje de usuario, con el resultado delante.
+        val user = llm.requests[1].messages.last()
+        assertTrue(user.content.first() is com.vidadomu.nexus.agent.core.llm.ContentBlock.ToolResult)
+        assertTrue(user.content.any { it is com.vidadomu.nexus.agent.core.llm.ContentBlock.Text && "La A" in it.text })
+    }
 }

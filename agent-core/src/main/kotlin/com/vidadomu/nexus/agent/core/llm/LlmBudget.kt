@@ -85,18 +85,30 @@ open class BudgetedLlmProvider(protected val delegate: LlmProvider, private val 
 
     protected suspend fun guarded(request: LlmRequest, call: suspend () -> LlmResponse): LlmResponse {
         val (inputRate, outputRate) = rates(request.modelId)
-        val counted = delegate.countInputTokens(request)
         val hasDocument = request.messages.any { m -> m.content.any { it is ContentBlock.Document } }
-        // Solo Bedrock cuenta tokens antes de enviar; en los demás proveedores se estima por tamaño.
-        if (counted == null && hasDocument && delegate.id.startsWith("bedrock")) throw LlmException(LlmException.Kind.BUDGET,
-            "Bedrock no pudo contar el documento antes de enviarlo. Revisa el permiso bedrock:CountTokens y la compatibilidad del modelo; el archivo sigue guardado.")
-        val input = counted?.toLong() ?: (ConverseCodec.encodeRequest(request).toString().toByteArray().size.toLong() + 1024)
-        val reserved = input * inputRate / 1_000_000 + request.maxTokens * outputRate / 1_000_000
-        val ticket = ledger.reserve(request.turnId ?: kotlin.coroutines.coroutineContext[LlmTurnContext]?.turnId ?: UUID.randomUUID().toString(), reserved, input + request.maxTokens, limits())
+        val turn = request.turnId ?: kotlin.coroutines.coroutineContext[LlmTurnContext]?.turnId ?: UUID.randomUUID().toString()
+        fun reserve(input: Long) = ledger.reserve(turn, input * inputRate / 1_000_000 + request.maxTokens * outputRate / 1_000_000, input + request.maxTokens, limits())
+        suspend fun counted(): Long? = delegate.countInputTokens(request)?.toLong()
+        val ticket = if (hasDocument && delegate.id.startsWith("bedrock")) {
+            // Con documentos, Bedrock cuenta siempre antes de enviar: el tamaño en bytes no sirve de cota.
+            reserve(counted() ?: throw LlmException(LlmException.Kind.BUDGET,
+                "Bedrock no pudo contar el documento antes de enviarlo. Revisa el permiso bedrock:CountTokens y la compatibilidad del modelo; el archivo sigue guardado."))
+        } else {
+            // Sin documentos, los bytes del cuerpo son una cota superior de los tokens: se reserva con ella y se evita
+            // una llamada previa de conteo en cada paso. Solo si esa cota choca con un límite se cuenta de verdad.
+            val estimate = ConverseCodec.encodeRequest(request).toString().toByteArray().size.toLong() + 1024
+            try { reserve(estimate) } catch (e: LlmException) {
+                if (e.kind != LlmException.Kind.BUDGET) throw e
+                reserve(counted() ?: throw e)
+            }
+        }
         try {
             val response = call()
-            if(response.usage.inputTokens + response.usage.outputTokens > 0) ledger.settle(ticket, response.usage.inputTokens * inputRate / 1_000_000 + response.usage.outputTokens * outputRate / 1_000_000,
-                response.usage.inputTokens.toLong() + response.usage.outputTokens)
+            val u = response.usage
+            // Caché de prompt: escribir cuesta 1,25× la entrada y leer 0,1× (tarifas de Bedrock para Claude).
+            if(u.promptTokens + u.outputTokens > 0) ledger.settle(ticket,
+                (u.inputTokens + u.cacheWriteTokens * 1.25 + u.cacheReadTokens * 0.1) * inputRate / 1_000_000 + u.outputTokens * outputRate / 1_000_000,
+                u.promptTokens.toLong() + u.outputTokens)
             return response
         } catch (error: LlmException) {
             // Unknown network/upstream outcomes retain the reservation, including after a process restart.
