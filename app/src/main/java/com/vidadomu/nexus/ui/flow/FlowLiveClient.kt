@@ -85,6 +85,7 @@ internal class FlowLiveClient(private val app: NexusApplication) {
     private var generation = 0
 
     fun start() {
+        scope.launch { runCatching { FlowMedia.repair(app) } }
         wanted = true
         if (socket == null) connect()
     }
@@ -207,6 +208,53 @@ internal class FlowLiveClient(private val app: NexusApplication) {
     fun order(text: String) { if (text.isNotBlank()) { order.value = "Enviando el encargo…"; send(JSONObject().put("t", "order").put("text", text)) } }
 }
 
+internal data class FlowMediaKind(val mime: String, val type: AssetType, val ext: String)
+
+internal object FlowMedia {
+    private val byExt = mapOf("jpg" to "image/jpeg", "jpeg" to "image/jpeg", "png" to "image/png", "webp" to "image/webp", "gif" to "image/gif",
+        "mp4" to "video/mp4", "mov" to "video/quicktime", "webm" to "video/webm", "m4v" to "video/mp4",
+        "mp3" to "audio/mpeg", "wav" to "audio/wav", "m4a" to "audio/mp4", "zip" to "application/zip", "pdf" to "application/pdf")
+
+    fun sniff(file: File, declaredMime: String?, name: String): FlowMediaKind {
+        val header = runCatching { file.inputStream().use(com.vidadomu.nexus.ui.components.MediaSniffer::readHeader) }.getOrNull()
+        val fromName = byExt[name.substringAfterLast('.', "").lowercase()]
+        val mime = com.vidadomu.nexus.ui.components.MediaSniffer.resolve(header, declaredMime, fromName)
+        val type = when {
+            mime.startsWith("image/") -> AssetType.IMAGE
+            mime.startsWith("video/") -> AssetType.VIDEO
+            mime.startsWith("audio/") -> AssetType.AUDIO
+            else -> AssetType.OTHER
+        }
+        val ext = byExt.entries.firstOrNull { it.value == mime && it.key.length == 3 }?.key
+            ?: android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
+        return FlowMediaKind(mime, type, ext)
+    }
+
+    /** Arregla lo que una versión anterior guardó como «archivo genérico»: lee su contenido y lo reclasifica. */
+    suspend fun repair(app: NexusApplication): Int {
+        val runtime = AssistantRuntime.get(app)
+        var fixed = 0
+        for (a in runtime.assets.snapshot().assets) {
+            if (a.type != AssetType.OTHER || "flow" !in a.tags || a.libraryDeleted) continue
+            val file = Uri.parse(a.uri).path?.let(::File)?.takeIf { it.isFile } ?: continue
+            val kind = sniff(file, a.mimeType, a.displayName)
+            if (kind.type == AssetType.OTHER) continue
+            val renamed = File(file.parentFile, file.nameWithoutExtension + "." + kind.ext)
+            val finalFile = if (renamed != file && !renamed.exists() && file.renameTo(renamed)) renamed else file
+            var w: Int? = null; var h: Int? = null
+            if (kind.type == AssetType.IMAGE) {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(finalFile.path, o); w = o.outWidth.takeIf { it > 0 }; h = o.outHeight.takeIf { it > 0 }
+            }
+            runCatching {
+                runtime.assets.updateAsset(a.id) { it.copy(type = kind.type, mimeType = kind.mime, uri = Uri.fromFile(finalFile).toString(), width = w, height = h) }
+                fixed++
+            }
+        }
+        return fixed
+    }
+}
+
 /**
  * Guarda en la Biblioteca lo que se descarga desde la pestaña de Flow de AXELPC. Sigue trabajando aunque salgas de
  * la pestaña; cada resultado se importa una sola vez y se comprueba su huella SHA-256.
@@ -232,10 +280,7 @@ internal object FlowLiveImporter {
 
     private suspend fun importOne(app: NexusApplication, base: String, asset: RemoteAsset): FlowImported {
         val dir = File(app.filesDir, "flow_live").apply { mkdirs() }
-        val ext = asset.name.substringAfterLast('.', "").lowercase().takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
-            ?: android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(asset.mime) ?: "bin"
-        val target = File(dir, "flow_${asset.id}.$ext")
-        val part = File(dir, target.name + ".part")
+        val part = File(dir, "flow_${asset.id}.part")
         val digest = MessageDigest.getInstance("SHA-256")
         try {
             http.newCall(Request.Builder().url("$base/assets/${Uri.encode(asset.id)}").build()).execute().use { r ->
@@ -254,19 +299,15 @@ internal object FlowLiveImporter {
             }
             val hex = digest.digest().joinToString("") { "%02x".format(it) }
             check(asset.sha256 == null || asset.sha256.equals(hex, ignoreCase = true)) { "la huella no coincide" }
-            check(part.renameTo(target)) { "no se pudo guardar el archivo" }
-        } finally {
-            part.delete()
+        } catch (e: Exception) {
+            part.delete(); throw e
         }
-        var mime = asset.mime
-        val type = when {
-            mime.startsWith("image/") -> AssetType.IMAGE
-            mime.startsWith("video/") -> AssetType.VIDEO
-            mime.startsWith("audio/") -> AssetType.AUDIO
-            ext in setOf("jpg", "jpeg", "png", "webp", "gif") -> AssetType.IMAGE.also { mime = "image/" + if (ext == "jpg") "jpeg" else ext }
-            ext in setOf("mp4", "mov", "webm") -> AssetType.VIDEO.also { mime = if (ext == "mov") "video/quicktime" else "video/$ext" }
-            else -> AssetType.OTHER
-        }
+        // El tipo sale del CONTENIDO (firma del archivo), no del nombre: Flow a veces entrega nombres sin extensión.
+        val sniffed = FlowMedia.sniff(part, asset.mime, asset.name)
+        val mime = sniffed.mime
+        val type = sniffed.type
+        val target = File(dir, "flow_${asset.id}.${sniffed.ext}")
+        check(part.renameTo(target)) { "no se pudo guardar el archivo" }
         var width: Int? = null
         var height: Int? = null
         var seconds: Double? = null
