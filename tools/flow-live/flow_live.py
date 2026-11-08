@@ -43,7 +43,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 FLOW_URL = os.environ.get("FLOW_LIVE_URL", "https://flow.google.com/")
 CDP_PORT = int(os.environ.get("FLOW_LIVE_CDP_PORT", "9338"))
 ENSURE_BROWSER = os.environ.get("FLOW_LIVE_ENSURE", str(Path.home() / "flow-chatgpt-bridge" / "ensure-browser.ps1"))
@@ -252,12 +252,12 @@ class Live:
         async with self.lock:
             if self.cdp and not self.cdp.closed.is_set() and self.session:
                 return
-            if not Cdp.version():
+            if not await asyncio.to_thread(Cdp.version):
                 log.info("Arrancando el navegador de Flow")
                 await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ENSURE_BROWSER],
                                         capture_output=True, timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 for _ in range(20):
-                    if Cdp.version():
+                    if await asyncio.to_thread(Cdp.version):
                         break
                     await asyncio.sleep(1)
             self.cdp = Cdp()
@@ -283,8 +283,23 @@ class Live:
             log.warning("descargas: %s", e)
 
     async def _guard_downloads(self) -> None:
+        misses = 0
         while self.cdp and not self.cdp.closed.is_set():
             await asyncio.sleep(30)
+            # Latido: si Edge deja de contestar por esta conexión, se cierra para reconectar en limpio.
+            try:
+                await self.cdp.send("Browser.getVersion", timeout=5)
+                misses = 0
+            except (CdpError, asyncio.TimeoutError):
+                misses += 1
+                log.warning("Edge no contesta (%d)", misses)
+                if misses >= 2:
+                    self.session = None
+                    try:
+                        await self.cdp.ws.close()
+                    except Exception:
+                        pass
+                    return
             await self.claim_downloads(force=True)
 
     async def _attach_main(self) -> None:
@@ -484,6 +499,14 @@ class Live:
             self.downloads[p["guid"]] = {"name": safe_name(p.get("suggestedFilename", "")), "url": p.get("url", ""), "mine": mine}
             if mine:
                 asyncio.create_task(self.broadcast({"type": "download", "name": self.downloads[p["guid"]]["name"], "state": "start"}))
+        elif method == "Page.javascriptDialogOpening" and msg.get("sessionId") == self.session:
+            # Un «¿Salir del sitio?», alert o confirm bloquea la pestaña (y con ella capturas y toques) hasta que
+            # alguien lo cierra. Se acepta solo y se avisa al móvil.
+            kind = p.get("type", "")
+            log.info("Aviso de la página (%s) aceptado: %s", kind, (p.get("message") or "")[:120])
+            asyncio.create_task(self.cdp.fire("Page.handleJavaScriptDialog", {"accept": True}, self.session))
+            asyncio.create_task(self.broadcast({"type": "order", "state": "failed",
+                                "message": f"Flow mostró un aviso y se aceptó: {(p.get('message') or kind)[:120]}"}))
         elif method == "Browser.downloadProgress":
             if p.get("state") in ("completed", "canceled"):
                 asyncio.create_task(self._finish_download(p["guid"], p["state"]))
@@ -794,15 +817,20 @@ def host_ok(host: str | None) -> bool:
 
 # ---------------------------------------------------------------- HTTP / WebSocket
 
+async def _ensure_quietly() -> None:
+    try:
+        await asyncio.wait_for(live.ensure(), 90)
+    except Exception as e:
+        log.warning("health: %s", e)
+
+
 async def health(request: Request) -> Response:
     if not host_ok(request.headers.get("host")) or not await asyncio.to_thread(allowed, request.client.host):
         return JSONResponse({"error": "forbidden"}, status_code=403)
-    try:
-        await live.ensure()
-        ok = True
-    except Exception as e:
-        ok = False
-        log.warning("health: %s", e)
+    # Responde al instante aunque Edge esté atascado (el vigilante lo usa para saber si el servicio vive).
+    ok = bool(live.cdp and not live.cdp.closed.is_set() and live.session)
+    if not ok and not live.lock.locked():
+        asyncio.create_task(_ensure_quietly())
     return JSONResponse({"ok": ok, "version": VERSION, **{k: live.info[k] for k in ("url", "title")}, "clients": len(live.clients),
                          "assets": len(live.assets)})
 
