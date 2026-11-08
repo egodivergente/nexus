@@ -10,7 +10,7 @@ verificado en JVM; **la app Android no se ha compilado ni probado en el telefono
 
 Rama `fix/codex-e2big-20261107` sobre vc184 (`f5ff19d`). Causa confirmada: el puente de AXEL pasa el texto de la
 conversacion a `codex exec` como un unico argumento (max 128 KiB) y el historial lo supera; no es la imagen. Parche del
-puente en `tools/bridge-patches/codex-stdin` (verificado en banco, **sin desplegar en el S25**) y mensaje claro en la app
+puente en `tools/bridge-patches/codex-stdin`, **desplegado en el S25 el 08/11** (5/5 en `verify-bridge.py`) y mensaje claro en la app
 (agent-core, **APK sin recompilar**). Detalle, mediciones y pasos de despliegue en `docs/CODEX-E2BIG-20261107.md`.
 
 
