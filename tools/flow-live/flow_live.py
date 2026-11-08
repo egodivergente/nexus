@@ -701,7 +701,7 @@ app = Starlette(routes=[
 def main() -> None:
     while True:
         try:
-            uvicorn.run(app, host=HOST, port=PORT, log_level="warning", ws_max_size=1 << 20, ws_ping_interval=20, ws_ping_timeout=30)
+            uvicorn.run(app, host=HOST, port=PORT, log_level="warning", log_config=None, ws_max_size=1 << 20, ws_ping_interval=20, ws_ping_timeout=30)
         except Exception:
             log.exception("servidor")
         time.sleep(5)
