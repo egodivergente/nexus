@@ -43,7 +43,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 FLOW_URL = os.environ.get("FLOW_LIVE_URL", "https://flow.google.com/")
 CDP_PORT = int(os.environ.get("FLOW_LIVE_CDP_PORT", "9338"))
 ENSURE_BROWSER = os.environ.get("FLOW_LIVE_ENSURE", str(Path.home() / "flow-chatgpt-bridge" / "ensure-browser.ps1"))
@@ -754,15 +754,32 @@ def allowed(ip: str) -> bool:
     who = tailscale("whois", ip) or {}
     login = (who.get("UserProfile") or {}).get("LoginName")
     owner = owner_login()
+    known = _known_devices()
     if not login or not owner:
-        # La consulta a Tailscale falló (PC cargado, CLI ocupada): no se guarda como rechazo; el siguiente intento repite.
+        # La consulta a Tailscale falló (PC cargado, CLI ocupada). Un dispositivo ya verificado como tuyo sigue
+        # entrando (las IP de Tailscale son fijas por dispositivo); uno nuevo se reintenta, sin guardarlo como rechazo.
+        if time.time() - known.get(ip, 0) < 30 * 86400:
+            return True
         log.warning("No se pudo identificar %s con Tailscale; se reintentará", ip)
         return False
     ok = login == owner
     _whois[ip] = (time.time(), ok)
+    if ok:
+        known[ip] = time.time()
+        try:
+            (ROOT / "known-devices.json").write_text(json.dumps(known), encoding="utf-8")
+        except OSError:
+            pass
     if not ok:
         log.warning("Acceso rechazado desde %s (%s)", ip, login)
     return ok
+
+
+def _known_devices() -> dict[str, float]:
+    try:
+        return {k: float(v) for k, v in json.loads((ROOT / "known-devices.json").read_text(encoding="utf-8")).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
 
 
 def host_ok(host: str | None) -> bool:
