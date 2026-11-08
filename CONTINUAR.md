@@ -358,3 +358,7 @@ Validación local de 1.9.98/vc134: APK Agent sin firmar generada, 750 pruebas de
 app y 405 del núcleo superadas (4 omitidas), pruebas de interfaz compiladas
 pero no ejecutadas. Nueve bibliotecas nativas y ZIP alineados a 16 KB. Código
 de la APK: 1c38ac5a4cdb. El informe contiene SHA-256 y límites de aceptación.
+
+# Flow en directo - 2026-11-08
+
+vc188 / 1.9.152 «Sirio», rama `feat/flow-live-20261108`. Pestaña Flow con tu Google Flow del Edge de AXELPC en tiempo real, control táctil, encargos al agente de Flow y descargas directas a la Biblioteca. Servicio `tools/flow-live` instalado en `C:\Users\User\nexus-flow-live` (tarea `Nexus-Flow-Live`). APK entregada al S25 (SHA-256 f0496bfe9a35…), instalador abierto; falta pulsar Instalar y probar en el teléfono. Detalle: `docs/FLOW-LIVE-20261108.md`.
