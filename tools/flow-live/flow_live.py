@@ -43,7 +43,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 FLOW_URL = os.environ.get("FLOW_LIVE_URL", "https://flow.google.com/")
 CDP_PORT = int(os.environ.get("FLOW_LIVE_CDP_PORT", "9338"))
 ENSURE_BROWSER = os.environ.get("FLOW_LIVE_ENSURE", str(Path.home() / "flow-chatgpt-bridge" / "ensure-browser.ps1"))
@@ -319,11 +319,17 @@ class Live:
         except CdpError as e:
             log.info("modo tranquilo: %s", e)
         try:
+            # La ventana es solo el escenario de la transmisión: fuera de la pantalla de AXELPC para no estorbar.
+            # Minimizada dejaría de pintarse; fuera de pantalla sigue pintando (Edge sin detección de oclusión).
             win = await self.cdp.send("Browser.getWindowForTarget", {"targetId": target})
-            if win.get("bounds", {}).get("windowState") == "minimized":
+            bounds = win.get("bounds", {})
+            if bounds.get("windowState") != "normal":
                 await self.cdp.send("Browser.setWindowBounds", {"windowId": win["windowId"], "bounds": {"windowState": "normal"}})
-        except CdpError:
-            pass
+            if bounds.get("left", 0) > -5000:
+                await self.cdp.send("Browser.setWindowBounds", {"windowId": win["windowId"],
+                                    "bounds": {"left": -10000, "top": -10000, "width": 1100, "height": 900}})
+        except CdpError as e:
+            log.info("ventana: %s", e)
         await self.apply_view()
         info = await self.cdp.send("Target.getTargetInfo", {"targetId": target})
         self.info.update(url=info["targetInfo"].get("url", ""), title=info["targetInfo"].get("title", ""))
