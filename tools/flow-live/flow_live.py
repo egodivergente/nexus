@@ -176,10 +176,11 @@ class Live:
         self.clients: set[Client] = set()
         self.frame: bytes | None = None
         self.meta: dict = {}
-        self.view = {"mode": "desktop", "width": 1024, "vw": 412, "vh": 860, "dpr": 2.6, "quality": 50, "fps": 6, "maxpx": 900}
+        self.view = {"mode": "desktop", "width": 1024, "vw": 412, "vh": 860, "dpr": 2.6, "quality": 45, "fps": 6, "maxpx": 820}
         self.info = {"url": "", "title": "", "loading": False}
         self.casting = False
-        self.last_ack = 0.0
+        self.last_pub = 0.0
+        self.pub_timer = None
         self.downloads: dict[str, dict] = {}
         self.assets_file = ROOT / "assets" / "index.json"
         self.assets: list[dict] = self._load_assets()
@@ -324,9 +325,20 @@ class Live:
         self._publish(base64.b64decode(shot["data"]))
 
     def _publish(self, jpeg: bytes) -> None:
+        """Entrega como mucho `fps` fotogramas por segundo; el último siempre llega (los intermedios se descartan)."""
         self.frame = jpeg
+        interval = 1.0 / max(1, int(self.view.get("fps", 6)))
+        wait = interval - (time.monotonic() - self.last_pub)
+        if wait <= 0:
+            self._deliver()
+        elif not self.pub_timer:
+            self.pub_timer = asyncio.get_running_loop().call_later(wait, self._deliver)
+
+    def _deliver(self) -> None:
+        self.pub_timer = None
+        self.last_pub = time.monotonic()
         for c in list(self.clients):
-            c.frame = jpeg
+            c.frame = self.frame
             c.ready.set()
 
     # -- eventos del navegador
@@ -373,11 +385,8 @@ class Live:
                 asyncio.create_task(self._finish_download(p["guid"], p["state"]))
 
     async def _ack(self, frame_session: int, session: str) -> None:
-        # Limita los fotogramas por segundo: Chrome no envía el siguiente hasta recibir el «ack».
-        gap = 1.0 / max(1, int(self.view.get("fps", 12))) - (time.monotonic() - self.last_ack)
-        if gap > 0:
-            await asyncio.sleep(gap)
-        self.last_ack = time.monotonic()
+        # Un «ack» algo retrasado frena a Chrome (menos JPEG que codificar); el tope real lo pone _publish.
+        await asyncio.sleep(0.5 / max(1, int(self.view.get("fps", 6))))
         try:
             await self.cdp.send("Page.screencastFrameAck", {"sessionId": frame_session}, session)
         except Exception:
