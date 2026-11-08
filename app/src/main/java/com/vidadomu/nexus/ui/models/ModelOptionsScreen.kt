@@ -185,7 +185,7 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                             Text(imageField?.label ?: "Archivos conservados",style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
-                            Text(imageField?.let {(if(it.required) "Obligatoria" else "Opcional")+if(it.maximum>1) " · hasta ${it.maximum} imágenes" else " · una imagen"}
+                            Text(imageField?.let {(if(it.required) "Obligatoria" else "Opcional")+if(it.maximum==Int.MAX_VALUE) " · sin límite publicado" else if(it.maximum>1) " · hasta ${it.maximum} imágenes" else " · una imagen"}
                                 ?: "Esta variante no admite estas imágenes; se conservan para otra.",
                                 style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                         }

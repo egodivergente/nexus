@@ -118,7 +118,9 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
             .thenBy { section -> if(modality == Modality.IMAGE) ImageModelChoices.priority(section.family) else 0 }
             .thenByDescending { section -> section.models.any { CatalogFocus.forModel(it)!=null } }
     ),catalogSort,jobs,onlyDated) }
-    val groups = remember(placementRev,visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { family == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == family }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated) }
+    // Grupos de una familia en el mismo orden que su ficha; el toque directo en la tarjeta de familia elige con él la variante.
+    fun groupsFor(selectedFamily: String?) = filterDatedGroups(sortGroups(catalogModelGroups(visible.filter { selectedFamily == null || (if(toolsView) toolCategory(it) else catalogFamily(it)) == selectedFamily }, favorites).sortedBy {savedOrder.indexOf(it.key).let {index -> if(index<0) Int.MAX_VALUE else index}},catalogSort,jobs).let {list->if(catalogSort!=CatalogSort.PERSONAL) list else list.sortedWith(compareByDescending<CatalogModelGroup> {it.routes.any {m->m.isFlagship}}.thenByDescending {it.routes.maxOf {m->m.versionNumeric}}.thenBy {group->val order=runtime.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',');group.routes.minOf {m->order.indexOf(configuredWorkflowKey(m)).takeIf {it>=0} ?: Int.MAX_VALUE}})},catalogSort==CatalogSort.RELEASE && onlyDated)
+    val groups = remember(placementRev,visible, family, favorites,savedOrder,catalogSort,jobs,onlyDated,toolsView,rules) { groupsFor(family) }
     val displayedKeys = if(rootLevel) sections.map {it.family} else groups.map {it.key}
     fun saveOrder(next:List<String>) { savedOrder=next; prefs.edit().putString(orderScope,next.joinToString("\n")).apply() }
     val listState=rememberLazyGridState()
@@ -146,6 +148,21 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         }
     }
     val activeGroup = groups.firstOrNull { it.key == groupKey }
+    /** La ruta que abriría la ficha de [group]: su último uso y su última ruta, o los primeros. */
+    fun quickRoute(group: CatalogModelGroup): NexusModel {
+        val saved=app.getSharedPreferences("catalog_choices_v1",0)
+        val order=rules.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',')
+        val task=restoredWorkflow(group,saved.getString("task:${group.key}",null),saved.getString("use:${group.key}",null),order)
+        val routes=workflowRoutes(group,order).getValue(task)
+        return routes.firstOrNull {modelBookmark(it)==saved.getString("task-route:${group.key}:${task.name}",null)} ?: routes.first()
+    }
+    /** Vidal 08-11: tocar una familia abre la Lanzadera con la variante que usaste la última vez, sin la ficha intermedia. */
+    fun openFamilyDirect(name: String) {
+        val familyGroups=groupsFor(name)
+        val savedVariant=app.getSharedPreferences("catalog_choices_v1",0).getString("family-variant:v1:${modality.name}:$name",null)
+        val group=familyGroups.firstOrNull {it.key==savedVariant} ?: familyGroups.firstOrNull()
+        if(group==null) {family=name;groupKey=null;filters=false} else onSelectModelAndCreate(quickRoute(group))
+    }
     // A restored pre-family search/favorite leaf retains its exact group, now inside its family brief.
     LaunchedEffect(activeGroup?.key,family,toolsView,personalizing) {
         if(family==null && !toolsView && !personalizing && activeGroup!=null)
@@ -298,7 +315,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { isDragging ->
                         val (moveUp,moveDown)=reorderActions(section.family)
-                        ArtBoxFamilyCard(section,onOpen={family=section.family;groupKey=null;filters=false},onOptions={contextTarget=Triple(if(toolsView) toolVisibilityKey(section.family) else familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView,
+                        ArtBoxFamilyCard(section,onOpen={if(toolsView || personalizing) {family=section.family;groupKey=null;filters=false} else openFamilyDirect(section.family)},onOptions={contextTarget=Triple(if(toolsView) toolVisibilityKey(section.family) else familyVisibilityKey(section.family),section.family,null)},toolCategory=toolsView,
                             dragModifier=if(canReorder) Modifier.longPressDraggableHandle(
                                 onDragStarted={dragMoved[0]=false;DragHaptics.lift(dragView)},
                                 onDragStopped={DragHaptics.drop(dragView)
@@ -316,14 +333,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                         val (moveUp,moveDown)=reorderActions(group.key)
                         NavigationCard(labels.name("group:"+group.key,group.title),catalogFamily(group.routes.first()),
                             labels.description("group:"+group.key,focusAdvice?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(group.routes)),group.routes,modality,
-                            onClick={groupKey=group.key;filters=false},onQuickUse={
-                                val saved=app.getSharedPreferences("catalog_choices_v1",0)
-                                val order=rules.value(if(modality==Modality.VIDEO) "catalog.videoOrder" else "catalog.imageOrder").split(',')
-                                val task=restoredWorkflow(group,saved.getString("task:${group.key}",null),saved.getString("use:${group.key}",null),order)
-                                val routes=workflowRoutes(group,order).getValue(task)
-                                val chosen=routes.firstOrNull {modelBookmark(it)==saved.getString("task-route:${group.key}:${task.name}",null)} ?: routes.first()
-                                onSelectModelAndCreate(chosen)
-                            },releaseLabel=groupReleaseLabel(group.routes).takeUnless {it=="Fecha no verificada"},compact=compactCards,grid=useGrid,
+                            onClick={groupKey=group.key;filters=false},onQuickUse={onSelectModelAndCreate(quickRoute(group))},releaseLabel=groupReleaseLabel(group.routes).takeUnless {it=="Fecha no verificada"},compact=compactCards,grid=useGrid,
                             onLongClick=if(canReorder) null else ({contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())}),
                             onOptions={contextTarget=Triple(groupVisibilityKey(group.routes.first()),group.title,group.routes.first())},
                             dragModifier=if(personalizing) Modifier.draggableHandle() else null,
@@ -417,6 +427,7 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
         val targetGroup=if(model==null) null else groups.firstOrNull {it.key==itemKey}
         val originalDescription=targetGroup?.let {g -> CatalogFocus.forModel(g.routes.first())?.let {fitCardSummary("Bueno para: ${it.good}")} ?: catalogCardSummary(g.routes)}.orEmpty()
         AlertDialog(onDismissRequest={contextTarget=null},title={Text(labels.name(labelKey,label))},text={Column {
+            if(model==null && key.startsWith("family:")) TextButton(onClick={family=label;groupKey=null;filters=false;contextTarget=null}) {Text("Ver variantes y detalles")}
             TextButton(onClick={labelTarget=Triple(labelKey,label,originalDescription);contextTarget=null}) {Text("Personalizar icono, nombre y tamaño")}
             if(model!=null) TextButton(onClick={toggleFavorite(model);contextTarget=null}) {Text(if(modelBookmark(model) in favorites) "Quitar favorito" else "Marcar favorito")}
             TextButton(onClick={
