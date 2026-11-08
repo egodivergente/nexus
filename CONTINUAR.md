@@ -1,3 +1,29 @@
+# Proyecto audiovisual vivo vc190 - 08/11/2026
+
+Rama `codex/audiovisual-project-20261108`, sobre la version **vc189 / 1.9.153** comprobada en el S25 (SM-S938B).
+Fuente de la APK nueva: `0cd54dd6514d3a8053c4ea2c2f17e09c938fde29`.
+**1.9.154-agent-preview / vc190 instalada como actualizacion**; certificado existente y alineacion de 16 KiB comprobados.
+SHA256 instalado = `ebb1c8973d61899bce810e94573df9be248cbca05b86de822ab449745c5618bb`.
+AWS CodeBuild `dcbc7cd4-3371-4e34-81b1-3a3e5dfb683e`: compilacion y **47 pruebas PASS, 0 fallos**.
+Las tres bibliotecas ARM64 coinciden byte a byte con las de vc189.
+
+Entrada: mantener pulsado un hueco del chat del Agente -> **Cambiar de proyecto** -> **Guion y storyboard**.
+Guion, Storyboard y Material comparten el indice existente. Editor, asociaciones n:m, referencias con alcance,
+propuestas con revisiones, herramientas reales de los cerebros, procedencia de generacion y preparacion local con WorkManager.
+Detalle y contratos: `docs/LIVING_AUDIOVISUAL_PROJECT.md`.
+
+S25 comprobado mediante las operaciones reales del repositorio y del toolkit: crear escenas/bloques/planos, un archivo
+en dos planos, mover sin perder vinculos, aplicar una herramienta del agente de forma idempotente, rechazar una
+propuesta que entra en conflicto con una edicion reciente y ejecutar preparacion en WorkManager. Sin generaciones ni
+llamadas a LLM externos de prueba. Todos los IDs existentes de proyectos, escenas, planos, personajes, archivos y
+generaciones siguen presentes; perfiles de cerebros, proveedores multimedia y apariencia tienen la misma huella.
+Otros ficheros recibieron actividad durante la sesion: no se afirma igualdad byte a byte de todo el perfil.
+
+**QA visual parcial**: arranque y pantallas existentes observados; el recorrido completo de pulsaciones del editor
+queda pendiente de una ventana estable de uso del S25. Flow respondia al health desde AXELPC, pero se observaron
+rechazo de Tailscale y reconexion en el telefono durante la revision; no se declara su streaming validado.
+La cola creativa requiere un turno activo del agente; la preparacion local si tiene ejecutor persistente.
+
 # Vision con Codex/AGY y carrusel - 08/11/2026
 
 Rama `fix/bridge-images-20261108` (encima de `fix/codex-e2big-20261107`). El agente no veia las imagenes con los

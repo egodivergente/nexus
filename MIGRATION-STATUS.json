@@ -1,4 +1,22 @@
 ﻿{
+    "livingAudiovisualProject20261108": {
+        "branch": "codex/audiovisual-project-20261108",
+        "apkSourceCommit": "0cd54dd6514d3a8053c4ea2c2f17e09c938fde29",
+        "baseInstalledVersionCode": 189,
+        "versionCode": 190,
+        "versionName": "1.9.154-agent-preview",
+        "build": "AWS CodeBuild dcbc7cd4-3371-4e34-81b1-3a3e5dfb683e; assembleAgentPreview + selected core/app tests; 47 PASS, 0 failures/errors",
+        "apkSha256": "ebb1c8973d61899bce810e94573df9be248cbca05b86de822ab449745c5618bb",
+        "s25InstalledAsUpdate": true,
+        "certificatePreserved": true,
+        "originalArm64LibrariesEqual": 3,
+        "existingIndexIdsPreserved": true,
+        "deviceOperationsPassed": ["structure", "many-to-many associations", "reordering", "registered agent tool", "proposal conflict", "WorkManager preparation"],
+        "uiVerified": "partial; complete screenplay interaction pending stable phone access",
+        "paidMediaTestGenerations": 0,
+        "externalAgentTestCalls": 0,
+        "doc": "docs/LIVING_AUDIOVISUAL_PROJECT.md"
+    },
     "atlasUploadReuse20261108": {
         "branch": "fix/bridge-images-20261108",
         "commit": "a5809a1",
