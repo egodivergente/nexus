@@ -43,7 +43,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 FLOW_URL = os.environ.get("FLOW_LIVE_URL", "https://flow.google.com/")
 CDP_PORT = int(os.environ.get("FLOW_LIVE_CDP_PORT", "9338"))
 ENSURE_BROWSER = os.environ.get("FLOW_LIVE_ENSURE", str(Path.home() / "flow-chatgpt-bridge" / "ensure-browser.ps1"))
@@ -217,6 +217,7 @@ class Live:
         self.pub_timer = None
         self.still_timer = None
         self.still_at = 0.0
+        self.input_at = 0.0
         self.capturing = False
         self.downloads: dict[str, dict] = {}
         self.assets_file = ROOT / "assets" / "index.json"
@@ -433,14 +434,19 @@ class Live:
         self._deliver(still=True)
 
     def _schedule_still(self) -> None:
+        """Captura nítida cuando la imagen se queda quieta. Sin una acción tuya de por medio, como mucho una cada 2 s:
+        la propia captura provoca un fotograma nuevo y, sin este freno, se pedían capturas en bucle (datos y CPU)."""
         if self.still_timer:
             self.still_timer.cancel()
-        self.still_timer = asyncio.get_running_loop().call_later(0.35, lambda: self.clients and asyncio.create_task(self.snapshot()))
+        now = time.monotonic()
+        acted = self.input_at > self.still_at
+        delay = 0.35 if acted else max(0.35, 2.0 - (now - self.still_at))
+        self.still_timer = asyncio.get_running_loop().call_later(delay, lambda: self.clients and asyncio.create_task(self.snapshot()))
 
     def _publish(self, jpeg: bytes) -> None:
         """Entrega como mucho `fps` fotogramas por segundo; el último siempre llega (los intermedios se descartan)."""
         # La propia captura nítida puede provocar un fotograma de screencast: se ignora para no entrar en bucle.
-        if time.monotonic() - self.still_at < 0.25:
+        if time.monotonic() - self.still_at < 0.8:
             return
         self._schedule_still()
         self.frame = jpeg
@@ -591,6 +597,8 @@ class Live:
         s = self.session
         if not s:
             return
+        if t in ("click", "down", "up", "key", "text", "command", "order", "wheel", "nav", "home", "back", "forward", "reload", "view"):
+            self.input_at = time.monotonic()
         if t in ("click", "down", "key", "command", "order"):
             await self.claim_downloads()
         if t == "click":
