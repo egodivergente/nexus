@@ -176,7 +176,7 @@ class Live:
         self.clients: set[Client] = set()
         self.frame: bytes | None = None
         self.meta: dict = {}
-        self.view = {"mode": "desktop", "width": 1024, "vw": 412, "vh": 860, "dpr": 2.6, "quality": 55, "fps": 10}
+        self.view = {"mode": "desktop", "width": 1024, "vw": 412, "vh": 860, "dpr": 2.6, "quality": 50, "fps": 6, "maxpx": 900}
         self.info = {"url": "", "title": "", "loading": False}
         self.casting = False
         self.last_ack = 0.0
@@ -274,12 +274,12 @@ class Live:
             return
         if v["mode"] == "mobile":
             w, h = int(v["vw"]), int(v["vh"])
-            dsf = max(1.0, min(3.0, float(v["dpr"])))
+            dsf = max(1.0, min(2.0, float(v["dpr"])))
             mobile = True
         else:
             w = int(max(480, min(1920, v["width"])))
             h = int(round(w * v["vh"] / max(1, v["vw"])))
-            dsf = max(1.0, min(2.0, v["vw"] * v["dpr"] / w))
+            dsf = 1.0
             mobile = False
         self.size = (w, h, dsf)
         await self.cdp.send("Emulation.setDeviceMetricsOverride", {"width": w, "height": h, "deviceScaleFactor": round(dsf, 2),
@@ -297,8 +297,10 @@ class Live:
                 await self.cdp.send("Page.stopScreencast", {}, self.session)
             except CdpError:
                 pass
+        # El fotograma se reduce en origen (maxWidth) sin cambiar la maquetación: menos datos móviles.
+        px = max(360, min(int(w * dsf), int(self.view.get("maxpx", 900))))
         await self.cdp.send("Page.startScreencast", {"format": "jpeg", "quality": int(self.view["quality"]),
-                            "maxWidth": int(w * dsf), "maxHeight": int(h * dsf), "everyNthFrame": 1}, self.session)
+                            "maxWidth": px, "maxHeight": int(px * h / max(1, w)), "everyNthFrame": 1}, self.session)
         self.casting = True
         await self.snapshot()
 
@@ -505,7 +507,7 @@ class Live:
             elif t == "back" and len(self.stack) > 1:
                 await self.cdp.send("Target.closeTarget", {"targetId": self.target})
         elif t == "view":
-            for k in ("mode", "width", "vw", "vh", "dpr", "quality", "fps"):
+            for k in ("mode", "width", "vw", "vh", "dpr", "quality", "fps", "maxpx"):
                 if k in ev:
                     self.view[k] = ev[k] if k == "mode" else float(ev[k])
             self.view["quality"] = int(max(30, min(90, self.view["quality"])))
@@ -643,7 +645,7 @@ async def ws_live(ws: WebSocket) -> None:
             frame = client.frame
             if frame is None:
                 continue
-            meta = (live.meta.get("deviceWidth"), live.meta.get("deviceHeight"))
+            meta = (round(live.meta.get("deviceWidth") or 0), round(live.meta.get("deviceHeight") or 0))
             if meta != client.sent_meta:
                 client.sent_meta = meta
                 await ws.send_text(json.dumps({"type": "meta", "w": meta[0], "h": meta[1]}))
