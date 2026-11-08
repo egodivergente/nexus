@@ -1,4 +1,20 @@
 ﻿{
+    "livingAudiovisualTab20261108": {
+        "branch": "codex/audiovisual-project-20261108",
+        "apkSourceCommit": "88b035eeb7053dd67a4acfc8663890ff1980d968",
+        "versionCode": 191,
+        "versionName": "1.9.155-agent-preview",
+        "entry": "Guion primary tab between Agente and ArtBox; project picker in header",
+        "build": "AWS CodeBuild 34f85b08-e1e0-4746-b62d-159a2dc23798; assembleAgentPreview + ScreenNavigationTest and OutputExportSpecTest; 8 PASS, 0 failures/errors",
+        "apkSha256": "423d88f0de8409875fb7e08c3c491efbdfd2ed2c6cc7843813278b3e04823054",
+        "s25InstalledAsUpdate": true,
+        "certificatePreserved": true,
+        "originalArm64LibrariesEqual": 3,
+        "existingIndexIdsPreserved": true,
+        "uiVerified": false,
+        "uiBlocker": "S25 Dozing; after wake Keyguard/NotificationShade active. No lock bypass. Guion set as selected launch route for review.",
+        "paidTestOperations": 0
+    },
     "livingAudiovisualProject20261108": {
         "branch": "codex/audiovisual-project-20261108",
         "apkSourceCommit": "0cd54dd6514d3a8053c4ea2c2f17e09c938fde29",

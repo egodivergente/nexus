@@ -1,3 +1,22 @@
+# Guion como pestaña principal vc191 - 08/11/2026
+
+Peticion de Vidal: el proyecto audiovisual pasa a primer nivel. Barra: **Agente / Guion / ArtBox / Biblioteca / Flow**.
+Guion abre el mismo editor con Guion, Storyboard y Material dentro de la pantalla principal, sin un Dialog exterior
+que tape la barra. La cabecera permite elegir o crear proyecto; se utiliza el proyecto activo del agente.
+Las rutas guardadas de las otras pestañas siguen siendo las mismas. El BackHandler del editor solo actua en la pestaña activa.
+
+Fuente APK `88b035eeb7053dd67a4acfc8663890ff1980d968`, rama `codex/audiovisual-project-20261108`.
+AWS CodeBuild `34f85b08-e1e0-4746-b62d-159a2dc23798`: assembleAgentPreview y **8 pruebas PASS, 0 fallos**
+(ScreenNavigationTest, OutputExportSpecTest). **1.9.155-agent-preview / vc191 instalada como actualizacion en el S25**.
+Firma existente, alineacion 16 KiB y tres bibliotecas ARM64 originales comprobadas.
+SHA256 instalado `423d88f0de8409875fb7e08c3c491efbdfd2ed2c6cc7843813278b3e04823054`.
+Tras la actualizacion siguen presentes todos los IDs previos: 7 proyectos, 1 escena, 3 planos, 9 personajes,
+3039 archivos y 753 registros de generacion. Sin generaciones ni llamadas a modelos de prueba.
+
+La ruta de apertura se dejo en Guion para la comprobacion. Arranque y version verificados; **QA visual pendiente**:
+el S25 estaba en Dozing y, al encenderlo, mostraba Keyguard/NotificationShade. No se ha eludido el bloqueo ni se
+declara comprobada visualmente la nueva barra. APK tambien copiada a `G:\Mi unidad\Nexus_Android_APK`.
+
 # Proyecto audiovisual vivo vc190 - 08/11/2026
 
 Rama `codex/audiovisual-project-20261108`, sobre la version **vc189 / 1.9.153** comprobada en el S25 (SM-S938B).
