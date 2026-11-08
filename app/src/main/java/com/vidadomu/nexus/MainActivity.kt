@@ -169,8 +169,11 @@ class MainActivity : ComponentActivity() {
                             com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE -> {
                                 if (selection?.shotId != null) {
                                     val index = com.vidadomu.nexus.assistant.AssistantRuntime.get(application as NexusApplication).assets
-                                    createViewModel.prepareStoryShot(index.storyGenerationContext(selection.projectId, selection.shotId))
-                                    navController.navigate(Screen.Create.route) { launchSingleTop = true }
+                                    val origin = runCatching { index.storyGenerationContext(selection.projectId, selection.shotId) }.getOrNull()
+                                    if (origin != null) {
+                                        createViewModel.prepareStoryShot(origin)
+                                        navController.navigate(Screen.Create.route) { launchSingleTop = true }
+                                    } else android.widget.Toast.makeText(this@MainActivity, "El plano cambió o ya no está disponible. Vuelve a abrirlo desde el guion.", android.widget.Toast.LENGTH_LONG).show()
                                 }
                             }
                         }

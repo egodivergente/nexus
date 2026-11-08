@@ -358,6 +358,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Opens the existing model form with an immutable shot origin; never submits or authorizes cost. */
     fun prepareStoryShot(origin: com.vidadomu.nexus.agent.core.assets.StoryGenerationContext) {
+        beginMediaCopy()
         viewModelScope.launch {
             try {
                 val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
@@ -370,6 +371,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update { it.copy(prompt = shot.description.orEmpty(), storyContext = origin) }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { _uiState.update { it.copy(errorMessage = e.message ?: "No se pudo preparar el plano.") } }
+            finally { endMediaCopy() }
         }
     }
 
