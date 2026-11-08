@@ -73,6 +73,9 @@ fun StoryWorkspaceScreen(
     onAgent: () -> Unit,
     onGenerate: (String) -> Unit,
     onFlow: () -> Unit,
+    embedded: Boolean = false,
+    isActive: Boolean = true,
+    onChooseProject: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
@@ -128,10 +131,10 @@ fun StoryWorkspaceScreen(
             agentMode, preservedIds.split('|').filter { it.isNotBlank() }.toSet()))
         onAgent()
     }
-    LaunchedEffect(scenes.map { it.text("id") }) {
-        if (sceneId == null || scenes.none { it.text("id") == sceneId }) select(scenes.firstOrNull()?.text("id"), null)
+    LaunchedEffect(isActive, scenes.map { it.text("id") }) {
+        if (isActive && (sceneId == null || scenes.none { it.text("id") == sceneId })) select(scenes.firstOrNull()?.text("id"), null)
     }
-    LaunchedEffect(shots.map { it.text("id") }) { if (shotId != null && shots.none { it.text("id") == shotId }) select(shot = null) }
+    LaunchedEffect(isActive, shots.map { it.text("id") }) { if (isActive && shotId != null && shots.none { it.text("id") == shotId }) select(shot = null) }
     fun run(input: JsonObject, done: (JsonObject) -> Unit = {}) {
         if (busy) return
         busy = true
@@ -155,8 +158,8 @@ fun StoryWorkspaceScreen(
             finally { busy = false }
         }
     }
-    LaunchedEffect(projectId) {
-        runtime.assets.storyCommand(projectId, buildJsonObject {
+    LaunchedEffect(projectId, isActive) {
+        if (isActive) runtime.assets.storyCommand(projectId, buildJsonObject {
             put("action", "adopt_legacy_links"); put("operation_id", "legacy-links:$projectId")
         }, "system:migration")
     }
@@ -175,11 +178,12 @@ fun StoryWorkspaceScreen(
             finally { busy = false }
         }
     }
-    BackHandler { if (shotId != null) select(shot = null) else onClose() }
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    BackHandler(enabled = isActive) { if (shotId != null) select(shot = null) else onClose() }
+    StoryWorkspaceContainer(embedded, onClose) {
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
-                modifier = Modifier.imePadding().safeDrawingPadding(),
+                modifier = if (embedded) Modifier.fillMaxSize() else Modifier.imePadding().safeDrawingPadding(),
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
                     Column {
                         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -187,6 +191,9 @@ fun StoryWorkspaceScreen(
                             Column(Modifier.weight(1f).clickable { projectEditor = true }) {
                                 Text(project?.name ?: "Proyecto", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(currentShot?.text("title")?.ifBlank { currentShot.text("code") } ?: "Guion vivo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            onChooseProject?.let { choose ->
+                                IconButton(onClick = choose) { Icon(Icons.Default.FolderOpen, "Cambiar de proyecto") }
                             }
                             IconButton(onClick = { run(command("undo")) }, enabled = !busy) { Icon(Icons.Default.Undo, "Deshacer último cambio") }
                             Box {
@@ -449,6 +456,13 @@ fun StoryWorkspaceScreen(
             }
         }
     }, confirmButton = { TextButton(onClick = { select(); agentSettings = false }) { Text("Aplicar alcance") } })
+}
+
+@Composable
+private fun StoryWorkspaceContainer(embedded: Boolean, onClose: () -> Unit, content: @Composable () -> Unit) {
+    if (embedded) content()
+    else Dialog(onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) { content() }
 }
 
 @Composable

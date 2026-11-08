@@ -313,6 +313,13 @@ class MainActivity : ComponentActivity() {
                                 vm = assistantViewModel
                             )
                         }
+                            Screen.Story -> com.vidadomu.nexus.assistant.story.StoryTabScreen(
+                                vm = assistantViewModel,
+                                isActive = pager.currentPage == index,
+                                onAgent = { tabRequest = tabs.indexOf(Screen.Assistant) },
+                                onGenerate = { com.vidadomu.nexus.assistant.story.StoryNavigation.request(com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE) },
+                                onFlow = { tabRequest = tabs.indexOf(Screen.Flow) }
+                            )
                             Screen.Models -> {
                             ModelsScreen(
                                 onSelectModelAndCreate = { model ->

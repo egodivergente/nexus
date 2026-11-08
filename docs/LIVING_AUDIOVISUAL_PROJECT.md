@@ -4,7 +4,9 @@ Base de entrega: Nexus Agent vc189, fuente `b3b504f7efc7`, comprobada en el S25 
 
 ## Entrada y datos
 
-Agente → Proyecto → **Guion y storyboard**. Las vistas Guion, Storyboard y Material leen el mismo `AssistantRuntime.assets` (`files/assistant/index.json`). No hay una base de guion paralela ni una nueva pestaña principal. La importación de TXT/Markdown o texto pegado conserva el texto en bloques editables sin exigir sintaxis de guion.
+La pestaña principal **Guion** aparece junto a Agente, ArtBox, Biblioteca y Flow. Abre el proyecto activo y permite cambiar de proyecto o crear uno desde su cabecera. Su editor se integra en la pantalla para conservar accesible la navegación principal. El acceso anterior del menú de proyectos sigue como atajo.
+
+Las vistas Guion, Storyboard y Material leen el mismo `AssistantRuntime.assets` (`files/assistant/index.json`). La importación de TXT/Markdown o texto pegado conserva el texto en bloques editables sin exigir sintaxis de guion.
 
 Los proyectos antiguos abren con los valores opcionales por defecto. Al abrir el espacio se adoptan una sola vez sus asociaciones antiguas; quitar una asociación no la recrea al volver a abrir. No se duplican ni borran archivos físicos. El fichero y sus usos tienen identificadores distintos. Los vínculos guardan el papel, la selección y la procedencia en cada contexto.
 
