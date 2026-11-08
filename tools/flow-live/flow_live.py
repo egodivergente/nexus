@@ -152,6 +152,28 @@ KEYS = {
 COMMANDS = {"selectAll": ("a", 65), "copy": ("c", 67), "paste": ("v", 86), "undo": ("z", 90), "redo": ("y", 89), "cut": ("x", 88)}
 
 
+# Pausa los vídeos que arrancan solos (banners, promociones). Los que reproduces tú con un toque siguen sonando.
+QUIET_JS = r"""
+(() => {
+  if (window.__nexusQuiet) return; window.__nexusQuiet = true;
+  let userAt = 0;
+  const mark = () => { userAt = Date.now(); };
+  addEventListener('pointerdown', mark, true); addEventListener('keydown', mark, true);
+  const recent = () => Date.now() - userAt < 1500;
+  const quiet = v => { if (!v.dataset.nexusAllowed) { v.autoplay = false; v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } };
+  document.addEventListener('play', e => {
+    const v = e.target;
+    if (!(v instanceof HTMLMediaElement)) return;
+    if (recent()) { v.dataset.nexusAllowed = '1'; return; }
+    quiet(v);
+  }, true);
+  const sweep = () => document.querySelectorAll('video').forEach(v => { if (!v.dataset.nexusAllowed && !recent()) quiet(v); });
+  new MutationObserver(sweep).observe(document.documentElement, { subtree: true, childList: true });
+  sweep();
+})()
+"""
+
+
 def safe_name(name: str) -> str:
     name = re.sub(r"[\\/:*?\"<>|\x00-\x1f]", "_", name or "").strip(" .") or "archivo"
     return name[:150]
@@ -276,6 +298,13 @@ class Live:
         await self.cdp.send("Page.enable", {}, s)
         await self.cdp.send("Runtime.enable", {}, s)
         await self.cdp.send("Emulation.setFocusEmulationEnabled", {"enabled": True}, s)
+        # Menos movimiento: sin animaciones ni vídeos que arranquen solos (ahorra CPU en AXELPC y datos en el móvil).
+        try:
+            await self.cdp.send("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "reduce"}]}, s)
+            await self.cdp.send("Page.addScriptToEvaluateOnNewDocument", {"source": QUIET_JS}, s)
+            await self.cdp.send("Runtime.evaluate", {"expression": QUIET_JS}, s)
+        except CdpError as e:
+            log.info("modo tranquilo: %s", e)
         try:
             win = await self.cdp.send("Browser.getWindowForTarget", {"targetId": target})
             if win.get("bounds", {}).get("windowState") == "minimized":
