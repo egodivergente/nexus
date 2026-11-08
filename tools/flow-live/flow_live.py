@@ -124,6 +124,16 @@ class Cdp:
             self.pending.clear()
             self.closed.set()
 
+    async def fire(self, method: str, params: dict | None = None, session: str | None = None) -> None:
+        """Envía sin esperar la respuesta: para la rueda y el movimiento del ratón, que no deben hacer cola."""
+        if self.ws is None or self.closed.is_set():
+            raise CdpError("Sin conexión con el navegador")
+        self.seq += 1
+        msg = {"id": self.seq, "method": method, "params": params or {}}
+        if session:
+            msg["sessionId"] = session
+        await self.ws.send(json.dumps(msg))
+
     async def send(self, method: str, params: dict | None = None, session: str | None = None, timeout: float = 30) -> dict:
         if self.ws is None or self.closed.is_set():
             raise CdpError("Sin conexión con el navegador")
@@ -187,6 +197,8 @@ class Client:
         self.frame: bytes | None = None
         self.ready = asyncio.Event()
         self.sent_meta: tuple | None = None
+        self.acks = False  # el móvil confirma cada fotograma: así nunca se acumulan en la red
+        self.acked = asyncio.Event()
 
 
 class Live:
@@ -556,16 +568,17 @@ class Live:
             await self.mouse("mousePressed", x, y, button="left", buttons=1, clickCount=1)
         elif t == "move":
             x, y = self._xy(ev)
-            await self.mouse("mouseMoved", x, y, button="left", buttons=1)
+            await self.cdp.fire("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y, "button": "left", "buttons": 1}, s)
         elif t == "up":
             x, y = self._xy(ev)
             await self.mouse("mouseReleased", x, y, button="left", buttons=0, clickCount=1)
         elif t == "hover":
             x, y = self._xy(ev)
-            await self.mouse("mouseMoved", x, y)
+            await self.cdp.fire("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y}, s)
         elif t == "wheel":
             x, y = self._xy(ev)
-            await self.mouse("mouseWheel", x, y, deltaX=float(ev.get("dx", 0)), deltaY=float(ev.get("dy", 0)))
+            await self.cdp.fire("Input.dispatchMouseEvent", {"type": "mouseWheel", "x": x, "y": y,
+                                "deltaX": float(ev.get("dx", 0)), "deltaY": float(ev.get("dy", 0))}, s)
         elif t == "text":
             text = str(ev.get("s", ""))[:20000]
             if text:
@@ -665,6 +678,23 @@ class Live:
 
 
 live = Live()
+
+
+def coalesce(events: list[dict]) -> list[dict]:
+    """Agrupa gestos seguidos del mismo tipo: la rueda se suma, el movimiento y la vista se quedan con el último."""
+    out: list[dict] = []
+    for ev in events:
+        t = ev.get("t")
+        prev = out[-1] if out else None
+        if prev and prev.get("t") == t == "wheel":
+            prev["dx"] = float(prev.get("dx", 0)) + float(ev.get("dx", 0))
+            prev["dy"] = float(prev.get("dy", 0)) + float(ev.get("dy", 0))
+            prev["x"], prev["y"] = ev.get("x", prev.get("x")), ev.get("y", prev.get("y"))
+        elif prev and prev.get("t") == t and t in ("move", "hover", "view"):
+            out[-1] = ev
+        else:
+            out.append(dict(ev))
+    return out
 
 
 def public_asset(a: dict) -> dict:
@@ -784,34 +814,68 @@ async def ws_live(ws: WebSocket) -> None:
             if meta != client.sent_meta:
                 client.sent_meta = meta
                 await ws.send_text(json.dumps({"type": "meta", "w": meta[0], "h": meta[1]}))
+            if client.acks:
+                client.acked.clear()
             await ws.send_bytes(frame)
+            if client.acks:
+                try:
+                    await asyncio.wait_for(client.acked.wait(), 3)
+                except asyncio.TimeoutError:
+                    pass
 
     send_task = asyncio.create_task(sender())
+    tasks: list[asyncio.Task] = [send_task]
     try:
         if not live.casting:
             await live.start_cast()
         elif live.frame:
             client.frame = live.frame
             client.ready.set()
+        pending: list[dict] = []
+        wake = asyncio.Event()
+
+        async def dispatcher() -> None:
+            # Recibir y ejecutar van por separado: mientras Edge procesa un toque, los gestos siguientes se acumulan
+            # y se agrupan (todo el arrastre pendiente se convierte en un solo desplazamiento) en vez de hacer cola.
+            while True:
+                await wake.wait()
+                wake.clear()
+                batch, pending[:] = coalesce(pending), []
+                for ev in batch:
+                    started = time.monotonic()
+                    try:
+                        await live.handle(ev)
+                    except (CdpError, asyncio.TimeoutError) as e:
+                        log.info("entrada %s: %s", ev.get("t"), e)
+                        if live.cdp is None or live.cdp.closed.is_set():
+                            live.session = None
+                            await live.ensure()
+                    took = time.monotonic() - started
+                    if took > 0.5:
+                        log.info("entrada lenta %s: %.2f s", ev.get("t"), took)
+
+        dispatch_task = asyncio.create_task(dispatcher())
+        tasks.append(dispatch_task)
         while True:
             raw = await ws.receive_text()
             try:
                 ev = json.loads(raw)
             except ValueError:
                 continue
-            try:
-                await live.handle(ev)
-            except (CdpError, asyncio.TimeoutError) as e:
-                log.info("entrada %s: %s", ev.get("t"), e)
-                if live.cdp is None or live.cdp.closed.is_set():
-                    live.session = None
-                    await live.ensure()
+            if ev.get("t") == "ack":
+                client.acked.set()
+                continue
+            if ev.get("t") == "view" and ev.get("acks"):
+                client.acks = True
+            pending.append(ev)
+            wake.set()
     except (WebSocketDisconnect, RuntimeError):
         pass  # el móvil se fue (cambio de red, app en segundo plano): no es un error
     except Exception:
         log.exception("ws")
     finally:
-        send_task.cancel()
+        for task in tasks:
+            task.cancel()
         live.clients.discard(client)
         if not live.clients:
             await live.stop_cast()
