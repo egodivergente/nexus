@@ -23,9 +23,39 @@ const ARGS_RE = /(const|let)\s+codexArgs\s*=\s*\[([\s\S]*?)\n([ \t]*)\];/g;
 const OPT = String.raw`(?:[^{}]|\{[^{}]*\})*?`;
 const SPAWN_RE = new RegExp(String.raw`(const|let)\s+(\w+)\s*=\s*spawn\(\s*([^,]+?)\s*,\s*codexArgs\s*,\s*\{(${OPT})stdio:\s*\[\s*"ignore"\s*,\s*"pipe"\s*,\s*"pipe"\s*\](${OPT})\}\s*\);`, "g");
 
+// Forma B (copia desplegada desde vc182): `const runCodex = async (codexArgs: string[]) => { const child = spawn(…, codexArgs,
+// {…stdio ["ignore",…]}) … }`, llamada con el texto como último argumento tanto en `exec … <texto>` como en
+// `exec … resume <id> <texto>`. Ambas formas de la CLI aceptan `-` para leerlo de stdin (`codex exec --help` y
+// `codex exec resume --help`, v0.167.0).
+const PARAM_RE = /async\s*\(\s*codexArgs\s*:\s*string\[\]\s*\)\s*=>\s*\{/g;
+
+function transformParam(source) {
+  const params = [...source.matchAll(PARAM_RE)];
+  if (params.length !== 1) return { ok: false, reason: `se esperaba una única función (codexArgs: string[]) y hay ${params.length}` };
+  const spawnMatches = [...source.matchAll(SPAWN_RE)];
+  if (spawnMatches.length !== 1) return { ok: false, reason: `se esperaba un único spawn(…, codexArgs, {… stdio ["ignore","pipe","pipe"]}) y hay ${spawnMatches.length}` };
+  const m = spawnMatches[0];
+  if (m.index < params[0].index) return { ok: false, reason: "el spawn no está dentro de la función que recibe codexArgs" };
+  const [whole, decl, name, bin, before, after] = m;
+  const lineStart = source.lastIndexOf("\n", m.index) + 1;
+  const pad = /^[ \t]*$/.test(source.slice(lineStart, m.index)) ? source.slice(lineStart, m.index) : "";
+  const replacement =
+    `// ${MARK}: el texto (último argumento) va por stdin con «-»; un argumento de más de 128 KiB da E2BIG.\n` +
+    `${pad}${decl} ${name} = spawn(${bin}, [...codexArgs.slice(0, -1), "-"], {${before}stdio: ["pipe", "pipe", "pipe"]${after}});\n` +
+    `${pad}${name}.stdin?.on("error", () => {}); // EPIPE si Codex termina antes de leer todo el texto\n` +
+    `${pad}${name}.stdin?.end(codexArgs[codexArgs.length - 1] ?? "");`;
+  return { ok: true, text: source.slice(0, m.index) + replacement + source.slice(m.index + whole.length), shape: "B" };
+}
+
 /** Devuelve { ok, text, reason }. No toca el disco. */
 export function transform(source) {
   if (source.includes(MARK)) return { ok: true, text: source, already: true };
+  // Sin array literal `codexArgs = ["exec", …]` pero con una función que lo recibe: forma B.
+  if (![...source.matchAll(ARGS_RE)].some((m) => /"exec"/.test(m[2])) && PARAM_RE.test(source)) {
+    PARAM_RE.lastIndex = 0;
+    return transformParam(source);
+  }
+  PARAM_RE.lastIndex = 0;
 
   const argsMatches = [...source.matchAll(ARGS_RE)].filter((m) => /"exec"/.test(m[2]));
   if (argsMatches.length !== 1) return { ok: false, reason: `se esperaba un único «codexArgs» con "exec" y hay ${argsMatches.length}` };

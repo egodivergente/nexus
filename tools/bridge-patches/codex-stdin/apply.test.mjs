@@ -131,3 +131,48 @@ test("el texto de más de 128 KiB llega íntegro por stdin a un proceso real", (
   const viaStdin = spawnSync(process.execPath, ["-e", reader], { input: text });
   assert.equal(viaStdin.stdout.toString(), String(Buffer.byteLength(text)));
 });
+
+// Forma B: extracto literal de la copia desplegada en el S25 (vc182), `runCodex` recibe los argumentos.
+const DEPLOYED_B = `
+        const runCodex = async (codexArgs: string[]) => {
+          const child = spawn("/usr/local/bin/codex", codexArgs, { stdio: ["ignore", "pipe", "pipe"], ...(nexusCodex ? { cwd: NEXUS_CODEX_CWD } : {}) });
+          activeChildren.set(job.key, child);
+        };
+        if (resumePlan) codexRun = await runCodex(codexResumeArgs(codexOptions, resumePlan.threadId, resumePlan.prompt));
+        if (!codexRun) codexRun = await runCodex(["exec", ...codexOptions, fullPrompt]);
+`;
+
+test("forma desplegada (runCodex): el último argumento pasa a stdin y se conserva el cwd", () => {
+  const r = transform(DEPLOYED_B);
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(r.shape, "B");
+  assert.match(r.text, /spawn\("\/usr\/local\/bin\/codex", \[\.\.\.codexArgs\.slice\(0, -1\), "-"\], \{ stdio: \["pipe", "pipe", "pipe"\], \.\.\.\(nexusCodex \? \{ cwd: NEXUS_CODEX_CWD \} : \{\}\) \}\);/);
+  assert.match(r.text, /child\.stdin\?\.end\(codexArgs\[codexArgs\.length - 1\] \?\? ""\);/);
+  assert.match(r.text, /runCodex\(\["exec", \.\.\.codexOptions, fullPrompt\]\)/, "las llamadas no cambian");
+  assert.equal(transform(r.text).already, true, "idempotente");
+  assert.equal(transform(DEPLOYED_B + DEPLOYED_B).ok, false, "dos funciones: no adivina");
+});
+
+test("forma desplegada, de verdad: un texto de 176 KB llega entero por stdin al proceso", async () => {
+  const src = `import { spawn } from "node:child_process";
+export const runCodex = async (codexArgs: string[]) => {
+  const child = spawn(process.execPath, codexArgs, { stdio: ["ignore", "pipe", "pipe"] });
+  let out = ""; child.stdout.on("data", (c) => (out += c));
+  await new Promise((resolve) => child.once("exit", resolve));
+  return out;
+};
+`;
+  const r = transform(src);
+  assert.equal(r.ok, true, r.reason);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-stdin-b-"));
+  try {
+    const file = path.join(dir, "run.mjs");
+    fs.writeFileSync(file, r.text.replace(": string[]", ""));
+    const { runCodex } = await import(file);
+    const reader = "let n=0;process.stdin.on('data',c=>n+=c.length).on('end',()=>process.stdout.write(String(n)))";
+    const text = ("b".repeat(79) + "\n").repeat(2200);
+    assert.equal(await runCodex(["-e", reader, text]), String(Buffer.byteLength(text)));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
