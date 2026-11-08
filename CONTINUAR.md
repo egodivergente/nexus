@@ -1,3 +1,11 @@
+# Codex «spawn E2BIG» - 07/11/2026
+
+Rama `fix/codex-e2big-20261107` sobre vc184 (`f5ff19d`). Causa confirmada: el puente de AXEL pasa el texto de la
+conversacion a `codex exec` como un unico argumento (max 128 KiB) y el historial lo supera; no es la imagen. Parche del
+puente en `tools/bridge-patches/codex-stdin` (verificado en banco, **sin desplegar en el S25**) y mensaje claro en la app
+(agent-core, **APK sin recompilar**). Detalle, mediciones y pasos de despliegue en `docs/CODEX-E2BIG-20261107.md`.
+
+
 # Feedback en video vc177 - 04/11/2026
 
 Rama `aki/video-feedback-20261101` sobre vc176 (`fe64efe`). Fuente APK

@@ -202,6 +202,60 @@ class AntigravityProviderTest {
         }
     }
 
+    @Test fun `un E2BIG del puente se explica con el tamano medido y no recorta el historial`() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"type\":\"status\",\"phase\":\"starting\"}\n\n" +
+                    "data: {\"type\":\"final\",\"status\":\"failed\",\"text\":\"\",\"provider\":\"codex\",\"error\":\"spawn E2BIG\"}\n\n"))
+            // Un chat largo: cuatro turnos de 40 KB de texto; ninguna imagen viaja en el cuerpo, solo su marca.
+            val filler = "x".repeat(40_000)
+            val history = listOf(
+                LlmMessage(Role.USER, listOf(ContentBlock.Text(filler), ContentBlock.Image("png", ByteArray(2_000_000)))),
+                LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text(filler))),
+                LlmMessage(Role.USER, listOf(ContentBlock.Text(filler))),
+                LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text(filler))),
+                LlmMessage(Role.USER, listOf(ContentBlock.Text("?"))),
+            )
+            val provider = AntigravityProvider(server.url("/").toString(), engine = AntigravityProvider.BridgeEngine.CODEX)
+            val error = assertFailsWith<LlmException> {
+                provider.complete(LlmRequest(modelId = "gpt-6.1-sol", system = listOf("Eres Nexus."), messages = history, tools = emptyList(), maxTokens = 1024))
+            }
+            val text = error.message.orEmpty()
+            assertTrue("E2BIG" in text && "128 KiB" in text && "stdin" in text, text)
+            assertTrue("no el formato ni la resolución de las imágenes" in text, text)
+            assertTrue(Regex("≈1[5-9]\\d KB").containsMatchIn(text), "tamaño medido del historial: $text")
+            assertEquals(LlmException.Kind.BAD_REQUEST, error.kind)
+            // El historial viaja completo: nada se recorta para esquivar el límite.
+            val sent = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["messages"]!!.jsonArray
+            assertEquals(4, sent.count { it.jsonObject["content"]!!.jsonPrimitive.content.contains(filler) })
+            assertTrue(sent.any { "[Imagen adjunta (png, 2000000 bytes)]" in it.jsonObject["content"]!!.jsonPrimitive.content }, "la imagen solo viaja como marca")
+        }
+    }
+
+    @Test fun `un E2BIG con texto pequeno no culpa al historial`() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"type\":\"final\",\"status\":\"failed\",\"text\":\"\",\"error\":\"spawn E2BIG\"}\n\n"))
+            val error = assertFailsWith<LlmException> {
+                AntigravityProvider(server.url("/").toString(), engine = AntigravityProvider.BridgeEngine.CODEX).complete(userTurn("Hola", model = ""))
+            }
+            val text = error.message.orEmpty()
+            assertTrue("E2BIG" in text && "aunque el texto enviado es pequeño" in text && "stdin" !in text, text)
+        }
+    }
+
+    @Test fun `bridgeTextBytes cuenta el texto que el puente pasa a la CLI sin los mensajes system`() {
+        val provider = AntigravityProvider("http://127.0.0.1:8788", engine = AntigravityProvider.BridgeEngine.CODEX)
+        val payload = buildJsonObject {
+            put("messages", kotlinx.serialization.json.buildJsonArray {
+                add(buildJsonObject { put("role", "system"); put("content", "s".repeat(500)) })
+                add(buildJsonObject { put("role", "user"); put("content", "ñ".repeat(10)) }) // 2 bytes por carácter
+                add(buildJsonObject { put("role", "assistant"); put("content", "ok") })
+            })
+        }
+        assertEquals(22, provider.bridgeTextBytes(payload))
+    }
+
     @Test fun `la imagen del motor propio llega con su modelo y se descarga del puente`() = runTest {
         val png = byteArrayOf(-119, 80, 78, 71)
         val sse = artifactEvent("gemini-3.1-flash-image") +

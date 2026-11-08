@@ -1,4 +1,18 @@
 ﻿{
+    "codexE2big20261107": {
+        "branch": "fix/codex-e2big-20261107",
+        "base": "codex/thinking-timer-v184-20261106@f5ff19d (vc184)",
+        "problem": "Codex: spawn E2BIG en el agente tras generar imagenes: el texto de la conversacion va como un unico argumento de codex exec (max 131072 B) y el historial lo supera",
+        "causeConfirmed": "peticiones reales al puente del S25: prompt 130993 B pasa, 132033 B da spawn E2BIG; historial sin system 120000 B pasa, 139200 B falla; server.ts lanza codex con stdio ignore y multiTurnPrompt como argumento",
+        "notImageFormatOrResolution": "las imagenes no viajan al puente (solo una marca con su tamano); se reproduce con cero imagenes",
+        "appChange": "AntigravityProvider: el E2BIG se explica con el tamano medido y no recorta el historial; solo agent-core, APK sin recompilar",
+        "bridgeRequired": "tools/bridge-patches/codex-stdin/apply.mjs sobre /root/axel-native-v2/bridge/server.ts (codex exec lee el texto de stdin con '-', interfaz comprobada en codex-cli 0.167.0); sin el, el fallo sigue",
+        "bridgeDeployed": false,
+        "bridgeVerifiedInBench": "server.ts real + codex simulado: 3 y 8 imagenes (131505 y 182214 B) fallan sin parche y pasan con parche; chat nuevo y 1 imagen identicos (misma huella SHA-256); reintentos ok",
+        "unitTests": "agent-core 427 pruebas, 0 fallos, 4 omitidas previas; apply.test.mjs 6/6",
+        "notDone": "despliegue en el S25, APK nuevo, prueba con un chat real, rama grok del puente (mismo defecto con --single), desktop/agent/core desactualizada (no sincronizada)",
+        "doc": "docs/CODEX-E2BIG-20261107.md"
+    },
     "vc181CodexEsfuerzo20261106": {
         "branch": "aki/vc181-codex-esfuerzo-20261106",
         "base": "aki/vc180-codex-auditoria-20261105@41bb087 (vc180 instalada en el S25)",

@@ -92,6 +92,7 @@ class AntigravityProvider(
         val jobId = "${engine.jobPrefix}${UUID.randomUUID()}"
         val payload = encodeStreamRequest(request, conversationId, jobId)
         val bodyBytes = payload.toString().toByteArray(StandardCharsets.UTF_8)
+        val textBytes = bridgeTextBytes(payload)
         val activeCalls = java.util.Collections.synchronizedList(mutableListOf<Call>())
         val cancelSent = java.util.concurrent.atomic.AtomicBoolean(false)
         fun triggerCancel() {
@@ -132,7 +133,7 @@ class AntigravityProvider(
                     triggerCancel()
                     throw e
                 } catch (e: LlmException) {
-                    throw e
+                    throw if (isArgumentLimitError(e)) argumentLimitError(e, textBytes) else e
                 } catch (e: IOException) {
                     if (!coroutineContext.isActive) {
                         triggerCancel()
@@ -598,6 +599,36 @@ class AntigravityProvider(
         ContentBlock.ToolUse(id = id, name = name, input = inputObj)
     }.getOrNull()
 
+    /**
+     * Bytes de texto de la conversación que el puente pasa a la CLI: el puente descarta los mensajes `system` y une el
+     * resto en un solo texto. Solo cuenta tamaños; no guarda ni registra contenido.
+     */
+    internal fun bridgeTextBytes(payload: JsonObject): Int =
+        (payload["messages"] as? kotlinx.serialization.json.JsonArray).orEmpty().fold(0) { total, m ->
+            val obj = m as? JsonObject
+            if (obj == null || obj["role"]?.jsonPrimitive?.contentOrNull == "system") total
+            else total + (obj["content"]?.jsonPrimitive?.contentOrNull ?: "").toByteArray(StandardCharsets.UTF_8).size
+        }
+
+    /** `spawn E2BIG`: el sistema rechazó los argumentos con los que el puente arrancó la CLI. */
+    internal fun isArgumentLimitError(e: LlmException): Boolean = e.message.orEmpty().contains("E2BIG", ignoreCase = true)
+
+    /**
+     * Explica el E2BIG con el tamaño medido. No es un fallo de la imagen ni se arregla recortando el historial: un puente
+     * antiguo pasa todo el texto como un único argumento (máx. 128 KiB en Linux); el puente actualizado lo pasa por stdin.
+     */
+    internal fun argumentLimitError(original: LlmException, textBytes: Int): LlmException {
+        val kb = (textBytes + 1023) / 1024
+        val detail = if (textBytes >= ARGUMENT_LIMIT_HINT_BYTES) {
+            "el texto de esta conversación (≈$kb KB) no cabe en el argumento con el que el puente arranca la CLI " +
+                "(máximo 128 KiB; error E2BIG del sistema). Es el tamaño del historial, no el formato ni la resolución de las imágenes. " +
+                "Actualiza el puente para que se lo pase por stdin (tools/bridge-patches/codex-stdin) o abre un chat nuevo; este chat se conserva."
+        } else {
+            "el sistema rechazó los argumentos con los que el puente arranca la CLI (E2BIG) aunque el texto enviado es pequeño (≈$kb KB); revisa el entorno del puente."
+        }
+        return LlmException(LlmException.Kind.BAD_REQUEST, "${engine.label}: $detail", original.httpStatus, original.code)
+    }
+
     private fun mapBridgeError(code: String, message: String): LlmException {
         val clean = Redactor.redact(message).take(320)
         val lower = "$code $clean".lowercase()
@@ -638,6 +669,8 @@ class AntigravityProvider(
         const val CODEX_DEFAULT_MODEL = "gpt-6-astra"
         private const val DEFAULT_CONVERSATION_ID = "nexus-agy-default"
         private const val MAX_ARTIFACT_BYTES = 40_000_000L
+        /** Por debajo de esto, un E2BIG no se explica por el tamaño del texto (límite por argumento: 131 072 B menos lo que añade el puente). */
+        private const val ARGUMENT_LIMIT_HINT_BYTES = 100_000
         private val IMAGE_TOOL = Regex("(?i)(generat|creat|edit|gen).*image|image.*(generat|creat|edit|gen)")
         private const val TOOL_OPEN_TAG = "<NEXUS_TOOL_CALL>"
         /** Document formats whose bytes are UTF-8 text and can travel inside the prompt. */
