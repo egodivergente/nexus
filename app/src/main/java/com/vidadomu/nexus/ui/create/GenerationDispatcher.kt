@@ -31,6 +31,9 @@ class GenerationDispatcher(private val app: NexusApplication) {
                 put("__project_id", origin.projectId)
                 put("__story_context", kotlinx.serialization.json.Json.encodeToString(
                     com.vidadomu.nexus.agent.core.assets.StoryGenerationContext.serializer(), origin))
+                put("__story_inputs", kotlinx.serialization.json.JsonArray(state.attachedMedia.map {
+                    kotlinx.serialization.json.JsonPrimitive(it.uriString)
+                }).toString())
             }
         }
         val routePlan=if(maxCostUsd!=null && maxCostUsd.isFinite() && maxCostUsd>=0)

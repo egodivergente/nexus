@@ -230,6 +230,7 @@ class AssociateAssetTool(private val d: ToolDeps) : BaseTool(
     }
 
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
+        if (session.storySelection != null) return fail("El proyecto audiovisual usa asociaciones con alcance y revisión. Usa edit_story_project con action=link_material, asset_id, scope, target_id, role y operation_id; así se conserva la selección y un archivo puede tener varios usos.")
         val p = d.assets.findProject(input.req("project")) ?: return fail("No existe el proyecto «${input.str("project")}». Créalo antes.")
         val a = d.assetFromInput(input, session)
         val scene = input.str("scene")?.let { d.assets.ensureScene(p.id, it) }

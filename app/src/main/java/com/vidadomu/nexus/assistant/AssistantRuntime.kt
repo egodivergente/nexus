@@ -589,6 +589,9 @@ class AssistantRuntime(private val app: NexusApplication) {
             val origin = previous?.storyContext ?: job.parameters["__story_context"]?.let { raw ->
                 runCatching { kotlinx.serialization.json.Json.decodeFromString(StoryGenerationContext.serializer(), raw) }.getOrNull()
             }
+            val usedReferences = job.parameters["__story_inputs"]?.let { raw ->
+                runCatching { kotlinx.serialization.json.Json.decodeFromString<List<String>>(raw) }.getOrNull()
+            } ?: listOfNotNull(job.inputMediaUri)
             val type = when (job.modality.name) { "VIDEO" -> AssetType.VIDEO; "IMAGE" -> AssetType.IMAGE; "AUDIO" -> AssetType.AUDIO; else -> AssetType.OTHER }
             val rec = assets.upsertGeneration(GenerationRecord(
                 id = AssetIndex.newId("gen"), nexusJobId = job.id, providerJobId = job.providerJobId, providerId = job.providerId,
@@ -596,7 +599,8 @@ class AssistantRuntime(private val app: NexusApplication) {
                 projectId = job.parameters["__project_id"]?.takeIf {assets.findProject(it)!=null} ?: assets.projectAt(job.startedAt),
                 shotId = origin?.shotId, storyContext = origin,
                 params = job.parameters.filterKeys { !it.startsWith("__") }, seed = job.parameters["seed"],
-                referenceUris = listOfNotNull(job.inputMediaUri), estimatedCostUsd = job.estimatedCostUsd, actualCostUsd = job.actualCostUsd,
+                referenceUris = usedReferences, referenceAssetIds = usedReferences.mapNotNull { assets.assetByUri(it)?.id },
+                estimatedCostUsd = job.estimatedCostUsd, actualCostUsd = job.actualCostUsd,
                 status = "COMPLETED", createdAt = job.startedAt, completedAt = job.completedAt,
             ))
             val ids = job.outputs.mapNotNull { o ->

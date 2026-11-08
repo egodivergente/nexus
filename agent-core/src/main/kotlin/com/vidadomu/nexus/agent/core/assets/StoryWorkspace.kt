@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 @Serializable data class StoryBlock(
     val id: String, val projectId: String, val sceneId: String, val kind: String = "action",
     val text: String = "", val speaker: String? = null, val shotId: String? = null,
-    val order: Int = 0, val narrativeState: String = "story", val revision: Long = 0,
+    val order: Int = 0, val narrativeState: String = "story", val revision: Long = 0, val contentRevision: Long = 0,
 )
 @Serializable data class StoryLink(
     val id: String, val projectId: String, val assetId: String, val scope: String, val targetId: String,
@@ -55,6 +55,8 @@ import kotlinx.serialization.json.*
     val proposals: List<StoryProposal> = emptyList(), val tasks: List<StoryTask> = emptyList(),
     val autonomy: List<StoryAutonomy> = emptyList(), val receipts: List<StoryReceipt> = emptyList(),
     val history: List<StoryHistory> = emptyList(),
+    /** Compatibility adoption is once per project; removing a new association never resurrects it. */
+    val legacyAdoptedProjectIds: List<String> = emptyList(),
 )
 
 private val storyJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
@@ -128,7 +130,7 @@ suspend fun AssetIndex.storyCommand(projectId: String, input: JsonObject, actor:
             val oldDocument = document(before, projectId)
             val newDocument = document(changed, projectId)
             val delta = documentDelta(oldDocument, newDocument)
-            val history = if (action != "undo" && oldDocument != newDocument) StoryHistory(id("edit"), projectId, action, actor, System.currentTimeMillis(), delta.first, delta.second) else null
+            val history = if (action !in setOf("undo", "adopt_legacy_links") && oldDocument != newDocument) StoryHistory(id("edit"), projectId, action, actor, System.currentTimeMillis(), delta.first, delta.second) else null
             val answer = JsonObject(output + mapOf("operation_id" to JsonPrimitive(operation)) + (history?.let { mapOf("history_id" to JsonPrimitive(it.id)) } ?: emptyMap()))
             changed.copy(story = changed.story.copy(
                 receipts = changed.story.receipts + StoryReceipt(operation, projectId, hash, answer),
@@ -145,6 +147,8 @@ private fun validateScope(d: IndexData, p: String, q: JsonObject) {
     val scopeBlock = q.s("scope_block_id")?.also { block(d, p, it) }
     val keep = q.strings("preserve_ids").orEmpty().toSet()
     val action = q.need("action")
+    val existingLink = q.s("link_id")?.let { value -> d.story.links.firstOrNull { it.id == value && it.projectId == p } ?: invalid("Asociación desconocida.") }
+    val existingPreference = q.s("preference_id")?.let { value -> d.story.preferences.firstOrNull { it.id == value && it.projectId == p } ?: invalid("Indicación desconocida.") }
     val targetShot = q.s("shot_id")?.let { value -> d.shots.firstOrNull { it.id == value && it.projectId == p } }
     val targetBlock = q.s("block_id")?.let { value -> d.story.blocks.firstOrNull { it.id == value && it.projectId == p } }
     val originBlock = (q.s("origin_block_id") ?: q.s("block_id").takeIf { action == "create_shot" })?.let { block(d, p, it) }
@@ -158,6 +162,7 @@ private fun validateScope(d: IndexData, p: String, q: JsonObject) {
         else -> null
     }
     if (identity in keep) invalid("El elemento está fijado por tu orden; se conserva.")
+    if (existingLink?.targetId in keep || existingPreference?.targetId in keep || existingPreference?.id in keep) invalid("El elemento está fijado por tu orden; se conservan sus asociaciones e indicaciones.")
     if (action in setOf("link_material", "set_preference") && q.s("target_id") in keep) invalid("El elemento está fijado por tu orden; no se modifican sus vínculos o indicaciones.")
     if (action == "delete_scene" && (d.shots.any { it.sceneId == targetScene && it.id in keep } || d.story.blocks.any { it.sceneId == targetScene && it.id in keep })) invalid("La escena contiene elementos fijados.")
     val administrative = action in setOf("propose", "apply_proposal", "reject_proposal", "enqueue_task", "update_task", "prepare_generation", "register_result")
@@ -171,9 +176,8 @@ private fun validateScope(d: IndexData, p: String, q: JsonObject) {
         var shotId = targetShot?.id ?: targetBlock?.shotId
         var blockId = targetBlock?.id ?: originBlock?.id
         if (action in setOf("link_material", "unlink_material", "set_preference")) {
-            val link = q.s("link_id")?.let { value -> d.story.links.firstOrNull { it.id == value && it.projectId == p } }
-            val scope = link?.scope ?: q.s("scope") ?: "project"
-            val target = link?.targetId ?: q.s("target_id") ?: p
+            val scope = existingLink?.scope ?: existingPreference?.scope ?: q.s("scope") ?: "project"
+            val target = existingLink?.targetId ?: existingPreference?.targetId ?: q.s("target_id") ?: p
             when (scope) {
                 "scene" -> sceneId = target
                 "shot" -> { shotId = target; sceneId = shot(d, p, target).sceneId }
@@ -191,6 +195,29 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
     project(d, p); validateScope(d, p, q)
     val st = d.story
     return when (q.need("action")) {
+        "adopt_legacy_links" -> {
+            if (p in st.legacyAdoptedProjectIds) d to result(p, extra = mapOf("adopted_count" to JsonPrimitive(0)))
+            else {
+                val additions = mutableListOf<StoryLink>()
+                fun adopt(assetId: String, scope: String, targetId: String, role: String, selected: Boolean = false, characterId: String? = null) {
+                    if (d.assets.none { it.id == assetId && !it.libraryDeleted }) return
+                    if ((st.links + additions).any { it.projectId == p && it.assetId == assetId && it.scope == scope && it.targetId == targetId && it.role == role && it.characterId == characterId }) return
+                    additions += StoryLink(id("lnk"), p, assetId, scope, targetId, role, selected, characterId = characterId, note = "Asociación existente conservada", createdAt = now)
+                }
+                for (asset in d.assets.filter { !it.libraryDeleted }) {
+                    val shot = d.shots.firstOrNull { it.id == asset.shotId && it.projectId == p }
+                    val scene = d.scenes.firstOrNull { it.id == asset.sceneId && it.projectId == p }
+                    val role = when (asset.role) { AssetRole.REFERENCE -> "reference"; AssetRole.FINAL -> "chosen"; AssetRole.KEYFRAME -> "sketch"; AssetRole.OUTPUT -> "candidate"; AssetRole.SOURCE -> "source"; AssetRole.OTHER -> if (asset.type == AssetType.AUDIO) "audio" else "candidate" }
+                    if (shot != null) adopt(asset.id, "shot", shot.id, role, asset.role == AssetRole.FINAL)
+                    else if (scene != null) adopt(asset.id, "scene", scene.id, role, asset.role == AssetRole.FINAL)
+                    // Project ownership alone is an inbox, not an inferred narrative use.
+                    else if (asset.projectId == p && asset.role == AssetRole.REFERENCE) adopt(asset.id, "project", p, "reference")
+                    for (character in d.characters.filter { it.projectId == p && it.id in asset.characterIds }) adopt(asset.id, "character", character.id, "reference", characterId = character.id)
+                }
+                for (character in d.characters.filter { it.projectId == p }) for (asset in character.referenceAssetIds) adopt(asset, "character", character.id, "identity", characterId = character.id)
+                d.copy(story = st.copy(links = st.links + additions, legacyAdoptedProjectIds = st.legacyAdoptedProjectIds + p)) to result(p, extra = mapOf("adopted_count" to JsonPrimitive(additions.size)))
+            }
+        }
         "update_project" -> {
             val old = project(d, p); rev(q, old.revision)
             val memory = old.memory.copy(synopsis = q.optional("synopsis", old.memory.synopsis), tone = q.optional("tone", old.memory.tone),
@@ -257,7 +284,8 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
                 attachedShot?.let { if (shot(d, p, it).sceneId != destination) invalid("Mueve primero el plano, o desvincúlalo antes de mover el bloque.") }
                 val next = old.copy(sceneId = destination, kind = kind, text = q.s("text") ?: old.text, speaker = q.optional("speaker", old.speaker), shotId = attachedShot,
                     order = q.i("order") ?: old.order, narrativeState = q.s("narrative_state")?.also { if (it !in narrativeStates) invalid("Estado narrativo desconocido.") } ?: old.narrativeState,
-                    revision = old.revision + 1)
+                    revision = old.revision + 1,
+                    contentRevision = old.contentRevision + if (q.b("invalidate_material") != false && q.keys.any { it in setOf("kind", "text", "speaker", "shot_id", "narrative_state") }) 1 else 0)
                 val positions = if (q.s("action") == "move_block") reorder(st.blocks.filter { it.sceneId == destination } + listOfNotNull(old.takeIf { it.sceneId != destination }), old.id, next.order, { it.id }, { it.order }).associate { it.first.id to it.second } else emptyMap()
                 d.copy(story = st.copy(blocks = st.blocks.map { if (it.id == old.id) next.copy(order = positions[it.id] ?: next.order) else if (it.id in positions) it.copy(order = positions.getValue(it.id)) else it })) to result(next.id, next.revision)
             }
@@ -266,14 +294,16 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
             val parent = (q.s("scene_id") ?: (q.s("origin_block_id") ?: q.s("block_id"))?.let { block(d, p, it).sceneId })?.also { scene(d, p, it) }
             val next = patchShot(d, p, Shot(creationId(d, q, "sht"), p, parent, q.s("code") ?: "P${d.shots.count { it.projectId == p } + 1}", order = (d.shots.filter { it.projectId == p && it.sceneId == parent }.maxOfOrNull { it.order } ?: -1) + 1), q, creating = true)
             val b = parent?.let { StoryBlock(id("blk"), p, it, "shot", shotId = next.id, order = q.i("block_order") ?: ((st.blocks.filter { b -> b.sceneId == it }.maxOfOrNull { b -> b.order } ?: -1) + 1)) }
-            d.copy(shots = d.shots + next, story = st.copy(blocks = st.blocks + listOfNotNull(b))) to result(next.id)
+            val origin = q.s("origin_block_id") ?: q.s("block_id")
+            val originals = st.blocks.map { original -> if (original.id == origin && original.projectId == p) original.copy(shotId = next.id, revision = original.revision + 1) else original }
+            d.copy(shots = d.shots + next, story = st.copy(blocks = originals + listOfNotNull(b))) to result(next.id)
         }
         "update_shot", "move_shot", "delete_shot", "duplicate_shot" -> {
             val old = shot(d, p, q.need("shot_id")); rev(q, old.revision)
             when (q.s("action")) {
                 "delete_shot" -> d.copy(shots = d.shots.filterNot { it.id == old.id }, story = st.copy(
                     blocks = st.blocks.mapNotNull { if (it.shotId == old.id) { if (it.kind == "shot" && it.text.isBlank()) null else it.copy(shotId = null, kind = if (it.kind == "shot") "note" else it.kind, revision = it.revision + 1) } else it },
-                    links = st.links.filterNot { it.scope == "shot" && it.targetId == old.id },
+                    links = st.links.filterNot { it.scope == "shot" && it.targetId == old.id || it.scope == "block" && st.blocks.any { b -> b.id == it.targetId && b.shotId == old.id && b.kind == "shot" && b.text.isBlank() } },
                 )) to result(old.id, old.revision + 1)
                 "duplicate_shot" -> {
                     val copy = old.copy(id = id("sht"), code = q.s("code") ?: "${old.code} · variante", title = q.s("title") ?: old.title,
@@ -317,12 +347,19 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
         "unlink_material" -> {
             val old = st.links.firstOrNull { it.id == q.need("link_id") && it.projectId == p } ?: invalid("Asociación desconocida.")
             rev(q, old.revision)
-            d.copy(story = st.copy(links = st.links.filterNot { it.id == old.id })) to result(old.id, old.revision + 1)
+            val remaining = st.links.filterNot { it.id == old.id }
+            val hasSameUse = remaining.any { it.projectId == p && it.assetId == old.assetId && it.scope == old.scope && it.targetId == old.targetId }
+            val assets = if (!hasSameUse && old.scope in setOf("scene", "shot")) d.assets.map { a -> if (a.id == old.assetId) {
+                if (old.scope == "shot" && a.shotId == old.targetId) a.copy(shotId = null)
+                else if (old.scope == "scene" && a.sceneId == old.targetId) a.copy(sceneId = null) else a
+            } else a } else d.assets
+            val characters = if (!hasSameUse && old.scope == "character" && old.role == "identity") d.characters.map { c -> if (c.id == old.targetId && c.projectId == p) c.copy(referenceAssetIds = c.referenceAssetIds - old.assetId, revision = c.revision + 1) else c } else d.characters
+            d.copy(assets = assets, characters = characters, story = st.copy(links = remaining)) to result(old.id, old.revision + 1)
         }
         "upsert_element" -> upsertElement(d, p, q)
         "set_preference" -> {
-            val scope = q.s("scope") ?: "project"; val target = q.s("target_id") ?: p; checkTarget(d, p, scope, target)
             val old = q.s("preference_id")?.let { value -> st.preferences.firstOrNull { it.id == value && it.projectId == p } ?: invalid("Indicación desconocida.") }
+            val scope = q.s("scope") ?: old?.scope ?: "project"; val target = q.s("target_id") ?: old?.targetId ?: p; checkTarget(d, p, scope, target)
             old?.let { rev(q, it.revision) }
             val next = StoryPreference(old?.id ?: id("pref"), p, scope, target, q.s("text") ?: old?.text ?: invalid("Falta la indicación."), old?.revision?.plus(1) ?: 0, q.b("enabled") ?: old?.enabled ?: true)
             d.copy(story = st.copy(preferences = st.preferences.filterNot { it.id == next.id } + next)) to result(next.id, next.revision)
@@ -532,12 +569,14 @@ private fun generationContext(d: IndexData, p: String, shotId: String): StoryGen
         put("elements", JsonArray(d.story.elements.filter { it.projectId == p && (it.id in sc?.locationIds.orEmpty() || it.sceneId == sc?.id && it.sceneId != null) && (it.characterId == null || it.characterId in s.characterIds) }.sortedBy { it.id }.map { storyJson.encodeToJsonElement(it) }))
         put("references", JsonArray(refs.map { buildJsonObject { put("asset_id", it.assetId); put("role", it.role); put("character_id", it.characterId); put("scope", it.scope); put("target_id", it.targetId) } }))
         put("preferences", JsonArray(effectivePreferences(d, p, sc?.id, s.id).sortedBy { it.id }.map { JsonPrimitive(it.text) }))
+        put("script", JsonArray(d.story.blocks.filter { it.projectId == p && !(it.kind == "shot" && it.text.isBlank()) && (it.shotId == s.id || it.sceneId == sc?.id && it.shotId == null && it.kind in setOf("action", "dialogue") && it.narrativeState != "idea") }.sortedWith(compareBy<StoryBlock> { it.order }.thenBy { it.id }).map { b -> buildJsonObject { put("id", b.id); put("content_revision", b.contentRevision) } }))
     }
     val contextText = buildString {
         appendLine("Proyecto: ${pr.name}"); pr.memory.synopsis?.let { appendLine("Sinopsis: $it") }; pr.treatment?.let { appendLine("Tratamiento: $it") }
         sc?.let { appendLine("Escena: ${it.title ?: it.code}"); it.description?.let { t -> appendLine(t) }; it.timeOfDay?.let { t -> appendLine("Momento: $t") }; it.light?.let { t -> appendLine("Luz: $t") } }
         appendLine("Plano: ${s.title ?: s.code}"); s.description?.let { appendLine("Acción: $it") }; s.intent?.let { appendLine("Intención: $it") }
         s.framing?.let { appendLine("Encuadre: $it") }; s.camera?.let { appendLine("Cámara: $it") }; s.performance?.let { appendLine("Actuación: $it") }; s.dialogue?.let { appendLine("Diálogo: $it") }; s.sound?.let { appendLine("Sonido: $it") }
+        for (b in d.story.blocks.filter { it.projectId == p && (it.shotId == s.id || it.sceneId == sc?.id && it.shotId == null && it.kind in setOf("action", "dialogue") && it.narrativeState != "idea") }.sortedBy { it.order }) if (b.text.isNotBlank()) appendLine("${b.kind}${b.speaker?.let { ": $it" }.orEmpty()}: ${b.text}")
         appendLine("Contexto verificable: $snapshot")
     }.trim()
     return StoryGenerationContext(p, sc?.id, s.id, s.contentRevision, contextText, refs.map { it.assetId }.distinct(), sha(snapshot.toString()))
@@ -574,7 +613,7 @@ private fun shotJson(s: Shot) = buildJsonObject {
     s.durationSec?.let { put("duration_sec", it) }; put("narrative_state", s.narrativeState); put("production_state", s.productionState); put("variant_of", s.variantOf); put("revision", s.revision); put("content_revision", s.contentRevision)
 }
 private fun blockJson(b: StoryBlock) = buildJsonObject {
-    put("id", b.id); put("project_id", b.projectId); put("scene_id", b.sceneId); put("kind", b.kind); put("text", b.text); put("speaker", b.speaker); put("shot_id", b.shotId); put("order", b.order); put("narrative_state", b.narrativeState); put("revision", b.revision)
+    put("id", b.id); put("project_id", b.projectId); put("scene_id", b.sceneId); put("kind", b.kind); put("text", b.text); put("speaker", b.speaker); put("shot_id", b.shotId); put("order", b.order); put("narrative_state", b.narrativeState); put("revision", b.revision); put("content_revision", b.contentRevision)
 }
 private fun taskJson(t: StoryTask) = buildJsonObject {
     put("id", t.id); put("project_id", t.projectId); put("scene_id", t.sceneId); put("shot_id", t.shotId); put("title", t.title); put("kind", t.kind); put("status", t.status); put("detail", t.detail)
@@ -601,7 +640,7 @@ fun AssetIndex.storyView(projectId: String, sceneId: String? = null, shotId: Str
         put("autonomy", (d.story.autonomy.firstOrNull { it.projectId == projectId } ?: StoryAutonomy(projectId)).let { buildJsonObject { put("enabled", it.enabled); put("mode", it.mode); put("scene_id", it.sceneId); put("revision", it.revision); put("execution", "Trabajo local persistido; el agente lo ejecuta en un turno activo. Sin turno, queda pendiente de reanudación.") } })
         put("effective_references", JsonArray(refs.map { linkJson(d, it) }))
         put("effective_preferences", JsonArray(effectivePreferences(d, projectId, sceneId ?: shotId?.let { shot(d, projectId, it).sceneId }, shotId).map { JsonPrimitive(it.text) }))
-        put("unplaced_asset_ids", JsonArray(d.assets.filter { a -> !a.libraryDeleted && (a.projectId == projectId || a.projectId == null) && d.story.links.none { it.projectId == projectId && it.assetId == a.id } && a.shotId == null }.map { JsonPrimitive(it.id) }))
+        put("unplaced_asset_ids", JsonArray(d.assets.filter { a -> !a.libraryDeleted && (a.projectId == projectId || a.projectId == null) && d.story.links.none { it.projectId == projectId && it.assetId == a.id } && (a.shotId == null || d.shots.none { it.id == a.shotId }) }.map { JsonPrimitive(it.id) }))
         put("gaps", JsonArray(allShots.filter { s -> d.story.links.none { it.projectId == projectId && it.scope == "shot" && it.targetId == s.id && it.role !in referenceRoles && it.role != "discarded" } && d.assets.none { it.shotId == s.id && !it.libraryDeleted && it.role in setOf(AssetRole.OUTPUT, AssetRole.FINAL, AssetRole.KEYFRAME) } }.map { s -> buildJsonObject { put("shot_id", s.id); put("title", s.title ?: s.code); put("reason", "Sin toma candidata ni material elegido") } }))
         put("history", JsonArray(d.story.history.filter { it.projectId == projectId }.asReversed().map { h -> buildJsonObject { put("id", h.id); put("action", h.action); put("actor", h.actor); put("at", h.at); put("undone", h.undone) } }))
         put("operation_contract", buildJsonObject {
@@ -655,6 +694,8 @@ private fun document(d: IndexData, p: String): JsonObject = buildJsonObject {
     put("links", JsonArray(d.story.links.filter { it.projectId == p }.map { storyJson.encodeToJsonElement(it) }))
     put("elements", JsonArray(d.story.elements.filter { it.projectId == p }.map { storyJson.encodeToJsonElement(it) }))
     put("preferences", JsonArray(d.story.preferences.filter { it.projectId == p }.map { storyJson.encodeToJsonElement(it) }))
+    // Only logical bindings participate in undo. URIs, files and generation provenance never do.
+    put("asset_bindings", JsonArray(d.assets.map { a -> buildJsonObject { put("id", a.id); put("project_id", a.projectId); put("scene_id", a.sceneId); put("shot_id", a.shotId) } }))
 }
 
 /** Store only affected entities; a long script does not get copied into every undo entry. */
@@ -685,11 +726,16 @@ private fun restoreDocument(d: IndexData, p: String, before: JsonObject, after: 
         val projectIds = (current[key] as? JsonArray).orEmpty().map { (it as JsonObject).need("id") }.toSet()
         return JsonArray(all.filterNot { (it as JsonObject).need("id") in projectIds } + (restored[key] as JsonArray))
     }
-    return d.copy(
+    val bindings = (restored["asset_bindings"] as? JsonArray).orEmpty().map { it.jsonObject }.associateBy { it.need("id") }
+    val next = d.copy(
         projects = storyJson.decodeFromJsonElement(merged("projects", d.projects.map { storyJson.encodeToJsonElement(it) })),
         scenes = storyJson.decodeFromJsonElement(merged("scenes", d.scenes.map { storyJson.encodeToJsonElement(it) })),
         shots = storyJson.decodeFromJsonElement(merged("shots", d.shots.map { storyJson.encodeToJsonElement(it) })),
         characters = storyJson.decodeFromJsonElement(merged("characters", d.characters.map { storyJson.encodeToJsonElement(it) })),
+        assets = d.assets.map { asset ->
+            val binding = bindings[asset.id]
+            if (binding == null) asset else asset.copy(projectId = binding.s("project_id"), sceneId = binding.s("scene_id"), shotId = binding.s("shot_id"))
+        },
         story = d.story.copy(
             blocks = storyJson.decodeFromJsonElement(merged("blocks", d.story.blocks.map { storyJson.encodeToJsonElement(it) })),
             links = storyJson.decodeFromJsonElement(merged("links", d.story.links.map { storyJson.encodeToJsonElement(it) })),
@@ -697,4 +743,19 @@ private fun restoreDocument(d: IndexData, p: String, before: JsonObject, after: 
             preferences = storyJson.decodeFromJsonElement(merged("preferences", d.story.preferences.map { storyJson.encodeToJsonElement(it) })),
         ),
     )
+    if ((invalidStoryReferences(next, p) - invalidStoryReferences(d, p)).isNotEmpty()) conflict("No se puede deshacer: hay contenido o material añadido después que depende de ese elemento. Conserva o reasigna esas dependencias antes.")
+    return next
+}
+
+private fun invalidStoryReferences(d: IndexData, p: String): Set<String> = buildSet {
+    val scenes = d.scenes.filter { it.projectId == p }.map { it.id }.toSet()
+    val shots = d.shots.filter { it.projectId == p }.map { it.id }.toSet()
+    val blocks = d.story.blocks.filter { it.projectId == p }.map { it.id }.toSet()
+    val characters = d.characters.filter { it.projectId == p }.map { it.id }.toSet()
+    val elements = d.story.elements.filter { it.projectId == p }.map { it.id }.toSet()
+    d.shots.filter { it.projectId == p && it.sceneId != null && it.sceneId !in scenes }.forEach { add("shot:${it.id}") }
+    d.story.blocks.filter { it.projectId == p && (it.sceneId !in scenes || it.shotId != null && it.shotId !in shots) }.forEach { add("block:${it.id}") }
+    fun valid(scope: String, id: String): Boolean = when (scope) { "project" -> id == p; "scene" -> id in scenes; "shot" -> id in shots; "block" -> id in blocks; "character" -> id in characters; "element" -> id in elements; else -> false }
+    d.story.links.filter { it.projectId == p && !valid(it.scope, it.targetId) }.forEach { add("link:${it.id}") }
+    d.story.preferences.filter { it.projectId == p && !valid(it.scope, it.targetId) }.forEach { add("preference:${it.id}") }
 }

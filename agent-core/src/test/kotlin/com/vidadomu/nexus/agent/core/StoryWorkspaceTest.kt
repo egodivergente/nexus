@@ -127,4 +127,48 @@ class StoryWorkspaceTest {
         assertEquals("La mano tiembla", index.snapshot().shots.first { it.id == a }.description)
         assertEquals("Cambio B", index.snapshot().shots.first { it.id == b }.description)
     }
+
+    @Test fun `legacy links adopt once can be removed and orphan material remains recoverable`() = runTest {
+        val index = AssetIndex(null); val p = index.createProject("Film").id; val scene = index.ensureScene(p, "E1"); val shot = index.ensureShot(p, "P1", scene.id)
+        val a = index.addAsset(Asset("", "file:///legacy.mp4", AssetType.VIDEO, role = AssetRole.FINAL, displayName = "Final previa", projectId = p, sceneId = scene.id, shotId = shot.id, createdAt = 1))
+        index.cmd(p, "adopt_legacy_links")
+        val link = index.snapshot().story.links.single()
+        assertEquals(shot.id, link.targetId); assertTrue(link.selected)
+        index.cmd(p, "adopt_legacy_links"); assertEquals(1, index.snapshot().story.links.size)
+        val unlinked = index.cmd(p, "unlink_material", "link_id" to str(link.id), "expected_revision" to num(0))
+        assertTrue(unlinked.ok()); assertNull(index.asset(a.id)?.shotId)
+        index.cmd(p, "adopt_legacy_links"); assertTrue(index.snapshot().story.links.isEmpty())
+        assertTrue(index.cmd(p, "undo", "history_id" to unlinked.getValue("history_id")).ok())
+        assertEquals(shot.id, index.asset(a.id)?.shotId); assertEquals(1, index.snapshot().story.links.size)
+        index.cmd(p, "delete_shot", "shot_id" to str(shot.id), "expected_revision" to num(0))
+        assertNotNull(index.asset(a.id))
+        assertTrue(str(a.id) in index.storyView(p).getValue("unplaced_asset_ids").jsonArray)
+    }
+
+    @Test fun `script changes invalidate local context and developing an idea keeps its original text`() = runTest {
+        val index = AssetIndex(null); val p = index.createProject("Film").id; val scene = index.sc(p)
+        val note = index.cmd(p, "create_block", "scene_id" to str(scene), "kind" to str("note"), "text" to str("Aquí quiero su mano temblando")).id()
+        val shot = index.cmd(p, "create_shot", "origin_block_id" to str(note), "scope_block_id" to str(note), "scope_scene_id" to str(scene), "description" to str("Primerísimo plano de la mano")).id()
+        val context = index.storyGenerationContext(p, shot)
+        assertTrue("Aquí quiero su mano temblando" in context.context)
+        assertEquals(shot, index.snapshot().story.blocks.first { it.id == note }.shotId)
+        val dialogue = index.cmd(p, "create_block", "scene_id" to str(scene), "kind" to str("dialogue"), "text" to str("No te vayas")).id()
+        assertTrue(index.isStoryContextStale(context))
+        val next = index.storyGenerationContext(p, shot)
+        index.cmd(p, "update_block", "block_id" to str(dialogue), "expected_revision" to num(0), "text" to str("No vuelvas"))
+        assertTrue(index.isStoryContextStale(next))
+        val corrected = index.storyGenerationContext(p, shot)
+        index.cmd(p, "update_block", "block_id" to str(dialogue), "expected_revision" to num(1), "text" to str("No vuelvas."), "invalidate_material" to JsonPrimitive(false))
+        assertFalse(index.isStoryContextStale(corrected))
+    }
+
+    @Test fun `undo cannot orphan later content and preserved links cannot be removed by indirect id`() = runTest {
+        val index = AssetIndex(null); val p = index.createProject("Film").id
+        val created = index.cmd(p, "create_scene", "title" to str("Nueva")); val scene = created.id(); val shot = index.sh(p, scene)
+        assertFalse(index.cmd(p, "undo", "history_id" to created.getValue("history_id")).ok())
+        assertNotNull(index.snapshot().scenes.firstOrNull { it.id == scene }); assertNotNull(index.snapshot().shots.firstOrNull { it.id == shot })
+        val asset = index.asset(); val link = index.cmd(p, "link_material", "asset_id" to str(asset.id), "scope" to str("shot"), "target_id" to str(shot), "role" to str("reference")).id()
+        val remove = index.cmd(p, "unlink_material", "link_id" to str(link), "expected_revision" to num(0), "preserve_ids" to JsonArray(listOf(str(shot))))
+        assertFalse(remove.ok()); assertEquals(1, index.snapshot().story.links.size)
+    }
 }

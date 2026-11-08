@@ -55,7 +55,8 @@ internal object ModelWorkDrafts {
 /** Exact state before a model switch, so "Volver" can put it back untouched. */
 internal data class ModelSwitchSnapshot(val model:NexusModel,val modality:Modality,val availableModels:List<NexusModel>,
     val prompt:String,val negativePrompt:String,val parameters:Map<String,String>,val media:List<AttachedMedia>,
-    val retainedMedia:List<AttachedMedia> = emptyList(),val parameterAdaptations:List<ParameterTransferAdaptation> = emptyList())
+    val retainedMedia:List<AttachedMedia> = emptyList(),val parameterAdaptations:List<ParameterTransferAdaptation> = emptyList(),
+    val storyContext:com.vidadomu.nexus.agent.core.assets.StoryGenerationContext? = null)
 
 data class ModelSwitchNotice(val id:Long,val modelName:String,val parkedMedia:Int,val adaptedSettings:Int=0) {
     val message:String get() = "Modelo cambiado"+when(parkedMedia) {
@@ -71,7 +72,7 @@ data class ModelSwitchNotice(val id:Long,val modelName:String,val parkedMedia:In
 
 internal object ModelSwitchUndo {
     fun snapshot(state:CreateUiState):ModelSwitchSnapshot? = state.selectedModel?.let {
-        ModelSwitchSnapshot(it,state.selectedModality,state.availableModels,state.prompt,state.negativePrompt,state.parameters,state.attachedMedia,state.retainedMedia,state.parameterAdaptations)
+        ModelSwitchSnapshot(it,state.selectedModality,state.availableModels,state.prompt,state.negativePrompt,state.parameters,state.attachedMedia,state.retainedMedia,state.parameterAdaptations,state.storyContext)
     }
 
     /** Media carried to the new model that it cannot use; they stay in the previous model's draft. */
@@ -83,7 +84,7 @@ internal object ModelSwitchUndo {
     fun restore(state:CreateUiState,snapshot:ModelSwitchSnapshot):CreateUiState = state.copy(selectedModel=snapshot.model,
         selectedModality=snapshot.modality,availableModels=snapshot.availableModels,prompt=snapshot.prompt,
         negativePrompt=snapshot.negativePrompt,parameters=snapshot.parameters,attachedMedia=snapshot.media,retainedMedia=snapshot.retainedMedia,
-        parameterAdaptations=snapshot.parameterAdaptations,
+        parameterAdaptations=snapshot.parameterAdaptations,storyContext=snapshot.storyContext,
         showAdvanced=false,errorMessage=null)
 }
 

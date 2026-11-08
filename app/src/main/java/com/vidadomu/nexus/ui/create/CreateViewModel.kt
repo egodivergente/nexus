@@ -333,10 +333,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         if(com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(job.providerId)) {_uiState.update {it.copy(errorMessage=com.vidadomu.nexus.provider.registry.RetiredProviders.SUBMIT_MESSAGE)};return}
         val model=modelCatalogRepo.getModelById(job.modelId)
         if(model==null) {_uiState.update {it.copy(errorMessage="El modelo de esta creación ya no está disponible.")};return}
+        val restoredOrigin = historyStoryOrigin(job)
+        _uiState.update { it.copy(storyContext = restoredOrigin) }
         selectModality(job.modality); selectModel(model); updatePrompt(job.prompt)
         viewModelScope.launch {
             schemaJob?.join()
-            if(_uiState.value.selectedModel?.id==model.id) _uiState.update {state ->state.copy(negativePrompt=job.negativePrompt,
+            if(_uiState.value.selectedModel?.id==model.id && _uiState.value.selectedModel?.providerId==model.providerId &&
+                _uiState.value.prompt==job.prompt && _uiState.value.storyContext==restoredOrigin) _uiState.update {state ->state.copy(negativePrompt=job.negativePrompt,
                 parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(state.selectedModel!!,job.parameters),
                 attachedMedia=emptyList(),errorMessage=if(job.inputMediaUri!=null) "Parámetros recuperados. Adjunta los archivos de entrada para continuar." else null)}
         }

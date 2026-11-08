@@ -31,7 +31,7 @@ class StoryPreparationWorker(context: Context, params: WorkerParameters) : Corou
         fun enqueue(context: Context, projectId: String) {
             val work = OneTimeWorkRequestBuilder<StoryPreparationWorker>()
                 .setInputData(workDataOf("project_id" to projectId)).addTag("nexus-story-preparation").build()
-            WorkManager.getInstance(context).enqueueUniqueWork("story-preparation:$projectId", ExistingWorkPolicy.KEEP, work)
+            WorkManager.getInstance(context).enqueueUniqueWork("story-preparation:$projectId", ExistingWorkPolicy.APPEND_OR_REPLACE, work)
         }
     }
 }

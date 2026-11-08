@@ -138,12 +138,27 @@ fun StoryWorkspaceScreen(
         scope.launch {
             try {
                 val result = runtime.assets.storyCommand(projectId, input, "user")
-                if (result["ok"]?.jsonPrimitive?.booleanOrNull == false) snackbar.showSnackbar(result.text("error").ifBlank { result.text("message").ifBlank { "No se pudo aplicar el cambio." } })
+                if (result["ok"]?.jsonPrimitive?.booleanOrNull == false) {
+                    val message = result.text("error").ifBlank { result.text("message").ifBlank { "No se pudo aplicar el cambio." } }
+                    if (edit != null || linkTarget != null || projectEditor || elementPanel || taskPanel || proposalDetail != null || importScript)
+                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                    else snackbar.showSnackbar(message)
+                }
                 else done(result)
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { snackbar.showSnackbar(error.message ?: "No se pudo guardar. Tu borrador se conserva.") }
+            catch (error: Exception) {
+                val message = error.message ?: "No se pudo guardar. Tu borrador se conserva."
+                if (edit != null || linkTarget != null || projectEditor || elementPanel || taskPanel || proposalDetail != null || importScript)
+                    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                else snackbar.showSnackbar(message)
+            }
             finally { busy = false }
         }
+    }
+    LaunchedEffect(projectId) {
+        runtime.assets.storyCommand(projectId, buildJsonObject {
+            put("action", "adopt_legacy_links"); put("operation_id", "legacy-links:$projectId")
+        }, "system:migration")
     }
     val importMedia = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) scope.launch {
@@ -310,7 +325,7 @@ fun StoryWorkspaceScreen(
         val kind = key.substringBefore(':')
         val entityId = key.substringAfter(':').substringBefore(':')
         val target = when (kind) { "scene" -> scenes; "shot" -> shots; else -> blocks }.firstOrNull { it.text("id") == entityId }
-        StoryEditorDialog(projectId, key, kind, target, sceneId, scenes, media, view.rows("effective_references"),
+        StoryEditorDialog(projectId, key, kind, target, sceneId, scenes, media, view.rows("effective_references"), view.rows("elements").filter { it.text("kind") == "character" },
             busy = busy, onClose = { edit = null }, onSave = { fields ->
                 val action = if (target == null) "create_${if (kind in listOf("action", "dialogue", "note", "reference", "material")) "block" else kind}" else "update_$kind"
                 val mutation = command(action) {
@@ -396,11 +411,18 @@ fun StoryWorkspaceScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val chosen = selectedChanges.split('|').filter(String::isNotBlank).toSet()
                         Checkbox(entry.text("id") in chosen, { checked -> selectedChanges = (if (checked) chosen + entry.text("id") else chosen - entry.text("id")).joinToString("|") })
-                        Text("${index + 1}. ${change.text("action").replace('_', ' ')}", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+                        Text("${index + 1}. ${storyActionLabel(change.text("action"))}", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
                     }
                     val targetId = change.text("shot_id").ifBlank { change.text("block_id") }.ifBlank { change.text("scene_id") }
-                    (shots + scenes + blocks).firstOrNull { it.text("id") == targetId }?.let { current -> Text("Actual · ${current.text("description").ifBlank { current.text("text") }.ifBlank { current.text("title") }}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 4.dp)) }
-                    Text(change.filterKeys { it !in setOf("action", "operation_id", "expected_revision") }.entries.joinToString("\n") { (k, v) -> "${k.replace('_', ' ')}: ${(v as? JsonPrimitive)?.contentOrNull ?: v.toString()}" }, style = MaterialTheme.typography.bodySmall)
+                    val current = (shots + scenes + blocks + view.rows("elements")).firstOrNull { it.text("id") == targetId }
+                    current?.text("title")?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
+                    val visible = change.entries.filter { it.key in proposalFieldLabels }
+                    if (visible.isEmpty()) Text(if (change.text("action").startsWith("delete_")) "Se retirará de la estructura. Sus archivos se conservarán." else "Se actualizará la organización de este contenido.", style = MaterialTheme.typography.bodySmall)
+                    visible.forEach { (field, proposed) ->
+                        Text(proposalFieldLabels.getValue(field), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        if (current != null && field in current) Text("Actual: ${proposalValue(field, current[field], view, media)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Propuesta: ${proposalValue(field, proposed, view, media)}", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }, confirmButton = { TextButton(enabled = !busy && selectedChanges.isNotBlank(), onClick = { run(command("apply_proposal") { put("proposal_id", proposalId); put("expected_revision", proposal.number("revision")); put("change_ids", JsonArray(selectedChanges.split('|').filter { it.isNotBlank() && it !in applied }.map(::JsonPrimitive))) }) { proposalDetail = null } }) { Text("Aplicar selección") } }, dismissButton = { TextButton(enabled = !busy, onClick = { run(command("reject_proposal") { put("proposal_id", proposalId); put("expected_revision", proposal.number("revision")) }) { proposalDetail = null } }) { Text("Descartar") } })
@@ -500,6 +522,45 @@ private fun MaterialTile(asset: Asset, uses: Int, onClick: () -> Unit) {
 private fun blockKindLabel(kind: String) = when (kind) { "action" -> "Acción"; "dialogue" -> "Diálogo"; "note", "idea" -> "Idea"; "reference" -> "Referencia"; "shot" -> "Plano"; else -> "Material" }
 private fun productionLabel(state: String) = when (state) { "prepared" -> "Preparado"; "generated" -> "Generado"; "chosen" -> "Elegido"; else -> "Pendiente" }
 private fun taskStatusLabel(state: String) = when (state) { "queued" -> "En cola"; "prepared" -> "Preparado"; "running" -> "En ejecución"; "pending_resume" -> "Pendiente de reanudación"; "waiting_approval" -> "Espera autorización"; "blocked" -> "Necesita información"; "complete" -> "Terminado"; "cancelled" -> "Cancelado"; "error" -> "Error"; else -> state }
+private val proposalFieldLabels = mapOf(
+    "title" to "Título", "description" to "Acción y descripción", "text" to "Texto", "speaker" to "Personaje que habla",
+    "group" to "Acto o secuencia", "code" to "Identificador visible", "intent" to "Intención narrativa", "framing" to "Encuadre",
+    "camera" to "Cámara y movimiento", "performance" to "Actuación", "dialogue" to "Diálogo", "sound" to "Sonido",
+    "duration_sec" to "Duración orientativa", "narrative_state" to "Lugar en la historia", "production_state" to "Producción",
+    "scene_id" to "Escena", "character_ids" to "Personajes presentes", "name" to "Nombre", "aliases" to "Otros nombres",
+    "variants" to "Variantes de apariencia", "notes" to "Notas", "kind" to "Tipo de contenido", "time_of_day" to "Momento del día",
+    "light" to "Luz", "location_ids" to "Escenarios", "role" to "Uso del material", "asset_id" to "Archivo",
+    "selected" to "Material elegido", "behavior" to "Relación con referencias generales", "enabled" to "Indicación activa",
+    "order" to "Posición", "block_order" to "Posición en el guion", "synopsis" to "Sinopsis", "tone" to "Tono e intención",
+    "visual_style" to "Criterios visuales", "treatment" to "Tratamiento", "format" to "Formato", "target_duration_sec" to "Duración objetivo",
+)
+private fun storyActionLabel(action: String): String = when (action) {
+    "create_scene" -> "Añadir escena"; "update_scene" -> "Editar escena"; "move_scene" -> "Reordenar escena"; "delete_scene" -> "Retirar escena"
+    "create_shot" -> "Añadir plano"; "update_shot" -> "Editar plano"; "move_shot" -> "Mover plano"; "delete_shot" -> "Retirar plano"; "duplicate_shot" -> "Crear variante del plano"
+    "create_block" -> "Insertar contenido"; "update_block" -> "Editar fragmento"; "move_block" -> "Mover fragmento"; "delete_block" -> "Retirar fragmento"
+    "update_project" -> "Actualizar historia"; "link_material" -> "Vincular material"; "unlink_material" -> "Retirar asociación"; "upsert_element" -> "Editar personaje o continuidad"
+    "set_preference" -> "Guardar indicación"; "import_script" -> "Incorporar guion"; else -> "Actualizar proyecto"
+}
+private fun proposalValue(field: String, value: JsonElement?, view: JsonObject, media: List<Asset>): String {
+    if (value == null || value is JsonNull) return "Sin definir"
+    val text = (value as? JsonPrimitive)?.contentOrNull.orEmpty()
+    fun name(identifier: String, fallback: String): String = (view.rows("scenes") + view.rows("shots") + view.rows("elements"))
+        .firstOrNull { it.text("id") == identifier }?.let { it.text("title").ifBlank { it.text("name") }.ifBlank { it.text("code") } }?.ifBlank { fallback } ?: fallback
+    return when (field) {
+        "scene_id" -> name(text, "Escena")
+        "character_ids", "location_ids" -> (value as? JsonArray)?.joinToString(", ") { name(it.jsonPrimitive.content, if (field == "character_ids") "Personaje" else "Escenario") }?.ifBlank { "Ninguno" } ?: "Ninguno"
+        "asset_id" -> media.firstOrNull { it.id == text }?.displayName ?: "Archivo de la biblioteca"
+        "narrative_state" -> if (text == "idea") "Idea por explorar" else "Incorporado a la historia"
+        "production_state" -> productionLabel(text)
+        "selected", "enabled" -> if ((value as? JsonPrimitive)?.booleanOrNull == true) "Sí" else "No"
+        "role" -> roleLabel(text)
+        "behavior" -> if (text == "replace") "Sustituye las generales del mismo tipo" else "Complementa las generales"
+        "order", "block_order" -> ((value as? JsonPrimitive)?.longOrNull?.plus(1))?.toString() ?: "Sin definir"
+        "duration_sec", "target_duration_sec" -> if (text.isBlank()) "Sin definir" else "$text s"
+        "kind" -> when (text) { "character" -> "Personaje"; "location" -> "Escenario"; "object" -> "Objeto"; "costume" -> "Vestuario"; "continuity" -> "Continuidad"; else -> blockKindLabel(text) }
+        else -> if (value is JsonArray) value.joinToString(", ") { (it as? JsonPrimitive)?.contentOrNull.orEmpty() }.ifBlank { "Sin definir" } else text.ifBlank { "Sin definir" }
+    }
+}
 private fun roleLabel(role: String) = when (role) { "identity" -> "Identidad"; "costume" -> "Vestuario"; "location" -> "Escenario"; "composition" -> "Encuadre"; "lighting" -> "Luz"; "sketch" -> "Boceto"; "generated" -> "Imagen generada"; "candidate" -> "Toma candidata"; "chosen" -> "Toma elegida"; "discarded" -> "Descartado"; "audio" -> "Audio"; else -> "Referencia" }
 
 /** A saved draft keeps its base revision. Receiving an agent edit never changes that base silently. */
@@ -509,7 +570,9 @@ private fun rememberStoryDraft(projectId: String, key: String, entity: JsonObjec
     val prefs = remember(context) { context.getSharedPreferences("story_editor_drafts_v1", Context.MODE_PRIVATE) }
     val prefKey = "$projectId:$key"
     val saved = remember(prefKey) { runCatching { Json.parseToJsonElement(prefs.getString(prefKey, null).orEmpty()).jsonObject }.getOrNull() }
-    var values by remember(prefKey) { mutableStateOf(saved?.obj("fields")?.mapValues { (_, v) -> (v as? JsonPrimitive)?.contentOrNull.orEmpty() } ?: entity.mapValues { (_, v) -> (v as? JsonPrimitive)?.contentOrNull.orEmpty() }) }
+    var values by remember(prefKey) { mutableStateOf(saved?.obj("fields")?.mapValues { (_, v) -> (v as? JsonPrimitive)?.contentOrNull.orEmpty() } ?: entity.mapValues { (_, v) ->
+        when (v) { is JsonArray -> v.joinToString(",") { (it as? JsonPrimitive)?.contentOrNull.orEmpty() }; is JsonPrimitive -> v.contentOrNull.orEmpty(); else -> "" }
+    }) }
     var revision by remember(prefKey) { mutableLongStateOf(saved?.number("revision") ?: entity.number("revision")) }
     val update: (Map<String, String>, Long) -> Unit = { next, base ->
         values = next; revision = base
@@ -520,7 +583,7 @@ private fun rememberStoryDraft(projectId: String, key: String, entity: JsonObjec
 
 @Composable
 private fun StoryEditorDialog(
-    projectId: String, key: String, kind: String, entity: JsonObject?, sceneId: String?, scenes: List<JsonObject>, media: List<Asset>, effectiveReferences: List<JsonObject>,
+    projectId: String, key: String, kind: String, entity: JsonObject?, sceneId: String?, scenes: List<JsonObject>, media: List<Asset>, effectiveReferences: List<JsonObject>, characters: List<JsonObject>,
     busy: Boolean, onClose: () -> Unit, onSave: (JsonObject) -> Unit, onDelete: (() -> Unit)?, onDuplicate: (() -> Unit)?,
     onAgent: () -> Unit, onReferences: (() -> Unit)?, onGenerate: (() -> Unit)?, onFlow: (() -> Unit)?,
 ) {
@@ -585,6 +648,13 @@ private fun StoryEditorDialog(
                         }
                     }
                     if (isShot) {
+                        if (characters.isNotEmpty()) {
+                            Text("Personajes presentes", style = MaterialTheme.typography.labelLarge)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { characters.forEach { character ->
+                                val present = values["character_ids"].orEmpty().split(',').filter(String::isNotBlank).toSet()
+                                FilterChip(character.text("id") in present, { change("character_ids", (if (character.text("id") in present) present - character.text("id") else present + character.text("id")).joinToString(",")) }, label = { Text(character.text("name")) })
+                            } }
+                        }
                         Text("Producción", style = MaterialTheme.typography.labelLarge)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf("pending", "prepared", "generated", "chosen").forEach { state -> FilterChip(values["production_state"].orEmpty().ifBlank { "pending" } == state, { change("production_state", state) }, label = { Text(productionLabel(state)) }) }
@@ -758,7 +828,7 @@ private fun ImportScriptDialog(projectId: String, busy: Boolean, onClose: () -> 
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("story_editor_drafts_v1", Context.MODE_PRIVATE) }
     var title by rememberSaveable(projectId) { mutableStateOf(prefs.getString("$projectId:import_title", "Guion importado").orEmpty()) }
-    var text by rememberSaveable(projectId) { mutableStateOf(prefs.getString("$projectId:import_text", "").orEmpty()) }
+    var text by remember(projectId) { mutableStateOf(prefs.getString("$projectId:import_text", "").orEmpty()) }
     var importing by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     val file = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->

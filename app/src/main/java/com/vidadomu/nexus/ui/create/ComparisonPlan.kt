@@ -89,7 +89,8 @@ object ComparisonPlan {
         require(source.attachedMedia.all { it.mimeType.startsWith("image/") }) { "Para comparar modelos, utiliza un prompt con imágenes; las otras entradas requieren su formulario específico." }
         val media = mapImages(model, source.attachedMedia)
         val state = CreateUiState(selectedModel = model, selectedModality = source.selectedModality,
-            prompt = source.prompt, parameters = values, attachedMedia = media, schemaReady = true)
+            prompt = source.prompt, parameters = values, attachedMedia = media, schemaReady = true,
+            storyContext = source.storyContext)
         val readiness = creationReadiness(state)
         require(readiness.canSubmit) { readiness.message ?: "Revisa los requisitos del modelo." }
         if(model.contractEndpoint != null) com.vidadomu.nexus.provider.runway.ContractPayload.validate(model,
