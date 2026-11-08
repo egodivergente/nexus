@@ -186,6 +186,8 @@ class Live:
         self.assets: list[dict] = self._load_assets()
         self.lock = asyncio.Lock()
         self.target_file = ROOT / "target.json"
+        self.claimed_at = 0.0
+        self.guard_task: asyncio.Task | None = None
 
     # -- persistencia de resultados
     def _load_assets(self) -> list[dict]:
@@ -225,12 +227,28 @@ class Live:
             await self.cdp.connect()
             self.cdp.listeners.append(self._on_event)
             await self.cdp.send("Target.setDiscoverTargets", {"discover": True})
-            try:
-                await self.cdp.send("Browser.setDownloadBehavior", {"behavior": "allowAndName",
-                                    "downloadPath": str(ROOT / "downloads"), "eventsEnabled": True})
-            except CdpError as e:
-                log.warning("descargas: %s", e)
+            await self.claim_downloads(force=True)
             await self._attach_main()
+            if not self.guard_task or self.guard_task.done():
+                self.guard_task = asyncio.create_task(self._guard_downloads())
+
+    async def claim_downloads(self, force: bool = False) -> None:
+        """Fija el destino de descargas del navegador. Otra herramienta conectada al mismo Edge (p. ej. la
+        sincronización de ChatGPT-Flow con Playwright) puede cambiarlo para todo el navegador, así que se reafirma
+        antes de cada toque y cada 30 s."""
+        if not force and time.monotonic() - self.claimed_at < 3:
+            return
+        try:
+            await self.cdp.send("Browser.setDownloadBehavior", {"behavior": "allowAndName",
+                                "downloadPath": str(ROOT / "downloads"), "eventsEnabled": True}, timeout=5)
+            self.claimed_at = time.monotonic()
+        except (CdpError, asyncio.TimeoutError) as e:
+            log.warning("descargas: %s", e)
+
+    async def _guard_downloads(self) -> None:
+        while self.cdp and not self.cdp.closed.is_set():
+            await asyncio.sleep(30)
+            await self.claim_downloads(force=True)
 
     async def _attach_main(self) -> None:
         targets = (await self.cdp.send("Target.getTargets"))["targetInfos"]
@@ -377,6 +395,7 @@ class Live:
             asyncio.create_task(self.broadcast_state())
         elif method == "Browser.downloadWillBegin":
             mine = p.get("frameId") in self.stack or p.get("frameId") == self.target
+            log.info("Descarga: %s · frame=%s · nuestra=%s · pestañas=%s", p.get("suggestedFilename"), p.get("frameId"), mine, self.stack)
             self.downloads[p["guid"]] = {"name": safe_name(p.get("suggestedFilename", "")), "url": p.get("url", ""), "mine": mine}
             if mine:
                 asyncio.create_task(self.broadcast({"type": "download", "name": self.downloads[p["guid"]]["name"], "state": "start"}))
@@ -464,6 +483,8 @@ class Live:
         s = self.session
         if not s:
             return
+        if t in ("click", "down", "key", "command", "order"):
+            await self.claim_downloads()
         if t == "click":
             x, y = self._xy(ev)
             n = int(ev.get("n", 1))
