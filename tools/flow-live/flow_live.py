@@ -181,6 +181,8 @@ class Live:
         self.casting = False
         self.last_pub = 0.0
         self.pub_timer = None
+        self.still_timer = None
+        self.still_at = 0.0
         self.downloads: dict[str, dict] = {}
         self.assets_file = ROOT / "assets" / "index.json"
         self.assets: list[dict] = self._load_assets()
@@ -298,7 +300,7 @@ class Live:
         else:
             w = int(max(480, min(1920, v["width"])))
             h = int(round(w * v["vh"] / max(1, v["vw"])))
-            dsf = 1.0
+            dsf = max(0.5, min(3.0, float(v["vw"]) * float(v["dpr"]) / w))
             mobile = False
         self.size = (w, h, dsf)
         await self.cdp.send("Emulation.setDeviceMetricsOverride", {"width": w, "height": h, "deviceScaleFactor": round(dsf, 2),
@@ -316,14 +318,17 @@ class Live:
                 await self.cdp.send("Page.stopScreencast", {}, self.session)
             except CdpError:
                 pass
-        # El fotograma se reduce en origen (maxWidth) sin cambiar la maquetación: menos datos móviles.
-        px = max(360, min(int(w * dsf), int(self.view.get("maxpx", 900))))
-        await self.cdp.send("Page.startScreencast", {"format": "jpeg", "quality": int(self.view["quality"]),
+        # En movimiento: resolución nativa del móvil (en «Ahorro» se reduce); al pararse llega una captura nítida.
+        px = int(w * dsf) if not self.saving() else max(360, int(w * dsf * 0.7))
+        await self.cdp.send("Page.startScreencast", {"format": "jpeg", "quality": self.motion_quality(),
                             "maxWidth": px, "maxHeight": int(px * h / max(1, w)), "everyNthFrame": 1}, self.session)
         self.casting = True
         await self.snapshot()
 
     async def stop_cast(self) -> None:
+        if self.still_timer:
+            self.still_timer.cancel()
+            self.still_timer = None
         if self.casting and self.session:
             try:
                 await self.cdp.send("Page.stopScreencast", {}, self.session)
@@ -331,19 +336,41 @@ class Live:
                 pass
         self.casting = False
 
+    def saving(self) -> bool:
+        return int(self.view.get("quality", 45)) < 40
+
+    def motion_quality(self) -> int:
+        return int(max(40, min(85, int(self.view.get("quality", 45)) + 15)))
+
     async def snapshot(self) -> None:
-        """Fotograma inmediato (el screencast solo emite cuando algo cambia)."""
+        """Captura nítida a la resolución nativa del móvil: al conectar y cada vez que la imagen se queda quieta
+        (el screencast, más ligero, solo emite mientras algo cambia)."""
+        if not self.session:
+            return
         try:
-            shot = await self.cdp.send("Page.captureScreenshot", {"format": "jpeg", "quality": int(self.view["quality"])}, self.session, timeout=10)
+            shot = await self.cdp.send("Page.captureScreenshot", {"format": "webp", "quality": 80 if self.saving() else 92},
+                                       self.session, timeout=10)
         except (CdpError, asyncio.TimeoutError) as e:
             log.info("captura: %s", e)
             return
         w, h, _ = getattr(self, "size", (1024, 2000, 1.0))
-        self.meta = {"deviceWidth": w, "deviceHeight": h, "offsetTop": 0}
-        self._publish(base64.b64decode(shot["data"]))
+        if not self.meta:
+            self.meta = {"deviceWidth": w, "deviceHeight": h, "offsetTop": 0}
+        self.still_at = time.monotonic()
+        self.frame = base64.b64decode(shot["data"])
+        self._deliver(still=True)
+
+    def _schedule_still(self) -> None:
+        if self.still_timer:
+            self.still_timer.cancel()
+        self.still_timer = asyncio.get_running_loop().call_later(0.35, lambda: self.clients and asyncio.create_task(self.snapshot()))
 
     def _publish(self, jpeg: bytes) -> None:
         """Entrega como mucho `fps` fotogramas por segundo; el último siempre llega (los intermedios se descartan)."""
+        # La propia captura nítida puede provocar un fotograma de screencast: se ignora para no entrar en bucle.
+        if time.monotonic() - self.still_at < 0.25:
+            return
+        self._schedule_still()
         self.frame = jpeg
         interval = 1.0 / max(1, int(self.view.get("fps", 6)))
         wait = interval - (time.monotonic() - self.last_pub)
@@ -352,8 +379,9 @@ class Live:
         elif not self.pub_timer:
             self.pub_timer = asyncio.get_running_loop().call_later(wait, self._deliver)
 
-    def _deliver(self) -> None:
-        self.pub_timer = None
+    def _deliver(self, still: bool = False) -> None:
+        if not still:
+            self.pub_timer = None
         self.last_pub = time.monotonic()
         for c in list(self.clients):
             c.frame = self.frame
