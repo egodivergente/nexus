@@ -1286,6 +1286,15 @@ private fun AttachmentThumb(a: Attachment, onRemove: (() -> Unit)? = null) {
             Text(a.name ?: "Imagen", style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
         else if (a.mimeType.startsWith("image/")) AsyncImage(model = a.uri, contentDescription = a.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), onError = { failed = true })
+        // Vídeo: primer fotograma real (como en Biblioteca) con ▶ encima; el icono solo si el archivo no se puede leer.
+        else if (a.mimeType.startsWith("video/") && !failed) Box(Modifier.fillMaxSize()) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            AsyncImage(model = remember(a.uri) { coil.request.ImageRequest.Builder(context).data(a.uri)
+                    .decoderFactory { result, options, _ -> coil.decode.VideoFrameDecoder(result.source, options) }.build() },
+                contentDescription = a.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), onError = { failed = true })
+            Icon(Icons.Default.PlayArrow, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.align(Alignment.Center).size(26.dp)
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f), androidx.compose.foundation.shape.CircleShape).padding(3.dp))
+        }
         else Surface(color = SurfaceVariantDark, modifier = Modifier.fillMaxSize()) { Box(contentAlignment = Alignment.Center) { Icon(if(a.mimeType.startsWith("video/")) Icons.Default.Movie else Icons.Default.Description, a.name) } }
         if (onRemove != null) IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(NexusTokens.minimumTouch)) {
             Icon(Icons.Default.Close, "Quitar", tint = MediaForeground)
