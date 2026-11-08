@@ -76,6 +76,7 @@ private fun JsonObject.b(key: String) = (get(key) as? JsonPrimitive)?.booleanOrN
 private fun JsonObject.d(key: String) = (get(key) as? JsonPrimitive)?.doubleOrNull
 private fun JsonObject.strings(key: String) = (get(key) as? JsonArray)?.map { (it as? JsonPrimitive)?.contentOrNull ?: invalid("«$key» debe contener identificadores.") }
 private fun JsonObject.optional(key: String, current: String?) = if (key in this) s(key)?.takeIf { it.isNotBlank() } else current
+private fun sameOptional(a: String?, b: String?) = a?.takeIf { it.isNotBlank() } == b?.takeIf { it.isNotBlank() }
 private fun rev(input: JsonObject, current: Long) {
     val expected = input.l("expected_revision") ?: invalid("Falta expected_revision; vuelve a leer el elemento antes de editarlo.")
     if (expected != current) conflict("El elemento ha cambiado (revisión $current; se esperaba $expected). Tu edición reciente se conserva.")
@@ -259,8 +260,10 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
                     group = q.optional("group", old.group), order = q.i("order") ?: old.order,
                     timeOfDay = q.optional("time_of_day", old.timeOfDay), light = q.optional("light", old.light),
                     locationIds = q.strings("location_ids")?.also { ids -> ids.forEach { checkTarget(d, p, "element", it) } } ?: old.locationIds,
-                    revision = old.revision + 1,
-                    contentRevision = old.contentRevision + if (q.b("invalidate_material") != false && q.keys.any { it in setOf("description", "time_of_day", "light", "location_ids") }) 1 else 0)
+                    revision = old.revision + 1).let { candidate ->
+                    val changed = !sameOptional(candidate.description, old.description) || !sameOptional(candidate.timeOfDay, old.timeOfDay) || !sameOptional(candidate.light, old.light) || candidate.locationIds.toSet() != old.locationIds.toSet()
+                    candidate.copy(contentRevision = old.contentRevision + if (q.b("invalidate_material") != false && changed) 1 else 0)
+                }
                 val others = if (q.s("action") == "move_scene") reorder(d.scenes.filter { it.projectId == p }, old.id, next.order, { it.id }, { it.order }).associate { it.first.id to it.second } else emptyMap()
                 d.copy(scenes = d.scenes.map { if (it.id == old.id) next.copy(order = others[it.id] ?: next.order) else if (it.id in others) it.copy(order = others.getValue(it.id)) else it }) to result(next.id, next.revision)
             }
@@ -284,8 +287,10 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
                 attachedShot?.let { if (shot(d, p, it).sceneId != destination) invalid("Mueve primero el plano, o desvincúlalo antes de mover el bloque.") }
                 val next = old.copy(sceneId = destination, kind = kind, text = q.s("text") ?: old.text, speaker = q.optional("speaker", old.speaker), shotId = attachedShot,
                     order = q.i("order") ?: old.order, narrativeState = q.s("narrative_state")?.also { if (it !in narrativeStates) invalid("Estado narrativo desconocido.") } ?: old.narrativeState,
-                    revision = old.revision + 1,
-                    contentRevision = old.contentRevision + if (q.b("invalidate_material") != false && q.keys.any { it in setOf("kind", "text", "speaker", "shot_id", "narrative_state") }) 1 else 0)
+                    revision = old.revision + 1).let { candidate ->
+                    val changed = candidate.kind != old.kind || candidate.text != old.text || !sameOptional(candidate.speaker, old.speaker) || candidate.shotId != old.shotId || candidate.narrativeState != old.narrativeState
+                    candidate.copy(contentRevision = old.contentRevision + if (q.b("invalidate_material") != false && changed) 1 else 0)
+                }
                 val positions = if (q.s("action") == "move_block") reorder(st.blocks.filter { it.sceneId == destination } + listOfNotNull(old.takeIf { it.sceneId != destination }), old.id, next.order, { it.id }, { it.order }).associate { it.first.id to it.second } else emptyMap()
                 d.copy(story = st.copy(blocks = st.blocks.map { if (it.id == old.id) next.copy(order = positions[it.id] ?: next.order) else if (it.id in positions) it.copy(order = positions.getValue(it.id)) else it })) to result(next.id, next.revision)
             }
@@ -488,13 +493,15 @@ private fun patchShot(d: IndexData, p: String, old: Shot, q: JsonObject, creatin
     val narrative = q.s("narrative_state")?.also { if (it !in narrativeStates) invalid("Estado narrativo desconocido.") } ?: old.narrativeState
     val production = q.s("production_state")?.also { if (it !in productionStates) invalid("Estado de producción desconocido.") } ?: old.productionState
     val duration = if ("duration_sec" in q) q.d("duration_sec")?.also { if (it <= 0 || !it.isFinite()) invalid("Duración inválida.") } else old.durationSec
-    val relevant = setOf("description", "action_text", "intent", "character_ids", "framing", "camera", "performance", "dialogue", "sound", "duration_sec", "scene_id")
-    return old.copy(sceneId = destination, code = q.s("code") ?: old.code, title = q.optional("title", old.title), description = q.optional("action_text", q.optional("description", old.description)),
+    val candidate = old.copy(sceneId = destination, code = q.s("code") ?: old.code, title = q.optional("title", old.title), description = q.optional("action_text", q.optional("description", old.description)),
         intent = q.optional("intent", old.intent), characterIds = characters, framing = q.optional("framing", old.framing), camera = q.optional("camera", old.camera),
         performance = q.optional("performance", old.performance), dialogue = q.optional("dialogue", old.dialogue), sound = q.optional("sound", old.sound), durationSec = duration,
         order = q.i("order") ?: old.order, narrativeState = narrative, productionState = production,
-        revision = if (creating) 0 else old.revision + 1,
-        contentRevision = old.contentRevision + if (!creating && q.b("invalidate_material") != false && q.keys.any { it in relevant }) 1 else 0)
+        revision = if (creating) 0 else old.revision + 1)
+    val changed = candidate.sceneId != old.sceneId || candidate.characterIds.toSet() != old.characterIds.toSet() || candidate.durationSec != old.durationSec ||
+        !sameOptional(candidate.description, old.description) || !sameOptional(candidate.intent, old.intent) || !sameOptional(candidate.framing, old.framing) ||
+        !sameOptional(candidate.camera, old.camera) || !sameOptional(candidate.performance, old.performance) || !sameOptional(candidate.dialogue, old.dialogue) || !sameOptional(candidate.sound, old.sound)
+    return candidate.copy(contentRevision = old.contentRevision + if (!creating && q.b("invalidate_material") != false && changed) 1 else 0)
 }
 
 private fun upsertElement(d: IndexData, p: String, q: JsonObject): Pair<IndexData, JsonObject> {

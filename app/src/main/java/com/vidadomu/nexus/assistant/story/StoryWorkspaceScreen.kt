@@ -614,6 +614,7 @@ private fun StoryEditorDialog(
                 }
             }
             if (entity != null) put("expected_revision", revision)
+            if (entity != null) put("invalidate_material", values["invalidate_material"] != "false")
         })
     }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -671,6 +672,10 @@ private fun StoryEditorDialog(
                     }
                     if (entity != null) {
                         HorizontalDivider()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(values["invalidate_material"] == "false", { checked -> change("invalidate_material", (!checked).toString()) })
+                            Text("Solo corrección de texto · conservar vigencia del material", style = MaterialTheme.typography.bodySmall)
+                        }
                         if (isShot && effectiveReferences.isNotEmpty()) {
                             Text("Referencias efectivas", style = MaterialTheme.typography.labelLarge)
                             LinkedThumbnails(effectiveReferences, media)
@@ -747,12 +752,20 @@ private fun MaterialLinkDialog(media: List<Asset>, target: String, characters: L
 private fun StoryWorkDialog(view: JsonObject, busy: Boolean, onClose: () -> Unit, onCommand: (JsonObject) -> Unit, onProposal: (String) -> Unit) {
     val autonomy = view.obj("autonomy")
     val enabled = autonomy["enabled"]?.jsonPrimitive?.booleanOrNull == true
-    var mode by rememberSaveable { mutableStateOf(autonomy.text("mode").ifBlank { "proposals" }) }
+    val mode = autonomy.text("mode").ifBlank { "proposals" }
+    val sceneScope = autonomy.text("scene_id")
+    fun policy(active: Boolean = enabled, nextMode: String = mode, scene: String = sceneScope) = command("set_autonomy") {
+        put("enabled", active); put("mode", nextMode); put("scene_id", scene.takeIf { it.isNotBlank() }); put("expected_revision", autonomy.number("revision"))
+    }
     AlertDialog(onDismissRequest = onClose, title = { Text("Trabajo del proyecto") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Preparación local. Las llamadas al agente y las generaciones mantienen su autorización de gasto.", style = MaterialTheme.typography.bodySmall)
-            Row(verticalAlignment = Alignment.CenterVertically) { Switch(enabled, { onCommand(command("set_autonomy") { put("enabled", it); put("mode", mode); put("expected_revision", autonomy.number("revision")) }) }, enabled = !busy); Spacer(Modifier.width(8.dp)); Text(if (enabled) "Preparación habilitada" else "Trabajo pausado") }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("preparation" to "Preparar", "proposals" to "Proponer", "direct" to "Cambios directos").forEach { (value, label) -> FilterChip(mode == value, { mode = value; onCommand(command("set_autonomy") { put("enabled", enabled); put("mode", value); put("expected_revision", autonomy.number("revision")) }) }, label = { Text(label) }) } }
+            Row(verticalAlignment = Alignment.CenterVertically) { Switch(enabled, { onCommand(policy(active = it)) }, enabled = !busy); Spacer(Modifier.width(8.dp)); Text(if (enabled) "Preparación habilitada" else "Trabajo pausado") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("preparation" to "Preparar", "proposals" to "Proponer", "direct" to "Cambios directos").forEach { (value, label) -> FilterChip(mode == value, { onCommand(policy(nextMode = value)) }, enabled = !busy, label = { Text(label) }) } }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item { FilterChip(sceneScope.isBlank(), { onCommand(policy(scene = "")) }, enabled = !busy, label = { Text("Todo el proyecto") }) }
+                items(view.rows("scenes"), key = { it.text("id") }) { scene -> FilterChip(sceneScope == scene.text("id"), { onCommand(policy(scene = scene.text("id"))) }, enabled = !busy, label = { Text(scene.text("title").ifBlank { scene.text("code") }) }) }
+            }
             Text(autonomy.text("execution"), style = MaterialTheme.typography.bodySmall)
             if (enabled) TextButton(enabled = !busy, onClick = { onCommand(command("run_preparation")) }) { Text("Procesar preparación pendiente") }
             Text("Propuestas", style = MaterialTheme.typography.titleSmall)
@@ -769,7 +782,7 @@ private fun StoryWorkDialog(view: JsonObject, busy: Boolean, onClose: () -> Unit
                     if (task.text("status") !in listOf("complete", "cancelled")) TextButton(enabled = !busy, onClick = { onCommand(command("update_task") { put("task_id", task.text("id")); put("expected_revision", task.number("revision")); put("status", "cancelled") }) }) { Text("Cancelar") }
                 }
             }
-            TextButton(enabled = !busy, onClick = { onCommand(command("enqueue_task") { put("kind", "preparation"); put("title", "Revisar planos sin material") }) }) { Text("Preparar siguiente trabajo") }
+            TextButton(enabled = !busy, onClick = { onCommand(command("enqueue_task") { put("kind", "preparation"); put("title", "Revisar planos sin material"); sceneScope.takeIf { it.isNotBlank() }?.let { put("scene_id", it) } }) }) { Text("Preparar siguiente trabajo") }
         }
     }, confirmButton = { TextButton(onClick = onClose) { Text("Listo") } })
 }

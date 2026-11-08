@@ -171,4 +171,22 @@ class StoryWorkspaceTest {
         val remove = index.cmd(p, "unlink_material", "link_id" to str(link), "expected_revision" to num(0), "preserve_ids" to JsonArray(listOf(str(shot))))
         assertFalse(remove.ok()); assertEquals(1, index.snapshot().story.links.size)
     }
+
+    @Test fun `full editor payload with unchanged values or new title does not invalidate material`() = runTest {
+        val index = AssetIndex(null); val p = index.createProject("Film").id; val scene = index.sc(p); val shot = index.sh(p, scene)
+        val block = index.cmd(p, "create_block", "scene_id" to str(scene), "kind" to str("action"), "text" to str("Su mano tiembla"), "speaker" to str("")).id()
+        val context = index.storyGenerationContext(p, shot)
+        assertTrue(index.cmd(p, "update_scene", "scene_id" to str(scene), "expected_revision" to num(0), "title" to str("Patio renombrado"), "description" to str(""), "group" to str(""), "time_of_day" to str(""), "light" to str(""), "location_ids" to JsonArray(emptyList())).ok())
+        assertFalse(index.isStoryContextStale(context))
+        assertTrue(index.cmd(p, "update_shot", "shot_id" to str(shot), "expected_revision" to num(0), "scene_id" to str(scene), "title" to str("Nuevo título"), "description" to str("La mano tiembla"),
+            "intent" to str(""), "framing" to str(""), "camera" to str(""), "performance" to str(""), "dialogue" to str(""), "sound" to str(""), "duration_sec" to JsonNull,
+            "character_ids" to JsonArray(emptyList()), "narrative_state" to str("story"), "production_state" to str("pending")).ok())
+        assertEquals(0L, index.snapshot().shots.single().contentRevision)
+        assertFalse(index.isStoryContextStale(context))
+        assertTrue(index.cmd(p, "update_block", "block_id" to str(block), "expected_revision" to num(0), "scene_id" to str(scene), "kind" to str("action"), "text" to str("Su mano tiembla"), "speaker" to str(""), "narrative_state" to str("story"), "shot_id" to JsonNull).ok())
+        assertEquals(0L, index.snapshot().story.blocks.first { it.id == block }.contentRevision)
+        assertFalse(index.isStoryContextStale(context))
+        index.cmd(p, "update_shot", "shot_id" to str(shot), "expected_revision" to num(1), "framing" to str("Primerísimo plano"))
+        assertTrue(index.isStoryContextStale(context))
+    }
 }
