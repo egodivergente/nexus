@@ -528,7 +528,30 @@ class AtlasCloudProvider(
         }
     }
 
+    private val uploads = UploadReuseCache()
+
+    /**
+     * Sube una referencia una sola vez: los encargos de un lote (o un reintento cercano) con el mismo archivo reutilizan su
+     * URL en vez de volver a subirlo. Ver [UploadReuseCache].
+     */
     override suspend fun uploadFile(
+        file: java.io.File,
+        fileName: String,
+        mimeType: String,
+        onProgress: (Long,Long)->Unit
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = secureStorage.getAtlasApiKey()
+        if (apiKey.isBlank()) return@withContext uploadFileNow(file, fileName, mimeType, onProgress)
+        val key = UploadReuseCache.contentKey(file, mimeType, apiKey)
+        val (result, reused) = uploads.getOrUpload(key) { uploadFileNow(file, fileName, mimeType, onProgress) }
+        if (reused && result.isSuccess) {
+            Log.d("AtlasCloudProvider", "uploadMedia reutilizada (mismo contenido ya subido)")
+            file.length().let { onProgress(it, it) }
+        }
+        result
+    }
+
+    private suspend fun uploadFileNow(
         file: java.io.File,
         fileName: String,
         mimeType: String,
