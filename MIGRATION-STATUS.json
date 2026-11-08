@@ -1,4 +1,15 @@
 ﻿{
+    "atlasUploadReuse20261108": {
+        "branch": "fix/bridge-images-20261108",
+        "commit": "a5809a1",
+        "change": "Atlas: cada referencia se sube una sola vez por lote (UploadReuseCache: SHA-256 + tipo + cuenta, 15 min, subidas simultaneas compartidas, fallos sin guardar). Incluye vc186 (ArtBox directo a la Lanzadera)",
+        "versionCode": 187,
+        "versionName": "1.9.151-agent-preview",
+        "build": "AXELPC :app:assembleAgentPreview + testAgentPreviewUnitTest (UploadReuseCacheTest, ImagePreviewSizeTest) BUILD SUCCESSFUL; firmado (entregar-apk.ps1 -SinInstalar); copiado a Drive",
+        "apkSha256Prefix": "73574c9559b2",
+        "s25Delivery": "2026-11-08 10:42: S25 en datos moviles, sin ADB TCP (perdido en el reinicio de las 04:37; adb 5555 rechazado por Tailscale). APK copiado por SSH via Tailscale (huella identica), copia en /sdcard/Download y instalador abierto con termux-open; falta que el usuario pulse Actualizar",
+        "s25Installed": "pendiente de confirmacion del usuario"
+    },
     "artboxDirect20261108": {
         "branch": "fix/bridge-images-20261108",
         "commit": "f6f3b60",
