@@ -217,6 +217,7 @@ class Live:
         self.pub_timer = None
         self.still_timer = None
         self.still_at = 0.0
+        self.capturing = False
         self.downloads: dict[str, dict] = {}
         self.assets_file = ROOT / "assets" / "index.json"
         self.assets: list[dict] = self._load_assets()
@@ -386,14 +387,23 @@ class Live:
     async def snapshot(self) -> None:
         """Captura nítida a la resolución nativa del móvil: al conectar y cada vez que la imagen se queda quieta
         (el screencast, más ligero, solo emite mientras algo cambia)."""
-        if not self.session:
+        if not self.session or self.capturing:
             return
+        # JPEG de alta calidad: comprimir en WebP a la resolución del móvil le costaba a Edge varios segundos y,
+        # mientras tanto, dejaba en cola los toques de esa pestaña (medido: >10 s frente a 0,15 s con JPEG).
+        self.capturing = True
+        started = time.monotonic()
         try:
-            shot = await self.cdp.send("Page.captureScreenshot", {"format": "webp", "quality": 78 if self.saving() else 88},
-                                       self.session, timeout=10)
+            shot = await self.cdp.send("Page.captureScreenshot", {"format": "jpeg", "quality": 80 if self.saving() else 90,
+                                       "optimizeForSpeed": True}, self.session, timeout=6)
         except (CdpError, asyncio.TimeoutError) as e:
-            log.info("captura: %s", e)
+            log.info("captura: %s %s", type(e).__name__, e)
             return
+        finally:
+            self.capturing = False
+        took = time.monotonic() - started
+        if took > 1:
+            log.info("captura lenta: %.2f s", took)
         w, h, _ = getattr(self, "size", (1024, 2000, 1.0))
         if not self.meta:
             self.meta = {"deviceWidth": w, "deviceHeight": h, "offsetTop": 0}
@@ -721,7 +731,7 @@ def tailscale(*args: str) -> dict | None:
 
 def owner_login() -> str | None:
     global _owner
-    if _owner is None:
+    if not _owner:
         st = tailscale("status") or {}
         uid = str((st.get("Self") or {}).get("UserID", ""))
         _owner = ((st.get("User") or {}).get(uid) or {}).get("LoginName")
@@ -743,7 +753,12 @@ def allowed(ip: str) -> bool:
         return hit[1]
     who = tailscale("whois", ip) or {}
     login = (who.get("UserProfile") or {}).get("LoginName")
-    ok = bool(login) and login == owner_login()
+    owner = owner_login()
+    if not login or not owner:
+        # La consulta a Tailscale falló (PC cargado, CLI ocupada): no se guarda como rechazo; el siguiente intento repite.
+        log.warning("No se pudo identificar %s con Tailscale; se reintentará", ip)
+        return False
+    ok = login == owner
     _whois[ip] = (time.time(), ok)
     if not ok:
         log.warning("Acceso rechazado desde %s (%s)", ip, login)
