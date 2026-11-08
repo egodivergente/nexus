@@ -1,4 +1,15 @@
 ﻿{
+    "artboxDirect20261108": {
+        "branch": "fix/bridge-images-20261108",
+        "commit": "f6f3b60",
+        "change": "ArtBox: tocar una familia abre la Lanzadera directamente (sin la ficha intermedia); la ficha sigue en el menu de la tarjeta. «hasta 2147483647 imagenes» -> «sin limite publicado»",
+        "versionCode": 186,
+        "versionName": "1.9.150-agent-preview",
+        "build": "AXELPC :app:assembleAgentPreview BUILD SUCCESSFUL (3 min 26 s); firmado con entregar-apk.ps1 -SinInstalar; copiado a Drive (Nexus-Agent-1.9.150-Sirio-preview.apk)",
+        "s25Installed": false,
+        "s25Note": "2026-11-08 08:45: el S25 dejo de responder (Tailscale ping, LAN, SSH y puente sin respuesta) antes de instalar; no se toco nada en el movil. Instalar cuando vuelva a estar en linea.",
+        "uiVerified": false
+    },
     "bridgeImages20261108": {
         "branch": "fix/bridge-images-20261108",
         "base": "fix/codex-e2big-20261107@d21e24f",
