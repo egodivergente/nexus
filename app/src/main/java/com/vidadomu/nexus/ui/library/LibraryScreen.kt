@@ -106,10 +106,24 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         if(uris.isNotEmpty()) { importing=true; scope.launch {
             var imported=0;var lastError:String?=null
             try { for(uri in uris) {
-                try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,context.contentResolver.getType(uri),openFolder); imported++ }
+                try {
+                    val declared=context.contentResolver.getType(uri)
+                    val isZip=declared=="application/zip" || declared=="application/x-zip-compressed" || uri.lastPathSegment?.endsWith(".zip",true)==true
+                    if(isZip) {
+                        // Un ZIP no es un archivo de la Biblioteca: se abre y se importa lo que lleva dentro.
+                        val dir=java.io.File(context.cacheDir,"zip_import").apply {mkdirs()}
+                        val tmp=java.io.File(dir,"in_${System.nanoTime()}.zip")
+                        try {
+                            context.contentResolver.openInputStream(uri)!!.use {i->tmp.outputStream().use {o->i.copyTo(o)}}
+                            val pieces=com.vidadomu.nexus.ui.flow.ZipMedia.extract(tmp,dir,"x${System.nanoTime()}")
+                            require(pieces.isNotEmpty()) {"El ZIP no contiene imágenes, vídeos ni audio."}
+                            for(piece in pieces) { try { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,android.net.Uri.fromFile(piece.file),piece.mime,openFolder); imported++ } finally {piece.file.delete()} }
+                        } finally {tmp.delete()}
+                    } else { com.vidadomu.nexus.assistant.AgentMediaStore.persist(app,uri,declared,openFolder); imported++ }
+                }
                 catch(e:kotlinx.coroutines.CancellationException) {throw e}
                 catch(e:Exception) {lastError=e.message}
-            }; snackbar.showSnackbar("Importados $imported de ${uris.size} archivos"+(lastError?.takeIf {imported<uris.size}?.let {". $it"} ?: "")) }
+            }; snackbar.showSnackbar("Importados $imported archivos"+(lastError?.let {". $it"} ?: "")) }
             finally {importing=false}
         } }
     }

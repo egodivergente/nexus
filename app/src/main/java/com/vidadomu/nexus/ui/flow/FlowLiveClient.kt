@@ -208,6 +208,46 @@ internal class FlowLiveClient(private val app: NexusApplication) {
     fun order(text: String) { if (text.isNotBlank()) { order.value = "Enviando el encargo…"; send(JSONObject().put("t", "order").put("text", text)) } }
 }
 
+internal data class ZipPiece(val file: File, val name: String, val mime: String, val type: AssetType)
+
+/** Abre un ZIP y deja en disco solo imágenes, vídeos y audio, con límites; los nombres del ZIP nunca se usan como ruta. */
+internal object ZipMedia {
+    private const val MAX_ENTRIES = 500
+    private const val MAX_TOTAL = 3L * 1024 * 1024 * 1024
+
+    fun extract(zip: File, dir: File, prefix: String): List<ZipPiece> {
+        val out = mutableListOf<ZipPiece>()
+        var total = 0L
+        var seen = 0
+        java.util.zip.ZipInputStream(zip.inputStream().buffered()).use { zin ->
+            while (true) {
+                val entry = zin.nextEntry ?: break
+                if (++seen > MAX_ENTRIES * 2) break
+                val display = entry.name.substringAfterLast('/')
+                if (entry.isDirectory || display.isBlank() || display.startsWith(".") || entry.name.startsWith("__MACOSX")) continue
+                val part = File(dir, "$prefix-${out.size + 1}.part")
+                try {
+                    part.outputStream().use { o ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = zin.read(buf); if (n < 0) break
+                            total += n
+                            check(total <= MAX_TOTAL) { "el ZIP descomprimido es demasiado grande" }
+                            o.write(buf, 0, n)
+                        }
+                    }
+                    val kind = FlowMedia.sniff(part, null, display)
+                    if (kind.type == AssetType.OTHER) { part.delete(); continue }
+                    val final = File(dir, "$prefix-${out.size + 1}.${kind.ext}")
+                    if (part.renameTo(final)) out += ZipPiece(final, display, kind.mime, kind.type) else part.delete()
+                } catch (e: Exception) { part.delete(); throw e }
+                if (out.size >= MAX_ENTRIES) break
+            }
+        }
+        return out
+    }
+}
+
 internal data class FlowMediaKind(val mime: String, val type: AssetType, val ext: String)
 
 internal object FlowMedia {
@@ -238,6 +278,15 @@ internal object FlowMedia {
             if (a.type != AssetType.OTHER || "flow" !in a.tags || a.libraryDeleted) continue
             val file = Uri.parse(a.uri).path?.let(::File)?.takeIf { it.isFile } ?: continue
             val kind = sniff(file, a.mimeType, a.displayName)
+            if (kind.mime == "application/zip") {
+                // ZIP guardado antes como archivo genérico: se abre y cada pieza pasa a la Biblioteca.
+                val pieces = runCatching { ZipMedia.extract(file, file.parentFile!!, "flow_zip_${a.id.take(8)}") }.getOrNull().orEmpty()
+                if (pieces.isEmpty()) continue
+                pieces.forEach { FlowLiveImporter.register(app, it.file, "${a.displayName} · ${it.name.substringBeforeLast('.')}", it.mime, it.type) }
+                runCatching { runtime.assets.deleteLibraryAssets(setOf(a.id)) }
+                fixed++
+                continue
+            }
             if (kind.type == AssetType.OTHER) continue
             val renamed = File(file.parentFile, file.nameWithoutExtension + "." + kind.ext)
             val finalFile = if (renamed != file && !renamed.exists() && file.renameTo(renamed)) renamed else file
@@ -272,13 +321,13 @@ internal object FlowLiveImporter {
             mutex.withLock {
                 if (asset.id in FlowLivePrefs.imported(app)) return@withLock
                 runCatching { importOne(app, base, asset) }
-                    .onSuccess { imported.emit(it) }
+                    .onSuccess { list -> list.forEach { imported.emit(it) } }
                     .onFailure { failures.emit("No se pudo guardar «${asset.name}»: ${it.message ?: "error de red"}") }
             }
         }
     }
 
-    private suspend fun importOne(app: NexusApplication, base: String, asset: RemoteAsset): FlowImported {
+    private suspend fun importOne(app: NexusApplication, base: String, asset: RemoteAsset): List<FlowImported> {
         val dir = File(app.filesDir, "flow_live").apply { mkdirs() }
         val part = File(dir, "flow_${asset.id}.part")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -308,6 +357,22 @@ internal object FlowLiveImporter {
         val type = sniffed.type
         val target = File(dir, "flow_${asset.id}.${sniffed.ext}")
         check(part.renameTo(target)) { "no se pudo guardar el archivo" }
+        if (mime == "application/zip") {
+            // Un ZIP de Flow (varias imágenes o vídeos): se abre y cada pieza entra por separado en la Biblioteca.
+            val pieces = ZipMedia.extract(target, dir, "flow_${asset.id}")
+            check(pieces.isNotEmpty()) { "el ZIP no contiene imágenes, vídeos ni audio" }
+            val base0 = asset.name.substringBeforeLast('.')
+            val out = pieces.mapIndexed { i, piece -> register(app, piece.file, "Flow · $base0 · ${piece.name.substringBeforeLast('.')}", piece.mime, piece.type) }
+            target.delete()
+            FlowLivePrefs.markImported(app, asset.id)
+            return out
+        }
+        val one = register(app, target, "Flow · ${asset.name.substringBeforeLast('.')}", mime, type)
+        FlowLivePrefs.markImported(app, asset.id)
+        return listOf(one)
+    }
+
+    internal suspend fun register(app: NexusApplication, target: File, displayName: String, mime: String, type: AssetType): FlowImported {
         var width: Int? = null
         var height: Int? = null
         var seconds: Double? = null
@@ -328,10 +393,9 @@ internal object FlowLiveImporter {
         val runtime = AssistantRuntime.get(app)
         val saved = runtime.assets.addAsset(Asset(
             id = "", uri = Uri.fromFile(target).toString(), type = type, role = AssetRole.OUTPUT, source = AssetSource.GENERATED,
-            displayName = "Flow · ${asset.name.substringBeforeLast('.')}".take(120), mimeType = mime,
+            displayName = displayName.take(120), mimeType = mime,
             width = width, height = height, durationSec = seconds, tags = listOf("flow"), createdAt = System.currentTimeMillis(),
         ))
-        FlowLivePrefs.markImported(app, asset.id)
         return FlowImported(saved.id, saved.uri, saved.displayName, mime)
     }
 }
