@@ -15,10 +15,12 @@ enum class Screen(
     Models("models", "ArtBox", Icons.Default.GridView),
     Generations("generations", "Historial", Icons.Default.Timelapse),
     Library("library", "Biblioteca", Icons.Default.Collections),
+    Flow("flow", "Flow", Icons.Default.Movie),
     Settings("settings", "Ajustes", Icons.Default.Tune);
 
     companion object {
         // Vidal 01-11: sin Lanzadera en la barra; ArtBox queda en el centro. Create sigue siendo un destino propio.
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Library)
+        // Vidal 08-11: Flow en directo (AXELPC) como cuarta pestaña.
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Library, Flow)
     }
 }

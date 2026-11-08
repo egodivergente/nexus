@@ -262,7 +262,9 @@ class MainActivity : ComponentActivity() {
                                 workspaceScope.launch { pager.animateScrollToPage(0) }
                             }
                             // Más sensible: con arrastrar un 20 % de la pantalla (o un gesto rápido) ya cambia de pestaña, en vez del 50 % por defecto.
-                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value,
+                            HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,
+                                // En Flow los arrastres son de la página en directo: no cambian de pestaña.
+                                userScrollEnabled=!com.vidadomu.nexus.ui.theme.ChromeVisibility.nestedLevel.value && tabs[pager.currentPage]!=Screen.Flow,
                                 flingBehavior=androidx.compose.foundation.pager.PagerDefaults.flingBehavior(state=pager,snapPositionalThreshold=.2f),
                                 // No system-gesture inset here: Android already gives the edge back-gesture priority, and that inset
                                 // (~20–25 dp per side with gesture navigation) doubled every screen's own 16 dp margin.
@@ -327,6 +329,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                            Screen.Flow -> com.vidadomu.nexus.ui.flow.FlowLiveScreen(
+                                onOpenLibrary={tabRequest=tabs.indexOf(Screen.Library)}
+                            )
                                     else -> Unit
                                 }
                                 }

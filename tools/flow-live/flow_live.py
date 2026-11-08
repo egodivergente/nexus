@@ -471,6 +471,7 @@ class Live:
             for i in range(1, n + 1):
                 await self.mouse("mousePressed", x, y, button="left", buttons=1, clickCount=i)
                 await self.mouse("mouseReleased", x, y, button="left", buttons=0, clickCount=i)
+            asyncio.create_task(self.report_focus())
         elif t == "down":
             x, y = self._xy(ev)
             await self.mouse("mouseMoved", x, y)
@@ -525,6 +526,17 @@ class Live:
             await self.broadcast_state()
         elif t == "refresh":
             await self.snapshot()
+
+    async def report_focus(self) -> None:
+        """Tras un toque: ¿quedó el cursor en un campo de texto? Nexus abre entonces su teclado."""
+        await asyncio.sleep(0.2)
+        expr = ("(()=>{let e=document.activeElement;while(e&&e.shadowRoot&&e.shadowRoot.activeElement)e=e.shadowRoot.activeElement;"
+                "return !!e&&(e.isContentEditable||e.tagName==='TEXTAREA'||(e.tagName==='INPUT'&&!/^(button|checkbox|radio|submit|file|range|color)$/i.test(e.type)))})()")
+        try:
+            r = await self.cdp.send("Runtime.evaluate", {"expression": expr, "returnByValue": True}, self.session, timeout=5)
+            await self.broadcast({"type": "focus", "editable": bool(r.get("result", {}).get("value"))})
+        except Exception:
+            pass
 
     async def key(self, k: str) -> None:
         vk, code, text = KEYS.get(k, (0, k, None))
