@@ -146,7 +146,7 @@ class ModelCatalogRepository(
 
 /** Claves locales que se guardan con el trabajo pero nunca viajan al proveedor. */
 object LocalJobMetadata {
-    fun allowed(key: String): Boolean = key in setOf("__project_id", "__conversation_id") ||
+    fun allowed(key: String): Boolean = key in setOf("__project_id", "__conversation_id", "__story_context") ||
         key.startsWith("__comparison_") || key.startsWith("__assistant_")
 
     fun validate(metadata: Map<String, String>) {

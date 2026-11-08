@@ -277,9 +277,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         failedTurn = null
         conversation.session.clearRenderedMedia()
         val latestSettings = runtime.settings.load()
+        val storySelectionForTurn = com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.value
+            ?.takeIf { it.projectId == _ui.value.activeProjectId }
+        // A narrative approval is not authorization for a native image call outside SpendGuard.
+        // Capture the runtime for this turn; a settings/navigation change cannot re-enable its native engine.
+        val turnOrchestrator = runtime.orchestrator(latestSettings, allowNativeImages = storySelectionForTurn == null)
+        orchestrator = turnOrchestrator
         if (latestSettings != _ui.value.settings) {
             // Native settings tools affect the next request without dropping conversation, plans or proposals.
-            orchestrator = runtime.orchestrator(latestSettings)
             _ui.update { it.copy(settings = latestSettings) }
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
@@ -293,6 +298,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
+        // Capture an explicit editorial scope for this turn. A later tap cannot redirect a running agent.
+        conv.session.storySelection = storySelectionForTurn
+            ?.let { selected -> com.vidadomu.nexus.agent.core.tools.StoryAgentSelection(
+                selected.projectId, selected.sceneId, selected.shotId, selected.blockId, selected.mode, selected.preserveIds,
+            ) }
         // Everything this answer produces goes to its own conversation, even if the user has moved to another one.
         val chatId = _ui.value.conversationId
         turnChat = chatId
@@ -300,7 +310,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             var lastBreakdown: String? = null
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
-                    orchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
+                    turnOrchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
                 }
                 // Tiempo máximo por mensaje = ajuste del usuario; 0 = sin límite.
                 val r = AssistantTurnService.runTurn(app) {

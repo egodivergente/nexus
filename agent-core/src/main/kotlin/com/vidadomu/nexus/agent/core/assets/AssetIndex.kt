@@ -19,6 +19,10 @@ data class Project(
     val archived: Boolean = false,
     /** Biblia del proyecto que el asistente lee en cada mensaje mientras el proyecto está activo. */
     val memory: ProjectMemory = ProjectMemory(),
+    val treatment: String? = null,
+    val format: String? = null,
+    val targetDurationSec: Double? = null,
+    val revision: Long = 0,
 )
 
 @Serializable
@@ -48,14 +52,23 @@ data class ProjectMemory(
 data class ProjectSession(val projectId: String, val from: Long, val to: Long? = null)
 
 @Serializable
-data class Scene(val id: String, val projectId: String, val code: String, val title: String? = null)
+data class Scene(val id: String, val projectId: String, val code: String, val title: String? = null,
+    val order: Int = 0, val group: String? = null, val description: String? = null,
+    val locationIds: List<String> = emptyList(), val timeOfDay: String? = null, val light: String? = null,
+    val revision: Long = 0, val contentRevision: Long = 0)
 
 /** status: PLANNED → KEYFRAME → VIDEO → FINAL (derivado de sus assets, ver [AssetIndex.shotStatus]). */
 @Serializable
-data class Shot(val id: String, val projectId: String, val sceneId: String? = null, val code: String, val description: String? = null)
+data class Shot(val id: String, val projectId: String, val sceneId: String? = null, val code: String, val description: String? = null,
+    val order: Int = 0, val title: String? = null, val intent: String? = null,
+    val characterIds: List<String> = emptyList(), val framing: String? = null, val camera: String? = null,
+    val performance: String? = null, val dialogue: String? = null, val sound: String? = null,
+    val durationSec: Double? = null, val narrativeState: String = "story", val productionState: String = "pending",
+    val variantOf: String? = null, val revision: Long = 0, val contentRevision: Long = 0)
 
 @Serializable
-data class Character(val id: String, val projectId: String?, val name: String, val aliases: List<String> = emptyList(), val description: String? = null, val referenceAssetIds: List<String> = emptyList())
+data class Character(val id: String, val projectId: String?, val name: String, val aliases: List<String> = emptyList(), val description: String? = null, val referenceAssetIds: List<String> = emptyList(),
+    val variants: List<String> = emptyList(), val notes: String? = null, val revision: Long = 0)
 
 @Serializable
 enum class AssetType { IMAGE, VIDEO, AUDIO, OTHER }
@@ -118,6 +131,7 @@ data class GenerationRecord(
     val outputAssetIds: List<String> = emptyList(),
     val createdAt: Long,
     val completedAt: Long? = null,
+    val storyContext: StoryGenerationContext? = null,
 )
 
 @Serializable
@@ -130,6 +144,7 @@ data class IndexData(
     val assets: List<Asset> = emptyList(),
     val generations: List<GenerationRecord> = emptyList(),
     val projectSessions: List<ProjectSession> = emptyList(),
+    val story: StoryState = StoryState(),
 )
 
 data class PeerIndexMerge(val snapshot: IndexData, val conflicts: List<String>)
@@ -154,7 +169,7 @@ data class AssetQuery(
 class AssetIndex(private val file: File?, private val clock: () -> Long = System::currentTimeMillis) {
 
     private val mutex = Mutex()
-    private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
+    @Volatile private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
 
     private val mutableChanges = MutableStateFlow(data)
     val changes = mutableChanges.asStateFlow()
@@ -169,7 +184,9 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         require(projectIds.size==incoming.projects.size)
         require(incoming.assets.map {it.id}.distinct().size==incoming.assets.size)
         require(incoming.assets.all {it.projectId==null || it.projectId in projectIds}) {"Falta el proyecto de un medio sincronizado."}
-        incoming.copy(projectSessions=current.projectSessions) to Unit
+        incoming.copy(projectSessions=current.projectSessions,
+            // A legacy peer cannot express deletion of the new narrative records.
+            story=if(incoming.story==StoryState() && current.story!=StoryState()) current.story else incoming.story) to Unit
     }
 
     /** Applies a peer snapshot under the same lock as agent/editor writes, and notifies the UI. */
@@ -197,18 +214,21 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
             scenes = if (memory) merged.scenes else local.scenes,
             shots = if (memory) merged.shots else local.shots,
             characters = if (memory) merged.characters else local.characters,
+            story = if (!memory || (remote.story == StoryState() && local.story != StoryState())) local.story else merged.story,
             assets = if (gallery) merged.assets else local.assets,
             generations = if (gallery) merged.generations else local.generations)
         next to PeerIndexMerge(next, result.conflicts)
     }
 
-    private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
+    internal suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
         // Serializing the whole index and fsync-ing it ran on the caller's thread: edits started from the UI froze the
         // main thread for seconds at start-up (Pixel 8 Pro trace, 25/10/2026). Same lock, same atomic write, on IO.
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { persist(next) }
-        data = next
-        mutableChanges.value = next
+        if (next != data) kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
+            persist(next)
+            data = next
+            mutableChanges.value = next
+        }
         result
     }
 
@@ -266,7 +286,7 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     suspend fun updateProjectMemory(projectId: String, change: (ProjectMemory) -> ProjectMemory): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
-        val next = cur.copy(memory = normalizedMemory(change(cur.memory)))
+        val next = cur.copy(memory = normalizedMemory(change(cur.memory)), revision = cur.revision + 1)
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
@@ -274,13 +294,13 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     suspend fun updateProjectMemoryAndDescription(projectId: String, description: String?, change: (Project) -> ProjectMemory): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
         val memory = normalizedMemory(change(cur))
-        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null }, memory = memory)
+        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null }, memory = memory, revision = cur.revision + 1)
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
     suspend fun updateProject(projectId: String, description: String?): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
-        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null })
+        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null }, revision = cur.revision + 1)
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
@@ -299,7 +319,7 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
 
     suspend fun updateCharacter(id: String, change: (Character) -> Character): Character = edit { d ->
         val cur = d.characters.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Personaje desconocido: $id")
-        val next = change(cur).copy(id = cur.id)
+        val next = change(cur).copy(id = cur.id, revision = cur.revision + 1)
         d.copy(characters = d.characters.map { if (it.id == id) next else it }) to next
     }
 
@@ -481,6 +501,7 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         if (existing == null) d.copy(generations = d.generations + rec) to rec
         else {
             val merged = rec.copy(id = existing.id, agentPlanId = rec.agentPlanId ?: existing.agentPlanId,
+                storyContext = rec.storyContext ?: existing.storyContext,
                 projectId = rec.projectId ?: existing.projectId, shotId = rec.shotId ?: existing.shotId,
                 parentGenerationId = rec.parentGenerationId ?: existing.parentGenerationId,
                 outputAssetIds = (existing.outputAssetIds + rec.outputAssetIds).distinct())

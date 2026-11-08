@@ -203,7 +203,7 @@ class NexusGenerationBackend(private val app: NexusApplication, private val regi
         }
         return CreateUiState(
             selectedModality = Modality.valueOf(plan.modality), selectedModel = model, prompt = plan.prompt,
-            parameters = values, attachedMedia = media, schemaReady = true,
+            parameters = values, attachedMedia = media, schemaReady = true, storyContext = plan.storyContext,
         )
     }
 

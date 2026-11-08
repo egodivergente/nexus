@@ -64,6 +64,7 @@ class PlanBuilder(
         originalPrompt: String? = null,
         /** Al reconstruir un plan antiguo: retira el texto que el schema no admite en vez de fallar. */
         dropUnacceptedPrompt: Boolean = false,
+        storyContext: com.vidadomu.nexus.agent.core.assets.StoryGenerationContext? = null,
     ): PlanBuild {
         val schema = runCatching { registry.schema(model.ref) }.getOrElse {
             return PlanBuild.Invalid(listOf(ValidationIssue("schema", "Nexus no pudo cargar el schema de ${model.ref.modelId}: ${it.message ?: it.javaClass.simpleName}. Sin schema no se prepara la generación.")))
@@ -110,7 +111,7 @@ class PlanBuilder(
             }
             if (v.dropped.isNotEmpty()) add("Descartados por vacíos: ${v.dropped.joinToString()}.")
         }
-        val shotId = if (projectId != null && shotCode != null) {
+        val shotId = storyContext?.takeIf { it.projectId == projectId }?.shotId ?: if (projectId != null && shotCode != null) {
             assets.snapshot().shots.firstOrNull { it.projectId == projectId && AssetIndex.norm(it.code) == AssetIndex.norm(shotCode) }?.id
         } else null
         val prepared = GenerationPlan(
@@ -130,6 +131,7 @@ class PlanBuilder(
             alternatives = alternatives,
             projectId = projectId,
             shotId = shotId,
+            storyContext = storyContext,
             sceneCode = sceneCode,
             shotCode = shotCode,
             characters = characters,
@@ -158,6 +160,7 @@ class PlanBuilder(
             originalPrompt = if (edit.prompt == null || edit.prompt == plan.prompt) plan.originalPrompt else null,
             // Un texto nuevo del agente o del usuario se valida; el del plan antiguo se retira si sobra.
             dropUnacceptedPrompt = edit.prompt == null,
+            storyContext = plan.storyContext,
         )
     }
 

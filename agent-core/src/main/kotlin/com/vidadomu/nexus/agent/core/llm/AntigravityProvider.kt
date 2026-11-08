@@ -546,6 +546,8 @@ class AntigravityProvider(
             if (engine == BridgeEngine.ANTIGRAVITY) {
                 appendLine("Calidad de imagen: el usuario quiere la máxima calidad. Si puedes elegir o influir en el modelo de imagen, usa el más avanzado disponible (Nano Banana Pro o Nano Banana 2) y evita las variantes Lite; escribe prompts de imagen detallados y precisos. Si aun así te asignan Lite, entrega la imagen igualmente: nunca la descartes.")
             }
+        } else {
+            appendLine("No uses tu motor nativo de imágenes ni herramientas de generación del servidor en este turno. Preparar un guion, storyboard o propuesta no autoriza gasto: prepara la generación mediante las herramientas Android de Nexus y espera su confirmación de coste.")
         }
         if (tools.isNotEmpty()) {
             appendLine()

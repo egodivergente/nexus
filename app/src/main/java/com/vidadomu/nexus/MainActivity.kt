@@ -1,6 +1,7 @@
 package com.vidadomu.nexus
 
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.agent.core.assets.storyGenerationContext
 
 import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.safeDrawing
@@ -157,6 +158,24 @@ class MainActivity : ComponentActivity() {
                 }
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
+                LaunchedEffect(Unit) {
+                    com.vidadomu.nexus.assistant.story.StoryNavigation.requests.collect { destination ->
+                        val selection = com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.value
+                        when (destination) {
+                            com.vidadomu.nexus.assistant.story.StoryDestination.FLOW -> {
+                                navController.popBackStack("workspace", false)
+                                tabRequest = tabs.indexOf(Screen.Flow)
+                            }
+                            com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE -> {
+                                if (selection?.shotId != null) {
+                                    val index = com.vidadomu.nexus.assistant.AssistantRuntime.get(application as NexusApplication).assets
+                                    createViewModel.prepareStoryShot(index.storyGenerationContext(selection.projectId, selection.shotId))
+                                    navController.navigate(Screen.Create.route) { launchSingleTop = true }
+                                }
+                            }
+                        }
+                    }
+                }
                 // One path for «Continuar en…» whether it is drawn inside the Agent tab or as the full sheet used for shared files.
                 val chooseProject: (String, com.vidadomu.nexus.assistant.PendingShare?) -> Unit = {id,sharedNow -> lifecycleScope.launch {
                     try {

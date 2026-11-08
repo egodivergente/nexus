@@ -109,6 +109,8 @@ fun AssistantScreen(
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    val storySelection by com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.collectAsState()
+    val storyIndex by vm.runtime.assets.changes.collectAsState()
     // Outputs can be downloaded after the order status changes: observe the repository too.
     val generationJobs by (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication)
         .generationRepository.allJobs.collectAsState()
@@ -483,6 +485,20 @@ fun AssistantScreen(
                 })
             }
             PendingGenerations(ui,blockedByDraft=ui.plans.values.any {it.includeInBatch && it.executable && !it.busy && it.state in setOf(PlanState.PREPARED,PlanState.AWAITING_CONFIRMATION) && dirtyPlans[it.plan.id]==true},onGenerate=vm::generatePending)
+            storySelection?.takeIf { selection -> selection.projectId == ui.activeProjectId && storyIndex.projects.any { it.id == selection.projectId && !it.archived } }?.let { selection ->
+                val scene=storyIndex.scenes.firstOrNull {it.id==selection.sceneId}
+                val shot=storyIndex.shots.firstOrNull {it.id==selection.shotId}
+                Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.thumbnail,modifier=Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=4.dp)) {
+                    Row(Modifier.padding(start=10.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Icon(Icons.Default.MovieFilter,null,Modifier.size(18.dp))
+                        Column(Modifier.weight(1f).padding(horizontal=8.dp).clickable {showProject=true}) {
+                            Text(listOfNotNull(scene?.title ?: scene?.code,shot?.title ?: shot?.code).joinToString(" › ").ifBlank {ui.projects.firstOrNull {it.id==selection.projectId}?.name ?: "Proyecto"},style=MaterialTheme.typography.labelMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text("${if(selection.mode=="direct") "Cambios directos" else "Propuestas"} · ${when {selection.blockId!=null->"fragmento";selection.shotId!=null->"plano";selection.sceneId!=null->"escena";else->"proyecto"}}${if(selection.preserveIds.isNotEmpty()) " · ${selection.preserveIds.size} fijados" else ""}",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
+                        }
+                        IconButton(onClick={com.vidadomu.nexus.assistant.story.StorySelectionStore.clear()}) {Icon(Icons.Default.Close,"Quitar contexto audiovisual",Modifier.size(18.dp))}
+                    }
+                }
+            }
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
                 onSend = { if(vm.sendWithBoards(input.text)) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
@@ -667,6 +683,7 @@ private fun EmptyHint() {
 @Composable
 private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:MutableMap<String,ProjectMemoryDraft>,
     editingId:String?,onEditingChange:(String?)->Unit,onDraftKept:(String,String)->Unit,onClose:()->Unit) {
+    var storyProjectId by rememberSaveable { mutableStateOf<String?>(null) }
     var creating by remember {mutableStateOf(false)}
     var name by rememberSaveable {mutableStateOf("")}
     var leaving by remember {mutableStateOf(false)}
@@ -676,6 +693,14 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
     var reviewedSnapshot by remember(editingId) {mutableStateOf<com.vidadomu.nexus.agent.core.assets.Project?>(null)}
     val active=ui.projects.firstOrNull {it.id==ui.activeProjectId}
     val editing=editingId?.let {id->ui.projects.firstOrNull {it.id==id}}
+    storyProjectId?.let { projectId ->
+        com.vidadomu.nexus.assistant.story.StoryWorkspaceScreen(projectId,
+            onClose = { storyProjectId = null },
+            onAgent = { vm.selectProject(projectId); storyProjectId = null; onClose() },
+            onGenerate = { storyProjectId = null; onClose(); com.vidadomu.nexus.assistant.story.StoryNavigation.request(com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE) },
+            onFlow = { storyProjectId = null; onClose(); com.vidadomu.nexus.assistant.story.StoryNavigation.request(com.vidadomu.nexus.assistant.story.StoryDestination.FLOW) })
+        return
+    }
     val draft=editing?.let {drafts[it.id]}
     LaunchedEffect(editingId,editing) {if(editingId!=null && editing==null) onEditingChange(null)}
     LaunchedEffect(editing?.id,draft==null) {if(editing!=null && draft==null) drafts[editing.id]=ProjectMemoryDraft.from(editing)}
@@ -775,6 +800,9 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
             .padding(bottom=NexusTokens.space24),verticalArrangement=Arrangement.spacedBy(NexusTokens.space16)) {
             if(active!=null) {
                 active.description?.takeIf {it.isNotBlank()}?.let {Text(it,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
+                FilledTonalButton(onClick={storyProjectId=active.id},modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)) {
+                    Icon(Icons.Default.MovieFilter,null);Spacer(Modifier.width(NexusTokens.space8));Text("Guion y storyboard")
+                }
                 FilledTonalButton(onClick={startEditing(active)},modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {
                     Icon(Icons.Default.EditNote,null);Spacer(Modifier.width(NexusTokens.space8))
                     Text(if(active.id in draftIds) "Retomar borrador de memoria" else "Editar memoria")

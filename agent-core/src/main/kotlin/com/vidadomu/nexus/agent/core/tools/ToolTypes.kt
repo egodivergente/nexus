@@ -54,11 +54,23 @@ data class SuggestedReply(val label: String, val text: String)
 class ToolOutcome(val result: JsonElement, val isError: Boolean = false, val events: List<UiEvent> = emptyList())
 
 /** Estado por conversación que comparten las herramientas. */
+@Serializable
+data class StoryAgentSelection(
+    val projectId: String,
+    val sceneId: String? = null,
+    val shotId: String? = null,
+    val blockId: String? = null,
+    val mode: String = "proposal",
+    val preserveIds: Set<String> = emptySet(),
+)
+
 class AgentSession(
     val id: String,
     var mode: AgentMode,
     var activeProjectId: String? = null,
 ) {
+    /** Snapshot of the explicitly selected scope for this turn; navigation cannot widen a running order. */
+    var storySelection: StoryAgentSelection? = null
     val attachments = mutableListOf<Attachment>()
     /** Media explicitly opened or created by tools during this turn for inline chat display. */
     val renderedMedia = linkedMapOf<String, Attachment>()
