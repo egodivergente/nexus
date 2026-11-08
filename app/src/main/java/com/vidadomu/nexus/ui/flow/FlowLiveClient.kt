@@ -71,6 +71,8 @@ internal class FlowLiveClient(private val app: NexusApplication) {
     val download = MutableStateFlow<String?>(null)
     /** El último toque dejó el cursor en un campo de texto de Flow. */
     val editable = MutableStateFlow(false)
+    /** Estado del último encargo: «opening», «sent» o un mensaje de error. */
+    val order = MutableStateFlow<String?>(null)
 
     private val http = OkHttpClient.Builder().connectTimeout(12, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS)
         .pingInterval(20, TimeUnit.SECONDS).build()
@@ -174,6 +176,11 @@ internal class FlowLiveClient(private val app: NexusApplication) {
                 FlowLiveImporter.enqueue(app, base, RemoteAsset.from(o.getJSONObject("asset")))
             }
             "focus" -> editable.value = o.optBoolean("editable")
+            "order" -> order.value = when (o.optString("state")) {
+                "opening" -> "Abriendo un proyecto nuevo en Flow…"
+                "sent" -> "Encargo enviado: mira cómo lo hace Flow."
+                else -> o.optString("message", "No se pudo enviar el encargo.")
+            }
             "error" -> error.value = o.optString("message")
         }
     }
@@ -197,6 +204,7 @@ internal class FlowLiveClient(private val app: NexusApplication) {
     fun key(k: String) = send(JSONObject().put("t", "key").put("k", k))
     fun command(c: String) = send(JSONObject().put("t", "command").put("c", c))
     fun simple(t: String) = send(JSONObject().put("t", t))
+    fun order(text: String) { if (text.isNotBlank()) { order.value = "Enviando el encargo…"; send(JSONObject().put("t", "order").put("text", text)) } }
 }
 
 /**

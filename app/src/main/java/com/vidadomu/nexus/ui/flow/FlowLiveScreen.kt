@@ -145,12 +145,13 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
     val page by client.page.collectAsState()
     val download by client.download.collectAsState()
     val editable by client.editable.collectAsState()
+    val order by client.order.collectAsState()
 
     var viewIndex by rememberSaveable { mutableStateOf(FlowLivePrefs.string(context, "view", "1").toIntOrNull()?.coerceIn(0, VIEWS.lastIndex) ?: 1) }
     var qualityIndex by rememberSaveable { mutableStateOf(FlowLivePrefs.string(context, "quality", "1").toIntOrNull()?.coerceIn(0, QUALITIES.lastIndex) ?: 1) }
     var menu by remember { mutableStateOf(false) }
     var serverDialog by remember { mutableStateOf(false) }
-    var keyboard by rememberSaveable { mutableStateOf(false) }
+    var keyboard by rememberSaveable { mutableStateOf(true) }
     val recent = remember { mutableStateListOf<FlowImported>() }
     var failure by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { FlowLiveImporter.imported.collect { recent.add(0, it); haptic.perform(NexusHapticEvent.CONFIRMATION) } }
@@ -339,7 +340,7 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
         }
 
         // Resultados que ya están en la Biblioteca.
-        AnimatedVisibility(recent.isNotEmpty() || download != null || failure != null) {
+        AnimatedVisibility(recent.isNotEmpty() || download != null || failure != null || order != null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
                 if (recent.isNotEmpty()) {
                     LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
@@ -351,10 +352,10 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
                     TextButton(onClick = onOpenLibrary) { Text("${recent.size} en Biblioteca") }
                     IconButton(onClick = { recent.clear(); failure = null }) { Icon(Icons.Default.Close, "Ocultar") }
                 } else {
-                    val text = failure ?: download?.let { "Descargando «$it»…" } ?: ""
+                    val text = failure ?: download?.let { "Descargando «$it»…" } ?: order ?: ""
                     Text(text, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         color = if (failure != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (failure != null) IconButton(onClick = { failure = null }) { Icon(Icons.Default.Close, "Ocultar") }
+                    if (failure != null || order != null) IconButton(onClick = { failure = null; client.order.value = null }) { Icon(Icons.Default.Close, "Ocultar") }
                 }
             }
         }
@@ -388,15 +389,18 @@ private fun FlowKeyboardBar(client: FlowLiveClient, editable: Boolean) {
     var more by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(editable) { if (editable) runCatching { focus.requestFocus() } }
+    // Con un campo de Flow activo, lo escrito va a ese campo; si no, es un encargo para el agente de Flow.
     fun send() {
-        if (draft.isNotEmpty()) { client.text(draft); draft = "" }
+        if (draft.isBlank()) return
+        if (editable) client.text(draft) else client.order(draft)
+        draft = ""
     }
     Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f).focusRequester(focus),
-            placeholder = { Text(if (editable) "Escribe para Flow" else "Toca un campo de Flow y escribe aquí") },
+            placeholder = { Text(if (editable) "Escribe en el campo de Flow" else "Encarga algo a Flow y míralo hacerlo") },
             maxLines = 4, shape = NexusTokens.field,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }))
-        IconButton(onClick = { send() }) { Icon(Icons.AutoMirrored.Filled.Send, "Escribir en Flow") }
+        IconButton(onClick = { send() }) { Icon(Icons.AutoMirrored.Filled.Send, if (editable) "Escribir en Flow" else "Encargar a Flow") }
         Box {
             TextButton(onClick = { more = true }) { Text("Teclas") }
             DropdownMenu(expanded = more, onDismissRequest = { more = false }) {

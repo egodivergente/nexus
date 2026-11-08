@@ -526,6 +526,42 @@ class Live:
             await self.broadcast_state()
         elif t == "refresh":
             await self.snapshot()
+        elif t == "order":
+            await self.order(str(ev.get("text", ""))[:20000])
+
+    async def order(self, text: str) -> None:
+        """Encargo al agente de Flow, a la vista: abre un proyecto si hace falta, escribe en «¿Qué quieres crear?» y envía."""
+        text = text.strip()
+        if not text:
+            return
+        find = ("(()=>{const e=document.querySelector('[role=textbox][aria-label=\"¿Qué quieres crear?\"],div.ProseMirror[contenteditable=true]');"
+                "if(!e)return null;e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()")
+        async def locate():
+            r = await self.cdp.send("Runtime.evaluate", {"expression": find, "returnByValue": True}, self.session, timeout=5)
+            return r.get("result", {}).get("value")
+        pos = await locate()
+        if not pos:
+            # En la portada no está el cuadro: «Nuevo proyecto» lo abre.
+            await self.broadcast({"type": "order", "state": "opening"})
+            await self.cdp.send("Runtime.evaluate", {"expression": "(()=>{const b=[...document.querySelectorAll('button,[role=button]')].find(b=>/Nuevo proyecto|New project/i.test(b.innerText||''));if(b)b.click();return !!b})()", "returnByValue": True}, self.session)
+            for _ in range(30):
+                await asyncio.sleep(0.5)
+                pos = await locate()
+                if pos:
+                    break
+        if not pos:
+            await self.broadcast({"type": "order", "state": "failed", "message": "No encuentro el cuadro «¿Qué quieres crear?» de Flow. Abre un proyecto y vuelve a enviarlo."})
+            return
+        x, y = pos
+        await self.mouse("mouseMoved", x, y)
+        await self.mouse("mousePressed", x, y, button="left", buttons=1, clickCount=1)
+        await self.mouse("mouseReleased", x, y, button="left", buttons=0, clickCount=1)
+        await asyncio.sleep(0.2)
+        await self.cdp.send("Input.insertText", {"text": text}, self.session)
+        await asyncio.sleep(0.3)
+        await self.key("Enter")
+        await self.broadcast({"type": "order", "state": "sent"})
+        log.info("Encargo enviado a Flow (%d caracteres)", len(text))
 
     async def report_focus(self) -> None:
         """Tras un toque: ¿quedó el cursor en un campo de texto? Nexus abre entonces su teclado."""
