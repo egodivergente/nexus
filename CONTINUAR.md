@@ -18,6 +18,8 @@ propuesta que entra en conflicto con una edicion reciente y ejecutar preparacion
 llamadas a LLM externos de prueba. Todos los IDs existentes de proyectos, escenas, planos, personajes, archivos y
 generaciones siguen presentes; perfiles de cerebros, proveedores multimedia y apariencia tienen la misma huella.
 Otros ficheros recibieron actividad durante la sesion: no se afirma igualdad byte a byte de todo el perfil.
+Se observo ademas `read_story_project` en el registro de herramientas de la conversacion real del agente instalado,
+con Codex configurado. Se leyo ese registro existente sin iniciar otra llamada al modelo.
 
 **QA visual parcial**: arranque y pantallas existentes observados; el recorrido completo de pulsaciones del editor
 queda pendiente de una ventana estable de uso del S25. Flow respondia al health desde AXELPC, pero se observaron

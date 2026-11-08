@@ -12,6 +12,7 @@
         "originalArm64LibrariesEqual": 3,
         "existingIndexIdsPreserved": true,
         "deviceOperationsPassed": ["structure", "many-to-many associations", "reordering", "registered agent tool", "proposal conflict", "WorkManager preparation"],
+        "liveAgentReadObserved": "read_story_project recorded in the installed agent conversation; existing user-initiated turn, no new model call",
         "uiVerified": "partial; complete screenplay interaction pending stable phone access",
         "paidMediaTestGenerations": 0,
         "externalAgentTestCalls": 0,
