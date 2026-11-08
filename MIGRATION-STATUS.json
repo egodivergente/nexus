@@ -1,4 +1,15 @@
 ﻿{
+    "bridgeImages20261108": {
+        "branch": "fix/bridge-images-20261108",
+        "base": "fix/codex-e2big-20261107@d21e24f",
+        "problem": "con Codex/AGY el agente no veia las imagenes: el proveedor del puente las sustituia por un aviso de texto y nunca las subia",
+        "causeConfirmed": "puente real: imagen subida (PUT /v1/uploads + attachments) -> Codex acierta colores impredecibles; sin imagen responde NO VEO IMAGEN",
+        "appChange": "AntigravityProvider sube cada imagen y la envia en attachments; si falla la subida el turno se detiene. Carrusel: caja con la proporcion real (hasta 360 dp de alto) y 4 dp entre imagenes",
+        "bridgeRequired": "no: el puente desplegado ya admite los adjuntos",
+        "unitTests": "agent-core 430 pruebas, 0 fallos; imagePreviewSize 3/3 en JVM",
+        "notDone": "compilar la app Android, APK, prueba en el telefono, AGY con adjuntos",
+        "doc": "docs/BRIDGE-VISION-20261108.md"
+    },
     "codexE2big20261107": {
         "branch": "fix/codex-e2big-20261107",
         "base": "codex/thinking-timer-v184-20261106@f5ff19d (vc184)",

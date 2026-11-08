@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -32,13 +34,30 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 @Composable
 internal fun AssistantImagePreview(media: Attachment) {
     var opened by rememberSaveable(media.id, media.uri) { mutableStateOf(false) }
-    Column {
+    // La caja toma la proporción de la imagen: una foto vertical ya no queda en medio de una caja apaisada con franjas vacías.
+    var aspect by remember(media.uri) { mutableStateOf(media.width?.let { w -> media.height?.takeIf { it > 0 }?.let { h -> w.toFloat() / h } }) }
+    val size = imagePreviewSize(aspect)
+    Column(Modifier.width(size.width)) {
         AsyncImage(model = media.uri, contentDescription = "Ampliar ${media.name ?: "imagen del agente"}", contentScale = ContentScale.Fit,
-            modifier = Modifier.width(280.dp).height(220.dp).clip(NexusTokens.card).clickable { opened = true })
-        media.caption?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+            onSuccess = { state ->
+                val intrinsic = state.painter.intrinsicSize
+                if (intrinsic.width.isFinite() && intrinsic.height.isFinite() && intrinsic.width > 0f && intrinsic.height > 0f) aspect = intrinsic.width / intrinsic.height
+            },
+            modifier = Modifier.size(size.width, size.height).clip(NexusTokens.card).clickable { opened = true })
+        media.caption?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
         com.vidadomu.nexus.ui.components.NexusTonalAction("Ampliar", { opened = true }, icon = Icons.Default.ZoomIn, description = "Ampliar imagen")
     }
     if (opened) AssistantImageForeground(media) { opened = false }
+}
+
+/**
+ * Tamaño de la vista previa en el chat con la proporción real de la imagen ([aspect] = ancho / alto; null = 4:5 hasta
+ * que cargue). Ocupa todo el alto disponible salvo que el ancho la limite (imágenes apaisadas).
+ */
+internal fun imagePreviewSize(aspect: Float?, maxWidth: Dp = 320.dp, maxHeight: Dp = 360.dp): DpSize {
+    val ratio = aspect?.takeIf { it.isFinite() && it > 0f }?.coerceIn(0.4f, 3f) ?: (4f / 5f)
+    return if (maxHeight * ratio <= maxWidth) DpSize(maxHeight * ratio, maxHeight) else DpSize(maxWidth, maxWidth / ratio)
 }
 
 internal fun boundedImageScale(scale: Float): Float = if (scale.isFinite()) scale.coerceIn(1f, 5f) else 1f

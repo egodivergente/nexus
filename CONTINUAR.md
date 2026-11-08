@@ -1,3 +1,11 @@
+# Vision con Codex/AGY y carrusel - 08/11/2026
+
+Rama `fix/bridge-images-20261108` (encima de `fix/codex-e2big-20261107`). El agente no veia las imagenes con los
+cerebros del puente: la app las cambiaba por un aviso de texto. Ahora las sube al puente como adjuntos (el puente
+desplegado ya los admite; probado en vivo con colores). Carrusel con la proporcion real y menos hueco. Nucleo
+verificado en JVM; **la app Android no se ha compilado ni probado en el telefono**. Ver `docs/BRIDGE-VISION-20261108.md`.
+
+
 # Codex «spawn E2BIG» - 07/11/2026
 
 Rama `fix/codex-e2big-20261107` sobre vc184 (`f5ff19d`). Causa confirmada: el puente de AXEL pasa el texto de la

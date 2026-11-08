@@ -974,7 +974,8 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) {
             val mediaState=androidx.compose.foundation.lazy.rememberLazyListState()
-            LazyRow(state=mediaState,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),
+            // Separación mínima: las imágenes ya ocupan su caja sin franjas vacías y quedan juntas.
+            LazyRow(state=mediaState,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4),
                 contentPadding=PaddingValues(end=NexusTokens.space32)) {
                 items(item.media,key={it.id}) { AssistantMediaPreview(it) }
             }

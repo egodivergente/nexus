@@ -203,11 +203,9 @@ class AntigravityProviderTest {
     }
 
     @Test fun `un E2BIG del puente se explica con el tamano medido y no recorta el historial`() = runTest {
-        MockWebServer().use { server ->
-            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
-                "data: {\"type\":\"status\",\"phase\":\"starting\"}\n\n" +
-                    "data: {\"type\":\"final\",\"status\":\"failed\",\"text\":\"\",\"provider\":\"codex\",\"error\":\"spawn E2BIG\"}\n\n"))
-            // Un chat largo: cuatro turnos de 40 KB de texto; ninguna imagen viaja en el cuerpo, solo su marca.
+        bridgeServer("data: {\"type\":\"status\",\"phase\":\"starting\"}\n\n" +
+            "data: {\"type\":\"final\",\"status\":\"failed\",\"text\":\"\",\"provider\":\"codex\",\"error\":\"spawn E2BIG\"}\n\n").use { server ->
+            // Un chat largo: cuatro turnos de 40 KB de texto; la imagen se sube aparte y en el texto solo va su nombre.
             val filler = "x".repeat(40_000)
             val history = listOf(
                 LlmMessage(Role.USER, listOf(ContentBlock.Text(filler), ContentBlock.Image("png", ByteArray(2_000_000)))),
@@ -226,9 +224,80 @@ class AntigravityProviderTest {
             assertTrue(Regex("≈1[5-9]\\d KB").containsMatchIn(text), "tamaño medido del historial: $text")
             assertEquals(LlmException.Kind.BAD_REQUEST, error.kind)
             // El historial viaja completo: nada se recorta para esquivar el límite.
+            assertEquals("PUT", server.takeRequest().method)
             val sent = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["messages"]!!.jsonArray
             assertEquals(4, sent.count { it.jsonObject["content"]!!.jsonPrimitive.content.contains(filler) })
-            assertTrue(sent.any { "[Imagen adjunta (png, 2000000 bytes)]" in it.jsonObject["content"]!!.jsonPrimitive.content }, "la imagen solo viaja como marca")
+            assertTrue(sent.any { "[Imagen adjunta: imagen-1.png]" in it.jsonObject["content"]!!.jsonPrimitive.content }, "en el texto solo va el nombre")
+        }
+    }
+
+    @Test fun `las imagenes se suben al puente con sus bytes y viajan como adjuntos`() = runTest {
+        val foto = byteArrayOf(-1, -40, -1, -32, 1, 2, 3)           // «JPEG» del usuario
+        val captura = byteArrayOf(-119, 80, 78, 71, 9, 9)           // «PNG» de un resultado
+        bridgeServer("data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Veo dos imágenes.\",\"error\":null}\n\n").use { server ->
+            val history = listOf(
+                LlmMessage(Role.USER, listOf(ContentBlock.Text("mira"), ContentBlock.Image("jpeg", foto), ContentBlock.Image("png", captura))),
+                LlmMessage(Role.ASSISTANT, listOf(ContentBlock.Text("¿Qué quieres saber?"))),
+                // La misma foto otra vez: se sube una sola vez.
+                LlmMessage(Role.USER, listOf(ContentBlock.Text("¿hay estiramiento?"), ContentBlock.Image("jpeg", foto))),
+            )
+            val provider = AntigravityProvider(server.url("/").toString(), engine = AntigravityProvider.BridgeEngine.CODEX)
+            val response = provider.complete(LlmRequest(modelId = "gpt-6.1-sol", system = listOf("Eres Nexus."), messages = history, tools = emptyList(), maxTokens = 1024))
+            assertEquals("Veo dos imágenes.", response.message.text())
+
+            val up1 = server.takeRequest(); val up2 = server.takeRequest(); val chat = server.takeRequest()
+            assertEquals(listOf("PUT", "PUT", "POST"), listOf(up1.method, up2.method, chat.method))
+            assertEquals(3, server.requestCount, "la foto repetida no se vuelve a subir")
+            assertTrue(foto.contentEquals(up1.body.readByteArray()) && captura.contentEquals(up2.body.readByteArray()), "se suben los bytes exactos")
+            val body = Json.parseToJsonElement(chat.body.readUtf8()).jsonObject
+            val jobId = body["jobId"]!!.jsonPrimitive.content
+            assertEquals("/v1/uploads/$jobId/imagen-1.jpg", up1.path)
+            assertEquals("/v1/uploads/$jobId/imagen-2.png", up2.path)
+            val attachments = body["attachments"]!!.jsonArray.map { it.jsonObject }
+            assertEquals(listOf("imagen-1.jpg", "imagen-2.png"), attachments.map { it["name"]!!.jsonPrimitive.content })
+            assertEquals(listOf("image/jpeg", "image/png"), attachments.map { it["mimeType"]!!.jsonPrimitive.content })
+            assertEquals(listOf("/root/.local/state/axel-native-v2/uploads/$jobId-imagen-1.jpg", "/root/.local/state/axel-native-v2/uploads/$jobId-imagen-2.png"),
+                attachments.map { it["uploadedPath"]!!.jsonPrimitive.content })
+            val texto = body["messages"]!!.jsonArray.joinToString("\n") { it.jsonObject["content"]!!.jsonPrimitive.content }
+            assertTrue("[Imagen adjunta: imagen-1.jpg]" in texto && "[Imagen adjunta: imagen-2.png]" in texto, texto.takeLast(300))
+            assertTrue("bytes)]" !in texto, "ya no se sustituye la imagen por un aviso de tamaño")
+            assertTrue("[Imagen adjunta: imagen-1.jpg]" in body["prompt"]!!.jsonPrimitive.content, "el turno actual nombra la imagen que lleva")
+        }
+    }
+
+    @Test fun `si una imagen no se puede subir el turno se detiene en vez de responder a ciegas`() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(500).setBody("{\"error\":\"disk full\"}"))
+            val request = LlmRequest(modelId = "gpt-6.1-sol", system = emptyList(),
+                messages = listOf(LlmMessage(Role.USER, listOf(ContentBlock.Text("mira"), ContentBlock.Image("jpeg", byteArrayOf(1, 2, 3))))), tools = emptyList(), maxTokens = 1024)
+            val error = assertFailsWith<LlmException> {
+                AntigravityProvider(server.url("/").toString(), engine = AntigravityProvider.BridgeEngine.CODEX).complete(request)
+            }
+            assertTrue("imagen-1.jpg" in error.message.orEmpty() && "a ciegas" in error.message.orEmpty(), error.message)
+            assertEquals(1, server.requestCount, "no se llega a pedir la respuesta sin la imagen")
+        }
+    }
+
+    @Test fun `un turno solo de texto no sube nada ni anade adjuntos`() = runTest {
+        bridgeServer("data: {\"type\":\"final\",\"status\":\"completed\",\"text\":\"Hola.\",\"error\":null}\n\n").use { server ->
+            AntigravityProvider(server.url("/").toString(), engine = AntigravityProvider.BridgeEngine.CODEX).complete(userTurn("Hola", model = ""))
+            val chat = server.takeRequest()
+            assertEquals("POST", chat.method)
+            assertEquals(1, server.requestCount)
+            assertTrue("attachments" !in Json.parseToJsonElement(chat.body.readUtf8()).jsonObject)
+        }
+    }
+
+    /** Puente falso: acepta subidas como el real (201 con la ruta) y responde al chat con [sse]. */
+    private fun bridgeServer(sse: String) = MockWebServer().apply {
+        dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                return if (request.method == "PUT" && path.startsWith("/v1/uploads/")) {
+                    val (job, name) = path.removePrefix("/v1/uploads/").split("/", limit = 2)
+                    MockResponse().setResponseCode(201).setBody("{\"ok\":true,\"path\":\"/root/.local/state/axel-native-v2/uploads/$job-$name\",\"sizeBytes\":${request.bodySize}}")
+                } else MockResponse().setHeader("Content-Type", "text/event-stream").setBody(sse)
+            }
         }
     }
 
