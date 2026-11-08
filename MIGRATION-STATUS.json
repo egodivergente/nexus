@@ -7,8 +7,17 @@
         "appChange": "AntigravityProvider sube cada imagen y la envia en attachments; si falla la subida el turno se detiene. Carrusel: caja con la proporcion real (hasta 360 dp de alto) y 4 dp entre imagenes",
         "bridgeRequired": "no: el puente desplegado ya admite los adjuntos",
         "unitTests": "agent-core 430 pruebas, 0 fallos; imagePreviewSize 3/3 en JVM",
-        "notDone": "compilar la app Android, APK, prueba en el telefono, AGY con adjuntos",
-        "doc": "docs/BRIDGE-VISION-20261108.md"
+        "notDone": "prueba manual en el telefono (enviar una imagen a Codex y ver el carrusel), AGY con adjuntos, parche E2BIG del puente sin desplegar",
+        "doc": "docs/BRIDGE-VISION-20261108.md",
+        "versionCode": 185,
+        "versionName": "1.9.149-agent-preview",
+        "build": "AXELPC, C:\\Users\\User\\nexus-vc185 @ c34bf8e, :app:assembleAgentPreview BUILD SUCCESSFUL (11 min 37 s); firmado con tools/release/entregar-apk.ps1 -SinInstalar; copiado a Drive",
+        "apk": "Nexus-Agent-1.9.149-Sirio-preview.apk",
+        "apkSha256": "abf3e0efc716975d09b003ba1f66d874300ff19f1cee942bca1d99c17c980096",
+        "s25InstalledAsUpdate": true,
+        "s25InstalledAt": "2026-11-08T03:23+01:00",
+        "s25InstallCheck": "adb install -r Success; versionCode 185; base.apk sha256 = apkSha256; 4648 archivos de datos con md5 identicos antes/despues; am start -W ok, proceso vivo, 0 crashes",
+        "pixelInstalled": false
     },
     "codexE2big20261107": {
         "branch": "fix/codex-e2big-20261107",
