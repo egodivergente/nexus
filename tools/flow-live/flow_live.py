@@ -348,7 +348,7 @@ class Live:
         if not self.session:
             return
         try:
-            shot = await self.cdp.send("Page.captureScreenshot", {"format": "webp", "quality": 80 if self.saving() else 92},
+            shot = await self.cdp.send("Page.captureScreenshot", {"format": "webp", "quality": 78 if self.saving() else 88},
                                        self.session, timeout=10)
         except (CdpError, asyncio.TimeoutError) as e:
             log.info("captura: %s", e)
@@ -777,8 +777,8 @@ async def ws_live(ws: WebSocket) -> None:
                 if live.cdp is None or live.cdp.closed.is_set():
                     live.session = None
                     await live.ensure()
-    except WebSocketDisconnect:
-        pass
+    except (WebSocketDisconnect, RuntimeError):
+        pass  # el móvil se fue (cambio de red, app en segundo plano): no es un error
     except Exception:
         log.exception("ws")
     finally:
@@ -806,7 +806,29 @@ app = Starlette(routes=[
 ], lifespan=lifespan)
 
 
+def single_instance() -> object | None:
+    """Candado de instancia única: si otra copia ya lo tiene (p. ej. la tarea de arranque y un relanzamiento a la
+    vez), esta sale sin tocar el navegador. Dos copias se pisaban la conexión con Edge y el índice de resultados."""
+    handle = open(ROOT / "flow-live.lock", "a+")
+    try:
+        if os.name == "nt":
+            import msvcrt
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
 def main() -> None:
+    lock = single_instance()
+    if lock is None:
+        log.info("Ya hay otra copia de Flow en directo funcionando; esta sale.")
+        return
     while True:
         try:
             uvicorn.run(app, host=HOST, port=PORT, log_level="warning", log_config=None, ws_max_size=1 << 20, ws_ping_interval=20, ws_ping_timeout=30)
