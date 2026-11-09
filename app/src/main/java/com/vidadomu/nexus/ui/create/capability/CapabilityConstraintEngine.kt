@@ -15,7 +15,9 @@ internal data class EffectiveModelConfiguration(
     val parameters: Map<String, String>, val inactiveParameters: Map<String, String>, val media: List<AttachedMedia>
 )
 
-internal data class CapabilityValidation(val configuration: EffectiveModelConfiguration, val issues: List<CapabilityIssue>) {
+internal data class CapabilityValidation(val configuration: EffectiveModelConfiguration, val issues: List<CapabilityIssue>,
+    /** Reglas del contrato que Nexus no sabe comprobar: se avisan, pero no impiden generar (el proveedor las valida al recibir el encargo). */
+    val advisories: List<String> = emptyList()) {
     val canSubmit: Boolean get() = issues.isEmpty()
 }
 
@@ -36,11 +38,16 @@ internal object CapabilityConstraintEngine {
             prompt.takeIf { capabilities.prompt.support == CapabilitySupport.CONFIRMED && capabilities.prompt.fieldKey !in visibility.hidden }, effective,
             allValues.filterKeys { it !in effective }, media.toList())
         val issues = mutableListOf<CapabilityIssue>()
+        val advisories = mutableListOf<String>()
         fun issue(kind: CapabilityIssueKind, key: String?, text: String) { issues += CapabilityIssue(kind, key, text) }
         when (capabilities.support) {
             CapabilitySupport.UNSUPPORTED -> issue(CapabilityIssueKind.MODEL, null, "Este destino no admite la modalidad seleccionada.")
             CapabilitySupport.UNKNOWN -> capabilities.unknownReasons.ifEmpty {listOf("Carga el contrato del modelo antes de continuar.")}
-                .forEach { issue(CapabilityIssueKind.UNKNOWN, null, it) }
+                .forEach { reason ->
+                    // Una regla condicional que la app no sabe evaluar ya no bloquea: se avisa y decide el usuario.
+                    if (reason.startsWith("Hay una condición del contrato") || reason.startsWith("El contrato contiene reglas de combinación")) advisories += reason
+                    else issue(CapabilityIssueKind.UNKNOWN, null, reason)
+                }
             CapabilitySupport.CONFIRMED -> Unit
         }
         if (!visibility.stable) issue(CapabilityIssueKind.UNKNOWN, null, "Las reglas de visibilidad no permiten una configuración estable.")
@@ -120,7 +127,7 @@ internal object CapabilityConstraintEngine {
                 ("prompt" to config.requestPrompt.orEmpty())
             NativeModelSchema.validate(model, values)?.let { issue(CapabilityIssueKind.PARAMETER, null, it) }
         }
-        return CapabilityValidation(config, issues.distinct())
+        return CapabilityValidation(config, issues.distinct(), advisories.distinct())
     }
 
     private fun violatesStep(value: String, step: BigDecimal, origin: BigDecimal): Boolean =

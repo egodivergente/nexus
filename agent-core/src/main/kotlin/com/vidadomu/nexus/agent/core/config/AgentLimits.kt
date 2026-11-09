@@ -16,7 +16,7 @@ data class AgentLimits(
     /** Máximo de tokens de salida por respuesta del LLM. */
     val maxTokens: Int = 4096,
     /** Imágenes que se envían al LLM por mensaje (las demás se omiten con aviso). 0 = sin límite. */
-    val maxImagesPerTurn: Int = 4,
+    val maxImagesPerTurn: Int = 12,
     /** Vídeos (fotogramas) que se envían al LLM por mensaje. 0 = sin límite. */
     val maxVideosPerTurn: Int = 2,
     /** Documentos que se leen por mensaje (y se conservan en el contexto). 0 = sin límite. */
