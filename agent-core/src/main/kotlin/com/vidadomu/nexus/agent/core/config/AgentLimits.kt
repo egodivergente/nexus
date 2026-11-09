@@ -15,8 +15,6 @@ data class AgentLimits(
     val turnTimeoutSeconds: Int = 600,
     /** Máximo de tokens de salida por respuesta del LLM. */
     val maxTokens: Int = 4096,
-    /** Resultados que se pueden pedir de una vez en un encargo de Google Flow. */
-    val flowMaxResults: Int = 20,
     /** Imágenes que se envían al LLM por mensaje (las demás se omiten con aviso). 0 = sin límite. */
     val maxImagesPerTurn: Int = 4,
     /** Vídeos (fotogramas) que se envían al LLM por mensaje. 0 = sin límite. */
@@ -35,7 +33,6 @@ data class AgentLimits(
     // Preferencias del usuario: los valores iniciales conservan el comportamiento anterior; 0 desactiva cada tope.
     val maxGenerationsPerBatch: Int = 20,
     val maxConcurrentGenerations: Int = 3,
-    val maxConcurrentFlowGenerations: Int = 1,
     val maxToolResults: Int = 50,
     val maxRecommendations: Int = 6,
     val maxRecommendationSchemaChecks: Int = 8,
@@ -46,8 +43,6 @@ data class AgentLimits(
     val maxOverviewPromptChars: Int = 180,
     val maxMemorySearchResults: Int = 12,
     val maxMemoryExcerptChars: Int = 900,
-    val maxFlowMedia: Int = 20,
-    val maxFlowWaitSeconds: Int = 240,
     val maxConcurrentSubagents: Int = 2,
     val maxSubagentDepth: Int = 1,
     val allowSubagentGeneration: Boolean = true,
@@ -72,9 +67,8 @@ data class AgentLimits(
         if (maxRecommendationSchemaChecks < 0) add("El número de esquemas no puede ser negativo (0 = sin límite).")
         if (maxToolRounds < 0) add("Los pasos por mensaje no pueden ser negativos (0 = sin límite).")
         if (turnTimeoutSeconds < 0) add("El tiempo por mensaje no puede ser negativo (0 = sin límite).")
-        if (listOf(maxGenerationsPerBatch,maxConcurrentGenerations,maxConcurrentFlowGenerations,maxToolResults,maxRecommendations,maxProjectContextChars,maxOverviewScenes,maxOverviewOutputs,maxOverviewGenerations,maxOverviewPromptChars,maxMemorySearchResults,maxMemoryExcerptChars,maxFlowMedia,maxFlowWaitSeconds,maxConcurrentSubagents,maxSubagentDepth).any { it < 0 }) add("Los límites no pueden ser negativos (0 = sin límite).")
+        if (listOf(maxGenerationsPerBatch,maxConcurrentGenerations,maxToolResults,maxRecommendations,maxProjectContextChars,maxOverviewScenes,maxOverviewOutputs,maxOverviewGenerations,maxOverviewPromptChars,maxMemorySearchResults,maxMemoryExcerptChars,maxConcurrentSubagents,maxSubagentDepth).any { it < 0 }) add("Los límites no pueden ser negativos (0 = sin límite).")
         if (maxTokens < 1) add("El máximo de tokens debe ser al menos 1.")
-        if (flowMaxResults < 0) add("Los resultados de Flow no pueden ser negativos (0 = sin límite).")
         if (maxImagesPerTurn < 0 || maxVideosPerTurn < 0 || maxMessages < 0 || maxToolResultChars < 0 || maxDocumentsPerTurn < 0 || maxUiContextChars < 0 || jobTrackingMinutes < 0) add("Los límites no pueden ser negativos (0 = sin límite).")
     }
 
@@ -98,7 +92,6 @@ data class AgentLimits(
     /** Texto que se añade al prompt: dice cuáles son los límites reales y que prevalecen sobre cualquier otra cifra. */
     fun promptBlock(): String = buildString {
         appendLine("LÍMITES CONFIGURADOS POR EL USUARIO (son los vigentes y prevalecen sobre cualquier otra cifra que aparezca en estas instrucciones):")
-        appendLine("- Resultados por encargo en Google Flow: ${if(flowMaxResults==0) "sin límite" else "hasta $flowMaxResults"}.")
         appendLine("- Pasos seguidos por mensaje: ${if (maxToolRounds <= 0) "sin límite" else maxToolRounds}.")
         appendLine("- Imágenes por mensaje que ves: ${if (maxImagesPerTurn <= 0) "sin límite" else maxImagesPerTurn}; vídeos: ${if (maxVideosPerTurn <= 0) "sin límite" else maxVideosPerTurn}.")
         appendLine("- Encargos por lote: ${if(maxGenerationsPerBatch==0) "sin límite" else maxGenerationsPerBatch}; consultas: ${if(maxToolResults==0) "sin límite" else maxToolResults}; candidatos: ${if(maxRecommendations==0) "sin límite" else maxRecommendations}.")

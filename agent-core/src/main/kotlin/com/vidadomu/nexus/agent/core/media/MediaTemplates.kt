@@ -44,10 +44,6 @@ object MediaTemplates {
                     mode = MediaMode.ASYNC, taskIdPath = "id", pollPath = "/v1/tasks/{{task_id}}", statusPath = "status",
                     successValues = listOf("succeeded"), failureValues = listOf("failed", "cancelled"), progressPath = "progress", errorPath = "failure",
                     resultPaths = listOf("output"))))),
-        Template("Estilo fal.ai (síncrono)", "Endpoint síncrono con `Authorization: Key …`. Las colas largas de fal no están soportadas.",
-            MediaProviderConfig("fal-extra", "fal (síncrono)", "https://fal.run", auth = BrainAuth(BrainAuthMode.HEADER, "Authorization", "Key "), models = listOf(MediaModelConfig(
-                id = "fal-ai/flux/schnell", name = "FLUX schnell", capability = MediaCapability.TEXT_TO_IMAGE, createPath = "/fal-ai/flux/schnell",
-                requestTemplate = """{"prompt":"{{prompt}}","seed":"{{seed}}"}""", params = listOf(seed), mode = MediaMode.SYNC,
-                errorPath = "detail", resultPaths = listOf("images.*.url"))))),
+        FalCuratedModels.template,
     )
 }

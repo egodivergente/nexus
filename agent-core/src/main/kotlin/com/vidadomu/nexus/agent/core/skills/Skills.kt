@@ -39,7 +39,12 @@ data class Skill(
 
     fun isVerified(tag: String): Boolean = tag !in unverifiedTags
 
-    /** Primera línea útil del resumen, para el índice que ve el LLM. */
+    /** Resumen acotado para el índice del prompt de sistema: basta para decidir qué skill cargar con load_skill. */
+    fun shortLine(max: Int = 100): String = oneLiner().let { s ->
+        if (s.length <= max) s else s.take(max).substringBeforeLast(' ').trimEnd(',', ';', ':', ' ') + "…"
+    }
+
+    /** Primera línea útil del resumen. */
     fun oneLiner(): String = body.lineSequence().map { it.trim() }
         .firstOrNull { it.isNotEmpty() && !it.startsWith("#") }?.take(180) ?: title
 
@@ -165,58 +170,34 @@ class DirectorySkillSource(private val root: File, private val label: String = r
 }
 
 /**
- * Parsed skills keyed by a hash of (origin, text), so a changed file is parsed again and entries for files that no
- * longer exist are dropped on [save]. The cache is optional: an unreadable, corrupt, oversized or outdated file
- * means a full parse, and a failed write leaves the previous cache file in place.
+ * Parsed skills keyed by a hash of (origin, text). Parsing ~400 YAML headers with snakeyaml took about a second on
+ * every cold start of the phone; an unchanged file is now read back from JSON. Changed files are parsed again and
+ * entries for removed files are dropped on [save]. A corrupt or missing cache simply means a full parse.
  */
 class SkillParseCache(private val file: File) {
-    @Serializable private data class Entries(val version: Int, val skills: Map<String, Skill>)
+    @Serializable private data class Entries(val version: Int = 1, val skills: Map<String, Skill> = emptyMap())
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val loaded: Map<String, Skill> = runCatching {
-        if (!file.isFile || file.length() > MAX_BYTES) null
-        else json.decodeFromString(Entries.serializer(), file.readText(Charsets.UTF_8)).takeIf { it.version == FORMAT_VERSION }?.skills
+        json.decodeFromString(Entries.serializer(), file.readText()).takeIf { it.version == 1 }?.skills
     }.getOrNull().orEmpty()
     private val used = linkedMapOf<String, Skill>()
 
-    @Synchronized fun parse(text: String, origin: String): Skill {
-        val key = key(text, origin)
-        val skill = loaded[key]?.takeIf { it.origin == origin } ?: SkillParser.parse(text, origin)
+    fun parse(text: String, origin: String): Skill {
+        val key = java.security.MessageDigest.getInstance("SHA-1")
+            .digest((origin + "\u0000" + text).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        val skill = loaded[key] ?: SkillParser.parse(text, origin)
         used[key] = skill
         return skill
     }
 
-    /** Writes the entries used since construction. Returns false when nothing could be written. */
-    @Synchronized fun save(): Boolean {
-        if (used.keys == loaded.keys) return true
-        val dir = file.absoluteFile.parentFile ?: return false
-        var tmp: java.nio.file.Path? = null
-        return try {
-            dir.mkdirs()
-            tmp = java.nio.file.Files.createTempFile(dir.toPath(), file.name + ".", ".tmp")
-            java.io.FileOutputStream(tmp.toFile()).use { output ->
-                output.write(json.encodeToString(Entries.serializer(), Entries(FORMAT_VERSION, used)).toByteArray(Charsets.UTF_8))
-                output.fd.sync()
-            }
-            try {
-                java.nio.file.Files.move(tmp, file.toPath(),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                java.nio.file.Files.move(tmp, file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            }
-            true
-        } catch (_: Exception) {
-            false
-        } finally {
-            tmp?.let { runCatching { java.nio.file.Files.deleteIfExists(it) } }
+    fun save() {
+        if (used.keys == loaded.keys) return
+        runCatching {
+            file.parentFile?.mkdirs()
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(json.encodeToString(Entries.serializer(), Entries(skills = used)))
+            if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
         }
-    }
-
-    companion object {
-        /** Bump whenever [SkillParser] output changes for the same input. */
-        const val FORMAT_VERSION = 1
-        private const val MAX_BYTES = 32L * 1024 * 1024
-        private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-        private fun key(text: String, origin: String): String = java.security.MessageDigest.getInstance("SHA-256")
-            .digest((origin + "\u0000" + text).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     }
 }
 
@@ -258,7 +239,8 @@ class SkillStore(sources: List<SkillSource>, active: Collection<String> = emptyL
 
     /** Índice compacto para el prompt de sistema: el LLM carga el cuerpo bajo demanda. */
     fun catalogText(): String = buildString {
-        expertise().forEach { appendLine("- ${it.id} (experto): ${it.oneLiner()}") }
-        models().forEach { appendLine("- ${it.id} (modelo, v${it.version}, ${it.updated ?: "s/f"}): ${it.oneLiner()}") }
+        // Una línea corta por skill: el índice va en cada llamada al modelo; list_skills y load_skill dan el detalle.
+        expertise().forEach { appendLine("- ${it.id} (experto): ${it.shortLine()}") }
+        models().forEach { appendLine("- ${it.id} (modelo v${it.version}): ${it.shortLine()}") }
     }.trim()
 }

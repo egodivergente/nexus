@@ -48,10 +48,10 @@ class ConfigurableLimitsTest {
         assertTrue("límite actual es de 1 vídeos" in e.message.orEmpty(), e.message)
     }
 
-    @Test fun `el prompt cita los limites vigentes y no una cifra propia de Flow`() {
-        val limits = AgentLimits(flowMaxResults = 7, maxToolRounds = 0, maxImagesPerTurn = 9)
+    @Test fun `el prompt cita los limites vigentes y no una cifra propia`() {
+        val limits = AgentLimits(maxGenerationsPerBatch = 7, maxToolRounds = 0, maxImagesPerTurn = 9)
         val prompt = SystemPrompt.build(AgentMode.AGENT, null, "", null, "2026-10-17", null, limits.promptBlock()).joinToString("\n")
-        assertTrue("hasta 7" in prompt && "Pasos seguidos por mensaje: sin límite" in prompt && "Imágenes por mensaje que ves: 9" in prompt, prompt.takeLast(700))
+        assertTrue("Encargos por lote: 7" in prompt && "Pasos seguidos por mensaje: sin límite" in prompt && "Imágenes por mensaje que ves: 9" in prompt, prompt.takeLast(700))
         assertTrue("prevalecen" in prompt)
         assertFalse("hasta 20 resultados" in prompt, "el prompt no debe fijar 20 resultados")
     }

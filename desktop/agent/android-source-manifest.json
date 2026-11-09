@@ -1,837 +1,167 @@
-[
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt",
-    "sha256": "a8b60aaf11a757bf63c923ab3d713013501d715d3bedb41104bb28415818c848"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ClaimVerifier.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ClaimVerifier.kt",
-    "sha256": "b8945853e414375ee2df5cb45d0ad673a8c1dafe4837670a8156a9276780de55"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ExternalServices.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ExternalServices.kt",
-    "sha256": "12aa407300a4d9ca5e106c41d2b7b44a1f956e8775125ef41fad79e78a8ad19f"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/GenerationLifecycle.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/GenerationLifecycle.kt",
-    "sha256": "f0f0f80ed32439791a9e2ac196812374739dcde252021a5372b70bd081fe6546"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt",
-    "sha256": "313f73eedeced75627d52a17e8295c9bee2ccde54191aa5fc31181c112952804"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt",
-    "sha256": "49c15d14899f46c0e207fdfea2baf971b5adcd742a37130ec3fa0cac9e68f0d8"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatMarkdown.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatMarkdown.kt",
-    "sha256": "415e5b6c539ee4b356d3a747c66aeb5e38423e1d4ee4cd7d5b6881033592339d"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentConfig.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentConfig.kt",
-    "sha256": "dc2980514d24e8665e528b828515a3639016a83b9af698a4930b7ef6395f628e"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentLimits.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentLimits.kt",
-    "sha256": "2b978585341562e5390b2729d96ef8d209c2a190552c14ab66e51e8383297f17"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/cost/CostEstimator.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/cost/CostEstimator.kt",
-    "sha256": "4fe57a3d2af4614e4695f000625b4350e875fc9ebec04a1d95cdd1b3e317d7bb"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/cost/TieredTariffs.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/cost/TieredTariffs.kt",
-    "sha256": "9d68e35a9f9ecf9bacc8fe1d60fc596762ae1345409bcd57b5c7a99d37b68ad7"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AnthropicProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AnthropicProvider.kt",
-    "sha256": "249c9c4c36b94f41b6e4576e6ce076362913baff35623a227c61a1e5aa7e298c"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProvider.kt",
-    "sha256": "b79a08feb7f893fb26d524323d18f6492198b7f8d5f8103cce7bb2fbf03e2059"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt",
-    "sha256": "6d425c5d4521120ecf7ad86dd71b17a5121764e207b013b493f956160a96d914"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockProxyProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockProxyProvider.kt",
-    "sha256": "3371ad51865da980425e74b9b136b13ac01ba6a92274101dece8163c375db085"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainFactory.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainFactory.kt",
-    "sha256": "c469f9bd6607e59732059eaaa84938cb08d320a72d2986a1887aff76e5af688c"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProfile.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProfile.kt",
-    "sha256": "a2cc52ac59351fe0f50c44eb8b2ca2a7565f859babd0e2e1d67b914f6b9ae338"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttp.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttp.kt",
-    "sha256": "b137ce0f92992c351d2d61da04e75ab3661faea1c3a4ff4f76e0f709d74beae2"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ConverseCodec.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ConverseCodec.kt",
-    "sha256": "5e45b314df93ad7853e097a7b7c388abd99c53fe06361775d30e95ab70fef876"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/HttpTarget.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/HttpTarget.kt",
-    "sha256": "5591fc471c870b2fbe3b8d5c9c9a5a7f01a52adcd0edb53b633c117c858aaead"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt",
-    "sha256": "28d641bdaa6e58c88f02cb677fb069c174a0e13d89df567e7ec6d89711489e7e"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt",
-    "sha256": "bcff36c83f05a4fc0dddba4602b2519a1049193ca630e799799df071bea0a84a"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OfflinePlannerProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OfflinePlannerProvider.kt",
-    "sha256": "90fca4e6e66d170289cb4e082278d58a4337e5b5fd0f49704f923996ecb98a53"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OpenAiCompatibleProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OpenAiCompatibleProvider.kt",
-    "sha256": "3836e83fd8a2ee1c9e4bce365e4b96627204a7924d9053945ddf0868d3d339a5"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/PromptAdapter.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/PromptAdapter.kt",
-    "sha256": "cdf56331d993f8f0312d379dc0b88501d60957ea3f2f0d9a867a591eebc73de4"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ResponsesApiProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ResponsesApiProvider.kt",
-    "sha256": "bffcb781c6e45b98a335ba3b6986d1c9cfbe8387794dba102f32a82a07c04cb9"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ScriptedLlmProvider.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ScriptedLlmProvider.kt",
-    "sha256": "3ac6fd70825c99e37bdc4650eda340cd6fb4759c8ac021a54f7962a71a677195"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/SseStream.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/SseStream.kt",
-    "sha256": "7ceb671b3b88004aff7002db42a59737810fab6056011843279d32228db79d32"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/log/Redactor.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/log/Redactor.kt",
-    "sha256": "da62bf2d1e3f9511d62a6f2606caf747e5a07600e25e7d5b5ac2e1c950790504"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaEngine.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaEngine.kt",
-    "sha256": "771bbb1d78692b0e7f4261e6dcdf3c1499e1398b593fbf2db6d7751fec859dc7"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaParamsText.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaParamsText.kt",
-    "sha256": "334109a1c23b4f4d3ac9e796e9b6faabcc0a8f346e10f5d375dd6b992dc26418"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaProviderConfig.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaProviderConfig.kt",
-    "sha256": "f4351b743e6b956f773c8a99494ea4dca7ba185e5ce0a634f502dc1ce7610965"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaTemplates.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaTemplates.kt",
-    "sha256": "1e513e863060e259ae3f2f432efd7828cf118324b4e4a1dc6bf7355c8413d180"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt",
-    "sha256": "20e00f98aebe0d0ab7ad0b7a3454776be4905d157fcd2fceeb24153ed8af20e1"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/orders/OrderBook.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/orders/OrderBook.kt",
-    "sha256": "f94e32596b47765845ec738efcc887e53b2f91dbffe6a4f8e94b63376b8654aa"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/registry/ModelRegistry.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/registry/ModelRegistry.kt",
-    "sha256": "4e1d3d95f0e1f46374bdfa75569168168d14a45d7ecb3bc13f66f7472dd7f7e0"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/router/ModelRouter.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/router/ModelRouter.kt",
-    "sha256": "16de22647ebee4696a95aa05e32043b827f2f68c0367f152c7cb2e180de42659"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/schema/ErrorDiagnosis.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/schema/ErrorDiagnosis.kt",
-    "sha256": "e27234cf1739b6cbda393b31e156f8c370d1b2538adb46cbcf93693503e251aa"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/schema/ParameterValidator.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/schema/ParameterValidator.kt",
-    "sha256": "be79b71f0c051acd6db05e1140a5e53b424ba1f14fb7650e0e58934d0c81d05e"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/skills/Skills.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/skills/Skills.kt",
-    "sha256": "e8199ee2be8efb8147074e71078e0b0f81e43da4ca9667a890489df4b7e3290b"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/spend/SpendGuard.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/spend/SpendGuard.kt",
-    "sha256": "a8f298f517f189b972e5437adfea3b8a36964e0cdaefc6d41fd239072d91e4a5"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/AssetTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/AssetTools.kt",
-    "sha256": "41e4b1b929cfe47bfde37e8b05ffd3464627eed00ae965e2731246f9a56882af"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/JsonArgs.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/JsonArgs.kt",
-    "sha256": "b7253b82a76b21283accd3adad50239c72dcb94e853ebc4b8f3ac3254d222473"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ModelGuidance.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ModelGuidance.kt",
-    "sha256": "019b8cf95bc89197c6716cc2de2fb7017c2ddc62e05a8e4e28880224eb2858ce"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ModelTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ModelTools.kt",
-    "sha256": "03e4dc7340e6f4ff2211a372751bece62fcf090998daf99b18a53ae4e676ec91"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt",
-    "sha256": "20fb5eb4583ae8da5db762115febb509df72bf8434fe97302608ac216e83564b"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NexusToolkit.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NexusToolkit.kt",
-    "sha256": "857dfd3dda59b3d708d5d3c692845f63769686ef4a509e960304a5151145f701"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/OrderTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/OrderTools.kt",
-    "sha256": "04a5bd58bf6a41a872b8d7f5d37532732369346ab5bd129f40934e2cf849af39"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/PlanBuilder.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/PlanBuilder.kt",
-    "sha256": "6c7ec6bbb54535ab480c4d84a80a9c6be17449f883b9bbc2ed91e9d235ab35ca"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/PlanTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/PlanTools.kt",
-    "sha256": "88cef7dbb888870fe86249dc088291f0e4158188a9c37b6d686f3d4b8aa2497c"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ProjectMemoryTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ProjectMemoryTools.kt",
-    "sha256": "be8863eed438984961c3dc583717d2c9a1e52d4080aa6c85159304b7b7d2022b"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ProjectOverviewTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ProjectOverviewTools.kt",
-    "sha256": "0f62b2cc6f47aa767e655cb26a45a074cf28dc47cbe691153beaa07711a18e9b"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ReplyTools.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ReplyTools.kt",
-    "sha256": "a14d996f9a2dc53321b1fa280a28cca073068c9b4ea2dcb272982a6e448448cd"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolDeps.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolDeps.kt",
-    "sha256": "f829a5b1422e4bfde900a5c754226262e5eff6aa804dc47ba3551c67661f68e5"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolTypes.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolTypes.kt",
-    "sha256": "2b7dc2086054cb5151bf008e7b56267490fb3c5b867aee9d3cefa6d1cb6b3a85"
-  },
-  {
-    "source": "agent-core/src/test/resources/atlas_published_prices.json",
-    "target": "agent/core/src/test/resources/atlas_published_prices.json",
-    "sha256": "d876bfcbcb3bc78acff8b4441ca4473aa155a3e848d78098148e00e4c2f60ca7"
-  },
-  {
-    "source": "agent-core/src/test/resources/skill_coverage.json",
-    "target": "agent/core/src/test/resources/skill_coverage.json",
-    "sha256": "53c2bea2d534b649b0d79d3148f21fdcc31d74bbca2b9b63a161f789ae1920ea"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AndroidRegexCompatibilityTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/AndroidRegexCompatibilityTest.kt",
-    "sha256": "afed66d278b08ad1368e2e4f737c319be2829b768891c60785bb6f73442b6cbc"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AssetRelocationTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/AssetRelocationTest.kt",
-    "sha256": "6ed5aa06e478f5f2f265cf880c3c5f0ec239a9b895146f4c3c489f197326b7e7"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/BedrockDirectTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/BedrockDirectTest.kt",
-    "sha256": "3e4556414b6e0c95872768a318d82baf8c436f92207b3220d6dd4f6b2f474701"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ChatMarkdownTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ChatMarkdownTest.kt",
-    "sha256": "f80782ce61d37c91248b04c645a79285782038ae1d995b6d4f3a368a19d268f9"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/CodecRedactorTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/CodecRedactorTest.kt",
-    "sha256": "96a9c9c63399c622453e9584cdc557a8b7e958c04def591fbc429ca9b3b8f87c"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ConfigurableLimitsTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ConfigurableLimitsTest.kt",
-    "sha256": "a7c8eb9dc1b43d349dba9eea7efb8c54d8aa96213c97ab5abc149fc09277944f"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ConfirmationSafetyTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ConfirmationSafetyTest.kt",
-    "sha256": "ae72ca29db85929e0d4a904cefaa0cae545be08ed1f23b263f4b58af8481e701"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/DirectFlowTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/DirectFlowTest.kt",
-    "sha256": "8c7cb9791b874c2dbc3d16ae1bdac265b59b40f7100c3c4b395c012217dad349"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ExternalServicesTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ExternalServicesTest.kt",
-    "sha256": "6c9285e044f3793d5b7cc5f8ae594208c73ebbb68cc85bf52d4a08b9c85adace"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/Fixtures.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/Fixtures.kt",
-    "sha256": "54a3793f4312b0a3a89617f9dca0098347bfb88941d24899d029e66721cf5e1e"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/FlowAssetOriginTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/FlowAssetOriginTest.kt",
-    "sha256": "ef2be779dcc829a26d3bfbe0d90b291dcbe616653bbe5c55d162df6818573ce9"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryDeletionTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryDeletionTest.kt",
-    "sha256": "69fa3d70337efc6d532259ffa7f0438f184b4c5d67f02cf6464aac07841638ad"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryVisionTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryVisionTest.kt",
-    "sha256": "cc8f48f2850589260ba57b64468972f5ce34b494de762183675ad33ae60e7aaa"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LlmBudgetTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/LlmBudgetTest.kt",
-    "sha256": "b462635bd6724040f61de4ac0dbe285863777d1c1faa975ae9c92f5a71f59884"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/MateoJulianFlowTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/MateoJulianFlowTest.kt",
-    "sha256": "bde0a674fa60bd529f0078eb38bbf393dbc24f06e65a1bb6fac9f983b91e501d"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/NativeOperationsTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/NativeOperationsTest.kt",
-    "sha256": "d5c93cbc49eab8982443902a0035dc8507abe6c5375251cbc5e663dab1ea2749"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OfflinePlannerTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/OfflinePlannerTest.kt",
-    "sha256": "ab75029fadcc2b1feef50d3758ea2aff322dd881e1a83e89ac2592ddc2bc5ef4"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrchestratorTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrchestratorTest.kt",
-    "sha256": "eb2c88eb8e77002d5330174f72b2fc1ece03ddb181d26c038701e06d22881cc5"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrderBookTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrderBookTest.kt",
-    "sha256": "a8a2654cec3ff149f0b87c3c9c60475e7483f192218e4af197cf400d927550bc"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PlanReferenceRecoveryTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/PlanReferenceRecoveryTest.kt",
-    "sha256": "72cd3f200bc9a931e4d0ed77cc2d84f959fd5ab5d0e8ca9dacd9726a7276e952"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ProjectMemoryTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ProjectMemoryTest.kt",
-    "sha256": "514ceb44f1d449f2be80aff814f550768edbeb5692fbb8992a9a82e71c429cdd"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PromptAdapterTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/PromptAdapterTest.kt",
-    "sha256": "fd0cf6056cbcbd07c5627c561a88fc225c21996fcad168aa3517246e7dff3fd9"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ReasoningCodecTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ReasoningCodecTest.kt",
-    "sha256": "54d63ae2d8bf6215bb84b5bf1f3267f6593b1e08adc444d3a23e662a28df8e36"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/RouterGenerationTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/RouterGenerationTest.kt",
-    "sha256": "5fdb480b10263f8ac34b159a2ae0b88fdc699297897061ead7c6f14c2c748023"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ScriptHelpers.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ScriptHelpers.kt",
-    "sha256": "32c1ac142598d841ad726d1909d8ceb7f78f97c6a3a5dcc152978a8f3158568d"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillCatalogCoverageTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillCatalogCoverageTest.kt",
-    "sha256": "3fe8782c1370fcbb43f05fb743a626c8073d8bfc6220de51ee6951a1787dda46"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillsRouterAssetsTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillsRouterAssetsTest.kt",
-    "sha256": "bd6720fcca32546cb25e61aa040c5edfbe9742e9012e8c93de5d3b6748e10118"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillsV2Test.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillsV2Test.kt",
-    "sha256": "c310b5ec2de06accba7f2f89e17eda7d95cd37308be00a9776d4bd308d40d5a4"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SpendGuardTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/SpendGuardTest.kt",
-    "sha256": "7bc2dd49f53417645a80f79a46be430b562c841071ae04402fecfad3b10f04dc"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SuggestedRepliesTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/SuggestedRepliesTest.kt",
-    "sha256": "a9ecfeeab8235bcd6513414fe44e3f45f489099851786038729753fb668df392"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/TencentUpscaleFlowTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/TencentUpscaleFlowTest.kt",
-    "sha256": "db6a8c520074c14896139ad796db5e1ddf02fca6ca53641c5aff014118cf4373"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ValidatorAndCostTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ValidatorAndCostTest.kt",
-    "sha256": "e445677c1f77a171489eccd8016f069fffd273848ab1fdae9cc190b86cf7b290"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/VideoAttachmentsTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/VideoAttachmentsTest.kt",
-    "sha256": "52987bfd6ff9be92d9191ff7958074ad15b91bf3d8904c42b047b6a73f0fcacd"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProviderTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProviderTest.kt",
-    "sha256": "1dd036bef7ebe2c36c2f56eb53317e32664b4db5b6320b505fad7025b1b49c9d"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProvidersTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProvidersTest.kt",
-    "sha256": "34304acd3e1799e9416ee12a95289acf458b0b98f79830479e75a49169b0a783"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BytePlusLiveTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BytePlusLiveTest.kt",
-    "sha256": "517faba9bfea35f7e2913f2535cc25ed4b64c4ac880d2e18ccf8b2f54b810843"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttpTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttpTest.kt",
-    "sha256": "0324449c5b6e9f286757f0415c94f58bfe9d12c7676851b442ea64ed3d2a2459"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/OtherLlmProvidersTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/OtherLlmProvidersTest.kt",
-    "sha256": "46e5699aedcf7a1a689f307ce4b457cf25d39222ecd083ac493fbcfb6918f825"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/MediaEngineTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/MediaEngineTest.kt",
-    "sha256": "75102258e14b2dee1899a69d85c70641f3bb9289cdbbe4319b12f2949d580720"
-  },
-  {
-    "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/MediaParamsTextTest.kt",
-    "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/MediaParamsTextTest.kt",
-    "sha256": "ccf899c1641bcede7719d7e3b811cbf49e8d1380b981d57b625a48f6afc13dbb"
-  },
-  {
-    "source": "agent-skills/skills/SKILL_FORMAT.md",
-    "target": "agent/agent-skills/skills/SKILL_FORMAT.md",
-    "sha256": "4831977233bce344ee8fc29a504ca6068f95a9ee0d77c61433198b854f0f465a"
-  },
-  {
-    "source": "agent-skills/skills/expertise/asset_librarian/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/asset_librarian/SKILL.md",
-    "sha256": "eb71b8b25555b6d9ca598f327975a5402cd4c12b9dea1bc6bebe4e3ae39bb5e7"
-  },
-  {
-    "source": "agent-skills/skills/expertise/camera_motion/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/camera_motion/SKILL.md",
-    "sha256": "7069c106f7976f0139e4a047590f438351aeb30e1ec7bd71dae0f805bd2be9a3"
-  },
-  {
-    "source": "agent-skills/skills/expertise/character_consistency/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/character_consistency/SKILL.md",
-    "sha256": "25e2c2d5c28751b36a0c6d8c37d7f642a23f5f21530a9632a2f23bb9c06d5d8d"
-  },
-  {
-    "source": "agent-skills/skills/expertise/cinematic_director/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/cinematic_director/SKILL.md",
-    "sha256": "e044da7bba8743cb4c189152f807e7e4130be40fc5bd9dbac7f400618c0aa6d1"
-  },
-  {
-    "source": "agent-skills/skills/expertise/continuity_supervisor/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/continuity_supervisor/SKILL.md",
-    "sha256": "ab402c1e42815816e2b532d3218e67a96ccf08f5a34f7ee715615a6497df13ca"
-  },
-  {
-    "source": "agent-skills/skills/expertise/cost_optimizer/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/cost_optimizer/SKILL.md",
-    "sha256": "6d30062096003792ac975819b202e6a0a9eba1197464599c85718a9d4a7316e9"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-account-credits/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-account-credits/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-account-credits/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-account-credits/SKILL.md",
-    "sha256": "6d0e1f120a47df97315b66eb12f87d5b70d8e2604763d306eafe94afac9acb66"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-action-camera-enhancer/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-action-camera-enhancer/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-action-camera-enhancer/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-action-camera-enhancer/SKILL.md",
-    "sha256": "4cdddbddb7571e6021b71e52bb58c47790833b67d9e44fbd8790baffe88745e0"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-agent-skills/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-agent-skills/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-agent-skills/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-agent-skills/SKILL.md",
-    "sha256": "1f0d53c870d11ef9e19dea7020f538084b9536fdbb7f2dea99ef4731088a6a2a"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-character-reference/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-character-reference/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-character-reference/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-character-reference/SKILL.md",
-    "sha256": "4f75a865f318ebbb57034f46d05c8c9635d2bab33f3df6d5a586b1e9ba025c1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-educational-comic/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-educational-comic/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-educational-comic/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-educational-comic/SKILL.md",
-    "sha256": "1990096cc15d426317f14007dc058138659152b2917a46403e0a37806e72d019"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-effect-template/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-effect-template/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-effect-template/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-effect-template/SKILL.md",
-    "sha256": "79596927b8c7322ab64106132571240d2b3f2525246786609e5e4d0706d6fd35"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-media-enhancer/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-media-enhancer/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-media-enhancer/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-media-enhancer/SKILL.md",
-    "sha256": "8df83643349f6d3b565a9c42beb47c54e07903f9c18b5ed9f26753e216109a83"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-meme-generator/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-meme-generator/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-meme-generator/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-meme-generator/SKILL.md",
-    "sha256": "1447ccb13d4803faf9be1ac7e0a5ce41af2faa6de7e57153146dfdc8957de748"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-model-router/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-model-router/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-model-router/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-model-router/SKILL.md",
-    "sha256": "74451ab7c21927e00806523ac031f3b0036f9c33d1cffa8a924a93af6a41d5a3"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-photo-replication/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-photo-replication/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-photo-replication/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-photo-replication/SKILL.md",
-    "sha256": "8320193553dbe9d26c11d0797ab300d2692e9ffe158a3412cbab25a96bf7cd05"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-task-runner/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-task-runner/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-task-runner/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-task-runner/SKILL.md",
-    "sha256": "686d8d4f8ae5d1672d68e19793dc226bd036e619f6b02e4ffd0a10d6c5cf569a"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-url-promo-generator/LICENSE",
-    "target": "agent/agent-skills/skills/expertise/crun-url-promo-generator/LICENSE",
-    "sha256": "0eef30464acdac9dca33dffab85002bc42212dca7029f0217a1e81e1b19bcd1b"
-  },
-  {
-    "source": "agent-skills/skills/expertise/crun-url-promo-generator/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/crun-url-promo-generator/SKILL.md",
-    "sha256": "8e5f2784b514e5a5178f885aa7edf5d59b2c2e3571330ae6834530a9d8dea605"
-  },
-  {
-    "source": "agent-skills/skills/expertise/image_generation_expert/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/image_generation_expert/SKILL.md",
-    "sha256": "2f7c788e494b41580ad6d2c4c847196ddac40ce51b0ac1e44e78a4441d38f8d7"
-  },
-  {
-    "source": "agent-skills/skills/expertise/mateo_madrid_no_duerme/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/mateo_madrid_no_duerme/SKILL.md",
-    "sha256": "f2a407b8b341b3e4494768d37099ffd0f983c5192614221eb8c2a1c5265f5382"
-  },
-  {
-    "source": "agent-skills/skills/expertise/model_router/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/model_router/SKILL.md",
-    "sha256": "842a17fb127be234f4d8f9146685d7e736b5673e4afcbfc9824047ab90da03ac"
-  },
-  {
-    "source": "agent-skills/skills/expertise/output_quality/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/output_quality/SKILL.md",
-    "sha256": "1718dc9d839e414c153ea46d5d2707f65f05a1bf9d0921f7ce1b3be7bc4b14a2"
-  },
-  {
-    "source": "agent-skills/skills/expertise/prompt_engineer/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/prompt_engineer/SKILL.md",
-    "sha256": "fa3c04572962a8aba5f734ffdfc7aaa6bd35e4532cf92f656ab7546e355be798"
-  },
-  {
-    "source": "agent-skills/skills/expertise/shot_planner/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/shot_planner/SKILL.md",
-    "sha256": "4727567414dd163c709073cb8e9a360ea0bcb312c7d9b5788c97d43745a8e86e"
-  },
-  {
-    "source": "agent-skills/skills/expertise/video_generation_expert/SKILL.md",
-    "target": "agent/agent-skills/skills/expertise/video_generation_expert/SKILL.md",
-    "sha256": "e8cce1f2b665d8d384159d58a20eeb4b0941336b9c9391b3ecae77385f7bb243"
-  },
-  {
-    "source": "agent-skills/skills/models/atlas-studio/SKILL.md",
-    "target": "agent/agent-skills/skills/models/atlas-studio/SKILL.md",
-    "sha256": "dd4fb76aa7b3dec6fef2cdcfe5ff7de143c9adac531708a3380cbb14d93a9226"
-  },
-  {
-    "source": "agent-skills/skills/models/avatar-lipsync/SKILL.md",
-    "target": "agent/agent-skills/skills/models/avatar-lipsync/SKILL.md",
-    "sha256": "b6bcfa08d3c8a230c8ab69293cdfa8639a478c949ed532be5f610e4702e32ccc"
-  },
-  {
-    "source": "agent-skills/skills/models/ernie-image/SKILL.md",
-    "target": "agent/agent-skills/skills/models/ernie-image/SKILL.md",
-    "sha256": "a4e2c5e11c18031b308388b7f72bffe42dc2990816431d7243dfb7e2db2777f1"
-  },
-  {
-    "source": "agent-skills/skills/models/flux/SKILL.md",
-    "target": "agent/agent-skills/skills/models/flux/SKILL.md",
-    "sha256": "ecac909dad37ff4d309c84037a456d6c9c3285ea21d1beac2cd8666b6373ef5f"
-  },
-  {
-    "source": "agent-skills/skills/models/gemini-omni/SKILL.md",
-    "target": "agent/agent-skills/skills/models/gemini-omni/SKILL.md",
-    "sha256": "b3bed1b9fae3c0c128a307fdda5105e1374c51413f8d8cfea645bb4270dea4df"
-  },
-  {
-    "source": "agent-skills/skills/models/gpt-image/SKILL.md",
-    "target": "agent/agent-skills/skills/models/gpt-image/SKILL.md",
-    "sha256": "4f9940faf9eba0e0871ce502e2c1852498bb963130e67223ee1f498c2c6cc960"
-  },
-  {
-    "source": "agent-skills/skills/models/grok-imagine/SKILL.md",
-    "target": "agent/agent-skills/skills/models/grok-imagine/SKILL.md",
-    "sha256": "1c1d616855ea01e5dcb0938335f5af5fb3906fec85c7207b3a30a2c7067a8cb1"
-  },
-  {
-    "source": "agent-skills/skills/models/happyhorse/SKILL.md",
-    "target": "agent/agent-skills/skills/models/happyhorse/SKILL.md",
-    "sha256": "e3944c4b56022219be75c323d7115023a6b3afd8592e6e0affc6f3592f317075"
-  },
-  {
-    "source": "agent-skills/skills/models/ideogram/SKILL.md",
-    "target": "agent/agent-skills/skills/models/ideogram/SKILL.md",
-    "sha256": "34582c7a96998104fa6e690c0022ee31e1a4774e804347295d634c0dc94206b8"
-  },
-  {
-    "source": "agent-skills/skills/models/kling/SKILL.md",
-    "target": "agent/agent-skills/skills/models/kling/SKILL.md",
-    "sha256": "c3d8f60d24d9301954e19ea22efb067ac7e13e4188b94696b44402a6813d5fb9"
-  },
-  {
-    "source": "agent-skills/skills/models/ltx/SKILL.md",
-    "target": "agent/agent-skills/skills/models/ltx/SKILL.md",
-    "sha256": "d36eb6dba0210a7dfa9bd41e84662554e02fb93521614406a400db79cc52c2b4"
-  },
-  {
-    "source": "agent-skills/skills/models/luma/SKILL.md",
-    "target": "agent/agent-skills/skills/models/luma/SKILL.md",
-    "sha256": "ff1aa37398bd18374b2a1585fc5a130305fea3d502c494510f7dd2fd76b8df8f"
-  },
-  {
-    "source": "agent-skills/skills/models/mai-image/SKILL.md",
-    "target": "agent/agent-skills/skills/models/mai-image/SKILL.md",
-    "sha256": "02cd2451675f0d222a009d38fd26e41a23d41c5442c03f169e1c436106baca21"
-  },
-  {
-    "source": "agent-skills/skills/models/midjourney/SKILL.md",
-    "target": "agent/agent-skills/skills/models/midjourney/SKILL.md",
-    "sha256": "4e56bdc38037b202419277c775688cdf31fd9fcf24e480d883657c8ac49bb5d0"
-  },
-  {
-    "source": "agent-skills/skills/models/minimax/SKILL.md",
-    "target": "agent/agent-skills/skills/models/minimax/SKILL.md",
-    "sha256": "c829f3a32e96ef3ae28ffd732228afa6cc81673ab2118e0f56c43cdb9ec776ad"
-  },
-  {
-    "source": "agent-skills/skills/models/modelos-3d/SKILL.md",
-    "target": "agent/agent-skills/skills/models/modelos-3d/SKILL.md",
-    "sha256": "4a667246ad4e525c83197b23bb6081a8b1e7e6950183368ee0d52f7e333039ab"
-  },
-  {
-    "source": "agent-skills/skills/models/musica/SKILL.md",
-    "target": "agent/agent-skills/skills/models/musica/SKILL.md",
-    "sha256": "f870262061714f1831e171df1566a3955b8307ab0a68b4787fde7a7053ee93a4"
-  },
-  {
-    "source": "agent-skills/skills/models/nano-banana/SKILL.md",
-    "target": "agent/agent-skills/skills/models/nano-banana/SKILL.md",
-    "sha256": "e788a8ed61b6eb08641ea58794f94f0462f126e5912b630e124fea3363a30657"
-  },
-  {
-    "source": "agent-skills/skills/models/nvidia-cosmos/SKILL.md",
-    "target": "agent/agent-skills/skills/models/nvidia-cosmos/SKILL.md",
-    "sha256": "090ecba07568ed6acbdf3ad2b2a35a44a9f1c690bda80aa5d3a237d6806f42fa"
-  },
-  {
-    "source": "agent-skills/skills/models/otros-imagen/SKILL.md",
-    "target": "agent/agent-skills/skills/models/otros-imagen/SKILL.md",
-    "sha256": "2108ffea4e118adac09b86b9d3af3352a6766c101e6bcd1fd82012ca4a0e208e"
-  },
-  {
-    "source": "agent-skills/skills/models/pixverse/SKILL.md",
-    "target": "agent/agent-skills/skills/models/pixverse/SKILL.md",
-    "sha256": "bb44cabe5c8a68d0bbcba47a741763b4979953f93f1a9d36962d24d079a60335"
-  },
-  {
-    "source": "agent-skills/skills/models/qwen-image/SKILL.md",
-    "target": "agent/agent-skills/skills/models/qwen-image/SKILL.md",
-    "sha256": "60a89f74d210af14bf56e9677b00a5574433939fc4efc9fef076886eb99f9545"
-  },
-  {
-    "source": "agent-skills/skills/models/runway/SKILL.md",
-    "target": "agent/agent-skills/skills/models/runway/SKILL.md",
-    "sha256": "0463feea46cd73a706fc7849880da817f2458629010754588a19a35c42b59974"
-  },
-  {
-    "source": "agent-skills/skills/models/seedance/SKILL.md",
-    "target": "agent/agent-skills/skills/models/seedance/SKILL.md",
-    "sha256": "ac44eebb2162fe9a83aeaa3598b6f4c93532c757f0d30227989ebc3802fb7314"
-  },
-  {
-    "source": "agent-skills/skills/models/seedream/SKILL.md",
-    "target": "agent/agent-skills/skills/models/seedream/SKILL.md",
-    "sha256": "421f493a397cd6db7605707bfed606d0e08b3409e93cea088c6460d408fed35d"
-  },
-  {
-    "source": "agent-skills/skills/models/tencent-video-upscaler/SKILL.md",
-    "target": "agent/agent-skills/skills/models/tencent-video-upscaler/SKILL.md",
-    "sha256": "3842f4a017954d1db2e7428c542310f3aa6ac02d23ba77c75407eb07717a154b"
-  },
-  {
-    "source": "agent-skills/skills/models/upscalers/SKILL.md",
-    "target": "agent/agent-skills/skills/models/upscalers/SKILL.md",
-    "sha256": "6372d6c61325f629996526e746ed8b01130dc9518d11aaf962fb3ab31f4eac84"
-  },
-  {
-    "source": "agent-skills/skills/models/veo/SKILL.md",
-    "target": "agent/agent-skills/skills/models/veo/SKILL.md",
-    "sha256": "57b566ee81e7b10b7d73f6291b0d806ee80c46538f08e49036de555043bd588f"
-  },
-  {
-    "source": "agent-skills/skills/models/vidu/SKILL.md",
-    "target": "agent/agent-skills/skills/models/vidu/SKILL.md",
-    "sha256": "b68a9af00d0c91edfa89d1eeb3ff44fe0db897ad8b2b08d812bfde9620099302"
-  },
-  {
-    "source": "agent-skills/skills/models/voz/SKILL.md",
-    "target": "agent/agent-skills/skills/models/voz/SKILL.md",
-    "sha256": "984b01576beebaace51ec3fbde20a543e9e272addfdd09c23105871de1571e8f"
-  },
-  {
-    "source": "agent-skills/skills/models/wan/SKILL.md",
-    "target": "agent/agent-skills/skills/models/wan/SKILL.md",
-    "sha256": "48ae25004e2f5f8a605db1602ae8273cb00db244cb09a1cabeece6fd0a9da227"
-  },
-  {
-    "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainDiagnosis.kt",
-    "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainDiagnosis.kt",
-    "sha256": "13dff0f56e463e983f9bf8e026762d1e9bf713fa849f429d0ccdab4f9ed530b1"
+{
+  "format": 2,
+  "reviewedAndroidCommit": "c4cb36750d2e7b8dd270f349d61c9e0715f67a1f",
+  "compiledSource": "agent-core/src",
+  "desktopAdaptations": [
+    "AssetIndex.importProject with narrative associations and injectable persistence context",
+    "Responses PDF visual pages and one-pass document reading",
+    "Kotlin 2.3 compatible temporary-directory test"
+  ],
+  "files": {
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/AgentOrchestrator.kt": "ca4dbc37578253e09f9410f782454926ae6eb187e63960ffd1b3652505694fee",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/ClaimVerifier.kt": "898d9835bb83f0eab286d126de5ca7bc498d1906655660a309a5d87d2c60a33a",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/GenerationLifecycle.kt": "8b4536f7cf6f0fe80df9203d2f9a0e51f1484116e8688dd9e363f48c18bb5ae7",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/SystemPrompt.kt": "8f455a33c6a70d898bc2783763da0e90007792d8806385b12b0702ef61a4835c",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/agent/VisualEvidence.kt": "73bd4b45d89c706e54988963f47faa453c201cd9bed0c29ab030e322e6e7d80d",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/AssetIndex.kt": "344410c09a7d2c94e4453b1f86acc329102dd6c4d509210ff38db865cc2424c8",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/StoryGenerationContext.kt": "c7032492a9b058315bf0c214f5314c64e6f27c3f441db7bf821145eba76d5b88",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/assets/StoryWorkspace.kt": "a5dffcfc4d8e6e70b9241e18b0c2c9f9131841ff8c33199ac0eb50d00ff09d32",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatMarkdown.kt": "ec92c196af05027514166c23a6d7a2b4f3d33b8771f34bbac5b05f15b7cb6b09",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatPresentation.kt": "d27efda7f184780a08fadde1eae9215b8f36ef60f3325f9cd059ae40c82657a7",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatWidgets.kt": "60486552e5bc70fcfea58a9756b55739ce2afc8f5591964efaf107b10d0d615c",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AdjustableConcurrencyGate.kt": "a7139f59992d3d7736b01c15532935d214c2dcc9a9aec70b2c772e817b121d35",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentConfig.kt": "5b21432e0425aefac8783cc0d3272c1a1e7568cfd79b16845d25781d8ab0f528",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentLimits.kt": "5b960f16241887356c0e2a639d137670e7243f7b8b69a0adab5ce248ff5fb5ec",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/RuntimeRules.kt": "6f3e89b63a385bc103dfb279eb03f4fcfc1ece18f2d34ec5dcb1a106a8644b65",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/cost/CostEstimator.kt": "4fe57a3d2af4614e4695f000625b4350e875fc9ebec04a1d95cdd1b3e317d7bb",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/cost/TieredTariffs.kt": "e412502d18d5344ed038638c8aba2218091b8a2868ffb195f8ceb165bdcf1678",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AnthropicProvider.kt": "bb87918f76eb4432369709d0c62b7e3aa681062c6f0227e875baeb45915e5ecc",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProvider.kt": "ed51432f172672eb33af18c9a4e4fde057bd61951f3cffdd2033a1d0633299e0",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityReasoning.kt": "0c97efed68c7d240167e0c91992c1c75aae043dc5d774bad3c99d112225739fd",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockDirectProvider.kt": "10909b16b421aa47ac39d2060c6b661400e1390990d0656869e9c5e554ef4287",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BedrockProxyProvider.kt": "2810bd582b934a219a3f3c1f0589239d52479126cc1fc3c660217ecb01053e50",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainDiagnosis.kt": "13dff0f56e463e983f9bf8e026762d1e9bf713fa849f429d0ccdab4f9ed530b1",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainFactory.kt": "c469f9bd6607e59732059eaaa84938cb08d320a72d2986a1887aff76e5af688c",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProfile.kt": "a2cc52ac59351fe0f50c44eb8b2ca2a7565f859babd0e2e1d67b914f6b9ae338",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BytePlusOfficialCache.kt": "413e9af3d9e64dea398a2fcbf6fca5b80334194e377ec6505b4f612f6b53e597",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/BytePlusUsage.kt": "d1a0e4ff0a3709be8eb30879c4a52c93e5d9865f1128dfe0a77141cb44d78612",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttp.kt": "cdd7764c3ababe338046ee53fb796b8722a85304d4a4bf101c709a8524361044",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/CodexReasoning.kt": "fb75ed45d72f0dafe38108a0a16efa40b84f1c20cd13c18d93084a9a56724a61",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ConverseCodec.kt": "a86cc65221d576b452171c76367b56fd7e954b7e9181242a0bbec7ebd396fceb",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/HttpTarget.kt": "5591fc471c870b2fbe3b8d5c9c9a5a7f01a52adcd0edb53b633c117c858aaead",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/Llm.kt": "75cb65e9447c4cc83b11996af8a76e6ec2b1c4f1702ab6d40f2087b864eb3016",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/LlmBudget.kt": "5101afa5c7ea5942e548e1409c2e53a72018f6022d4aa09db5887248e3fd33e2",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/NativeImageModels.kt": "40e8c9c2a612d9f499d0a06af990d10ce71e81bddc779b3dc870bfb4f82cd50f",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OfflinePlannerProvider.kt": "65ed8d328fcde92c4d49d7c5d381012f98873b6ca2823c3b778302ed2f133712",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/OpenAiCompatibleProvider.kt": "3836e83fd8a2ee1c9e4bce365e4b96627204a7924d9053945ddf0868d3d339a5",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/PromptAdapter.kt": "8926ae4b9f4992c1606888e61083c907d33e15760972835e556838fe1e0acdf2",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/PromptCacheFallback.kt": "ace0811c01384d9405d39dca333e76556da38de8d79852fc4b94ad2641d4fded",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ResponsesApiProvider.kt": "b0f18d22dfd6d3564897a62b0b00a363a8f6e19edeaefbd306cabd0f1d22a1bc",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/ScriptedLlmProvider.kt": "8399a74a96f38cd60d7b07bac17e0c29911dde45ca00044d6b06a8a1ea62fa59",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/llm/SseStream.kt": "7ceb671b3b88004aff7002db42a59737810fab6056011843279d32228db79d32",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/log/Redactor.kt": "5bd2a8a0398799fbbe756a1389f6af680265e3612e03c350351b109fbd04d6c6",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/FalCuratedModels.kt": "794f2feb0184d90325173d61ca2dea2691de5b469301b9344d31e1afcd95e80d",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/FalQueue.kt": "61e4b8ce82cfe8b5d0a384421260545a97f752dcf7b6e508b02ba39d8556c4b9",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaEngine.kt": "643e5a5dbb518d4f8fa47121c4a80cc919a51a930ad0fcaf48f84eb04472e9a0",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaParamsText.kt": "334109a1c23b4f4d3ac9e796e9b6faabcc0a8f346e10f5d375dd6b992dc26418",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaProviderConfig.kt": "167ca7d8702e4c2da1e0d393f7a7fed6dfcd7e81443f63080311e059bec18a81",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/MediaTemplates.kt": "17b126d769ce7921686c23ab640befb82436f27b36727a7167dce80af6428926",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/media/ProviderProgress.kt": "8c3b0c5c27daa9543183d26735ed3ce6505c8a87566d276a8aa5ff770a620505",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/net/JsonTemplate.kt": "20e00f98aebe0d0ab7ad0b7a3454776be4905d157fcd2fceeb24153ed8af20e1",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/orders/OrderBook.kt": "157bf13b37533ae96788d3c809c2187f06359bc2b176121217e2c7a9e0c688c3",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/registry/CapabilityRegistry.kt": "019ef929db30bb7ab659e4eef1aefbafe25fb1a8747a8ec42b17bf6b81e5a8a6",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/registry/ModelRegistry.kt": "35d24cbd946e94e58e66f509af448589ca8351726f06e3e28142ca08022f0574",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/router/ModelRouter.kt": "498e81f242a81c82e71ab1cd3505d41dad38c050d0f858e1baa687e53a846b53",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/GenerationCostPreflight.kt": "925a65b9032a449a20f9c7fa5b5fee266bc12d4f3f8a57a442d4aad382594d15",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/ProviderRoutePolicy.kt": "128207b36d5f8c525b33d24d0397b3eb9fdb8b57f4b253d4bc39e240e538a81f",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/RouteComparisonContract.kt": "f0195129f6dd1aea97c268715738d7f0ef76bd635e1bf7cc4479b6a7ad158232",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/VerifiedRouteExecution.kt": "3ccac0cf8e6c7f8e893e162c12784c4ca5ec7d78f6d1017118d0cd2a7bc5ef48",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/schema/ErrorDiagnosis.kt": "2de92dadfab2d811a451d0cfa45df769c6e35247c3f54bd0abefe2488182d9d7",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/schema/ParameterValidator.kt": "8616c40117cc952fe6060c3678e27263ed7a259f872a549480ec794ba448991f",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/skills/Skills.kt": "6e982373d38d6e643bb5a244b004f543f1b71f5088fab8085118700d9c3c1965",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/spend/SpendGuard.kt": "adb05ee101895463cde3a2f4ed8a5772772014e110865945f7eca5c46d2d6872",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/sync/DriveRemote.kt": "9cd744b2c4d4a878224e0b92d3e06a5b9f73777bd1c924b8065ca6a7e71e8160",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/sync/SyncBlobs.kt": "db38628e9fb28a1064095fd236cb89fe43b26f976f109d5b41da5ac8feb2005c",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/sync/SyncDocuments.kt": "85a510d993a62887592773584ed00d42f297ed28e01a9996a38e1174d2925777",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/sync/SyncJournal.kt": "f058bd4e751b3d2b9a617e13bf9c9e79f8691b5fddf599f3e29a846d4d5c43ae",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/sync/SyncProtocol.kt": "61f1a3bd8e8cb5664014552958e1faa4ae9d4aa295bf00b2564a79b5bb136f0e",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/sync/SyncWorkspace.kt": "4f3318a18c7e57b075be67006c4f70f9cebe8310b9f6459a17cb4abd803c3beb",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/AssetTools.kt": "5abc87f5d76b1c93d24102c83f243aa9a50de963a453c54490f337ff79d9c5bd",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/JsonArgs.kt": "092f8ff5f6905c7acd86208d8a83bf2a9e09af4acca495ba528f1c30fe1ddbe5",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ModelGuidance.kt": "008874c5ebfa401d08ade4468191b40de26efa96b18b2e4636a148eae6684018",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ModelTools.kt": "3f21704367fb35013a59ffec692e5574310e8152615f1067b1c53480acf3c735",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NativeOperations.kt": "fe90dcb5f9d66899fdd8847505a111f956dd59cb98b816b679f804ac1f75a196",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/NexusToolkit.kt": "6741fae936f4f6aaa46015b27620a3162e095ad4aa3350ad419b3df0f0814e25",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/OrderTools.kt": "8396df7e92cab030d31677c0514aae1da1cf2ba1b71c03fdba4df59c5e7c4d38",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/PlanBuilder.kt": "dbb5ffc5e13bb17e2727e8b124d483505ae7427ab94672f4b486edd2402a7195",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/PlanTools.kt": "7fc371da8630e680b751507e682066bab1b409658f47ba2b031912938a573f1f",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ProjectMemoryTools.kt": "928fecb0a04fb2f0aa5b3da36db7221ed4c3972f0592f2d366537984d4455540",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ProjectOverviewTools.kt": "6af0308411e8c36647497c8fc9983b116485c3697ef3aa4eac23d9dab225537d",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ReplyTools.kt": "d454dfec3a741a1b7768f33b57c8f07b72990ffed13f31529a174bc49dafbdef",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/StoryTools.kt": "a05b58df932be556781a11bf8be6dcaeb986b3cb3bc3ded70fec91ab3416c1e0",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolDeps.kt": "116c2d8255a5d9e5123f5622b65c5a568676bcb7bdd92ac9ed9b560803cf8ba3",
+    "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/tools/ToolTypes.kt": "57b8e0dbb9f592979b13da19605a56dc9d37e774dfb003d217298601753cbd93",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AdjustableConcurrencyTest.kt": "960ba341ab62e44689195481388e41045c3d24a7beefe5fb4a0244c0f301ee49",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AndroidRegexCompatibilityTest.kt": "fb1961031bf79eddf28663ca4abfd824d18475c31bbf1b32c8df8db7ea3ee8cc",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AssetIndexExternalWriterTest.kt": "ebd7b5583e900b7c56c048f652b58ab2f6bfb79a20a2b9422ce247b53d5d605d",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AssetIndexPersistenceTest.kt": "e100e1b3edb16c0a1db6baf6af2fafa4d339d71071d61e93b4e4473562ab1a46",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/AssetRelocationTest.kt": "2eaa025ba13f59f2c2d9f9056aeb2bb7694a494ca8cbf71c541b7e10b1eb2a9c",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/BedrockDirectTest.kt": "f363368cb6ce9bb27145cc779defffc32185105bc0287edf032f710747a7281f",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/BytePlusOfficialCacheTest.kt": "d22d823d33479aa8a31a0e988ed16a278b8235a27bd58feb999e1a295b04059f",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/BytePlusUsageTest.kt": "5287f9739a89e7c517aa4da03c411dd4a941467b7daae89513d4bd79d27e33f8",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/chat/ChatPresentationTest.kt": "a01c8ad1746861a6ca1e6b83025212c9b40cd3e093f0f4b662cbb5ff56cf39cb",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/chat/VerifiedRouteExecutionTest.kt": "fcd01e0e21c17e2febb4a9ac9434a8e027a89e6fbdd9d9918fc402454e863668",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ChatMarkdownTest.kt": "c9a1d5024e4202700a51eac2b8b43d83d2d0cbd10a0af3c39d77b630e3951131",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ChatRichContentTest.kt": "f1fb70c759c0033c4de33860ebba83729b359af7708275102ad51edf304f9b4d",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/CodecRedactorTest.kt": "f95bb528702b7813fadde734bf509f72548290cb47b240bb3bc4e03bb38ffba3",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ConfigurableLimitsTest.kt": "8a00abed15bc7d1b97100a4b2c63f102b758495da7737c799c008838b04d4ea6",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ConfirmationSafetyTest.kt": "75fae0b7ea742f865c2e647542387353a246cce6ad58c37856f09fba64b26129",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/DeviceSyncTest.kt": "f258dd820c93a851b4f7e1d92ebe9c468173f405b7900e5ffe297243ea6ab9bc",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/FalCuratedTest.kt": "291f2adfd705735e93689d87c5dbdc6b004ce2b812044a71c59fca7909f511ac",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/Fixtures.kt": "6e650564462a4c8f28b516ad2d7a112adfb415316ee0569ce5261d79d8b3b627",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/FlowAssetOriginTest.kt": "f3464176c0dfe38d2cdf397fcea21308ca16428e342197a90847c9f5368b8fb0",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/FolderToolsTest.kt": "d97b2098f58a299f750d35331d0fedf1790cf5cc7d6c65e325a6b881e3b94063",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryDeletionTest.kt": "698bffe8262d8525228edc1d28ae56ab6a24bf8a4b5c582af50c7ab8ad26c450",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryRestoreTest.kt": "6fc0157265e034c094b340961a6eceb0bdfaac2c8fa5e7bf9468bbfb267801f9",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LibraryVisionTest.kt": "3d63f9bc7433f18eb8ade91af9c1e30ff91ada91aa17aeb33fd509946dfb6938",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityProviderTest.kt": "967f441ec6ab1432c7fc887550a04cb9931a55f2ef2793aa997ce1b6bdaee4ba",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/AntigravityReasoningTest.kt": "7a34e74de9dbfe28fd36de09f1b4fdef5649502e4b715e727549151ac2e36090",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BrainProvidersTest.kt": "64e3daefbe4a1217c77e1dca18c0827ec33684508a94b721900b1cf367e6e393",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/BytePlusLiveTest.kt": "517faba9bfea35f7e2913f2535cc25ed4b64c4ac880d2e18ccf8b2f54b810843",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/CancellableHttpTest.kt": "1f094913523a56398dd636411dd77a7c799b8d75ce7d61df6e50bc920d7654e7",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/NativeImageModelsTest.kt": "eda9fb4e017d99d06097f80dde344169ec4361210078adcde62936dcc82159b2",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/OtherLlmProvidersTest.kt": "7f04e38f30af814609f60a4da8b6f43715450f4cf9f1ddfb2c91f21c66fa2cb4",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/llm/ResponsesVisualDocumentTest.kt": "7252eee8f5b185948c859fe61c12c721ee3ec1a83db2881ec3ce42fa6c043c47",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/LlmBudgetTest.kt": "169b2d9b45b0f8c994e0d65518de50b5ab4cf787c0155ba0b3ad025f1c3247a9",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/MateoJulianFlowTest.kt": "51787b602f1af5e0f732637ec9cc9cf0cc1774116a159d3b7b9ef6cdfd4204b3",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/MediaEngineTest.kt": "ec1188ed7b4a31b8eba9f3206ebb95589870c4c32edc1acf31cfa9b58c5acc61",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/MediaParamsTextTest.kt": "ccf899c1641bcede7719d7e3b811cbf49e8d1380b981d57b625a48f6afc13dbb",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/media/ProviderProgressTest.kt": "c2993a783c4b5a6c3074e4867afde72819a91ca858e7460e563b3a574525d1c0",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/NativeOperationsTest.kt": "217e36415fe6a9696c351497ed26d3adb79fa6d8dd5afd7ae4b9a533a1571732",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OfflinePlannerTest.kt": "b7c31353fc8e53e35350207ca6493ae8c9d8f63af4b043d8f2ca2018855f9382",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrchestratorTest.kt": "4ae1677b3c39d98d9f6fc23b6a78c8351d0a368e8bb6a48214e2175fd9e1766e",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/OrderBookTest.kt": "ed015e2ff10620e35f2c5ce764e87a895da6a2705c3cc2a5dbc20be2b0bc4c5d",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PlanReferenceRecoveryTest.kt": "090204690a5efed3ac0a7d1b7d8355b983b58e1a12dc67b8478e7ea2e48ab5b5",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PortableIndexTest.kt": "25abab88fdcb2edcda3df5c5b70e8cc16e6b442956cd374235155104097d44dd",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ProjectMemoryTest.kt": "92273f9002c29078a731f17e5917c7fbb3b4cb9a5cb9f0babf8410ba605de90e",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PromptAdapterTest.kt": "b9dc871254ad9ae550d59542d9094d39a733d098e25ab519673e071a29226bf3",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PromptCacheTest.kt": "c028b5a76e61c6e731972b2e4ed731af1a4b37f3c6aab2579a0045f0f73848f0",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/PromptFidelityTest.kt": "c3381d015ec7af6d187017d6525c18537a7cab2a28d8fbd9b2f4453c1c06e688",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ReasoningCodecTest.kt": "e0d6761055f188871d6fce2a2ae57af1894ce97d82903a6b67542aefb1d630d7",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ResultsWallTest.kt": "be06f9ad6a60ba665afd3846cc47fc56cfb6bc5b93e89ba4bbacb1c19e1a79f2",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/RetiredFlowSubmissionTest.kt": "65b7c794457c8a0e953a44df7969b105f5cf3d5d78a9976842254107fb92155a",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/RouterGenerationTest.kt": "8382c4107075a86fe3aa6ff690c0ec8b11789339536dd9d62aaf8d370b7281d0",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/GenerationCostPreflightTest.kt": "25c3bf67a4d9676b79e00150724bfb7bbac9bb01e6e000d2e8f7e535dfdd48c6",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/IntegrationContractTest.kt": "7cfb695f05c94bdd86bfec1ffd8884543c91240a8dee48e61420d621b6608b7c",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/routing/comparison/ProviderRoutePolicyTest.kt": "cd1bb983a63ee94194b2d5d0e51550886c7bc9022358a8b13a3e93fc4eeca0bf",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/RuntimeCapabilitiesTest.kt": "22b44644849489853a505bc574a126dadd700f17bc093c908e73a84264083431",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ScriptHelpers.kt": "99387e884ca5dbe731f08903a6a44f8a2fb91a3f15c2f0f095c81436b778fa8a",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillCatalogCoverageTest.kt": "d6bb356e215043ded36e77c5226c6d9aafecdb3b5b5860e931a01159f2acf3f2",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillParseCacheTest.kt": "e75f68464acfb393dd8db601e7fed37f3832cbfd3aea1cb28f4418fb1cf84248",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillsRouterAssetsTest.kt": "e0a032c4117da8f8185a02d7e1db9106c2ef5e2911f2036fd7e870aa2ccae415",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SkillsV2Test.kt": "d0a5ee63e8b57f43af494bf54b60fc968cf8dd3f00e0e0c65fa8c20d2af14f75",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SpendGuardTest.kt": "288a933cc19ced1d79f80096a51d81975e7e989afbbf4b5894a99118eeaef5d5",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/StoryAgentToolsTest.kt": "b3c0f0e82b6008e5b95625b61fb058c000239d78edcd04d2002309cdaaee4780",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/StoryWorkspaceTest.kt": "50d8ea06d6aeb562937a7ee78a9e711d5bb5ba7b6f7b51749937558670f62de4",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SuggestedRepliesTest.kt": "9942cf44a41681aceabc94d630165dca5cf62863b2f178e50c550fc6b92b7690",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SyncDriveRemoteTest.kt": "24cce942908c312c2c6619b33218918d281457506292578e218f4156915ea167",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SyncJournalTest.kt": "efe6c7bcfbd9bd7e9fed21d1fe95d03d98bf58cec478da45cd548449e6979215",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/SyncWorkspaceTest.kt": "7762273b2fb283617774c412c3e35afab26e1df1e5a46c80e46aec84aba159db",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/TencentUpscaleFlowTest.kt": "5222059861c88ae90bfea1341912d26253b0d1a2daf133b2c1104892f85b4067",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ValidatorAndCostTest.kt": "21848a4a69a99efa5bdac68d677292a6b63665a6f8ff4b8908309035fd20d90b",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/VideoAttachmentsTest.kt": "749d6907a3d9bfd0229007e4e0d4a7ed10a615a82939a1c143501bcf8deffc54",
+    "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/VisualEvidenceTest.kt": "b33b4d58babbf60c26dbec08586c4c346560b60b2c554612e99e4c6f29d2f739",
+    "agent-core/src/test/resources/atlas_published_prices.json": "d876bfcbcb3bc78acff8b4441ca4473aa155a3e848d78098148e00e4c2f60ca7",
+    "agent-core/src/test/resources/skill_coverage.json": "53c2bea2d534b649b0d79d3148f21fdcc31d74bbca2b9b63a161f789ae1920ea"
   }
-]
+}

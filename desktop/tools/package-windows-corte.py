@@ -33,6 +33,9 @@ for name in ['android-source-manifest.json', 'desktop-parity-manifest.json']:
     include(desktop/'agent'/name,Path('desktop/agent')/name)
 include(root/'docs/DESKTOP-MODERN-20261026.md',Path('docs/DESKTOP-MODERN-20261026.md'))
 include(root/'docs/DESKTOP-PREMIUM-20261029.md',Path('docs/DESKTOP-PREMIUM-20261029.md'))
+include(root/'docs/DESKTOP-AUDIOVISUAL-20261109.md',Path('docs/DESKTOP-AUDIOVISUAL-20261109.md'))
+for name in ['test-desktop-story.py','test-story-host.py','test-story-generation.js','test-library-story-links.js','test-current-catalog-policy.py','test-current-catalog-policy.js','verify-flow-live-readonly.py','write-agent-manifest.py']:
+    include(desktop/'tools'/name,Path('desktop/tools')/name)
 for name in ['test-gallery-previews.py','test-gallery-sources.py','test-library-workflow.py','test-library-snapshot.py','test-library-projects.py','test-library-operations.py','test-library-move.py','test-library-move-journal.py','test-import-dedup.py','test-library-model.js','test-originals-protection.js','test-original-archive.py','test-workspace-continuity.py','test-android-handoff.py','test-drive-sync.py']:
     include(desktop/'tools'/name,Path('desktop/tools')/name)
 for p in (root/'docs/windows-corte').glob('*'):

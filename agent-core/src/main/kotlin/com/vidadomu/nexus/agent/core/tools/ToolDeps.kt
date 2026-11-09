@@ -43,7 +43,6 @@ class ToolDeps(
     val assets: AssetIndex,
     val history: GenerationHistorySource? = null,
     val clock: () -> Long = System::currentTimeMillis,
-    val directFlow: Boolean = false,
     val adaptPrompt: (suspend (String, ModelSchema, String) -> String)? = null,
     val nativeOperations: NativeOperations? = null,
     /** Encargos visibles: estado compartido por UI, agente y envío. Sobrevive a reconstruir las deps. */
@@ -52,8 +51,10 @@ class ToolDeps(
     val probeFrameRate: (suspend (String) -> Double?)? = null,
     /** Límites vigentes del usuario, leídos en cada uso para que un cambio de ajustes aplique sin reiniciar. */
     val limits: () -> com.vidadomu.nexus.agent.core.config.AgentLimits = { com.vidadomu.nexus.agent.core.config.AgentLimits() },
+    val costPreflight: com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight =
+        com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight(),
 ) {
-    val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate)
+    val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate, costPreflight)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock, orders) { plan, message ->
         com.vidadomu.nexus.agent.core.schema.ErrorDiagnosis.diagnose(message, runCatching { registry.schema(plan.ref) }.getOrNull(), plan)
     }

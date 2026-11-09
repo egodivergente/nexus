@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),model=require('../ui/library-model.js');
+const snapshot={projects:[{id:'a',name:'A'},{id:'b',name:'B'}],entries:[{id:'asset:shared',assetId:'shared',uri:'/media/shared.png',modality:'IMAGE',projectAssignmentExplicit:true,projectIds:['a','b'],memberships:[{projectId:null,role:'OTHER',assetId:'shared'},{projectId:'a',role:'FINAL',storyRole:'candidate',selected:true,scope:'shot',targetId:'shot-a',sceneId:'scene-a',shotId:'shot-a',assetId:'shared'},{projectId:'b',role:'REFERENCE',storyRole:'costume',selected:false,scope:'block',targetId:'block-b',sceneId:'scene-b',shotId:'shot-b',assetId:'shared'}]}]};
+const entries=model.build(snapshot,[]);
+assert.equal(entries.length,1);
+assert.equal(model.filter(entries,{project:'a',role:'FINAL',shotId:'shot-a'},{}).length,1);
+assert.equal(model.filter(entries,{project:'b',role:'REFERENCE',sceneId:'scene-b'},{}).length,1);
+assert.equal(model.filter(entries,{project:'b',role:'FINAL'},{}).length,0);
+assert.equal(model.filter(entries,{project:'__unassigned__'},{}).length,0);
+assert.equal(entries[0].memberships.find(m=>m.projectId==='b').storyRole,'costume');
+assert.equal(model.build({...snapshot,hiddenIdentityKeys:['asset:shared']},[]).length,0);
+console.log('Library story associations: PASS (one file, two projects, scoped roles/selection, hidden preservation)');

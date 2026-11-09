@@ -16,6 +16,8 @@ class WindowsToolProvider(private val delegate: LlmProvider) : LlmProvider {
             "validate_parameters", "estimate_generation_cost", "create_generation_prompt", "compare_model_families",
             "prepare_generation", "prepare_image_upscale", "update_plan", "submit_generation", "get_generation_status",
             "cancel_generation", "get_model_brief", "get_ui_state")
+        val editing = setOf("corte_status", "corte_list_projects", "corte_read_project", "corte_find_silences",
+            "corte_apply_ops", "corte_import_media", "corte_create_project", "corte_undo")
         fun select(request: LlmRequest): LlmRequest {
             if (request.tools.size <= 64) return request
             val latestUser = request.messages.indexOfLast { message -> message.role == Role.USER &&
@@ -23,7 +25,11 @@ class WindowsToolProvider(private val delegate: LlmProvider) : LlmProvider {
             val group = request.messages.drop((latestUser + 1).coerceAtLeast(0)).flatMap { it.content }
                 .filterIsInstance<ContentBlock.ToolUse>().lastOrNull { it.name == "use_desktop_tools" }
                 ?.input?.get("group")?.jsonPrimitive?.contentOrNull ?: "models"
-            val hidden = if (group == "connections") models else connections
+            val hidden = when (group) {
+                "connections" -> models + editing
+                "editing" -> models + connections
+                else -> connections + editing
+            }
             val selected = request.tools.filterNot { it.name in hidden }
             require(selected.size <= 64) { "El catálogo de herramientas supera el límite del transporte; revisa los grupos de escritorio." }
             return request.copy(tools = selected)

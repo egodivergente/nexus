@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),data=JSON.parse(fs.readFileSync(path.join(root,'ui/curated-video-selection.json'),'utf8'));
+const {createPolicy}=require('../ui/current-catalog-policy.js'),p=createPolicy(data);
+const catalog=JSON.parse(fs.readFileSync(path.join(root,'ui/catalog.json'),'utf8'));
+const hidden=['private/unknown-route','runway/gen4.5/i2v'],before=JSON.stringify(hidden);
+const candidates=catalog.filter(model=>p.allowed(model)&&!hidden.includes(model.id));
+assert(!candidates.some(model=>model.id==='runway/gen4_turbo/i2v'));
+assert(!candidates.some(model=>model.id==='runway/gen4.5/i2v'));
+assert.equal(JSON.stringify(hidden),before);
+assert(catalog.some(model=>model.id==='runway/gen4_turbo/i2v'),'History catalog remains complete');
+const mini=catalog.find(model=>model.id==='crun/bytedance/seedance2-0-mini-i2v');
+assert(p.validate(mini,[]));assert.equal(p.validate(mini,[{mime:'image/png'}]),null);
+assert(p.reachesBytePlus(mini,{direct_byteplus:'true'}));
+assert.equal(p.tool(catalog.find(model=>model.id==='alibaba/wan-2.7/video-edit')),'Edición de vídeo');
+console.log('Current catalog policy: PASS (selection, hidden persistence, history, visual inputs, BytePlus, tools)');

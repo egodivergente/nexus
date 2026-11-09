@@ -183,7 +183,7 @@ async function agentCallback(op,args){
   }
   case'history':return state.jobs.slice(0,Number(args)||30).map(j=>({jobId:j.id,providerId:j.providerId,modelId:j.modelId,
    modality:j.modality||'IMAGE',prompt:j.prompt||'',status:j.status,createdAt:j.startedAt||0,
-   outputs:(j.outputs||[]).map(x=>typeof x==='string'?x:x.url).filter(Boolean)}));
+   outputs:(j.outputs||[]).map(x=>typeof x==='string'?x:x.url).filter(Boolean),projectId:j.projectId||j.storyContext?.projectId||null,parameters:j.parameters||{},storyContext:j.storyContext||null,referenceUris:j.referenceUris||[],estimatedCostUsd:j.estimated?.currency==='USD'?j.estimated.amount:null}));
   case'status':{
    await poll();const j=state.jobs.find(j=>j.id===args);if(!j)throw Error('Trabajo no encontrado.');
    return {jobId:j.id,status:j.status,outputs:j.outputs||[],error:j.error||null};
@@ -197,7 +197,7 @@ async function agentCallback(op,args){
   case'submit':{
    const model=await agentModel(args.ref),media=agentMedia(args,model),values={...args.params};
    if(args.negativePrompt)values.negative_prompt=args.negativePrompt;
-   const plan={model,prompt:args.prompt,values,media};
+   const plan={model,prompt:args.prompt,values,media,storyContext:args.storyContext||null};
    const key=args.id,approved=Agent.approved;
    if(model.providerId==='google_flow'){
     const count=Number(values.count||1);if(!Number.isInteger(count)||count<1||count>20)throw Error('Puedes pedir hasta 20 resultados por encargo.');
@@ -288,7 +288,7 @@ function renderGenerationPlans(snapshot,disabled){
 }
 function findGenerationBatch(id){return generationBatches((Agent.snapshot?.plans||[]).filter(entry=>entry.state!=='DISCARDED')).groups.find(batch=>batch.id===id);}
 function agentPendingEntries(){return (Agent.snapshot?.plans||[]).filter(e=>e.plan.ref.providerId!=='google_flow'&&!['SUBMITTED','UNCERTAIN','DISCARDED'].includes(e.state)&&!jobsForPlan(e.plan.id).length);}
-async function openBatchCanvas(batch,regenerate=false){const p=batch.plan,m=await agentModel(p.ref),supportsCount='count' in (p.params||{})||'count' in (p.effectiveParams||{}),values={...p.params,...(supportsCount?{count:String(batch.count)}:{})};state.draft={modelId:p.ref.modelId,prompt:p.prompt,values,media:agentMedia(p,m)};persist();await openModel(p.ref.modelId,false);if(regenerate)toast(`Lote de ${batch.count} listo para regenerar.`);}
+async function openBatchCanvas(batch,regenerate=false){const p=batch.plan,m=await agentModel(p.ref),supportsCount='count' in (p.params||{})||'count' in (p.effectiveParams||{}),values={...p.params,...(supportsCount?{count:String(batch.count)}:{})};state.draft={modelId:p.ref.modelId,prompt:p.prompt,values,media:agentMedia(p,m),storyContext:p.storyContext||null};persist();await openModel(p.ref.modelId,false);if(regenerate)toast(`Lote de ${batch.count} listo para regenerar.`);}
 async function consolidateBatch(batch,prompt=batch.plan.prompt){
  // Editing a group must not invent unsupported count parameters or discard jobs.
  for(const entry of batch.entries)if(prompt!==entry.plan.prompt)await agentCall('edit',{id:entry.plan.id,prompt,params:entry.plan.params});
@@ -457,7 +457,7 @@ document.addEventListener('click',async e=>{
    if(b.dataset.agentBatchGenerate){const batch=findGenerationBatch(b.dataset.agentBatchGenerate);if(!batch)throw Error('El lote ya no está disponible.');await generateAgentEntries(batch.entries);return;}
   if(b.dataset.agentDiscard){if(Agent.snapshot.plans.some(p=>p.plan.id===b.dataset.agentDiscard))await agentCall('discard',{id:b.dataset.agentDiscard});else{for(const entry of state.agentConversation?.resultPlans||[])if(entry.plan.id===b.dataset.agentDiscard)entry.state='DISCARDED';persist();renderAssistant();}return;}
   if(b.dataset.agentCanvas){const p=(Agent.snapshot.plans.find(p=>p.plan.id===b.dataset.agentCanvas)||state.agentConversation?.resultPlans?.find(p=>p.plan.id===b.dataset.agentCanvas))?.plan;if(!p)throw Error('No se encontró el encargo archivado.');
-   const m=await agentModel(p.ref);state.draft={modelId:p.ref.modelId,prompt:p.prompt,originalPrompt:p.originalPrompt,values:p.params,media:agentMedia(p,m)};await openModel(p.ref.modelId,false);persist();}
+   const m=await agentModel(p.ref);state.draft={modelId:p.ref.modelId,prompt:p.prompt,originalPrompt:p.originalPrompt,values:p.params,media:agentMedia(p,m),storyContext:p.storyContext||null};await openModel(p.ref.modelId,false);persist();}
   if(b.dataset.agentEdit){const p=Agent.snapshot.plans.find(p=>p.plan.id===b.dataset.agentEdit).plan,m=await agentModel(p.ref);
    modal(`<h2>Editar plan</h2><form id="agent-edit"><input type="hidden" name="id" value="${p.id}"><label>Prompt<textarea name="prompt">${escape(p.prompt)}</textarea></label><div class="fields">${m.parameters.map(param=>agentEditControl(param,p.effectiveParams[param.key])).join('')}</div><button class="primary">Guardar cambios</button></form>`);}
   if(b.dataset.agentGenerate){

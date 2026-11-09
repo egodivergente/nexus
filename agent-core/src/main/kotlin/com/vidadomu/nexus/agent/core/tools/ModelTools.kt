@@ -109,13 +109,6 @@ class SearchModelsTool(private val d: ToolDeps) : BaseTool(
             .take(limit).toList()
         return ok {
             put("count", hits.size)
-            if (com.vidadomu.nexus.agent.core.agent.ExternalServices.mentionsFlow(input.req("query"))) put("external_service", buildJsonObject {
-                put("name", "Google Flow")
-                put("generation_available_in_nexus", true)
-                put("requires_explicit_confirmation", false)
-                put("authentication_status", "check_in_app")
-                put("details", com.vidadomu.nexus.agent.core.agent.ExternalServices.FLOW_INFO)
-            })
             put("items", JsonArray(hits.map { it.first.compact(d.skills.forModel(it.first.ref.modelId)) }))
             if (hits.isEmpty()) put("note", "Ningún modelo del registro coincide. No propongas modelos que no estén aquí.")
         }
@@ -177,6 +170,7 @@ class RecommendModelsTool(private val d: ToolDeps) : BaseTool(
 ) {
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val spec = TaskSpec(
+            expertQuality = true,
             modality = input.req("modality").uppercase(),
             task = input.req("task").lowercase(),
             durationSec = input.int("duration_sec"),
@@ -193,7 +187,14 @@ class RecommendModelsTool(private val d: ToolDeps) : BaseTool(
             limit = d.limits().boundedCount(input.int("limit"),3,d.limits().maxRecommendations),
         )
         if (spec.task !in TASKS) throw ToolInputException("Tarea desconocida «${spec.task}».")
-        return ok(d.router.route(spec).toJson())
+        val result = d.router.route(spec).toJson() as JsonObject
+        fun withoutScore(value: kotlinx.serialization.json.JsonElement) =
+            if (value is JsonObject) JsonObject(value.filterKeys { it != "score" }) else value
+        return ok(JsonObject(result.mapValues { (key, value) -> when (key) {
+            "recommended" -> withoutScore(value)
+            "alternatives" -> JsonArray((value as JsonArray).map(::withoutScore))
+            else -> value
+        } }))
     }
 }
 

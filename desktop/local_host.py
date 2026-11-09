@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.10.29-desktop-premium.6'
+DESKTOP_VERSION = '2026.11.09-desktop-audiovisual.1'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -600,7 +600,7 @@ def dispatch(keys, operation, args):
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
                 'version': DESKTOP_VERSION, 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
-                'desktopParity': 'integrated-20261026', 'reviewedAndroidSource': '3b6082cecde9fe37c3bc4b642f7c9114dc62bdaf',
+                'desktopParity': 'audiovisual-20261109', 'reviewedAndroidSource': 'c4cb36750d2e7b8dd270f349d61c9e0715f67a1f',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:
@@ -680,6 +680,8 @@ def dispatch(keys, operation, args):
         body = args.get('body') or {}
         if not isinstance(body, dict):
             raise ValueError('Solicitud de generación no válida.')
+        from catalog_policy import validate_generation
+        validate_generation(args)
         for field in ('model', 'model_id', 'modelId'):
             if re.search(r'nano[_ -]?banana.*lite|nano[_ -]?lite', str(body.get(field, '')), re.I):
                 raise ValueError('Nano Banana Lite está desactivado. Elige otro modelo.')
@@ -741,6 +743,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self.checked():
             self.send_error(403); return
         path = urllib.parse.urlsplit(self.path).path
+        if path.startswith('/flow-live/'):
+            from flow_live_proxy import route
+            route(self, offline=OFFLINE_QA)
+            return
         if path == '/health':
             self.respond(b'{"app":"Nexus Studio"}', 'application/json'); return
         if path == '/favicon.ico':

@@ -1,0 +1,1046 @@
+[
+  {
+    "id": "bytedance/avatar-omni-human-v2.0",
+    "displayName": "Avatar Omni Human 2.0",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "ByteDance",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "AUDIO_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "OmniHuman 2.0 is ByteDance's audio-driven avatar model: one image plus an audio track becomes a 720p video of the character(s) speaking or singing, with dynamic gestures, multi-person scenes, prompt-directed camera movement and clips up to 5 minutes.",
+    "pricingInfo": "5.6 cént. / unidad sin especificar (80% dto.)",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.056,
+    "originPriceUsd": 0.07,
+    "priceUnit": "unidad sin especificar",
+    "priceUnitVerified": false,
+    "uuid": "ms-253f046a2519",
+    "family": "Avatar Omni Human 2.0 Multi-Person Avatars",
+    "categories": [
+      "AUDIO-TO-VIDEO"
+    ],
+    "tags": [
+      "AUDIO-TO-VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/BYTEDANCE.png",
+    "coverUrl": "https://static.atlascloud.ai/model/cover/bytedance-avatar-omni-human-v2.0.jpg",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/bytedance-avatar-omni-human-v2.0.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "80",
+    "inputMode": "TEXT_ONLY",
+    "maxImages": 0,
+    "maxVideos": 0,
+    "firstFrameField": null,
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": false,
+    "supportsNativeAspectRatio": true,
+    "supportsImageInput": false,
+    "supportsFirstFrame": false,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": null,
+    "supportsAudio": true,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para generación de vídeo dinámico con fluidez temporal.",
+    "speedQualityTag": "Económico",
+    "popularityScore": 85,
+    "releaseDateMillis": 1790323411702,
+    "pairedEditModelId": null,
+    "isFlagship": true,
+    "versionNumeric": 2.0,
+    "modelFamily": "ByteDance",
+    "variantRank": 3,
+    "isPrimaryGeneration": false,
+    "providerPriority": 85,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  },
+  {
+    "id": "pixverse/v6-max/image-to-video",
+    "displayName": "Pixverse v6-max",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "PixVerse",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "IMAGE_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "Pixverse v6-max Image-to-Video model. High-quality video generation from image prompts.",
+    "pricingInfo": "2.4 cént. / seg (80% dto.)",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.024,
+    "originPriceUsd": 0.03,
+    "priceUnit": "seg",
+    "priceUnitVerified": true,
+    "uuid": "ms-d3741e7f6168",
+    "family": "Seven Image Reference Control with Pixverse v6",
+    "categories": [
+      "IMAGE-TO-VIDEO"
+    ],
+    "tags": [
+      "IMAGE-TO-VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/PIXVERSE.png",
+    "coverUrl": "https://static.atlascloud.ai/model/cover/pixverse-v6-max-image-to-video.jpg",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/pixverse-v6-max-image-to-video.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "80",
+    "inputMode": "SINGLE_IMAGE",
+    "maxImages": 1,
+    "maxVideos": 0,
+    "firstFrameField": "image",
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": true,
+    "supportsNativeAspectRatio": false,
+    "supportsImageInput": true,
+    "supportsFirstFrame": true,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": "image",
+    "supportsAudio": false,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para generación de vídeo dinámico con fluidez temporal.",
+    "speedQualityTag": "Ultra Calidad",
+    "popularityScore": 95,
+    "releaseDateMillis": 1790323411744,
+    "pairedEditModelId": "pixverse/v6-max/text-to-video",
+    "isFlagship": true,
+    "versionNumeric": 6.0,
+    "modelFamily": "PixVerse",
+    "variantRank": 4,
+    "isPrimaryGeneration": true,
+    "providerPriority": 95,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  },
+  {
+    "id": "heygen/avatar-5/digital-twin",
+    "displayName": "HeyGen Avatar V Digital Twin",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "Heygen",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "TEXT_TO_VIDEO",
+      "AUDIO_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "HeyGen Avatar V digital twin videos: pick a stock avatar, give it a script or an audio track, and get a natural lip-synced presenter video with optional backgrounds, background removal and transparent WebM output, up to 4K.",
+    "pricingInfo": "10.0 cént. / unidad sin especificar",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.1,
+    "originPriceUsd": 0.1,
+    "priceUnit": "unidad sin especificar",
+    "priceUnitVerified": false,
+    "uuid": "ms-457316f7f47e",
+    "family": "HeyGen Avatar V Digital Twin Background Removal",
+    "categories": [
+      "TEXT-TO-VIDEO",
+      "AUDIO-TO-VIDEO"
+    ],
+    "tags": [
+      "TEXT-TO-VIDEO",
+      "AUDIO-TO-VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/HEYGEN.png",
+    "coverUrl": "https://static.atlascloud.ai/model/cover/heygen-avatar-5-digital-twin.jpg",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/heygen-avatar-5-digital-twin.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "100",
+    "inputMode": "TEXT_ONLY",
+    "maxImages": 0,
+    "maxVideos": 0,
+    "firstFrameField": null,
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": false,
+    "supportsNativeAspectRatio": true,
+    "supportsImageInput": false,
+    "supportsFirstFrame": false,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": null,
+    "supportsAudio": true,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para generación de vídeo dinámico con fluidez temporal.",
+    "speedQualityTag": "Económico",
+    "popularityScore": 60,
+    "releaseDateMillis": 1790323411770,
+    "pairedEditModelId": null,
+    "isFlagship": false,
+    "versionNumeric": 1.0,
+    "modelFamily": "Heygen",
+    "variantRank": 3,
+    "isPrimaryGeneration": false,
+    "providerPriority": 60,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  },
+  {
+    "id": "kwaivgi/kling-v4.0/reference-to-video",
+    "displayName": "Kling Video 4.0 Reference-to-Video",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "Kling (Kuaishou)",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "IMAGE_TO_VIDEO",
+      "REFERENCE_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "Kling 4.0 Omni Reference combines up to 15 images, videos, subjects and voices to generate a consistent 3-30 second video.",
+    "pricingInfo": "11.0 cént. / seg (70% dto.)",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.11,
+    "originPriceUsd": 0.157,
+    "priceUnit": "seg",
+    "priceUnitVerified": true,
+    "uuid": "ms-52c3b2bfa03e",
+    "family": "Kling 4 API: 30 Second Video with Audio",
+    "categories": [
+      "IMAGE-TO-VIDEO"
+    ],
+    "tags": [
+      "IMAGE-TO-VIDEO",
+      "REFERENCE-TO-VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/KUAISHOU.png",
+    "coverUrl": "https://static.atlascloud.ai/model/cover/kwaivgi-kling-v4.0-reference-to-video.jpg",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/kwaivgi-kling-v4.0-reference-to-video.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "70",
+    "inputMode": "SINGLE_IMAGE",
+    "maxImages": 1,
+    "maxVideos": 0,
+    "firstFrameField": "image",
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": true,
+    "supportsNativeAspectRatio": false,
+    "supportsImageInput": true,
+    "supportsFirstFrame": true,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": "image",
+    "supportsAudio": false,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para secuencias de acción trepidante, acrobacias y efectos VFX.",
+    "speedQualityTag": "Equilibrado",
+    "popularityScore": 100,
+    "releaseDateMillis": 1790323411771,
+    "pairedEditModelId": null,
+    "isFlagship": true,
+    "versionNumeric": 4.0,
+    "modelFamily": "Kling",
+    "variantRank": 3,
+    "isPrimaryGeneration": true,
+    "providerPriority": 100,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  },
+  {
+    "id": "kwaivgi/kling-v4.0/image-to-video",
+    "displayName": "Kling Video 4.0",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "Kling (Kuaishou)",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "IMAGE_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "Kling 4.0 keyframe video: animate from a first frame, through up to 10 keyframes, to a last frame in a single 3-30 second shot.",
+    "pricingInfo": "11.0 cént. / seg (70% dto.)",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.11,
+    "originPriceUsd": 0.157,
+    "priceUnit": "seg",
+    "priceUnitVerified": true,
+    "uuid": "ms-acd14327febd",
+    "family": "Kling 4 API: 30 Second Video with Audio",
+    "categories": [
+      "IMAGE-TO-VIDEO"
+    ],
+    "tags": [
+      "IMAGE-TO-VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/KUAISHOU.png",
+    "coverUrl": "https://static.atlascloud.ai/model/cover/kwaivgi-kling-v4.0-image-to-video.jpg",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/kwaivgi-kling-v4.0-image-to-video.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "70",
+    "inputMode": "SINGLE_IMAGE",
+    "maxImages": 1,
+    "maxVideos": 0,
+    "firstFrameField": "image",
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": true,
+    "supportsNativeAspectRatio": false,
+    "supportsImageInput": true,
+    "supportsFirstFrame": true,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": "image",
+    "supportsAudio": false,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para secuencias de acción trepidante, acrobacias y efectos VFX.",
+    "speedQualityTag": "Equilibrado",
+    "popularityScore": 100,
+    "releaseDateMillis": 1790323411771,
+    "pairedEditModelId": "kwaivgi/kling-v4.0/text-to-video",
+    "isFlagship": true,
+    "versionNumeric": 4.0,
+    "modelFamily": "Kling",
+    "variantRank": 3,
+    "isPrimaryGeneration": true,
+    "providerPriority": 100,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  },
+  {
+    "id": "vidu/q4-preview/image-to-video",
+    "displayName": "Vidu Q4 Preview",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "Vidu",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "IMAGE_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "Vidu's latest flagship video model animates a single image into a 3-16 second clip with native synchronized audio, automatic scene transitions, and output from 540p up to 4K.",
+    "pricingInfo": "3.2 cént. / seg (80% dto.)",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.032,
+    "originPriceUsd": 0.04,
+    "priceUnit": "seg",
+    "priceUnitVerified": true,
+    "uuid": "ms-bcac9da15cb4",
+    "family": "Vidu Q4 Automatic Scene Transitions",
+    "categories": [
+      "IMAGE-TO-VIDEO"
+    ],
+    "tags": [
+      "IMAGE-TO-VIDEO",
+      "VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/Vidu.png",
+    "coverUrl": "https://static.atlascloud.ai/uploads/models/fdbb4885-c72a-415f-ab95-c9d63290890c.png",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/vidu-q4-preview-image-to-video.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "80",
+    "inputMode": "SINGLE_IMAGE",
+    "maxImages": 1,
+    "maxVideos": 0,
+    "firstFrameField": "image",
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": true,
+    "supportsNativeAspectRatio": false,
+    "supportsImageInput": true,
+    "supportsFirstFrame": true,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": "image",
+    "supportsAudio": false,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para generación de vídeo dinámico con fluidez temporal.",
+    "speedQualityTag": "Económico",
+    "popularityScore": 96,
+    "releaseDateMillis": 1790323411773,
+    "pairedEditModelId": "vidu/q4-preview/text-to-video",
+    "isFlagship": true,
+    "versionNumeric": 1.0,
+    "modelFamily": "Vidu",
+    "variantRank": 3,
+    "isPrimaryGeneration": true,
+    "providerPriority": 96,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  },
+  {
+    "id": "vidu/q4-preview/reference-to-video",
+    "displayName": "Vidu Q4 Preview Reference-to-Video",
+    "providerId": "atlas_cloud",
+    "providerModelId": null,
+    "organization": "Vidu",
+    "modalities": [
+      "VIDEO"
+    ],
+    "capabilities": [
+      "IMAGE_TO_VIDEO",
+      "REFERENCE_TO_VIDEO"
+    ],
+    "parameters": [
+      {
+        "key": "duration",
+        "displayName": "Duración",
+        "type": "DURATION",
+        "defaultValue": "5",
+        "description": "Duración del clip en segundos",
+        "options": [
+          "5",
+          "10"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "aspect_ratio",
+        "displayName": "Relación de aspecto",
+        "type": "ASPECT_RATIO",
+        "defaultValue": "16:9",
+        "description": "Orientación de pantalla",
+        "options": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      },
+      {
+        "key": "resolution",
+        "displayName": "Resolución",
+        "type": "RESOLUTION",
+        "defaultValue": "720p",
+        "description": "Calidad de render",
+        "options": [
+          "720p",
+          "1080p"
+        ],
+        "minValue": null,
+        "maxValue": null,
+        "step": null,
+        "isAdvanced": false,
+        "isRequired": false,
+        "nativeType": null,
+        "minExact": null,
+        "maxExact": null
+      }
+    ],
+    "description": "Vidu's latest flagship video model keeps subjects consistent across a 3-16 second clip from up to 15 reference images and 3 reference audio clips, with native synchronized audio and output from 540p up to 4K.",
+    "pricingInfo": "3.2 cént. / seg (80% dto.)",
+    "badge": "NUEVO",
+    "basePriceUsd": 0.032,
+    "originPriceUsd": 0.04,
+    "priceUnit": "seg",
+    "priceUnitVerified": true,
+    "uuid": "ms-83789ef32a9a",
+    "family": "Vidu Q4 Automatic Scene Transitions",
+    "categories": [
+      "IMAGE-TO-VIDEO"
+    ],
+    "tags": [
+      "IMAGE-TO-VIDEO",
+      "VIDEO",
+      "NEW"
+    ],
+    "avatarUrl": "https://static.atlascloud.ai/model/avatar/Vidu.png",
+    "coverUrl": "https://static.atlascloud.ai/model/cover/vidu-q4-preview-reference-to-video.jpg",
+    "schemaUrl": "https://static.atlascloud.ai/model/schema/vidu-q4-preview-reference-to-video.json",
+    "chatSamplingParameters": [],
+    "nativeRequiredFields": [],
+    "discount": "80",
+    "inputMode": "SINGLE_IMAGE",
+    "maxImages": 1,
+    "maxVideos": 0,
+    "firstFrameField": "image",
+    "lastFrameField": null,
+    "imagesArrayField": null,
+    "structuredImageReferences": false,
+    "videoField": null,
+    "videosArrayField": null,
+    "isMediaRequired": true,
+    "supportsNativeAspectRatio": false,
+    "supportsImageInput": true,
+    "supportsFirstFrame": true,
+    "supportsLastFrame": false,
+    "supportsReferenceImages": false,
+    "supportsVideoInput": false,
+    "inputImageField": "image",
+    "supportsAudio": false,
+    "supportedAspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "supportedResolutions": [
+      "720p",
+      "1080p"
+    ],
+    "supportedDurations": [
+      "5",
+      "10"
+    ],
+    "shortDescription": "Ideal para generación de vídeo dinámico con fluidez temporal.",
+    "speedQualityTag": "Económico",
+    "popularityScore": 96,
+    "releaseDateMillis": 1790323411773,
+    "pairedEditModelId": null,
+    "isFlagship": true,
+    "versionNumeric": 1.0,
+    "modelFamily": "Vidu",
+    "variantRank": 3,
+    "isPrimaryGeneration": true,
+    "providerPriority": 96,
+    "contractEndpoint": null,
+    "atlasEndpoint": null,
+    "contractSource": null,
+    "contractCheckedAt": null,
+    "catalogCheckedAt": 1794211411632,
+    "contractMedia": [],
+    "contractDefaults": {},
+    "promptRequired": true,
+    "promptMaxLength": null,
+    "promptAccepted": true,
+    "contractPromptField": "promptText"
+  }
+]

@@ -30,8 +30,10 @@ function setText(node,text){if(node&&node.textContent!==text)node.textContent=te
 /* ---------- Vocabulary, header and navigation ---------- */
 const VIEWS={
  editor:['Corte · Montaje','Monta y edita tus medios locales con el agente'],
- assistant:['Asistente','Planifica y prepara tus creaciones conversando'],
- canvas:['Crear','Describe tu idea, elige un modelo y revisa el coste antes de generar'],
+ assistant:['Agente','Planifica y prepara tus creaciones conversando'],
+ canvas:['ArtBox','Describe tu idea, elige un modelo y revisa el coste antes de generar'],
+ story:['Guion','Historia, storyboard y material del mismo proyecto'],
+ flow:['Flow','Tu sesión de Flow en directo, con sus controles y encargos'],
  catalog:['Modelos','Elige por lo que quieres conseguir'],
  history:['Historial','Todas tus generaciones, su estado y su coste'],
  library:['Biblioteca','Tus resultados, listos para reutilizar'],
@@ -68,12 +70,12 @@ function sidebar(){
  const settings=$('#studio-settings');
  if(settings){const label=settings.querySelector('.creative-nav-label');if(label)setText(label,'Ajustes');}
  document.querySelectorAll('#navigation [data-nav="canvas"]').forEach(b=>{
-  const label=b.querySelector('.creative-nav-label');if(label)setText(label,'Crear');
-  if(b.getAttribute('aria-label')!=='Crear')b.setAttribute('aria-label','Crear');
-  if(b.title!=='Crear')b.title='Crear';
+  const label=b.querySelector('.creative-nav-label');if(label)setText(label,'ArtBox');
+  if(b.getAttribute('aria-label')!=='ArtBox')b.setAttribute('aria-label','ArtBox');
+  if(b.title!=='ArtBox')b.title='ArtBox';
   // CreativeEngine uses this marker to know that it has wrapped the label.
   // Marking a fresh base-shell button early leaves bare clipped text on resize.
-  if(label&&b.dataset.creativeLabel!=='Crear')b.dataset.creativeLabel='Crear';
+  if(label&&b.dataset.creativeLabel!=='ArtBox')b.dataset.creativeLabel='ArtBox';
  });
 }
 

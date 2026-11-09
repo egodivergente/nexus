@@ -21,7 +21,7 @@ private const val MAX_TEXT = 300
  */
 class SuggestRepliesTool : BaseTool(
     "suggest_replies", ToolCategory.READ,
-    "Muestra 2–4 botones de respuesta rápida bajo tu respuesta cuando terminas preguntando al usuario que elija entre opciones concretas (modelos, caminos, sí/no con matiz). Úsala UNA vez por turno, justo antes de responder, y no repitas aquí información que no esté en tu texto. Elegir un botón equivale a que el usuario escriba ese texto. No la uses para confirmar gastos: el envío siempre es el botón de la tarjeta.",
+    "Muestra 2–4 botones de respuesta rápida bajo tu respuesta cuando terminas preguntando al usuario que elija entre opciones concretas (modelos, caminos, sí/no con matiz). Úsala UNA vez por turno, en la misma respuesta que tu texto final (escribe el texto y llama a la herramienta a la vez): Nexus cierra el turno sin pedirte otro paso. No repitas aquí información que no esté en tu texto. Elegir un botón equivale a que el usuario escriba ese texto. No la uses para confirmar gastos: el envío siempre es el botón de la tarjeta.",
     schema {
         objectArray("replies", "Entre 2 y 4 respuestas, en el orden en que las has presentado.", required = true) {
             string("label", "Texto corto del botón (máx. 40 caracteres), p. ej. «Kling O3 · 0,84 €».", required = true)

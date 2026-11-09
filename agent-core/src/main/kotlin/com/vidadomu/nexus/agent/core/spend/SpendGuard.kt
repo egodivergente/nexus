@@ -49,6 +49,7 @@ data class GenerationPlan(
     val warnings: List<String> = emptyList(),
     val createdAt: Long,
     val originalPrompt: String? = null,
+    val storyContext: com.vidadomu.nexus.agent.core.assets.StoryGenerationContext? = null,
 ) {
     /** Huella de lo que se va a pagar. Cualquier cambio exige una confirmación nueva. */
     fun fingerprint(): String {

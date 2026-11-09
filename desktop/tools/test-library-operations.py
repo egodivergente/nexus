@@ -212,6 +212,22 @@ class LibraryOperationsTests(unittest.TestCase):
         self.assertEqual(result,{'status':'exists','assetId':'first','projectId':'a'})
         self.assertEqual(self.host.index,before);self.assertEqual(self.host.calls,[])
 
+    def test_move_cannot_replace_story_uses_and_leaves_unrelated_legacy_moves_available(self):
+        self.host.index['story']={'links':[
+            {'id':'use-a','assetId':'first','projectId':'a','scope':'shot','targetId':'shot-a','role':'candidate'},
+            {'id':'use-b','assetId':'first','projectId':'b','scope':'project','targetId':'b','role':'reference'}]}
+        self.host.persist();before=copy.deepcopy(self.host.index)
+        index_bytes=(self.host.data/'index.json').read_bytes()
+        originals={path.name:path.read_bytes() for path in (self.root/'media').iterdir()}
+        with self.assertRaisesRegex(ValueError,'Gestiona sus usos desde Guion → Material'):
+            self.move()
+        self.assertEqual(before,self.host.index);self.assertEqual([],self.host.calls)
+        self.assertEqual(index_bytes,(self.host.data/'index.json').read_bytes())
+        self.assertEqual(originals,{path.name:path.read_bytes() for path in (self.root/'media').iterdir()})
+        result=self.move(['asset:other'],projectId='c')
+        self.assertEqual('completed',result['status']);self.assertEqual('c',self.by_id('other')['projectId'])
+        self.assertEqual(before['story'],self.host.index['story'])
+
     def test_import_preserves_retirement_and_imports_distinct_content_once(self):
         self.host.index['assets'][0]['libraryDeleted']=True;self.host.persist()
         result=self.service.register_import(self.receipt(),'b')

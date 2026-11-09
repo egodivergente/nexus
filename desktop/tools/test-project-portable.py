@@ -70,6 +70,32 @@ class PortableAcceptance(unittest.TestCase):
         self.assertEqual(self.import_(archive),result)
         self.assertEqual(len(self.host.command({'op':'snapshot','owner':'qa'})['result']['index']['projects']),2)
 
+    def test_story_roundtrip_keeps_many_to_many_and_is_inert(self):
+        def change(action,**fields):
+            value=self.host.story_command({'op':'storyCommand','owner':'qa','args':{'projectId':self.project,
+                'input':{'action':action,'operation_id':uuid.uuid4().hex,**fields}}})['result']
+            self.assertTrue(value.get('ok'),value)
+            return value
+        scene=change('create_scene',title='Encuentro')['id']
+        note=change('create_block',scene_id=scene,kind='note',text='Conservar mi idea')['id']
+        shots=[change('create_shot',scene_id=scene,title=title)['id'] for title in ['Mano','Mirada']]
+        for shot in shots:change('link_material',asset_id=self.asset['id'],scope='shot',target_id=shot,role='candidate')
+        change('set_autonomy',enabled=True,mode='preparation')
+        result=self.import_(self.archive(),'import-story')
+        current=self.host.command({'op':'snapshot','owner':'qa'})['result']['index']
+        project=result['projectId']
+        linked=[link for link in current['story']['links'] if link['projectId']==project]
+        self.assertEqual(len(linked),2)
+        self.assertEqual(len({link['assetId'] for link in linked}),1)
+        self.assertNotEqual(linked[0]['assetId'],self.asset['id'])
+        self.assertFalse(any(link['targetId'] in shots for link in linked))
+        copied=[block for block in current['story']['blocks'] if block['projectId']==project and block['text']=='Conservar mi idea']
+        self.assertEqual(len(copied),1)
+        self.assertNotEqual(copied[0]['id'],note)
+        policy=next(policy for policy in current['story']['autonomy'] if policy['projectId']==project)
+        self.assertFalse(policy['enabled'])
+        self.assertEqual(digest(self.source),self.original_hash)
+
     def test_corrupted_file_and_zip_paths_leave_original_project_unchanged(self):
         archive=self.archive();source=self.data/archive['url'].lstrip('/')
         with zipfile.ZipFile(source) as z:contents={i.filename:z.read(i) for i in z.infolist()}

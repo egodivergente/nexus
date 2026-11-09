@@ -285,6 +285,8 @@ class CustomMedia:
                     atomic_json(target, job)
                 return self.public_job(job)
             p, m = self.model(model)
+            from catalog_policy import validate_custom_generation
+            validate_custom_generation(self.catalog(p, m), media_input)
             quote = self.quote(model, media_input.get('params', {}))
             if not isinstance(cost, dict) or cost.get('source') != 'user_declared' or cost.get('configFingerprint') != quote['configFingerprint'] or cost.get('amount') != quote['amount'] or cost.get('currency') != 'USD' or not 0 <= time.time() * 1000 - cost.get('time', 0) <= 300000:
                 raise ValueError('Consulta y acepta una estimación vigente antes de enviar.')

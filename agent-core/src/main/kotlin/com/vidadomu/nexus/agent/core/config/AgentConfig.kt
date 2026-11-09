@@ -30,8 +30,6 @@ data class AgentConfig(
     val temperature: Double? = null,
     val maxTokens: Int = 4096,
     val toolUse: Boolean = true,
-    /** Providers with native mixed text/image input can read documents alongside tools. */
-    val documentsInOnePass: Boolean = false,
     val mode: AgentMode = AgentMode.COPILOT,
     /** Ids de skills activas; vacío = todas las disponibles. */
     val activeSkills: List<String> = emptyList(),
@@ -43,4 +41,6 @@ data class AgentConfig(
     val systemPromptOverride: String? = null,
     /** Límites del usuario (imágenes, vídeos, documentos, historial, resultados…). `maxToolRounds` y `maxTokens` siguen siendo los autoritativos. */
     val limits: AgentLimits = AgentLimits(),
+    /** Desktop Responses can read locally rendered PDF pages in the same response. */
+    val documentsInOnePass: Boolean = false,
 )

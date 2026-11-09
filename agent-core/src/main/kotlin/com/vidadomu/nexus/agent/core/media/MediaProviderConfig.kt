@@ -72,6 +72,8 @@ data class MediaModelConfig(
     val priceUsd: Double? = null,
     val priceUnit: String = "",
     val description: String = "",
+    /** Fal queue uses provider-returned status/result URLs, persisted in an opaque task token. */
+    val falQueue: Boolean = false,
 ) {
     val modelValue get() = providerModelId.ifBlank { id }
 }
@@ -116,7 +118,9 @@ data class MediaProviderConfig(
         listOf(pollIntervalSeconds, maxWaitMinutes, httpTimeoutSeconds, maxUploadMb).forEach { if (it < 0) add("Los límites no pueden ser negativos (0 = sin límite).") }
         if (models.isEmpty()) add("Añade al menos un modelo.")
         if (models.map { it.id }.toSet().size != models.size) add("Hay modelos con el mismo identificador.")
-        models.forEach { m -> addAll(modelProblems(m).map { "${m.name.ifBlank { m.id }}: $it" }) }
+        models.forEach { m ->
+            if (m.falQueue && (baseUrl != "https://queue.fal.run" || m.mode != MediaMode.ASYNC)) add("Fal requiere cola HTTPS y modo asíncrono.")
+            addAll(modelProblems(m).map { "${m.name.ifBlank { m.id }}: $it" }) }
     }
 
     private fun modelProblems(m: MediaModelConfig): List<String> = buildList {

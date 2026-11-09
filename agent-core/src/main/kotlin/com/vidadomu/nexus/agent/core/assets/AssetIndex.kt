@@ -3,14 +3,10 @@ package com.vidadomu.nexus.agent.core.assets
 import java.io.File
 import java.text.Normalizer
 import java.util.UUID
-import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -23,6 +19,10 @@ data class Project(
     val archived: Boolean = false,
     /** Biblia del proyecto que el asistente lee en cada mensaje mientras el proyecto está activo. */
     val memory: ProjectMemory = ProjectMemory(),
+    val treatment: String? = null,
+    val format: String? = null,
+    val targetDurationSec: Double? = null,
+    val revision: Long = 0,
 )
 
 @Serializable
@@ -52,14 +52,23 @@ data class ProjectMemory(
 data class ProjectSession(val projectId: String, val from: Long, val to: Long? = null)
 
 @Serializable
-data class Scene(val id: String, val projectId: String, val code: String, val title: String? = null)
+data class Scene(val id: String, val projectId: String, val code: String, val title: String? = null,
+    val order: Int = 0, val group: String? = null, val description: String? = null,
+    val locationIds: List<String> = emptyList(), val timeOfDay: String? = null, val light: String? = null,
+    val revision: Long = 0, val contentRevision: Long = 0)
 
 /** status: PLANNED → KEYFRAME → VIDEO → FINAL (derivado de sus assets, ver [AssetIndex.shotStatus]). */
 @Serializable
-data class Shot(val id: String, val projectId: String, val sceneId: String? = null, val code: String, val description: String? = null)
+data class Shot(val id: String, val projectId: String, val sceneId: String? = null, val code: String, val description: String? = null,
+    val order: Int = 0, val title: String? = null, val intent: String? = null,
+    val characterIds: List<String> = emptyList(), val framing: String? = null, val camera: String? = null,
+    val performance: String? = null, val dialogue: String? = null, val sound: String? = null,
+    val durationSec: Double? = null, val narrativeState: String = "story", val productionState: String = "pending",
+    val variantOf: String? = null, val revision: Long = 0, val contentRevision: Long = 0)
 
 @Serializable
-data class Character(val id: String, val projectId: String?, val name: String, val aliases: List<String> = emptyList(), val description: String? = null, val referenceAssetIds: List<String> = emptyList())
+data class Character(val id: String, val projectId: String?, val name: String, val aliases: List<String> = emptyList(), val description: String? = null, val referenceAssetIds: List<String> = emptyList(),
+    val variants: List<String> = emptyList(), val notes: String? = null, val revision: Long = 0)
 
 @Serializable
 enum class AssetType { IMAGE, VIDEO, AUDIO, OTHER }
@@ -122,6 +131,7 @@ data class GenerationRecord(
     val outputAssetIds: List<String> = emptyList(),
     val createdAt: Long,
     val completedAt: Long? = null,
+    val storyContext: StoryGenerationContext? = null,
 )
 
 @Serializable
@@ -134,6 +144,7 @@ data class IndexData(
     val assets: List<Asset> = emptyList(),
     val generations: List<GenerationRecord> = emptyList(),
     val projectSessions: List<ProjectSession> = emptyList(),
+    val story: StoryState = StoryState(),
 )
 
 data class PeerIndexMerge(val snapshot: IndexData, val conflicts: List<String>)
@@ -155,14 +166,16 @@ data class AssetQuery(
  * Índice de proyectos/escenas/planos/personajes/assets/generaciones. Persistido en un JSON propio con
  * escritura atómica: no modifica nexus.db ni mueve archivos, así que es reversible por completo.
  */
-class AssetIndex(
-    private val file: File?,
-    private val clock: () -> Long = System::currentTimeMillis,
-    private val persistContext: CoroutineContext = Dispatchers.IO,
-) {
+class AssetIndex(private val file: File?, private val clock: () -> Long = System::currentTimeMillis,
+    private val persistContext: kotlin.coroutines.CoroutineContext = kotlinx.coroutines.Dispatchers.IO) {
 
     private val mutex = Mutex()
-    @Volatile private var data: IndexData = file?.takeIf { it.isFile }?.let { JSON.decodeFromString<IndexData>(it.readText()) } ?: IndexData()
+    private var diskFingerprint: String? = null
+    @Volatile private var data: IndexData = file?.takeIf { it.isFile }?.let {
+        val bytes = it.readBytes()
+        diskFingerprint = fingerprint(bytes)
+        JSON.decodeFromString<IndexData>(bytes.toString(Charsets.UTF_8))
+    } ?: IndexData()
 
     private val mutableChanges = MutableStateFlow(data)
     val changes = mutableChanges.asStateFlow()
@@ -177,7 +190,9 @@ class AssetIndex(
         require(projectIds.size==incoming.projects.size)
         require(incoming.assets.map {it.id}.distinct().size==incoming.assets.size)
         require(incoming.assets.all {it.projectId==null || it.projectId in projectIds}) {"Falta el proyecto de un medio sincronizado."}
-        incoming.copy(projectSessions=current.projectSessions) to Unit
+        incoming.copy(projectSessions=current.projectSessions,
+            // A legacy peer cannot express deletion of the new narrative records.
+            story=if(incoming.story==StoryState() && current.story!=StoryState()) current.story else incoming.story) to Unit
     }
 
     /** Applies a peer snapshot under the same lock as agent/editor writes, and notifies the UI. */
@@ -205,6 +220,7 @@ class AssetIndex(
             scenes = if (memory) merged.scenes else local.scenes,
             shots = if (memory) merged.shots else local.shots,
             characters = if (memory) merged.characters else local.characters,
+            story = if (!memory || (remote.story == StoryState() && local.story != StoryState())) local.story else merged.story,
             assets = if (gallery) merged.assets else local.assets,
             generations = if (gallery) merged.generations else local.generations)
         next to PeerIndexMerge(next, result.conflicts)
@@ -215,7 +231,8 @@ class AssetIndex(
         require(bundle.schemaVersion == 1 && bundle.projects.size == 1 && bundle.projectSessions.isEmpty()) { "Paquete de proyecto incompatible" }
         val project = bundle.projects.single()
         fun ids(d: IndexData) = d.projects.map { it.id } + d.scenes.map { it.id } + d.shots.map { it.id } +
-            d.characters.map { it.id } + d.assets.map { it.id } + d.generations.map { it.id }
+            d.characters.map { it.id } + d.assets.map { it.id } + d.generations.map { it.id } +
+            d.story.blocks.map { it.id } + d.story.links.map { it.id } + d.story.elements.map { it.id } + d.story.preferences.map { it.id } + d.story.proposals.map { it.id } + d.story.tasks.map { it.id }
         val incoming = ids(bundle)
         val existingIds=ids(current).toSet()
         require(incoming.all { it.isNotBlank() } && incoming.distinct().size == incoming.size) { "Identidades repetidas en el paquete" }
@@ -223,27 +240,43 @@ class AssetIndex(
         require(bundle.assets.all { it.projectId == project.id } && bundle.scenes.all { it.projectId == project.id } &&
             bundle.shots.all { it.projectId == project.id } && bundle.characters.all { it.projectId == project.id } &&
             bundle.generations.all { it.projectId == project.id }) { "El paquete contiene otro proyecto" }
+        require(bundle.story.blocks.all { it.projectId == project.id } && bundle.story.links.all { it.projectId == project.id } && bundle.story.elements.all { it.projectId == project.id } &&
+            bundle.story.preferences.all { it.projectId == project.id } && bundle.story.proposals.all { it.projectId == project.id } && bundle.story.tasks.all { it.projectId == project.id } &&
+            bundle.story.autonomy.all { it.projectId == project.id } && bundle.story.receipts.all { it.projectId == project.id } && bundle.story.history.all { it.projectId == project.id }) { "La estructura narrativa contiene otro proyecto" }
         val sceneIds=bundle.scenes.map { it.id }.toSet()
         val shotIds=bundle.shots.map { it.id }.toSet()
         val characterIds=bundle.characters.map { it.id }.toSet()
         val assetIds=bundle.assets.map { it.id }.toSet()
         val generationIds=bundle.generations.map { it.id }.toSet()
+        val blockIds=bundle.story.blocks.map { it.id }.toSet()
+        val elementIds=bundle.story.elements.map { it.id }.toSet()
         fun String?.belongsTo(ids: Set<String>) = this == null || this in ids
         require(bundle.assets.all { it.sceneId.belongsTo(sceneIds) && it.shotId.belongsTo(shotIds) &&
             it.generationId.belongsTo(generationIds) && it.parentAssetId.belongsTo(assetIds) && it.characterIds.all { id -> id in characterIds } } &&
             bundle.shots.all { it.sceneId.belongsTo(sceneIds) } && bundle.characters.all { it.referenceAssetIds.all { id -> id in assetIds } } &&
             bundle.generations.all { it.parentGenerationId.belongsTo(generationIds) && it.shotId.belongsTo(shotIds) &&
                 (it.referenceAssetIds+it.outputAssetIds).all { id -> id in assetIds } }) { "Faltan relaciones del proyecto o tienen un tipo incorrecto" }
+        fun targetBelongs(scope:String, target:String) = when(scope) { "project" -> target==project.id; "scene" -> target in sceneIds; "shot" -> target in shotIds; "block" -> target in blockIds; "character" -> target in characterIds; "element" -> target in elementIds; else -> false }
+        require(bundle.story.blocks.all { it.sceneId in sceneIds && it.shotId.belongsTo(shotIds) } &&
+            bundle.story.links.all { it.assetId in assetIds && targetBelongs(it.scope,it.targetId) && it.characterId.belongsTo(characterIds) } &&
+            bundle.story.elements.all { it.sceneId.belongsTo(sceneIds) && it.characterId.belongsTo(characterIds) } &&
+            bundle.story.preferences.all { targetBelongs(it.scope,it.targetId) } &&
+            bundle.story.tasks.all { it.sceneId.belongsTo(sceneIds) && it.shotId.belongsTo(shotIds) }) { "Faltan asociaciones de la estructura narrativa" }
         current.copy(projects=current.projects+bundle.projects,scenes=current.scenes+bundle.scenes,
             shots=current.shots+bundle.shots,characters=current.characters+bundle.characters,
-            assets=current.assets+bundle.assets,generations=current.generations+bundle.generations) to project
+            assets=current.assets+bundle.assets,generations=current.generations+bundle.generations,
+            story=current.story.copy(blocks=current.story.blocks+bundle.story.blocks,links=current.story.links+bundle.story.links,
+                elements=current.story.elements+bundle.story.elements,preferences=current.story.preferences+bundle.story.preferences,
+                proposals=current.story.proposals+bundle.story.proposals,tasks=current.story.tasks+bundle.story.tasks,
+                autonomy=current.story.autonomy+bundle.story.autonomy,receipts=current.story.receipts+bundle.story.receipts,
+                history=current.story.history+bundle.story.history,legacyAdoptedProjectIds=(current.story.legacyAdoptedProjectIds+bundle.story.legacyAdoptedProjectIds).distinct())) to project
     }
 
-    private suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
+    internal suspend fun <T> edit(block: (IndexData) -> Pair<IndexData, T>): T = mutex.withLock {
         val (next, result) = block(data)
-        // The blocking write runs off the caller's thread. Publishing happens inside the same non-cancellable block:
-        // a cancellation arriving after the file was replaced must not leave memory behind the disk.
-        withContext(persistContext + NonCancellable) {
+        // Serializing the whole index and fsync-ing it ran on the caller's thread: edits started from the UI froze the
+        // main thread for seconds at start-up (Pixel 8 Pro trace, 25/10/2026). Same lock, same atomic write, on IO.
+        if (next != data) kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + persistContext) {
             persist(next)
             data = next
             mutableChanges.value = next
@@ -254,10 +287,19 @@ class AssetIndex(
     private fun persist(snapshot: IndexData) {
         val f = file ?: return
         f.parentFile?.mkdirs()
-        val tmp = File(f.parentFile, f.name + ".tmp")
+        var temporary: File? = null
+        val channel = java.nio.channels.FileChannel.open(File(f.parentFile, f.name + ".lock").toPath(),
+            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE)
+        var lock: java.nio.channels.FileLock? = null
         try {
+            lock = try { channel.tryLock() } catch (_: java.nio.channels.OverlappingFileLockException) { null }
+            check(lock != null) { "Otra instancia está guardando el proyecto. Conserva tu borrador y vuelve a intentarlo." }
+            val actual = f.takeIf { it.isFile }?.readBytes()?.let(::fingerprint)
+            check(actual == diskFingerprint) { "El índice cambió fuera de esta instancia. Reabre Nexus antes de guardar para conservar los datos más recientes. Tu borrador no se ha aplicado." }
+            val bytes = JSON.encodeToString(IndexData.serializer(), snapshot).toByteArray(Charsets.UTF_8)
+            val tmp = File.createTempFile(f.name.take(80) + "-idx-", ".tmp", f.parentFile).also { temporary = it }
             java.io.FileOutputStream(tmp).use { output ->
-                output.write(JSON.encodeToString(IndexData.serializer(), snapshot).toByteArray(Charsets.UTF_8))
+                output.write(bytes)
                 output.fd.sync()
             }
             try {
@@ -266,8 +308,17 @@ class AssetIndex(
             } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
                 java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
             }
-        } finally { tmp.delete() }
+            diskFingerprint = fingerprint(bytes)
+        } finally {
+            // Once rename committed, cleanup must not report failure before in-memory publication.
+            runCatching { temporary?.delete() }
+            runCatching { lock?.release() }
+            runCatching { channel.close() }
+        }
     }
+
+    private fun fingerprint(bytes: ByteArray): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(bytes).joinToString("") { "%02x".format(it) }
 
     // ---------- proyectos y estructura ----------
 
@@ -283,24 +334,43 @@ class AssetIndex(
         d.copy(projects = d.projects + p) to p
     }
 
+    /** «Eliminar carpeta»: la archiva y devuelve sus archivos a la Biblioteca general. No borra ningún archivo. */
+    suspend fun archiveProject(projectId: String): Int = edit { d ->
+        if (d.projects.none { it.id == projectId }) return@edit d to 0
+        val moved = d.assets.count { it.projectId == projectId }
+        d.copy(
+            projects = d.projects.map { if (it.id == projectId) it.copy(archived = true) else it },
+            assets = d.assets.map { if (it.projectId == projectId) it.copy(projectId = null) else it },
+        ) to moved
+    }
+
+    private fun normalizedMemory(m: ProjectMemory): ProjectMemory = m.copy(
+        synopsis = m.synopsis?.trim()?.take(MAX_FIELD)?.ifBlank { null },
+        tone = m.tone?.trim()?.take(MAX_FIELD)?.ifBlank { null },
+        visualStyle = m.visualStyle?.trim()?.take(MAX_FIELD)?.ifBlank { null },
+        rules = m.rules.map { it.trim().take(MAX_RULE_LENGTH) }.filter { it.isNotEmpty() }.distinctBy { norm(it) }.take(MAX_RULES),
+        preferredModels = m.preferredModels.map { it.trim().take(MAX_MODEL_LENGTH) }.filter { it.isNotEmpty() }.distinct().take(MAX_PREFERRED_MODELS),
+        notes = m.notes.filter { it.text.isNotBlank() }.takeLast(MAX_NOTES),
+        updatedAt = clock(),
+    )
+
     suspend fun updateProjectMemory(projectId: String, change: (ProjectMemory) -> ProjectMemory): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
-        val m = change(cur.memory)
-        val next = cur.copy(memory = m.copy(
-            synopsis = m.synopsis?.trim()?.take(MAX_FIELD)?.ifBlank { null },
-            tone = m.tone?.trim()?.take(MAX_FIELD)?.ifBlank { null },
-            visualStyle = m.visualStyle?.trim()?.take(MAX_FIELD)?.ifBlank { null },
-            rules = m.rules.map { it.trim().take(300) }.filter { it.isNotEmpty() }.distinctBy { norm(it) }.take(MAX_RULES),
-            preferredModels = m.preferredModels.map { it.trim().take(120) }.filter { it.isNotEmpty() }.distinct().take(12),
-            notes = m.notes.filter { it.text.isNotBlank() }.takeLast(MAX_NOTES),
-            updatedAt = clock(),
-        ))
+        val next = cur.copy(memory = normalizedMemory(change(cur.memory)), revision = cur.revision + 1)
+        d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
+    }
+
+    /** One write, with validation against the current project under the same lock as agent/sync edits. */
+    suspend fun updateProjectMemoryAndDescription(projectId: String, description: String?, change: (Project) -> ProjectMemory): Project = edit { d ->
+        val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
+        val memory = normalizedMemory(change(cur))
+        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null }, memory = memory, revision = cur.revision + 1)
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
     suspend fun updateProject(projectId: String, description: String?): Project = edit { d ->
         val cur = d.projects.firstOrNull { it.id == projectId } ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
-        val next = cur.copy(description = description?.trim()?.take(400)?.ifBlank { null })
+        val next = cur.copy(description = description?.trim()?.take(MAX_DESCRIPTION)?.ifBlank { null }, revision = cur.revision + 1)
         d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
     }
 
@@ -319,7 +389,7 @@ class AssetIndex(
 
     suspend fun updateCharacter(id: String, change: (Character) -> Character): Character = edit { d ->
         val cur = d.characters.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Personaje desconocido: $id")
-        val next = change(cur).copy(id = cur.id)
+        val next = change(cur).copy(id = cur.id, revision = cur.revision + 1)
         d.copy(characters = d.characters.map { if (it.id == id) next else it }) to next
     }
 
@@ -409,6 +479,12 @@ class AssetIndex(
         d.copy(assets=d.assets.map {if(it.id in targets) it.copy(libraryDeleted=true) else it}) to targets.size
     }
 
+    /** Undo a library removal atomically; retain current metadata, file references and identities. */
+    suspend fun restoreLibraryAssets(ids: Set<String>): Int = edit { d ->
+        val targets = d.assets.filter { it.id in ids && it.libraryDeleted }.map { it.id }.toSet()
+        d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = false) else it }) to targets.size
+    }
+
     suspend fun deleteFromLibrary(projectId: String, ids: Set<String>): Int = edit { d ->
         val targets = d.assets.filter { it.id in ids && it.projectId == projectId && !it.libraryDeleted }.map { it.id }.toSet()
         d.copy(assets = d.assets.map { if (it.id in targets) it.copy(libraryDeleted = true) else it }) to targets.size
@@ -495,6 +571,7 @@ class AssetIndex(
         if (existing == null) d.copy(generations = d.generations + rec) to rec
         else {
             val merged = rec.copy(id = existing.id, agentPlanId = rec.agentPlanId ?: existing.agentPlanId,
+                storyContext = rec.storyContext ?: existing.storyContext,
                 projectId = rec.projectId ?: existing.projectId, shotId = rec.shotId ?: existing.shotId,
                 parentGenerationId = rec.parentGenerationId ?: existing.parentGenerationId,
                 outputAssetIds = (existing.outputAssetIds + rec.outputAssetIds).distinct())
@@ -508,8 +585,12 @@ class AssetIndex(
     }
 
     companion object {
+        const val MAX_DESCRIPTION = 400
         const val MAX_FIELD = 2_000
         const val MAX_RULES = 40
+        const val MAX_RULE_LENGTH = 300
+        const val MAX_PREFERRED_MODELS = 12
+        const val MAX_MODEL_LENGTH = 120
         const val MAX_NOTES = 80
         val JSON = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = false }
         fun newId(prefix: String) = prefix + "_" + UUID.randomUUID().toString().replace("-", "").take(12)

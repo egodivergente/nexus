@@ -11,12 +11,16 @@ import java.net.URI
 internal object DesktopMarkdown {
     private val bareUrl = Regex("https?://[^\\s<>\"'`]+", RegexOption.IGNORE_CASE)
 
-    fun html(text: String): String = ChatMarkdown.parse(text).joinToString("") { block ->
+    fun html(text: String): String = blocksHtml(ChatMarkdown.parse(text))
+    private fun blocksHtml(blocks: List<MdBlock>): String = blocks.joinToString("") { block ->
         when (block) {
             is MdBlock.Heading -> "<h3>${spans(block.spans)}</h3>"
             is MdBlock.Paragraph -> "<p>${spans(block.spans)}</p>"
             is MdBlock.Quote -> "<blockquote>${spans(block.spans)}</blockquote>"
             is MdBlock.Code -> "<pre><code>${escape(block.code)}</code></pre>"
+            is MdBlock.Visual -> "<pre><code>${escape(block.code)}</code></pre>"
+            is MdBlock.Callout -> "<aside class=agent-callout>${blocksHtml(block.blocks)}</aside>"
+            is MdBlock.Widget -> "<p>${escape(com.vidadomu.nexus.agent.core.chat.ChatWidgets.plain(block.spec)).replace("\n", "<br>")}</p>"
             is MdBlock.ListBlock -> list(block.items)
             is MdBlock.Table -> "<div class=agent-table><table><thead><tr>" + block.header.joinToString("") { "<th>${spans(it)}</th>" } +
                 "</tr></thead><tbody>" + block.rows.joinToString("") { row -> "<tr>" + row.joinToString("") { "<td>${spans(it)}</td>" } + "</tr>" } +

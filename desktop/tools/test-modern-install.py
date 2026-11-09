@@ -43,14 +43,16 @@ with tempfile.TemporaryDirectory(prefix='nexus-modern-package-') as folder:
                 assert page.evaluate('initial.version') == expected_version
                 assert page.evaluate('initial.maxImportBytes') == 4*1024**3
                 page.evaluate("async()=>{await ensureAssistantReady();await agentCall('createProject',{name:'Paquete moderno · prueba aislada'});}")
-                assert page.evaluate('Agent.snapshot.tools.length') == 81
-                checks += ['packaged-version', '4-GiB-contract', '81-runtime-tools']
-                for view in ['assistant', 'canvas', 'catalog', 'history', 'library', 'settings', 'editor']:
+                tools = set(page.evaluate('Agent.snapshot.tools'))
+                assert {'search_assets', 'read_story_project', 'edit_story_project', 'prepare_story_generation'} <= tools
+                checks += ['packaged-version', '4-GiB-contract', 'real-runtime-and-story-tools']
+                for view in ['assistant', 'canvas', 'catalog', 'history', 'library', 'settings', 'editor', 'story', 'flow']:
                     page.evaluate('(view)=>navigate(view)', view)
                     page.wait_for_timeout(180)
                     assert page.locator('#navigation [data-nav="editor"]').count() == 1
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                     checks.append('navigation:'+view)
+                page.evaluate('()=>navigate("editor")')
                 page.wait_for_function('()=>Corte.loaded&&!Agent.busy')
                 assert page.locator('#corte-chat #agent-compose').count() == 1
                 assert page.locator('#title').inner_text() == 'Corte · Montaje'
@@ -67,7 +69,13 @@ with tempfile.TemporaryDirectory(prefix='nexus-modern-package-') as folder:
                 checks += ['no-javascript-errors', 'no-remote-requests']
                 browser.close()
         finally:
-            host.terminate()
+            if os.name == 'nt' and host.poll() is None:
+                # The offline profile owns this subprocess tree, including its JVM.
+                subprocess.run(['taskkill', '/PID', str(host.pid), '/T', '/F'],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            else:
+                host.terminate()
             try:
                 host.wait(timeout=10)
             except subprocess.TimeoutExpired:

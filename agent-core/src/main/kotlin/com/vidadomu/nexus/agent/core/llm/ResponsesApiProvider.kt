@@ -139,15 +139,12 @@ object ResponsesCodec {
                         })
                     }
                     val parts = m.content.filter { it !is ContentBlock.ToolResult && it !is ContentBlock.Reasoning }.flatMap { block ->
-                        if(block is ContentBlock.Document && block.visualPages.isNotEmpty()) {
-                            return@flatMap listOf(buildJsonObject {
-                                put("type", "input_text");put("text", "[Documento ${block.name}; ${block.visualCoverage ?: "páginas visuales adjuntas"}]")
-                            }) + block.visualPages.map { page -> buildJsonObject {
-                                put("type", "input_image");put("image_url", "data:image/${page.format};base64,"+Base64.getEncoder().encodeToString(page.bytes))
-                            } }
-                        }
-                        listOf(
-                        when (block) {
+                        if (block is ContentBlock.Document && block.visualPages.isNotEmpty()) return@flatMap listOf(buildJsonObject {
+                            put("type", "input_text"); put("text", "[Documento ${block.name}; ${block.visualCoverage ?: "páginas visuales adjuntas"}]")
+                        }) + block.visualPages.map { page -> buildJsonObject {
+                            put("type", "input_image"); put("image_url", "data:image/${page.format};base64," + Base64.getEncoder().encodeToString(page.bytes))
+                        } }
+                        listOf(when (block) {
                             is ContentBlock.Text -> buildJsonObject { put("type", "input_text"); put("text", block.text) }
                             is ContentBlock.Image -> buildJsonObject {
                                 put("type", "input_image")
@@ -159,8 +156,7 @@ object ResponsesCodec {
                                     else "[Documento ${block.name} (${block.format}): este proveedor no lo recibe como archivo; pide al usuario el texto si lo necesitas.]")
                             }
                             else -> buildJsonObject { put("type", "input_text"); put("text", "") }
-                        }
-                        )
+                        })
                     }
                     if (parts.isNotEmpty()) add(buildJsonObject {
                         put("role", "user")

@@ -34,4 +34,17 @@ class WindowsToolsTest {
             cancelled.first { it.name == "import_windows_files" }.run(buildJsonObject {}, session)
         }
     } }
+
+    @Test fun storyToolsStayReachableWhileCorteUsesItsOwnTransportGroup() {
+        val story = setOf("read_story_project", "read_story_fragment", "edit_story_project", "propose_story_changes", "apply_story_proposal", "search_story_material", "story_tasks", "prepare_story_generation")
+        val names = WindowsToolProvider.connections + WindowsToolProvider.models + WindowsToolProvider.editing + story + (1..32).map { "local_$it" } + "use_desktop_tools"
+        val user = LlmMessage(Role.USER, listOf(ContentBlock.Text("Trabaja la escena")))
+        val request = LlmRequest("test", emptyList(), listOf(user), names.map { ToolSpec(it, it, buildJsonObject {}) }, 1024)
+        val selected = listOf("models", "connections", "editing").map { group ->
+            WindowsToolProvider.select(request.copy(messages = listOf(user, LlmMessage(Role.ASSISTANT, listOf(ContentBlock.ToolUse("select", "use_desktop_tools", buildJsonObject { put("group", group) }))))))
+        }
+        assertTrue(selected.all { it.tools.size <= 64 && it.tools.map { tool -> tool.name }.containsAll(story) })
+        assertEquals(names, selected.flatMap { it.tools }.map { it.name }.toSet())
+        assertTrue(selected.last().tools.any { it.name == "corte_apply_ops" })
+    }
 }

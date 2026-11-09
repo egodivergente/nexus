@@ -30,8 +30,12 @@ class BedrockProxyProvider(
 
     override val id: String = "bedrock-proxy"
 
-    override suspend fun complete(request: LlmRequest): LlmResponse = withContext(Dispatchers.IO) {
-        val body = ConverseCodec.encodeRequest(request).toString()
+    // El proxy (agent-proxy/nexus_proxy.py) aún no admite cachePoint en herramientas ni sistema ni cuenta la caché en su
+    // presupuesto: se envía sin caché hasta adaptarlo.
+    override suspend fun complete(request: LlmRequest): LlmResponse = send(request, cache = false)
+
+    private suspend fun send(request: LlmRequest, cache: Boolean): LlmResponse = withContext(Dispatchers.IO) {
+        val body = ConverseCodec.encodeRequest(request, cache).toString()
             .toRequestBody("application/json; charset=utf-8".toMediaType())
         val http = Request.Builder()
             .url(baseUrl.trimEnd('/') + "/v1/converse")

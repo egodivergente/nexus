@@ -62,9 +62,9 @@ class NativeOperationsTest {
         val native = NativeOperations { _, _, _ -> executed = true; JsonObject(emptyMap()) }
         val llm = ScriptedLlmProvider(listOf(
             { r ->
-                assertTrue("diagnose_flow" in r.toolNames())
-                assertFalse("repair_flow" in r.toolNames())
-                tools(use("bad", "repair_flow"))
+                assertTrue("get_active_generations" in r.toolNames())
+                assertFalse("recover_generation" in r.toolNames())
+                tools(use("bad", "recover_generation"))
             },
             { r -> assertTrue(r.result("bad").isError); text("Solo lectura.") },
         ))

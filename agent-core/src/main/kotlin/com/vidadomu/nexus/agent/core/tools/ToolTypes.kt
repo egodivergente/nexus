@@ -27,6 +27,8 @@ data class Attachment(
     val height: Int? = null,
     val durationSec: Double? = null,
     val assetId: String? = null,
+    /** Shown under the media in the chat, e.g. who created an image («AGY · Nano Banana 2»). */
+    val caption: String? = null,
 )
 
 /** Eventos para la UI: tarjetas de plan, propuestas a aplicar, etc. */
@@ -38,6 +40,8 @@ sealed interface UiEvent {
     data class ProposedAction(val id: String, val description: String) : UiEvent
     data class ResultsWall(val media: List<Attachment>) : UiEvent
     data class Info(val text: String) : UiEvent
+    /** Paso que el agente está haciendo ahora (se muestra bajo «Pensando…»). */
+    data class Activity(val text: String) : UiEvent
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     data class StreamingText(val text: String) : UiEvent
     /** Botones de respuesta de un toque bajo la última respuesta del agente. Pulsar uno envía [SuggestedReply.text] como mensaje del usuario. */
@@ -50,11 +54,23 @@ data class SuggestedReply(val label: String, val text: String)
 class ToolOutcome(val result: JsonElement, val isError: Boolean = false, val events: List<UiEvent> = emptyList())
 
 /** Estado por conversación que comparten las herramientas. */
+@Serializable
+data class StoryAgentSelection(
+    val projectId: String,
+    val sceneId: String? = null,
+    val shotId: String? = null,
+    val blockId: String? = null,
+    val mode: String = "proposal",
+    val preserveIds: Set<String> = emptySet(),
+)
+
 class AgentSession(
     val id: String,
     var mode: AgentMode,
     var activeProjectId: String? = null,
 ) {
+    /** Snapshot of the explicitly selected scope for this turn; navigation cannot widen a running order. */
+    var storySelection: StoryAgentSelection? = null
     val attachments = mutableListOf<Attachment>()
     /** Media explicitly opened or created by tools during this turn for inline chat display. */
     val renderedMedia = linkedMapOf<String, Attachment>()
@@ -62,7 +78,6 @@ class AgentSession(
     fun clearRenderedMedia() { renderedMedia.clear() }
     /** Acciones de organización propuestas en modo Copiloto, pendientes de que el usuario las aplique. */
     val pendingActions = linkedMapOf<String, PendingAction>()
-    var flowSubmittedResults = 0
     /** Skills de modelo cuya guía ya recibió el agente en esta conversación (no se repite). */
     val deliveredSkills = mutableSetOf<String>()
 

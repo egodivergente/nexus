@@ -37,7 +37,8 @@ import okhttp3.Response
 
 /**
  * Proveedor LLM que reutiliza el puente local de AXEL (`/root/axel-native-v2/bridge/server.ts`)
- * hacia Antigravity CLI (`/root/.local/bin/agy --mode agent --output-format stream-json`).
+ * hacia Antigravity CLI (`/root/.local/bin/agy --mode agent --output-format stream-json`) o, con [BridgeEngine.CODEX],
+ * hacia Codex CLI (`codex exec`).
  *
  * Compatible tanto con el contrato actual de AXEL Native (`POST /v1/chat`, SSE `text_delta` + `final`,
  * `POST /v1/jobs/cancel`, `GET /health`) como con el endpoint legado (`POST /v1/chat/stream`, SSE `done`).
@@ -50,8 +51,27 @@ class AntigravityProvider(
     endpoint: String = DEFAULT_ENDPOINT,
     private val sessionId: () -> String = { DEFAULT_CONVERSATION_ID },
     private val client: OkHttpClient = defaultHttpClient(),
+    private val engine: BridgeEngine = BridgeEngine.ANTIGRAVITY,
+    /** The brain may create images with its own engine; the bridge hands them over as `artifact` events. */
+    private val nativeImages: Boolean = false,
+    /** Solo Codex: nivel de razonamiento (`model_reasoning_effort`); null = el del modelo. AGY lo lleva en el id del modelo. */
+    private val reasoningEffort: String? = null,
 ) : StreamingLlmProvider {
-    override val id: String = "antigravity"
+    /** The same AXEL bridge serves several CLIs; [bridgeProvider] is the name it routes by. */
+    enum class BridgeEngine(
+        val providerId: String,
+        val bridgeProvider: String,
+        val label: String,
+        val shortLabel: String,
+        val jobPrefix: String,
+        val defaultModel: String,
+        val imageTool: String,
+    ) {
+        ANTIGRAVITY("antigravity", "gemini", "Antigravity (AGY)", "AGY", "nexus-agy-", AntigravityProvider.DEFAULT_MODEL, "generate_image (Nano Banana)"),
+        CODEX("codex", "codex", "Codex", "Codex", "nexus-codex-", AntigravityProvider.CODEX_DEFAULT_MODEL, "generación de imágenes de Codex (GPT Image)"),
+    }
+
+    override val id: String = engine.providerId
     private val baseUrl = endpoint.trim().trimEnd('/').ifBlank { DEFAULT_ENDPOINT }
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -69,9 +89,8 @@ class AntigravityProvider(
         onTextDelta: (String) -> Unit,
     ): LlmResponse = withContext(Dispatchers.IO) {
         val conversationId = request.conversationId?.takeIf { it.isNotBlank() } ?: sessionId()
-        val jobId = "nexus-agy-${UUID.randomUUID()}"
-        val payload = encodeStreamRequest(request, conversationId, jobId)
-        val bodyBytes = payload.toString().toByteArray(StandardCharsets.UTF_8)
+        val jobId = "${engine.jobPrefix}${UUID.randomUUID()}"
+        val images = bridgeImages(request)
         val activeCalls = java.util.Collections.synchronizedList(mutableListOf<Call>())
         val cancelSent = java.util.concurrent.atomic.AtomicBoolean(false)
         fun triggerCancel() {
@@ -87,6 +106,11 @@ class AntigravityProvider(
         }
 
         try {
+            // Los píxeles viajan como archivos subidos al puente (que se los pasa al motor), no como un aviso de texto.
+            val attachments = uploadImages(jobId, images, activeCalls) { triggerCancel() }
+            val payload = encodeStreamRequest(request, conversationId, jobId, images.associate { it.key to it.name }, attachments)
+            val bodyBytes = payload.toString().toByteArray(StandardCharsets.UTF_8)
+            val textBytes = bridgeTextBytes(payload)
             val primaryResponse = executeStreamCall("$baseUrl/v1/chat", bodyBytes, activeCalls) { triggerCancel() }
             val activeResponse = if (primaryResponse.code == 404) {
                 primaryResponse.close()
@@ -102,7 +126,7 @@ class AntigravityProvider(
                 }
                 val body = res.body ?: throw LlmException(
                     LlmException.Kind.PROTOCOL,
-                    "El puente Antigravity cerró la respuesta sin contenido.",
+                    "El puente de ${engine.label} cerró la respuesta sin contenido.",
                 )
                 try {
                     BufferedReader(InputStreamReader(body.byteStream(), StandardCharsets.UTF_8)).use { reader ->
@@ -112,7 +136,7 @@ class AntigravityProvider(
                     triggerCancel()
                     throw e
                 } catch (e: LlmException) {
-                    throw e
+                    throw if (isArgumentLimitError(e)) argumentLimitError(e, textBytes) else e
                 } catch (e: IOException) {
                     if (!coroutineContext.isActive) {
                         triggerCancel()
@@ -120,7 +144,7 @@ class AntigravityProvider(
                     }
                     throw LlmException(
                         LlmException.Kind.NETWORK,
-                        "Conexión interrumpida con el puente Antigravity: ${Redactor.redact(e.message ?: "stream cerrado")}",
+                        "Conexión interrumpida con el puente de ${engine.label}: ${Redactor.redact(e.message ?: "stream cerrado")}",
                     )
                 }
             }
@@ -151,12 +175,12 @@ class AntigravityProvider(
         } catch (e: ConnectException) {
             throw LlmException(
                 LlmException.Kind.NETWORK,
-                "Antigravity (AGY) no está disponible en $baseUrl. Verifica que el puente de Termux esté activo o elige otro proveedor LLM.",
+                "${engine.label} no está disponible en $baseUrl. Verifica que el puente de Termux esté activo o elige otro proveedor LLM.",
             )
         } catch (e: SocketTimeoutException) {
             throw LlmException(
                 LlmException.Kind.NETWORK,
-                "Tiempo de espera agotado conectando con Antigravity (AGY) en $baseUrl.",
+                "Tiempo de espera agotado conectando con ${engine.label} en $baseUrl.",
             )
         } catch (e: IOException) {
             if (!coroutineContext.isActive) {
@@ -165,7 +189,7 @@ class AntigravityProvider(
             }
             throw LlmException(
                 LlmException.Kind.NETWORK,
-                "No se pudo conectar con Antigravity (AGY) en $baseUrl: ${Redactor.redact(e.message ?: "error de red")}",
+                "No se pudo conectar con ${engine.label} en $baseUrl: ${Redactor.redact(e.message ?: "error de red")}",
             )
         }
     }
@@ -177,10 +201,10 @@ class AntigravityProvider(
                 if (!res.isSuccessful) return@use false
                 val obj = json.parseToJsonElement(res.body?.string().orEmpty()).jsonObject
                 val ok = obj["ok"]?.jsonPrimitive?.contentOrNull == "true"
-                val geminiReady = obj["providers"]?.jsonObject
-                    ?.get("gemini")?.jsonObject
+                val engineReady = obj["providers"]?.jsonObject
+                    ?.get(engine.bridgeProvider)?.jsonObject
                     ?.get("ready")?.jsonPrimitive?.contentOrNull
-                ok && (geminiReady == null || geminiReady == "true")
+                ok && (engineReady == null || engineReady == "true")
             }
         }.getOrDefault(false)
     }
@@ -238,6 +262,7 @@ class AntigravityProvider(
         var lastEmittedVisible = ""
         var inputTokens = 0
         var outputTokens = 0
+        val artifacts = linkedMapOf<String, BridgeArtifact>()
 
         fun flushEvent() {
             if (dataLines.isEmpty()) {
@@ -263,6 +288,10 @@ class AntigravityProvider(
                         }
                     }
                 }
+                "artifact" -> if (nativeImages) {
+                    val artifact = parseArtifact(payload)
+                    if (artifact != null && artifact.fetchPath !in artifacts) artifacts[artifact.fetchPath] = artifact
+                }
                 "usage" -> {
                     inputTokens = payload["input_tokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: inputTokens
                     outputTokens = payload["output_tokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: outputTokens
@@ -270,7 +299,7 @@ class AntigravityProvider(
                 "error" -> {
                     val msg = payload["message"]?.jsonPrimitive?.contentOrNull
                         ?: payload["error"]?.jsonPrimitive?.contentOrNull
-                        ?: "Antigravity devolvió un error."
+                        ?: "${engine.label} devolvió un error."
                     val code = payload["code"]?.jsonPrimitive?.contentOrNull.orEmpty()
                     streamError = mapBridgeError(code, msg)
                 }
@@ -281,7 +310,7 @@ class AntigravityProvider(
                     when (status) {
                         "cancelled", "canceled" -> cancelledByBridge = true
                         "failed", "error" -> {
-                            streamError = mapBridgeError("final_failed", errorMsg ?: "El puente Antigravity no pudo completar la respuesta.")
+                            streamError = mapBridgeError("final_failed", errorMsg ?: "El puente de ${engine.label} no pudo completar la respuesta.")
                         }
                         else -> {
                             val current = fullText.toString()
@@ -343,21 +372,89 @@ class AntigravityProvider(
             content += ContentBlock.Text(parsed.visibleText)
         }
         content += parsed.toolUses
-        if (content.isEmpty()) {
-            content += ContentBlock.Text("…")
+        val notices = mutableListOf<String>()
+        val media = artifacts.values.mapNotNull { artifact -> receiveArtifact(artifact, notices) }
+        if (content.isEmpty() && media.isNotEmpty()) content += ContentBlock.Text("Imagen creada.")
+        if (content.isEmpty() || parsed.toolUses.isEmpty() && media.isEmpty() && parsed.visibleText.trim() in setOf("…", "...")) {
+            throw LlmException(LlmException.Kind.PROTOCOL,
+                "${engine.label} terminó sin devolver texto ni herramientas. El mensaje se conserva; puedes reintentar la respuesta.")
         }
         val stopReason = if (parsed.toolUses.isNotEmpty()) StopReason.TOOL_USE else StopReason.END_TURN
         return LlmResponse(
             message = LlmMessage(Role.ASSISTANT, content),
             stopReason = stopReason,
             usage = Usage(inputTokens, outputTokens),
+            generatedMedia = media,
+            notices = notices,
         )
     }
+
+    internal data class BridgeArtifact(
+        val fetchPath: String,
+        val mimeType: String?,
+        val filename: String,
+        val model: String?,
+        val width: Int?,
+        val height: Int?,
+    )
+
+    /** Only images created by the engine's image tool: a tool that merely reads an image also yields an artifact. */
+    private fun parseArtifact(payload: JsonObject): BridgeArtifact? {
+        fun text(key: String) = (payload[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() && it != "null" }
+        val mime = text("mimeType")
+        if (text("kind") != "image" && mime?.startsWith("image/") != true) return null
+        if (!IMAGE_TOOL.containsMatchIn(text("originatingTool").orEmpty())) return null
+        val fetchPath = text("fetchPath")?.takeIf { it.startsWith("/v1/artifacts/") && ".." !in it } ?: return null
+        return BridgeArtifact(
+            fetchPath = fetchPath,
+            mimeType = mime,
+            filename = text("filename") ?: fetchPath.substringAfterLast('/'),
+            model = text("model") ?: text("imageModel"),
+            width = text("width")?.toIntOrNull(),
+            height = text("height")?.toIntOrNull(),
+        )
+    }
+
+    private fun receiveArtifact(artifact: BridgeArtifact, notices: MutableList<String>): GeneratedMedia? {
+        val media = try {
+            val req = Request.Builder().url("$baseUrl${artifact.fetchPath}").get().build()
+            downloadClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) throw IOException("HTTP ${res.code}")
+                val body = res.body ?: throw IOException("respuesta vacía")
+                if (body.contentLength() > MAX_ARTIFACT_BYTES) throw IOException("supera ${MAX_ARTIFACT_BYTES / 1_000_000} MB")
+                val bytes = body.byteStream().use { input ->
+                    val out = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        out.write(buffer, 0, n)
+                        if (out.size() > MAX_ARTIFACT_BYTES) throw IOException("supera ${MAX_ARTIFACT_BYTES / 1_000_000} MB")
+                    }
+                    out.toByteArray()
+                }
+                val mime = artifact.mimeType ?: body.contentType()?.let { "${it.type}/${it.subtype}" }
+                if (bytes.isEmpty() || mime?.startsWith("image/") != true) throw IOException("no es una imagen")
+                GeneratedMedia(bytes, mime, artifact.filename, engine.shortLabel, artifact.model, artifact.width, artifact.height)
+            }
+        } catch (e: IOException) {
+            notices += "No se recibió la imagen «${artifact.filename}» de ${engine.shortLabel}: ${Redactor.redact(e.message ?: "error de red").take(160)}. Sigue en el puente."
+            return null
+        }
+        if (NativeImageModels.isLite(artifact.model)) {
+            notices += "«${artifact.filename}» la hizo ${engine.shortLabel} con ${NativeImageModels.label(artifact.model)}, la versión ligera que asignó el servidor. Ya está en la Biblioteca; si quieres más calidad, pídela de nuevo."
+        }
+        return media
+    }
+
+    private val downloadClient by lazy { client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build() }
 
     internal fun encodeStreamRequest(
         request: LlmRequest,
         conversationId: String,
         jobId: String = "nexus-agy-turn",
+        imageNames: Map<String, String> = emptyMap(),
+        attachments: List<JsonObject> = emptyList(),
     ): JsonObject {
         val systemPrompt = buildSystemInstructions(request.system, request.tools)
         val encodedMessages = mutableListOf<JsonObject>()
@@ -369,7 +466,7 @@ class AntigravityProvider(
         }
         var firstUserDecorated = false
         for (msg in request.messages) {
-            val rendered = renderMessage(msg)
+            val rendered = renderMessage(msg, imageNames)
             if (rendered.isNotBlank()) {
                 val roleStr = if (msg.role == Role.USER) "user" else "assistant"
                 val contentStr = if (msg.role == Role.USER && !firstUserDecorated && systemPrompt.isNotBlank()) {
@@ -384,7 +481,7 @@ class AntigravityProvider(
                 }
             }
         }
-        val lastUserMessage = request.messages.lastOrNull { it.role == Role.USER }?.let(::renderMessage).orEmpty()
+        val lastUserMessage = request.messages.lastOrNull { it.role == Role.USER }?.let { renderMessage(it, imageNames) }.orEmpty()
         val promptForTurn = when {
             request.messages.size <= 1 && systemPrompt.isNotBlank() ->
                 "$systemPrompt\n\n[Mensaje del usuario]\n$lastUserMessage"
@@ -396,14 +493,17 @@ class AntigravityProvider(
         return buildJsonObject {
             put("jobId", jobId)
             put("conversationId", conversationId)
-            put("provider", "gemini")
-            put("model", request.modelId.ifBlank { DEFAULT_MODEL })
+            put("provider", engine.bridgeProvider)
+            val model = request.modelId.ifBlank { engine.defaultModel }
+            put("model", model)
+            if (engine == BridgeEngine.CODEX) CodexReasoning.effective(model, reasoningEffort)?.let { put("reasoningEffort", it) }
             put("prompt", promptForTurn)
             put("messages", buildJsonArray { encodedMessages.forEach { add(it) } })
+            if (attachments.isNotEmpty()) put("attachments", buildJsonArray { attachments.forEach { add(it) } })
         }
     }
 
-    private fun renderMessage(message: LlmMessage): String = buildString {
+    private fun renderMessage(message: LlmMessage, imageNames: Map<String, String> = emptyMap()): String = buildString {
         for (block in message.content) {
             when (block) {
                 is ContentBlock.Text -> if (block.text.isNotBlank()) appendLine(block.text.trim())
@@ -419,8 +519,14 @@ class AntigravityProvider(
                     val status = if (block.isError) "ERROR" else "OK"
                     appendLine("[Resultado de herramienta ${block.toolUseId} ($status)]: ${block.content}")
                 }
-                is ContentBlock.Document -> appendLine("[Documento adjunto: ${block.name} (${block.format}, ${block.bytes.size} bytes)]")
-                is ContentBlock.Image -> appendLine("[Imagen adjunta (${block.format}, ${block.bytes.size} bytes)]")
+                // El puente solo transporta texto: los documentos de texto (incluido el texto extraído de un PDF) van completos.
+                is ContentBlock.Document -> if (block.format in TEXT_DOCUMENTS) {
+                    appendLine("[Documento adjunto: ${block.name}]")
+                    appendLine(block.bytes.toString(Charsets.UTF_8).trim())
+                    appendLine("[Fin del documento]")
+                } else appendLine("[Documento adjunto: ${block.name} (${block.format}, ${block.bytes.size} bytes) · su contenido no se puede enviar por este puente]")
+                is ContentBlock.Image -> appendLine(imageNames[imageKey(block)]?.let { "[Imagen adjunta: $it]" }
+                    ?: "[Imagen adjunta (${block.format}, ${block.bytes.size} bytes)]")
                 is ContentBlock.Reasoning -> Unit
             }
         }
@@ -434,6 +540,15 @@ class AntigravityProvider(
         }
         appendLine("IMPORTANTE: Estás ejecutándote como el cerebro integrado de la aplicación Android Nexus.")
         appendLine("NO ejecutes comandos bash del servidor ni herramientas de escritorio para responder sobre Nexus; utiliza exclusivamente las herramientas Android de Nexus descritas a continuación.")
+        if (nativeImages) {
+            appendLine("EXCEPCIÓN — imágenes con tu propio motor: puedes usar tu herramienta nativa ${engine.imageTool} para crear o editar imágenes cuando el usuario pida una imagen sin nombrar un modelo del catálogo de Nexus, o cuando pida expresamente tu motor.")
+            appendLine("Nexus recibe el archivo, lo guarda en su Biblioteca y lo muestra en el chat: no lo copies a otras carpetas ni inventes rutas. Si el usuario nombra un modelo del catálogo (Seedream, Flux, Kling…) o pide vídeo o audio, usa las herramientas de Nexus.")
+            if (engine == BridgeEngine.ANTIGRAVITY) {
+                appendLine("Calidad de imagen: el usuario quiere la máxima calidad. Si puedes elegir o influir en el modelo de imagen, usa el más avanzado disponible (Nano Banana Pro o Nano Banana 2) y evita las variantes Lite; escribe prompts de imagen detallados y precisos. Si aun así te asignan Lite, entrega la imagen igualmente: nunca la descartes.")
+            }
+        } else {
+            appendLine("No uses tu motor nativo de imágenes ni herramientas de generación del servidor en este turno. Preparar un guion, storyboard o propuesta no autoriza gasto: prepara la generación mediante las herramientas Android de Nexus y espera su confirmación de coste.")
+        }
         if (tools.isNotEmpty()) {
             appendLine()
             appendLine("## Herramientas Android de Nexus disponibles")
@@ -493,6 +608,85 @@ class AntigravityProvider(
         ContentBlock.ToolUse(id = id, name = name, input = inputObj)
     }.getOrNull()
 
+    internal class BridgeImage(val key: String, val name: String, val mimeType: String, val bytes: ByteArray)
+
+    /** Imágenes de la petición, sin repetir (la misma puede aparecer en dos mensajes), en orden de aparición. */
+    internal fun bridgeImages(request: LlmRequest): List<BridgeImage> {
+        val seen = linkedMapOf<String, ContentBlock.Image>()
+        request.messages.flatMap { it.content }.filterIsInstance<ContentBlock.Image>().forEach { seen.putIfAbsent(imageKey(it), it) }
+        return seen.entries.mapIndexed { i, (key, image) ->
+            val ext = when (image.format.lowercase()) { "jpeg", "jpg" -> "jpg"; "png" -> "png"; "webp" -> "webp"; "gif" -> "gif"; else -> "jpg" }
+            val mime = if (ext == "jpg") "image/jpeg" else "image/$ext"
+            BridgeImage(key, "imagen-${i + 1}.$ext", mime, image.bytes)
+        }
+    }
+
+    private fun imageKey(image: ContentBlock.Image): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(image.bytes).joinToString("") { "%02x".format(it) }
+
+    /**
+     * Sube cada imagen con `PUT /v1/uploads/<jobId>/<nombre>` y devuelve los adjuntos que el puente espera en `attachments`.
+     * Si una subida falla, se detiene el turno con el motivo: responder sin la imagen sería hacerlo a ciegas.
+     */
+    private suspend fun uploadImages(jobId: String, images: List<BridgeImage>, activeCalls: MutableList<Call>, onCancel: () -> Unit): List<JsonObject> =
+        images.map { image ->
+            val req = Request.Builder()
+                .url("$baseUrl/v1/uploads/$jobId/${image.name}")
+                .put(image.bytes.toRequestBody(image.mimeType.toMediaType()))
+                .build()
+            val call = uploadClient.newCall(req)
+            activeCalls += call
+            val path = try {
+                awaitResponse(call, onCancel).use { res ->
+                    val raw = res.body?.string().orEmpty()
+                    if (!res.isSuccessful) throw LlmException(LlmException.Kind.UPSTREAM,
+                        "${engine.label}: el puente no aceptó «${image.name}» (HTTP ${res.code}). Sin la imagen no puede verla, así que no sigo a ciegas.", res.code)
+                    runCatching { json.parseToJsonElement(raw).jsonObject["path"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: throw LlmException(LlmException.Kind.PROTOCOL, "${engine.label}: el puente recibió «${image.name}» pero no dijo dónde la guardó.")
+                }
+            } catch (e: CancellationException) {
+                onCancel(); throw e
+            } catch (e: IOException) {
+                if (!coroutineContext.isActive) { onCancel(); throw CancellationException("Generación detenida.", e) }
+                throw LlmException(LlmException.Kind.NETWORK,
+                    "${engine.label}: no pude enviar «${image.name}» al puente (${Redactor.redact(e.message ?: "error de red").take(120)}). Sin la imagen no puede verla, así que no sigo a ciegas.")
+            }
+            buildJsonObject { put("name", image.name); put("uploadedPath", path); put("mimeType", image.mimeType) }
+        }
+
+    private val uploadClient by lazy { client.newBuilder().callTimeout(120, TimeUnit.SECONDS).build() }
+
+    /**
+     * Bytes de texto de la conversación que el puente pasa a la CLI: el puente descarta los mensajes `system` y une el
+     * resto en un solo texto. Solo cuenta tamaños; no guarda ni registra contenido.
+     */
+    internal fun bridgeTextBytes(payload: JsonObject): Int =
+        (payload["messages"] as? kotlinx.serialization.json.JsonArray).orEmpty().fold(0) { total, m ->
+            val obj = m as? JsonObject
+            if (obj == null || obj["role"]?.jsonPrimitive?.contentOrNull == "system") total
+            else total + (obj["content"]?.jsonPrimitive?.contentOrNull ?: "").toByteArray(StandardCharsets.UTF_8).size
+        }
+
+    /** `spawn E2BIG`: el sistema rechazó los argumentos con los que el puente arrancó la CLI. */
+    internal fun isArgumentLimitError(e: LlmException): Boolean = e.message.orEmpty().contains("E2BIG", ignoreCase = true)
+
+    /**
+     * Explica el E2BIG con el tamaño medido. No es un fallo de la imagen ni se arregla recortando el historial: un puente
+     * antiguo pasa todo el texto como un único argumento (máx. 128 KiB en Linux); el puente actualizado lo pasa por stdin.
+     */
+    internal fun argumentLimitError(original: LlmException, textBytes: Int): LlmException {
+        val kb = (textBytes + 1023) / 1024
+        val detail = if (textBytes >= ARGUMENT_LIMIT_HINT_BYTES) {
+            "el texto de esta conversación (≈$kb KB) no cabe en el argumento con el que el puente arranca la CLI " +
+                "(máximo 128 KiB; error E2BIG del sistema). Es el tamaño del historial, no el formato ni la resolución de las imágenes. " +
+                "Actualiza el puente para que se lo pase por stdin (tools/bridge-patches/codex-stdin) o abre un chat nuevo; este chat se conserva."
+        } else {
+            "el sistema rechazó los argumentos con los que el puente arranca la CLI (E2BIG) aunque el texto enviado es pequeño (≈$kb KB); revisa el entorno del puente."
+        }
+        return LlmException(LlmException.Kind.BAD_REQUEST, "${engine.label}: $detail", original.httpStatus, original.code)
+    }
+
     private fun mapBridgeError(code: String, message: String): LlmException {
         val clean = Redactor.redact(message).take(320)
         val lower = "$code $clean".lowercase()
@@ -507,7 +701,7 @@ class AntigravityProvider(
                 LlmException.Kind.UPSTREAM
             else -> LlmException.Kind.UPSTREAM
         }
-        return LlmException(kind, "Antigravity (AGY): $clean")
+        return LlmException(kind, "${engine.label}: $clean")
     }
 
     private fun mapHttpError(status: Int, rawBody: String): LlmException {
@@ -524,14 +718,21 @@ class AntigravityProvider(
             in 500..599 -> LlmException.Kind.UPSTREAM
             else -> LlmException.Kind.PROTOCOL
         }
-        return LlmException(kind, "Antigravity (AGY) devolvió HTTP $status: $clean", status)
+        return LlmException(kind, "${engine.label} devolvió HTTP $status: $clean", status)
     }
 
     companion object {
         const val DEFAULT_ENDPOINT = "http://127.0.0.1:8788"
         const val DEFAULT_MODEL = "gemini-3.8-flash"
+        const val CODEX_DEFAULT_MODEL = "gpt-6-astra"
         private const val DEFAULT_CONVERSATION_ID = "nexus-agy-default"
+        private const val MAX_ARTIFACT_BYTES = 40_000_000L
+        /** Por debajo de esto, un E2BIG no se explica por el tamaño del texto (límite por argumento: 131 072 B menos lo que añade el puente). */
+        private const val ARGUMENT_LIMIT_HINT_BYTES = 100_000
+        private val IMAGE_TOOL = Regex("(?i)(generat|creat|edit|gen).*image|image.*(generat|creat|edit|gen)")
         private const val TOOL_OPEN_TAG = "<NEXUS_TOOL_CALL>"
+        /** Document formats whose bytes are UTF-8 text and can travel inside the prompt. */
+        val TEXT_DOCUMENTS = setOf("txt", "md", "csv", "html")
         private const val TOOL_CLOSE_TAG = "</NEXUS_TOOL_CALL>"
         private const val TOOL_REMINDER_FOOTER =
             "[Recordatorio Nexus: si necesitas otra herramienta Android de Nexus, usa <NEXUS_TOOL_CALL>{\"name\":\"...\",\"input\":{...}}</NEXUS_TOOL_CALL>; si ya tienes los datos, responde directamente al usuario en español sin etiquetas XML.]"

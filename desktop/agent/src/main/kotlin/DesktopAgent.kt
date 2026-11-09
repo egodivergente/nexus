@@ -48,6 +48,7 @@ private fun callback(op: String, args: JsonElement = JsonObject(emptyMap())): Js
 
 private class DesktopRuntime(private val root: File, private val data: File) {
     private val assets = AssetIndex(File(data, "index.json"))
+    private val story = DesktopStoryWorkspace(assets, data)
     private var settings = JsonObject(emptyMap())
     private var secrets = JsonObject(emptyMap())
     private var mode = AgentMode.COPILOT
@@ -82,8 +83,8 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         ModelRouter(registry, skills, published, excludedFamilies = {
             settings.text("excludedFamilies", "veo").split(',', ';', '\n').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
         }), guard, GuardedExecutor(backend, guard), assets,
-            GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) }, directFlow = true,
-            adaptPrompt = { prompt, schema, target -> promptAdapter.adapt(prompt, schema.textLimits["prompt"], target) },
+            GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) },
+            adaptPrompt = { prompt, _, _ -> prompt },
             nativeOperations = NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) })
     private suspend fun runNative(operation: String, arguments: JsonObject, session: AgentSession): JsonObject {
         val response = callback("native", obj("operation" to JsonPrimitive(operation), "input" to arguments,
@@ -116,7 +117,9 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             "profile" -> BrainFactory.create(profile ?: error("Falta el perfil del cerebro"), { secrets.text("brainKey") })
             "anthropic" -> AnthropicProvider({ secrets.text("apiKey") }, settings.text("endpoint").ifBlank { "https://api.anthropic.com" })
             "openai" -> OpenAiCompatibleProvider(settings.text("endpoint"), { secrets.text("apiKey") })
-            "antigravity" -> AntigravityProvider(settings.text("endpoint"), { secrets.text("apiKey") })
+            "antigravity", "codex" -> AntigravityProvider(settings.text("endpoint"),
+                engine = if (backend == "codex") AntigravityProvider.BridgeEngine.CODEX else AntigravityProvider.BridgeEngine.ANTIGRAVITY,
+                nativeImages = false, reasoningEffort = settings.text("codexEffort").ifBlank { null })
             "proxy" -> if(settings.text("endpoint").isNotBlank() && secrets.text("token").isNotBlank())
                 BedrockProxyProvider(settings.text("endpoint"), { secrets.text("token") }) else OfflinePlannerProvider()
             "direct" -> if(secrets.text("accessKey").isNotBlank() && secrets.text("secretKey").isNotBlank())
@@ -169,7 +172,12 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 listOf(ContentBlock.Text("Fotograma del asset ${attachment.assetId ?: attachment.id}, t≈${frame["timestamp_ms"]} ms"),
                     ContentBlock.Image(frame.text("format"), Base64.getDecoder().decode(frame.text("bytes"))))
             }
-        })
+        }, uiContext = { session -> session.storySelection?.let { selection -> buildString {
+            appendLine("Alcance audiovisual explícito: ${encoded(selection)}")
+            appendLine("Modo: ${if (selection.mode == "direct") "aplicar cambios reversibles autorizados" else "proponer sin sustituir el contenido actual"}.")
+            appendLine("Respeta el alcance y los elementos fijados. Este contexto no autoriza gasto, llamadas a otros agentes ni generaciones. Usa las herramientas del proyecto y la confirmación de coste de Nexus.")
+            append(assets.storyContext(selection.projectId, selection.sceneId, selection.shotId))
+        } } })
     }
     private var orchestrator = makeOrchestrator()
     private var conversation = orchestrator.newConversation()
@@ -178,6 +186,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         "projectId" to (conversation.session.activeProjectId?.let(::JsonPrimitive) ?: JsonNull),
         "skills" to encoded(skills.all()), "skillErrors" to encoded(skills.errors),
         "index" to encoded(assets.snapshot()),
+        "storySelection" to (story.selection()?.let { encoded(it) } ?: JsonNull),
         "tools" to encoded(orchestrator.toolsFor(mode).map { it.name }),
         "budgetUsdToday" to JsonPrimitive(budget.spentToday()),
         "plans" to JsonArray(guard.plans().map { plan -> obj("plan" to encoded(plan),
@@ -186,6 +195,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
             obj("id" to JsonPrimitive(it.id), "description" to JsonPrimitive(it.description)) }))
 
     suspend fun command(op: String, args: JsonObject): JsonElement {
+        if (op in setOf("storyView", "storyCommand", "storySelection")) return story.command(op, args)
         when (op) {
             "init", "settings" -> {
                 settings = args["settings"]?.jsonObject ?: settings
@@ -222,7 +232,9 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                     if (current != settings) { settings = current; orchestrator = makeOrchestrator() }
                 }
                 viewedAssets.clear()
-                conversation.session.flowSubmittedResults = 0
+                val capturedStory = story.captureForTurn(conversation.session.activeProjectId)
+                conversation.session.storySelection = capturedStory
+                conversation.session.mode = capturedStory?.let { if (it.mode == "direct") AgentMode.AGENT else AgentMode.COPILOT } ?: mode
                 turnModels = null; turnSchemas.clear()
                 val started = System.nanoTime()
                 val incoming = args["attachments"]?.let { json.decodeFromJsonElement<List<Attachment>>(it) } ?: emptyList()
@@ -233,7 +245,8 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                         mimeType=attachment.mimeType, projectId=conversation.session.activeProjectId, createdAt=System.currentTimeMillis()))
                     attachment.copy(assetId=asset.id)
                 }
-                val projectRefs = assets.snapshot().assets.filter { conversation.session.activeProjectId != null && it.projectId == conversation.session.activeProjectId && it.role == AssetRole.REFERENCE }
+                val effectiveIds = capturedStory?.shotId?.let { assets.storyGenerationContext(capturedStory.projectId, it).referenceAssetIds.toSet() }
+                val projectRefs = assets.snapshot().assets.filter { if (effectiveIds != null) it.id in effectiveIds else capturedStory == null && conversation.session.activeProjectId != null && it.projectId == conversation.session.activeProjectId && it.role == AssetRole.REFERENCE }
                 val request = args.text("text")
                 val words = request.lowercase().split(Regex("[^\\p{L}\\p{N}]+" )).toSet()
                 val ignored = setOf("face", "reference", "referencia", "imagen", "foto", "image", "video", "png", "jpg", "jpeg", "webp")
@@ -265,11 +278,13 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 val id = args.text("id").ifBlank { null }
                 require(id == null || assets.findProject(id) != null) { "Proyecto desconocido" }
                 conversation.session.activeProjectId = id; assets.startProjectSession(id)
+                conversation.session.storySelection = null
             }
             "createProject" -> {
                 val name = args.text("name").trim().take(80); require(name.isNotBlank())
                 conversation.session.activeProjectId = (assets.findProject(name) ?: assets.createProject(name)).id
                 assets.startProjectSession(conversation.session.activeProjectId)
+                conversation.session.storySelection = null
             }
             "importReferences" -> {
                 val projectId = args.text("projectId")
@@ -324,12 +339,25 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                 val byJob = rawHistory.associateBy { it.jsonObject.text("jobId") }
                 for (job in history.filter { it.status == "COMPLETED" && it.outputs.isNotEmpty() }) {
                     val existing = assets.generation(job.jobId)
-                    if (existing?.status == "COMPLETED" && existing.outputAssetIds.mapNotNull { assets.asset(it)?.uri }.toSet() == job.outputs.toSet()) continue
+                    if (existing?.status == "COMPLETED" && existing.outputAssetIds.mapNotNull { assets.asset(it)?.uri }.toSet() == job.outputs.toSet()) {
+                        registerStoryOutputs(existing, existing.outputAssetIds)
+                        continue
+                    }
                     val type = runCatching { AssetType.valueOf(job.modality) }.getOrDefault(AssetType.OTHER)
-                    val projectId = byJob[job.jobId]?.jsonObject?.text("projectId")?.takeIf { assets.findProject(it) != null }
-                    val record = existing ?: GenerationRecord(id = AssetIndex.newId("gen"), nexusJobId = job.jobId,
+                    val raw = byJob[job.jobId]?.jsonObject
+                    val origin = existing?.storyContext ?: raw?.get("storyContext")?.takeIf { it is JsonObject }?.let { json.decodeFromJsonElement<StoryGenerationContext>(it) }
+                        ?: (raw?.get("parameters") as? JsonObject)?.text("__story_context")?.takeIf { it.isNotBlank() }?.let { runCatching { json.decodeFromString<StoryGenerationContext>(it) }.getOrNull() }
+                    val projectId = origin?.projectId ?: raw?.text("projectId")?.takeIf { assets.findProject(it) != null }
+                    val sentParams = (raw?.get("parameters") as? JsonObject)?.filterKeys { !it.startsWith("__") }?.mapValues { (_, value) -> if (value is JsonPrimitive) value.content else value.toString() }
+                    val sentReferences = (raw?.get("referenceUris") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    val record = (existing ?: GenerationRecord(id = AssetIndex.newId("gen"), nexusJobId = job.jobId,
                         providerId = job.providerId, modelId = job.modelId, modality = job.modality,
-                        prompt = job.prompt, status = job.status, createdAt = job.createdAt, projectId = projectId)
+                        prompt = job.prompt, status = job.status, createdAt = job.createdAt, projectId = projectId)).copy(
+                            storyContext = origin, shotId = origin?.shotId ?: existing?.shotId, projectId = projectId ?: existing?.projectId,
+                            params = sentParams ?: existing?.params.orEmpty(), referenceUris = sentReferences ?: existing?.referenceUris.orEmpty(),
+                            referenceAssetIds = sentReferences?.mapNotNull { assets.assetByUri(it)?.id } ?: existing?.referenceAssetIds.orEmpty(),
+                            estimatedCostUsd = (raw?.get("estimatedCostUsd") as? JsonPrimitive)?.doubleOrNull ?: existing?.estimatedCostUsd,
+                            actualCostUsd = job.costUsd ?: existing?.actualCostUsd)
                     val outputIds = job.outputs.mapIndexed { index, uri ->
                         assets.assetByUri(uri)?.id ?: assets.addAsset(Asset(id = "", uri = uri,
                             type = type, role = AssetRole.OUTPUT, source = AssetSource.GENERATED,
@@ -337,6 +365,7 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                             generationId = record.id, projectId = record.projectId, shotId = record.shotId, createdAt = job.createdAt)).id
                     }
                     assets.upsertGeneration(record.copy(status = "COMPLETED", outputAssetIds = outputIds, completedAt = record.completedAt ?: System.currentTimeMillis()))
+                    registerStoryOutputs(record, outputIds)
                 }
             }
             "reload" -> { skills = loadSkills(); deps = deps(); orchestrator = makeOrchestrator() }
@@ -386,6 +415,14 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         }
         return snapshot()
     }
+
+    private suspend fun registerStoryOutputs(record: GenerationRecord, assetIds: List<String>) {
+        val origin = record.storyContext ?: return
+        for (asset in assetIds) assets.storyCommand(origin.projectId, buildJsonObject {
+            put("action", "register_result"); put("operation_id", "result:${record.nexusJobId ?: record.id}:$asset")
+            put("asset_id", asset); put("context", Json.encodeToJsonElement(StoryGenerationContext.serializer(), origin))
+        }, "provider")
+    }
 }
 
 fun main(args: Array<String>) {
@@ -405,6 +442,19 @@ fun main(args: Array<String>) {
         }
         if("op" !in request) {
             if(worker.get()!=null && request.text("requestId")==activeRequestId) callbackReplies.offer(request)
+            continue
+        }
+        // The editor shares the running agent's index. This path never performs a callback,
+        // changes the active turn id, starts a second JVM or replays a provider operation.
+        if (request.text("op") in setOf("storyView", "storyCommand", "storySelection")) {
+            val requestId = request.text("requestId")
+            val reply = try {
+                val value = runBlocking { runtime.command(request.text("op"), request["args"]?.jsonObject ?: JsonObject(emptyMap())) }
+                obj("ok" to JsonPrimitive(true), "value" to value)
+            } catch (e: Exception) {
+                obj("ok" to JsonPrimitive(false), "error" to JsonPrimitive(Redactor.redact(e.message ?: "No se pudo guardar el proyecto.")))
+            }
+            emit(JsonObject(reply + ("requestId" to JsonPrimitive(requestId))))
             continue
         }
         if(worker.get()!=null) { emit(obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive("El agente está ocupado")));continue }

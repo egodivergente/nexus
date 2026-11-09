@@ -159,6 +159,46 @@ class LibraryProjectSnapshotTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(self.index_path.read_bytes()).digest(),digest_before)
         self.assertEqual(sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob('*') if p.is_file()),files_before)
 
+    def test_story_links_project_one_file_into_two_contexts_without_reviving_retired_assets(self):
+        media=self.root/'media';media.mkdir()
+        original=media/('f'*32+'.png');original.write_bytes(b'one original file')
+        self.state={'jobs':[],'draft':{'prompt':'Conservar borrador'}}
+        self.index['assets']=[{'id':'shared','uri':'/media/'+original.name,'type':'IMAGE','role':'OTHER',
+            'projectId':'a','source':'IMPORTED','mimeType':'image/png'},
+            {'id':'retired','uri':'/media/'+original.name,'type':'IMAGE','libraryDeleted':True}]
+        self.index['scenes'].append({'id':'scene-b','projectId':'b','code':'B01'})
+        self.index['shots'].append({'id':'shot-b','projectId':'b','sceneId':'scene-b','code':'B01-01'})
+        self.index['story']={'legacyAdoptedProjectIds':['a','b'],
+            'blocks':[{'id':'block-b','projectId':'b','sceneId':'scene-b','shotId':'shot-b','kind':'reference'}],
+            'links':[{'id':'use-a','projectId':'a','assetId':'shared','scope':'shot','targetId':'shot-a',
+                'role':'candidate','selected':True},
+                {'id':'use-b','projectId':'b','assetId':'shared','scope':'block','targetId':'block-b',
+                 'role':'costume','characterId':'person-b','selected':False,'behavior':'replace'},
+                {'id':'retired-link','projectId':'b','assetId':'retired','scope':'project','targetId':'b','role':'chosen','selected':True}]}
+        self.index_path.write_text(json.dumps(self.index),'utf-8')
+        index_before=self.index_path.read_bytes();file_before=original.read_bytes()
+        rows=self.entries();entry=rows['asset:shared']
+        self.assertEqual(['a','b'],entry['projectIds'])
+        self.assertEqual(['a','b'],entry['knownProjectIds'])
+        uses=[member for member in entry['memberships'] if member['assignmentSource']=='story-link']
+        self.assertEqual([('a','shot-a','scene-a','FINAL','candidate',True),('b','shot-b','scene-b','REFERENCE','costume',False)],
+            [(u['projectId'],u['shotId'],u['sceneId'],u['role'],u['storyRole'],u['selected']) for u in uses])
+        self.assertEqual('block',uses[1]['scope']);self.assertEqual('block-b',uses[1]['targetId'])
+        self.assertEqual(['person-b'],uses[1]['characterIds'])
+        self.assertNotIn('asset:retired',rows)
+        self.assertEqual(index_before,self.index_path.read_bytes());self.assertEqual(file_before,original.read_bytes())
+        self.assertEqual(1,len(list(media.iterdir())))
+        removed=next(link for link in self.index['story']['links'] if link['id']=='use-a')
+        self.index['story']['links']=[link for link in self.index['story']['links'] if link['id']!='use-a']
+        self.index['story']['history']=[{'action':'unlink_material','before':{'links':[removed]},'after':{'links':[]}}]
+        self.index_path.write_text(json.dumps(self.index),'utf-8')
+        self.assertEqual(['b'],self.entries()['asset:shared']['projectIds'],'Legacy ownership must not resurrect an unlinked story use')
+
+    def test_new_legacy_import_into_adopted_project_keeps_its_folder(self):
+        self.index['story']={'legacyAdoptedProjectIds':['a'],'links':[],'history':[]}
+        self.index_path.write_text(json.dumps(self.index),'utf-8')
+        self.assertEqual(['a'],self.entries()['asset:a-output']['projectIds'])
+
 
 if __name__=='__main__':
     unittest.main(verbosity=2)

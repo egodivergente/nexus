@@ -69,7 +69,11 @@ class MediaEngineTest {
     }
 
     @Test fun `flujo sincrono con comodin y autenticacion con prefijo (estilo fal)`() {
-        val fal = MediaTemplates.all.first { it.label.startsWith("Estilo fal") }.config
+        // Previously saved synchronous Fal configs remain supported, even though the picker is curated.
+        val fal = MediaProviderConfig("fal-extra", "fal", "https://fal.run", models = listOf(MediaModelConfig(
+            id = "fal-ai/flux/schnell", name = "FLUX schnell", capability = MediaCapability.TEXT_TO_IMAGE,
+            createPath = "/fal-ai/flux/schnell", requestTemplate = """{"prompt":"{{prompt}}"}""",
+            mode = MediaMode.SYNC, errorPath = "detail", resultPaths = listOf("images.*.url"))))
         val m = fal.models.single()
         val call = MediaEngine.buildCreate(fal, m, MediaInput("un faro"))
         assertEquals("https://fal.run/fal-ai/flux/schnell", call.url)

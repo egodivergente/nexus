@@ -13,6 +13,7 @@ from corte_render import local_path
 
 COLLECTIONS=('scenes','shots','characters','assets','generations')
 RELATIONS={'sceneId','shotId','characterIds','referenceAssetIds','outputAssetIds','parentAssetId','generationId','parentGenerationId'}
+STORY_COLLECTIONS=('blocks','links','elements','preferences','proposals','tasks','autonomy')
 TOKEN='nexus-bundle:'
 
 
@@ -49,6 +50,19 @@ class PortableProject:
         if not project:raise ValueError('Proyecto desconocido.')
         rows={r['id']:(collection,r) for collection in COLLECTIONS for r in index.get(collection,[])}
         selected={identifier for identifier,(_,r) in rows.items() if r.get('projectId')==project_id}
+        story={kind:[row for row in index.get('story',{}).get(kind,[]) if row.get('projectId')==project_id]
+               for kind in STORY_COLLECTIONS}
+        # Story links may refer to an unassigned asset or one used in another project.
+        # Include its bytes once, retaining each narrative use separately.
+        def referenced(value):
+            if isinstance(value,str):
+                return {value} if value in rows else set()
+            if isinstance(value,list):
+                return set().union(*(referenced(item) for item in value)) if value else set()
+            if isinstance(value,dict):
+                return set().union(*(referenced(item) for item in value.values())) if value else set()
+            return set()
+        selected.update(referenced(story))
         # Include ancestry and external references rather than silently losing relationships.
         while True:
             refs=set()
@@ -59,6 +73,8 @@ class PortableProject:
             if not added:break
             selected.update(added)
         bundle={'schemaVersion':1,'projects':[project],**{c:[{**r,'projectId':project_id} for identifier,(kind,r) in rows.items() if kind==c and identifier in selected] for c in COLLECTIONS},'projectSessions':[]}
+        if any(story.values()):
+            bundle['story']={**story,'legacyAdoptedProjectIds':[project_id]}
         corte_file=self.data/'projects'/project_id/'edit.json'
         corte=self.host.corte.exchange('export_document',{'project_id':project_id})['document'] if corte_file.exists() else None
         files={};uris={};origin={'projectId':project_id,'entities':{identifier:{'projectId':rows[identifier][1].get('projectId'),'uri':rows[identifier][1].get('uri'),'nexusJobId':rows[identifier][1].get('nexusJobId'),'providerJobId':rows[identifier][1].get('providerJobId')} for identifier in selected}}
@@ -145,9 +161,27 @@ class PortableProject:
                 for row in bundle.get(collection,[]):
                     if row['id'] in ids:raise ValueError('Identidades repetidas en los metadatos.')
                     ids[row['id']]=collection.rstrip('s')+'_'+uuid.uuid4().hex[:12]
+            for collection in STORY_COLLECTIONS:
+                for row in bundle.get('story',{}).get(collection,[]):
+                    if 'id' in row:
+                        if row['id'] in ids:raise ValueError('Identidades de guion repetidas en los metadatos.')
+                        ids[row['id']]='story_'+collection+'_'+uuid.uuid4().hex[:12]
+                    if collection=='proposals':
+                        for change in row.get('changes',[]):
+                            ids.setdefault(change['id'],'change_'+uuid.uuid4().hex[:12])
             targets={name:uuid.uuid4().hex+Path(name).suffix for name in manifest['files'] if name.startswith('media/')}
             uri_map={TOKEN+name:'/media/'+target for name,target in targets.items()}
             bundle=rewrite(bundle,{**ids,**uri_map});bundle['projectSessions']=[]
+            story=bundle.get('story',{})
+            if story:
+                # A transported project is an inert copy. Prior execution receipts and
+                # undo transactions do not authorize work or overwrite the destination.
+                story['receipts']=[];story['history']=[]
+                for policy in story.get('autonomy',[]):policy['enabled']=False
+                for task in story.get('tasks',[]):
+                    if task.get('status') not in {'complete','cancelled','error'}:
+                        task['status']='pending_resume'
+                    task['providerJobId']=None;task['executor']=None
             for asset in bundle.get('assets',[]):
                 if asset['uri'] not in uri_map.values():raise ValueError('El paquete contiene un activo sin medio incluido.')
             for record in bundle.get('generations',[]):

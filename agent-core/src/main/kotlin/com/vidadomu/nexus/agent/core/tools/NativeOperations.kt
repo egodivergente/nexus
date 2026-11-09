@@ -37,24 +37,6 @@ object NativeOperationTools {
         NativeTool(operations, "recover_generation", ToolCategory.ORGANIZE,
             "Consulta de nuevo el proveedor y restaura el seguimiento de UN job existente. No vuelve a generar ni borra resultados.",
             schema { string("job_id", "Id local del historial.", required = true) }),
-        NativeTool(operations, "flow_agent_send", ToolCategory.ORGANIZE,
-            "Habla con el AGENTE de Google Flow (cuenta Ultra del usuario, sin coste por uso) en el proyecto abierto: pídele imágenes o vídeos (muchas variaciones a la vez), que cree o ordene colecciones, que prepare descargas, etc. Escribe en lenguaje natural y concreto (cantidad, estilo, formato). Espera su respuesta (wait_seconds) y devuelve su texto, las opciones que proponga y los archivos generados ya copiados a la Biblioteca de Nexus (asset_ids). Si pregunta o propone opciones, negocia: decide o consulta al usuario y responde con otro flow_agent_send. Para encargos de generación con Flow, prefiere esta vía.",
-            schema {
-                string("message", "Lo que quieres decirle o pedirle al agente de Flow.", required = true)
-                integer("wait_seconds", "Segundos máximos de espera a que responda (0 = no esperar; máximo configurable en Ajustes).")
-            }),
-        NativeTool(operations, "flow_agent_read", ToolCategory.READ,
-            "Lee (y espera) la respuesta del agente de Google Flow a un flow_agent_send que aún no había terminado. Copia a la Biblioteca lo que haya generado.",
-            schema {
-                string("conversation_id", "El conversation_id que devolvió flow_agent_send.", required = true)
-                integer("wait_seconds", "Segundos máximos de espera (0 = no esperar; máximo configurable en Ajustes).")
-            }),
-        NativeTool(operations, "diagnose_flow", ToolCategory.READ,
-            "Comprueba conexión, sesión y capacidad real del puente Flow y enumera su cola local.",
-            schema {}),
-        NativeTool(operations, "repair_flow", ToolCategory.ORGANIZE,
-            "Recupera el seguimiento local de Flow, sin nuevos envíos ni reiniciar el navegador. Devuelve si requiere iniciar sesión o abrir proyecto.",
-            schema {}),
         NativeTool(operations, "get_nexus_settings", ToolCategory.READ,
             "Lee modelo del agente, tema y preferencias editables. Nunca devuelve credenciales.",
             schema {}),
@@ -88,7 +70,7 @@ object NativeOperationTools {
         NativeTool(operations,"prepare_whisper_model",ToolCategory.ORGANIZE,
             "Descarga el modelo Whisper Base local de 148 MB por HTTPS y verifica su SHA-256. Sólo descarga pesos; no sube audio, no usa API de pago ni borra otros modelos. Úsalo cuando el usuario pida habilitar Whisper local y falte el modelo.",schema {}),
         NativeTool(operations,"edit_video_assets",ToolCategory.ORGANIZE,
-            "Edita medios locales sin coste de proveedor: recorta, une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Conserva originales. Devuelve edit_job_id: consulta get_media_edit_job hasta finalizar, sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
+            "Edita medios locales sin coste de proveedor: recorta, une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Conserva originales. Espera hasta 60 s y devuelve el resultado si ya terminó; si sigue en curso, consulta get_media_edit_job una vez (espera sola), sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
             schema {
                 string("action","Operación.",required=true,enum=listOf("trim","concat","remove_audio","replace_audio","mix_audio","extract_audio"))
                 stringArray("asset_ids","Ids indexados, de 1 a 12; concat conserva este orden.",required=true)
@@ -103,6 +85,13 @@ object NativeOperationTools {
                 integerArray("timestamps_ms","Tiempos exactos solicitados en milisegundos.",required=true)
                 integer("max_dimension","Tamaño máximo de fotograma: 320 a 3840; defecto 1920.")
             }),
+        NativeTool(operations,"detect_video_scenes",ToolCategory.READ,
+            "Estima los cambios de escena de un vídeo local comparando el color de fotogramas muestreados (gratis, en el teléfono, sin alterar el vídeo). Devuelve escenas con start_ms/end_ms para recortarlas con edit_video_assets (trim) o sacar un fotograma de cada una con extract_video_frames. Es una estimación: no ve cortes más cortos que el paso y puede confundir un fogonazo con un corte; verifica con fotogramas.",
+            schema {
+                string("asset_id","Id del vídeo local.",required=true)
+                integer("step_ms","Cada cuántos ms se mira un fotograma: 250 a 5000, por defecto 1000.")
+                number("threshold","Sensibilidad 0.05 a 0.9: menos detecta más cortes. Por defecto 0.3.")
+            }),
         NativeTool(operations,"transcribe_media_asset",ToolCategory.ORGANIZE,
             "Transcribe hasta 15 minutos de un vídeo/audio local con Whisper EN ESTE TELÉFONO y el modelo descargado. No sube audio ni usa una API de pago. Produce TXT y SRT indexados; devuelve edit_job_id para consultar estado. Si falta el modelo, indica Ajustes del agente → Edición y Whisper. No inventes una transcripción si falla.",
             schema {
@@ -111,8 +100,8 @@ object NativeOperationTools {
                 integer("end_ms","Final opcional en milisegundos.")
             }),
         NativeTool(operations,"get_media_edit_job",ToolCategory.READ,
-            "Consulta estado, progreso y archivos resultantes de UN encargo local de edición o transcripción. No crea ni repite la edición.",
-            schema {string("edit_job_id","Id devuelto por la herramienta de edición.",required=true);integer("wait_seconds","Espera hasta 20 segundos por un resultado; defecto 5. Usa 20 para evitar consultas inmediatas repetidas.")}),
+            "Consulta estado, progreso y archivos resultantes de UN encargo local de edición o transcripción. Espera sola a que termine (hasta 180 s): llámala una vez, no en bucle. No crea ni repite la edición.",
+            schema {string("edit_job_id","Id devuelto por la herramienta de edición.",required=true);integer("wait_seconds","Segundos máximos de espera, de 0 a 180; defecto 90. Devuelve antes si termina.")}),
         NativeTool(operations, "atlas_get_balance", ToolCategory.READ,
             "Consulta saldo disponible, efectivo, bono y fondos retenidos en la API oficial de Atlas. No genera ni estima un saldo local.",
             schema {}),
@@ -136,7 +125,7 @@ object NativeOperationTools {
                 integer("pad_ms", "Margen que se respeta a cada lado; por defecto 120.")
             }),
         NativeTool(operations, "corte_apply_ops", ToolCategory.ORGANIZE,
-            "Aplica en Corte una lista de operaciones como UNA sola edición validada por su motor (un único «Deshacer»). Si una falla, no cambia nada y devuelve cuál y por qué. Requiere el proyecto abierto en Corte. Operaciones: split{clip_ids?,at_us}, delete{clip_ids,ripple}, delete_ranges{ranges:[[ini_us,fin_us]],track_ids?,ripple}, trim{clip_id,edge:head|tail,delta_us,ripple}, move{clip_ids,delta_us,track_offset?,mode?}, close_gap{track_id,at_us}, set_speed{clip_id,num,den}, duplicate{clip_ids}, set_transition{track_id,left_clip_id,right_clip_id,kind:CROSS_DISSOLVE|DIP_TO_BLACK|AUDIO_CROSSFADE,duration_us}, remove_transition{transition_id}, add_title{at_us,duration_us,text,size?,bold?,align?}, add_marker{at_us,label}, remove_marker{marker_id}, set_audio{clip_ids,gain_db?,muted?,fade_in_us?,fade_out_us?}, set_video{clip_ids,opacity?,scale?,position_x?,position_y?,fade_in_us?,fade_out_us?}, set_color{clip_ids,exposure?,contrast?,saturation?,temperature?,tint?,fade?}. En Windows también: add_audio_track{name?,role?:DIALOGUE|MUSIC|AMBIENCE|SFX|VOICE_OVER|GENERIC_AUDIO}, set_audio_track{track_id,name?,gain_db?:-60..12,muted?,solo?}.",
+            "Aplica en Corte una lista de operaciones como UNA sola edición validada por su motor (un único «Deshacer»). Si una falla, no cambia nada y devuelve cuál y por qué. Requiere el proyecto abierto en Corte. Operaciones: split{clip_ids?,at_us}, delete{clip_ids,ripple}, delete_ranges{ranges:[[ini_us,fin_us]],track_ids?,ripple}, trim{clip_id,edge:head|tail,delta_us,ripple}, move{clip_ids,delta_us,track_offset?,mode?}, close_gap{track_id,at_us}, set_speed{clip_id,num,den}, duplicate{clip_ids}, set_transition{track_id,left_clip_id,right_clip_id,kind:CROSS_DISSOLVE|DIP_TO_BLACK|AUDIO_CROSSFADE,duration_us}, remove_transition{transition_id}, add_title{at_us,duration_us,text,size?,bold?,align?}, add_marker{at_us,label}, remove_marker{marker_id}, set_audio{clip_ids,gain_db?,muted?,fade_in_us?,fade_out_us?}, set_video{clip_ids,opacity?,scale?,position_x?,position_y?,fade_in_us?,fade_out_us?}, set_color{clip_ids,exposure?,contrast?,saturation?,temperature?,tint?,fade?}.",
             schema {
                 string("ops_json", "Array JSON de operaciones, p. ej. [{\"op\":\"split\",\"at_us\":1200000}].", required = true)
                 string("label", "Nombre corto que verá el usuario en Deshacer, p. ej. «Quitar silencios».")
@@ -148,8 +137,6 @@ object NativeOperationTools {
                 stringArray("asset_ids", "Ids de la biblioteca de Nexus (list_library_assets o search_assets); máximo 10 por llamada.", required = true)
                 boolean("place", "Colocarlos en la línea de tiempo; por defecto true. Con false solo entran en Medios.")
                 integer("at_us", "Posición en microsegundos donde empezar a colocarlos; vacío = al final.")
-                string("audio_track_id", "Windows: pista destino de audio; por defecto a1. Lee los ids reales antes.")
-                string("mode", "Windows: mix para audio simultáneo sin desplazar otras pistas; rechaza solapamientos en la pista elegida. Por defecto insert.")
                 string("project_id", "Proyecto; vacío = el abierto.")
             }),
         NativeTool(operations, "corte_create_project", ToolCategory.ORGANIZE,

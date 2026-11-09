@@ -24,6 +24,9 @@ class AgentHost:
         self.pending_lock = threading.Lock()
         self.pending = {}
         self.write_lock = threading.Lock()
+        self.start_lock = threading.RLock()
+        self.story_pending = {}
+        self.story_request_ids = set()
         self.active_exchange = None
         self.turn_id = None
         self.lines = queue.Queue()
@@ -112,6 +115,10 @@ class AgentHost:
         return secret
 
     def start(self):
+        with self.start_lock:
+            self._start()
+
+    def _start(self):
         if self.process and self.process.poll() is None:
             return
         java = shutil.which('java')
@@ -131,8 +138,25 @@ class AgentHost:
 
         def read_lines():
             for line in process.stdout:
+                try:
+                    response = decode_line(line)
+                except ValueError:
+                    response = None  # The normal exchange reports protocol errors.
+                if response and 'callback' not in response:
+                    with self.pending_lock:
+                        request_id = response.get('requestId')
+                        is_story = request_id in self.story_request_ids
+                        target = self.story_pending.get(request_id)
+                    if is_story:
+                        if target is not None:
+                            target.put(response)
+                        continue
                 lines.put(line)
             lines.put(None)
+            with self.pending_lock:
+                waiting = list(self.story_pending.values())
+            for target in waiting:
+                target.put(None)
         threading.Thread(target=read_lines, daemon=True).start()
         self.exchange('init', {'settings': self.settings(),
                               'secrets': self.runtime_secrets()})
@@ -267,6 +291,8 @@ class AgentHost:
         return result.get('value')
 
     def command(self, args):
+        if args.get('op') in {'storyView', 'storyCommand', 'storySelection'}:
+            return self.story_command(args)
         if not self.lock.acquire(blocking=False):
             raise RuntimeError('El asistente esta ocupado.')
         try:
@@ -330,3 +356,32 @@ class AgentHost:
             self.owner = None
             self.turn_id = None
             self.lock.release()
+
+    def story_command(self, args):
+        """Edit the shared index while a chat turn runs, without a second JVM/store."""
+        if not isinstance(args.get('owner'), str) or not args['owner']:
+            raise ValueError('Falta la sesión de la ventana.')
+        body = args.get('args') or {}
+        if not isinstance(body, dict):
+            raise ValueError('Operación de guion no válida.')
+        self.start()
+        request_id = uuid.uuid4().hex
+        replies = queue.Queue()
+        with self.pending_lock:
+            self.story_pending[request_id] = replies
+            self.story_request_ids.add(request_id)
+        try:
+            self.write({'op': args['op'], 'args': body, 'requestId': request_id})
+            try:
+                response = replies.get(timeout=60)
+            except queue.Empty:
+                # Do not interrupt another turn or replay an edit with an ambiguous receipt.
+                raise RuntimeError('No llegó la respuesta del guion. Comprueba el contenido antes de repetir.') from None
+            if response is None:
+                raise RuntimeError('El motor se ha cerrado. El guion guardado se conserva.')
+            if not response.get('ok'):
+                raise RuntimeError(response.get('error', 'No se pudo actualizar el guion.'))
+            return {'result': response.get('value'), 'settings': self.public_settings()}
+        finally:
+            with self.pending_lock:
+                self.story_pending.pop(request_id, None)

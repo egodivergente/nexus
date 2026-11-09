@@ -35,8 +35,10 @@ class BedrockDirectProvider(
 
     override val id: String = "bedrock-direct"
 
-    override suspend fun complete(request: LlmRequest): LlmResponse = withContext(Dispatchers.IO) {
-        val body = JsonObject(ConverseCodec.encodeRequest(request) - "modelId").toString()
+    override suspend fun complete(request: LlmRequest): LlmResponse = PromptCacheFallback.complete(request) { cache -> send(request, cache) }
+
+    private suspend fun send(request: LlmRequest, cache: Boolean): LlmResponse = withContext(Dispatchers.IO) {
+        val body = JsonObject(ConverseCodec.encodeRequest(request, cache) - "modelId").toString()
         val host = "bedrock-runtime.$region.amazonaws.com"
         val path = "/model/${SigV4.encode(request.modelId)}/converse"
         val signed = SigV4.sign("POST", host, path, body, region, "bedrock", credentials(), now())

@@ -56,6 +56,88 @@ class LibrarySnapshot:
             if asset.get(key) is not None:member[key]=asset[key]
         return member
 
+    @classmethod
+    def _story_memberships(cls, index):
+        """Project/scene/shot uses are associations, independent of the file's legacy owner.
+
+        Keep the original narrative role, scope and selection alongside the existing
+        library classification so current folder/role filters remain useful.
+        """
+        story = index.get('story') or {}
+        by_id = lambda rows: {row['id']: row for row in rows if isinstance(row, dict) and isinstance(row.get('id'), str)}
+        assets = by_id(index.get('assets', [])); shots = by_id(index.get('shots', []))
+        blocks = by_id(story.get('blocks', [])); elements = by_id(story.get('elements', [])); result = {}
+        roles = {'identity': 'REFERENCE', 'costume': 'REFERENCE', 'location': 'REFERENCE', 'composition': 'REFERENCE',
+                 'lighting': 'REFERENCE', 'reference': 'REFERENCE', 'sketch': 'REFERENCE', 'generated': 'OUTPUT',
+                 'candidate': 'OUTPUT', 'output': 'OUTPUT', 'audio': 'SOURCE', 'chosen': 'FINAL', 'final': 'FINAL',
+                 'source': 'SOURCE', 'discarded': 'OTHER'}
+        for link in story.get('links', []):
+            if not isinstance(link, dict):
+                continue
+            asset = assets.get(link.get('assetId'))
+            if asset is None or asset.get('libraryDeleted') or not isinstance(link.get('projectId'), str):
+                continue
+            project, scope, target = link['projectId'], link.get('scope'), link.get('targetId')
+            scene_id = shot_id = None; characters = []
+            if scope == 'scene':
+                scene_id = target
+            elif scope == 'shot':
+                shot_id = target
+                shot = shots.get(target, {})
+                if shot.get('projectId') == project:
+                    scene_id = shot.get('sceneId')
+            elif scope == 'block':
+                block = blocks.get(target, {})
+                if block.get('projectId') == project:
+                    scene_id, shot_id = block.get('sceneId'), block.get('shotId')
+            elif scope == 'character':
+                characters.append(target)
+            elif scope == 'element':
+                element = elements.get(target, {})
+                if element.get('projectId') == project:
+                    scene_id = element.get('sceneId')
+                    if element.get('characterId'):
+                        characters.append(element['characterId'])
+            elif scope != 'project':
+                continue
+            if link.get('characterId'):
+                characters.append(link['characterId'])
+            role = link.get('role', 'reference')
+            classification = 'FINAL' if link.get('selected') and role in {'candidate', 'generated', 'output', 'audio'} else roles.get(role, 'OTHER')
+            member = cls._membership(dict(asset, projectId=project, sceneId=scene_id, shotId=shot_id,
+                characterIds=list(dict.fromkeys(value for value in characters if value)), role=classification,
+                assetId=asset['id']), 'story-link')
+            member.update(storyLinkId=link.get('id'), storyRole=role, scope=scope, targetId=target,
+                          selected=link.get('selected') is True, behavior=link.get('behavior', 'complement'))
+            result.setdefault(asset['id'], []).append(member)
+        return result
+
+    @staticmethod
+    def _story_legacy_pairs(index):
+        """Only supersede legacy ownership proven to have become a narrative association.
+
+        New imports/moves into an adopted project still use the existing library contract.
+        Removed links are evidenced by the undo journal, rather than inferred from a title
+        or from the project's migration flag alone.
+        """
+        story=index.get('story') or {}
+        pairs={(link.get('assetId'),link.get('projectId')) for link in story.get('links',[])
+               if isinstance(link,dict) and isinstance(link.get('assetId'),str) and isinstance(link.get('projectId'),str)}
+        for history in story.get('history',[]):
+            if not isinstance(history,dict):continue
+            sides=[]
+            for side in ('before','after'):
+                value=history.get(side)
+                rows=value.get('links',[]) if isinstance(value,dict) else []
+                sides.append({row['id']:row for row in rows if isinstance(row,dict) and isinstance(row.get('id'),str)})
+            before,after=sides
+            for identifier in before.keys() | after.keys():
+                if before.get(identifier)==after.get(identifier):continue
+                for row in (before.get(identifier),after.get(identifier)):
+                    if row and isinstance(row.get('assetId'),str) and isinstance(row.get('projectId'),str):
+                        pairs.add((row['assetId'],row['projectId']))
+        return pairs
+
     @staticmethod
     def _classify(entry, members, known_projects, explicit):
         project_ids=list(dict.fromkeys(member['projectId'] for member in members if member.get('projectId') is not None))
@@ -161,6 +243,9 @@ class LibrarySnapshot:
             for generation in generations:
                 for asset_id in generation.get('outputAssetIds') or []:
                     generation_by_asset.setdefault(asset_id,generation)
+            story_members=self._story_memberships(index)
+            adopted=set((index.get('story') or {}).get('legacyAdoptedProjectIds') or [])
+            migrated_uses=self._story_legacy_pairs(index)
             entries=[];hidden=[];visible_keys=set();hidden_jobs=set();job_members={}
             for asset in index.get('assets',[]):
                 if not isinstance(asset,dict) or not isinstance(asset.get('id'),str) or not isinstance(asset.get('uri'),str):continue
@@ -175,8 +260,12 @@ class LibrarySnapshot:
                     hidden.append('asset:'+asset['id']);hidden_jobs.update(linked);continue
                 visible_keys.update(keys)
                 generation=generation_by_id.get(asset.get('generationId')) or generation_by_asset.get(asset['id'],{})
-                member=self._membership(dict(asset,assetId=asset['id'],generationId=generation.get('id')))
-                for identifier in linked:job_members.setdefault(identifier,[]).append(member)
+                legacy=dict(asset,assetId=asset['id'],generationId=generation.get('id'))
+                if legacy.get('projectId') in adopted and (asset['id'],legacy.get('projectId')) in migrated_uses:
+                    # Legacy fields remain provenance after adoption, not a second association.
+                    legacy.update(projectId=None,sceneId=None,shotId=None,characterIds=[])
+                members=[self._membership(legacy)]+story_members.get(asset['id'],[])
+                for identifier in linked:job_members.setdefault(identifier,[]).extend(members)
                 entry={'id':'asset:'+asset['id'],'assetId':asset['id'],'generationId':generation.get('id'),
                     'displayName':asset.get('displayName') or 'Archivo','modality':self.modality(asset),
                     'uri':asset['uri'],'localUri':local_uri,'createdAt':asset.get('createdAt',0),
@@ -184,7 +273,7 @@ class LibrarySnapshot:
                     'projectId':asset.get('projectId'),'providerId':generation.get('providerId') or 'local_media',
                     'modelId':generation.get('modelId') or 'shared-library','status':'COMPLETED',
                     'source':asset.get('source') or 'IMPORTED','identityKeys':keys}
-                self._classify(entry,[member],known_projects,True)
+                self._classify(entry,members,known_projects,True)
                 if len(linked)==1:
                     link=next(iter(linked));job_key,ordinal=link.rsplit(':',1)
                     entry.update(sourceJobId=job_key.removeprefix('job:'),outputIndex=int(ordinal))

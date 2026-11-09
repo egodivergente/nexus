@@ -31,6 +31,7 @@ data class TaskSpec(
     val preferProviders: List<String> = emptyList(),
     val excludeModels: List<String> = emptyList(),
     val limit: Int = 3,
+    val expertQuality: Boolean = false,
 )
 
 @Serializable
@@ -105,7 +106,9 @@ class ModelRouter(
         val toCheck = diversify(scored, schemaCheckLimit())
         val checked = toCheck.mapNotNull { c -> verify(c, task)?.also { } ?: run { reject("schema incompatible"); null } }
             .let { list -> applyCost(list, task) { reject(it) } }
-            .sortedByDescending { it.score }
+            .sortedWith(compareByDescending<RouteCandidate> { it.score }.thenBy {
+                if (task.expertQuality) comparablePrice(it.estimate) else null
+            })
 
         val recommended = checked.firstOrNull()
         val alternatives = buildList {
@@ -118,6 +121,7 @@ class ModelRouter(
             }
         }
         val notes = buildList {
+            if (task.expertQuality) add("Calidad y compatibilidad primero; rapidez ignorada. El precio solo desempata con cotización verificable. Los criterios editoriales no son mediciones de calidad.")
             if (pre.isEmpty()) add("Ningún modelo del registro actual de Nexus cumple la tarea; revisa modalidad o adjuntos.")
             if (checked.any { !it.schemaVerified }) add("Algún candidato no pudo verificarse contra su schema; Nexus lo validará al preparar.")
             if (skills.models().isEmpty()) add("No hay skills de modelo cargadas: la elección se basa solo en el registro.")
@@ -162,10 +166,12 @@ class ModelRouter(
             warnings += "Sin skill para esta familia: criterio editorial limitado."
         } else {
             for (p in task.priorities) {
+                if (task.expertQuality && p in setOf("fast", "low_cost")) continue
                 if (p in skill.strengths) {
                     val verified = skill.isVerified(p)
-                    score += if (verified) 3.0 else 1.5
-                    reasons += "Skill ${skill.id}: fuerte en ${label(p)}" + if (verified) "" else " [sin verificar]"
+                    score += if (verified) 3.0 else if (task.expertQuality) 0.0 else 1.5
+                    if (verified || !task.expertQuality) reasons += "Skill ${skill.id}: fuerte en ${label(p)}" + if (verified) "" else " [sin verificar]"
+                    else warnings += "Sin evidencia verificada para ${label(p)} en skill ${skill.id}."
                 }
                 if (p in skill.weaknesses) {
                     score -= 3.0
@@ -178,19 +184,19 @@ class ModelRouter(
         val id = m.ref.modelId.lowercase()
         val wantsSpeedOrSaving = "fast" in task.priorities || "low_cost" in task.priorities || task.budget == "low"
         val wantsQuality = task.priorities.any { it in QUALITY_TRAITS }
-        if (CHEAP_TIER.containsMatchIn(id)) {
+        if (!task.expertQuality && CHEAP_TIER.containsMatchIn(id)) {
             if (wantsSpeedOrSaving) { score += 1.0; reasons += "Variante rápida/económica" } else if (wantsQuality) score -= 1.0
         }
-        if (TOP_TIER.containsMatchIn(id) && wantsQuality) { score += 0.75; reasons += "Variante de máxima calidad" }
-        if (m.isFlagship) score += 0.5
+        if (!task.expertQuality && TOP_TIER.containsMatchIn(id) && wantsQuality) { score += 0.75; reasons += "Variante de máxima calidad" }
+        if (m.isFlagship && !task.expertQuality) score += 0.5
         if (m.ref.providerId in task.preferProviders) { score += 1.0; reasons += "Proveedor preferido" }
-        m.releaseMonth?.let { if (it >= RECENT_CUTOFF) score += 0.5 }
+        m.releaseMonth?.let { if (it >= RECENT_CUTOFF && !task.expertQuality) score += 0.5 }
         // La generación pesa más que el sufijo «pro»/«max»: una versión vieja «pro» no debe ganar a la actual.
         val gen = generationOf(m.ref.modelId)
         val newest = latest[familyKeyOf(m)]
         if (gen != null && newest != null) {
             if (gen < newest) {
-                score -= OLD_GENERATION_PENALTY
+                if (!task.expertQuality) score -= OLD_GENERATION_PENALTY
                 warnings += "Generación anterior (${fmt(gen)}); en el catálogo hay ${fmt(newest)}"
             } else reasons += "Generación más reciente de su familia (${fmt(gen)})"
         }
@@ -214,18 +220,26 @@ class ModelRouter(
         var score = d.score
         val params = linkedMapOf<String, String>()
         if (schema == null) {
+            if (task.expertQuality) return null
             warnings += "No se pudo cargar el schema; parámetros sin verificar."
             return RouteCandidate(d.m.ref, d.m.name, score - 2.0, reasons, warnings, d.skill?.id, null, params, false)
         }
         if (schema.unsupportedRequired.isNotEmpty()) return null
+        if (task.expertQuality) {
+            if (task.needsLastFrame && schema.media.lastFrameField == null) return null
+            if (task.imageInputs > 0 && schema.media.inputImageField == null && schema.media.firstFrameField == null && schema.media.imagesArrayField == null) return null
+            if (task.imageInputs > 1 && (schema.media.imagesArrayField == null || schema.media.maxImages < task.imageInputs)) return null
+        }
 
         task.durationSec?.let { want ->
             val p = durationParam(schema)
             if (p == null) {
+                if (task.expertQuality) return null
                 score -= 1.0; warnings += "El schema no permite elegir duración."
             } else {
                 val pick = pickNumeric(p, want.toDouble())
                 if (pick == null) return null
+                if (task.expertQuality && !pick.second) return null
                 params[p.key] = pick.first
                 if (pick.second) { score += 1.0; reasons += "Duración ${pick.first} s admitida por el schema" }
                 else { score -= 1.5; warnings += "Duración ajustada a ${pick.first} s (el schema no admite $want s)" }
@@ -234,17 +248,20 @@ class ModelRouter(
         task.resolution?.let { want ->
             val p = schema.parameters.firstOrNull { it.uiType == "RESOLUTION" || it.key in RESOLUTION_KEYS }
             val opt = p?.options?.firstOrNull { it.equals(want, true) } ?: p?.options?.firstOrNull { it.contains(want.trimEnd('p', 'P'), true) }
+            if (task.expertQuality && (p == null || opt == null)) return null
             if (p != null && opt != null) params[p.key] = opt
             else if (p != null && p.options.isNotEmpty()) warnings += "Resolución $want no disponible; opciones: ${p.options.joinToString()}"
         }
         task.aspectRatio?.let { want ->
             val p = schema.parameters.firstOrNull { it.uiType == "ASPECT_RATIO" || it.key in ASPECT_KEYS }
             val opt = p?.options?.firstOrNull { it == want }
+            if (task.expertQuality && (p == null || opt == null)) return null
             if (p != null && opt != null) params[p.key] = opt
             else if (p != null && p.options.isNotEmpty()) warnings += "Relación $want no disponible; opciones: ${p.options.joinToString()}"
         }
         task.needsAudio?.let { want ->
             val p = schema.parameters.firstOrNull { it.key in AUDIO_KEYS && (it.nativeType ?: it.uiType).equals("boolean", true) }
+            if (task.expertQuality && p == null && want != d.m.supportsAudio) return null
             when {
                 p != null -> params[p.key] = want.toString()
                 want && !d.m.supportsAudio -> { score -= 1.5; warnings += "Nexus no indica audio para este modelo." }
@@ -257,16 +274,21 @@ class ModelRouter(
     }
 
     private suspend fun applyCost(list: List<RouteCandidate>, task: TaskSpec, reject: (String) -> Unit): List<RouteCandidate> {
-        val withCost = list.map { c ->
-            val m = registry.get(c.ref)!!
+        val withCost = list.mapNotNull { c ->
+            val m = registry.get(c.ref) ?: return@mapNotNull null
             val schema = runCatching { registry.schema(c.ref) }.getOrNull()
             val effective = if (schema != null) ParameterValidator.effective(schema, c.suggestedParams) else c.suggestedParams
-            c.copy(estimate = runCatching { cost.estimate(m, effective) }.getOrNull())
+            c.copy(estimate = if (task.expertQuality && task.imageInputs > 1) null else runCatching { cost.estimate(m, effective) }.getOrNull())
         }.filter { c ->
             val amount = c.estimate?.amountUsd
             val over = task.maxCostUsd != null && amount != null && amount > task.maxCostUsd
             if (over) reject("supera el coste máximo")
             !over
+        }
+        if (task.expertQuality) return withCost.map { candidate ->
+            if (comparablePrice(candidate.estimate) == Double.POSITIVE_INFINITY)
+                candidate.copy(warnings = candidate.warnings + "Tarifa efectiva no verificable; no se usa para comparar precios.")
+            else candidate
         }
         val known = withCost.mapNotNull { it.estimate?.amountUsd }
         if (known.isEmpty()) return withCost
@@ -283,6 +305,14 @@ class ModelRouter(
             }
         }
     }
+
+    private fun comparablePrice(estimate: CostEstimate?): Double = estimate?.takeIf {
+        it.confidence == com.vidadomu.nexus.agent.core.cost.CostConfidence.NEXUS_QUOTE &&
+            !it.source.isNullOrBlank() && runCatching {
+                val age = java.time.Duration.between(java.time.Instant.parse(it.checkedAt), java.time.Instant.now()).seconds
+                age in 0..3600
+            }.getOrDefault(false)
+    }?.amountUsd?.takeIf { it.isFinite() && it >= 0.0 } ?: Double.POSITIVE_INFINITY
 
     private fun durationParam(s: ModelSchema): ParamSpec? =
         s.parameters.firstOrNull { it.key == "duration" } ?: s.parameters.firstOrNull { it.uiType == "DURATION" }

@@ -136,11 +136,14 @@ class LibraryOperations:
             self.sources._reload()
             projected={entry['id']:entry for entry in self.snapshot()['entries']}
             assets=[a for a in index.get('assets',[]) if isinstance(a,dict)]
+            story_assets={link.get('assetId') for link in (index.get('story') or {}).get('links',[]) if isinstance(link,dict)}
             changes={};plans={};already=[];merged=set();merge_proofs={}
             for identifier in identifiers:
                 entry=projected.get(identifier)
                 if entry is None:raise ValueError('Un archivo seleccionado cambió o está retirado. Actualiza la biblioteca.')
                 group=self._group(entry,assets,state)
+                if any(asset.get('id') in story_assets for asset in group):
+                    raise ValueError('Este archivo tiene usos en el guion. Gestiona sus usos desde Guion → Material.')
                 if scoped and origin is None:
                     # Android's unfiled view also includes dangling project IDs.
                     targets=group if not any(a.get('projectId') in known for a in group) else []
