@@ -19,11 +19,21 @@ class GenerationDispatcher(private val app: NexusApplication) {
         val readiness = creationReadiness(state)
         require(readiness.canSubmit) { readiness.message ?: "Revisa la configuración." }
         val model = requireNotNull(state.selectedModel)
-        val metadata=localMetadata+buildMap {
+        val metadata=buildMap {
             val runtime=com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
             runtime.settings.activeProjectId()?.let { project ->
                 put("__project_id",project)
                 app.getSharedPreferences("nexus_project_conversations",0).getString(project,null)?.let {put("__conversation_id",it)}
+            }
+        } + localMetadata + buildMap {
+            // Bound to this draft, never to the screen/project that happens to be active at submission.
+            state.storyContext?.let { origin ->
+                put("__project_id", origin.projectId)
+                put("__story_context", kotlinx.serialization.json.Json.encodeToString(
+                    com.vidadomu.nexus.agent.core.assets.StoryGenerationContext.serializer(), origin))
+                put("__story_inputs", kotlinx.serialization.json.JsonArray(state.attachedMedia.map {
+                    kotlinx.serialization.json.JsonPrimitive(it.uriString)
+                }).toString())
             }
         }
         val routePlan=if(maxCostUsd!=null && maxCostUsd.isFinite() && maxCostUsd>=0)

@@ -11,6 +11,7 @@ enum class Screen(
     val icon: ImageVector
 ) {
     Assistant("assistant", "Agente", Icons.Default.Assistant),
+    Story("story", "Guion", Icons.Default.MovieFilter),
     Create("create", "Lanzadera", Icons.Default.AutoAwesome),
     Models("models", "ArtBox", Icons.Default.GridView),
     Generations("generations", "Historial", Icons.Default.Timelapse),
@@ -19,8 +20,7 @@ enum class Screen(
     Settings("settings", "Ajustes", Icons.Default.Tune);
 
     companion object {
-        // Vidal 01-11: sin Lanzadera en la barra; ArtBox queda en el centro. Create sigue siendo un destino propio.
-        // Vidal 08-11: Flow en directo (AXELPC) como cuarta pestaña.
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Models, Library, Flow)
+        // The audiovisual project is a primary workspace. Routes remain stable when tabs move.
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Story, Models, Library, Flow)
     }
 }

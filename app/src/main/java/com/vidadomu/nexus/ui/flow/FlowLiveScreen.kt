@@ -1,4 +1,9 @@
 package com.vidadomu.nexus.ui.flow
+import com.vidadomu.nexus.agent.core.assets.storyCommand
+import com.vidadomu.nexus.agent.core.assets.storyContext
+import com.vidadomu.nexus.assistant.story.StorySelectionStore
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 import android.content.ClipboardManager
 import android.content.Context
@@ -122,6 +127,11 @@ private val QUALITIES = listOf(
 fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
+    val storySelection by StorySelectionStore.selection.collectAsState()
+    val storyIndex = remember { com.vidadomu.nexus.assistant.AssistantRuntime.get(app).assets }
+    val storyData by storyIndex.changes.collectAsState()
+    val storyShot = storyData.shots.firstOrNull { it.id == storySelection?.shotId && it.projectId == storySelection?.projectId }
+    var linkImported by remember { mutableStateOf<FlowImported?>(null) }
     val client = remember { FlowLiveClient(app) }
     val haptic = rememberNexusHaptics()
     val scope = rememberCoroutineScope()
@@ -346,7 +356,7 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
                     LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                         items(recent.take(12), key = { it.assetId }) { item ->
                             AsyncImage(model = item.uri, contentDescription = item.name, contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(44.dp).clip(NexusTokens.thumbnail).clickable { onOpenLibrary() })
+                                modifier = Modifier.size(44.dp).clip(NexusTokens.thumbnail).clickable { linkImported = item })
                         }
                     }
                     TextButton(onClick = onOpenLibrary) { Text("${recent.size} en Biblioteca") }
@@ -362,10 +372,28 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
 
         // Teclado: lo escrito aquí se inserta donde esté el cursor en Flow.
         AnimatedVisibility(keyboard) {
-            FlowKeyboardBar(client, editable)
+            FlowKeyboardBar(client, editable, storySelection?.takeIf { storyShot != null }?.let {
+                storyIndex.storyContext(it.projectId, it.sceneId, it.shotId)
+            })
         }
     }
 
+    linkImported?.let { item ->
+        AlertDialog(onDismissRequest = { linkImported = null }, title = { Text(item.name) },
+            text = { Text(if (storyShot == null) "Guardado en Biblioteca · puedes asignarlo desde Material del proyecto." else
+                "Vincular como toma candidata al plano «${storyShot.description?.take(70) ?: storyShot.code}».") },
+            confirmButton = { if (storyShot != null) TextButton(onClick = {
+                val shot = storyShot
+                linkImported = null
+                scope.launch {
+                    runCatching { storyIndex.storyCommand(shot.projectId, buildJsonObject {
+                        put("action", "link_material"); put("operation_id", "flow-link-${item.assetId}-${shot.id}")
+                        put("scope", "shot"); put("target_id", shot.id); put("asset_id", item.assetId); put("role", "candidate")
+                    }) }.onFailure { failure = it.message ?: "No se pudo vincular el material." }
+                }
+            }) { Text("Vincular al plano") } },
+            dismissButton = { TextButton(onClick = { linkImported = null; onOpenLibrary() }) { Text("Biblioteca") } })
+    }
     if (serverDialog) {
         var url by remember { mutableStateOf(FlowLivePrefs.url(context)) }
         AlertDialog(onDismissRequest = { serverDialog = false },
@@ -383,7 +411,7 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
 }
 
 @Composable
-private fun FlowKeyboardBar(client: FlowLiveClient, editable: Boolean) {
+private fun FlowKeyboardBar(client: FlowLiveClient, editable: Boolean, storyContext: String? = null) {
     val context = LocalContext.current
     var draft by rememberSaveable { mutableStateOf("") }
     var more by remember { mutableStateOf(false) }
@@ -404,6 +432,8 @@ private fun FlowKeyboardBar(client: FlowLiveClient, editable: Boolean) {
         Box {
             TextButton(onClick = { more = true }) { Text("Teclas") }
             DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                if (storyContext != null) DropdownMenuItem(text = { Text("Preparar encargo del plano") },
+                    onClick = { more = false; draft = storyContext })
                 DropdownMenuItem(text = { Text("Intro") }, onClick = { more = false; client.key("Enter") })
                 DropdownMenuItem(text = { Text("Borrar") }, onClick = { more = false; client.key("Backspace") })
                 DropdownMenuItem(text = { Text("Tabulador") }, onClick = { more = false; client.key("Tab") })

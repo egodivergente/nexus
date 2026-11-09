@@ -104,7 +104,7 @@ class AgentOrchestrator(
     private val documents: AttachmentDocumentLoader? = null,
     private val videos: AttachmentVideoLoader? = null,
     /** Estado real de la interfaz (encargos, errores, eventos) que se adjunta a cada turno. */
-    private val uiContext: (() -> String?)? = null,
+    private val uiContext: ((AgentSession) -> String?)? = null,
     /** Encargos verificados para contrastar lo que el agente afirma. */
     private val verifiedOrders: (() -> List<com.vidadomu.nexus.agent.core.orders.Order>)? = null,
     private val generatedMedia: GeneratedMediaStore? = null,
@@ -158,7 +158,7 @@ class AgentOrchestrator(
             )) + frames)
         }
         blocks += ContentBlock.Text(userText(text, newAttachments))
-        runCatching { uiContext?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(config.limits.uiContextChars)) }
+        runCatching { uiContext?.invoke(session) }.getOrNull()?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it.take(config.limits.uiContextChars)) }
         val loader = images
         if (config.sendImagesToLlm && loader != null) {
             newAttachments.filter { it.mimeType.startsWith("image/") }.take(config.limits.images).forEach { a ->

@@ -9,6 +9,8 @@ import android.os.Bundle
 import android.os.Process
 import android.util.Base64
 import com.vidadomu.nexus.BuildConfig
+import com.vidadomu.nexus.agent.core.assets.storyCommand
+import com.vidadomu.nexus.agent.core.assets.storyView
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.provider.atlas.NativeModelSchema
@@ -54,6 +56,32 @@ class NexusAgentProvider:ContentProvider() {
             return buildJsonObject {put("ok",true);put("whisper",state)}
         }
         fun text(key:String)=input[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+        // The same service used by editor and agent; available only to the already-authorized ADB UID.
+        if (method == "story") {
+            val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            if (text("action") == "create_project") {
+                require(text("title").isNotBlank())
+                val project = runtime.assets.createProject(text("title"))
+                return buildJsonObject { put("ok", true); put("project_id", project.id) }
+            }
+            val projectId = text("project_id")
+            require(runtime.assets.findProject(projectId)?.id == projectId) { "Proyecto desconocido." }
+            if (text("action") in setOf("", "read")) return runtime.assets.storyView(projectId,
+                text("scene_id").ifBlank { null }, text("shot_id").ifBlank { null })
+            return runtime.assets.storyCommand(projectId, input, "user:adb")
+        }
+        if (method == "story_tool") {
+            val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            val tools = com.vidadomu.nexus.agent.core.tools.StoryTools.all(runtime.deps)
+            val tool = tools.singleOrNull { it.name == text("tool") } ?: error("Herramienta audiovisual desconocida.")
+            val projectId = text("project_id")
+            require(runtime.assets.findProject(projectId)?.id == projectId) { "Proyecto desconocido." }
+            val session = com.vidadomu.nexus.agent.core.tools.AgentSession("adb_story", com.vidadomu.nexus.agent.core.config.AgentMode.AGENT, projectId)
+            session.storySelection = com.vidadomu.nexus.agent.core.tools.StoryAgentSelection(projectId,
+                sceneId = text("scene_id").ifBlank { null }, shotId = text("shot_id").ifBlank { null }, mode = text("mode").ifBlank { "proposal" })
+            val result = tool.run(input["input"]?.jsonObject ?: buildJsonObject {}, session)
+            return buildJsonObject { put("ok", !result.isError); put("result", result.result) }
+        }
         if(method=="device_sync_probe") {
             val id=text("id")
             require(id.matches(Regex("sync_probe_[a-f0-9]{32}")))
@@ -95,6 +123,7 @@ class NexusAgentProvider:ContentProvider() {
         }
         if(method=="status") return buildJsonObject {
             put("ok",true);put("appVersion",BuildConfig.VERSION_NAME);put("protocol",1)
+            put("sourceRevision",BuildConfig.SOURCE_REVISION)
             put("catalogReady",app.modelCatalogRepository.models.value.isNotEmpty())
             put("paidExecutionEnabled",false);put("profile",0)
             put("credentialStorageAvailable",app.secureStorage.credentialStorageAvailable)

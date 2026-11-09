@@ -1,6 +1,7 @@
 package com.vidadomu.nexus
 
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.agent.core.assets.storyGenerationContext
 
 import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.safeDrawing
@@ -157,6 +158,27 @@ class MainActivity : ComponentActivity() {
                 }
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
+                LaunchedEffect(Unit) {
+                    com.vidadomu.nexus.assistant.story.StoryNavigation.requests.collect { destination ->
+                        val selection = com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.value
+                        when (destination) {
+                            com.vidadomu.nexus.assistant.story.StoryDestination.FLOW -> {
+                                navController.popBackStack("workspace", false)
+                                tabRequest = tabs.indexOf(Screen.Flow)
+                            }
+                            com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE -> {
+                                if (selection?.shotId != null) {
+                                    val index = com.vidadomu.nexus.assistant.AssistantRuntime.get(application as NexusApplication).assets
+                                    val origin = runCatching { index.storyGenerationContext(selection.projectId, selection.shotId) }.getOrNull()
+                                    if (origin != null) {
+                                        createViewModel.prepareStoryShot(origin)
+                                        navController.navigate(Screen.Create.route) { launchSingleTop = true }
+                                    } else android.widget.Toast.makeText(this@MainActivity, "El plano cambió o ya no está disponible. Vuelve a abrirlo desde el guion.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }
                 // One path for «Continuar en…» whether it is drawn inside the Agent tab or as the full sheet used for shared files.
                 val chooseProject: (String, com.vidadomu.nexus.assistant.PendingShare?) -> Unit = {id,sharedNow -> lifecycleScope.launch {
                     try {
@@ -291,6 +313,13 @@ class MainActivity : ComponentActivity() {
                                 vm = assistantViewModel
                             )
                         }
+                            Screen.Story -> com.vidadomu.nexus.assistant.story.StoryTabScreen(
+                                vm = assistantViewModel,
+                                isActive = pager.currentPage == index,
+                                onAgent = { tabRequest = tabs.indexOf(Screen.Assistant) },
+                                onGenerate = { com.vidadomu.nexus.assistant.story.StoryNavigation.request(com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE) },
+                                onFlow = { tabRequest = tabs.indexOf(Screen.Flow) }
+                            )
                             Screen.Models -> {
                             ModelsScreen(
                                 onSelectModelAndCreate = { model ->

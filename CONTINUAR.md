@@ -1,3 +1,50 @@
+# Guion como pestaña principal vc191 - 08/11/2026
+
+Peticion de Vidal: el proyecto audiovisual pasa a primer nivel. Barra: **Agente / Guion / ArtBox / Biblioteca / Flow**.
+Guion abre el mismo editor con Guion, Storyboard y Material dentro de la pantalla principal, sin un Dialog exterior
+que tape la barra. La cabecera permite elegir o crear proyecto; se utiliza el proyecto activo del agente.
+Las rutas guardadas de las otras pestañas siguen siendo las mismas. El BackHandler del editor solo actua en la pestaña activa.
+
+Fuente APK `88b035eeb7053dd67a4acfc8663890ff1980d968`, rama `codex/audiovisual-project-20261108`.
+AWS CodeBuild `34f85b08-e1e0-4746-b62d-159a2dc23798`: assembleAgentPreview y **8 pruebas PASS, 0 fallos**
+(ScreenNavigationTest, OutputExportSpecTest). **1.9.155-agent-preview / vc191 instalada como actualizacion en el S25**.
+Firma existente, alineacion 16 KiB y tres bibliotecas ARM64 originales comprobadas.
+SHA256 instalado `423d88f0de8409875fb7e08c3c491efbdfd2ed2c6cc7843813278b3e04823054`.
+Tras la actualizacion siguen presentes todos los IDs previos: 7 proyectos, 1 escena, 3 planos, 9 personajes,
+3039 archivos y 753 registros de generacion. Sin generaciones ni llamadas a modelos de prueba.
+
+La ruta de apertura se dejo en Guion para la comprobacion. Arranque y version verificados; **QA visual pendiente**:
+el S25 estaba en Dozing y, al encenderlo, mostraba Keyguard/NotificationShade. No se ha eludido el bloqueo ni se
+declara comprobada visualmente la nueva barra. APK tambien copiada a `G:\Mi unidad\Nexus_Android_APK`.
+
+# Proyecto audiovisual vivo vc190 - 08/11/2026
+
+Rama `codex/audiovisual-project-20261108`, sobre la version **vc189 / 1.9.153** comprobada en el S25 (SM-S938B).
+Fuente de la APK nueva: `0cd54dd6514d3a8053c4ea2c2f17e09c938fde29`.
+**1.9.154-agent-preview / vc190 instalada como actualizacion**; certificado existente y alineacion de 16 KiB comprobados.
+SHA256 instalado = `ebb1c8973d61899bce810e94573df9be248cbca05b86de822ab449745c5618bb`.
+AWS CodeBuild `dcbc7cd4-3371-4e34-81b1-3a3e5dfb683e`: compilacion y **47 pruebas PASS, 0 fallos**.
+Las tres bibliotecas ARM64 coinciden byte a byte con las de vc189.
+
+Entrada: mantener pulsado un hueco del chat del Agente -> **Cambiar de proyecto** -> **Guion y storyboard**.
+Guion, Storyboard y Material comparten el indice existente. Editor, asociaciones n:m, referencias con alcance,
+propuestas con revisiones, herramientas reales de los cerebros, procedencia de generacion y preparacion local con WorkManager.
+Detalle y contratos: `docs/LIVING_AUDIOVISUAL_PROJECT.md`.
+
+S25 comprobado mediante las operaciones reales del repositorio y del toolkit: crear escenas/bloques/planos, un archivo
+en dos planos, mover sin perder vinculos, aplicar una herramienta del agente de forma idempotente, rechazar una
+propuesta que entra en conflicto con una edicion reciente y ejecutar preparacion en WorkManager. Sin generaciones ni
+llamadas a LLM externos de prueba. Todos los IDs existentes de proyectos, escenas, planos, personajes, archivos y
+generaciones siguen presentes; perfiles de cerebros, proveedores multimedia y apariencia tienen la misma huella.
+Otros ficheros recibieron actividad durante la sesion: no se afirma igualdad byte a byte de todo el perfil.
+Se observo ademas `read_story_project` en el registro de herramientas de la conversacion real del agente instalado,
+con Codex configurado. Se leyo ese registro existente sin iniciar otra llamada al modelo.
+
+**QA visual parcial**: arranque y pantallas existentes observados; el recorrido completo de pulsaciones del editor
+queda pendiente de una ventana estable de uso del S25. Flow respondia al health desde AXELPC, pero se observaron
+rechazo de Tailscale y reconexion en el telefono durante la revision; no se declara su streaming validado.
+La cola creativa requiere un turno activo del agente; la preparacion local si tiene ejecutor persistente.
+
 # Vision con Codex/AGY y carrusel - 08/11/2026
 
 Rama `fix/bridge-images-20261108` (encima de `fix/codex-e2big-20261107`). El agente no veia las imagenes con los

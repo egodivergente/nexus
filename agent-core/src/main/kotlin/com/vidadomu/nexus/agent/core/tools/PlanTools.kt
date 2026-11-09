@@ -2,6 +2,7 @@ package com.vidadomu.nexus.agent.core.tools
 
 import com.vidadomu.nexus.agent.core.assets.AssetIndex
 import com.vidadomu.nexus.agent.core.assets.AssetType
+import com.vidadomu.nexus.agent.core.assets.storyGenerationContext
 import com.vidadomu.nexus.agent.core.registry.ModelRef
 import com.vidadomu.nexus.agent.core.spend.GenerationPlan
 import com.vidadomu.nexus.agent.core.spend.PlanState
@@ -22,6 +23,12 @@ internal fun GenerationPlan.cardJson(state: PlanState?): JsonObject = buildJsonO
     put("params_sent", params.toJson())
     put("effective_config", effectiveParams.toJson())
     put("media", JsonArray(media.map { m -> buildJsonObject { put("role", m.role); m.fieldKey?.let { put("field", it) }; put("uri", m.uri) } }))
+    storyContext?.let { context ->
+        put("story_origin", buildJsonObject {
+            put("project_id", context.projectId); put("shot_id", context.shotId); put("revision", context.revision)
+            context.sceneId?.let { put("scene_id", it) }
+        })
+    }
     estimate?.let { put("estimate", it.toJson()) }
     if (warnings.isNotEmpty()) put("warnings", strings(warnings))
 }
@@ -87,6 +94,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         string("project", "Proyecto (nombre o id). Por defecto, el proyecto activo.")
         string("scene", "Código de escena, p. ej. 3.")
         string("shot", "Código de plano, p. ej. 12.")
+        string("shot_id", "Id persistente del plano audiovisual de origen; vacío usa el plano seleccionado explícitamente. No uses el número ni la última pantalla.")
         stringArray("characters", "Personajes que aparecen.")
         string("parent_generation_id", "Generación de la que deriva (nueva versión).")
     },
@@ -95,6 +103,19 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
         val model = d.resolveModel(input)
         val projectName = input.str("project")
         val project = (projectName ?: session.activeProjectId)?.let { d.assets.findProject(it) }
+        val selected = session.storySelection?.takeIf { it.projectId == session.activeProjectId }
+        if (selected != null && project?.id != selected.projectId)
+            return fail("El encargo debe conservar el proyecto seleccionado. Abre el otro proyecto explícitamente antes de prepararlo.")
+        val originShot = input.str("shot_id") ?: selected?.shotId
+        if (selected?.shotId != null && originShot != selected.shotId)
+            return fail("El plano solicitado queda fuera del alcance seleccionado.")
+        val storyOrigin = originShot?.let { id ->
+            val shot = d.assets.snapshot().shots.firstOrNull { it.id == id && it.projectId == project?.id }
+                ?: return fail("El plano de origen no existe en el proyecto activo. Vuelve a leer el fragmento antes de preparar el encargo.")
+            if (selected?.sceneId != null && shot.sceneId != selected.sceneId)
+                return fail("El plano de origen pertenece a otra escena y queda fuera del alcance.")
+            d.assets.storyGenerationContext(shot.projectId, shot.id)
+        }
         val alternatives = input.strList("alternatives").mapNotNull { s ->
             s.split(':', limit = 2).takeIf { it.size == 2 }?.let { ModelRef(it[0], it[1]) }
         }
@@ -113,6 +134,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
             shotCode = input.str("shot"),
             characters = input.strList("characters"),
             parentGenerationId = input.str("parent_generation_id"),
+            storyContext = storyOrigin,
         )
         val requestedOrder = input.str("order_id")?.let { id -> d.orders.get(id) ?: throw ToolInputException("Encargo desconocido «$id». Consulta get_ui_state.") }
         return when (built) {
@@ -137,6 +159,7 @@ class PrepareGenerationTool(private val d: ToolDeps) : BaseTool(
                         p.fingerprint() == candidate.fingerprint() && p.projectId == candidate.projectId &&
                         p.sceneCode == candidate.sceneCode && p.shotCode == candidate.shotCode &&
                         p.characters == candidate.characters && p.parentGenerationId == candidate.parentGenerationId && p.task == candidate.task
+                        && p.storyContext == candidate.storyContext
                 }
                 // Un encargo = una tarjeta: el mismo modelo con los mismos archivos actualiza el encargo
                 // abierto en lugar de crear otro (salvo new_copy o un order_id explícito).

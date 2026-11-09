@@ -6,6 +6,7 @@ import com.vidadomu.nexus.agent.core.assets.AssetRole
 import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.agent.core.assets.GenerationRecord
+import com.vidadomu.nexus.agent.core.assets.storyCommand
 import com.vidadomu.nexus.agent.core.orders.FailureKind
 import com.vidadomu.nexus.agent.core.orders.OrderBook
 import com.vidadomu.nexus.agent.core.schema.ErrorDiagnosis
@@ -126,6 +127,7 @@ class GenerationLifecycle(
                 agentPlanId = plan.id,
                 projectId = projectId,
                 shotId = shotId,
+                storyContext = plan.storyContext,
                 createdAt = clock(),
             ),
         )
@@ -137,6 +139,14 @@ class GenerationLifecycle(
         reportJob(jobId, st)
         val rec = assets.generation(jobId) ?: return st
         val outputIds = if (st.status == "COMPLETED") importOutputs(rec, st.outputs) else emptyList()
+        if (rec.storyContext != null) outputIds.forEach { assetId ->
+            assets.storyCommand(rec.storyContext.projectId, kotlinx.serialization.json.buildJsonObject {
+                put("action", kotlinx.serialization.json.JsonPrimitive("register_result"))
+                put("operation_id", kotlinx.serialization.json.JsonPrimitive("result:$jobId:$assetId"))
+                put("asset_id", kotlinx.serialization.json.JsonPrimitive(assetId))
+                put("context", kotlinx.serialization.json.Json.encodeToJsonElement(com.vidadomu.nexus.agent.core.assets.StoryGenerationContext.serializer(), rec.storyContext))
+            }, "provider")
+        }
         assets.upsertGeneration(
             rec.copy(
                 status = st.status,

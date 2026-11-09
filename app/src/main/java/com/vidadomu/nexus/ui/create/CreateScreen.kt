@@ -176,6 +176,13 @@ fun CreateScreen(
                 Column(Modifier.fillMaxWidth().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
                     .padding(horizontal=screenMargin, vertical=NexusTokens.space4),
                     verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                    state.storyContext?.let { origin ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.CenterVertically) {
+                            Text("Plano · ${origin.shotId.takeLast(8)} · revisión ${origin.revision}",
+                                Modifier.weight(1f), style=MaterialTheme.typography.labelSmall)
+                            TextButton(onClick=viewModel::clearStoryOrigin) { Text("Desvincular") }
+                        }
+                    }
                     val busy = state.isSubmitting || state.isUploading || state.isPreparingMedia || comparisonState.phase == ComparisonPhase.SENDING
                     val inlineReason=readiness.fixTarget==CreationFixTarget.MEDIA || readiness.fixTarget==CreationFixTarget.PROMPT
                     if(!compactEditor && !busy && !inlineReason) readiness.message?.let { reason ->

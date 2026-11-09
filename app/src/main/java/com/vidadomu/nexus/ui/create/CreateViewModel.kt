@@ -56,7 +56,8 @@ data class CreateUiState(
     val errorMessage: String? = null,
     val submitFailure: SubmitFailure? = null,
     val retainedMedia: List<AttachedMedia> = emptyList(),
-    val parameterAdaptations: List<ParameterTransferAdaptation> = emptyList()
+    val parameterAdaptations: List<ParameterTransferAdaptation> = emptyList(),
+    val storyContext: com.vidadomu.nexus.agent.core.assets.StoryGenerationContext? = null,
 ) {
     val missingRequiredFields: List<String>
         get() = selectedModel?.let { model ->
@@ -176,7 +177,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val _uiState = MutableStateFlow(CreateUiState(selectedModality=restoredDraft?.modality ?: Modality.IMAGE,
         prompt=restoredDraft?.prompt.orEmpty(),negativePrompt=restoredDraft?.negativePrompt.orEmpty(),
         attachedMedia=restoredDraft?.media.orEmpty(),retainedMedia=restoredDraft?.retainedMedia.orEmpty(),
-        parameterAdaptations=restoredDraft?.parameterAdaptations.orEmpty()))
+        parameterAdaptations=restoredDraft?.parameterAdaptations.orEmpty(),storyContext=restoredDraft?.storyContext))
     val uiState: StateFlow<CreateUiState> = _uiState.asStateFlow()
 
     init {
@@ -214,7 +215,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private fun observeDraft() = viewModelScope.launch {
         _uiState.map {state -> state.selectedModel?.takeIf {state.schemaReady && !state.isLoadingSchema}?.let {model ->
             model.providerId to CreationDraft(model.id,state.selectedModality,state.prompt,state.parameters,state.attachedMedia,state.negativePrompt,
-                state.retainedMedia,model.providerId,ModelCapabilityRegistry.key(model,state.selectedModality).endpoint,state.parameterAdaptations)
+                state.retainedMedia,model.providerId,ModelCapabilityRegistry.key(model,state.selectedModality).endpoint,state.parameterAdaptations,state.storyContext)
         }}.distinctUntilChanged().debounce(400).collect {entry ->
             if(entry!=null) withContext(Dispatchers.IO) {creationPreferences.saveDraft(entry.second,entry.first)}
         }
@@ -317,7 +318,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update {
             val parameters=if(parametersRestored) it.parameters else FormContract.restoredValues(model,draft.parameters)
             val adaptations=if(parametersRestored) it.parameterAdaptations else restoredParameterAdaptations(parameters,draft.parameterAdaptations)
-            it.copy(parameters=parameters,parameterAdaptations=adaptations,
+            it.copy(parameters=parameters,parameterAdaptations=adaptations,storyContext=draft.storyContext,
             errorMessage=if(available.size<draft.media.size) "Borrador recuperado. Vuelve a adjuntar los archivos que ya no están disponibles." else null).withModelMedia(model,::isMediaAvailable)}
     }
     fun applyPreset(preset:CreationPreset) { forgetModelSwitch(); val model=_uiState.value.selectedModel ?: return
@@ -332,10 +333,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         if(com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(job.providerId)) {_uiState.update {it.copy(errorMessage=com.vidadomu.nexus.provider.registry.RetiredProviders.SUBMIT_MESSAGE)};return}
         val model=modelCatalogRepo.getModelById(job.modelId)
         if(model==null) {_uiState.update {it.copy(errorMessage="El modelo de esta creación ya no está disponible.")};return}
+        val restoredOrigin = historyStoryOrigin(job)
+        _uiState.update { it.copy(storyContext = restoredOrigin) }
         selectModality(job.modality); selectModel(model); updatePrompt(job.prompt)
         viewModelScope.launch {
             schemaJob?.join()
-            if(_uiState.value.selectedModel?.id==model.id) _uiState.update {state ->state.copy(negativePrompt=job.negativePrompt,
+            if(_uiState.value.selectedModel?.id==model.id && _uiState.value.selectedModel?.providerId==model.providerId &&
+                _uiState.value.prompt==job.prompt && _uiState.value.storyContext==restoredOrigin) _uiState.update {state ->state.copy(negativePrompt=job.negativePrompt,
                 parameters=com.vidadomu.nexus.core.model.FormContract.restoredValues(state.selectedModel!!,job.parameters),
                 attachedMedia=emptyList(),errorMessage=if(job.inputMediaUri!=null) "Parámetros recuperados. Adjunta los archivos de entrada para continuar." else null)}
         }
@@ -351,6 +355,27 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value=state.copy(availableModels=modelCatalogRepo.models.value.filter {it.modalities.contains(state.selectedModality)}
             .ifEmpty {listOf(model)},isLoadingSchema=false,schemaReady=true,errorMessage=null)
     }
+
+    /** Opens the existing model form with an immutable shot origin; never submits or authorizes cost. */
+    fun prepareStoryShot(origin: com.vidadomu.nexus.agent.core.assets.StoryGenerationContext) {
+        beginMediaCopy()
+        viewModelScope.launch {
+            try {
+                val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+                val shot = runtime.assets.snapshot().shots.firstOrNull { it.id == origin.shotId && it.projectId == origin.projectId }
+                    ?: error("Este plano ya no está disponible.")
+                val model = uiState.first { it.selectedModel != null }.selectedModel!!
+                val references = origin.referenceAssetIds.mapNotNull(runtime.assets::asset).filter { it.type == com.vidadomu.nexus.agent.core.assets.AssetType.IMAGE }
+                draftRestored = true
+                prepareWithMedia(model, references.map { Uri.parse(it.uri) to (it.mimeType ?: "image/jpeg") })
+                _uiState.update { it.copy(prompt = shot.description.orEmpty(), storyContext = origin) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _uiState.update { it.copy(errorMessage = e.message ?: "No se pudo preparar el plano.") } }
+            finally { endMediaCopy() }
+        }
+    }
+
+    fun clearStoryOrigin() { _uiState.update { it.copy(storyContext = null) } }
     fun prepareAgentDraft(draft:com.vidadomu.nexus.agent.AgentDraft) { forgetModelSwitch();
         check(com.vidadomu.nexus.BuildConfig.DEBUG)
         viewModelScope.launch {

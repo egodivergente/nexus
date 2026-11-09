@@ -18,6 +18,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collect
+import com.vidadomu.nexus.agent.core.assets.storyCommand
 
 class NexusApplication : Application() {
 
@@ -115,6 +119,37 @@ class NexusApplication : Application() {
         // ViewModel first asked for it. Building it here in the background lets the first frame draw meanwhile;
         // AssistantRuntime.get is synchronized, so the ViewModel simply reuses the instance.
         CoroutineScope(Dispatchers.Default).launch { runCatching { com.vidadomu.nexus.assistant.AssistantRuntime.get(this@NexusApplication) } }
+        CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+            val index = com.vidadomu.nexus.assistant.AssistantRuntime.get(this@NexusApplication).assets
+            index.snapshot().story.tasks.filter { it.status == "running" && it.providerJobId == null }
+                .map { it.projectId }.distinct().forEach { project ->
+                    index.storyCommand(project, kotlinx.serialization.json.buildJsonObject {
+                        put("action", kotlinx.serialization.json.JsonPrimitive("recover_tasks"))
+                        put("operation_id", kotlinx.serialization.json.JsonPrimitive("resume:${java.util.UUID.randomUUID()}"))
+                    }, "system:recovery")
+                }
+            index.changes.map { snapshot ->
+                snapshot.story.autonomy.filter { it.enabled }.mapNotNull { autonomy ->
+                    val pending = snapshot.story.tasks.filter { it.projectId == autonomy.projectId &&
+                        it.status == "queued" && (autonomy.sceneId == null || it.sceneId == autonomy.sceneId) }
+                    if (pending.isEmpty()) null else autonomy.projectId to pending.map { it.id }
+                }
+            }.distinctUntilChanged().collect { projects ->
+                projects.forEach { (project, _) -> com.vidadomu.nexus.assistant.story.StoryPreparationWorker.enqueue(this@NexusApplication, project) }
+            }
+        }
+        // Remote jobs already have a durable polling worker. Index their verified results independently
+        // of which screen is open, also after process recreation. This observer never submits a job.
+        CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+            generationRepository.allJobs.map { jobs ->
+                jobs.filter { it.parameters.containsKey("__story_context") }
+                    .map { Triple(it.id, it.status, it.outputs.map { output -> output.id }) }
+            }.distinctUntilChanged().collect { changed ->
+                if (changed.isNotEmpty()) runCatching {
+                    com.vidadomu.nexus.assistant.AssistantRuntime.get(this@NexusApplication).importHistory()
+                }.onFailure { android.util.Log.w("NexusStory", "Resultado pendiente de indexar: ${it.javaClass.simpleName}") }
+            }
+        }
 
         // Asynchronously check and refresh currency rate on startup
         CoroutineScope(Dispatchers.IO).launch {

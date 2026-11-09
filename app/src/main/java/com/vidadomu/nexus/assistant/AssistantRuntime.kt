@@ -15,6 +15,9 @@ import com.vidadomu.nexus.agent.core.assets.AssetRole
 import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.agent.core.assets.GenerationRecord
+import com.vidadomu.nexus.agent.core.assets.StoryGenerationContext
+import com.vidadomu.nexus.agent.core.assets.storyCommand
+import com.vidadomu.nexus.agent.core.assets.storyContext
 import com.vidadomu.nexus.agent.core.config.AgentConfig
 import com.vidadomu.nexus.agent.core.config.AgentLimits
 import com.vidadomu.nexus.agent.core.config.AgentMode
@@ -478,13 +481,13 @@ class AssistantRuntime(private val app: NexusApplication) {
     /** Relee skills (assets + files/skills + Documents/ALEXIA/Nexus/Skills) sin recompilar. */
     fun reloadSkills(): SkillStore { skills = loadSkills(); deps = buildDeps(); mutableSkillsRevision.value++; return skills }
 
-    fun llm(s: AssistantSettings): LlmProvider =
+    fun llm(s: AssistantSettings, allowNativeImages: Boolean = true): LlmProvider =
         when {
             s.offline -> OfflinePlannerProvider()
             s.bridge -> AntigravityProvider(
                 s.antigravityEndpoint.ifBlank { AssistantSettings.DEFAULT_ANTIGRAVITY_ENDPOINT },
                 engine = if (s.backend == AssistantSettings.BACKEND_CODEX) AntigravityProvider.BridgeEngine.CODEX else AntigravityProvider.BridgeEngine.ANTIGRAVITY,
-                nativeImages = s.nativeImages,
+                nativeImages = s.nativeImages && allowNativeImages,
                 reasoningEffort = if (s.backend == AssistantSettings.BACKEND_CODEX) s.codexEffort else null,
             )
             // BytePlus y cerebros propios: todo sale del perfil (protocolo, auth, razonamiento, límites propios).
@@ -516,8 +519,8 @@ class AssistantRuntime(private val app: NexusApplication) {
             else -> BedrockProxyProvider(s.endpoint, { settings.token() })
         }
 
-    fun orchestrator(s: AssistantSettings = settings.load()) = AgentOrchestrator(
-        llm(s), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
+    fun orchestrator(s: AssistantSettings = settings.load(), allowNativeImages: Boolean = true) = AgentOrchestrator(
+        llm(s, allowNativeImages), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
         // El límite de 4,5 MB por documento es de Bedrock; el puente (AGY, Codex) solo recibe texto y no tiene ese límite.
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {
             val agy = !s.offline && s.bridge
@@ -525,7 +528,23 @@ class AssistantRuntime(private val app: NexusApplication) {
         },
         images = if (s.visionEnabled) AttachmentImageLoader { AgentMediaStore.thumbnail(app,it) } else null,
         videos = if (s.visionEnabled) com.vidadomu.nexus.agent.core.agent.AttachmentVideoLoader { AgentVideoFrames.load(app, it) } else null,
-        uiContext = { orders.turnContext(guard) },
+        uiContext = { session ->
+            listOfNotNull(
+                orders.turnContext(guard),
+                session.storySelection?.takeIf { it.projectId == session.activeProjectId }?.let { selected ->
+                    val context = assets.storyContext(selected.projectId, selected.sceneId, selected.shotId)
+                    buildString {
+                        appendLine("Selección audiovisual explícita de este turno (no inferida de la última pantalla):")
+                        appendLine("project_id=${selected.projectId}; scene_id=${selected.sceneId ?: "—"}; shot_id=${selected.shotId ?: "—"}; block_id=${selected.blockId ?: "—"}")
+                        appendLine("Alcance: ${if (selected.mode == "direct") "cambios directos si el modo Agente lo permite" else "propuestas revisables; no sustituir el contenido actual"}.")
+                        if (selected.preserveIds.isNotEmpty()) appendLine("Conservar sin cambios: ${selected.preserveIds.sorted().joinToString()}.")
+                        appendLine("No amplíes el alcance ni apruebes costes. Una aprobación editorial no autoriza llamadas externas ni generaciones.")
+                        appendLine("Este turno audiovisual prepara, propone o edita; el motor nativo de imágenes está deshabilitado. Para generar usa las herramientas de Nexus y su confirmación de coste.")
+                        append(context)
+                    }
+                },
+            ).joinToString("\n\n").ifBlank { null }
+        },
         verifiedOrders = { orders.all() },
         generatedMedia = com.vidadomu.nexus.agent.core.agent.GeneratedMediaStore { media, session -> saveGeneratedImage(media, session) },
     )
@@ -565,14 +584,23 @@ class AssistantRuntime(private val app: NexusApplication) {
     private suspend fun importHistoryLocked(): Int {
         var added = 0
         for (job in app.generationRepository.allJobs.value.filter { it.status == GenerationStatus.COMPLETED && it.outputs.isNotEmpty() }) {
-            if (assets.generation(job.id) != null) continue
+            val previous = assets.generation(job.id)
+            if (previous != null && previous.status == "COMPLETED" && previous.outputAssetIds.isNotEmpty()) continue
+            val origin = previous?.storyContext ?: job.parameters["__story_context"]?.let { raw ->
+                runCatching { kotlinx.serialization.json.Json.decodeFromString(StoryGenerationContext.serializer(), raw) }.getOrNull()
+            }
+            val usedReferences = job.parameters["__story_inputs"]?.let { raw ->
+                runCatching { kotlinx.serialization.json.Json.decodeFromString<List<String>>(raw) }.getOrNull()
+            } ?: listOfNotNull(job.inputMediaUri)
             val type = when (job.modality.name) { "VIDEO" -> AssetType.VIDEO; "IMAGE" -> AssetType.IMAGE; "AUDIO" -> AssetType.AUDIO; else -> AssetType.OTHER }
             val rec = assets.upsertGeneration(GenerationRecord(
                 id = AssetIndex.newId("gen"), nexusJobId = job.id, providerJobId = job.providerJobId, providerId = job.providerId,
                 modelId = job.modelId, modality = job.modality.name, prompt = job.prompt, negativePrompt = job.negativePrompt.ifBlank { null },
                 projectId = job.parameters["__project_id"]?.takeIf {assets.findProject(it)!=null} ?: assets.projectAt(job.startedAt),
+                shotId = origin?.shotId, storyContext = origin,
                 params = job.parameters.filterKeys { !it.startsWith("__") }, seed = job.parameters["seed"],
-                referenceUris = listOfNotNull(job.inputMediaUri), estimatedCostUsd = job.estimatedCostUsd, actualCostUsd = job.actualCostUsd,
+                referenceUris = usedReferences, referenceAssetIds = usedReferences.mapNotNull { assets.assetByUri(it)?.id },
+                estimatedCostUsd = job.estimatedCostUsd, actualCostUsd = job.actualCostUsd,
                 status = "COMPLETED", createdAt = job.startedAt, completedAt = job.completedAt,
             ))
             val ids = job.outputs.mapNotNull { o ->
@@ -583,6 +611,14 @@ class AssistantRuntime(private val app: NexusApplication) {
                     width = o.width, height = o.height, durationSec = o.durationSeconds?.toDouble(), generationId = rec.id, createdAt = job.startedAt,
                     projectId = rec.projectId,
                 )).id
+            }
+            if (origin != null) ids.forEach { assetId ->
+                assets.storyCommand(origin.projectId, kotlinx.serialization.json.buildJsonObject {
+                    put("action", kotlinx.serialization.json.JsonPrimitive("register_result"))
+                    put("operation_id", kotlinx.serialization.json.JsonPrimitive("result:${job.id}:$assetId"))
+                    put("asset_id", kotlinx.serialization.json.JsonPrimitive(assetId))
+                    put("context", kotlinx.serialization.json.Json.encodeToJsonElement(StoryGenerationContext.serializer(), origin))
+                }, "provider")
             }
             assets.upsertGeneration(rec.copy(outputAssetIds = ids)); added++
         }
