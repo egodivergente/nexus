@@ -353,7 +353,7 @@ fun AssistantScreen(
                                         Text("${row.cards.size} encargos pendientes de confirmar", style = MaterialTheme.typography.titleSmall)
                                         Text(listOfNotNull(plans.map { it.plan.modelName }.distinct().joinToString(", ").takeIf { it.isNotBlank() },
                                             if (amounts.size == plans.size && amounts.isNotEmpty()) remember(amounts, currencyNow) { currency.formatCost(amounts.sum()) } else "coste por confirmar").joinToString(" · "),
-                                            style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                     }
                                     TextButton(onClick = { expandedPending = if (open) expandedPending - row.firstId else expandedPending + row.firstId }) {
                                         Text(if (open) "Resumir" else "Revisar y editar")
@@ -364,7 +364,7 @@ fun AssistantScreen(
                                         horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.Top) {
                                         Text("${idx + 1}", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.width(18.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text(pl.plan.prompt.ifBlank { "(sin prompt)" }, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                            Text(pl.plan.prompt.ifBlank { "(sin prompt)" }, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                             val pics = pl.plan.media.filter { it.mimeType?.startsWith("video") != true && it.mimeType?.startsWith("audio") != true }
                                             if (pics.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4), modifier = Modifier.padding(top = NexusTokens.space4)) {
                                                 items(pics.take(8)) { m -> AsyncImage(model = m.uri, contentDescription = "Imagen adjunta", contentScale = ContentScale.Crop,
