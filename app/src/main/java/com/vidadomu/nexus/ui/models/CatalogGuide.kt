@@ -7,6 +7,12 @@ private val WAN_TOKEN = Regex("\\bwan\\b")
 
 internal fun catalogFamily(model: NexusModel): String {
     val id = (model.providerModelId?.takeIf { it.isNotBlank() } ?: model.id).lowercase(java.util.Locale.ROOT).replace('_', '-')
+    return catalogFamilyById(id, model.organization) ?: model.modelFamily.takeIf { it.isNotBlank() } ?: creator(model)
+}
+
+/** Familia por el identificador del modelo (la misma que usa ArtBox), o null si no es una familia conocida. */
+internal fun catalogFamilyById(rawId: String, organization: String? = null): String? {
+    val id = rawId.lowercase(java.util.Locale.ROOT).replace('_', '-')
     return when {
         "seedream" in id -> "Seedream"
         "seedance" in id -> "Seedance"
@@ -25,7 +31,7 @@ internal fun catalogFamily(model: NexusModel): String {
         "veo" in id -> "Veo"
         "imagen" in id -> "Imagen"
         "sora" in id -> "Sora"
-        "midjourney" in id || model.organization.equals("Midjourney", true) -> "Midjourney"
+        "midjourney" in id || organization.equals("Midjourney", true) -> "Midjourney"
         "vidu" in id -> "Vidu"
         "pixverse" in id -> "PixVerse"
         "hunyuan" in id -> "Hunyuan"
@@ -36,7 +42,7 @@ internal fun catalogFamily(model: NexusModel): String {
         "ideogram" in id -> "Ideogram"
         "luma" in id || "ray-" in id -> "Luma"
         "pika" in id -> "Pika"
-        else -> model.modelFamily.takeIf { it.isNotBlank() } ?: creator(model)
+        else -> null
     }
 }
 

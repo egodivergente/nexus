@@ -219,7 +219,7 @@ private fun MosaicCell(
             .padding(start = 5.dp, end = 5.dp, top = 20.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            BrandLogo(organization = tile.provider.replace('_', ' '), family = tile.model,
+            BrandLogo(organization = tile.provider.replace('_', ' '), family = com.vidadomu.nexus.ui.models.catalogFamilyById(tile.modelId) ?: tile.model,
                 modelId = tile.modelId, size = 17.dp, containerSize = 22.dp)
             Column(Modifier.weight(1f)) {
                 Text(tile.model, color = Color.White, style = MaterialTheme.typography.labelSmall,

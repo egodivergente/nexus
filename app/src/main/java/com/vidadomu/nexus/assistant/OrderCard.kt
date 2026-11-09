@@ -267,7 +267,7 @@ internal fun OrderCard(
 /** Logo oficial del modelo (biblioteca de marcas de la app); si no hay uno conocido, monograma neutro con el proveedor. */
 @Composable
 internal fun ProviderMark(providerId: String, modelId: String, modelName: String) {
-    com.vidadomu.nexus.ui.components.BrandLogo(organization = providerId.replace('_', ' '), family = modelName, modelId = modelId, size = 28.dp, containerSize = 32.dp)
+    com.vidadomu.nexus.ui.components.BrandLogo(organization = providerId.replace('_', ' '), family = com.vidadomu.nexus.ui.models.catalogFamilyById(modelId) ?: modelName, modelId = modelId, size = 28.dp, containerSize = 32.dp)
 }
 
 /** Miniatura 16:9 del resultado (fotograma para vídeo) con indicador de reproducción. */
