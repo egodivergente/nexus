@@ -1174,6 +1174,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val order = orderOf(planId) ?: return
         if (order.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.COMPLETED && order.outputs.isEmpty() && job.status == GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) {
             runCatching { runtime.orders.attachOutputs(order.id, job.outputs.map { it.localUri ?: it.url }) }
+                .onSuccess { queueResultReview(order, job) }
             return
         }
         if (order.status !in setOf(com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING, com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN)) return
@@ -1189,6 +1190,44 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 if (order.jobId == null) runtime.orders.accepted(order.id, job.id)
                 runtime.deps.lifecycle.reportJob(job.id, com.vidadomu.nexus.agent.core.spend.JobStatus(job.id, st, job.progress,
                     job.outputs.map { it.localUri ?: it.url }, job.error, job.actualCostUsd))
+            }
+        }
+    }
+
+    // ---- revisión automática del resultado ----------------------------------------------------------
+
+    private val reviewPrefs get() = getApplication<Application>().getSharedPreferences("assistant_review", android.content.Context.MODE_PRIVATE)
+    private val reviewQueue = linkedMapOf<String, String>()
+    private var reviewJob: kotlinx.coroutines.Job? = null
+
+    fun autoReviewEnabled(): Boolean = reviewPrefs.getBoolean("auto_review", true)
+    fun setAutoReview(on: Boolean) { reviewPrefs.edit().putBoolean("auto_review", on).apply(); if (!on) { reviewQueue.clear(); reviewJob?.cancel() } }
+
+    /** Un encargo de imagen acaba de recibir su resultado: se anota para revisarlo junto con el resto de su lote. */
+    private fun queueResultReview(order: com.vidadomu.nexus.agent.core.orders.Order, job: com.vidadomu.nexus.core.model.GenerationJob) {
+        if (!autoReviewEnabled() || order.modality != "IMAGE") return
+        // Solo trabajos recién terminados: al reabrir la app no se revisa lo antiguo.
+        if ((job.completedAt ?: 0L) < System.currentTimeMillis() - 10 * 60_000L) return
+        reviewQueue[order.id] = order.modelName
+        reviewJob?.cancel()
+        reviewJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(4_000)
+            repeat(40) {
+                val busyStates = setOf(com.vidadomu.nexus.agent.core.orders.OrderStatus.SUBMITTING, com.vidadomu.nexus.agent.core.orders.OrderStatus.PROCESSING,
+                    com.vidadomu.nexus.agent.core.orders.OrderStatus.UNCERTAIN)
+                val inFlight = _ui.value.orders.values.any { it.status in busyStates }
+                if (!_ui.value.thinking && !inFlight && background == null) {
+                    val ids = reviewQueue.toMap(); reviewQueue.clear()
+                    if (ids.isEmpty() || !autoReviewEnabled()) return@launch
+                    val list = ids.entries.joinToString(", ") { "${it.value} (${it.key})" }
+                    // Solo informa y, si hace falta, deja una tarjeta corregida SIN enviar: nada se genera ni se gasta por su cuenta.
+                    send("Revisa los resultados que acaban de terminar: $list. Mira cada imagen con view_library_asset o inspect_image_quality " +
+                        "y compárala con lo que pedí en esta conversación (sujeto, lugar, acción, formato y referencias). Dime en 2–3 líneas si cumple y, " +
+                        "si algo no cumple, qué falla exactamente. Si conviene corregirlo, deja preparada la tarjeta corregida SIN enviarla; no generes nada por tu cuenta.",
+                        retryAttachments = emptyList())
+                    return@launch
+                }
+                kotlinx.coroutines.delay(3_000)
             }
         }
     }

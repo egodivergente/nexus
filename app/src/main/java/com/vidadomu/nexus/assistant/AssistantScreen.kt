@@ -1611,6 +1611,15 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                 // 4 · Herramientas
                 // «Edición y Whisper» vive ahora en Ajustes → Sistema y diagnóstico.
                 AgentSection("Herramientas", Icons.Default.Build) {
+                    var autoReview by remember { mutableStateOf(vm.autoReviewEnabled()) }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Revisar los resultados al terminar", style = MaterialTheme.typography.bodyLarge)
+                            Text("Cuando acaban tus imágenes, el agente las mira y comprueba que cumplen lo que pediste. Solo informa; no genera ni gasta nada por su cuenta. Usa una consulta al modelo por lote.",
+                                style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        }
+                        Switch(autoReview, { autoReview = it; vm.setAutoReview(it) })
+                    }
                     AgentInternetSettings()
                 }
                 // 5 · Skills
