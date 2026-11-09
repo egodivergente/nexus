@@ -1058,13 +1058,20 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) {
             val mediaState=androidx.compose.foundation.lazy.rememberLazyListState()
-            // Separación mínima: las imágenes ya ocupan su caja sin franjas vacías y quedan juntas.
-            LazyRow(state=mediaState,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4),
-                contentPadding=PaddingValues(end=NexusTokens.space32)) {
-                items(item.media,key={it.id}) { AssistantMediaPreview(it) }
+            // Dos o más imágenes seguidas se muestran como collage; vídeos, audios y documentos siguen en el carrusel.
+            val pictures=item.media.filter {it.mimeType.startsWith("image/")}
+            val collage=pictures.size>=2
+            val others=if(collage) item.media.filterNot {it.mimeType.startsWith("image/")} else item.media
+            if(collage) ImageCollage(pictures)
+            if(others.isNotEmpty()) {
+                // Separación mínima: las imágenes ya ocupan su caja sin franjas vacías y quedan juntas.
+                LazyRow(state=mediaState,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space4),
+                    contentPadding=PaddingValues(end=NexusTokens.space32)) {
+                    items(others,key={it.id}) { AssistantMediaPreview(it) }
+                }
+                // Page indicator: with several media the row is a carousel, and the reader must know there is more.
+                if(others.size>1) MediaPageDots(others.size,mediaState.firstVisibleItemIndex)
             }
-            // Page indicator: with several media the row is a carousel, and the reader must know there is more.
-            if(item.media.size>1) MediaPageDots(item.media.size,mediaState.firstVisibleItemIndex)
         }
     }
 }

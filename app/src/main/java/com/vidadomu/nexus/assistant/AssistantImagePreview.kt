@@ -1,5 +1,6 @@
 package com.vidadomu.nexus.assistant
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -49,6 +50,49 @@ internal fun AssistantImagePreview(media: Attachment) {
         com.vidadomu.nexus.ui.components.NexusTonalAction("Ampliar", { opened = true }, icon = Icons.Default.ZoomIn, description = "Ampliar imagen")
     }
     if (opened) AssistantImageForeground(media) { opened = false }
+}
+
+/**
+ * Varias imágenes seguidas del agente se ven juntas, como un collage: 2 en mitades, 3 con una grande y dos pequeñas,
+ * 4 en cuadrícula y, a partir de 5, la cuadrícula con «+N» en la última casilla. Un toque abre esa imagen ampliada.
+ */
+@Composable
+internal fun ImageCollage(images: List<Attachment>) {
+    var opened by rememberSaveable(images.first().id, images.size) { mutableStateOf<Int?>(null) }
+    val gap = 3.dp
+    val shown = images.take(4)
+    val extra = images.size - shown.size
+    @Composable fun Cell(i: Int, modifier: Modifier) {
+        Box(modifier.clickable { opened = i }) {
+            AsyncImage(model = shown[i].uri, contentDescription = "Ampliar imagen ${i + 1} de ${images.size}", contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize())
+            if (i == shown.lastIndex && extra > 0) Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .55f)), contentAlignment = Alignment.Center) {
+                Text("+$extra", style = MaterialTheme.typography.headlineSmall, color = androidx.compose.ui.graphics.Color.White)
+            }
+        }
+    }
+    Column(Modifier.fillMaxWidth().widthIn(max = 360.dp).clip(NexusTokens.card), verticalArrangement = Arrangement.spacedBy(gap)) {
+        when (shown.size) {
+            2 -> Row(Modifier.fillMaxWidth().aspectRatio(2f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                Cell(0, Modifier.weight(1f).fillMaxHeight()); Cell(1, Modifier.weight(1f).fillMaxHeight())
+            }
+            3 -> Row(Modifier.fillMaxWidth().aspectRatio(1.5f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                Cell(0, Modifier.weight(2f).fillMaxHeight())
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                    Cell(1, Modifier.weight(1f).fillMaxWidth()); Cell(2, Modifier.weight(1f).fillMaxWidth())
+                }
+            }
+            else -> {
+                Row(Modifier.fillMaxWidth().aspectRatio(2f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    Cell(0, Modifier.weight(1f).fillMaxHeight()); Cell(1, Modifier.weight(1f).fillMaxHeight())
+                }
+                Row(Modifier.fillMaxWidth().aspectRatio(2f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    Cell(2, Modifier.weight(1f).fillMaxHeight()); Cell(3, Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+        }
+    }
+    opened?.let { index -> AssistantImageForeground(images[index.coerceIn(0, images.lastIndex)]) { opened = null } }
 }
 
 /**
