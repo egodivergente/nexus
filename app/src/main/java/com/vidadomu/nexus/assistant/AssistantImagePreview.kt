@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesomeMosaic
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.*
@@ -59,6 +60,7 @@ internal fun AssistantImagePreview(media: Attachment) {
 @Composable
 internal fun ImageCollage(images: List<Attachment>) {
     var opened by rememberSaveable(images.first().id, images.size) { mutableStateOf<Int?>(null) }
+    var wall by rememberSaveable(images.first().id, images.size) { mutableStateOf(false) }
     val gap = 3.dp
     val shown = images.take(4)
     val extra = images.size - shown.size
@@ -71,7 +73,8 @@ internal fun ImageCollage(images: List<Attachment>) {
             }
         }
     }
-    Column(Modifier.fillMaxWidth().widthIn(max = 360.dp).clip(NexusTokens.card), verticalArrangement = Arrangement.spacedBy(gap)) {
+    Box(Modifier.fillMaxWidth().widthIn(max = 360.dp)) {
+    Column(Modifier.fillMaxWidth().clip(NexusTokens.card), verticalArrangement = Arrangement.spacedBy(gap)) {
         when (shown.size) {
             2 -> Row(Modifier.fillMaxWidth().aspectRatio(2f), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 Cell(0, Modifier.weight(1f).fillMaxHeight()); Cell(1, Modifier.weight(1f).fillMaxHeight())
@@ -92,7 +95,14 @@ internal fun ImageCollage(images: List<Attachment>) {
             }
         }
     }
+    // Botón pequeño: abre el muro libre con estas mismas imágenes, más grandes y movibles.
+    Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(34.dp).clip(androidx.compose.foundation.shape.CircleShape)
+        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .55f)).clickable { wall = true }, contentAlignment = Alignment.Center) {
+        Icon(Icons.Default.AutoAwesomeMosaic, "Abrir el muro", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
+    }
+    }
     opened?.let { index -> AssistantImageForeground(images[index.coerceIn(0, images.lastIndex)]) { opened = null } }
+    if (wall) FreeWall(images) { wall = false }
 }
 
 /**
@@ -107,7 +117,7 @@ internal fun imagePreviewSize(aspect: Float?, maxWidth: Dp = 320.dp, maxHeight: 
 internal fun boundedImageScale(scale: Float): Float = if (scale.isFinite()) scale.coerceIn(1f, 5f) else 1f
 
 @Composable
-private fun AssistantImageForeground(media: Attachment, onClose: () -> Unit) {
+internal fun AssistantImageForeground(media: Attachment, onClose: () -> Unit) {
     var scale by remember(media.uri) { mutableFloatStateOf(1f) }
     var offset by remember(media.uri) { mutableStateOf(Offset.Zero) }
     var imageState by remember(media.uri) { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
