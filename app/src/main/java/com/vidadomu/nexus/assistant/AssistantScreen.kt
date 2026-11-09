@@ -179,14 +179,29 @@ fun AssistantScreen(
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
     // Active and finished adjacent image/video orders share a live wall; failures keep their own actions.
     var expandedGroups by remember {mutableStateOf(setOf<String>())}
-    val rows=remember(visibleItems,ui.orders,ui.plans,expandedGroups,generationJobs) {
+    var expandedPending by remember {mutableStateOf(setOf<String>())}
+    val rows=remember(visibleItems,ui.orders,ui.plans,expandedGroups,expandedPending,generationJobs) {
         fun eligible(i:ChatItem):Boolean {
             if(i !is ChatItem.PlanCard) return false
             val order=i.orderId?.let {ui.orders[it]} ?: return false
             val plan=ui.plans[i.planId] ?: return false
             return mosaicEligible(order.status,order.modality)
         }
+        fun pendingEligible(i:ChatItem):Boolean {
+            if(i !is ChatItem.PlanCard) return false
+            val order=i.orderId?.let {ui.orders[it]} ?: return false
+            return order.status==com.vidadomu.nexus.agent.core.orders.OrderStatus.AWAITING_CONFIRMATION && ui.plans[i.planId]!=null
+        }
         val out=mutableListOf<Any>();var run=mutableListOf<ChatItem.PlanCard>()
+        var prun=mutableListOf<ChatItem.PlanCard>()
+        // Varios encargos pendientes seguidos se presentan como un lote: cabecera con el resumen y, debajo, sus tarjetas.
+        fun pflush() {
+            if(prun.size>=2) {
+                out.add(PendingHeader(prun.first().id,prun.toList()))
+                if(prun.first().id in expandedPending) out.addAll(prun)
+            } else out.addAll(prun)
+            prun=mutableListOf()
+        }
         fun flush() {
             if(run.isNotEmpty()) {
                 if(run.first().id in expandedGroups) {out.add(GroupHeader(run.first().id,run.size));out.addAll(run)}
@@ -194,8 +209,12 @@ fun AssistantScreen(
             }
             run=mutableListOf()
         }
-        for(i in visibleItems) if(eligible(i)) run.add(i as ChatItem.PlanCard) else {flush();out.add(i)}
-        flush();out
+        for(i in visibleItems) {
+            if(eligible(i)) {pflush();run.add(i as ChatItem.PlanCard)}
+            else if(pendingEligible(i)) {flush();prun.add(i as ChatItem.PlanCard)}
+            else {flush();pflush();out.add(i)}
+        }
+        flush();pflush();out
     }
     val latestRows by rememberUpdatedState(rows)
     val latestUi by rememberUpdatedState(ui)
@@ -320,7 +339,44 @@ fun AssistantScreen(
                     // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
                     bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
-                items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; else -> it.hashCode() } }) { row ->
+                items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; is PendingHeader -> "ph:" + it.firstId; else -> it.hashCode() } }) { row ->
+                    if (row is PendingHeader) {
+                        val open = row.firstId in expandedPending
+                        val currency = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).currencyManager
+                        val currencyNow by currency.state.collectAsState()
+                        val plans = row.cards.mapNotNull { ui.plans[it.planId] }
+                        val amounts = plans.mapNotNull { it.plan.estimate?.amountUsd }
+                        Card(Modifier.fillMaxWidth().animateItem(), shape = NexusTokens.card) {
+                            Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("${row.cards.size} encargos pendientes de confirmar", style = MaterialTheme.typography.titleSmall)
+                                        Text(listOfNotNull(plans.map { it.plan.modelName }.distinct().joinToString(", ").takeIf { it.isNotBlank() },
+                                            if (amounts.size == plans.size && amounts.isNotEmpty()) remember(amounts, currencyNow) { currency.formatCost(amounts.sum()) } else "coste por confirmar").joinToString(" · "),
+                                            style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    TextButton(onClick = { expandedPending = if (open) expandedPending - row.firstId else expandedPending + row.firstId }) {
+                                        Text(if (open) "Resumir" else "Revisar y editar")
+                                    }
+                                }
+                                if (!open) plans.forEachIndexed { idx, pl ->
+                                    Row(Modifier.fillMaxWidth().clip(NexusTokens.thumbnail).clickable { expandedPending = expandedPending + row.firstId }.padding(vertical = NexusTokens.space4),
+                                        horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalAlignment = Alignment.Top) {
+                                        Text("${idx + 1}", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.width(18.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(pl.plan.prompt.ifBlank { "(sin prompt)" }, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                            val pics = pl.plan.media.filter { it.mimeType?.startsWith("video") != true && it.mimeType?.startsWith("audio") != true }
+                                            if (pics.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4), modifier = Modifier.padding(top = NexusTokens.space4)) {
+                                                items(pics.take(8)) { m -> AsyncImage(model = m.uri, contentDescription = "Imagen adjunta", contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.size(40.dp).clip(NexusTokens.thumbnail)) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return@items
+                    }
                     if (row is CardGroup) {
                         val tiles = row.cards.flatMap { c ->
                             val order = c.orderId?.let { ui.orders[it] } ?: return@flatMap emptyList<MosaicTile>()
@@ -1586,6 +1642,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
 
 private data class CardGroup(val cards: List<ChatItem.PlanCard>) { val key get() = "group:" + cards.first().id }
 private data class GroupHeader(val firstId: String, val count: Int)
+private data class PendingHeader(val firstId: String, val cards: List<ChatItem.PlanCard>)
 
 /** Los ajustes del asistente, abiertos desde Ajustes → Agente y modelos, con el mismo modelo de vista que el chat. */
 @Composable

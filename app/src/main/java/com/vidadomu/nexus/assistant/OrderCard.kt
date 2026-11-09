@@ -217,6 +217,16 @@ internal fun OrderCard(
                         Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                // Pendiente de confirmar: se ve qué se va a enviar (prompt e imágenes adjuntas) sin abrir la tarjeta.
+                if (order.status == OrderStatus.AWAITING_CONFIRMATION && !expanded) {
+                    if (plan.prompt.isNotBlank()) Text(plan.prompt, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().clickable { expanded = true })
+                    val pics = plan.media.filter { it.mimeType?.startsWith("video") != true && it.mimeType?.startsWith("audio") != true }
+                    if (pics.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+                        items(pics.take(8)) { m -> coil.compose.AsyncImage(model = m.uri, contentDescription = "Imagen adjunta", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.size(48.dp).clip(NexusTokens.thumbnail).clickable { expanded = true }) }
+                    }
+                }
                 // El resultado es el contenido: miniatura que abre el visor, sin botón aparte.
                 if (outputs.isNotEmpty() && (!compact || outputs.size > 1)) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     items(if (compact) outputs.drop(1) else outputs) { uri -> ResultThumb(uri, plan.modality, onOpenOutput, presentation.cardSize) }
