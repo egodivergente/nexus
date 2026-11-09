@@ -131,11 +131,17 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             }
             if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
                 contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8)) {
-                items(ui.pendingAttachments, key = { it.id }) { att -> Column {
+                items(ui.pendingAttachments, key = { it.id }) { att -> Box {
                     AttachmentTile(att) { onRemove(att.id) }
-                    if(onReorder!=null && ui.pendingAttachments.size>1) Row {
-                        IconButton(onClick={onReorder(att.id,-1)},enabled=ui.pendingAttachments.first().id!=att.id) {Icon(Icons.Default.ChevronLeft,"Mover adjunto antes")}
-                        IconButton(onClick={onReorder(att.id,1)},enabled=ui.pendingAttachments.last().id!=att.id) {Icon(Icons.Default.ChevronRight,"Mover adjunto después")}
+                    // Reordenar: dos botones pequeños sobre la propia miniatura (antes iban debajo, desalineados y sueltos).
+                    if(onReorder!=null && ui.pendingAttachments.size>1) Row(Modifier.align(Alignment.BottomCenter).padding(bottom=NexusTokens.space4),
+                        horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+                        val first=ui.pendingAttachments.first().id==att.id
+                        val last=ui.pendingAttachments.last().id==att.id
+                        if(!first) Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape).background(androidx.compose.ui.graphics.Color.Black.copy(alpha=.55f))
+                            .clickable {onReorder(att.id,-1)},contentAlignment=Alignment.Center) {Icon(Icons.Default.ChevronLeft,"Mover adjunto antes",tint=androidx.compose.ui.graphics.Color.White,modifier=Modifier.size(22.dp))}
+                        if(!last) Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape).background(androidx.compose.ui.graphics.Color.Black.copy(alpha=.55f))
+                            .clickable {onReorder(att.id,1)},contentAlignment=Alignment.Center) {Icon(Icons.Default.ChevronRight,"Mover adjunto después",tint=androidx.compose.ui.graphics.Color.White,modifier=Modifier.size(22.dp))}
                     }
                 }}
             }
