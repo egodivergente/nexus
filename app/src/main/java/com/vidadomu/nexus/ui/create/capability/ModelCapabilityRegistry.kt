@@ -229,8 +229,22 @@ internal object ModelCapabilityRegistry {
                     add(CapabilityConstraint(key, whenValues, required = true, otherwise = otherwise, conditionRequired = requiredWhen,
                         whenMinimumItems = minimumItems, whenMaximumItems = maximumItems))
                 }
+                // «Si X entonces no puede enviarse Y» (`then: {not: {required: [Y]}}`): Y queda oculto y fuera del envío mientras se cumpla X.
+                forbiddenFields(branch).forEach { key ->
+                    add(CapabilityConstraint(key, whenValues, hidden = true, otherwise = otherwise, conditionRequired = requiredWhen,
+                        whenMinimumItems = minimumItems, whenMaximumItems = maximumItems))
+                }
             }
         }
+    }
+
+    /** Campos que una rama prohíbe: solo la forma simple `not: {required: [...]}`; cualquier otra forma sigue siendo «no comprobable». */
+    private fun forbiddenFields(branch: JsonObject): List<String> {
+        val not = branch["not"] as? JsonObject ?: return emptyList()
+        if (not.keys != setOf("required")) return emptyList()
+        val list = not["required"] as? JsonArray ?: return emptyList()
+        if (list.any { it !is JsonPrimitive }) return emptyList()
+        return list.mapNotNull { (it as JsonPrimitive).contentOrNull }
     }
 
     /** Unsupported conditional operators stay explicit; this adapter does not claim full JSON Schema support. */
@@ -248,7 +262,8 @@ internal object ModelCapabilityRegistry {
                     (predicate["const"] == null && predicate["enum"] !is JsonArray && predicate["minItems"] == null && predicate["maxItems"] == null)
             } || condition?.keys?.any {it !in setOf("properties", "required", "description", "title")} == true ||
                 listOf("then", "else").mapNotNull {rule?.get(it) as? JsonObject}.any { branch ->
-                    branch.keys.any {it !in setOf("properties", "required", "description", "title")}
+                    branch.keys.any {it !in setOf("properties", "required", "description", "title", "not")} ||
+                        (branch["not"] != null && forbiddenFields(branch).isEmpty())
                 }) add("Hay una condición del contrato cuyo resultado no se puede comprobar todavía.")
         }
         fun simpleNullable(node: JsonObject): Boolean {
