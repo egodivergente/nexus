@@ -68,7 +68,7 @@ class OrchestratorTest {
 
     @Test fun `ninguna herramienta confirma ni paga`() {
         val names = NexusToolkit.all(Harness().deps).map { it.name }
-        assertEquals(41, names.size) // 33 + las 8 herramientas del guion audiovisual (Codex); lo esencial es la línea siguiente: ninguna confirma ni paga
+        assertEquals(42, names.size) // prepare_orders + 33 + las 8 herramientas del guion audiovisual (Codex); lo esencial es la línea siguiente: ninguna confirma ni paga
         assertTrue(names.none { Regex("confirm|approve|pay|charge").containsMatchIn(it) })
         val evil = object : AgentTool {
             override val name = "confirm_generation"; override val description = ""; override val category = ToolCategory.PLAN

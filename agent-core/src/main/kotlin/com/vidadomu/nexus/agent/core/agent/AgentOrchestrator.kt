@@ -545,6 +545,7 @@ class AgentOrchestrator(
 /** Texto corto y en español de lo que hace una herramienta, para mostrarlo mientras el agente trabaja. */
 internal fun toolActivity(name: String): String = when (name) {
     "get_model_schema", "get_model" -> "Consultando las características de un modelo"
+    "prepare_orders" -> "Preparando los encargos"
     "list_models", "search_models", "recommend_models" -> "Buscando modelos en el catálogo"
     "load_skill", "list_skills" -> "Cargando una skill"
     "view_library_asset", "inspect_image_quality" -> "Mirando un archivo de la biblioteca"
