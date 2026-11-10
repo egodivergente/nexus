@@ -64,12 +64,27 @@ fun OrderBook.turnContext(guard: SpendGuard, maxOrders: Int = 8): String? {
                 }
                 appendLine()
             }
+            // Para «lo mismo pero…»: modelo, parámetros, archivos y prompt de los encargos más recientes, sin otra consulta.
+            val recent = live.take(4).mapNotNull { o -> guard.plan(o.planId)?.let { o to it } }
+            if (recent.isNotEmpty()) {
+                appendLine("Detalle de los últimos encargos (para repetirlos o variarlos con prepare_orders):")
+                var lastPrompt: String? = null
+                recent.forEach { (o, plan) ->
+                    append("- ").append(o.id).append(": model_id=").append(plan.ref.modelId).append("; provider_id=").append(plan.ref.providerId)
+                    if (plan.params.isNotEmpty()) append("; params=").append(plan.params.entries.joinToString(",") { "${it.key}=${it.value}" })
+                    if (plan.media.isNotEmpty()) append("; media=").append(plan.media.joinToString(",") { m -> "${m.role}:" + (m.assetId?.let { "asset_id=$it" } ?: "sin id") })
+                    val prompt = plan.prompt.trim()
+                    if (prompt.isNotEmpty()) append("; prompt=").append(if (prompt == lastPrompt) "(el mismo que el anterior)" else "«${prompt.take(900)}»")
+                    lastPrompt = prompt
+                    appendLine()
+                }
+            }
         }
         if (fresh.isNotEmpty()) {
             appendLine("Novedades desde tu último mensaje:")
             fresh.forEach { e -> appendLine("- ${e.orderId}: ${e.kind.name.lowercase()} (${e.actor.name.lowercase()}) ${e.detail}") }
         }
-        append("Usa get_ui_state para el detalle. Corrige con update_plan(order_id) sin crear encargos nuevos. ")
+        append("get_ui_state solo hace falta para errores del proveedor o un historial más largo. Corrige con update_plan(order_id) sin crear encargos nuevos. ")
         append("No digas que algo se envió, está generando o terminó si su estado no lo indica.")
     }
 }

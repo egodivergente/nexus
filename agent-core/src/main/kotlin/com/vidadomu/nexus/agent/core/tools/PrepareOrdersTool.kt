@@ -79,6 +79,8 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
         // 2) Cada encargo pasa por el mismo camino validado que prepare_generation, de uno en uno (comparten estado).
         val prepare = PrepareGenerationTool(d)
         val events = mutableListOf<UiEvent>()
+        val lines = mutableListOf<String>()
+        var total = 0.0; var unknownCost = false
         val seenModels = mutableSetOf<String>()
         var ready = 0
         val results = buildJsonArray {
@@ -106,7 +108,14 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
                 }
                 val outcome = prepare.run(call, session)
                 events += outcome.events
-                if (!outcome.isError) ready++
+                if (!outcome.isError) {
+                    ready++
+                    val plan = (outcome.result as? JsonObject)?.str("order_id")?.let { d.orders.get(it) }?.let { d.guard.plan(it.planId) }
+                    val cost = plan?.estimate?.amountUsd
+                    if (cost != null) total += cost else unknownCost = true
+                    lines += "- **${item.model.name}**" + (plan?.params?.takeIf { it.isNotEmpty() }?.let { p -> ": " + p.entries.joinToString(", ") { "${it.key} ${it.value}" } } ?: "") +
+                        " · " + (cost?.let { usd(it) } ?: "coste por confirmar") + notes.joinToString("") { " · $it" }
+                }
                 add(buildJsonObject {
                     put("model_id", item.model.ref.modelId); put("ok", !outcome.isError)
                     if (notes.isNotEmpty()) put("adaptations", strings(notes))
@@ -127,6 +136,14 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
         val failed = items.size - ready
         val summary = buildJsonObject {
             put("prepared", ready); put("failed", failed); put("orders", results)
+            // Con todo preparado, este texto ES la respuesta al usuario: el turno termina sin otra llamada al modelo.
+            if (failed == 0) put("summary_for_user", buildString {
+                appendLine(if (ready == 1) "Preparado 1 encargo:" else "Preparados $ready encargos:")
+                lines.forEach { appendLine(it) }
+                appendLine()
+                if (ready > 1) appendLine("Coste estimado total: **${usd(total)}**" + if (unknownCost) " (sin contar los que están por confirmar)." else ".")
+                append("Nada se ha enviado todavía. Revisa las tarjetas y pulsa **GENERAR**.")
+            })
             put("next", when {
                 failed == 0 -> "Las $ready tarjetas están PREPARADAS, no enviadas. Resume al usuario qué has preparado y cualquier adaptación (formato o referencias recortadas). El envío solo ocurre cuando pulse GENERAR."
                 ready == 0 -> "Ningún encargo quedó preparado. Corrige con los «issues» y el «schema» devueltos y vuelve a llamar a prepare_orders solo con los que fallaron."
@@ -180,6 +197,7 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
 
     companion object {
         const val MAX_ORDERS = 20
+        private fun usd(v: Double) = String.format(java.util.Locale.US, "%.4f", v).trimEnd('0').trimEnd('.').replace('.', ',') + " USD"
         private val RATIO_KEYS = setOf("aspect_ratio", "aspectRatio", "ratio")
         private val SIZE_KEYS = setOf("size", "image_size", "resolution")
         private val DIMENSIONS = Regex("""(\d{2,5})\s*[x*×]\s*(\d{2,5})""")

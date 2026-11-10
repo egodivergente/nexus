@@ -81,4 +81,28 @@ class PrepareOrdersTest {
         val out = PrepareOrdersTool(h.deps).run(call("""{"prompt":"x","orders":[{"model_id":"no/existe"}]}"""), s)
         assertTrue(out.isError); assertTrue(h.guard.plans().isEmpty()); assertTrue(out.events.isEmpty())
     }
+
+    @Test fun `un lote preparado cierra el turno en una sola llamada al modelo y el siguiente turno ya trae su detalle`() = runTest {
+        val h = harness(); val att = (0 until 2).map { Attachment("ref$it", "file:///ref$it.png", "image/png") }
+        val llm = com.vidadomu.nexus.agent.core.llm.ScriptedLlmProvider(listOf(
+            { _ -> com.vidadomu.nexus.agent.core.llm.ScriptedLlmProvider.tools(use("p1", "prepare_orders", """{"prompt":"Selfie de Mateo en el Templo de Debod","aspect_ratio":"16:9",
+                "media":[${refs(2)}],"orders":[{"model_id":"${editA.modelId}"},{"model_id":"${editB.modelId}"}]}""")) },
+            { r ->
+                // Segundo turno («ahora en el Retiro»): el contexto ya trae modelo, parámetros y prompt; no hace falta get_ui_state.
+                val ctx = r.system.joinToString("\n") + r.messages.joinToString("\n") { m -> m.content.filterIsInstance<com.vidadomu.nexus.agent.core.llm.ContentBlock.Text>().joinToString { it.text } }
+                assertTrue("model_id=${editA.modelId}" in ctx, ctx.takeLast(1500)); assertTrue("Templo de Debod" in ctx); assertTrue("aspect_ratio=16:9" in ctx)
+                com.vidadomu.nexus.agent.core.llm.ScriptedLlmProvider.text("Entendido: preparo la misma idea en el Retiro cuando me confirmes los modelos.")
+            },
+        ))
+        val o = com.vidadomu.nexus.agent.core.agent.AgentOrchestrator(llm, com.vidadomu.nexus.agent.core.config.AgentConfig(provider = "scripted", modelId = "test-model",
+            region = "eu-west-1", endpoint = "http://proxy", maxToolRounds = 4), NexusToolkit.all(h.deps), h.skills, h.assets,
+            uiContext = { h.deps.orders.turnContext(h.guard) }, verifiedOrders = { h.deps.orders.all() })
+        val conv = o.newConversation(mode = AgentMode.AGENT)
+        val first = o.send(conv, "Hazme un selfie en Debod con dos modelos en 16:9", att)
+        assertEquals(1, llm.requests.size, "una sola llamada al modelo")
+        assertTrue(first.text.startsWith("Preparados 2 encargos"), first.text); assertTrue("GENERAR" in first.text)
+        assertEquals(2, h.guard.plans().size); assertTrue(h.backend.submitted.isEmpty())
+        val second = o.send(conv, "ahora en el retiro")
+        assertEquals(2, llm.requests.size); assertTrue("Retiro" in second.text)
+    }
 }

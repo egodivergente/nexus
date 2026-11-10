@@ -27,6 +27,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -354,6 +355,11 @@ class AgentOrchestrator(
             conv.messages += LlmMessage(Role.USER, results + loaded)
             rounds++
             if (response.stopReason == StopReason.MAX_TOKENS) { stop = "MAX_TOKENS"; break }
+            // Lote preparado al completo: el resumen lo escribe el código con los datos verificados, sin otra ronda del modelo.
+            if (uses.size == 1 && uses[0].name == "prepare_orders" && results.none { it.isError } && loaded.isEmpty()) {
+                val summary = ((results.single().content as? JsonObject)?.get("summary_for_user") as? JsonPrimitive)?.takeIf { it.isString }?.content
+                if (!summary.isNullOrBlank()) { turnTexts += summary; onEvent(UiEvent.StreamingText(summary)); stop = "END_TURN"; break }
+            }
             // Botones de respuesta junto al texto final: el turno ya está contestado y no hace falta otra llamada
             // al modelo. El resultado queda en el historial, así que el siguiente mensaje sigue siendo válido.
             // Si ese texto contradice el estado verificado, se sigue como antes para no saltarse la autocorrección.
@@ -530,7 +536,7 @@ class AgentOrchestrator(
     /** Mensaje con el que empieza un turno del usuario. Tras suggest_replies, su texto va fusionado detrás del resultado. */
     private fun startsTurn(m: List<LlmMessage>, i: Int) = isPlainUser(m[i]) || (m[i].role == Role.USER && i > 0 &&
         m[i].content.any { it !is ContentBlock.ToolResult } &&
-        m[i - 1].toolUses().let { uses -> uses.isNotEmpty() && uses.all { it.name in TERMINAL_TOOLS } })
+        m[i - 1].toolUses().let { uses -> uses.isNotEmpty() && uses.all { it.name in TERMINAL_TOOLS || it.name == "prepare_orders" } })
 
     companion object {
         const val VIDEO_FRAMES_PER_ATTACHMENT = 6
