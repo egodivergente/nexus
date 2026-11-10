@@ -47,8 +47,8 @@ class PrepareOrdersTest {
         assertEquals(10, plans.getValue(editA).media.size); assertEquals(4, plans.getValue(editB).media.size)
         assertEquals("file:///ref0.png", plans.getValue(editB).media.first().uri)
         assertTrue(orders(out).all { o -> o["adaptations"]!!.jsonArray.any { "como máximo" in it.jsonPrimitive.content } })
-        // Un schema por modelo y nada enviado.
-        assertEquals(2, h.registry.schemaCalls); assertTrue(h.backend.submitted.isEmpty())
+        // Dos lecturas por modelo (la del lote y la del validador; en la app la segunda sale de la caché) y nada enviado.
+        assertEquals(4, h.registry.schemaCalls); assertTrue(h.backend.submitted.isEmpty())
     }
 
     @Test fun `un modelo que falla no impide los demas y devuelve su schema para corregirlo`() = runTest {
