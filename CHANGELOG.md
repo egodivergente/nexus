@@ -2,6 +2,18 @@
 
 Todos los cambios relevantes de **Nexus Agent** (Android) y **Nexus Studio** (Windows) se documentan en este archivo.
 
+## [Sin publicar]
+
+### Añadido
+- Jerarquía visual en las respuestas del agente, traducida por la app al tema claro/oscuro (el modelo no elige colores ni tamaños): recuadros `:::tldr`, `:::tip`, `:::warn`, `:::decision` y `:::result` con icono y etiqueta, y resaltado `==texto==` (máximo 2 por respuesta).
+- Paneles interactivos en un bloque ` ```nexus-ui `: encuesta (con descripciones y multiselección), pasos que el usuario va tachando y comparación de 2-6 opciones. Lo que se toca llega al agente como el siguiente mensaje del usuario; el panel no ejecuta nada, no gasta y no sustituye a `suggest_replies` (que sigue siendo la vía para elegir entre 2-4 opciones) ni a la tarjeta de coste. Tras responder, el panel se bloquea y marca lo elegido.
+- Skill `response_craft` con la gramática, los límites y cuándo no usar un panel; el prompt solo suma dos líneas y remite a ella.
+- Windows: los recuadros y el resaltado se pintan en el chat; los paneles se muestran como tarjeta de solo lectura (sin interacción en esta edición).
+
+### Estado
+- Verificado: el parser y los límites con la suite del núcleo (230 pruebas en JVM, 9 nuevas) y la compilación de `DesktopAgent.kt`.
+- Sin verificar: la interfaz de Android (`ChatMarkdownView.kt`, `ChatWidgetsView.kt`, `AssistantScreen.kt`) no se ha compilado ni probado en un dispositivo; no se ha subido versión ni generado APK.
+
 ## [1.9.29-agent] - 2026-10-17
 
 ### Cambiado

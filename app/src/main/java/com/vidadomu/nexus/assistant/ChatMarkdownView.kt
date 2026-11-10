@@ -10,13 +10,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontFamily
@@ -25,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidadomu.nexus.agent.core.chat.CalloutKind
 import com.vidadomu.nexus.agent.core.chat.ChatMarkdown
 import com.vidadomu.nexus.agent.core.chat.ListItem
 import com.vidadomu.nexus.agent.core.chat.MdBlock
@@ -38,6 +44,7 @@ private data class MdStyles(
     val soft: Color,
     val muted: Color,
     val accent: Color,
+    val mark: Color,
     val codeBg: Color,
     val line: Color,
     val heading: TextStyle,
@@ -54,6 +61,7 @@ private fun mdStyles(): MdStyles {
         soft = cs.onSurface,
         muted = cs.onSurfaceVariant,
         accent = cs.onSurfaceVariant,
+        mark = cs.primary.copy(alpha = 0.22f),
         codeBg = cs.background.copy(alpha = 0.72f),
         line = cs.outlineVariant,
         heading = ty.titleMedium,
@@ -67,14 +75,18 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
         val style = SpanStyle(
             color = when {
                 sp.code || sp.link != null || accentLead -> st.accent
-                sp.bold -> st.ink
+                sp.bold || sp.mark -> st.ink
                 else -> Color.Unspecified
             },
-            fontWeight = if (sp.bold) FontWeight.SemiBold else null,
+            fontWeight = if (sp.bold || sp.mark) FontWeight.SemiBold else null,
             fontStyle = if (sp.italic) FontStyle.Italic else null,
             fontFamily = if (sp.code) FontFamily.Monospace else null,
             fontSize = if (sp.code) st.body.fontSize else androidx.compose.ui.unit.TextUnit.Unspecified,
-            background = if (sp.code) st.accent.copy(alpha = 0.12f) else Color.Unspecified,
+            background = when {
+                sp.code -> st.accent.copy(alpha = 0.12f)
+                sp.mark -> st.mark
+                else -> Color.Unspecified
+            },
             textDecoration = when {
                 sp.strike -> TextDecoration.LineThrough
                 sp.link != null -> TextDecoration.Underline
@@ -87,31 +99,46 @@ private fun annotated(spans: List<MdSpan>, st: MdStyles, leadAccent: Boolean = f
     }
 }
 
-/** Mensaje del asistente con jerarquía tipográfica; nunca muestra marcas de markdown crudas. */
+/**
+ * Mensaje del asistente con jerarquía tipográfica; nunca muestra marcas de markdown crudas.
+ * [streaming]: el texto sigue llegando (los paneles a medias no se enseñan). [answered]: lo que el usuario contestó
+ * después de este mensaje; bloquea los paneles interactivos y marca lo elegido. [onReply] envía una respuesta y
+ * devuelve si se envió; null deja los paneles en solo lectura.
+ */
 @Composable
-fun ChatMarkdownView(text: String, modifier: Modifier = Modifier) {
+fun ChatMarkdownView(
+    text: String,
+    modifier: Modifier = Modifier,
+    streaming: Boolean = false,
+    answered: String? = null,
+    onReply: ((String) -> Boolean)? = null,
+) {
     val st = mdStyles()
-    val blocks = remember(text) { ChatMarkdown.parse(text) }
-    SelectionContainer(modifier) {
-        Column {
-            blocks.forEachIndexed { i, b ->
-                val prev = blocks.getOrNull(i - 1)
-                val gap = when {
-                    i == 0 -> 0.dp
-                    b is MdBlock.Heading && b.level <= 2 -> NexusTokens.space16
-                    b is MdBlock.Heading -> NexusTokens.space16
-                    prev is MdBlock.Heading -> NexusTokens.space8
-                    else -> NexusTokens.space12
-                }
-                Spacer(Modifier.height(gap))
-                MdBlockView(b, st)
+    val blocks = remember(text, streaming) { ChatMarkdown.parse(text, streaming) }
+    val ctx = remember(answered, onReply) { WidgetCtx(answered, onReply) }
+    SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
+}
+
+@Composable
+private fun MdBlockList(blocks: List<MdBlock>, st: MdStyles, ctx: WidgetCtx) {
+    Column {
+        blocks.forEachIndexed { i, b ->
+            val prev = blocks.getOrNull(i - 1)
+            val gap = when {
+                i == 0 -> 0.dp
+                b is MdBlock.Heading && b.level <= 2 -> NexusTokens.space16
+                b is MdBlock.Heading -> NexusTokens.space16
+                prev is MdBlock.Heading -> NexusTokens.space8
+                else -> NexusTokens.space12
             }
+            Spacer(Modifier.height(gap))
+            MdBlockView(b, st, ctx)
         }
     }
 }
 
 @Composable
-private fun MdBlockView(b: MdBlock, st: MdStyles) {
+private fun MdBlockView(b: MdBlock, st: MdStyles, ctx: WidgetCtx) {
     when (b) {
         is MdBlock.Heading -> if (b.level <= 2) {
             Text(annotated(b.spans, st), style = st.heading, color = st.ink)
@@ -127,7 +154,35 @@ private fun MdBlockView(b: MdBlock, st: MdStyles) {
         }
         is MdBlock.Code -> MdCodeBlock(b, st)
         is MdBlock.Table -> MdTable(b, st)
+        is MdBlock.Callout -> if (b.blocks.isNotEmpty()) MdCallout(b, st, ctx)
+        is MdBlock.Widget -> MdWidget(b.spec, ctx)
         MdBlock.Rule -> HorizontalDivider(Modifier.padding(vertical = NexusTokens.space4), thickness = 1.dp, color = st.line)
+    }
+}
+
+private class CalloutLook(val tone: Color, val icon: ImageVector, val label: String)
+
+/** Recuadro semántico: el color sale del tema (claro/oscuro) y siempre va con icono y etiqueta, nunca solo color. */
+@Composable
+private fun MdCallout(b: MdBlock.Callout, st: MdStyles, ctx: WidgetCtx) {
+    val cs = MaterialTheme.colorScheme
+    val look = when (b.kind) {
+        CalloutKind.TLDR -> CalloutLook(cs.primary, Icons.Default.AutoAwesome, "En breve")
+        CalloutKind.TIP -> CalloutLook(cs.tertiary, Icons.Default.Info, "Consejo")
+        CalloutKind.WARN -> CalloutLook(cs.error, Icons.Outlined.WarningAmber, "Ojo")
+        CalloutKind.DECISION -> CalloutLook(cs.primary, Icons.Default.Tune, "Decisión")
+        CalloutKind.RESULT -> CalloutLook(cs.tertiary, Icons.Default.Check, "Resultado")
+    }
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(NexusTokens.field).background(look.tone.copy(alpha = 0.09f))) {
+        Box(Modifier.width(3.dp).fillMaxHeight().background(look.tone))
+        Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(look.icon, null, Modifier.size(16.dp), tint = look.tone)
+                Spacer(Modifier.width(NexusTokens.space4))
+                Text(look.label, style = st.label, color = look.tone)
+            }
+            MdBlockList(b.blocks, st, ctx)
+        }
     }
 }
 
