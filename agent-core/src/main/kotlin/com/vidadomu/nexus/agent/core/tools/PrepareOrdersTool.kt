@@ -119,6 +119,7 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
                     } else {
                         body?.get("order_id")?.let { put("order_id", it) }
                         body?.get("plan")?.let { put("plan", it) }
+                        body?.get("model_guidance")?.let { put("model_guidance", it) }
                     }
                 })
             }

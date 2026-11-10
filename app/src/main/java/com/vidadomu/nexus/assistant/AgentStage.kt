@@ -206,7 +206,9 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
                 HorizontalPager(pager, Modifier.fillMaxSize(), key = { results[it].id }) { page ->
-                    Box(Modifier.fillMaxSize().padding(horizontal = NexusTokens.space8), contentAlignment = Alignment.Center) {
+                    // Una imagen se abre ya a tamaño completo y con zoom: sin el paso intermedio de «Ampliar».
+                    if (results[page].mimeType.startsWith("image/")) ZoomableImage(results[page], Modifier.padding(top = 56.dp, bottom = 40.dp))
+                    else Box(Modifier.fillMaxSize().padding(horizontal = NexusTokens.space8), contentAlignment = Alignment.Center) {
                         AssistantMediaPreview(results[page])
                     }
                 }

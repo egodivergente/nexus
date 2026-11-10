@@ -544,14 +544,15 @@ fun AssistantScreen(
             storySelection?.takeIf { selection -> selection.projectId == ui.activeProjectId && storyIndex.projects.any { it.id == selection.projectId && !it.archived } }?.let { selection ->
                 val scene=storyIndex.scenes.firstOrNull {it.id==selection.sceneId}
                 val shot=storyIndex.shots.firstOrNull {it.id==selection.shotId}
-                Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.thumbnail,modifier=Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=4.dp)) {
+                // Pastilla compacta: indica que el agente está trabajando sobre ese guion; la ✕ lo desvincula.
+                Surface(color=MaterialTheme.colorScheme.surfaceContainerHigh,shape=NexusTokens.pill,modifier=Modifier.padding(horizontal=12.dp,vertical=2.dp).widthIn(max=260.dp).height(36.dp)) {
                     Row(Modifier.padding(start=10.dp),verticalAlignment=Alignment.CenterVertically) {
-                        Icon(Icons.Default.MovieFilter,null,Modifier.size(18.dp))
-                        Column(Modifier.weight(1f).padding(horizontal=8.dp).clickable {showProject=true}) {
+                        Icon(Icons.Default.MovieFilter,"Guion vinculado",Modifier.size(16.dp))
+                        Column(Modifier.weight(1f,fill=false).padding(horizontal=6.dp).clickable {showProject=true}) {
                             Text(listOfNotNull(scene?.title ?: scene?.code,shot?.title ?: shot?.code).joinToString(" › ").ifBlank {ui.projects.firstOrNull {it.id==selection.projectId}?.name ?: "Proyecto"},style=MaterialTheme.typography.labelMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text("${if(selection.mode=="direct") "Cambios directos" else "Propuestas"} · ${when {selection.blockId!=null->"fragmento";selection.shotId!=null->"plano";selection.sceneId!=null->"escena";else->"proyecto"}}${if(selection.preserveIds.isNotEmpty()) " · ${selection.preserveIds.size} fijados" else ""}",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
+                            // (el detalle «Propuestas · proyecto» se ve al tocar la pastilla; aquí solo el nombre)
                         }
-                        IconButton(onClick={com.vidadomu.nexus.assistant.story.StorySelectionStore.clear()}) {Icon(Icons.Default.Close,"Quitar contexto audiovisual",Modifier.size(18.dp))}
+                        IconButton(onClick={com.vidadomu.nexus.assistant.story.StorySelectionStore.clear()},modifier=Modifier.size(36.dp)) {Icon(Icons.Default.Close,"Desvincular el guion",Modifier.size(16.dp))}
                     }
                 }
             }

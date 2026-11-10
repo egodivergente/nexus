@@ -2,6 +2,10 @@ package com.vidadomu.nexus.assistant
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -21,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -51,6 +56,38 @@ internal fun AssistantImagePreview(media: Attachment) {
         com.vidadomu.nexus.ui.components.NexusTonalAction("Ampliar", { opened = true }, icon = Icons.Default.ZoomIn, description = "Ampliar imagen")
     }
     if (opened) AssistantImageForeground(media) { opened = false }
+}
+
+/**
+ * Imagen a todo el espacio disponible, con zoom por pellizco y doble toque. Con un dedo y sin zoom no consume el gesto,
+ * así que dentro de un paginador se puede seguir pasando de una imagen a otra.
+ */
+@Composable
+internal fun ZoomableImage(media: Attachment, modifier: Modifier = Modifier) {
+    var scale by remember(media.uri) { mutableFloatStateOf(1f) }
+    var offset by remember(media.uri) { mutableStateOf(Offset.Zero) }
+    var box by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    AsyncImage(model = media.uri, contentDescription = media.name ?: "Imagen", contentScale = ContentScale.Fit,
+        modifier = modifier.fillMaxSize().clipToBounds().onSizeChanged { box = it }
+            .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y }
+            .pointerInput(media.uri) { detectTapGestures(onDoubleTap = { scale = if (scale > 1f) 1f else 2.5f; offset = Offset.Zero }) }
+            .pointerInput(media.uri) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val fingers = event.changes.count { it.pressed }
+                        if (fingers >= 2 || scale > 1.01f) {
+                            scale = boundedImageScale(scale * event.calculateZoom())
+                            val maxX = box.width * (scale - 1f) / 2f
+                            val maxY = box.height * (scale - 1f) / 2f
+                            val next = offset + event.calculatePan()
+                            offset = Offset(next.x.coerceIn(-maxX, maxX), next.y.coerceIn(-maxY, maxY))
+                            event.changes.forEach { it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            })
 }
 
 /**
