@@ -3,6 +3,8 @@
 Para quien continúe (Codex u otro agente). Rama: `feat/nexus-cut-20261111`. No trabajar sobre `main` (va muy atrás) ni sobre `feat/flow-live-20261108` (es la base vc204, no se toca).
 Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS.md`.
 
+**Trabajo posterior solicitado por Vidal:** pestaña propia de Cut, editor oscuro y chat integrado; estado actual en `docs/NEXUS-CUT-CHAT.md`. Esa petición sustituye la decisión inicial de acceso sin pestaña descrita en la secuencia histórica de abajo.
+
 **Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada al S25 por Tailscale con hashes comprobados e instalación confirmada por Vidal. Después, por petición expresa de Vidal, el recorrido funcional se ejecutó por ADB en el **Pixel 8 Pro físico**: Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproduciéndose en Biblioteca. PASS en Pixel; no se atribuye esa prueba al S25.
 
 ## Estado verificado
@@ -24,7 +26,7 @@ Estos archivos se compilaron por primera vez el 11/11/2026 en AXELPC, sobre `d68
 - `app/.../cut/NexusCut.kt` — espacio de trabajo único (`files/cut/projects`), implementación Android de `CutLibrary` y `CutRenderer`, `openWith()` (reutiliza el montaje del proyecto/escena, nunca duplica) y canal `openRequests`.
 - `app/.../ui/cut/` — `CutEditorViewModel`, `CutEditorScreen`, `CutTimelineCanvas` + `CutTimelineGeometry` (de Corte), `CutPalette` (colores del tema activo).
 
-## Secuencia del hito B (estado de ejecución al final)
+## Secuencia original del hito B (completada; acceso actualizado después)
 
 1. **Compilar** en AXELPC: `C:\Users\User\nexus-flow-live\build-cut.ps1 -Tasks :cut-core:test,:agent-core:test,:app:assembleAgentPreview -Tag cut-b1` (deja `RESULTADO:` al final de `C:\Users\User\nexus-cut-b1-build.log`). Corregir errores de compilación de `app/.../cut` y `ui/cut`.
 2. **Manifest** (`app/src/main/AndroidManifest.xml`): añadir

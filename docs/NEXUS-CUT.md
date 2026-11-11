@@ -11,6 +11,10 @@ Editor multipista dentro de la APK de Nexus, manejable a mano y por el agente po
 
 Rama de trabajo: `feat/nexus-cut-20261111`.
 
+## Acceso y agente dentro del editor — actualización 11/11/2026
+
+Por petición posterior de Vidal, Nexus Cut tiene una sección propia en la barra inferior. Su estantería abre los montajes y el editor conserva la ruta inmersiva. El editor usa una apariencia oscura local y un chat persistente por montaje, separado del chat principal. Las órdenes quedan vinculadas al montaje y pasan por la misma sesión; la exportación del chat usa una capacidad JOB local. Detalles y validación: `docs/NEXUS-CUT-CHAT.md`.
+
 ## Camino único
 
 ```

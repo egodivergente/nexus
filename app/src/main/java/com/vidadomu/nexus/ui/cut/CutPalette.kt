@@ -4,9 +4,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import com.vidadomu.nexus.ui.theme.LocalNexusAppearance
+import com.vidadomu.nexus.ui.theme.LocalNexusVisuals
+import com.vidadomu.nexus.ui.theme.NexusAppearance
+import com.vidadomu.nexus.ui.theme.NexusThemeSpecs
+
+/** A neutral editing room keeps the image readable without changing the user's app theme. */
+@Composable
+internal fun CutEditorTheme(content: @Composable () -> Unit) {
+    val appearance = NexusAppearance.OBSIDIAN
+    val scheme = NexusThemeSpecs.forAppearance(appearance).colors.copy(
+        primary = Color(0xFF6AE4CE), onPrimary = Color(0xFF07251F),
+        primaryContainer = Color(0xFF173B34), onPrimaryContainer = Color(0xFFB8F6E8),
+        background = Color(0xFF0B0D0F), surface = Color(0xFF15171A),
+        surfaceContainer = Color(0xFF1A1D21), surfaceContainerLow = Color(0xFF121416),
+        surfaceContainerHigh = Color(0xFF24282D), surfaceContainerLowest = Color(0xFF0B0D0F),
+    )
+    CompositionLocalProvider(LocalNexusAppearance provides appearance,
+        LocalNexusVisuals provides NexusThemeSpecs.visuals(appearance)) {
+        MaterialTheme(colorScheme = scheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes, content = content)
+    }
+}
 
 /**
  * Colores de la línea de tiempo derivados del tema activo de Nexus (Aurora, OLED, Cuarzo…). Los tipos de

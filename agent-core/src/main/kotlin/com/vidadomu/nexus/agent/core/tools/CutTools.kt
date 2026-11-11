@@ -26,12 +26,15 @@ import kotlinx.serialization.json.put
 object CutTools {
     fun all(w: CutWorkspace): List<AgentTool> = listOf(CutCatalogTool(w), CutDescribeTool(w), CutReadTool(w), CutEditTool(w), CutCreateTool(w))
 
+    /** Herramientas de la conversación de un montaje: la navegación nunca cambia su destino. */
+    fun forProject(w: CutWorkspace, projectId: String): List<AgentTool> = boundCutTools(w, projectId)
+
     /** Una línea para el contexto del turno cuando hay un montaje abierto; null si no lo hay. */
-    fun context(w: CutWorkspace): String? {
-        val s = w.current()?.state?.value ?: return null
+    fun context(w: CutWorkspace, projectId: String? = null): String? {
+        val s = (if (projectId == null) w.current() else w.opened(projectId))?.state?.value ?: return null
         val p = s.project
         return "Montaje abierto en Nexus Cut: «${p.name}» (project_id=${p.id}, revisión ${p.revision}, ${p.timeline.durationUs / 1000} ms, " +
-            "${p.timeline.allTracks.sumOf { it.clips.size }} clips, cabezal en ${s.view.playheadUs / 1000} ms" +
+            "${p.timeline.allTracks.sumOf { it.clips.size }} clips, cabezal en ${s.view.playheadUs / 1000} ms (playhead_us=${s.view.playheadUs})" +
             (if (s.view.selection.isEmpty()) "" else ", seleccionados: ${s.view.selection.joinToString()}") + "). Se edita con cut_edit; el detalle, con cut_read."
     }
 

@@ -10,6 +10,7 @@ import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.cut.NexusCut
 import com.vidadomu.nexus.cut.command.CutSession
 import com.vidadomu.nexus.cut.command.CutState
+import com.vidadomu.nexus.cut.command.CutEvent
 import com.vidadomu.nexus.cut.command.ErrorCode
 import com.vidadomu.nexus.cut.command.Op
 import com.vidadomu.nexus.cut.command.Origin
@@ -84,6 +85,8 @@ class CutEditorViewModel(app: Application, val projectId: String) : AndroidViewM
     val messages: SharedFlow<CutMessage> = _messages.asSharedFlow()
 
     val export: StateFlow<ExportState> = ExportManager.state
+    private val _agentActivity = MutableStateFlow<String?>(null)
+    val agentActivity: StateFlow<String?> = _agentActivity.asStateFlow()
 
     private var lastPushedPlayhead = -1L
 
@@ -97,6 +100,18 @@ class CutEditorViewModel(app: Application, val projectId: String) : AndroidViewM
             workspace.setActive(projectId)
             _session.value = s
             launch { s.state.collect { st -> onState(st) } }
+            launch {
+                s.events.collect { event ->
+                    if (event.origin == Origin.AGENT) {
+                        _agentActivity.value = when (event) {
+                            is CutEvent.Committed -> "Agente · ${event.label}"
+                            is CutEvent.Undone -> "Agente · Deshacer: ${event.label}"
+                            is CutEvent.Redone -> "Agente · Rehacer: ${event.label}"
+                            is CutEvent.Rejected -> "No aplicado · ${event.error.message}"
+                        }
+                    }
+                }
+            }
             // El cabezal de la reproducción manda mientras se ve: se publica en la sesión para que el agente sepa dónde está «aquí».
             launch { preview.positionUs.collect { us -> lastPushedPlayhead = us; s.setPlayhead(us) } }
             launch { preview.playing.collect { s.setPlaying(it) } }

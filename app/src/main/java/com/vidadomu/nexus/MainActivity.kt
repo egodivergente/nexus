@@ -70,6 +70,7 @@ import com.vidadomu.nexus.ui.navigation.NotificationNavigation
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
 import com.vidadomu.nexus.cut.NexusCut
 import com.vidadomu.nexus.ui.cut.CutEditorScreen
+import com.vidadomu.nexus.ui.cut.CutHomeScreen
 import com.vidadomu.nexus.ui.settings.SettingsScreen
 import com.vidadomu.nexus.ui.theme.BackgroundDark
 import com.vidadomu.nexus.ui.theme.ScreenBackground
@@ -342,6 +343,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                            Screen.Cut -> CutHomeScreen(isActive = pager.currentPage == index)
                             Screen.Library -> {
                             LibraryScreen(
                                 onOpenHistory={navController.navigate(Screen.Generations.route)},

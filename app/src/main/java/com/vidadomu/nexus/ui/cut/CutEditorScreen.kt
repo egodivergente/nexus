@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.ui.cut
 
 import android.app.Application
+import android.content.res.Configuration
 import android.net.Uri
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -85,6 +87,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,7 +96,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -131,10 +137,12 @@ fun CutEditorScreen(projectId: String, onBack: () -> Unit, onOpenLibraryAsset: (
     val context = LocalContext.current
     val app = context.applicationContext as Application
     val vm: CutEditorViewModel = viewModel(key = "cut-$projectId", factory = CutEditorViewModel.Factory(app, projectId))
+    val chat: CutChatViewModel = viewModel(key = "cut-chat-$projectId", factory = CutChatViewModel.Factory(app, projectId))
     val state by vm.state.collectAsState()
     val loadError by vm.loadError.collectAsState()
     BackHandler(onBack = onBack)
     val st = state
+    CutEditorTheme {
     if (st == null) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             if (loadError != null) Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -142,15 +150,16 @@ fun CutEditorScreen(projectId: String, onBack: () -> Unit, onOpenLibraryAsset: (
                 TextButton(onClick = onBack) { Text("Volver") }
             } else CircularProgressIndicator()
         }
-        return
+    } else {
+        CutEditor(vm, chat, onBack, onOpenLibraryAsset)
     }
-    CutEditor(vm, onBack, onOpenLibraryAsset)
+    }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @UnstableApi
 @Composable
-private fun CutEditor(vm: CutEditorViewModel, onBack: () -> Unit, onOpenLibraryAsset: (String) -> Unit) {
+private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: () -> Unit, onOpenLibraryAsset: (String) -> Unit) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val haptics = rememberNexusHaptics()
@@ -173,6 +182,11 @@ private fun CutEditor(vm: CutEditorViewModel, onBack: () -> Unit, onOpenLibraryA
     val ripple by vm.ripple.collectAsState()
     val snapping by vm.snapping.collectAsState()
     val export by vm.export.collectAsState()
+    val agentActivity by vm.agentActivity.collectAsState()
+    val chatState by chat.ui.collectAsState()
+    var chatExpanded by rememberSaveable(vm.projectId) { mutableStateOf(true) }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val viewport = remember { TimelineViewport() }
     val snackbar = remember { SnackbarHostState() }
     val media = remember(project.media) { project.media.associateBy { it.id } }
@@ -201,132 +215,184 @@ private fun CutEditor(vm: CutEditorViewModel, onBack: () -> Unit, onOpenLibraryA
         vm.importAssets(ids)
     }
 
-    Surface(Modifier.fillMaxSize(), color = palette.bg) {
-        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)) {
-            val wide = maxWidth > maxHeight
-            val previewMax = if (wide) maxHeight * 0.5f else maxHeight * 0.4f
-            Column(Modifier.fillMaxSize()) {
-                // ------------------------------------------------------------------ barra superior
-                Row(Modifier.fillMaxWidth().height(NexusTokens.topBarHeight).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-                    Column(Modifier.weight(1f).clickable { dialog = CutDialog.Rename }) {
-                        Text(project.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${project.settings.width}×${project.settings.height} · ${project.settings.frameRate} fps", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = { vm.undo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, st.undoLabel?.let { "Deshacer: $it" } ?: "Deshacer") }
-                    IconButton(onClick = { vm.redo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canRedo) { Icon(Icons.AutoMirrored.Filled.Redo, st.redoLabel?.let { "Rehacer: $it" } ?: "Rehacer") }
-                    Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más") }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Ripple: lo posterior acompaña") }, trailingIcon = { Switch(ripple, null) }, onClick = { vm.ripple.value = !ripple })
-                            DropdownMenuItem(text = { Text("Imán en cortes y marcadores") }, trailingIcon = { Switch(snapping, null) }, onClick = { vm.snapping.value = !snapping })
-                            DropdownMenuItem(text = { Text("Formato del montaje") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) }, onClick = { menu = false; dialog = CutDialog.Format })
-                            DropdownMenuItem(text = { Text("Renombrar") }, onClick = { menu = false; dialog = CutDialog.Rename })
-                        }
-                    }
-                    Button(onClick = { dialog = CutDialog.Export }, enabled = timeline.durationUs > 0 && export !is ExportState.Running,
-                        modifier = Modifier.padding(start = 4.dp, end = 8.dp).height(36.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)) {
-                        Icon(Icons.Default.Upload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Exportar")
-                    }
-                }
-                (export as? ExportState.Running)?.takeIf { it.projectId == project.id }?.let { r ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        LinearProgressIndicator(progress = { r.progress / 100f }, modifier = Modifier.weight(1f))
-                        Text("  ${r.stage} · ${r.progress} %", style = MaterialTheme.typography.labelSmall)
-                        IconButton(onClick = vm::cancelExport, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Cancelar exportación", Modifier.size(18.dp)) }
-                    }
-                }
-
-                // ------------------------------------------------------------------ imagen
-                Box(Modifier.fillMaxWidth().heightIn(max = previewMax).background(Color.Black), contentAlignment = Alignment.Center) {
-                    Box(Modifier.aspectRatio(project.settings.width.toFloat() / project.settings.height, matchHeightConstraintsFirst = true)) {
-                        AndroidView(factory = { ctx ->
-                            SurfaceView(ctx).apply {
-                                holder.addCallback(object : SurfaceHolder.Callback {
-                                    override fun surfaceCreated(holder: SurfaceHolder) = Unit
-                                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = vm.preview.attachSurface(holder.surface, width, height)
-                                    override fun surfaceDestroyed(holder: SurfaceHolder) = vm.preview.detachSurface()
-                                })
-                            }
-                        }, modifier = Modifier.fillMaxSize())
-                        val frame = still
-                        if (showStill && frame != null && timeline.durationUs > 0) {
-                            Image(frame.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
-                        }
-                        if (timeline.durationUs <= 0) Column(Modifier.align(Alignment.Center).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Montaje vacío", color = Color.White, style = MaterialTheme.typography.titleSmall)
-                            Text("Añade vídeos o imágenes de la Biblioteca", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.bodySmall)
-                            Spacer(Modifier.height(8.dp))
-                            Button(onClick = { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }) { Text("Añadir de la Biblioteca") }
-                        }
-                        if (buffering) CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp), strokeWidth = 2.dp, color = Color.White)
-                    }
-                    previewError?.let {
-                        Text(it, fontSize = 11.sp, color = Color.White, modifier = Modifier.align(Alignment.TopStart).background(Color(0xCC8B0000)).padding(6.dp).clickable { vm.preview.clearError() })
-                    }
-                }
-
-                // ------------------------------------------------------------------ transporte
-                Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(Timecode.formatFrames(playhead, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Text(" / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.weight(1f))
-                    val rate = project.settings.frameRate
-                    IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) { Icon(Icons.Default.SkipPrevious, "Fotograma anterior") }
-                    Surface(onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) }, shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary) }
-                    }
-                    IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) { Icon(Icons.Default.SkipNext, "Fotograma siguiente") }
-                    Spacer(Modifier.weight(1f))
-                    Text(if (selectedClips.isEmpty()) "${timeline.allTracks.sumOf { it.clips.size }} clips" else "${selectedClips.size} seleccionado${if (selectedClips.size > 1) "s" else ""}",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                // ------------------------------------------------------------------ línea de tiempo
-                Row(Modifier.weight(1f).fillMaxWidth()) {
-                    TrackHeaders(timeline, viewport.scrollY, palette, onToggleLock = { t -> vm.toggleTrack(t.id, locked = !t.locked) }, onToggleMute = { t -> vm.toggleTrack(t.id, muted = !t.muted) })
-                    TimelineCanvas(
-                        timeline = timeline, selection = selection, playheadUs = playhead, frameRate = project.settings.frameRate, media = media,
-                        offline = offline, waveforms = waveforms, thumbnails = vm.thumbnails, thumbVersion = thumbVersion, snapLineUs = snapLine,
-                        viewport = viewport, palette = palette, modifier = Modifier.weight(1f).fillMaxHeight(),
-                        actions = object : TimelineActions {
-                            override fun seek(us: Long, scrubbing: Boolean) = vm.preview.seekTo(us, scrubbing)
-                            override fun scrubEnd() = vm.preview.seekTo(vm.preview.positionUs.value)
-                            override fun tap(clipId: String?, trackId: String?, additive: Boolean) { vm.select(clipId, additive); if (clipId != null) haptics.perform(NexusHapticEvent.SELECTION) }
-                            override fun beginDrag(exclude: Set<String>) { vm.beginDrag(exclude); haptics.perform(NexusHapticEvent.GESTURE_START) }
-                            override fun trim(clipId: String, edge: Edge, deltaUs: Long, snapUs: Long) = vm.dragTrim(clipId, edge, deltaUs, snapUs)
-                            override fun move(clipId: String, deltaUs: Long, trackOffset: Int, snapUs: Long) = vm.dragMove(clipId, deltaUs, trackOffset, snapUs)
-                            override fun fade(clipId: String, fadeIn: Boolean, fadeUs: Long) = vm.dragFade(clipId, fadeIn, fadeUs)
-                            override fun endDrag(commit: Boolean) { vm.endDrag(commit); haptics.perform(NexusHapticEvent.GESTURE_END) }
-                        },
-                    )
-                }
-
-                // ------------------------------------------------------------------ herramientas
-                Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (selectedClips.isEmpty()) {
-                            Tool(Icons.Default.AddPhotoAlternate, "Añadir") { picker.launch(arrayOf("video/*", "image/*")) }
-                            Tool(Icons.Default.MusicNote, "Audio") { picker.launch(arrayOf("audio/*")) }
-                            Tool(Icons.Default.TextFields, "Texto") { dialog = CutDialog.Title(null) }
-                            Tool(Icons.Default.ContentCut, "Dividir", enabled = timeline.durationUs > 0) { vm.split(); haptics.perform(NexusHapticEvent.CONFIRMATION) }
-                            Tool(Icons.Default.AspectRatio, "Formato") { dialog = CutDialog.Format }
-                        } else {
-                            val one = selectedClips.singleOrNull()
-                            Tool(Icons.Default.ContentCut, "Dividir") { vm.split(); haptics.perform(NexusHapticEvent.CONFIRMATION) }
-                            Tool(Icons.Default.Delete, "Eliminar") { vm.deleteSelection(); haptics.perform(NexusHapticEvent.CONFIRMATION) }
-                            Tool(Icons.Default.ContentCopy, "Duplicar") { vm.duplicateSelection() }
-                            if (one != null && one.kind != ClipKind.TEXT) Tool(Icons.Default.Speed, "Velocidad") { dialog = CutDialog.Speed(one) }
-                            val audible = selectedClips.filter { it.kind == ClipKind.AUDIO }
-                            if (audible.isNotEmpty()) Tool(Icons.AutoMirrored.Filled.VolumeUp, "Volumen") { dialog = CutDialog.Volume(audible) }
-                            if (selectedClips.any { it.linkId != null }) Tool(Icons.Default.LinkOff, "Separar audio") { vm.unlinkSelection() }
-                            if (one?.kind == ClipKind.TEXT) Tool(Icons.Default.TextFields, "Editar texto") { dialog = CutDialog.Title(one) }
-                            Tool(Icons.Default.Close, "Deseleccionar") { vm.select(null, false) }
-                        }
-                    }
+    @Composable
+    fun EditorHeader() {
+        Row(Modifier.fillMaxWidth().height(NexusTokens.topBarHeight).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
+            Column(Modifier.weight(1f).clickable { dialog = CutDialog.Rename }) {
+                Text("NEXUS CUT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(project.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            IconButton(onClick = { vm.undo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, st.undoLabel?.let { "Deshacer: $it" } ?: "Deshacer") }
+            IconButton(onClick = { vm.redo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canRedo) { Icon(Icons.AutoMirrored.Filled.Redo, st.redoLabel?.let { "Rehacer: $it" } ?: "Rehacer") }
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Ripple: lo posterior acompaña") }, trailingIcon = { Switch(ripple, null) }, onClick = { vm.ripple.value = !ripple })
+                    DropdownMenuItem(text = { Text("Imán en cortes y marcadores") }, trailingIcon = { Switch(snapping, null) }, onClick = { vm.snapping.value = !snapping })
+                    DropdownMenuItem(text = { Text("Formato del montaje") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) }, onClick = { menu = false; dialog = CutDialog.Format })
+                    DropdownMenuItem(text = { Text("Renombrar") }, onClick = { menu = false; dialog = CutDialog.Rename })
                 }
             }
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp))
+            Button(onClick = { dialog = CutDialog.Export }, enabled = timeline.durationUs > 0 && export !is ExportState.Running,
+                modifier = Modifier.padding(start = 4.dp, end = 8.dp).height(36.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)) {
+                Icon(Icons.Default.Upload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Exportar")
+            }
+        }
+        (export as? ExportState.Running)?.takeIf { it.projectId == project.id }?.let { r ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(progress = { r.progress / 100f }, modifier = Modifier.weight(1f))
+                Text("  ${r.stage} · ${r.progress} %", style = MaterialTheme.typography.labelSmall)
+                IconButton(onClick = vm::cancelExport, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Cancelar exportación", Modifier.size(18.dp)) }
+            }
+        }
+    }
+
+    @Composable
+    fun PreviewPane(modifier: Modifier) {
+        Box(modifier.fillMaxWidth().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(Modifier.aspectRatio(project.settings.width.toFloat() / project.settings.height, matchHeightConstraintsFirst = true)) {
+                AndroidView(factory = { ctx ->
+                    SurfaceView(ctx).apply {
+                        holder.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: SurfaceHolder) = Unit
+                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = vm.preview.attachSurface(holder.surface, width, height)
+                            override fun surfaceDestroyed(holder: SurfaceHolder) = vm.preview.detachSurface()
+                        })
+                    }
+                }, modifier = Modifier.fillMaxSize())
+                val frame = still
+                if (showStill && frame != null && timeline.durationUs > 0) {
+                    Image(frame.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+                }
+                if (timeline.durationUs <= 0) Column(Modifier.align(Alignment.Center).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Montaje vacío", color = Color.White, style = MaterialTheme.typography.titleSmall)
+                    Text("Añade vídeos o imágenes de la Biblioteca", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }) { Text("Añadir de la Biblioteca") }
+                }
+                if (buffering) CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp), strokeWidth = 2.dp, color = Color.White)
+            }
+            previewError?.let {
+                Text(it, fontSize = 11.sp, color = Color.White, modifier = Modifier.align(Alignment.TopStart).background(Color(0xCC8B0000)).padding(6.dp).clickable { vm.preview.clearError() })
+            }
+        }
+    }
+
+    @Composable
+    fun Transport() {
+        Row(Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(Timecode.formatFrames(playhead, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Text(" / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            val rate = project.settings.frameRate
+            IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) { Icon(Icons.Default.SkipPrevious, "Fotograma anterior") }
+            Surface(onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) }, shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary) }
+            }
+            IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) { Icon(Icons.Default.SkipNext, "Fotograma siguiente") }
+            Spacer(Modifier.weight(1f))
+            Text(if (selectedClips.isEmpty()) "${timeline.allTracks.sumOf { it.clips.size }} clips" else "${selectedClips.size} seleccionado${if (selectedClips.size > 1) "s" else ""}",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    @Composable
+    fun TimelinePane(modifier: Modifier) {
+        Row(modifier.fillMaxWidth()) {
+            TrackHeaders(timeline, viewport.scrollY, palette, onToggleLock = { t -> vm.toggleTrack(t.id, locked = !t.locked) }, onToggleMute = { t -> vm.toggleTrack(t.id, muted = !t.muted) })
+            TimelineCanvas(
+                timeline = timeline, selection = selection, playheadUs = playhead, frameRate = project.settings.frameRate, media = media,
+                offline = offline, waveforms = waveforms, thumbnails = vm.thumbnails, thumbVersion = thumbVersion, snapLineUs = snapLine,
+                viewport = viewport, palette = palette, modifier = Modifier.weight(1f).fillMaxHeight(),
+                actions = object : TimelineActions {
+                    override fun seek(us: Long, scrubbing: Boolean) = vm.preview.seekTo(us, scrubbing)
+                    override fun scrubEnd() = vm.preview.seekTo(vm.preview.positionUs.value)
+                    override fun tap(clipId: String?, trackId: String?, additive: Boolean) { vm.select(clipId, additive); if (clipId != null) haptics.perform(NexusHapticEvent.SELECTION) }
+                    override fun beginDrag(exclude: Set<String>) { vm.beginDrag(exclude); haptics.perform(NexusHapticEvent.GESTURE_START) }
+                    override fun trim(clipId: String, edge: Edge, deltaUs: Long, snapUs: Long) = vm.dragTrim(clipId, edge, deltaUs, snapUs)
+                    override fun move(clipId: String, deltaUs: Long, trackOffset: Int, snapUs: Long) = vm.dragMove(clipId, deltaUs, trackOffset, snapUs)
+                    override fun fade(clipId: String, fadeIn: Boolean, fadeUs: Long) = vm.dragFade(clipId, fadeIn, fadeUs)
+                    override fun endDrag(commit: Boolean) { vm.endDrag(commit); haptics.perform(NexusHapticEvent.GESTURE_END) }
+                },
+            )
+        }
+    }
+
+    @Composable
+    fun Tools() {
+        Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                if (selectedClips.isEmpty()) {
+                                    Tool(Icons.Default.AddPhotoAlternate, "Añadir") { picker.launch(arrayOf("video/*", "image/*")) }
+                                    Tool(Icons.Default.MusicNote, "Audio") { picker.launch(arrayOf("audio/*")) }
+                                    Tool(Icons.Default.TextFields, "Texto") { dialog = CutDialog.Title(null) }
+                                    Tool(Icons.Default.ContentCut, "Dividir", enabled = timeline.durationUs > 0) { vm.split(); haptics.perform(NexusHapticEvent.CONFIRMATION) }
+                                    Tool(Icons.Default.AspectRatio, "Formato") { dialog = CutDialog.Format }
+                                } else {
+                                    val one = selectedClips.singleOrNull()
+                                    Tool(Icons.Default.ContentCut, "Dividir") { vm.split(); haptics.perform(NexusHapticEvent.CONFIRMATION) }
+                                    Tool(Icons.Default.Delete, "Eliminar") { vm.deleteSelection(); haptics.perform(NexusHapticEvent.CONFIRMATION) }
+                                    Tool(Icons.Default.ContentCopy, "Duplicar") { vm.duplicateSelection() }
+                                    if (one != null && one.kind != ClipKind.TEXT) Tool(Icons.Default.Speed, "Velocidad") { dialog = CutDialog.Speed(one) }
+                                    val audible = selectedClips.filter { it.kind == ClipKind.AUDIO }
+                                    if (audible.isNotEmpty()) Tool(Icons.AutoMirrored.Filled.VolumeUp, "Volumen") { dialog = CutDialog.Volume(audible) }
+                                    if (selectedClips.any { it.linkId != null }) Tool(Icons.Default.LinkOff, "Separar audio") { vm.unlinkSelection() }
+                                    if (one?.kind == ClipKind.TEXT) Tool(Icons.Default.TextFields, "Editar texto") { dialog = CutDialog.Title(one) }
+                                    Tool(Icons.Default.Close, "Deseleccionar") { vm.select(null, false) }
+                                }
+                            }
+                        }
+    }
+
+    Surface(Modifier.fillMaxSize(), color = palette.bg) {
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)) {
+            val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val typing = WindowInsets.isImeVisible
+            val trackHeight = (RULER_DP + timeline.allTracks.sumOf {
+                (if (it.collapsed) COLLAPSED_ROW_DP else if (it.kind == TrackKind.VIDEO) VIDEO_ROW_DP else AUDIO_ROW_DP).toDouble()
+            }.toFloat()).dp
+            val timelineHeight = if (typing) 96.dp else minOf(trackHeight, 212.dp, maxHeight * .28f).coerceAtLeast(120.dp)
+            Column(Modifier.fillMaxSize()) {
+                EditorHeader()
+                if (wide && !typing) {
+                    Row(Modifier.weight(1f).fillMaxWidth()) {
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            PreviewPane(Modifier.weight(1f))
+                            Transport()
+                        }
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            TimelinePane(Modifier.weight(1f))
+                            Tools()
+                        }
+                    }
+                } else if (!wide) {
+                    PreviewPane(Modifier.weight(1f))
+                    Transport()
+                    TimelinePane(Modifier.height(timelineHeight))
+                    if (!typing) Tools()
+                } else {
+                    // In landscape the keyboard needs the conversation's space; editing returns on dismissal.
+                    Spacer(Modifier.weight(1f))
+                }
+                CutChatPanel(
+                    state = chatState, expanded = chatExpanded, onExpanded = { chatExpanded = it },
+                    onDraft = chat::setDraft,
+                    onSend = {
+                        if (chat.send()) {
+                            chatExpanded = true
+                            focusManager.clearFocus(force = true)
+                            keyboard?.hide()
+                        }
+                    },
+                    onStop = chat::stop,
+                    selectionLabel = if (selection.isEmpty()) "Este montaje" else "${selection.size} clip${if (selection.size == 1) "" else "s"} seleccionado${if (selection.size == 1) "" else "s"}",
+                    agentActivity = agentActivity,
+                    messageHeight = if (wide) 64.dp else if (typing) 96.dp else 140.dp,
+                    compact = typing && wide,
+                )
+            }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 84.dp))
         }
     }
 

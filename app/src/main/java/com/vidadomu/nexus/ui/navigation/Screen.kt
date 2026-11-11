@@ -14,6 +14,7 @@ enum class Screen(
     Story("story", "Guion", Icons.Default.MovieFilter),
     Create("create", "Lanzadera", Icons.Default.AutoAwesome),
     Models("models", "ArtBox", Icons.Default.GridView),
+    Cut("cut", "Cut", Icons.Default.ContentCut),
     Generations("generations", "Historial", Icons.Default.Timelapse),
     Library("library", "Biblioteca", Icons.Default.Collections),
     Flow("flow", "Flow", Icons.Default.Movie),
@@ -21,6 +22,6 @@ enum class Screen(
 
     companion object {
         // The audiovisual project is a primary workspace. Routes remain stable when tabs move.
-        val bottomNavItems: List<Screen> get() = listOf(Assistant, Story, Models, Library, Flow)
+        val bottomNavItems: List<Screen> get() = listOf(Assistant, Story, Models, Cut, Library, Flow)
     }
 }

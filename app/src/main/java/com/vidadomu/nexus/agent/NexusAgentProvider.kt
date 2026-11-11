@@ -45,6 +45,7 @@ class NexusAgentProvider:ContentProvider() {
     private suspend fun execute(method:String,input:JsonObject):JsonObject {
         val app=context!!.applicationContext as NexusApplication
         app.ready.await() // arranque en frío: no tocar los lateinit antes de Application.onCreate
+        if (method == "cut_chat_qa") return com.vidadomu.nexus.cut.CutChatQa.handle(app, input)
         if(method=="agent_model_availability") {
             require(input.keys==setOf("modelId")) {"La consulta solo admite modelId."}
             return com.vidadomu.nexus.assistant.agentModelAvailability(app,input["modelId"]!!.jsonPrimitive.content)
