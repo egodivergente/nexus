@@ -1,5 +1,6 @@
 import sys
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -29,5 +30,16 @@ class SchemaCacheTests(unittest.TestCase):
         self.assertFalse(host.SCHEMA_CACHE)
     def test_allowlist_before_cache(self):
         with self.assertRaises(ValueError):host.dispatch({},'schema',{'url':'https://example.test/a'})
+    def test_public_schema_identifies_nexus_without_forwarding_provider_secret(self):
+        def answer(request, timeout):
+            # Cloudflare rejects the library-default Python urllib signature.
+            self.assertEqual(request.get_header('User-agent'),'Nexus/1.0.0 (Windows; Desktop)')
+            self.assertEqual(request.get_header('Accept'),'application/json')
+            self.assertIsNone(request.get_header('Authorization'))
+            self.assertEqual(timeout,15)
+            return BytesIO(b'{"components":{}}')
+        with patch.object(host.OPENER,'open',side_effect=answer) as fetch:
+            self.assertEqual(host.dispatch({'atlas_cloud':'isolated-test-value'},'schema',{'url':self.url}),{'components':{}})
+            self.assertEqual(fetch.call_count,1)
 
 if __name__=='__main__':unittest.main()

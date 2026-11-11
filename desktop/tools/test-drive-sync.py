@@ -50,6 +50,32 @@ class DriveSyncTest(unittest.TestCase):
         with urllib.request.urlopen(endpoint, timeout=5) as response:
             return response.read()
 
+    def test_legacy_synced_never_claims_narrative_synced(self):
+        self.service.config['enabled'] = True
+        self.service.status = {'state': 'synced'}
+        self.assertFalse(self.service.public()['storyEnabled'])
+        self.assertEqual(self.service.public()['narrativeSync']['state'], 'disabled')
+        self.service.config['story'] = True
+        public = self.service.public()
+        self.assertTrue(public['storyEnabled'])
+        self.assertEqual(public['narrativeSync']['state'], 'not_checked')
+        self.service.status['narrativeSync'] = {'supported': True, 'enabled': True,
+            'state': 'conflicts', 'conflicts': 1}
+        self.assertEqual(self.service.public()['narrativeSync']['state'], 'conflicts')
+
+    def test_narrative_scope_persists_without_reauthorizing_or_deleting_content(self):
+        self.service.config['enabled'] = True
+        self.host.write_secret(self.service.secret_file, {'refresh_token': 'isolated-test-only'})
+        with patch.object(self.service, 'run') as run:
+            result = self.service.command({'op': 'story', 'enabled': False})
+            run.assert_called_once()
+        self.assertFalse(result['storyEnabled'])
+        self.assertEqual(result['narrativeSync']['state'], 'disabled')
+        restarted = DriveSync(self.host, start_scheduler=False)
+        self.assertFalse(restarted.public()['storyEnabled'])
+        self.assertEqual(self.host.read_secret(self.service.secret_file), {'refresh_token': 'isolated-test-only'})
+        restarted.closed.set()
+
     def test_authorization_uses_pkce_loopback_and_minimum_scope(self):
         url = self.service.begin()
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)

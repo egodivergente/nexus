@@ -394,7 +394,8 @@ private class DesktopRuntime(private val root: File, private val data: File) {
                     if(destination.exists())require(com.vidadomu.nexus.agent.core.sync.SyncBlobs.hash(destination)==source.name.substringBefore('.'))
                     else java.nio.file.Files.copy(source.toPath(),destination.toPath())
                     "/media/$name"
-                },deviceLabel=System.getenv("COMPUTERNAME")?:"Windows")
+                },deviceLabel=System.getenv("COMPUTERNAME")?:"Windows",
+                    storyRemote=remote.storyChannel(),storyEnabled={args["storyEnabled"]?.jsonPrimitive?.booleanOrNull==true})
                 args["resolve"]?.takeIf {it!=JsonNull}?.jsonObject?.let {workspace.resolve(it.text("key"),it.text("revision"))}
                 val result=workspace.cycle(null,documents.capture(chats,montages)){rows->
                     callback("syncApplyDocuments",JsonObject(rows))

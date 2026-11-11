@@ -1,0 +1,213 @@
+{
+  "fetched_at": "2026-11-11T20:28:47.182786+00:00",
+  "source": "Exact Input property subsets and required alternatives from the public schema URLs; isolated tests only.",
+  "models": [
+    {
+      "model": {
+        "id": "kwaivgi/kling-v4.0/image-to-video",
+        "providerId": "atlas_cloud",
+        "schemaUrl": "https://static.atlascloud.ai/model/schema/kwaivgi-kling-v4.0-image-to-video.json",
+        "modalities": [
+          "VIDEO"
+        ],
+        "parameters": []
+      },
+      "schema": {
+        "components": {
+          "schemas": {
+            "Input": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "default": "kwaivgi/kling-v4.0/image-to-video",
+                  "enum": [
+                    "kwaivgi/kling-v4.0/image-to-video"
+                  ],
+                  "description": "Model name."
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "She looks into the camera with a confident smile, adjusts her hair and walks two steps toward the camera; the camera slowly pushes in.",
+                  "description": "Optional text prompt describing the motion between keyframes. Up to 26,000 English characters (11,000 non-English). Can include negative descriptions.",
+                  "x-ui-component": "textarea"
+                },
+                "image": {
+                  "type": "string",
+                  "description": "First keyframe image (URL or Base64). JPG / JPEG / PNG, max 30MB, at least 300px, aspect ratio 2:5 to 5:2.",
+                  "x-ui-component": "uploader",
+                  "x-format": "image"
+                },
+                "middle_images": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 8,
+                  "description": "Optional keyframes between the first and last frame, in timeline order (URLs or Base64). Kling 4.0 accepts up to 10 images in total across image, middle_images and last_image. Refer to them in the prompt as @image_N (numbered first frame → middle frames → last frame).",
+                  "x-ui-component": "uploaders",
+                  "x-format": "image"
+                },
+                "last_image": {
+                  "type": "string",
+                  "description": "Optional last keyframe image (URL or Base64).",
+                  "x-ui-component": "uploader",
+                  "x-format": "image"
+                }
+              },
+              "required": [
+                "model",
+                "image"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "model": {
+        "id": "vidu/q4-preview/reference-to-video",
+        "providerId": "atlas_cloud",
+        "schemaUrl": "https://static.atlascloud.ai/model/schema/vidu-q4-preview-reference-to-video.json",
+        "modalities": [
+          "VIDEO"
+        ],
+        "parameters": []
+      },
+      "schema": {
+        "components": {
+          "schemas": {
+            "Input": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "default": "vidu/q4-preview/reference-to-video",
+                  "enum": [
+                    "vidu/q4-preview/reference-to-video"
+                  ],
+                  "description": "Model name."
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "The woman from the first image and the man from the second image hug by the lakeside at sunset.",
+                  "description": "Text description of the video. Refer to subjects from the reference images. Up to 20,000 characters.",
+                  "x-image-reference": {
+                    "enabled": true,
+                    "tag": "image",
+                    "syntax": "@N",
+                    "example": "@1",
+                    "indexBase": 1,
+                    "source": "reference_images",
+                    "description": "Reference an uploaded image in the prompt with @N, where N is the 1-based index of the image in `reference_images` (the first image is @1)."
+                  }
+                },
+                "reference_images": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "maxItems": 15,
+                  "description": "1 to 15 reference images (URLs or Base64) whose subjects stay consistent in the video. Formats: PNG, JPEG, JPG, WebP. Max 50MB each.",
+                  "x-ui-component": "uploaders",
+                  "x-format": "image"
+                },
+                "reference_audios": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 0,
+                  "maxItems": 3,
+                  "description": "Optional, up to 3 reference audio clip URLs. Format: MP3, 3 to 12 seconds each, max 50MB each.",
+                  "x-ui-component": "uploaders",
+                  "x-format": "audio"
+                }
+              },
+              "required": [
+                "model",
+                "prompt",
+                "reference_images"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "model": {
+        "id": "heygen/avatar-5/digital-twin",
+        "providerId": "atlas_cloud",
+        "schemaUrl": "https://static.atlascloud.ai/model/schema/heygen-avatar-5-digital-twin.json",
+        "modalities": [
+          "VIDEO"
+        ],
+        "parameters": []
+      },
+      "schema": {
+        "components": {
+          "schemas": {
+            "Input": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "description": "Model name.",
+                  "default": "heygen/avatar-5/digital-twin",
+                  "enum": [
+                    "heygen/avatar-5/digital-twin"
+                  ]
+                },
+                "prompt": {
+                  "type": "string",
+                  "description": "Script the avatar speaks, voiced by the selected `voice`. Provide `prompt`, `audio`, or both (then `audio` is used). The output video length follows the spoken script.",
+                  "x-ui-component": "textarea"
+                },
+                "background_image": {
+                  "type": "string",
+                  "description": "Background image behind the avatar, as a URL or Base64. Takes precedence over `background_color`. Ignored when `output_format` is `webm`.",
+                  "format": "uri",
+                  "x-format": "image",
+                  "x-ui-component": "uploader"
+                },
+                "audio": {
+                  "type": "string",
+                  "description": "Audio for the avatar to lip-sync to, as a public URL or Base64. Provide `prompt`, `audio`, or both. When set, `prompt` and `voice` are ignored and the output video length follows the audio.",
+                  "format": "uri",
+                  "x-format": "audio",
+                  "x-ui-component": "uploader"
+                }
+              },
+              "required": [
+                "model"
+              ],
+              "anyOf": [
+                {
+                  "required": [
+                    "prompt"
+                  ],
+                  "properties": {
+                    "prompt": {
+                      "minLength": 1
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "audio"
+                  ],
+                  "properties": {
+                    "audio": {
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

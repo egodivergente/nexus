@@ -20,10 +20,10 @@ def write():
                 files[path.relative_to(ROOT).as_posix()] = digest(path)
     for name in ('desktop/agent/build.gradle.kts', 'desktop/agent/core/build.gradle.kts', 'desktop/agent/settings.gradle.kts'):
         files[name] = digest(ROOT / name)
-    upstream = subprocess.check_output(['git', 'rev-parse', 'c4cb3675'], cwd=ROOT, text=True).strip()
+    upstream = subprocess.check_output(['git', 'rev-parse', '9734f23b'], cwd=ROOT, text=True).strip()
     manifest = {
         'format': 2,
-        'version': '2026.11.09-desktop-audiovisual',
+        'version': '2026.11.11-desktop-continuity',
         'reviewedAndroidCommit': upstream,
         'compiledCore': 'agent-core/src/main/kotlin',
         'duplicateCoreTreeCompiled': False,

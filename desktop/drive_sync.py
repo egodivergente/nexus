@@ -73,9 +73,15 @@ class DriveSync:
 
     def public(self):
         connected = bool(self.host.read_secret(self.secret_file).get('refresh_token'))
+        narrative = self.status.get('narrativeSync') or {'supported': True,
+            'enabled': self.config.get('enabled', False) and self.config.get('story', False),
+            'state': 'not_checked', 'conflicts': 0, 'pendingDependencies': 0}
+        if not self.config.get('story', False) or not self.config.get('enabled', False):
+            narrative = {**narrative, 'enabled': False, 'state': 'disabled'}
         return {**self.status, **self.activity, 'busy': self.lock.locked(),
                 'connected': connected, 'configured': bool(self.config.get('client_id')),
                 'enabled': self.config.get('enabled', False), 'folderId': self.config.get('folderId'),
+                'storyEnabled': self.config.get('story', False), 'narrativeSync': narrative,
                 'missingMedia': self.status.get('missingMedia', self.activity.get('lastMissingMedia', 0)),
                 'conflicts': self.status.get('conflicts', self.conflicts)}
 
@@ -120,6 +126,11 @@ class DriveSync:
         elif op == 'enabled':
             self.config['enabled'] = args.get('enabled') is True
             atomic_json(self.config_file, self.config)
+        elif op == 'story':
+            self.config['story'] = args.get('enabled') is True
+            atomic_json(self.config_file, self.config)
+            if self.config.get('enabled') and self.public()['connected']:
+                self.run()
         elif op == 'run':
             self.run()
         elif op == 'resolve':
@@ -324,7 +335,8 @@ class DriveSync:
                 try:
                     result = self.host.exchange('driveSync', {'accessToken': token, 'rootId': self.config.get('folderId', ''),
                                                              'paths': paths, 'resolve': resolution,
-                                                             'chats': chats, 'montages': self.captured_montages})
+                                                             'chats': chats, 'montages': self.captured_montages,
+                                                             'storyEnabled': self.config.get('story', False)})
                     self.config['folderId'] = result['rootId']
                     atomic_json(self.config_file, self.config)
                     self.status = result

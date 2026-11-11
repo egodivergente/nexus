@@ -1,9 +1,36 @@
 (function(root){'use strict';
 const valid=v=>typeof v==='string'&&v.trim()&&!['null','undefined','-','–','—'].includes(v.trim().toLowerCase())&&/[\p{L}\p{N}]/u.test(v);
 const labels={prompt:'Prompt',negative_prompt:'Evitar',aspect_ratio:'Relación de aspecto',ratio:'Formato',resolution:'Resolución',quality:'Calidad',duration:'Duración',num_images:'Imágenes',outputCount:'Imágenes',seed:'Semilla',character_orientation:'Orientación del personaje',keep_original_sound:'Conservar sonido original',generate_audio:'Generar sonido',guidance_scale:'Fidelidad al prompt',steps:'Pasos',num_inference_steps:'Pasos',image:'Imagen de entrada',images:'Imágenes de referencia',video:'Vídeo de entrada',referenceImages:'Referencias',reference_images:'Referencias',size:'Tamaño',enable_safety_checker:'Filtro de seguridad',prompt_enhancement:'Mejorar prompt'};
+Object.assign(labels,{middle_images:'Fotogramas intermedios',reference_audios:'Audios de referencia',background_image:'Imagen de fondo'});
 const label=k=>labels[k]||k.replace(/[_.]/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,s=>s.toUpperCase());
+// Support only explicit required alternatives whose controls this form can represent.
+function requiredAlternatives(input,m){
+ if(!Array.isArray(input.anyOf)||!input.anyOf.length)return;
+ const controls=new Set(['model','prompt',...m.fields.map(f=>f.key),...m.parameters.map(p=>p.key)]);
+ const branches=input.anyOf.map(branch=>{
+  if(!branch||Object.keys(branch).some(k=>!['required','properties'].includes(k))||!Array.isArray(branch.required)||!branch.required.length||branch.required.some(k=>typeof k!=='string'||!input.properties[k]||!controls.has(k)))return null;
+  const properties=branch.properties||{};
+  if(typeof properties!=='object'||Array.isArray(properties)||Object.keys(properties).some(k=>!branch.required.includes(k)))return null;
+  const fields=branch.required.map(key=>{
+   const rule=properties[key]??{};
+   if(!rule||typeof rule!=='object'||Array.isArray(rule)||Object.keys(rule).some(k=>k!=='minLength')||rule.minLength!=null&&(!Number.isInteger(rule.minLength)||rule.minLength<0||input.properties[key]?.type!=='string'))return null;
+   return {key,minimum:rule.minLength??0};
+  });
+  return fields.every(Boolean)?fields:null;
+ });
+ if(branches.every(Boolean))m.requiredAlternatives=branches;
+}
+function requiredAlternativesError(m,prompt,values,media){
+ if(!m.requiredAlternatives?.length)return null;
+ const present=field=>{
+  if(m.fields.some(f=>f.key===field.key))return media.some(file=>file.field===field.key);
+  const value=field.key==='prompt'?prompt.trim():field.key==='model'?(m.providerModelId||m.id):values[field.key];
+  return value!=null&&String(value).trim()!==''&&Array.from(String(value)).length>=field.minimum;
+ };
+ return m.requiredAlternatives.some(branch=>branch.every(present))?null:'Añade '+m.requiredAlternatives.map(branch=>branch.map(f=>label(f.key).toLowerCase()).join(' y ')).join(' o ')+'.';
+}
 function normalize(input,schema){
- const m=structuredClone(input);m.fields=[];m.unsupported=[];m.textLimits={};
+ const m=structuredClone(input);m.fields=[];m.unsupported=[];m.textLimits={};m.requiredAlternatives=[];
  if(m.providerId==='crun'&&!m.providerModelId)m.providerModelId=({'crun/kling-v3-std':'kling/v3','crun/kling-v3-pro':'kling/v3','crun/kling-v3-motion-control-std':'kling/v3-motion-control','crun/kling-v3-motion-control-pro':'kling/v3-motion-control'})[m.id];
  if(!m.contractEndpoint&&m.nativeRequiredFields?.length)m.promptRequired=m.nativeRequiredFields.includes('prompt');
  if(schema){
@@ -16,7 +43,7 @@ function normalize(input,schema){
    if(!valid(key)||key.startsWith('__')||['prompt','model'].includes(key))continue;
    const required=(s.required||[]).includes(key);
    if(!p||typeof p!=='object'){if(required)m.unsupported.push(label(key));continue;}
-   const media=/^(image|images|image_url|image_urls|input_image|input_images|input_image_url|input_image_urls|reference_image_url|reference_image_urls|reference_images|ref_images|first_frame_image|start_image|last_image|last_frame_image|end_image|video|videos|video_url|video_urls|input_video|input_video_url|source_video|source_video_url|reference_video_urls|reference_videos|audio|audio_url|mask|mask_image|mask_url|refers)$/i.test(key);
+   const media=/^(image|images|image_url|image_urls|input_image|input_images|input_image_url|input_image_urls|reference_image_url|reference_image_urls|reference_images|ref_images|first_frame_image|start_image|last_image|last_frame_image|end_image|middle_images|background_image|video|videos|video_url|video_urls|input_video|input_video_url|source_video|source_video_url|reference_video_urls|reference_videos|audio|audio_url|reference_audios|mask|mask_image|mask_url|refers)$/i.test(key);
    if(media&&!p.enum&&['array','string'].includes(p.type)){
     m.fields.push({key,label:label(key),mime:/video/.test(key)?'video/*':/audio/.test(key)?'audio/*':'image/*',required,maximum:p.type==='array'?(p.maxItems||m.maxImages||10):1,encoding:key==='refers'?'atlas-references':p.type==='array'?'array':'string',minItems:p.minItems||0});continue;
    }
@@ -26,6 +53,7 @@ function normalize(input,schema){
    m.parameters.push({key,displayName:label(key),nativeType:p.type,type:p.type==='boolean'?'BOOLEAN':options.length?'ENUM':'TEXT',options,defaultValue:p.default==null?'':String(p.default),isRequired:required,minValue:p.minimum,maxValue:p.maximum,description:p.description||''});
   }
   for(const key of s.required||[])if(valid(key)&&!['prompt','model'].includes(key)&&!s.properties[key])m.unsupported.push(label(key));
+  requiredAlternatives(s,m);
  }else{
   // Reviewed 2026-10-06: official Runway SDK, exact text-to-video variants only.
   const runwayTextMax={text_to_video:{'gen4.5':1000,'veo3.1':1000,'veo3.1_fast':1000,'happyhorse_1_0':2500},image_to_video:{'gen4.5':1000,gen4_turbo:1000,'veo3.1':1000,'veo3.1_fast':1000,'happyhorse_1_0':2500},text_to_image:{gen4_image:1000,gen4_image_turbo:1000}};
@@ -43,6 +71,7 @@ function defaults(m){return Object.fromEntries(m.parameters.map(p=>[p.key,p.defa
 function type(p,v){const t=p.nativeType||(p.type==='BOOLEAN'?'boolean':['INTEGER','SEED'].includes(p.type)?'integer':['FLOAT','SLIDER'].includes(p.type)?'number':'string');if(t==='boolean'){if(!['true','false'].includes(String(v)))throw Error('Revisa '+p.displayName);return String(v)==='true';}if(['number','integer'].includes(t)){const n=Number(v);if(!Number.isFinite(n)||(t==='integer'&&!Number.isInteger(n)))throw Error('Revisa '+p.displayName);return n;}if(['array','object'].includes(t))return JSON.parse(v);return String(v);}
 function validate(m,prompt,values,media){
  if(m.unsupported?.length)return 'Entradas aún no compatibles: '+m.unsupported.join(', ');
+ const alternatives=requiredAlternativesError(m,prompt,values,media);if(alternatives)return alternatives;
  if(m.promptRequired!==false&&!prompt.trim())return 'Escribe un prompt.';
  for(const [key,limit] of Object.entries(m.textLimits||{})){
   const raw=key==='prompt'?prompt.trim():values[key];if(raw==null||raw==='')continue;
@@ -58,7 +87,7 @@ function validate(m,prompt,values,media){
 }
 function put(o,key,value){const parts=key.split('.');let at=o;for(const p of parts.slice(0,-1)){if(['__proto__','prototype','constructor'].includes(p))throw Error('Clave no válida');at=at[p]||(at[p]={});}const last=parts.at(-1);if(['__proto__','prototype','constructor'].includes(last))throw Error('Clave no válida');at[last]=value;}
 function payload(m,prompt,values,media,quote=false){
- const error=quote?null:validate(m,prompt,values,media);if(error)throw Error(error);
+ const error=quote?requiredAlternativesError(m,prompt,values,media):validate(m,prompt,values,media);if(error)throw Error(error);
  const out={};for(const [key,value] of Object.entries(m.contractDefaults||{}))put(out,key,value);
  if(!quote&&prompt.trim())out[m.contractEndpoint?(m.contractPromptField||'promptText'):'prompt']=prompt.trim();
  for(const p of m.parameters){let v=values[p.key]??p.defaultValue;if(v==null||String(v).trim()===''||p.key.startsWith('__')||quote&&['prompt','negative_prompt','system_prompt'].includes(p.key))continue;put(out,p.key,type(p,v));}

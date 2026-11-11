@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.11.09-desktop-audiovisual.1'
+DESKTOP_VERSION = '2026.11.11-desktop-continuity.1'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'
@@ -600,7 +600,7 @@ def dispatch(keys, operation, args):
             flow_provider.automation_initialize(DATA)
         return {'qa': OFFLINE_QA, 'browserImport': True, 'maxImportBytes': MAX_IMPORT_BYTES, 'configured': list(keys) + (['google_flow'] if flow_models else []), 'flowModels':flow_models, 'state': read_state(),
                 'version': DESKTOP_VERSION, 'androidSource': '8ceb3aa7ab44be162d7fc1c8f82a047d33d71ce6',
-                'desktopParity': 'audiovisual-20261109', 'reviewedAndroidSource': 'c4cb36750d2e7b8dd270f349d61c9e0715f67a1f',
+                'desktopParity': 'continuity-20261111', 'reviewedAndroidSource': '9734f23b93175eae22c844653e48b9cba6a34df1',
                 'platform': os.environ.get('COMPUTERNAME', 'Windows') + ' · Windows x64', 'localMedia': True}
     if operation in ('flowConnection', 'flowConnect'):
         if OFFLINE_QA:

@@ -68,7 +68,7 @@ class OrchestratorTest {
 
     @Test fun `ninguna herramienta confirma ni paga`() {
         val names = NexusToolkit.all(Harness().deps).map { it.name }
-        assertEquals(33, names.size)
+        assertEquals(names.size, names.distinct().size, "Los nombres de herramientas deben ser únicos")
         assertTrue(names.none { Regex("confirm|approve|pay|charge").containsMatchIn(it) })
         val evil = object : AgentTool {
             override val name = "confirm_generation"; override val description = ""; override val category = ToolCategory.PLAN

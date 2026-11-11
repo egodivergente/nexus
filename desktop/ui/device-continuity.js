@@ -38,21 +38,29 @@
    }
    if (status.textContent !== text) status.textContent = text;
    writeText(row.querySelector('[data-channel-last]'),date(value.lastCompletedAt || value.lastSuccessAt));
+   if(id==='drive') {
+    const narrative=window.NexusDriveSync.narrativeSummary(value),node=row.querySelector('[data-channel-narrative]');
+    if(node){writeText(node,narrative.text);node.dataset.tone=narrative.tone;node.title=narrative.detail;}
+   }
   }
   const available = !!(state.drive?.connected && state.drive.state !== 'authorization_required') || !!(state.device?.configured && state.device?.enabled);
   const busy = pending || !!state.drive?.busy || !!state.device?.busy || state.device?.status === 'Intercambio pendiente';
   const button = hub.querySelector('[data-continuity=all]');
   button.disabled = !available || busy;
   writeText(button,busy ? 'Sincronizando…' : 'Sincronizar todo');
-  writeText(hub.querySelector('[data-continuity-summary]'),available ? 'Continúa con los proyectos y archivos compartidos al abrir Nexus Agent en el otro dispositivo.' : 'Conecta la misma cuenta de Google Drive en Nexus y Nexus Agent para compartir proyectos, galería y chats.');
+  writeText(hub.querySelector('[data-continuity-summary]'),available ? 'Sincroniza también en Nexus Agent para recuperar los cambios compartidos en Drive.' : 'Conecta la misma cuenta de Google Drive en Nexus y Nexus Agent para compartir proyectos, guion, galería y chats.');
   window.dispatchEvent(new CustomEvent('nexus:continuity-status', {detail:{...state,busy,available}}));
  }
  function schedule() {
   clearTimeout(timer);
   if (!document.hidden && document.querySelector('#continuity-hub')) timer = setTimeout(refresh, 15000);
  }
- async function refresh() {
-  if (refreshing) return refreshing;
+ async function refresh(force = false) {
+  if (refreshing) {
+   const current=refreshing;
+   await current;
+   return force ? refresh() : undefined;
+  }
   refreshing = (async () => {
    const replies = await Promise.allSettled([rpc('driveSync',{op:'status'}),rpc('deviceContinuity',{op:'status'})]);
    state.drive = replies[0].status === 'fulfilled' ? replies[0].value : null;
@@ -78,7 +86,8 @@
   const hub = document.createElement('section');hub.id = 'continuity-hub';hub.className = 'sheet continuity-hub';
   hub.innerHTML = '<div class="continuity-heading"><div><h2 tabindex="-1">Continúa en otro dispositivo</h2><p class="continuity-summary" data-continuity-summary></p></div><button class="primary" data-continuity="all" disabled>Sincronizar todo</button></div><div class="continuity-channels"></div><p class="hint">Las versiones en conflicto se conservan para que puedas revisarlas.</p>';
   const channels = hub.querySelector('.continuity-channels');
-  const drive = channel('drive','Proyectos y galería','Google Drive mantiene tus archivos, proyectos y chats disponibles entre Windows y Android.');
+  const drive = channel('drive','Proyectos, guion y galería','Google Drive comparte tus proyectos, guion, material y chats entre versiones compatibles de Nexus.');
+  const narrative=document.createElement('p');narrative.className='continuity-status';narrative.dataset.channelNarrative='';narrative.setAttribute('role','status');drive.append(narrative);
   const direct = channel('device','Vinculación con Nexus Agent','El enlace directo cifrado comparte los ajustes, skills y datos que elijas entre dispositivos vinculados.');
   channels.append(drive,direct);
   const googleDetails = document.createElement('details');googleDetails.className = 'continuity-advanced';googleDetails.innerHTML = '<summary>Configurar Google Drive y revisar versiones</summary>';
@@ -119,7 +128,7 @@
     if (args.op === 'configure') { delete section.dataset.loaded;toast('Vinculación guardada'); }
    }
   } catch (error) { toast(error.message); }
-  finally { pending = false;button.disabled = false;await refresh(); }
+  finally { pending = false;button.disabled = false;await refresh(true); }
  });
  document.addEventListener('visibilitychange', () => {
   clearTimeout(timer);

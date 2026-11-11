@@ -13,6 +13,7 @@ class DriveRemote(
     private val token:()->String,private val rootId:String,
     private val client:OkHttpClient=OkHttpClient.Builder().followRedirects(false).connectTimeout(20,TimeUnit.SECONDS).readTimeout(90,TimeUnit.SECONDS).build(),
     private val sessionDirectory:File?=null,
+    private val commitNamespace:String?=null,
 ) : SyncRemote {
     companion object {
         const val SCOPE="https://www.googleapis.com/auth/drive.file"
@@ -30,7 +31,10 @@ class DriveRemote(
     }
     private val known=mutableMapOf<String,SyncObject>()
     private var indexed=false
-    init {require(rootId.isEmpty() || rootId.matches(Regex("[a-zA-Z0-9_-]{1,200}")))}
+    init {require(rootId.isEmpty() || rootId.matches(Regex("[a-zA-Z0-9_-]{1,200}")));require(commitNamespace==null || commitNamespace=="story-v1")}
+    /** Old clients accept only commit-UUID.json, so they never read this opt-in stream. */
+    fun storyChannel():SyncRemote = DriveRemote(token,rootId,client,sessionDirectory?.let {File(it,"story-v1")},"story-v1")
+    private val commitPrefix get()=commitNamespace?.let {"$it-commit-"}?:"commit-"
     private fun request(builder:Request.Builder,allowed:Set<Int> = emptySet()):Response {
         val response=client.newCall(builder.header("Authorization","Bearer "+token()).build()).execute()
         if(response.isSuccessful || response.code==308 || response.code in allowed)return response
@@ -63,8 +67,9 @@ class DriveRemote(
         }while(page!=null)
         return result
     }
-    override fun commits():List<SyncObject> = list("'$rootId' in parents and trashed = false and name contains 'commit-'")
-        .filter {it.name.matches(Regex("commit-[a-f0-9-]{36}\\.json"))}
+    override fun commits():List<SyncObject> = list("'$rootId' in parents and trashed = false and name contains '$commitPrefix'")
+        .filter {it.name.matches(Regex(Regex.escape(commitPrefix)+"[a-f0-9-]{36}\\.json"))}
+        .map {it.copy(name="commit-"+it.name.removePrefix(commitPrefix))}
     override fun readCommit(item:SyncObject):ByteArray=request(Request.Builder().url(API+"/files/"+item.id+"?alt=media").get()).use {
         val bytes=bounded(it.body!!.byteStream())
         require(bytes.size<=8_388_608);bytes
@@ -110,7 +115,7 @@ class DriveRemote(
         error("La transferencia no se ha confirmado. Se reintentará.")
     }
     override fun putCommit(commit:SyncCommit,bytes:ByteArray) {
-        val name="commit-"+commit.id+".json"
+        val name=commitPrefix+commit.id+".json"
         if(find(name)!=null)return
         upload(name,bytes.size.toLong()){offset,count->bytes.copyOfRange(offset.toInt(),offset.toInt()+count)}
     }

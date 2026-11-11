@@ -27,7 +27,8 @@ interface SyncRemote {
 data class SyncConflict(val key:String,val versions:List<SyncRevision>)
 data class SyncResult(val rows:Map<String,JsonObject>,val conflicts:List<SyncConflict>,val uploaded:Int,val downloaded:Int)
 
-class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabel:String="Dispositivo") {
+class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabel:String="Dispositivo",
+    private val allowedKinds:Set<String> = kinds) {
     companion object {
         val json=Json { encodeDefaults=true;ignoreUnknownKeys=false }
         val kinds=setOf("projects","scenes","shots","characters","assets","generations","conversations","montages")
@@ -40,6 +41,8 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         }
     }
     private var state=if(file.exists())json.decodeFromString<SyncState>(file.readText()) else SyncState(label=deviceLabel)
+    private fun accepts(key:String)=key.substringBefore(':') in allowedKinds && key.length in 3..250 && !key.any {it<' '}
+    @Synchronized fun knownKeys():Set<String> = state.revisions.values.map {it.key}.toSet()
     private fun save(next:SyncState) { atomic(file,json.encodeToString(next));state=next }
     private fun heads(key:String):List<SyncRevision> {
         val rows=state.revisions.values.filter {it.key==key}
@@ -98,7 +101,7 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
     }
     /** Called before touching local data. An interrupted apply can be retried without re-uploading. */
     @Synchronized fun exchange(local:Map<String,JsonObject>):SyncResult {
-        require(local.keys.all(::validKey)) {"Entidad de sincronización no admitida."}
+        require(local.keys.all(::accepts)) {"Entidad de sincronización no admitida."}
         val bases=state.baselineHeads.toMutableMap()
         val changes=(local.keys+state.baseline.keys).filter {local[it]!=state.baseline[it]}.mapNotNull {key->
             val matching=heads(key).filter {it.value==local[key]}
@@ -123,7 +126,7 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
             val commit=json.decodeFromString<SyncCommit>(bytes.decodeToString())
             require(commit.format==1 && commit.id==id && commit.revisions.size<=20_000) {"Registro remoto incompatible."}
             for(r in commit.revisions) {
-                require(validKey(r.key) && runCatching {UUID.fromString(r.id)}.isSuccess && r.id !in r.parents && r.parents.size<=1000)
+                require(accepts(r.key) && runCatching {UUID.fromString(r.id)}.isSuccess && r.id !in r.parents && r.parents.size<=1000)
                 val existing=state.revisions[r.id]
                 require(existing==null || existing==r) {"Una revisión remota ha cambiado de contenido."}
             }
@@ -144,11 +147,14 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         }
         return SyncResult(rows,conflicts,uploaded,downloaded)
     }
-    @Synchronized fun acknowledge(rows:Map<String,JsonObject>) {
+    @Synchronized fun acknowledge(rows:Map<String,JsonObject>,preserveKeys:Set<String> = emptySet()) {
         val bases=state.revisions.values.map {it.key}.distinct().associateWith {key->
             val h=heads(key);if(values(h).distinct().size>1)listOf(h.last().id)else h.map {it.id}
         }
-        save(state.copy(baseline=rows,baselineHeads=bases))
+        // A retained local conflict is not an implicit resolution. Keep its pre-apply baseline,
+        // otherwise the next cycle would publish the retained text as a new child of a remote head.
+        save(state.copy(baseline=rows.filterKeys {it !in preserveKeys}+state.baseline.filterKeys {it in preserveKeys},
+            baselineHeads=bases.filterKeys {it !in preserveKeys}+state.baselineHeads.filterKeys {it in preserveKeys}))
     }
     @Synchronized fun resolve(key:String,revisionId:String) {
         val h=heads(key);val selected=h.firstOrNull {it.id==revisionId}?:error("La versión ya no está disponible.")
