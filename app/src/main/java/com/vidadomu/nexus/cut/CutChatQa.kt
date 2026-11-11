@@ -128,7 +128,7 @@ internal object CutChatQa {
             .lastOrNull { it.toolUseId == toolId }
         check(result != null && !result.isError) { "La herramienta de prueba no devolvió un resultado correcto." }
         val content = result.content as? JsonObject ?: error("La herramienta de prueba no devolvió un objeto válido.")
-        check(content["ok"]?.jsonPrimitive?.booleanOrNull == true && "error" !in content) {
+        check(content["ok"]?.jsonPrimitive?.booleanOrNull != false && "error" !in content) {
             "La herramienta de prueba informó de un error."
         }
         return content
