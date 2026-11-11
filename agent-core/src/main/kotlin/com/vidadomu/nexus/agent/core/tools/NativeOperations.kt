@@ -76,12 +76,12 @@ object NativeOperationTools {
         NativeTool(operations,"prepare_whisper_model",ToolCategory.ORGANIZE,
             "Descarga el modelo Whisper Base local de 148 MB por HTTPS y verifica su SHA-256. Sólo descarga pesos; no sube audio, no usa API de pago ni borra otros modelos. Úsalo cuando el usuario pida habilitar Whisper local y falte el modelo.",schema {}),
         NativeTool(operations,"edit_video_assets",ToolCategory.ORGANIZE,
-            "Edita medios locales sin coste de proveedor: recorta, une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Conserva originales. Devuelve edit_job_id: consulta get_media_edit_job hasta finalizar, sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
+            "Edita medios locales sin coste de proveedor: recorta, divide vídeos largos en clips de 30 minutos (split_video), une vídeos en orden, quita, sustituye o mezcla audio y extrae audio. Para extract_audio sobre vídeos largos, divide automáticamente en pistas de audio indexadas. Nunca pidas al usuario usar un editor externo cuando puedas procesarlo por partes. Conserva originales. Devuelve edit_job_id: consulta get_media_edit_job hasta finalizar, sin repetir la creación. Una pista añadida corta se repite hasta cubrir el vídeo. No ejecutes shell ni inventes duraciones.",
             schema {
-                string("action","Operación.",required=true,enum=listOf("trim","concat","remove_audio","replace_audio","mix_audio","extract_audio"))
+                string("action","Operación.",required=true,enum=listOf("trim","concat","remove_audio","replace_audio","mix_audio","extract_audio","split_video"))
                 stringArray("asset_ids","Ids indexados, de 1 a 12; concat conserva este orden.",required=true)
-                integer("start_ms","Inicio del recorte en milisegundos.")
-                integer("end_ms","Final del recorte en milisegundos, obligatorio para trim.")
+                integer("start_ms","Inicio del recorte en milisegundos (hasta 12 horas).")
+                integer("end_ms","Final del recorte en milisegundos, obligatorio para trim (hasta 12 horas).")
                 string("audio_asset_id","Pista adicional para replace_audio o mix_audio.")
             }),
         NativeTool(operations,"extract_video_frames",ToolCategory.ORGANIZE,

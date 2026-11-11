@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.media.MediaCodec
+import android.media.MediaMuxer
+import java.nio.ByteBuffer
 import android.net.Uri
 import android.os.Build
 import androidx.media3.common.MediaItem
@@ -99,14 +102,24 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             if(inspect(id)["tracks"]!!.jsonArray.none {it.jsonObject["mime"]!!.jsonPrimitive.content.startsWith("audio/")})
                 throw ToolInputException("La pista adicional no contiene audio.")
         }
-        val seconds=infos.sumOf {it["duration_ms"]!!.jsonPrimitive.long}/1000
-        if(seconds>3600) throw ToolInputException("Divide la edición en encargos de hasta una hora.")
-        if(app.filesDir.usableSpace<maxOf(128L*1024*1024,seconds*1_000_000))
+        val totalMs=infos.sumOf {it["duration_ms"]!!.jsonPrimitive.long}
+        val selectedMs=if(spec.action in setOf("trim","extract_audio","transcribe","analyze_audio"))
+            (spec.endMs ?: totalMs)-spec.startMs else totalMs
+        if(selectedMs>3_600_000 && spec.action !in setOf("split_video","extract_audio"))
+            throw ToolInputException("Esta operación admite como máximo una hora. Usa split_video para segmentar archivos largos.")
+        if(selectedMs>43_200_000) throw ToolInputException("El máximo automático es de 12 horas por archivo.")
+        val seconds=selectedMs/1000
+        val bytesPerSecond=if(spec.action=="extract_audio") 96_000L else 1_000_000L
+        if(app.filesDir.usableSpace<maxOf(128L*1024*1024,seconds*bytesPerSecond))
             throw ToolInputException("No hay suficiente espacio libre para exportar sin tocar los originales.")
     }
     suspend fun execute(job:MediaEditJob,onProgress:(Int)->Unit):List<String> {
         validate(job.spec)
-        val spec=job.spec;val first=source(spec.assetIds.first())
+        val spec=job.spec
+        if(spec.action=="split_video" || (spec.action=="extract_audio" &&
+            (spec.endMs ?: inspect(spec.assetIds.first())["duration_ms"]!!.jsonPrimitive.long)-spec.startMs>3_600_000L))
+            return processInChunks(job,onProgress)
+        val first=source(spec.assetIds.first())
         val folder=File(app.filesDir,"agent_exports").apply {mkdirs()}
         if(spec.action=="frames") return frames(job,first,folder,onProgress)
         val stage=File(folder,"edit_${job.id}.part.mp4")
@@ -152,6 +165,128 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             return listOf(index(job,output,first,type,if(type==AssetType.AUDIO) "audio/mp4" else "video/mp4",info).id)
         } finally {stage.delete()}
     }
+    /** Segments long media locally; every chunk is a bounded, independently indexed export.
+     * Originals are never modified. A failed chunk leaves already completed exports accessible.
+     */
+    private suspend fun processInChunks(job:MediaEditJob,onProgress:(Int)->Unit):List<String> {
+        val original=job.spec
+        val durationMs=inspect(original.assetIds.single())["duration_ms"]!!.jsonPrimitive.long
+        val rangeStart=original.startMs
+        val rangeEnd=original.endMs ?: durationMs
+        val ranges=mediaChunkRanges(rangeStart,rangeEnd)
+        val parts=ranges.size
+        val outputs=mutableListOf<String>()
+        for((i,range) in ranges.withIndex()) {
+            currentCoroutineContext().ensureActive()
+            val (start,end)=range
+            val partSpec=original.copy(
+                action=if(original.action=="split_video") "trim" else "extract_audio",
+                startMs=start,endMs=end
+            )
+            val partJob=job.copy(id="${job.id}_part_${i+1}",spec=partSpec)
+            outputs+=execute(partJob) {partProgress ->
+                onProgress(((i*94)+(partProgress.coerceIn(0,100)*94/100))/parts)
+            }
+            onProgress((i+1)*94/parts)
+        }
+        if(original.action=="extract_audio") {
+            onProgress(96)
+            val chunks=outputs.map { id ->
+                val uri=Uri.parse(source(id).uri)
+                File(uri.path ?: throw ToolInputException("No se encontró un segmento de audio."))
+            }
+            val folder=File(app.filesDir,"agent_exports").apply {mkdirs()}
+            val stage=File(folder,"edit_${job.id}.merged.part.m4a")
+            val final=File(folder,"edit_${job.id}.m4a")
+            stage.delete()
+            try {
+                withContext(Dispatchers.IO) { concatAudioAac(chunks,stage) }
+                if(!stage.isFile || stage.length()==0L || inspectFile(stage)<=0L)
+                    throw ToolInputException("No se pudo comprobar el audio unido.")
+                if(!stage.renameTo(final)) throw ToolInputException("No se pudo publicar el audio unido.")
+                val result=index(job,final,source(original.assetIds.single()),AssetType.AUDIO,"audio/mp4",inspectFile(final))
+                onProgress(99)
+                return listOf(result.id)
+            } catch(e:Exception) {
+                throw ToolInputException("No se pudo unir el audio automáticamente; los segmentos extraídos permanecen disponibles.")
+            } finally { stage.delete() }
+        }
+        return outputs
+    }
+
+    /** Fast AAC remux: no second encode, source and intermediate exports remain intact. */
+    private fun concatAudioAac(chunks:List<File>,target:File) {
+        if(chunks.isEmpty()) throw ToolInputException("No hay audio para unir.")
+        var muxer:MediaMuxer?=null
+        var started=false
+        var offsetUs=0L
+        var previousPts=-1L
+        var totalSamples=0L
+        var expectedRate=-1
+        var expectedChannels=-1
+        try {
+            for(chunk in chunks) {
+                val extractor=MediaExtractor()
+                try {
+                    extractor.setDataSource(chunk.path)
+                    val track=(0 until extractor.trackCount).firstOrNull {
+                        extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)=="audio/mp4a-latm"
+                    } ?: throw ToolInputException("Un segmento no contiene audio AAC compatible.")
+                    val format=extractor.getTrackFormat(track)
+                    val rate=format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                    val channels=format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                    if(muxer==null) {
+                        muxer=MediaMuxer(target.path,MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                        muxer.addTrack(format)
+                        muxer.start()
+                        started=true
+                        expectedRate=rate
+                        expectedChannels=channels
+                    } else if(rate!=expectedRate || channels!=expectedChannels) {
+                        throw ToolInputException("Los segmentos tienen frecuencias o canales diferentes.")
+                    }
+                    extractor.selectTrack(track)
+                    val declaredSize=if(format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE))
+                        format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 262144
+                    if(declaredSize<=0 || declaredSize>8*1024*1024)
+                        throw ToolInputException("El tamaño de muestra AAC no es compatible.")
+                    val buffer=ByteBuffer.allocateDirect(maxOf(262144,declaredSize))
+                    val info=MediaCodec.BufferInfo()
+                    var firstUs=-1L
+                    var lastRelativeUs=-1L
+                    var segmentSamples=0
+                    val frameUs=maxOf(1L,1024L*1_000_000L/rate)
+                    while(true) {
+                        buffer.clear()
+                        val size=extractor.readSampleData(buffer,0)
+                        if(size<0) break
+                        if(size>buffer.capacity()) throw ToolInputException("La muestra AAC excede el búfer.")
+                        val sampleUs=extractor.sampleTime
+                        if(sampleUs<0) break
+                        if(firstUs<0L) firstUs=sampleUs
+                        val relativeUs=(sampleUs-firstUs).coerceAtLeast(0L)
+                        val pts=offsetUs+relativeUs
+                        if(pts<=previousPts) throw ToolInputException("Marcas de tiempo AAC desordenadas.")
+                        info.set(0,size,pts,extractor.sampleFlags)
+                        buffer.position(0)
+                        buffer.limit(size)
+                        muxer!!.writeSampleData(0,buffer,info)
+                        previousPts=pts
+                        lastRelativeUs=relativeUs
+                        segmentSamples++
+                        totalSamples++
+                        extractor.advance()
+                    }
+                    if(segmentSamples==0) throw ToolInputException("Uno de los segmentos está vacío.")
+                    offsetUs+=lastRelativeUs+frameUs
+                } finally { extractor.release() }
+            }
+            if(totalSamples==0L) throw ToolInputException("No se encontraron muestras AAC.")
+        } finally {
+            try { if(started) muxer?.stop() } finally { muxer?.release() }
+        }
+    }
+
     private fun inspectFile(file:File):Long = duration(Uri.fromFile(file))
     private suspend fun export(composition:Composition,file:File,onProgress:(Int)->Unit) = withContext(Dispatchers.Main) {
         val complete=CompletableDeferred<Unit>()
