@@ -99,14 +99,23 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             if(inspect(id)["tracks"]!!.jsonArray.none {it.jsonObject["mime"]!!.jsonPrimitive.content.startsWith("audio/")})
                 throw ToolInputException("La pista adicional no contiene audio.")
         }
-        val seconds=infos.sumOf {it["duration_ms"]!!.jsonPrimitive.long}/1000
-        if(seconds>3600) throw ToolInputException("Divide la edición en encargos de hasta una hora.")
+        val totalMs=infos.sumOf {it["duration_ms"]!!.jsonPrimitive.long}
+        val selectedMs=if(spec.action=="trim" || spec.action in setOf("transcribe","analyze_audio"))
+            (spec.endMs ?: totalMs)-spec.startMs else totalMs
+        if(selectedMs>3_600_000 && spec.action !in setOf("split_video","extract_audio"))
+            throw ToolInputException("Esta operación admite como máximo una hora. Usa split_video para segmentar archivos largos.")
+        if(selectedMs>43_200_000) throw ToolInputException("El máximo automático es de 12 horas por archivo.")
+        val seconds=selectedMs/1000
         if(app.filesDir.usableSpace<maxOf(128L*1024*1024,seconds*1_000_000))
             throw ToolInputException("No hay suficiente espacio libre para exportar sin tocar los originales.")
     }
     suspend fun execute(job:MediaEditJob,onProgress:(Int)->Unit):List<String> {
         validate(job.spec)
-        val spec=job.spec;val first=source(spec.assetIds.first())
+        val spec=job.spec
+        if(spec.action=="split_video" || (spec.action=="extract_audio" &&
+            inspect(spec.assetIds.first())["duration_ms"]!!.jsonPrimitive.long>3_600_000L))
+            return processInChunks(job,onProgress)
+        val first=source(spec.assetIds.first())
         val folder=File(app.filesDir,"agent_exports").apply {mkdirs()}
         if(spec.action=="frames") return frames(job,first,folder,onProgress)
         val stage=File(folder,"edit_${job.id}.part.mp4")
@@ -152,6 +161,32 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             return listOf(index(job,output,first,type,if(type==AssetType.AUDIO) "audio/mp4" else "video/mp4",info).id)
         } finally {stage.delete()}
     }
+    /** Segments long media locally; every chunk is a bounded, independently indexed export.
+     * Originals are never modified. A failed chunk leaves already completed exports accessible.
+     */
+    private suspend fun processInChunks(job:MediaEditJob,onProgress:(Int)->Unit):List<String> {
+        val original=job.spec
+        val durationMs=inspect(original.assetIds.single())["duration_ms"]!!.jsonPrimitive.long
+        val chunkMs=1_800_000L // 30-minute chunks: safe within the one-hour Media3 export budget.
+        val parts=((durationMs+chunkMs-1)/chunkMs).toInt()
+        val outputs=mutableListOf<String>()
+        for(i in 0 until parts) {
+            currentCoroutineContext().ensureActive()
+            val start=i*chunkMs
+            val end=minOf(durationMs,start+chunkMs)
+            val partSpec=original.copy(
+                action=if(original.action=="split_video") "trim" else "extract_audio",
+                startMs=start,endMs=end
+            )
+            val partJob=job.copy(id="${job.id}_part_${i+1}",spec=partSpec)
+            outputs+=execute(partJob) {partProgress ->
+                onProgress(((i*100)+(partProgress.coerceIn(0,100)))/parts)
+            }
+            onProgress((i+1)*100/parts)
+        }
+        return outputs
+    }
+
     private fun inspectFile(file:File):Long = duration(Uri.fromFile(file))
     private suspend fun export(composition:Composition,file:File,onProgress:(Int)->Unit) = withContext(Dispatchers.Main) {
         val complete=CompletableDeferred<Unit>()
