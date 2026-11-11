@@ -31,6 +31,15 @@ class MediaEditSpecTest {
         for(raw in listOf("""{"asset_id":"v","timestamps_ms":[]}""","""{"asset_id":"v","timestamps_ms":[-1]}""","""{"asset_id":"v","timestamps_ms":[1.2]}"""))
             assertThrows(com.vidadomu.nexus.agent.core.tools.ToolInputException::class.java) {MediaEditSpec.parse("frames",input(raw),null)}
     }
+    @Test fun longMediaCanBeSegmentedWithoutRelaxingUnrelatedActions() {
+        val split=MediaEditSpec.parse("split_video",input("""{"asset_ids":["long-video"]}"""),null)
+        assertEquals("split_video",split.action)
+        val lateTrim=MediaEditSpec.parse("trim",input("""{"asset_ids":["long-video"],"start_ms":3600000,"end_ms":3660000}"""),null)
+        assertEquals(3660000L,lateTrim.endMs)
+        assertThrows(com.vidadomu.nexus.agent.core.tools.ToolInputException::class.java) {
+            MediaEditSpec.parse("split_video",input("""{"asset_ids":["a","b"]}"""),null)
+        }
+    }
     @Test fun subtitlesUseHoursAndMillisecondPrecision() {
         assertEquals("01:02:03,004",WhisperTranscription.timestamp(3723004))
         assertEquals("00:00:00,000",WhisperTranscription.timestamp(-1))
