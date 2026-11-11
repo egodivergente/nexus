@@ -3,14 +3,16 @@
 Para quien continúe (Codex u otro agente). Rama: `feat/nexus-cut-20261111`. No trabajar sobre `main` (va muy atrás) ni sobre `feat/flow-live-20261108` (es la base vc204, no se toca).
 Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS.md`.
 
+**Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada por Tailscale con hashes comprobados. Se solicitó abrir el instalador. Instalación y recorrido funcional físico pendientes de confirmación; no se declaran probados por la entrega.
+
 ## Estado verificado
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
 | Hito A: `:cut-core` (motor de Corte + bus `CutSession` + registro de capacidades) | Hecho | `gradlew :cut-core:test` → 101 pruebas, 0 fallos |
-| Herramientas del agente `cut_catalog/describe/read/edit/create` (`agent-core/.../tools/CutTools.kt`) | Hecho | `CutToolsTest` (2) y suite `:agent-core:test` 456, 0 fallos |
+| Herramientas del agente `cut_catalog/describe/read/edit/create` (`agent-core/.../tools/CutTools.kt`) | Hecho | `CutToolsTest` (2) y suite `:agent-core:test`: 456 registradas, 452 PASS, 4 omitidas, 0 fallos |
 | Toolchain Kotlin 2.3.20, compileSdk 36, Media3 1.11.1 | Hecho | APK `assembleAgentPreview` compilada en AXELPC sobre `8885fb2` |
-| App: 906 pruebas unitarias | 7 fallan | Fallan igual en la base vc204 intacta (comprobado). No son de Nexus Cut. Lista en la tarea «Update 7 stale Nexus app unit tests». |
+| App vc205: 922 pruebas unitarias | 915 PASS, 7 FAIL, 0 omitidas | Los siete fallos coinciden exactamente por clase, método y aserción con los XML de vc204 (31 pruebas seleccionadas, 24 PASS y esos 7 FAIL). No son regresiones de Nexus Cut ni se han desactivado. |
 | `media.import` / `render.export` / `render.status` / `render.cancel` | Hecho en núcleo | `DeviceCapabilitiesTest` (3) |
 
 ## Capa Android escrita en d687cbf (primera compilación completada)
@@ -52,4 +54,12 @@ No inventar estados ni resultados; un build fallido se informa como fallido. No 
 5. **Entradas: integradas.** Biblioteca: selección múltiple → «Montar», en orden visible y con proyecto activo; Guion: escena o proyecto en orden narrativo, con vínculos n:m y legacy; visor: «Editar en Nexus Cut». Todas llaman a `NexusCut.openWith` y editan mediante `CutSession`. Reabrir no duplica clips ni restaura los borrados; aperturas simultáneas se serializan y una edición concurrente del agente se protege por revisión. `:app:testAgentPreviewUnitTest` con filtros de Cut, Biblioteca, navegación y visor: **22 pruebas PASS**, sin omitidas (10 nuevas de Cut y 12 existentes). No es la suite completa.
 
    Solo se montan copias locales identificadas. Para resultados antiguos múltiples cuyas URIs se relocalizaron sin conservar una asociación inequívoca con cada output, el visor rechaza adivinar la posición; se puede elegir el asset local en Biblioteca. El fallback de generación monoresultado sí está cubierto por prueba.
-6. **Preparación de entrega.** Versión `1.9.169-agent-preview / versionCode 205`. `tools/release/entregar-tailscale.ps1` permite elegir el worktree y exige paquete/versión, certificado existente, alineación de 16 KiB y SHA-256 completo local/remoto/Descargas antes de solicitar el instalador. El wrapper privado de AXELPC acepta `-Worktree` para no firmar por error la APK de la rama base. Compilación final, suite completa y estado real de entrega se registrarán tras ejecutarlos; abrir el instalador no demuestra instalación ni prueba funcional.
+6. **APK compilada y entregada; instalación y QA manual pendientes.** `1.9.169-agent-preview / versionCode 205`, paquete `com.vidadomu.nexus.agent`, fuente `0f3c89750010955948bd84fe09b6850437bd2c81`. `:app:assembleAgentPreview` **BUILD SUCCESSFUL in 2m 36s** en AXELPC. Comprobados versión, permiso, servicio y revisión `0f3c89750010` dentro de los DEX del APK terminado.
+
+   Suite completa `:cut-core:test :agent-core:test :app:testAgentPreviewUnitTest --continue`: **BUILD FAILED** por las siete pruebas preexistentes de la app; 922 pruebas de app, 915 PASS y 7 FAIL, sin errores ni omitidas. Las 16 pruebas de app de Nexus Cut pasan (6 selección de assets, 4 reapertura, 4 hueco inicial y 2 matemáticas de exportación). `cut-core` y `agent-core` fueron `UP-TO-DATE` en esta última invocación: se reutilizaron sus resultados del paso 1.
+
+   `tools/release/entregar-tailscale.ps1` exige paquete/versión, certificado existente, alineación de 16 KiB y SHA-256 completo local/remoto/Descargas. El wrapper privado de AXELPC acepta `-Worktree` para usar la APK de Cut sin tocar la rama base. El primer intento falló con timeout de SSH (el teléfono estaba offline); tras el aviso de Vidal, el segundo completó la transferencia, verificó ambas copias y solicitó abrir el instalador. No se usó ADB ni se ejecutó desinstalación o borrado de datos. No se han hecho generaciones ni llamadas de prueba a proveedores.
+
+   - Certificado SHA-256: `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`.
+   - APK SHA-256 local = S25 = Descargas: `57e6a8e0541c366deef1199d26360efbcb2fccbd154715e0a12fb9776551f867` (47 906 831 bytes).
+   - **Pendiente en el S25:** confirmar actualización; Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproducible en Biblioteca. No hay evidencia de ese recorrido todavía.
