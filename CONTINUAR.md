@@ -413,3 +413,5 @@ vc188 / 1.9.152 «Sirio», rama `feat/flow-live-20261108`. Pestaña Flow con tu 
 # Nexus Cut - 2026-11-11
 
 Rama `feat/nexus-cut-20261111` (parte de vc204, `90d9a5a`). Hito A: el núcleo de Corte vive en el módulo `:cut-core` con bus de comandos (`CutSession`), registro de 54 capacidades y cinco herramientas del agente (`cut_*`) que solo se registran cuando la app monte `ToolDeps.cut`. Kotlin 2.3.20, compileSdk 36 y Media3 1.11.1. Sin interfaz todavía y sin APK entregada: el hito B migra motor, preview, exportación y pantalla. Decisiones y riesgos en `docs/NEXUS-CUT.md`. Quien compile esta rama: `gradlew :cut-core:test :agent-core:test`.
+
+Relevo del 2026-11-11 (hito B a medias, código de la app sin compilar): leer `docs/NEXUS-CUT-RELEVO.md` antes de seguir.
