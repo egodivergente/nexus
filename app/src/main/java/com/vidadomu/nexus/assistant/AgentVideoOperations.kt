@@ -169,13 +169,12 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
         val durationMs=inspect(original.assetIds.single())["duration_ms"]!!.jsonPrimitive.long
         val rangeStart=original.startMs
         val rangeEnd=original.endMs ?: durationMs
-        val chunkMs=1_800_000L // 30-minute chunks: safe within the one-hour Media3 export budget.
-        val parts=((rangeEnd-rangeStart+chunkMs-1)/chunkMs).toInt()
+        val ranges=mediaChunkRanges(rangeStart,rangeEnd)
+        val parts=ranges.size
         val outputs=mutableListOf<String>()
-        for(i in 0 until parts) {
+        for((i,range) in ranges.withIndex()) {
             currentCoroutineContext().ensureActive()
-            val start=rangeStart+i*chunkMs
-            val end=minOf(rangeEnd,start+chunkMs)
+            val (start,end)=range
             val partSpec=original.copy(
                 action=if(original.action=="split_video") "trim" else "extract_audio",
                 startMs=start,endMs=end
