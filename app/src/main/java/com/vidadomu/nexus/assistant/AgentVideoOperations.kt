@@ -185,9 +185,9 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             )
             val partJob=job.copy(id="${job.id}_part_${i+1}",spec=partSpec)
             outputs+=execute(partJob) {partProgress ->
-                onProgress(((i*100)+(partProgress.coerceIn(0,100)))/parts)
+                onProgress(((i*94)+(partProgress.coerceIn(0,100)*94/100))/parts)
             }
-            onProgress((i+1)*100/parts)
+            onProgress((i+1)*94/parts)
         }
         if(original.action=="extract_audio") {
             onProgress(96)
@@ -283,8 +283,7 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
             }
             if(totalSamples==0L) throw ToolInputException("No se encontraron muestras AAC.")
         } finally {
-            if(started) muxer?.stop()
-            muxer?.release()
+            try { if(started) muxer?.stop() } finally { muxer?.release() }
         }
     }
 
