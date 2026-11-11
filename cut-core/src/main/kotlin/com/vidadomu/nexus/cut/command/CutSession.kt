@@ -168,7 +168,7 @@ class CutSession(
         if (request.dryRun) return done(before.revision, committed = false, preview = after)
         if (!changed) {
             // Solo cambió la vista (cabezal, selección): se ve al instante y no toca el historial.
-            _state.value = before.copy(view = tidy(draft.view, before.project))
+            publish(before.project, draft.view, before.view)
             return done(before.revision, committed = false)
         }
         val committed = after.copy(revision = before.revision + 1, modifiedAtMs = clock())
@@ -176,7 +176,7 @@ class CutSession(
         undoStack.addLast(Entry(label, request.origin, changes, head(before.project).takeIf { headChanged }, head(after).takeIf { headChanged }))
         while (undoStack.size > historyLimit) undoStack.removeFirst()
         redoStack.clear()
-        _state.value = snapshot(committed, tidy(draft.view, committed))
+        publish(committed, draft.view, before.view)
         log?.committed(committed.revision, committed.modifiedAtMs, request.origin, label, request.idempotencyKey, request.ops, draft.created)
         val outcome = done(committed.revision, committed = true)
         request.idempotencyKey?.let { replays[it] = outcome }
@@ -196,7 +196,7 @@ class CutSession(
         val project = base.copy(timeline = timeline, revision = current.revision + 1, modifiedAtMs = clock())
         persist(project)?.let { from.addLast(entry); return reject(request, CutError(ErrorCode.INTERNAL, it, currentRevision = current.revision)) }
         (if (undo) redoStack else undoStack).addLast(entry)
-        _state.value = snapshot(project, tidy(current.view, project))
+        publish(project, current.view, current.view)
         val label = (if (undo) "Deshacer: " else "Rehacer: ") + entry.label
         log?.committed(project.revision, project.modifiedAtMs, request.origin, label, null, request.ops, emptyList())
         _events.tryEmit(if (undo) CutEvent.Undone(project.revision, request.origin, entry.label) else CutEvent.Redone(project.revision, request.origin, entry.label))
@@ -242,6 +242,15 @@ class CutSession(
         log?.rejected(revision, clock(), request.origin, error, request.ops)
         _events.tryEmit(CutEvent.Rejected(revision, request.origin, error))
         return Outcome.Failed(error)
+    }
+
+    /**
+     * Publica el nuevo estado. El cabezal puede haberse movido por la reproducción mientras se preparaba la
+     * transacción: si la petición no lo cambió, se respeta el que hay ahora en vez de devolverlo atrás.
+     */
+    private fun publish(project: Project, wanted: ViewState, base: ViewState) = _state.update { live ->
+        val view = wanted.copy(playheadUs = if (wanted.playheadUs == base.playheadUs) live.view.playheadUs else wanted.playheadUs, playing = live.view.playing)
+        snapshot(project, tidy(view, project))
     }
 
     private fun snapshot(project: Project, view: ViewState) = CutState(
