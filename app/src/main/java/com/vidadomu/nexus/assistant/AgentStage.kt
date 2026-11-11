@@ -234,7 +234,8 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
         // Its cutout/system-bar safe area is still applied exactly once to the content below.
         NexusSheetSystemBars()
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
+            // A separate window must not inherit the Activity's already-consumed safe area.
+            Column(Modifier.fillMaxSize().padding(NexusInsets.fullScreen.asPaddingValues())) {
                 Row(Modifier.fillMaxWidth().padding(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
                     Text(results.getOrNull(pager.currentPage)?.name ?: "Resultado", color = Color.White, style = MaterialTheme.typography.titleSmall,
                         maxLines = 1, modifier = Modifier.weight(1f).padding(start = NexusTokens.space8))
