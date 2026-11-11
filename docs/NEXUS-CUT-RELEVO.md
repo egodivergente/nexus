@@ -3,7 +3,7 @@
 Para quien continúe (Codex u otro agente). Rama: `feat/nexus-cut-20261111`. No trabajar sobre `main` (va muy atrás) ni sobre `feat/flow-live-20261108` (es la base vc204, no se toca).
 Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS.md`.
 
-**Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada por Tailscale con hashes comprobados. Se solicitó abrir el instalador. Instalación y recorrido funcional físico pendientes de confirmación; no se declaran probados por la entrega.
+**Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada por Tailscale con hashes comprobados. Tras abrir el instalador, Vidal confirmó que la actualización quedó instalada. El recorrido funcional físico sigue pendiente; no se declara probado por la entrega o por la instalación.
 
 ## Estado verificado
 
@@ -54,7 +54,7 @@ No inventar estados ni resultados; un build fallido se informa como fallido. No 
 5. **Entradas: integradas.** Biblioteca: selección múltiple → «Montar», en orden visible y con proyecto activo; Guion: escena o proyecto en orden narrativo, con vínculos n:m y legacy; visor: «Editar en Nexus Cut». Todas llaman a `NexusCut.openWith` y editan mediante `CutSession`. Reabrir no duplica clips ni restaura los borrados; aperturas simultáneas se serializan y una edición concurrente del agente se protege por revisión. `:app:testAgentPreviewUnitTest` con filtros de Cut, Biblioteca, navegación y visor: **22 pruebas PASS**, sin omitidas (10 nuevas de Cut y 12 existentes). No es la suite completa.
 
    Solo se montan copias locales identificadas. Para resultados antiguos múltiples cuyas URIs se relocalizaron sin conservar una asociación inequívoca con cada output, el visor rechaza adivinar la posición; se puede elegir el asset local en Biblioteca. El fallback de generación monoresultado sí está cubierto por prueba.
-6. **APK compilada y entregada; instalación y QA manual pendientes.** `1.9.169-agent-preview / versionCode 205`, paquete `com.vidadomu.nexus.agent`, fuente `0f3c89750010955948bd84fe09b6850437bd2c81`. `:app:assembleAgentPreview` **BUILD SUCCESSFUL in 2m 36s** en AXELPC. Comprobados versión, permiso, servicio y revisión `0f3c89750010` dentro de los DEX del APK terminado.
+6. **APK compilada, entregada e instalación confirmada por Vidal; QA manual pendiente.** `1.9.169-agent-preview / versionCode 205`, paquete `com.vidadomu.nexus.agent`, fuente `0f3c89750010955948bd84fe09b6850437bd2c81`. `:app:assembleAgentPreview` **BUILD SUCCESSFUL in 2m 36s** en AXELPC. Comprobados versión, permiso, servicio y revisión `0f3c89750010` dentro de los DEX del APK terminado.
 
    Suite completa `:cut-core:test :agent-core:test :app:testAgentPreviewUnitTest --continue`: **BUILD FAILED** por las siete pruebas preexistentes de la app; 922 pruebas de app, 915 PASS y 7 FAIL, sin errores ni omitidas. Las 16 pruebas de app de Nexus Cut pasan (6 selección de assets, 4 reapertura, 4 hueco inicial y 2 matemáticas de exportación). `cut-core` y `agent-core` fueron `UP-TO-DATE` en esta última invocación: se reutilizaron sus resultados del paso 1.
 
@@ -62,4 +62,5 @@ No inventar estados ni resultados; un build fallido se informa como fallido. No 
 
    - Certificado SHA-256: `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`.
    - APK SHA-256 local = S25 = Descargas: `57e6a8e0541c366deef1199d26360efbcb2fccbd154715e0a12fb9776551f867` (47 906 831 bytes).
-   - **Pendiente en el S25:** confirmar actualización; Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproducible en Biblioteca. No hay evidencia de ese recorrido todavía.
+   - **S25:** Vidal indicó primero que seguía en 1.9.168 y posteriormente confirmó «ya instalada» tras la entrega de 1.9.169. Es confirmación manual del usuario, no lectura instrumentada de versión/datos.
+   - **Pendiente en el S25:** Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproducible en Biblioteca. No hay evidencia de ese recorrido todavía.
