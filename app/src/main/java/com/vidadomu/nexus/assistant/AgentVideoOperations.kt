@@ -180,21 +180,21 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
                 .setRemoveVideo(spec.action in setOf("extract_audio","transcribe","analyze_audio")).apply {
                     if(spec.action in setOf("transcribe","analyze_audio")) {
                         val mono=ChannelMixingAudioProcessor().apply {
-                            for(channels in 1..2) putChannelMixingMatrix(ChannelMixingMatrix.create(channels,1))
+                            for(channels in 1..2) putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(channels,1))
                         }
                         val resample=SonicAudioProcessor().apply {setOutputSampleRateHz(16000)}
                         setEffects(Effects(listOf(mono,resample),emptyList()))
                     }
                 }.build()
         }
-        val sequences=mutableListOf(EditedMediaItemSequence(videoItems))
+        val sequences=mutableListOf(EditedMediaItemSequence.Builder(videoItems).build())
         spec.audioAssetId?.let {id ->
             val d=duration(Uri.parse(first.uri))
             val audio=EditedMediaItem.Builder(MediaItem.Builder().setUri(source(id).uri)
                 .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(d).build()).build())
                 .setRemoveVideo(true).build()
             // The requested soundtrack covers the output duration; short tracks loop.
-            sequences+=EditedMediaItemSequence(listOf(audio),true)
+            sequences+=EditedMediaItemSequence.Builder(listOf(audio)).setIsLooping(true).build()
         }
         try {
             withTimeout(30*60*1000L) {export(Composition.Builder(sequences).build(),stage,onProgress)}

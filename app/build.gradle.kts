@@ -17,7 +17,7 @@ fun versionCodename(code: Int) = versionCodenames[(code / 10) % versionCodenames
 
 android {
     namespace = "com.vidadomu.nexus"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
@@ -99,13 +99,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.media3.common.util.UnstableApi"
-        )
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -123,6 +116,17 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.all { it.maxHeapSize = "64m" }
+    }
+}
+
+// Kotlin 2.3: kotlinOptions ya no existe; mismas opciones con compilerOptions.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.media3.common.util.UnstableApi",
+        )
     }
 }
 
@@ -182,10 +186,11 @@ dependencies {
     implementation("io.coil-kt:coil-video:2.7.0")
 
     // Video/Audio playback with Media3 ExoPlayer
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
-    implementation("androidx.media3:media3-common:1.4.1")
-    implementation("androidx.media3:media3-transformer:1.4.1")
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-ui:1.11.1")
+    implementation("androidx.media3:media3-common:1.11.1")
+    implementation("androidx.media3:media3-transformer:1.11.1")
+    implementation("androidx.media3:media3-effect:1.11.1")
 
     // Security Crypto for Keystore backed storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
