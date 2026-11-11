@@ -26,13 +26,17 @@ import com.vidadomu.nexus.ui.components.nexusScreenTitleStyle
 internal fun LibrarySelectionBar(count: Int, single: Boolean, favoritesOn: Boolean,
     onClose: () -> Unit, onSelectAll: () -> Unit, onExport: () -> Unit,
     onFavorite: () -> Unit, onHide: () -> Unit, onOptions: () -> Unit,
-    onMove: () -> Unit, onRename: () -> Unit, onCrop: (() -> Unit)?, onArtBox: (() -> Unit)?) {
+    onMove: () -> Unit, onRename: () -> Unit, onCrop: (() -> Unit)?, onArtBox: (() -> Unit)?,
+    onMontar: (() -> Unit)?, mounting: Boolean = false) {
     var menu by remember { mutableStateOf(false) }
     NexusTopAppBar(title = {
         Text(if (count == 1) "1 marcado" else "$count marcados", style = nexusScreenTitleStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }, showBalance = false, navigationIcon = {
         IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Salir de la selección") }
     }, actions = {
+        TextButton(onClick = { onMontar?.invoke() }, enabled = onMontar != null && !mounting) {
+            Text(if (mounting) "Abriendo…" else "Montar")
+        }
         IconButton(onClick = onExport) { Icon(Icons.Default.Download, "Exportar en ZIP") }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más acciones sobre lo marcado") }

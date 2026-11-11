@@ -47,6 +47,9 @@ import com.vidadomu.nexus.agent.core.assets.storyCommand
 import com.vidadomu.nexus.agent.core.assets.storyView
 import com.vidadomu.nexus.assistant.AgentMediaStore
 import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.cut.NexusCut
+import com.vidadomu.nexus.cut.isLocalCutUri
+import com.vidadomu.nexus.cut.storyCutAssetIds
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.library.Thumb
@@ -66,6 +69,7 @@ private fun command(action: String, block: JsonObjectBuilder.() -> Unit = {}) = 
 }
 
 /** All three views read the same AssetIndex. Drafts are local editing buffers, never a second script. */
+@OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun StoryWorkspaceScreen(
     projectId: String,
@@ -130,6 +134,22 @@ fun StoryWorkspaceScreen(
             if (agentScope == "fragment") shot else null, if (agentScope == "fragment") block else null,
             agentMode, preservedIds.split('|').filter { it.isNotBlank() }.toSet()))
         onAgent()
+    }
+    fun mount(scene: String?) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                runtime.importHistory()
+                val snapshot = runtime.assets.snapshot()
+                val ids = storyCutAssetIds(snapshot, projectId, scene)
+                val remote = ids.mapNotNull { id -> snapshot.assets.firstOrNull { it.id == id } }.firstOrNull { !isLocalCutUri(it.uri) }
+                require(remote == null) { "«${remote?.displayName}» necesita una copia local para editar en Nexus Cut." }
+                NexusCut.openWith(app, ids, projectId, scene)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { snackbar.showSnackbar(error.message ?: "No se pudo abrir el montaje.") }
+            finally { busy = false }
+        }
     }
     LaunchedEffect(isActive, scenes.map { it.text("id") }) {
         if (isActive && (sceneId == null || scenes.none { it.text("id") == sceneId })) select(scenes.firstOrNull()?.text("id"), null)
@@ -199,6 +219,10 @@ fun StoryWorkspaceScreen(
                             Box {
                                 IconButton(onClick = { tools = true }) { Icon(Icons.Default.MoreVert, "Opciones del proyecto") }
                                 DropdownMenu(tools, { tools = false }) {
+                                    DropdownMenuItem(text = { Text("Montar proyecto en Nexus Cut") }, enabled = !busy,
+                                        onClick = { tools = false; mount(null) })
+                                    if (sceneId != null) DropdownMenuItem(text = { Text("Montar escena en Nexus Cut") }, enabled = !busy,
+                                        onClick = { tools = false; mount(sceneId) })
                                     DropdownMenuItem(text = { Text("Historia y criterios") }, onClick = { tools = false; projectEditor = true })
                                     DropdownMenuItem(text = { Text("Personajes y continuidad") }, onClick = { tools = false; elementPanel = true })
                                     DropdownMenuItem(text = { Text("Trabajo y propuestas") }, onClick = { tools = false; taskPanel = true })
@@ -247,6 +271,9 @@ fun StoryWorkspaceScreen(
                                 TextButton(onClick = { requestAgent(shot = null) }) { Text(if (agentMode == "proposal") "Pedir propuesta" else "Trabajar con agente") }
                                 TextButton(onClick = { linkTarget = "scene:${scene.text("id")}" }) { Text("Referencias") }
                                 IconButton(onClick = { agentSettings = true }) { Icon(Icons.Default.Tune, "Modo y alcance del agente") }
+                            }
+                            TextButton(onClick = { mount(scene.text("id")) }, enabled = !busy) {
+                                Icon(Icons.Default.Movie, null); Spacer(Modifier.width(6.dp)); Text("Montar escena")
                             }
                             Text("${if (agentMode == "proposal") "Propuestas" else "Cambios directos"} · ${when (agentScope) { "project" -> "proyecto"; "scene" -> "escena"; else -> "selección" }}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } }

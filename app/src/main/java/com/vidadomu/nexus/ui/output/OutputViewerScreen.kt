@@ -46,6 +46,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
+import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.cut.NexusCut
+import com.vidadomu.nexus.cut.cutOutputAsset
 import com.vidadomu.nexus.core.model.GenerationJob
 import com.vidadomu.nexus.core.model.GenerationStatus
 import com.vidadomu.nexus.core.model.Modality
@@ -97,6 +100,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     val trustedLocal=chosenOutput?.let {OutputFiles.trustedLocalUri(it,conflicts)}
     var alexiaFailed by remember(chosenOutput?.id) {mutableStateOf(false)}
+    var openingCut by remember(chosenOutput?.id) { mutableStateOf(false) }
     val title=when(job?.modality) {Modality.IMAGE->"Imagen";Modality.VIDEO->"Vídeo";Modality.AUDIO->"Audio";Modality.CHAT->"Texto";else->"Resultado"}
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={TopAppBar(
         title={Text(title,style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},navigationIcon={IconButton(onClick=onBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Atrás")}})
@@ -158,6 +162,41 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
                     ViewerAction(Icons.Default.Replay,"Remezclar",Modifier.weight(1f)) {onReuseAsInput(job.prompt, null)}
                     if(output.url.startsWith("https://") || output.url.startsWith("http://")) ViewerAction(Icons.Default.Share,"Compartir",Modifier.weight(1f)) {shareMedia(context,output.url,job.prompt)}
                     // Sin acceso directo a otra app: el resultado vive en la Biblioteca de Nexus.
+                }
+                if (output.type in setOf(Modality.IMAGE, Modality.VIDEO, Modality.AUDIO)) {
+                    OutlinedButton(
+                        enabled = !openingCut,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = NexusTokens.screenMargin),
+                        onClick = {
+                            openingCut = true
+                            scope.launch {
+                                try {
+                                    val runtime = AssistantRuntime.get(app)
+                                    runtime.importHistory()
+                                    val snapshot = runtime.assets.snapshot()
+                                    val asset = cutOutputAsset(snapshot, output, trustedLocal, job.outputs)
+                                        ?: error("Este resultado no tiene una copia identificada en la Biblioteca. Descárgalo e impórtalo para montarlo.")
+                                    check(Uri.parse(asset.uri).scheme in setOf("file", "content")) {
+                                        "Este resultado necesita una copia local. Descárgalo e impórtalo en la Biblioteca para montarlo."
+                                    }
+                                    val projectId = asset.projectId?.takeIf { runtime.assets.findProject(it) != null }
+                                        ?: runtime.settings.activeProjectId()?.takeIf { runtime.assets.findProject(it) != null }
+                                    val sceneId = asset.sceneId?.takeIf { id -> snapshot.scenes.any { it.id == id && it.projectId == projectId } }
+                                    NexusCut.openWith(app, listOf(asset.id), projectId, sceneId)
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    snackbar.showSnackbar(e.message ?: "No se pudo abrir el resultado en Nexus Cut.")
+                                } finally {
+                                    openingCut = false
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.ContentCut, null)
+                        Spacer(Modifier.width(NexusTokens.space8))
+                        Text(if (openingCut) "Abriendo montaje…" else "Editar en Nexus Cut")
+                    }
                 }
                 // Aviso que no desaparece solo: el botón nunca queda inerte y se ofrece una salida que no descarga ni envía nada.
                 if(alexiaFailed) com.vidadomu.nexus.ui.components.InlineNotice(alexiaUnavailableMessage(trustedLocal!=null),

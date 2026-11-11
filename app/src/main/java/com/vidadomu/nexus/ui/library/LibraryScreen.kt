@@ -48,6 +48,9 @@ import coil.request.ImageRequest
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.core.model.*
 import com.vidadomu.nexus.agent.core.assets.AssetType
+import com.vidadomu.nexus.cut.NexusCut
+import com.vidadomu.nexus.cut.cutOutputAsset
+import com.vidadomu.nexus.cut.isLocalCutUri
 import com.vidadomu.nexus.ui.components.matchesCreationSearch
 import com.vidadomu.nexus.ui.theme.*
 import java.text.SimpleDateFormat
@@ -60,7 +63,7 @@ internal fun mediaDuration(seconds:Float?):String? = seconds?.takeIf {it.isFinit
     "%d:%02d".format(Locale.ROOT,it/60,it%60)
 }
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,ExperimentalFoundationApi::class)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,ExperimentalFoundationApi::class,androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,Int)->Unit)?=null,
     onUseInCanvas:((com.vidadomu.nexus.agent.core.assets.Asset)->Unit)?=null,
@@ -71,6 +74,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     val app=context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
     var importing by remember {mutableStateOf(false)}
+    var mounting by remember {mutableStateOf(false)}
     val prefs=remember {context.getSharedPreferences("library_actions_v1",0)}
     var hidden by remember {mutableStateOf(prefs.getStringSet("hidden",emptySet())!!.toSet())}
     var favorites by remember {mutableStateOf(prefs.getStringSet("favorites",emptySet())!!.toSet())}
@@ -302,6 +306,35 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             entry.job.prompt.lineSequence().firstOrNull()?.trim()?.take(80).orEmpty()).filter {it.isNotBlank()}.joinToString(" · ")
     }
     fun message(text:String) {scope.launch {snackbar.showSnackbar(text)}}
+    fun mountSelection() {
+        if(mounting) return
+        val entries=shownTimeline.values.flatten().filter {tokenOf(it) in markedVisible}
+        if(entries.isEmpty()) {message("Marca vídeos, imágenes o audio para montar.");return}
+        mounting=true
+        scope.launch {
+            try {
+                runtime.importHistory()
+                val snapshot=runtime.assets.snapshot()
+                val ids=entries.map {entry ->
+                    val asset=when(entry) {
+                        is LibraryEntry.Local -> snapshot.assets.firstOrNull {it.id==entry.asset.id && !it.libraryDeleted}
+                        is LibraryEntry.Out -> entry.job.outputs[entry.index].let {output ->
+                            cutOutputAsset(snapshot,output,OutputFiles.trustedLocalUri(output,conflicts),
+                                jobs.firstOrNull {it.id==entry.job.id}?.outputs.orEmpty())
+                        }
+                    } ?: error("«${nameOf(entry)}» necesita una copia local disponible para editar en Nexus Cut.")
+                    require(asset.type!=AssetType.OTHER) {"«${asset.displayName}» no es un vídeo, una imagen ni un audio."}
+                    require(isLocalCutUri(asset.uri)) {"«${asset.displayName}» necesita una copia local para editar en Nexus Cut."}
+                    asset.id
+                }.distinct()
+                val activeProject=runtime.settings.activeProjectId()?.takeIf {id -> snapshot.projects.any {it.id==id}}
+                NexusCut.openWith(app,ids,activeProject)
+                marked=emptySet()
+            } catch(cancelled:kotlinx.coroutines.CancellationException) {throw cancelled}
+            catch(error:Exception) {snackbar.showSnackbar(error.message ?: "No se pudo abrir el montaje.")}
+            finally {mounting=false}
+        }
+    }
     fun rename(entry:LibraryEntry,name:String) {
         if(entry is LibraryEntry.Out) {
             val token=tokenOf(entry);names=names+(token to name);prefs.edit().putString("name:"+token,name).apply()
@@ -471,6 +504,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     Scaffold(containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar)},topBar={if(selecting) LibrarySelectionBar(markedVisible.size,markedVisible.size==1,
         favoritesOn=markedVisible.isNotEmpty() && markedVisible.all {it in favorites},
         onClose={marked=emptySet()},onSelectAll={marked=visibleTokens},onExport={startExport()},
+        onMontar={mountSelection()},mounting=mounting,
         onFavorite={
             val allFav=markedVisible.all {it in favorites}
             favorites=if(allFav) favorites-markedVisible else favorites+markedVisible

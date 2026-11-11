@@ -21,10 +21,6 @@ import com.vidadomu.nexus.cut.command.DeviceCapabilities
 import com.vidadomu.nexus.cut.command.ErrorCode
 import com.vidadomu.nexus.cut.command.ExportOverrides
 import com.vidadomu.nexus.cut.command.LibraryMedia
-import com.vidadomu.nexus.cut.command.Op
-import com.vidadomu.nexus.cut.command.Origin
-import com.vidadomu.nexus.cut.command.Outcome
-import com.vidadomu.nexus.cut.command.Request
 import com.vidadomu.nexus.cut.command.cutFail
 import com.vidadomu.nexus.cut.export.ExportJob
 import com.vidadomu.nexus.cut.export.ExportManager
@@ -63,6 +59,7 @@ object NexusCut {
     // ------------------------------------------------------------------ navegación
 
     private val opens = Channel<String>(Channel.BUFFERED)
+    private val imports = CutImports()
     /** Montajes que hay que abrir en pantalla (los recoge MainActivity). */
     val openRequests = opens.receiveAsFlow()
 
@@ -75,12 +72,7 @@ object NexusCut {
      */
     suspend fun openWith(app: NexusApplication, assetIds: List<String>, nexusProjectId: String?, sceneId: String? = null, name: String? = null): String {
         val ws = workspace(app)
-        val session = montageFor(app, nexusProjectId, sceneId, name)
-        if (assetIds.isNotEmpty()) {
-            val out = session.execute(Request(Op("media.import", CutSession.argsOf("asset_ids" to assetIds)), Origin.USER, label = "Añadir desde la Biblioteca"))
-            if (out is Outcome.Failed) throw CutFailure(out.error.code, out.error.message)
-        }
-        ws.setActive(session.projectId)
+        val session = imports.openWith(ws, assetIds) { montageFor(app, nexusProjectId, sceneId, name) }
         open(session.projectId)
         return session.projectId
     }
