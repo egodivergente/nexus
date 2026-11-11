@@ -120,6 +120,33 @@ class StorySyncCompatibilityTest {
         } finally {root.deleteRecursively()}
     }
 
+    @Test fun deduplicationUsesTheLocalAssetVersionRetainedDuringAConflict()=runBlocking<Unit> {
+        val root=dir()
+        try {
+            val cloud=SyncJournalTest.Cloud();val narrative=SyncJournalTest.Cloud()
+            val index=AssetIndex(File(root,"index.json"));val p=index.createProject("Conflicto de original").id
+            val initial=File(root,"initial.png").apply {writeBytes(byteArrayOf(1))}
+            val local=File(root,"local.png").apply {writeBytes(byteArrayOf(2))}
+            val other=File(root,"other.png").apply {writeBytes(byteArrayOf(3))}
+            index.addAsset(Asset("a",initial.toURI().toString(),AssetType.IMAGE,displayName="A",projectId=p,createdAt=1))
+            index.addAsset(Asset("z",other.toURI().toString(),AssetType.IMAGE,displayName="Z",projectId=p,createdAt=1))
+            val sync=workspace(index,root,cloud,narrative);sync.cycle(null)
+            val revisions=cloud.commits.values.flatMap {SyncJournal.json.decodeFromString<SyncCommit>(it.decodeToString()).revisions}
+            val original=revisions.single {it.key=="assets:a"};val otherRow=revisions.single {it.key=="assets:z"}.value!!
+            val remoteValue=JsonObject(original.value!!+mapOf("uri" to otherRow.getValue("uri")))
+            val commit=SyncCommit(id=UUID.randomUUID().toString(),device="Otro dispositivo",revisions=listOf(
+                SyncRevision("ffffffff-ffff-ffff-ffff-ffffffffffff","assets:a",listOf(original.id),remoteValue,"Otro dispositivo",2)))
+            cloud.putCommit(commit,SyncJournal.json.encodeToString(SyncCommit.serializer(),commit).toByteArray())
+            index.updateAsset("a"){it.copy(uri=local.toURI().toString())}
+            val status=sync.cycle(null)
+            assertTrue(status.getValue("conflicts").jsonArray.any {it.jsonObject["key"]?.jsonPrimitive?.content=="assets:a"})
+            assertEquals(0,status.getValue("deduplicated").jsonPrimitive.int)
+            assertEquals(2,index.snapshot().assets.count {!it.libraryDeleted})
+            assertContentEquals(local.readBytes(),File(URI(index.asset("a")!!.uri)).readBytes())
+            assertContentEquals(other.readBytes(),File(URI(index.asset("z")!!.uri)).readBytes())
+        } finally {root.deleteRecursively()}
+    }
+
     @Test fun acceptingTheSameLegacyProposalOfflineUsesOneSetOfCreationIdentities()=runBlocking<Unit> {
         val root=dir()
         try {

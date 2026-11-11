@@ -79,7 +79,7 @@ class SyncWorkspace(
         for(row in localized.filterKeys {it.startsWith("characters:")}.values)protected+=row["referenceAssetIds"]?.jsonArray.orEmpty().map {it.jsonPrimitive.content}
         for(row in localized.filterKeys {it.startsWith("generations:")}.values)protected+=row["outputAssetIds"]?.jsonArray.orEmpty().map {it.jsonPrimitive.content}
         for(row in localized.filterKeys {it.startsWith("assets:")}.values)if(row["role"]?.jsonPrimitive?.content=="FINAL")row["id"]?.jsonPrimitive?.contentOrNull?.let {protected+=it}
-        val copies=result.rows.filter { (key,row)->
+        val copies=retained.filter { (key,row)->
             val uri=row["uri"]?.jsonPrimitive?.contentOrNull.orEmpty()
             key.startsWith("assets:") && row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull!=true &&
                 (uri.startsWith(SyncBlobs.PREFIX) || uri.startsWith("https://"))
