@@ -53,6 +53,8 @@ class ToolDeps(
     val limits: () -> com.vidadomu.nexus.agent.core.config.AgentLimits = { com.vidadomu.nexus.agent.core.config.AgentLimits() },
     val costPreflight: com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight =
         com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight(),
+    /** Montajes de Nexus Cut y sus sesiones vivas; null mientras la app no monte el editor. */
+    val cut: com.vidadomu.nexus.cut.command.CutWorkspace? = null,
 ) {
     val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate, costPreflight)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock, orders) { plan, message ->

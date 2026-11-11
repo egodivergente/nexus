@@ -8,7 +8,10 @@ import java.io.File
  * elsewhere and can be deleted at any time without affecting projects.
  */
 class ProjectStore(private val root: File) {
-    data class Summary(val id: String, val name: String, val modifiedAtMs: Long, val error: String? = null)
+    data class Summary(
+        val id: String, val name: String, val modifiedAtMs: Long, val error: String? = null,
+        val durationUs: Long = 0, val clips: Int = 0, val nexusProjectId: String? = null, val sceneId: String? = null,
+    )
 
     data class Loaded(val project: Project, val recoveredFromBackup: Boolean, val primaryError: String?)
 
@@ -44,7 +47,9 @@ class ProjectStore(private val root: File) {
             if (!f.exists() && !AtomicFile.backupOf(f).exists()) return@mapNotNull null
             try {
                 val l = load(d.name)
-                Summary(l.project.id, l.project.name, l.project.modifiedAtMs, if (l.recoveredFromBackup) "Recuperado de copia" else null)
+                val p = l.project
+                Summary(p.id, p.name, p.modifiedAtMs, if (l.recoveredFromBackup) "Recuperado de copia" else null,
+                    p.timeline.durationUs, p.timeline.allTracks.sumOf { it.clips.size }, p.nexusProjectId, p.sceneId)
             } catch (e: ProjectFormatException) {
                 Summary(d.name, d.name, f.lastModified(), e.message)
             }
