@@ -27,8 +27,8 @@ object CutTools {
     fun all(w: CutWorkspace): List<AgentTool> = listOf(CutCatalogTool(w), CutDescribeTool(w), CutReadTool(w), CutEditTool(w), CutCreateTool(w))
 
     /** Una línea para el contexto del turno cuando hay un montaje abierto; null si no lo hay. */
-    suspend fun context(w: CutWorkspace): String? {
-        val s = w.activeSession()?.state?.value ?: return null
+    fun context(w: CutWorkspace): String? {
+        val s = w.current()?.state?.value ?: return null
         val p = s.project
         return "Montaje abierto en Nexus Cut: «${p.name}» (project_id=${p.id}, revisión ${p.revision}, ${p.timeline.durationUs / 1000} ms, " +
             "${p.timeline.allTracks.sumOf { it.clips.size }} clips, cabezal en ${s.view.playheadUs / 1000} ms" +

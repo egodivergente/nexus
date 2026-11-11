@@ -303,7 +303,7 @@ object CoreCapabilities {
             }),
     )
 
-    private fun place(d: Draft, a: Args): JsonObject {
+    internal fun place(d: Draft, a: Args): JsonObject {
         val items = a.objects("items").ifEmpty { a.bad("«items» está vacío") }
         val mode = mode(a, EditMode.INSERT)
         val withAudio = a.bool("with_audio", true)

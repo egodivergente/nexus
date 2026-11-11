@@ -88,7 +88,24 @@ class CutSession(
                 if (alone) mutex.withLock { travel(request, undo = caps[0].handler is Handler.Undo) }
                 else reject(request, CutError(ErrorCode.INVALID_ARGUMENT, "Deshacer y rehacer se piden solos."))
             caps.all { it.kind == CapabilityKind.READ } -> read(request, caps)
-            else -> mutex.withLock { transact(request, caps) }
+            else -> {
+                // Lo que necesita E/S se prepara antes de tomar el turno de escritura, para no bloquear a nadie.
+                val snapshot = _state.value
+                val staged = HashMap<Int, (Draft) -> JsonObject>()
+                for ((i, op) in request.ops.withIndex()) {
+                    val h = caps[i].handler as? Handler.Staged ?: continue
+                    staged[i] = try {
+                        h.stage(snapshot, Args(op.args))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: CutFailure) {
+                        return reject(request, CutError(e.code, e.message ?: "Operación no válida", i, op.id, snapshot.revision))
+                    } catch (e: IllegalArgumentException) {
+                        return reject(request, CutError(ErrorCode.INVALID_ARGUMENT, e.message ?: "Argumentos no válidos", i, op.id, snapshot.revision))
+                    }
+                }
+                mutex.withLock { transact(request, caps, staged) }
+            }
         }
     }
 
@@ -124,7 +141,7 @@ class CutSession(
 
     // ------------------------------------------------------------------ transacción
 
-    private suspend fun transact(request: Request, caps: List<Capability>): Outcome {
+    private suspend fun transact(request: Request, caps: List<Capability>, staged: Map<Int, (Draft) -> JsonObject> = emptyMap()): Outcome {
         val before = _state.value
         request.idempotencyKey?.let { key -> replays[key]?.let { return it.copy(replayed = true) } }
         if (request.expectedRevision != null && request.expectedRevision != before.revision) {
@@ -139,6 +156,7 @@ class CutSession(
             results += try {
                 when (val h = caps[i].handler) {
                     is Handler.Edit -> h.apply(draft, Args(op.args))
+                    is Handler.Staged -> staged.getValue(i)(draft)
                     is Handler.Read -> h.read(before.copy(project = draft.project, view = draft.view), Args(op.args))
                     else -> return fail(ErrorCode.INTERNAL, "Manejador inesperado")
                 }

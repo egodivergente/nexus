@@ -33,6 +33,11 @@ sealed interface Handler {
     /** Sin suspender ni E/S: se ejecuta dentro de la transacción. Sirve para EDIT y VIEW. */
     fun interface Edit : Handler { fun apply(draft: Draft, args: Args): JsonObject }
     fun interface Job : Handler { suspend fun start(session: CutSession, args: Args, origin: Origin): JsonObject }
+    /**
+     * Edición con trabajo previo de E/S (analizar un archivo, leer la Biblioteca): [stage] corre fuera de la
+     * transacción sobre una foto del estado y devuelve el paso que se aplica dentro, igual que un [Edit].
+     */
+    fun interface Staged : Handler { suspend fun stage(state: CutState, args: Args): (Draft) -> JsonObject }
     data object Undo : Handler
     data object Redo : Handler
 }

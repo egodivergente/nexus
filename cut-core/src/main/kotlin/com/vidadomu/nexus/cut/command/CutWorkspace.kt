@@ -26,7 +26,7 @@ class CutWorkspace(
     private val io: CoroutineContext = Dispatchers.IO,
 ) {
     private val lock = Mutex()
-    private val sessions = HashMap<String, CutSession>()
+    private val sessions = java.util.concurrent.ConcurrentHashMap<String, CutSession>()
 
     private val _active = MutableStateFlow<String?>(null)
     /** Montaje que el usuario tiene abierto en pantalla; es el destino por defecto de lo que pida al agente. */
@@ -47,6 +47,12 @@ class CutWorkspace(
             }
         }.also { sessions[projectId] = it }
     }
+
+    /** Sesión ya abierta de un montaje, sin tocar el disco; null si nadie lo ha abierto. */
+    fun opened(projectId: String): CutSession? = sessions[projectId]
+
+    /** Montaje abierto en pantalla, si ya tiene sesión viva. Para contextos que no pueden suspender. */
+    fun current(): CutSession? = _active.value?.let { sessions[it] }
 
     suspend fun activeSession(): CutSession? = _active.value?.let { id -> runCatching { session(id) }.getOrNull() }
 
