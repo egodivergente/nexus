@@ -13,9 +13,9 @@ Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS
 | App: 906 pruebas unitarias | 7 fallan | Fallan igual en la base vc204 intacta (comprobado). No son de Nexus Cut. Lista en la tarea «Update 7 stale Nexus app unit tests». |
 | `media.import` / `render.export` / `render.status` / `render.cancel` | Hecho en núcleo | `DeviceCapabilitiesTest` (3) |
 
-## Escrito pero SIN compilar todavía (último commit)
+## Capa Android escrita en d687cbf (primera compilación completada)
 
-Ninguno de estos archivos de `app/` se ha compilado aún. Lo primero es compilar y corregir lo que salga:
+Estos archivos se compilaron por primera vez el 11/11/2026 en AXELPC, sobre `d687cbf`, sin errores. La integración y la prueba física se registran abajo; compilar no acredita el recorrido en el teléfono.
 
 - `app/.../cut/engine|media|export/` — motor de Corte trasladado (paquetes renombrados). `export/ExportService.kt` y `ExportManager.kt` adaptados: el render se valida y entra en la Biblioteca (ya no usa SAF).
 - `app/.../cut/media/MediaProbe.kt` — acepta `mimeHint` para URIs `file://`.
@@ -42,3 +42,7 @@ Ninguno de estos archivos de `app/` se ha compilado aún. Lo primero es compilar
 ## Reglas que el usuario ha pedido
 
 No inventar estados ni resultados; un build fallido se informa como fallido. No instalar sobre datos sin actualización compatible. No generaciones de pago en pruebas. Sin force-push, sin sobrescribir ramas ajenas, secretos y firmas fuera de Git.
+
+## Continuación del hito B — 11/11/2026
+
+1. **Primera compilación: PASS.** Ejecutado `build-cut.ps1 -Tasks :cut-core:test,:agent-core:test,:app:assembleAgentPreview -Tag cut-b1` en AXELPC sobre `d687cbf`. `BUILD SUCCESSFUL in 6m 11s`; no fue necesario corregir errores de compilación. XML de esta ejecución: `cut-core` 101 pruebas, 101 PASS; `agent-core` 456 registradas, 452 PASS y 4 omitidas, sin fallos ni errores. No se ejecutó todavía la suite de la app ni la prueba funcional del S25.
