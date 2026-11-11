@@ -70,6 +70,7 @@ import com.vidadomu.nexus.agent.core.tools.Attachment
 import com.vidadomu.nexus.core.model.Modality
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.NexusInsets
+import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import kotlinx.coroutines.delay
 
@@ -207,28 +208,28 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
 internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () -> Unit, onAdd: ((Attachment) -> Unit)? = null) {
     if (results.isEmpty()) return
     val pager = rememberPagerState(initialPage = initial.coerceIn(0, results.lastIndex)) { results.size }
-    var addFooterHeightPx by remember { mutableIntStateOf(0) }
-    val addFooterHeight = if (onAdd == null) 0.dp else if (addFooterHeightPx == 0) 104.dp
-        else with(LocalDensity.current) { addFooterHeightPx.toDp() }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        // The dialog owns its window: matching the immersive Activity avoids a status-bar offset
+        // combined with a full-display content height. Apply its actual safe insets once below.
+        NexusSheetSystemBars()
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
-                HorizontalPager(pager, Modifier.fillMaxSize().padding(bottom = addFooterHeight), key = { results[it].id }) { page ->
-                    // Una imagen se abre ya a tamaño completo y con zoom: sin el paso intermedio de «Ampliar».
-                    if (results[page].mimeType.startsWith("image/")) ZoomableImage(results[page], Modifier.padding(top = 56.dp, bottom = 40.dp))
-                    else Box(Modifier.fillMaxSize().padding(horizontal = NexusTokens.space8), contentAlignment = Alignment.Center) {
-                        AssistantMediaPreview(results[page])
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(NexusTokens.space8).align(Alignment.TopCenter), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
+                Row(Modifier.fillMaxWidth().padding(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
                     Text(results.getOrNull(pager.currentPage)?.name ?: "Resultado", color = Color.White, style = MaterialTheme.typography.titleSmall,
                         maxLines = 1, modifier = Modifier.weight(1f).padding(start = NexusTokens.space8))
                     if (results.size > 1) Text("${pager.currentPage + 1} / ${results.size}", color = Color.White.copy(alpha = .8f),
                         style = MaterialTheme.typography.labelLarge)
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cerrar escenario", tint = Color.White) }
                 }
-                if (onAdd != null) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .onGloballyPositioned { addFooterHeightPx = it.size.height }.padding(NexusTokens.space16),
+                // Header and actions are measured first; the media gets only the remaining height.
+                // The action therefore remains inside the dialog rather than below an overlay's bounds.
+                HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), key = { results[it].id }) { page ->
+                    if (results[page].mimeType.startsWith("image/")) ZoomableImage(results[page], Modifier.fillMaxSize())
+                    else Box(Modifier.fillMaxSize().padding(horizontal = NexusTokens.space8), contentAlignment = Alignment.Center) {
+                        AssistantMediaPreview(results[page])
+                    }
+                }
+                if (onAdd != null) Column(Modifier.fillMaxWidth().padding(NexusTokens.space16),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     if (results.size > 1) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         repeat(results.size.coerceAtMost(12)) { i ->
@@ -241,7 +242,7 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
                         Text("Añadir al montaje")
                     }
                 }
-                else if (results.size > 1) Row(Modifier.align(Alignment.BottomCenter).padding(NexusTokens.space16),
+                else if (results.size > 1) Row(Modifier.align(Alignment.CenterHorizontally).padding(NexusTokens.space16),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     repeat(results.size.coerceAtMost(12)) { i ->
                         Box(Modifier.size(if (i == pager.currentPage) 8.dp else 6.dp).clip(CircleShape)

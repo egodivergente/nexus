@@ -25,7 +25,7 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 internal fun ResultsWallSheet(outputs: List<Attachment>, onOpen: (Attachment) -> Unit, onDismiss: () -> Unit,
     onAdd: ((Attachment) -> Unit)? = null) {
     val context = LocalContext.current
-    NexusSheet("Muro de resultados", onDismiss, subtitle = "${outputs.size} archivos") {
+    NexusSheet("Muro de resultados", onDismiss, subtitle = if (outputs.size == 1) "1 archivo" else "${outputs.size} archivos") {
         LazyVerticalStaggeredGrid(columns=StaggeredGridCells.Adaptive(150.dp),
             contentPadding=PaddingValues(NexusTokens.space12),
             verticalItemSpacing=NexusTokens.space8,

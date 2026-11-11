@@ -328,7 +328,7 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
             }
             IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) { Icon(Icons.Default.SkipNext, "Fotograma siguiente") }
             Spacer(Modifier.weight(1f))
-            Text(if (selectedClips.isEmpty()) "${timeline.allTracks.sumOf { it.clips.size }} clips" else "${selectedClips.size} seleccionado${if (selectedClips.size > 1) "s" else ""}",
+            Text(if (selectedClips.isEmpty()) timeline.allTracks.sumOf { it.clips.size }.let { "$it ${if (it == 1) "clip" else "clips"}" } else "${selectedClips.size} seleccionado${if (selectedClips.size > 1) "s" else ""}",
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

@@ -118,7 +118,7 @@ internal fun CutChatPanel(
             }
             if (state.libraryResults.isNotEmpty()) TextButton(onClick = onShowResults,
                 modifier = Modifier.padding(horizontal = 10.dp).heightIn(min = 40.dp)) {
-                Text("Ver ${state.libraryResults.size} archivos encontrados")
+                Text(if (state.libraryResults.size == 1) "Ver archivo encontrado" else "Ver ${state.libraryResults.size} archivos encontrados")
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(top = 4.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
