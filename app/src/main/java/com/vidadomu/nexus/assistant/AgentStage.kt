@@ -2,6 +2,8 @@
 
 package com.vidadomu.nexus.assistant
 
+import android.os.Build
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -57,12 +59,15 @@ import com.vidadomu.nexus.ui.theme.onStylusHover
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.agent.core.orders.Order
 import com.vidadomu.nexus.agent.core.orders.OrderStatus
@@ -209,8 +214,24 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
     if (results.isEmpty()) return
     val pager = rememberPagerState(initialPage = initial.coerceIn(0, results.lastIndex)) { results.size }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        // The dialog owns its window: matching the immersive Activity avoids a status-bar offset
-        // combined with a full-display content height. Apply its actual safe insets once below.
+        val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.let { window ->
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val cutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    if (window.attributes.layoutInDisplayCutoutMode != cutoutMode) {
+                        window.attributes = window.attributes.apply { layoutInDisplayCutoutMode = cutoutMode }
+                        window.decorView.requestApplyInsets()
+                    }
+                }
+            }
+        }
+        // The dialog must opt into the camera cutout independently of the Activity. Otherwise
+        // Android offsets this full-height window below the cutout and clips the bottom action.
+        // Its cutout/system-bar safe area is still applied exactly once to the content below.
         NexusSheetSystemBars()
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
