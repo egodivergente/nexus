@@ -21,6 +21,8 @@ Windows: **Ajustes → Dispositivos → Google Drive**, apartado de guion/storyb
 
 La pausa conserva el contenido local. Los mecanismos existentes de autorización, reintento y resolución siguen siendo los puntos de entrada. No hay otro inicio de sesión ni un servicio nuevo de pago.
 
+El instalador de Windows admite `-DataDirectory` y conserva esa ruta explícita en los accesos directos y su arranque. Se utiliza el directorio físico del perfil verificado para evitar que la virtualización de una aplicación empaquetada seleccione otro almacén al abrir Nexus desde Explorer. Esta selección no copia ni reemplaza los perfiles existentes.
+
 ## Atlas en Windows
 
 El transporte real de Nexus obtiene los siete esquemas públicos incorporados anteriormente. El HTTP 403 detectado en el sondeo genérico corresponde a la identificación predeterminada de urllib; no se ha sustituido ninguna credencial para resolverlo.

@@ -1,17 +1,21 @@
-param([switch]$NoLaunch, [string]$AdditionalShortcut, [int]$Port = 0, [string]$PythonExecutable)
+param([switch]$NoLaunch, [string]$AdditionalShortcut, [int]$Port = 0, [string]$PythonExecutable, [string]$DataDirectory)
 $ErrorActionPreference = 'Stop'
 $python = if ($PythonExecutable) { (Resolve-Path -LiteralPath $PythonExecutable).Path } else { (Get-Command python.exe -ErrorAction Stop).Source }
 $pythonw = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) { throw 'Falta Python para Windows.' }
 if ((Get-AuthenticodeSignature -LiteralPath $pythonw).Status -ne 'Valid') { throw 'Python no tiene una firma valida.' }
 $script = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'local_host.py')).Path
+if ($DataDirectory) {
+    $DataDirectory = (Resolve-Path -LiteralPath $DataDirectory -ErrorAction Stop).Path
+    if ($DataDirectory.Contains('"') -or -not (Test-Path -LiteralPath $DataDirectory -PathType Container)) { throw 'La carpeta de datos no es valida.' }
+}
 $icon = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'nexus.ico')).Path
 $desktop = [Environment]::GetFolderPath('DesktopDirectory')
 $shortcut = Join-Path $desktop 'Nexus Studio.lnk'
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = $pythonw
-$link.Arguments = '"' + $script + '"' + $(if ($Port) { ' --port ' + $Port } else { '' })
+$link.Arguments = '"' + $script + '"' + $(if ($Port) { ' --port ' + $Port } else { '' }) + $(if ($DataDirectory) { ' --data-dir "' + $DataDirectory + '"' } else { '' })
 $link.WorkingDirectory = $PSScriptRoot
 $link.IconLocation = $icon
 $link.Description = 'Nexus Studio local, privado y con datos protegidos en Windows'
