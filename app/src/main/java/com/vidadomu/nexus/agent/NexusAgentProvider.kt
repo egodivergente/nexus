@@ -58,7 +58,7 @@ class NexusAgentProvider:ContentProvider() {
             return buildJsonObject {
                 put("ok", true); put("configured", connected)
                 put("enabled", manager.prefs.getBoolean("enabled", false))
-                put("storyEnabled", manager.prefs.getBoolean("story", true))
+                put("storyEnabled", manager.prefs.getBoolean("story", false))
                 put("requested", op == "run"); put("status", manager.status.value)
             }
         }

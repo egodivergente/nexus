@@ -14,30 +14,31 @@ class DriveNarrativeStatusTest {
     }
 
     @Test fun aLegacySuccessNeverClaimsTheScreenplayWasShared() {
-        val result = driveNarrativeStatus(buildJsonObject { put("state", "synced"); put("completedAt", 123) })
+        val result = driveNarrativeStatus(buildJsonObject { put("state", "synced"); put("completedAt", 123) }, true)
         assertEquals("Guion pendiente de sincronizar", result.title)
         assertTrue(result.detail!!.contains("todavía no confirma"))
     }
 
     @Test fun disabledAndUnsupportedRemainDistinctFromCompleted() {
         assertEquals("Guion y storyboard pausados", driveNarrativeStatus(status("synced"), false).title)
-        assertEquals("Guion sin conexión compatible", driveNarrativeStatus(status("synced", supported = false)).title)
-        assertTrue(driveNarrativeStatus(status("synced", supported = false)).attention)
-        assertEquals("Guion pendiente de sincronizar", driveNarrativeStatus(status("disabled", enabled = false)).title)
+        assertEquals("Guion y storyboard pausados", driveNarrativeStatus(status("synced")).title)
+        assertEquals("Guion sin conexión compatible", driveNarrativeStatus(status("synced", supported = false), true).title)
+        assertTrue(driveNarrativeStatus(status("synced", supported = false), true).attention)
+        assertEquals("Guion pendiente de sincronizar", driveNarrativeStatus(status("disabled", enabled = false), true).title)
     }
 
     @Test fun conflictsAndMissingDependenciesTakePriorityOverASuccessLabel() {
-        val conflict = driveNarrativeStatus(status("synced", conflicts = 1))
+        val conflict = driveNarrativeStatus(status("synced", conflicts = 1), true)
         assertEquals("Guion con versiones para revisar", conflict.title)
         assertEquals("1 elemento conserva versiones distintas.", conflict.detail)
         assertTrue(conflict.attention)
-        val pending = driveNarrativeStatus(status("synced", pending = 2))
+        val pending = driveNarrativeStatus(status("synced", pending = 2), true)
         assertEquals("Guion con vínculos pendientes", pending.title)
         assertTrue(pending.attention)
     }
 
     @Test fun uploadCompletionDoesNotInventPeerAcknowledgement() {
-        val result = driveNarrativeStatus(status("synced"))
+        val result = driveNarrativeStatus(status("synced"), true)
         assertEquals("Guion compartido en Drive", result.title)
         assertTrue(result.detail!!.contains("completar su sincronización"))
         assertFalse(result.attention)

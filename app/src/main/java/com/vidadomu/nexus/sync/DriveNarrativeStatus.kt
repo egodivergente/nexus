@@ -5,7 +5,7 @@ import kotlinx.serialization.json.*
 /** A completed legacy exchange does not prove the living screenplay was shared. */
 data class DriveNarrativeStatus(val title: String, val detail: String? = null, val attention: Boolean = false)
 
-fun driveNarrativeStatus(status: JsonObject, enabled: Boolean = true): DriveNarrativeStatus {
+fun driveNarrativeStatus(status: JsonObject, enabled: Boolean = false): DriveNarrativeStatus {
     if (!enabled) return DriveNarrativeStatus("Guion y storyboard pausados", "El contenido local se conserva.")
     val value = status["narrativeSync"] as? JsonObject
         ?: return DriveNarrativeStatus("Guion pendiente de sincronizar", "Este intercambio todavía no confirma el guion y sus vínculos de material.")

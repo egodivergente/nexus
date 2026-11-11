@@ -4,7 +4,7 @@ Esta evolución conecta el proyecto audiovisual de Windows con Nexus Android, ma
 
 ## Datos y compatibilidad
 
-`SyncWorkspace` sigue usando un solo `AssetIndex`. El guion se transporta en un diario independiente `story-v1-commit-UUID.json`, dentro de la misma carpeta Drive. Los lectores anteriores solo aceptan `commit-UUID.json` y no procesan este canal. La sincronización completa del guion requiere ambos clientes actualizados.
+`SyncWorkspace` sigue usando un solo `AssetIndex`. El guion se transporta en un diario independiente `story-v1-commit-UUID.json`, dentro de la misma carpeta Drive. Los lectores anteriores solo aceptan `commit-UUID.json` y no procesan este canal. La sincronización completa del guion requiere todos los clientes que usen esa carpeta actualizados. El canal nuevo comienza desactivado: mientras esté pausado o ausente, el intercambio anterior conserva sus filas completas, incluidos los campos extendidos que conoce207. Solo se separan los campos al activar expresamente el canal entre versiones compatibles.
 
 Las filas del nuevo canal representan bloques, asociaciones, elementos, preferencias, propuestas, tareas y metadatos de origen. Los campos extendidos de escenas, planos, personajes y proyectos se proyectan sin reemplazar los campos comunes editables por los clientes anteriores. Nombres, códigos y descripciones comunes conservan su mecanismo de resolución existente.
 

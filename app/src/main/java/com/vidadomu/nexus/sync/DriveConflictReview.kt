@@ -24,7 +24,7 @@ import androidx.compose.ui.window.DialogProperties
     pendingKey:String?,
     onResolve:(key:String,versionId:String)->Unit,
     modifier:Modifier=Modifier,
-    storyEnabled:Boolean=true,
+    storyEnabled:Boolean=false,
 ) {
     var submitted by remember(summary) {mutableStateOf<String?>(null)}
     val pending=pendingKey?:submitted

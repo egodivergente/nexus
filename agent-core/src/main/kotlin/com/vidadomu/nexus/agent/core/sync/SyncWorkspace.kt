@@ -33,7 +33,7 @@ class SyncWorkspace(
         }
         val rows=linkedMapOf<String,JsonObject>()
         for(kind in collections)for(element in encoded[kind]?.jsonArray.orEmpty()) {
-            var row=StorySyncCodec.legacyRow(kind,element.jsonObject)
+            var row=if(useStory)StorySyncCodec.legacyRow(kind,element.jsonObject)else element.jsonObject
             if(kind=="assets")row=JsonObject(row+mapOf("uri" to JsonPrimitive(portable(row["uri"]!!.jsonPrimitive.content))))
             if(kind=="generations")row=JsonObject(row+mapOf("referenceUris" to JsonArray(row["referenceUris"]?.jsonArray.orEmpty().map {JsonPrimitive(portable(it.jsonPrimitive.content))})))
             rows[kind+":"+row["id"]!!.jsonPrimitive.content]=row

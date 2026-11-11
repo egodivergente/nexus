@@ -78,6 +78,37 @@ class StorySyncCompatibilityTest {
         assertFalse(SyncJournal.validKey("story:blocks:one"),"The legacy validation contract must not change")
     }
 
+    @Test fun pausedNarrativePublishesFullRowsThatVersion207CanApplyWithoutResettingFields()=runBlocking<Unit> {
+        val root=dir()
+        try {
+            val cloud=SyncJournalTest.Cloud();val narrative=SyncJournalTest.Cloud();val counted=CountRemote(narrative)
+            val source=AssetIndex(File(root,"source/index.json"));val p=source.createProject("Proyecto207").id
+            command(source,p,"update_project"){put("expected_revision",0);put("treatment","Tratamiento vivo");put("target_duration_sec",90)}
+            val scene=command(source,p,"create_scene"){put("title","Patio");put("description","Luz de tarde");put("time_of_day","Tarde")}.id()
+            val shot=command(source,p,"create_shot"){put("scene_id",scene);put("description","La mano tiembla");put("camera","Cámara fija");put("duration_sec",4)}.id()
+            val character=source.ensureCharacter("Mateo",p)
+            source.updateCharacter(character.id){it.copy(variants=listOf("Joven, diecisiete años"),notes="Conservar chaqueta",revision=7)}
+            workspace(source,File(root,"source"),cloud,counted){false}.cycle(null)
+            assertEquals(0,counted.reads);assertTrue(narrative.commits.isEmpty())
+
+            // Version207 exchanges the same six full collections, decodes them and applies the snapshot directly.
+            val oldJournal=SyncJournal(File(root,"old-reader.json"),cloud,"Nexus207")
+            val received=oldJournal.exchange(emptyMap()).rows
+            val collections=listOf("projects","scenes","shots","characters","assets","generations")
+            val incoming=AssetIndex.JSON.decodeFromJsonElement<IndexData>(buildJsonObject {
+                put("schemaVersion",1)
+                for(kind in collections)put(kind,JsonArray(received.filterKeys {it.startsWith("$kind:")}.values.toList()))
+            })
+            val old=AssetIndex(File(root,"old/index.json"));old.applySyncedSnapshot(old.snapshot(),incoming)
+            assertEquals(source.findProject(p),old.findProject(p))
+            assertEquals(source.snapshot().scenes.single {it.id==scene},old.snapshot().scenes.single {it.id==scene})
+            assertEquals(source.snapshot().shots.single {it.id==shot},old.snapshot().shots.single {it.id==shot})
+            assertEquals(source.snapshot().characters.single(),old.snapshot().characters.single())
+            assertEquals(90.0,old.findProject(p)!!.targetDurationSec)
+            assertEquals(4.0,old.snapshot().shots.single().durationSec)
+        } finally {root.deleteRecursively()}
+    }
+
     @Test fun selectingProjectBDownloadsItsLinkedOriginalOwnedByProjectA()=runBlocking<Unit> {
         val root=dir()
         try {

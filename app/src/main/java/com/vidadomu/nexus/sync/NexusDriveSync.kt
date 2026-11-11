@@ -126,7 +126,7 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         if(BuildConfig.OFFLINE_QA || connectedAccount==null || (!manual && !prefs.getBoolean("enabled",false)))return@withLock true
         prefs.edit().putBoolean("dirty",false).apply()
         setStatus(buildJsonObject {put("state","syncing");put("narrativeSync",buildJsonObject {
-            put("supported",true);put("enabled",prefs.getBoolean("story",true));put("state",if(prefs.getBoolean("story",true))"syncing" else "disabled")
+            put("supported",true);put("enabled",prefs.getBoolean("story",false));put("state",if(prefs.getBoolean("story",false))"syncing" else "disabled")
         })})
         try {
             var cachedToken=token();var tokenAt=System.currentTimeMillis()
@@ -146,7 +146,7 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
                     else->null
                 }
             },localUri={Uri.fromFile(it).toString()},deviceLabel=android.os.Build.MODEL,
-                storyRemote=remote.storyChannel(),storyEnabled={prefs.getBoolean("story",true)})
+                storyRemote=remote.storyChannel(),storyEnabled={prefs.getBoolean("story",false)})
             val documents=SyncDocuments(directory)
             val conversationDir=File(app.filesDir,"assistant/conversations")
             val chatFiles=conversationDir.listFiles().orEmpty().filter {it.extension=="json" && !it.name.startsWith("sync_")}+listOf(File(app.filesDir,"assistant/chat-v1.json")).filter {it.exists()}
@@ -176,7 +176,7 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
             put("state",if(e.message=="authorization_required")"authorization_required" else "retry")
             put("message",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "Sincronización pendiente. Tus archivos locales se conservan.")
             put("narrativeSync",buildJsonObject {
-                put("supported",true);put("enabled",prefs.getBoolean("story",true));put("state",if(prefs.getBoolean("story",true))"error" else "disabled")
+                put("supported",true);put("enabled",prefs.getBoolean("story",false));put("state",if(prefs.getBoolean("story",false))"error" else "disabled")
                 put("reason",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "El intercambio no ha terminado. Tus cambios locales se conservan.")
             })
             // Support data is private and contains no exception messages, URLs or tokens.

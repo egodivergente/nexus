@@ -57,11 +57,12 @@ import kotlinx.coroutines.launch
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Sincronización automática");Switch(checked=remember(revision){manager.prefs.getBoolean("enabled",false)},onCheckedChange={manager.setEnabled(it);revision++})}
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Solo Wi-Fi");Switch(checked=remember(revision){manager.prefs.getBoolean("wifi",true)},onCheckedChange={manager.setWifi(it);revision++})}
-            val storyEnabled=remember(revision){manager.prefs.getBoolean("story",true)}
+            val storyEnabled=remember(revision){manager.prefs.getBoolean("story",false)}
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Guion, storyboard y vínculos de material",Modifier.weight(1f))
                 Switch(checked=storyEnabled,onCheckedChange={manager.setStoryEnabled(it);revision++})
             }
+            Text("Actívalo después de actualizar tus dispositivos.",style=MaterialTheme.typography.bodySmall)
             val narrative=driveNarrativeStatus(status,storyEnabled)
             Text(narrative.title,style=MaterialTheme.typography.labelLarge,
                 color=if(narrative.attention)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
@@ -89,6 +90,6 @@ import kotlinx.coroutines.launch
             manager.prefs.getString("resolution",null)?.let {raw->runCatching {Json.parseToJsonElement(raw).jsonObject["key"]?.jsonPrimitive?.contentOrNull}.getOrNull()?:""}
         }
         DriveConflictReview(summary,pendingKey,onResolve={key,version->manager.resolve(key,version);revision++},
-            storyEnabled=remember(revision){manager.prefs.getBoolean("story",true)})
+            storyEnabled=remember(revision){manager.prefs.getBoolean("story",false)})
     }
 }
