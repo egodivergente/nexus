@@ -56,4 +56,8 @@ El proveedor scripted es explícito, vive en memoria y se consume una vez; se ar
 
 El primer intento falló por timeout de SSH con el S25 offline. Tras el aviso de conexión de Vidal, el reintento de `nexus-entregar-tailscale.ps1` **completó la transferencia** y comprobó paquete, vc206, certificado existente, alineación de 16 KiB y el mismo SHA-256 completo local/S25/Descargas indicado arriba. Se solicitó abrir el instalador sin ADB, desinstalar ni borrar datos.
 
-**Instalación de vc206 en el S25 pendiente de confirmación.** La instalación instrumentada y esta prueba funcional corresponden al Pixel; no se atribuyen al S25.
+La instalación final se completó por ADB. Se comprobó el acceso al S25 físico y el certificado de la APK instalada vc205; coincide con la identidad existente. `adb install -r` de vc206 terminó **Success**. `dumpsys package` confirmó **1.9.170-agent-preview / versionCode 206** y el SHA-256 de `base.apk` coincide con el de la entrega. No hubo desinstalación ni borrado de datos.
+
+La comparación de IDs antes y después de la actualización del S25 muestra **0 ausentes y 0 añadidos**: 7 proyectos, 1 escena, 3 planos, 9 personajes, 3177 assets, 780 generaciones, 774 trabajos y 642 outputs. El log disponible del PID de Nexus no contiene FATAL EXCEPTION ni ANR. Vidal confirmó «Instalada: 1.9.170 y Cut visible».
+
+Los intentos de obtener la jerarquía de UI del S25 devolvieron `null root node returned by UiTestAutomationBridge`; no se acredita allí un recorrido automatizado del editor. La comprobación funcional de chat, teclado y deshacer descrita arriba corresponde al Pixel.
