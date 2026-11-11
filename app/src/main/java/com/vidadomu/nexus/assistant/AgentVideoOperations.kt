@@ -100,7 +100,7 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
                 throw ToolInputException("La pista adicional no contiene audio.")
         }
         val totalMs=infos.sumOf {it["duration_ms"]!!.jsonPrimitive.long}
-        val selectedMs=if(spec.action=="trim" || spec.action in setOf("transcribe","analyze_audio"))
+        val selectedMs=if(spec.action in setOf("trim","extract_audio","transcribe","analyze_audio"))
             (spec.endMs ?: totalMs)-spec.startMs else totalMs
         if(selectedMs>3_600_000 && spec.action !in setOf("split_video","extract_audio"))
             throw ToolInputException("Esta operación admite como máximo una hora. Usa split_video para segmentar archivos largos.")
