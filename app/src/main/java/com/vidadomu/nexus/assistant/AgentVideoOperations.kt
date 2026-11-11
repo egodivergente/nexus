@@ -113,7 +113,7 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
         validate(job.spec)
         val spec=job.spec
         if(spec.action=="split_video" || (spec.action=="extract_audio" &&
-            inspect(spec.assetIds.first())["duration_ms"]!!.jsonPrimitive.long>3_600_000L))
+            (spec.endMs ?: inspect(spec.assetIds.first())["duration_ms"]!!.jsonPrimitive.long)-spec.startMs>3_600_000L))
             return processInChunks(job,onProgress)
         val first=source(spec.assetIds.first())
         val folder=File(app.filesDir,"agent_exports").apply {mkdirs()}
@@ -167,13 +167,15 @@ internal class AgentVideoOperations(private val app:NexusApplication) {
     private suspend fun processInChunks(job:MediaEditJob,onProgress:(Int)->Unit):List<String> {
         val original=job.spec
         val durationMs=inspect(original.assetIds.single())["duration_ms"]!!.jsonPrimitive.long
+        val rangeStart=original.startMs
+        val rangeEnd=original.endMs ?: durationMs
         val chunkMs=1_800_000L // 30-minute chunks: safe within the one-hour Media3 export budget.
-        val parts=((durationMs+chunkMs-1)/chunkMs).toInt()
+        val parts=((rangeEnd-rangeStart+chunkMs-1)/chunkMs).toInt()
         val outputs=mutableListOf<String>()
         for(i in 0 until parts) {
             currentCoroutineContext().ensureActive()
-            val start=i*chunkMs
-            val end=minOf(durationMs,start+chunkMs)
+            val start=rangeStart+i*chunkMs
+            val end=minOf(rangeEnd,start+chunkMs)
             val partSpec=original.copy(
                 action=if(original.action=="split_video") "trim" else "extract_audio",
                 startMs=start,endMs=end
