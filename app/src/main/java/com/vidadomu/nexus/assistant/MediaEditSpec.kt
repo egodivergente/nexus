@@ -58,6 +58,19 @@ internal data class MediaEditSpec(
     }
 }
 
+/** End-exclusive chunk boundaries shared by long video and audio operations. */
+internal fun mediaChunkRanges(startMs:Long,endMs:Long,chunkMs:Long=1_800_000L):List<Pair<Long,Long>> {
+    require(startMs>=0L && endMs>startMs && endMs<=43_200_000L && chunkMs in 1L..3_600_000L)
+    return buildList {
+        var cursor=startMs
+        while(cursor<endMs) {
+            val end=minOf(endMs,cursor+chunkMs)
+            add(cursor to end)
+            cursor=end
+        }
+    }
+}
+
 @Serializable
 internal data class MediaEditJob(
     val id:String, val spec:MediaEditSpec, val state:String="QUEUED", val progress:Int=0,
