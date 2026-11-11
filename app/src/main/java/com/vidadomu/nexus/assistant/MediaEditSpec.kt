@@ -17,7 +17,7 @@ internal data class MediaEditSpec(
     val projectId: String? = null,
 ) {
     companion object {
-        val ACTIONS = setOf("trim", "concat", "remove_audio", "replace_audio", "mix_audio", "extract_audio", "frames", "transcribe", "analyze_audio")
+        val ACTIONS = setOf("trim", "concat", "remove_audio", "replace_audio", "mix_audio", "extract_audio", "split_video", "frames", "transcribe", "analyze_audio")
         fun parse(action: String, input: JsonObject, projectId: String?): MediaEditSpec {
             if(action !in ACTIONS) throw ToolInputException("Operación de edición no admitida.")
             val allowed=setOf("action","asset_id","asset_ids","start_ms","end_ms","audio_asset_id","timestamps_ms","max_dimension")
@@ -34,7 +34,7 @@ internal data class MediaEditSpec(
             fun ms(key:String, default:Long?=null):Long? {
                 if(key !in input) return default
                 val value=(input[key] as? JsonPrimitive)?.longOrNull ?: throw ToolInputException("$key debe ser un entero en milisegundos.")
-                if(value !in 0..3_600_000L) throw ToolInputException("$key debe estar entre 0 y 3600000 ms.")
+                if(value !in 0..43_200_000L) throw ToolInputException("$key debe estar entre 0 y 43200000 ms.")
                 return value
             }
             val start=ms("start_ms",0)!!; val end=ms("end_ms")
