@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
@@ -152,6 +153,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var background: AssistantUiState? = null
     private var backgroundConversation: AgentConversation? = null
     private var parkedOrders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null
+    private var archivedProjectDetach: Pair<String, Job>? = null
     private val chatStore = AssistantChatStore(app)
     private val chatsReady=kotlinx.coroutines.CompletableDeferred<Unit>()
     private val submitSlots = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentGenerations)
@@ -184,7 +186,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             if(_ui.value.activeProjectId==null) { _ui.update {it.copy(activeProjectId=project)};runtime.settings.setActiveProject(project);conversation.session.activeProjectId=project }
             withContext(Dispatchers.IO) { runCatching { runtime.assets.startProjectSession(project); runtime.importHistory() } }; refreshProjects()
         }
-        viewModelScope.launch { runtime.assets.changes.collect { refreshProjects() } }
+        viewModelScope.launch {
+            chatsReady.await()
+            runtime.assets.changes.collect {
+                refreshProjects()
+                _ui.value.activeProjectId?.takeIf(::isArchivedProject)?.let(::leaveArchivedProject)
+            }
+        }
         viewModelScope.launch { runtime.skillsRevision.collect {
             val settings = runtime.settings.load()
             orchestrator = runtime.orchestrator(settings)
@@ -263,6 +271,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
+        _ui.value.activeProjectId?.takeIf(::isArchivedProject)?.let { archived ->
+            leaveArchivedProject(archived)
+            return false // The draft remains in its conversation; no new turn targets an archived project.
+        }
         // One answer at a time: while the agent finishes another conversation, this one waits (the draft stays).
         background?.let { bg ->
             _ui.update { it.copy(message = msg("Nexus sigue trabajando en «${chatTitle(bg)}». Cuando termine podrás enviar aquí; tu borrador se conserva.")) }
@@ -695,15 +707,45 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     /** Navigation waits for restoration before selecting a project or appending its draft. */
     internal suspend fun awaitChatsReady() { chatsReady.await() }
 
-    /** Archiving removes the active context through the normal history-preserving conversation switch. */
+    private fun isArchivedProject(id: String) = runtime.assets.snapshot().projects.firstOrNull { it.id == id }?.archived == true
+
+    private fun canLeaveArchivedProject(state: AssistantUiState) =
+        !state.thinking && !state.carrying && state.plans.values.none { it.busy } && background == null
+
+    /** Busy work may finish, then the same archived context is detached without replaying or losing its chat. */
     internal fun leaveArchivedProject(id: String): Boolean {
         val current = _ui.value
-        if (current.activeProjectId != id) return true
-        if (current.thinking || current.carrying || current.plans.values.any { it.busy } || background != null) {
-            notice("El proyecto se ha archivado. Espera a que termine la operación del agente antes de dejar su contexto.")
+        if (current.activeProjectId != id || !isArchivedProject(id)) return true
+        if (!canLeaveArchivedProject(current)) {
+            if (archivedProjectDetach?.let { it.first == id && it.second.isActive } != true) {
+                archivedProjectDetach?.second?.cancel()
+                lateinit var detach: Job
+                detach = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+                    try {
+                        while (_ui.value.activeProjectId == id && isArchivedProject(id)) {
+                            val settled = _ui.first { state ->
+                                state.activeProjectId != id || !isArchivedProject(id) || canLeaveArchivedProject(state)
+                            }
+                            // Moving to another project or restoring this one consumes the pending detach.
+                            if (settled.activeProjectId != id || !isArchivedProject(id)) return@launch
+                            kotlinx.coroutines.yield()
+                            if (_ui.value.activeProjectId == id && isArchivedProject(id) && canLeaveArchivedProject(_ui.value)) {
+                                switchConversation(null, targetProject = null)
+                                return@launch
+                            }
+                        }
+                    } finally {
+                        if (archivedProjectDetach?.second === detach) archivedProjectDetach = null
+                    }
+                }
+                archivedProjectDetach = id to detach
+                detach.start()
+                notice("El proyecto se ha archivado. Al terminar la operación del agente se dejará su contexto automáticamente; no se enviarán nuevas peticiones a ese proyecto.")
+            }
             return false
         }
-        if (runtime.assets.snapshot().projects.firstOrNull { it.id == id }?.archived != true) return true
+        archivedProjectDetach?.second?.cancel()
+        archivedProjectDetach = null
         switchConversation(null, targetProject = null)
         return true
     }

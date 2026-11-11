@@ -65,4 +65,27 @@ class ProjectGenerationScopeTest {
         val filtered = projectGenerationJobs(data, listOf(job("old-address")), "a").single()
         assertTrue(filtered.outputs.isEmpty())
     }
+
+    @Test fun conflictingLocalCopiesDoNotAssignAnotherProjectsJobToTheLocalFilesOwner() {
+        val sharedUri = "file:///shared.mp4"
+        val outputA = GenerationOutput("output-a", "job-a", Modality.VIDEO, "https://example.invalid/a.mp4", sharedUri)
+        val outputB = GenerationOutput("output-b", "job-b", Modality.VIDEO, "https://example.invalid/b.mp4", sharedUri)
+        val jobA = job().copy(id = "job-a", outputs = listOf(outputA))
+        val jobB = job(owner = "b").copy(id = "job-b", outputs = listOf(outputB))
+        val data = IndexData(
+            projects = projects,
+            assets = listOf(asset("a", "a", "record-a").copy(uri = sharedUri),
+                asset("b", "b", "record-b").copy(uri = outputB.url)),
+            generations = listOf(record("a", listOf("a")).copy(id = "record-a", nexusJobId = jobA.id),
+                record("b", listOf("b")).copy(id = "record-b", nexusJobId = jobB.id)),
+        )
+        val aJobs = projectGenerationJobs(data, listOf(jobA, jobB), "a")
+        assertEquals(listOf("job-a"), aJobs.map { it.id })
+        assertTrue(aJobs.single().outputs.isEmpty()) // An ambiguous copy is not a selectable result.
+        val bJobs = projectGenerationJobs(data, listOf(jobA, jobB), "b")
+        assertEquals(listOf("job-b"), bJobs.map { it.id })
+        assertEquals(listOf(outputB), bJobs.single().outputs) // Its independent URL remains a valid identity.
+        assertEquals(listOf(outputA), jobA.outputs)
+        assertEquals(listOf(outputB), jobB.outputs)
+    }
 }

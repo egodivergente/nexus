@@ -2,6 +2,7 @@ package com.vidadomu.nexus.ui.generations
 
 import com.vidadomu.nexus.agent.core.assets.IndexData
 import com.vidadomu.nexus.core.model.GenerationJob
+import com.vidadomu.nexus.core.model.OutputFiles
 import com.vidadomu.nexus.cut.projectCutHub
 
 /** The project hub and its generation list share current material assignments, including shared links. */
@@ -12,10 +13,11 @@ internal fun projectGenerationJobs(index: IndexData, jobs: List<GenerationJob>, 
     val assetsByUri = index.assets.groupBy { it.uri }
     val assetsById = index.assets.associateBy { it.id }
     val assetsByGeneration = index.assets.filter { it.generationId != null }.groupBy { it.generationId }
+    val localUriConflicts = OutputFiles.conflictingLocalUris(jobs.flatMap { it.outputs })
     return jobs.mapNotNull { job ->
         val record = records[job.id]
         val mappedOutputs = job.outputs.associate { output ->
-            output.id to (listOfNotNull(output.localUri, output.url).flatMap { assetsByUri[it].orEmpty() } +
+            output.id to (listOfNotNull(OutputFiles.trustedLocalUri(output, localUriConflicts), output.url).flatMap { assetsByUri[it].orEmpty() } +
                 listOfNotNull(assetsById[output.id])).distinctBy { it.id }
         }
         val indexed = (mappedOutputs.values.flatten() + record?.let {

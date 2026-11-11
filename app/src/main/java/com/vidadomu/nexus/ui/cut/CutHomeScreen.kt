@@ -290,6 +290,20 @@ private fun CutProjectDetail(
                 }
             }
         }
+        item(key = "montages-heading") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Montajes", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(project.montageCount.toString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        items(project.montages, key = { it.id }) { montage ->
+            CutHubMontageRow(montage, snapshot.montageCovers[montage.id], imageLoader,
+                enabled = !project.archived && !busy, onOpen = { onOpenMontage(montage.id) })
+        }
+        if (project.montages.isEmpty()) item(key = "montage-empty") {
+            Text(if (project.archived) "Este proyecto no tiene montajes guardados." else "Todavía no hay montajes. Crea uno para empezar a editar.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if (!project.archived) item(key = "project-agent") {
             Surface(shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                 Column(Modifier.padding(NexusTokens.space16), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
@@ -306,20 +320,6 @@ private fun CutProjectDetail(
                         enabled = !busy, modifier = Modifier.align(Alignment.End), shape = NexusTokens.action) { Text("Abrir conversación") }
                 }
             }
-        }
-        item(key = "montages-heading") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Montajes", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(project.montageCount.toString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        items(project.montages, key = { it.id }) { montage ->
-            CutHubMontageRow(montage, snapshot.montageCovers[montage.id], imageLoader,
-                enabled = !project.archived && !busy, onOpen = { onOpenMontage(montage.id) })
-        }
-        if (project.montages.isEmpty()) item(key = "montage-empty") {
-            Text(if (project.archived) "Este proyecto no tiene montajes guardados." else "Todavía no hay montajes. Crea uno para empezar a editar.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

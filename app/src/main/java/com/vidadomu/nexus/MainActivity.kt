@@ -477,7 +477,7 @@ class MainActivity : ComponentActivity() {
                                             val before = assistantViewModel.ui.value
                                             if (!assistantViewModel.leaveArchivedProject(projectId)) {
                                                 android.widget.Toast.makeText(this@MainActivity,
-                                                    "El proyecto está archivado. El agente sigue ocupado; su conversación se conserva hasta que termine.",
+                                                    "El proyecto está archivado. Al terminar la operación del agente se dejará su contexto automáticamente; el historial se conserva.",
                                                     android.widget.Toast.LENGTH_LONG).show()
                                             } else if (before.activeProjectId == projectId) {
                                                 val changed = kotlinx.coroutines.withTimeoutOrNull(10_000) {
