@@ -40,6 +40,13 @@ class MediaEditSpecTest {
             MediaEditSpec.parse("split_video",input("""{"asset_ids":["a","b"]}"""),null)
         }
     }
+    @Test fun longMediaChunkPlanCoversSourceExactlyOnce() {
+        assertEquals(listOf(0L to 1800000L,1800000L to 3600000L,3600000L to 3900000L),
+            mediaChunkRanges(0,3900000))
+        assertEquals(listOf(3600000L to 3660000L),mediaChunkRanges(3600000,3660000))
+        assertEquals(listOf(0L to 1800000L,1800000L to 3600000L),mediaChunkRanges(0,3600000))
+        assertThrows(IllegalArgumentException::class.java) { mediaChunkRanges(3600000,3600000) }
+    }
     @Test fun subtitlesUseHoursAndMillisecondPrecision() {
         assertEquals("01:02:03,004",WhisperTranscription.timestamp(3723004))
         assertEquals("00:00:00,000",WhisperTranscription.timestamp(-1))
