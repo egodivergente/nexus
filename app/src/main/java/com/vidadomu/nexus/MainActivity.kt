@@ -68,6 +68,8 @@ import com.vidadomu.nexus.ui.navigation.Screen
 import com.vidadomu.nexus.ui.navigation.openHistoryTab
 import com.vidadomu.nexus.ui.navigation.NotificationNavigation
 import com.vidadomu.nexus.ui.output.OutputViewerScreen
+import com.vidadomu.nexus.cut.NexusCut
+import com.vidadomu.nexus.ui.cut.CutEditorScreen
 import com.vidadomu.nexus.ui.settings.SettingsScreen
 import com.vidadomu.nexus.ui.theme.BackgroundDark
 import com.vidadomu.nexus.ui.theme.ScreenBackground
@@ -158,6 +160,13 @@ class MainActivity : ComponentActivity() {
                 }
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
+                LaunchedEffect(navController) {
+                    NexusCut.openRequests.collect { projectId ->
+                        focusManager.clearFocus(force = true)
+                        keyboard?.hide()
+                        navController.navigate("cut/${Uri.encode(projectId)}") { launchSingleTop = true }
+                    }
+                }
                 LaunchedEffect(Unit) {
                     com.vidadomu.nexus.assistant.story.StoryNavigation.requests.collect { destination ->
                         val selection = com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.value
@@ -252,7 +261,7 @@ class MainActivity : ComponentActivity() {
                         .imePadding().revealBarOnSwipeUp(),
                     containerColor = ScreenBackground,
                     bottomBar = {
-                        if(!WindowInsets.isImeVisible) {
+                        if(!WindowInsets.isImeVisible && activeEntry?.destination?.route?.startsWith("cut/") != true) {
                             androidx.compose.foundation.layout.Column {
                                 val currentRoute = activeEntry?.destination?.route
                                 if (currentRoute?.startsWith("output") != true) {
@@ -399,6 +408,16 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("byteplus/{page}",arguments=listOf(navArgument("page") {type=NavType.StringType})) {entry ->
                             SettingsScreen(initialPage=entry.arguments?.getString("page"),onCloseInitialPage={navController.popBackStack()},assistantViewModel=assistantViewModel)
+                        }
+                        composable("cut/{projectId}", arguments = listOf(navArgument("projectId") { type = NavType.StringType })) { entry ->
+                            CutEditorScreen(
+                                projectId = requireNotNull(entry.arguments?.getString("projectId")),
+                                onBack = { navController.popBackStack() },
+                                onOpenLibraryAsset = {
+                                    navController.popBackStack("workspace", false)
+                                    tabRequest = tabs.indexOf(Screen.Library)
+                                },
+                            )
                         }
                         composable(
                             route = "output/{jobId}?index={index}",
