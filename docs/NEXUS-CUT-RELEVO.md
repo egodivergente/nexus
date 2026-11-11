@@ -3,7 +3,7 @@
 Para quien continúe (Codex u otro agente). Rama: `feat/nexus-cut-20261111`. No trabajar sobre `main` (va muy atrás) ni sobre `feat/flow-live-20261108` (es la base vc204, no se toca).
 Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS.md`.
 
-**Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada por Tailscale con hashes comprobados. Tras abrir el instalador, Vidal confirmó que la actualización quedó instalada. El recorrido funcional físico sigue pendiente; no se declara probado por la entrega o por la instalación.
+**Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada al S25 por Tailscale con hashes comprobados e instalación confirmada por Vidal. Después, por petición expresa de Vidal, el recorrido funcional se ejecutó por ADB en el **Pixel 8 Pro físico**: Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproduciéndose en Biblioteca. PASS en Pixel; no se atribuye esa prueba al S25.
 
 ## Estado verificado
 
@@ -54,7 +54,7 @@ No inventar estados ni resultados; un build fallido se informa como fallido. No 
 5. **Entradas: integradas.** Biblioteca: selección múltiple → «Montar», en orden visible y con proyecto activo; Guion: escena o proyecto en orden narrativo, con vínculos n:m y legacy; visor: «Editar en Nexus Cut». Todas llaman a `NexusCut.openWith` y editan mediante `CutSession`. Reabrir no duplica clips ni restaura los borrados; aperturas simultáneas se serializan y una edición concurrente del agente se protege por revisión. `:app:testAgentPreviewUnitTest` con filtros de Cut, Biblioteca, navegación y visor: **22 pruebas PASS**, sin omitidas (10 nuevas de Cut y 12 existentes). No es la suite completa.
 
    Solo se montan copias locales identificadas. Para resultados antiguos múltiples cuyas URIs se relocalizaron sin conservar una asociación inequívoca con cada output, el visor rechaza adivinar la posición; se puede elegir el asset local en Biblioteca. El fallback de generación monoresultado sí está cubierto por prueba.
-6. **APK compilada, entregada e instalación confirmada por Vidal; QA manual pendiente.** `1.9.169-agent-preview / versionCode 205`, paquete `com.vidadomu.nexus.agent`, fuente `0f3c89750010955948bd84fe09b6850437bd2c81`. `:app:assembleAgentPreview` **BUILD SUCCESSFUL in 2m 36s** en AXELPC. Comprobados versión, permiso, servicio y revisión `0f3c89750010` dentro de los DEX del APK terminado.
+6. **APK entregada al S25 y recorrido funcional comprobado por ADB en Pixel.** `1.9.169-agent-preview / versionCode 205`, paquete `com.vidadomu.nexus.agent`, fuente `0f3c89750010955948bd84fe09b6850437bd2c81`. `:app:assembleAgentPreview` **BUILD SUCCESSFUL in 2m 36s** en AXELPC. Comprobados versión, permiso, servicio y revisión `0f3c89750010` dentro de los DEX del APK terminado.
 
    Suite completa `:cut-core:test :agent-core:test :app:testAgentPreviewUnitTest --continue`: **BUILD FAILED** por las siete pruebas preexistentes de la app; 922 pruebas de app, 915 PASS y 7 FAIL, sin errores ni omitidas. Las 16 pruebas de app de Nexus Cut pasan (6 selección de assets, 4 reapertura, 4 hueco inicial y 2 matemáticas de exportación). `cut-core` y `agent-core` fueron `UP-TO-DATE` en esta última invocación: se reutilizaron sus resultados del paso 1.
 
@@ -63,4 +63,23 @@ No inventar estados ni resultados; un build fallido se informa como fallido. No 
    - Certificado SHA-256: `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`.
    - APK SHA-256 local = S25 = Descargas: `57e6a8e0541c366deef1199d26360efbcb2fccbd154715e0a12fb9776551f867` (47 906 831 bytes).
    - **S25:** Vidal indicó primero que seguía en 1.9.168 y posteriormente confirmó «ya instalada» tras la entrega de 1.9.169. Es confirmación manual del usuario, no lectura instrumentada de versión/datos.
-   - **Pendiente en el S25:** Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproducible en Biblioteca. No hay evidencia de ese recorrido todavía.
+   - **S25:** el recorrido de edición/exportación no se ejecutó allí. Vidal pidió sustituir esa comprobación por la prueba mediante ADB en el Pixel.
+
+## Prueba funcional física — Pixel 8 Pro, 11/11/2026
+
+Pixel identificado por ADB, inicialmente vc204 / 1.9.168. Certificado instalado comprobado antes de actualizar: coincide con la identidad anterior. Sin generaciones activas (todos los trabajos terminados o fallidos). `adb install -r` de vc205: **Success**; versión instalada y SHA-256 de `base.apk` coinciden con la entrega anterior. No se desinstaló ni borraron datos.
+
+Se operó la interfaz real por ADB; los JSON privados y las capturas se conservaron fuera de Git. No se usaron llamadas del agente para simular pulsaciones o fabricar el resultado.
+
+| Acción por interfaz | Evidencia contrastada | Resultado |
+|---|---|---|
+| Biblioteca, filtro vídeo, marcar dos vídeos locales y «Montar» | Editor inmersivo abierto; proyecto persistido con 2 medios, 2 clips de vídeo y 2 de audio; duración 26,648 s | PASS |
+| Desplazar cabezal y «Dividir» a 1,960 s | Revisión 2; 3 clips de vídeo y 3 de audio; duración total conservada | PASS |
+| «Eliminar» el primer tramo, con ripple | Revisión 3; desaparecen los dos segmentos vinculados; posteriores adelantados 1,960 s | PASS |
+| «Deshacer» | Revisión 4; `timeline` restaurada exactamente al JSON posterior a dividir | PASS |
+| Exportar, seleccionar 720p y H.264 | Progreso real observado; asset final registrado y MP4 existente, 8 741 357 bytes | PASS |
+| Volver a Biblioteca y abrir el MP4 exportado | Nueva miniatura visible; reproducción real con fotogramas distintos, controles de reproducción y progreso observado | PASS |
+
+`ffprobe` del MP4 recuperado del dispositivo: vídeo **H.264, 1280×720, 26,648 s**; audio **AAC, 26,702 s**; duración del contenedor 26,702 s. La Biblioteca registra VIDEO / FINAL / GENERATED, MIME `video/mp4` y tag `nexus-cut`. El registro del montaje contiene, con origen USER, `media.import`, `clip.split`, `clip.delete`, `project.undo` y `project.set_export`.
+
+Comparación antes de instalar y después del recorrido: ningún ID original ausente en proyectos, escenas, planos, personajes, assets, generaciones, trabajos u outputs. Solo se añadió el asset de la exportación; no hay nuevos trabajos ni generaciones. Los hashes de tres ficheros de preferencias cambiaron al arrancar tras la actualización; no se afirma igualdad byte a byte de todo el perfil ni se leyeron valores de credenciales. No se detectaron FATAL EXCEPTION ni ANR de Nexus en el log del proceso de esta prueba. Pixel dejado en Biblioteca, filtro Todos, con el MP4 exportado visible.
