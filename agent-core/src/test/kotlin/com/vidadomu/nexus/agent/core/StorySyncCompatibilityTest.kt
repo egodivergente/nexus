@@ -56,6 +56,10 @@ class StorySyncCompatibilityTest {
             assertEquals("La mano deja de temblar",index.snapshot().shots.single().description)
             assertTrue(index.isStoryContextStale(context));assertEquals("Cámara fija",index.snapshot().shots.single().camera)
             val reads=counted.reads;val uploads=narrative.commits.size;enabled=false
+            // Pausing republishes full207 rows. Receive that representation before editing;
+            // editing an older filtered baseline concurrently is correctly a reviewable conflict.
+            current.cycle(null)
+            oldRows=old.exchange(oldRows).rows;old.acknowledge(oldRows)
             publish(mapOf("scenes:$scene" to JsonObject(oldRows.getValue("scenes:$scene")+mapOf("title" to JsonPrimitive("Título nuevo con guion pausado")))))
             val paused=current.cycle(null)
             assertEquals(reads,counted.reads);assertEquals(uploads,narrative.commits.size)
