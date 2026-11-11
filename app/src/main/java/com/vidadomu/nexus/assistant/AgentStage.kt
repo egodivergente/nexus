@@ -58,6 +58,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.vidadomu.nexus.ui.theme.onStylusHover
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
@@ -215,6 +216,20 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
     val pager = rememberPagerState(initialPage = initial.coerceIn(0, results.lastIndex)) { results.size }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val dialogView = LocalView.current
+        val dialogContext = LocalContext.current
+        val configuration = LocalConfiguration.current
+        // Floating windows can report zero Compose cutout insets even when they cover the camera.
+        // Window metrics retain the physical safe area; refresh it on rotation/window changes.
+        val physicalCutout = remember(dialogView, configuration) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                dialogContext.getSystemService(WindowManager::class.java).currentWindowMetrics.windowInsets.displayCutout
+            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) dialogView.rootWindowInsets?.displayCutout
+            else null
+        }
+        val safeArea = WindowInsets(
+            left = physicalCutout?.safeInsetLeft ?: 0, top = physicalCutout?.safeInsetTop ?: 0,
+            right = physicalCutout?.safeInsetRight ?: 0, bottom = physicalCutout?.safeInsetBottom ?: 0,
+        ).union(NexusInsets.fullScreen)
         SideEffect {
             (dialogView.parent as? DialogWindowProvider)?.window?.let { window ->
                 WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -235,7 +250,7 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
         NexusSheetSystemBars()
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             // A separate window must not inherit the Activity's already-consumed safe area.
-            Column(Modifier.fillMaxSize().padding(NexusInsets.fullScreen.asPaddingValues())) {
+            Column(Modifier.fillMaxSize().padding(safeArea.asPaddingValues())) {
                 Row(Modifier.fillMaxWidth().padding(NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
                     Text(results.getOrNull(pager.currentPage)?.name ?: "Resultado", color = Color.White, style = MaterialTheme.typography.titleSmall,
                         maxLines = 1, modifier = Modifier.weight(1f).padding(start = NexusTokens.space8))
