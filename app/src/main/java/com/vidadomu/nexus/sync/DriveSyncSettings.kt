@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
     Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Text("Google Drive",style=MaterialTheme.typography.titleMedium)
         val state=status["state"]?.jsonPrimitive?.content
-        Text(when(state){"syncing"->"Sincronizando…";"synced"->"Al día";"partial"->"Faltan originales por recuperar";"conflicts"->"Versiones para revisar";"authorization_required"->"Vuelve a conectar Google";"retry"->"Pendiente de reintento";else->"Comparte tus proyectos con tus otros dispositivos"})
+        Text(when(state){"syncing"->"Sincronizando…";"synced"->"Al día";"partial"->"Sincronización incompleta";"conflicts"->"Versiones para revisar";"authorization_required"->"Vuelve a conectar Google";"retry"->"Pendiente de reintento";else->"Comparte tus proyectos con tus otros dispositivos"})
         message?.let {Text(it,color=MaterialTheme.colorScheme.error)}
         val connected=remember(revision){manager.prefs.getString("account",null)!=null}
         if(!connected || state=="authorization_required")Button(enabled=!connecting,onClick={
@@ -57,6 +57,15 @@ import kotlinx.coroutines.launch
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Sincronización automática");Switch(checked=remember(revision){manager.prefs.getBoolean("enabled",false)},onCheckedChange={manager.setEnabled(it);revision++})}
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Solo Wi-Fi");Switch(checked=remember(revision){manager.prefs.getBoolean("wifi",true)},onCheckedChange={manager.setWifi(it);revision++})}
+            val storyEnabled=remember(revision){manager.prefs.getBoolean("story",true)}
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Text("Guion, storyboard y vínculos de material",Modifier.weight(1f))
+                Switch(checked=storyEnabled,onCheckedChange={manager.setStoryEnabled(it);revision++})
+            }
+            val narrative=driveNarrativeStatus(status,storyEnabled)
+            Text(narrative.title,style=MaterialTheme.typography.labelLarge,
+                color=if(narrative.attention)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+            narrative.detail?.let {Text(it,style=MaterialTheme.typography.bodySmall)}
             Text("Proyectos disponibles sin conexión",style=MaterialTheme.typography.labelLarge)
             Text("El proyecto activo también se descarga al sincronizar.",style=MaterialTheme.typography.bodySmall)
             for(project in projects.projects){
@@ -65,11 +74,21 @@ import kotlinx.coroutines.launch
             }
         }
         val projectNames=projects.projects.associate {it.id to it.name}
-        val summary=remember(status,projectNames) {DriveConflictPresentation.summarize(status,projectNames)}
+        val relatedNames=remember(projects) {buildMap<String,String> {
+            projects.scenes.forEach {put(it.id,it.title?:it.code)}
+            projects.shots.forEach {put(it.id,it.title?:it.code)}
+            projects.characters.forEach {put(it.id,it.name)}
+            projects.assets.forEach {put(it.id,it.displayName)}
+            projects.generations.forEach {put(it.id,it.prompt.take(55))}
+            projects.story.elements.forEach {put(it.id,it.name)}
+            projects.story.blocks.forEach {put(it.id,it.text.take(55))}
+        }}
+        val summary=remember(status,projectNames,relatedNames) {DriveConflictPresentation.summarize(status,projectNames,relatedNames=relatedNames)}
         // A malformed pending value still blocks new choices; the manager would overwrite it.
         val pendingKey=remember(status,revision) {
             manager.prefs.getString("resolution",null)?.let {raw->runCatching {Json.parseToJsonElement(raw).jsonObject["key"]?.jsonPrimitive?.contentOrNull}.getOrNull()?:""}
         }
-        DriveConflictReview(summary,pendingKey,onResolve={key,version->manager.resolve(key,version);revision++})
+        DriveConflictReview(summary,pendingKey,onResolve={key,version->manager.resolve(key,version);revision++},
+            storyEnabled=remember(revision){manager.prefs.getBoolean("story",true)})
     }
 }

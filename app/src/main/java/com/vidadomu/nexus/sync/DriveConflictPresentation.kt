@@ -16,10 +16,27 @@ enum class DriveConflictKind(val collection:String,val singular:String,val plura
     GENERATIONS("generations","generación","generaciones"),
     CONVERSATIONS("conversations","chat","chats"),
     MONTAGES("montages","montaje","montajes"),
+    STORY_PROJECTS("story:projects","historia de proyecto","historias de proyecto"),
+    STORY_SCENES("story:scenes","escena de guion","escenas de guion"),
+    STORY_SHOTS("story:shots","plano de guion","planos de guion"),
+    STORY_CHARACTERS("story:characters","personaje del guion","personajes del guion"),
+    STORY_GENERATIONS("story:generations","contexto de generación","contextos de generación"),
+    STORY_BLOCKS("story:blocks","fragmento de guion","fragmentos de guion"),
+    STORY_LINKS("story:links","vínculo de material","vínculos de material"),
+    STORY_ELEMENTS("story:elements","elemento de continuidad","elementos de continuidad"),
+    STORY_PREFERENCES("story:preferences","indicación","indicaciones"),
+    STORY_PROPOSALS("story:proposals","propuesta","propuestas"),
+    STORY_TASKS("story:tasks","tarea del proyecto","tareas del proyecto"),
+    STORY_HISTORY("story:history","cambio del proyecto","cambios del proyecto"),
+    STORY_RECEIPTS("story:receipts","registro de operación","registros de operación"),
+    STORY_ADOPTED("story:adopted","grupo de referencias heredadas","grupos de referencias heredadas"),
     OTHER("","elemento","otros elementos");
     fun count(n:Int)="$n "+if(n==1)singular else plural
     companion object {
-        fun of(key:String)=entries.firstOrNull {it!=OTHER && it.collection==key.substringBefore(':')}?:OTHER
+        fun of(key:String):DriveConflictKind {
+            val collection=if(key.startsWith("story:"))key.split(':',limit=3).take(2).joinToString(":") else key.substringBefore(':')
+            return entries.firstOrNull {it!=OTHER && it.collection==collection}?:OTHER
+        }
     }
 }
 
@@ -81,11 +98,12 @@ object DriveConflictPresentation {
         status:JsonObject,
         projectNames:Map<String,String> = emptyMap(),
         zone:TimeZone=TimeZone.getDefault(),
+        relatedNames:Map<String,String> = emptyMap(),
     ):DriveConflictSummary {
         val missing=(status["missingMedia"] as? JsonPrimitive)?.intOrNull?.coerceAtLeast(0)?:0
         var malformed=0
         val items=(status["conflicts"] as? JsonArray).orEmpty().mapNotNull {entry->
-            item(entry,projectNames,zone).also {if(it==null)malformed++}
+            item(entry,projectNames,zone,relatedNames).also {if(it==null)malformed++}
         }
         val groups=DriveConflictKind.entries.mapNotNull {kind->
             items.filter {it.kind==kind}.takeIf {it.isNotEmpty()}?.let {DriveConflictGroup(kind,disambiguate(it))}
@@ -100,7 +118,7 @@ object DriveConflictPresentation {
         return SimpleDateFormat("d MMM yyyy, HH:mm",spanish).apply {timeZone=zone}.format(Date(at))
     }
 
-    private fun item(entry:JsonElement,projectNames:Map<String,String>,zone:TimeZone):DriveConflictItem? {
+    private fun item(entry:JsonElement,projectNames:Map<String,String>,zone:TimeZone,relatedNames:Map<String,String>):DriveConflictItem? {
         val conflict=entry as? JsonObject?:return null
         val key=conflict.string("key")?:return null
         val rawVersions=(conflict["versions"] as? JsonArray)?.map {it as? JsonObject?:return null}?:return null
@@ -108,15 +126,16 @@ object DriveConflictPresentation {
         val kind=DriveConflictKind.of(key)
         val versions=rawVersions.mapIndexed {index,raw->
             val id=raw.string("id")?:return null
-            val value=raw["value"] as? JsonObject
-            if(raw["value"]!=null && raw["value"]!=JsonNull && value==null)return null
+            val rawValue=raw["value"] as? JsonObject
+            if(raw["value"]!=null && raw["value"]!=JsonNull && rawValue==null)return null
+            val value=rawValue?.let(::editorial)
             DriveConflictVersion(
                 id=id,ordinal=index+1,
                 device=raw.string("device")?.takeIf {it.isNotBlank()},
                 date=formatDate((raw["at"] as? JsonPrimitive)?.longOrNull,zone),
                 removes=value==null,
-                name=value?.let {name(kind,it,projectNames)},
-                fields=value?.let {fields(kind,it,projectNames,zone)}.orEmpty(),
+                name=value?.let {name(kind,it,projectNames,relatedNames)},
+                fields=value?.let {fields(kind,it,projectNames,zone,relatedNames)}.orEmpty(),
                 original=value?.takeIf {kind==DriveConflictKind.ASSETS}?.string("uri")?.let {
                     if(it.startsWith(SyncBlobs.PREFIX))DriveOriginalState.REFERENCED_IN_DRIVE else DriveOriginalState.NOT_REFERENCED_IN_DRIVE
                 },
@@ -148,23 +167,39 @@ object DriveConflictPresentation {
         }
     }
 
-    private fun name(kind:DriveConflictKind,row:JsonObject,projects:Map<String,String>):String? = when(kind) {
+    private fun editorial(value:JsonObject):JsonObject {
+        val payload=value["payload"] as? JsonObject?:return value
+        return JsonObject(payload+mapOf("id" to (payload["id"]?:value["id"]?:JsonNull),"projectId" to (payload["projectId"]?:value["projectId"]?:JsonNull)))
+    }
+
+    private fun baseKind(kind:DriveConflictKind)=when(kind) {
+        DriveConflictKind.STORY_PROJECTS->DriveConflictKind.PROJECTS
+        DriveConflictKind.STORY_SCENES->DriveConflictKind.SCENES
+        DriveConflictKind.STORY_SHOTS->DriveConflictKind.SHOTS
+        DriveConflictKind.STORY_CHARACTERS->DriveConflictKind.CHARACTERS
+        DriveConflictKind.STORY_GENERATIONS->DriveConflictKind.GENERATIONS
+        else->kind
+    }
+
+    private fun name(kind:DriveConflictKind,row:JsonObject,projects:Map<String,String>,relatedNames:Map<String,String>):String? = (when(baseKind(kind)) {
         DriveConflictKind.ASSETS->row.string("displayName")
         DriveConflictKind.SCENES->row.string("title")?:row.string("code")
         DriveConflictKind.SHOTS->row.string("code")
         DriveConflictKind.GENERATIONS->row.string("prompt")?.let(::excerpt)?:row.string("modelId")
         DriveConflictKind.CONVERSATIONS->(row["items"] as? JsonArray)?.firstNotNullOfOrNull {(it as? JsonObject)?.string("text")}?.let {excerpt(it,40)}
         DriveConflictKind.MONTAGES->row.string("projectId")?.let {projects[it]}
-        else->row.string("name")?:row.string("displayName")
-    }?.takeIf {it.isNotBlank()}
+        DriveConflictKind.STORY_BLOCKS,DriveConflictKind.STORY_PREFERENCES->row.string("text")?.let {excerpt(it,40)}
+        DriveConflictKind.STORY_LINKS->listOfNotNull(row.string("assetId")?.let {relatedNames[it]},row.string("targetId")?.let {relatedNames[it]?:projects[it]}).joinToString(" → ").takeIf {it.isNotBlank()}
+        else->row.string("name")?:row.string("displayName")?:row.string("title")
+    }?:row.string("id")?.let {relatedNames[it]?:projects[it]})?.takeIf {it.isNotBlank()}
 
-    private fun fields(kind:DriveConflictKind,row:JsonObject,projects:Map<String,String>,zone:TimeZone):List<DriveConflictField> {
+    private fun fields(kind:DriveConflictKind,row:JsonObject,projects:Map<String,String>,zone:TimeZone,relatedNames:Map<String,String>):List<DriveConflictField> {
         val out=mutableListOf<DriveConflictField>()
-        fun add(label:String,value:String?) {if(!value.isNullOrBlank())out+=DriveConflictField(label,value)}
+        fun add(label:String,value:String?) {if(!value.isNullOrBlank()){out.removeAll {it.label==label};out+=DriveConflictField(label,value)}}
         fun count(label:String,key:String,singular:String,plural:String) {
             (row[key] as? JsonArray)?.let {add(label,"${it.size} "+if(it.size==1)singular else plural)}
         }
-        when(kind) {
+        when(baseKind(kind)) {
             DriveConflictKind.PROJECTS->{
                 add("Nombre",row.string("name"))
                 add("Descripción",row.string("description")?.let(::excerpt))
@@ -193,6 +228,25 @@ object DriveConflictPresentation {
             }
             DriveConflictKind.CONVERSATIONS->count("Mensajes","items","mensaje","mensajes")
             else->{}
+        }
+        if(kind.collection.startsWith("story:")) {
+            for((key,label) in listOf("title" to "Título","description" to "Acción y descripción","text" to "Texto","speaker" to "Personaje que habla",
+                "intent" to "Intención narrativa","framing" to "Encuadre","camera" to "Cámara","performance" to "Actuación","dialogue" to "Diálogo",
+                "sound" to "Sonido","note" to "Nota","notes" to "Notas","treatment" to "Tratamiento","format" to "Formato","detail" to "Detalle"))add(label,row.string(key))
+            row.string("role")?.let {add("Uso del material",when(it){"identity"->"Identidad";"costume"->"Vestuario";"location"->"Escenario";"composition"->"Encuadre";"lighting"->"Luz";"sketch"->"Boceto";"generated"->"Imagen generada";"candidate"->"Toma candidata";"chosen"->"Toma elegida";"discarded"->"Descartado";"audio"->"Audio";"output"->"Resultado";"final"->"Material final";"source"->"Material de origen";else->"Referencia"})}
+            row.string("scope")?.let {scope->add("Alcance",when(scope){"project"->"Proyecto";"scene"->"Escena";"shot"->"Plano";"character"->"Personaje";"element"->"Elemento de continuidad";"block"->"Fragmento de guion";else->null})}
+            (row.string("behavior")?:row.string("mode"))?.let {behavior->add("Referencias",when(behavior){"complement"->"Complementa las referencias generales";"replace"->"Sustituye las referencias generales";else->null})}
+            (row["order"] as? JsonPrimitive)?.intOrNull?.let {add("Posición",(it+1).toString())}
+            (row["durationSec"] as? JsonPrimitive)?.doubleOrNull?.let {add("Duración orientativa","$it s")}
+            (row["selected"] as? JsonPrimitive)?.booleanOrNull?.let {add("Material elegido",if(it)"Sí" else "No")}
+            (row["enabled"] as? JsonPrimitive)?.booleanOrNull?.let {add("Indicación activa",if(it)"Sí" else "No")}
+            row.string("narrativeState")?.let {add("Lugar en la historia",if(it=="idea")"Idea por explorar" else "Incorporado")}
+            (row.string("productionState")?:row.string("status"))?.let {add("Estado de trabajo",when(it){"pending"->"Pendiente";"prepared"->"Preparado";"generated"->"Generado";"chosen"->"Elegido";"queued"->"En cola";"pending_resume"->"Pendiente de reanudación";"complete"->"Terminado";"cancelled"->"Cancelado";"error"->"Error";"applied"->"Aplicado";"rejected"->"Descartado";else->null})}
+            for((key,label) in listOf("assetId" to "Archivo","targetId" to "Destino","characterId" to "Personaje","sceneId" to "Escena"))
+                row.string(key)?.let {add(label,relatedNames[it]?:projects[it]?:"Contexto aún no recibido")}
+            for((key,label) in listOf("characterIds" to "Personajes","locationIds" to "Escenarios"))
+                (row[key] as? JsonArray)?.let {array->add(label,array.mapNotNull {(it as? JsonPrimitive)?.contentOrNull}.joinToString(", ") {relatedNames[it]?:"Contexto aún no recibido"}.ifBlank {"Ninguno"})}
+            count("Cambios propuestos","changes","cambio","cambios")
         }
         row.string("projectId")?.let {id->add("Proyecto",projects[id]?:"Proyecto no disponible en este dispositivo")}
         return out

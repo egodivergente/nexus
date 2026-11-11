@@ -24,6 +24,7 @@ import androidx.compose.ui.window.DialogProperties
     pendingKey:String?,
     onResolve:(key:String,versionId:String)->Unit,
     modifier:Modifier=Modifier,
+    storyEnabled:Boolean=true,
 ) {
     var submitted by remember(summary) {mutableStateOf<String?>(null)}
     val pending=pendingKey?:submitted
@@ -67,8 +68,9 @@ import androidx.compose.ui.window.DialogProperties
     if(openKey!=null && open==null)SideEffect {openKey=null}
     if(open!=null)DriveConflictDetail(
         item=open,
-        canChoose=pending==null,
+        canChoose=pending==null && (storyEnabled || !open.key.startsWith("story:")),
         pendingHere=pending==open.key,
+        blockedReason=if(!storyEnabled && open.key.startsWith("story:"))"Activa el intercambio de guion para aplicar una versión. Puedes seguir comparándolas." else null,
         onDismiss={openKey=null},
         onConfirmed={version->
             if(submitted==null && pendingKey==null) {
@@ -113,6 +115,7 @@ import androidx.compose.ui.window.DialogProperties
 
 @Composable private fun DriveConflictDetail(
     item:DriveConflictItem,canChoose:Boolean,pendingHere:Boolean,
+    blockedReason:String?=null,
     onDismiss:()->Unit,onConfirmed:(DriveConflictVersion)->Unit,
 ) {
     var confirming by remember(item.key) {mutableStateOf<DriveConflictVersion?>(null)}
@@ -126,7 +129,7 @@ import androidx.compose.ui.window.DialogProperties
                     Text("Conservar ambas como elementos separados aún no está disponible.",style=MaterialTheme.typography.bodySmall)
                     if(item.onlyHiddenDifferences)Text("Los datos visibles coinciden; la diferencia está en información interna que esta pantalla no muestra.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
                     if(pendingHere)Text("Ya elegiste una versión de este elemento. Se aplicará en la próxima sincronización.",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.bodySmall,modifier=Modifier.semantics {liveRegion=LiveRegionMode.Polite})
-                    else if(!canChoose)Text("Hay otra elección pendiente de sincronizar. Puedes comparar, pero no elegir hasta entonces.",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.bodySmall)
+                    else if(!canChoose)Text(blockedReason ?: "Hay otra elección pendiente de sincronizar. Puedes comparar, pero no elegir hasta entonces.",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.bodySmall)
                     for(version in item.versions)VersionCard(item,version,canChoose) {confirming=version}
                     TextButton(onClick={technical=!technical}) {Text(if(technical)"Ocultar identificadores técnicos" else "Mostrar identificadores técnicos")}
                     if(technical) {
