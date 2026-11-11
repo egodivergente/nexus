@@ -5,6 +5,8 @@ Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS
 
 **Trabajo posterior solicitado por Vidal:** pestaña propia de Cut, editor oscuro y chat integrado; estado actual en `docs/NEXUS-CUT-CHAT.md`. Esa petición sustituye la decisión inicial de acceso sin pestaña descrita en la secuencia histórica de abajo.
 
+**Estado actual vc206:** fuente `97af8b48dee194012d038f78717fd37d636f26f2`, **1.9.170-agent-preview**, compilada en AXELPC e instalada como actualización en el Pixel con certificado y hash comprobados. Barra con seis pestañas, lista y creación de montajes, chat persistente y deshacer compartido comprobados por interfaz. La prueba del chat usa un cerebro scripted local y herramientas reales; no se llamó a un LLM externo. **vc206 entregada al S25 por Tailscale con firma y hashes verificados; instalador solicitado. Instalación pendiente de confirmación.**
+
 **Continuación verificada del 11/11:** integración de los pasos 1–5 compilada y publicada; vc205 firmada y entregada al S25 por Tailscale con hashes comprobados e instalación confirmada por Vidal. Después, por petición expresa de Vidal, el recorrido funcional se ejecutó por ADB en el **Pixel 8 Pro físico**: Biblioteca → Montar 2 vídeos → dividir, borrar, deshacer → exportar 720p → MP4 visible y reproduciéndose en Biblioteca. PASS en Pixel; no se atribuye esa prueba al S25.
 
 ## Estado verificado
@@ -12,9 +14,10 @@ Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS
 | Pieza | Estado | Evidencia |
 |---|---|---|
 | Hito A: `:cut-core` (motor de Corte + bus `CutSession` + registro de capacidades) | Hecho | `gradlew :cut-core:test` → 101 pruebas, 0 fallos |
-| Herramientas del agente `cut_catalog/describe/read/edit/create` (`agent-core/.../tools/CutTools.kt`) | Hecho | `CutToolsTest` (2) y suite `:agent-core:test`: 456 registradas, 452 PASS, 4 omitidas, 0 fallos |
+| Herramientas del agente y herramientas vinculadas del chat vc206 | Hecho | Suite `:agent-core:test`: 461 registradas, 457 PASS, 4 omitidas, 0 fallos; cinco pruebas nuevas del destino fijo y los trabajos locales |
 | Toolchain Kotlin 2.3.20, compileSdk 36, Media3 1.11.1 | Hecho | APK `assembleAgentPreview` compilada en AXELPC sobre `8885fb2` |
 | App vc205: 922 pruebas unitarias | 915 PASS, 7 FAIL, 0 omitidas | Los siete fallos coinciden exactamente por clase, método y aserción con los XML de vc204 (31 pruebas seleccionadas, 24 PASS y esos 7 FAIL). No son regresiones de Nexus Cut ni se han desactivado. |
+| App vc206: 930 pruebas unitarias | 923 PASS, 7 FAIL, 0 errores, 0 omitidas | **BUILD FAILED** por los mismos siete casos preexistentes: seis mensajes de aserción idénticos; `ScreenInitializationTest` sigue esperando 4 y observa 6 en lugar de 5 por la pestaña nueva. Primera ejecución con 8 FAIL: expectativa de `OutputExportSpecTest` corregida de 5 a 6 y Cut; repetición con 7 FAIL, sin desactivar pruebas. |
 | `media.import` / `render.export` / `render.status` / `render.cancel` | Hecho en núcleo | `DeviceCapabilitiesTest` (3) |
 
 ## Capa Android escrita en d687cbf (primera compilación completada)
@@ -39,7 +42,7 @@ Estos archivos se compilaron por primera vez el 11/11/2026 en AXELPC, sobre `d68
 
 ## Hitos siguientes
 
-- C: composer del agente dentro del editor; `audio.find_silences` (formas de onda ya existen en `WaveformRepository`); avisar en el editor de lo que hizo el agente (`CutEvent`).
+- C: composer del agente dentro del editor y avisos de sus acciones mediante `CutEvent` **hechos en vc206**; chat persistente y deshacer compartido comprobados en Pixel. Sigue pendiente `audio.find_silences` (formas de onda ya existen en `WaveformRepository`).
 - D: inspector (transformar, color, keyframes, transiciones) — las capacidades ya existen en el núcleo, falta la interfaz.
 - E: traer proyectos antiguos de Corte (su puente aún no los exporta), retirar `CorteBridge.kt` y herramientas `corte_*`, formato portable para Nexus Desktop.
 
@@ -85,3 +88,21 @@ Se operó la interfaz real por ADB; los JSON privados y las capturas se conserva
 `ffprobe` del MP4 recuperado del dispositivo: vídeo **H.264, 1280×720, 26,648 s**; audio **AAC, 26,702 s**; duración del contenedor 26,702 s. La Biblioteca registra VIDEO / FINAL / GENERATED, MIME `video/mp4` y tag `nexus-cut`. El registro del montaje contiene, con origen USER, `media.import`, `clip.split`, `clip.delete`, `project.undo` y `project.set_export`.
 
 Comparación antes de instalar y después del recorrido: ningún ID original ausente en proyectos, escenas, planos, personajes, assets, generaciones, trabajos u outputs. Solo se añadió el asset de la exportación; no hay nuevos trabajos ni generaciones. Los hashes de tres ficheros de preferencias cambiaron al arrancar tras la actualización; no se afirma igualdad byte a byte de todo el perfil ni se leyeron valores de credenciales. No se detectaron FATAL EXCEPTION ni ANR de Nexus en el log del proceso de esta prueba. Pixel dejado en Biblioteca, filtro Todos, con el MP4 exportado visible.
+
+## Continuación vc206 — acceso propio y chat, 11/11/2026
+
+Fuente `97af8b48dee194012d038f78717fd37d636f26f2`, **1.9.170-agent-preview / versionCode 206**. `:app:assembleAgentPreview` en AXELPC: **BUILD SUCCESSFUL in 1m 24s**. APK SHA-256 `bcc31fd6bc7f6ee20d67c6efc68cd8c49a90a8f0e354c891e347fe91b9396a98`; certificado existente SHA-256 `8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127`. Instalada en Pixel mediante `adb install -r`, con certificado y hash instalado verificados.
+
+`agent-core`: **461 registradas, 457 PASS y 4 omitidas**, sin fallos. App completa: primera ejecución con **930 pruebas y 8 FAIL**; una expectativa antigua aún exigía cinco pestañas. Se actualizó `OutputExportSpecTest.studioNavigationKeepsSettingsOffTheBar` a seis e inclusión de Cut, sin desactivar la prueba. La repetición terminó **BUILD FAILED**, con **930 pruebas, 923 PASS y los mismos 7 casos preexistentes en FAIL**, 0 errores y 0 omitidas. Al comparar con vc204, seis mensajes de aserción son idénticos. `ScreenInitializationTest` ya esperaba cuatro pestañas y observaba cinco; ahora observa seis por la pestaña solicitada. Ese caso sigue activo y sin modificar. No se presenta la suite como verde.
+
+Por interfaz del Pixel se comprobaron las seis pestañas, la lista de Cut y crear/volver/reabrir un montaje. Escribir y pulsar Enviar ejecutó un turno scripted local: `cut_read` leyó el contexto y `cut_edit` renombró la sesión real mediante el bus. La respuesta y su etiqueta identificaron la prueba local; el estado quedó en revisión 1, con dos mensajes guardados y `pending=null`. Volver y reabrir conservó ambos mensajes y un borrador sin reenviar ni cambiar esa revisión. El botón Deshacer del editor revirtió el renombrado del agente y dejó la revisión 2.
+
+Capturas reales acreditan composer y Enviar visibles con teclado en vertical y horizontal; se restauraron los ajustes de rotación a sus valores previos (1/0). Capturas y datos privados permanecen fuera de Git. No se llamó a un modelo externo: las herramientas y los cambios son reales, el cerebro de QA es scripted; no se acredita interpretación por un LLM real.
+
+Comparación de IDs antes/después de vc206: **0 ausentes y 0 añadidos** en Nexus, con 6 proyectos, 1 escena, 3 planos, 9 personajes, 2624 assets, 683 generaciones, 466 trabajos y 505 outputs. Solo se añadió el montaje de QA en el espacio privado de Cut, fuera del índice de Nexus. La comparación de 30 archivos de preferencias no da igualdad global; no se afirma identidad byte a byte del perfil. Las 78 huellas del chat principal continúan idénticas en la comprobación final. El log disponible del PID observado no muestra FATAL EXCEPTION ni ANR de Nexus. Pixel dejado en la lista principal de Cut.
+
+### Entrega vc206 al S25
+
+El primer intento falló por timeout de SSH con el S25 offline, sin transferencia ni instalador. Tras el aviso de conexión de Vidal, el reintento con `nexus-entregar-tailscale.ps1 -Version 1.9.170 -Worktree C:\Users\User\nexus-cut -ExpectedVersionCode 206` terminó correctamente. Comprobados paquete, versión, certificado existente, alineación de 16 KiB y SHA-256 completo local/S25/Descargas: `bcc31fd6bc7f6ee20d67c6efc68cd8c49a90a8f0e354c891e347fe91b9396a98`. Se solicitó abrir el instalador sin ADB, desinstalación ni borrado de datos.
+
+**Instalación de vc206 en el S25 pendiente de confirmación.** El estado histórico de vc205 y la comprobación física instrumentada de vc206 en Pixel son independientes.

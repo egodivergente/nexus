@@ -23,8 +23,9 @@ class OutputExportSpecTest {
         assertTrue(outputExportSpec(output(Modality.IMAGE, "application/octet-stream")).fileName.endsWith(".bin"))
     }
     @Test fun studioNavigationKeepsSettingsOffTheBar() {
-        assertEquals(5, com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems.size)
+        assertEquals(6, com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems.size)
         assertTrue(com.vidadomu.nexus.ui.navigation.Screen.Story in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
+        assertTrue(com.vidadomu.nexus.ui.navigation.Screen.Cut in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
         assertFalse(com.vidadomu.nexus.ui.navigation.Screen.Settings in com.vidadomu.nexus.ui.navigation.Screen.bottomNavItems)
     }
 }
