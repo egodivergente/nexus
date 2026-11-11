@@ -472,6 +472,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         guard = guard, executor = executor, assets = assets, history = NexusHistorySource(app),
         nativeOperations = NexusNativeOperations(app, this),
         orders = orders,
+        cut = com.vidadomu.nexus.cut.NexusCut.workspace(app),
         probeFrameRate = { uri -> AgentMediaStore.frameRate(app, uri) },
         limits = { settings.limits() },
         adaptPrompt = { text, _, _ -> text }, // Prompt adaptation requires an explicit user edit/approval.
@@ -531,6 +532,7 @@ class AssistantRuntime(private val app: NexusApplication) {
         uiContext = { session ->
             listOfNotNull(
                 orders.turnContext(guard),
+                com.vidadomu.nexus.agent.core.tools.CutTools.context(deps.cut!!),
                 session.storySelection?.takeIf { it.projectId == session.activeProjectId }?.let { selected ->
                     val context = assets.storyContext(selected.projectId, selected.sceneId, selected.shotId)
                     buildString {
