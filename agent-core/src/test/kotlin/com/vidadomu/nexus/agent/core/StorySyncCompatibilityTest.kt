@@ -137,7 +137,7 @@ class StorySyncCompatibilityTest {
             val commit=SyncCommit(id=UUID.randomUUID().toString(),device="Otro dispositivo",revisions=listOf(
                 SyncRevision("ffffffff-ffff-ffff-ffff-ffffffffffff","assets:a",listOf(original.id),remoteValue,"Otro dispositivo",2)))
             cloud.putCommit(commit,SyncJournal.json.encodeToString(SyncCommit.serializer(),commit).toByteArray())
-            index.updateAsset("a"){it.copy(uri=local.toURI().toString())}
+            index.relocateAsset("a",index.asset("a")!!.uri,local.toURI().toString(),"A")
             val status=sync.cycle(null)
             assertTrue(status.getValue("conflicts").jsonArray.any {it.jsonObject["key"]?.jsonPrimitive?.content=="assets:a"})
             assertEquals(0,status.getValue("deduplicated").jsonPrimitive.int)
