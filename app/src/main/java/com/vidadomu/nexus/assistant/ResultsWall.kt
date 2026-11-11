@@ -22,7 +22,8 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 
 /** Stable asset IDs keep equal URLs and multi-output jobs individually addressable. */
 @Composable
-internal fun ResultsWallSheet(outputs: List<Attachment>, onOpen: (Attachment) -> Unit, onDismiss: () -> Unit) {
+internal fun ResultsWallSheet(outputs: List<Attachment>, onOpen: (Attachment) -> Unit, onDismiss: () -> Unit,
+    onAdd: ((Attachment) -> Unit)? = null) {
     val context = LocalContext.current
     NexusSheet("Muro de resultados", onDismiss, subtitle = "${outputs.size} archivos") {
         LazyVerticalStaggeredGrid(columns=StaggeredGridCells.Adaptive(150.dp),
@@ -34,6 +35,7 @@ internal fun ResultsWallSheet(outputs: List<Attachment>, onOpen: (Attachment) ->
                 val request=remember(media.uri,video) { ImageRequest.Builder(context).data(media.uri).apply {
                     if(video) decoderFactory { result, options, _ -> VideoFrameDecoder(result.source,options) }
                 }.build() }
+                Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                 Box(Modifier.fillMaxWidth().clip(NexusTokens.field).clickable {onOpen(media)}) {
                     SubcomposeAsyncImage(model=request, contentDescription=media.name ?: "Resultado generado",
                         contentScale=ContentScale.FillWidth, modifier=Modifier.fillMaxWidth(),
@@ -43,6 +45,12 @@ internal fun ResultsWallSheet(outputs: List<Attachment>, onOpen: (Attachment) ->
                         } })
                     if(video) Icon(Icons.Default.PlayCircle,"Vídeo",tint=androidx.compose.ui.graphics.Color.White,
                         modifier=Modifier.align(Alignment.Center).size(36.dp))
+                }
+                onAdd?.let { add ->
+                    FilledTonalButton(onClick = { add(media) }, modifier = Modifier.fillMaxWidth(), shape = NexusTokens.action) {
+                        Text("Añadir al montaje")
+                    }
+                }
                 }
             }
         }

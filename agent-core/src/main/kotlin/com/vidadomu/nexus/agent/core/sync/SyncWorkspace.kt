@@ -18,7 +18,8 @@ class SyncWorkspace(
     private val collections=listOf("projects","scenes","shots","characters","assets","generations")
     suspend fun cycle(downloadProjects:Set<String>?,extras:Map<String,JsonObject> = emptyMap(),applyExtras:(Map<String,JsonObject>)->Unit = {}):JsonObject {
         val expected=index.snapshot()
-        val encoded=AssetIndex.JSON.encodeToJsonElement(IndexData.serializer(),expected).jsonObject
+        // Device-local transfer receipts are never part of a portable snapshot or sync journal.
+        val encoded=AssetIndex.JSON.encodeToJsonElement(IndexData.serializer(),expected.copy(projectTransfers=emptyList())).jsonObject
         val missing=linkedSetOf<String>();val replacements=mutableMapOf<String,String>()
         fun portable(uri:String):String {
             if(uri.startsWith(SyncBlobs.PREFIX))return uri
@@ -73,7 +74,7 @@ class SyncWorkspace(
             for(kind in collections)put(kind,JsonArray(localized.filterKeys {it.startsWith(kind+":")}.values.toList()))
         }
         val decoded=AssetIndex.JSON.decodeFromJsonElement<IndexData>(next)
-        if(decoded.copy(projectSessions=expected.projectSessions)!=expected) {
+        if(decoded.copy(projectSessions=expected.projectSessions,projectTransfers=expected.projectTransfers)!=expected) {
             SyncJournal.atomic(File(directory,"index-before-apply.json"),encoded.toString())
             index.applySyncedSnapshot(expected,decoded)
         }

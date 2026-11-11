@@ -795,8 +795,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun refreshProjects() = _ui.update { state -> state.copy(projects = runtime.assets.projects(),
-        projectAssets = runtime.assets.snapshot().assets.filter { it.projectId == state.activeProjectId && state.activeProjectId != null && !it.libraryDeleted }) }
+    private fun refreshProjects() {
+        val index = runtime.assets.snapshot()
+        val membership = com.vidadomu.nexus.agent.core.assets.ProjectAssetMembership(index)
+        _ui.update { state -> state.copy(projects = index.projects.filterNot { it.archived },
+            projectAssets = state.activeProjectId?.let { projectId -> index.assets.filter { membership.inProject(it, projectId) } }.orEmpty()) }
+    }
 
     fun importProjectFiles(uris: List<Uri>) {
         val projectId = _ui.value.activeProjectId ?: return

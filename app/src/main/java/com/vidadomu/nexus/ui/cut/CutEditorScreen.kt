@@ -184,6 +184,10 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
     val export by vm.export.collectAsState()
     val agentActivity by vm.agentActivity.collectAsState()
     val chatState by chat.ui.collectAsState()
+    val libraryIndex by AssistantRuntime.get(app).assets.changes.collectAsState()
+    val libraryResults = remember(chatState.libraryResults, libraryIndex) { currentCutLibraryResults(chatState.libraryResults, libraryIndex) }
+    var resultStage by remember(vm.projectId) { mutableStateOf<Pair<List<com.vidadomu.nexus.agent.core.tools.Attachment>, Int>?>(null) }
+    var addingFromResults by remember(vm.projectId) { mutableStateOf(false) }
     var chatExpanded by rememberSaveable(vm.projectId) { mutableStateOf(true) }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -194,6 +198,38 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     var dialog by remember { mutableStateOf<CutDialog?>(null) }
     var menu by remember { mutableStateOf(false) }
+    LaunchedEffect(chatState.libraryResultsOpen) {
+        if (chatState.libraryResultsOpen) {
+            addingFromResults = false
+            vm.preview.pause()
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+        }
+    }
+    fun addFoundAsset(media: com.vidadomu.nexus.agent.core.tools.Attachment) {
+        if (addingFromResults) return
+        val current = currentCutLibraryResults(listOf(media), AssistantRuntime.get(app).assets.snapshot()).singleOrNull()
+        if (current == null) {
+            android.widget.Toast.makeText(context, "El archivo ya no está disponible en la Biblioteca.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        addingFromResults = true
+        chat.closeLibraryResults()
+        resultStage = null
+        vm.importAssets(listOf(requireNotNull(current.assetId)))
+    }
+    if (chatState.libraryResultsOpen && libraryResults.isNotEmpty()) com.vidadomu.nexus.assistant.ResultsWallSheet(
+        libraryResults,
+        onOpen = { selected ->
+            resultStage = libraryResults to libraryResults.indexOfFirst { it.assetId == selected.assetId }.coerceAtLeast(0)
+            chat.closeLibraryResults()
+        },
+        onDismiss = chat::closeLibraryResults,
+        onAdd = ::addFoundAsset,
+    )
+    resultStage?.let { (results, position) ->
+        com.vidadomu.nexus.assistant.ResultStage(results, position, onDismiss = { resultStage = null }, onAdd = ::addFoundAsset)
+    }
 
     LaunchedEffect(vm) { vm.messages.collect { m -> snackbar.showSnackbar(m.text, duration = if (m.error) SnackbarDuration.Long else SnackbarDuration.Short) } }
     LaunchedEffect(export) {
@@ -386,6 +422,7 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                         }
                     },
                     onStop = chat::stop,
+                    onShowResults = chat::showLibraryResults,
                     selectionLabel = if (selection.isEmpty()) "Este montaje" else "${selection.size} clip${if (selection.size == 1) "" else "s"} seleccionado${if (selection.size == 1) "" else "s"}",
                     agentActivity = agentActivity,
                     messageHeight = if (wide) 64.dp else if (typing) 96.dp else 140.dp,

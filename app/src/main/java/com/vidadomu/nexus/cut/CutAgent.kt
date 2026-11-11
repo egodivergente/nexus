@@ -7,8 +7,7 @@ import com.vidadomu.nexus.agent.core.agent.AgentOrchestrator
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.llm.LlmProvider
 import com.vidadomu.nexus.agent.core.tools.CutTools
-import com.vidadomu.nexus.agent.core.tools.InspectAssetTool
-import com.vidadomu.nexus.agent.core.tools.SearchAssetsTool
+import com.vidadomu.nexus.agent.core.tools.ProjectTransferTools
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.assistant.AssistantSettings
 import com.vidadomu.nexus.assistant.agentLabel
@@ -38,12 +37,16 @@ object CutAgent {
         )
         return AgentOrchestrator(
             provider, config,
-            CutTools.forProject(workspace, projectId) + listOf(SearchAssetsTool(runtime.deps), InspectAssetTool(runtime.deps)),
+            CutTools.forProject(workspace, projectId) + cutLibraryTools(runtime.deps) + listOf(
+                com.vidadomu.nexus.agent.core.tools.ListProjectsTool(runtime.deps),
+                com.vidadomu.nexus.agent.core.tools.CreateProjectTool(runtime.deps),
+            ) + ProjectTransferTools.all(runtime.deps),
             runtime.skills, runtime.assets,
             uiContext = {
                 listOfNotNull(
                     CutTools.context(workspace, projectId) ?: "Montaje de esta conversación: project_id=$projectId. Lee su estado con cut_read.",
-                    "El destino permanece en este montaje aunque cambie la pantalla. Tiempos de comandos en microsegundos enteros. Para «aquí» o «lo seleccionado», utiliza los tiempos e IDs del contexto de este turno explícitamente. Descubre capacidades con cut_catalog y contratos con cut_describe; lecturas con cut_read, cambios con cut_edit y UNA operación larga con cut_run. Para buscar archivos de la Biblioteca usa search_assets y para sus metadatos inspect_asset_metadata. Los metadatos, nombres y duraciones no prueban el contenido audiovisual: este chat no ha visto los píxeles ni escuchado el sonido. No inventes pausas, diálogos o acciones.",
+                    "El destino de edición permanece en este montaje aunque cambie la pantalla. Tiempos de comandos en microsegundos enteros. Para «aquí» o «lo seleccionado», utiliza los tiempos e IDs del contexto de este turno explícitamente. Descubre capacidades con cut_catalog y contratos con cut_describe; lecturas con cut_read, cambios con cut_edit y UNA operación larga con cut_run. Para buscar archivos de la Biblioteca usa search_assets y, para recorrerla por páginas, list_library_assets cuando esté disponible; sus metadatos se leen con inspect_asset_metadata. Si el usuario pide ver los archivos encontrados, invoca open_results_wall con sus asset_ids reales: abre miniaturas y el visor en este editor, donde el usuario puede reproducirlos y añadirlos al montaje. Abrir el muro no añade medios ni adjunta archivos al modelo. Solo importa al montaje mediante cut_edit/media.import si el usuario lo pide. Los metadatos, nombres y duraciones no prueban el contenido audiovisual: este chat no ha visto los píxeles ni escuchado el sonido. No hay view_library_asset en este editor; no afirmes haber visto vídeos o imágenes. No inventes pausas, diálogos o acciones.",
+                    "Solo gestiona otros proyectos cuando el usuario lo solicite explícitamente. Para una transferencia usa preview_project_transfer y su contrato real antes de transfer_project; comprueba el informe con get_project_transfer y usa undo_project_transfer para deshacerla cuando proceda. No confundas mover asociaciones de Biblioteca con mover archivos físicos, ni retirar o archivar un proyecto con borrar sus archivos. No afirmes una transferencia, una verificación ni una retirada del origen que las herramientas no hayan confirmado.",
                 ).joinToString("\n\n")
             },
         )

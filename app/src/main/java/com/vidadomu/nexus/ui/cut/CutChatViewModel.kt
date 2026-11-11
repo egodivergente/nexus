@@ -10,6 +10,7 @@ import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.log.Redactor
 import com.vidadomu.nexus.agent.core.tools.UiEvent
+import com.vidadomu.nexus.agent.core.tools.Attachment
 import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.assistant.AssistantTurnService
 import com.vidadomu.nexus.cut.CutAgent
@@ -47,6 +48,8 @@ data class CutChatUiState(
     val streamingText: String = "",
     val activity: String = "",
     val modelLabel: String = "",
+    val libraryResults: List<Attachment> = emptyList(),
+    val libraryResultsOpen: Boolean = false,
 )
 
 /** The montage owns its chat and cancellation; the main Assistant conversation is never selected or edited. */
@@ -61,6 +64,7 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
     val ui: StateFlow<CutChatUiState> = _ui.asStateFlow()
     private var turnJob: Job? = null
     private var activeTurnId: String? = null
+    private val presentedLibraryEvents = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<UiEvent.ResultsWall, Boolean>())
 
     init {
         viewModelScope.launch {
@@ -94,6 +98,7 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
         val user = CutChatMessage(id(), CutChatRole.USER, safe(text), System.currentTimeMillis())
         val turnId = id()
         activeTurnId = turnId
+        presentedLibraryEvents.clear()
         document = document.copy(messages = document.messages + user, draft = originalDraft, pending = PendingCutChatTurn(user.id, user.at))
         _ui.update { it.copy(messages = document.messages, draft = "", thinking = true, streamingText = "", activity = "Preparando el montaje") }
         turnJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -122,6 +127,8 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
                 val result = AssistantTurnService.runTurn(nexus) {
                     limits.turnTimeoutMillis?.let { withTimeout(it) { run() } } ?: run()
                 }
+                // Providers may emit from IO; consume any presentation event before this turn is closed.
+                result.events.filterIsInstance<UiEvent.ResultsWall>().forEach(::presentLibraryEvent)
                 answer = safe(result.text.trim()).takeIf { it.isNotBlank() }
                 notes = result.verifiedNotes.map(::safe) + when (result.stop) {
                     "MAX_ROUNDS" -> listOf("El agente alcanzó el límite de pasos de este turno. Revisa lo aplicado antes de continuar.")
@@ -161,12 +168,24 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
 
     fun stop() { turnJob?.cancel(CancellationException("Detenido desde el editor.")) }
 
+    fun closeLibraryResults() { _ui.update { it.copy(libraryResultsOpen = false) } }
+
+    fun showLibraryResults() {
+        _ui.update { presentCutLibraryResults(it, it.libraryResults, runtime.assets.snapshot()) }
+    }
+
+    private fun presentLibraryEvent(event: UiEvent.ResultsWall) {
+        if (!presentedLibraryEvents.add(event)) return
+        _ui.update { presentCutLibraryResults(it, event.media, runtime.assets.snapshot()) }
+    }
+
     private fun onEvent(turnId: String, event: UiEvent) {
         viewModelScope.launch {
             if (activeTurnId != turnId || !_ui.value.thinking) return@launch
             when (event) {
                 is UiEvent.StreamingText -> _ui.update { it.copy(streamingText = safe(event.text)) }
                 is UiEvent.Activity -> _ui.update { it.copy(activity = safe(event.text)) }
+                is UiEvent.ResultsWall -> presentLibraryEvent(event)
                 is UiEvent.Info -> {
                     val text = safe(event.text).trim()
                     if (text.isNotBlank() && document.messages.lastOrNull()?.let { it.role == CutChatRole.NOTICE && it.text == text } != true) {

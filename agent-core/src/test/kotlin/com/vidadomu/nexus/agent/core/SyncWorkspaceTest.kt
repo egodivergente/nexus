@@ -1,6 +1,9 @@
 package com.vidadomu.nexus.agent.core
 
 import com.vidadomu.nexus.agent.core.assets.AssetIndex
+import com.vidadomu.nexus.agent.core.assets.IndexData
+import com.vidadomu.nexus.agent.core.assets.Project
+import com.vidadomu.nexus.agent.core.assets.ProjectTransferReceipt
 import com.vidadomu.nexus.agent.core.sync.*
 import java.io.File
 import java.net.URI
@@ -102,5 +105,51 @@ class SyncWorkspaceTest {
         val index=AssetIndex(file)
         workspace(index,File(dir,"sync"),SyncJournalTest.Cloud()).cycle(null)
         assertEquals(3,index.snapshot().assets.count {!it.libraryDeleted})
+    }
+    @Test fun localTransferUndoSnapshotsStayPrivateAcrossIncomingSyncWithoutRepeatedApply()=runTest {
+        val localDir=root();val peerDir=root();val cloud=SyncJournalTest.Cloud()
+        try {
+            val privateMarker="private-undo-snapshot-must-stay-local"
+            val receipt=ProjectTransferReceipt("local-transfer","source","target",false,"fixture-fingerprint",
+                before=buildJsonObject {put("projects",buildJsonArray {add(buildJsonObject {
+                    put("id","unrelated-private-project");put("name",privateMarker);put("createdAt",1)
+                })})},createdAt=1)
+            val localFile=File(localDir,"index.json").apply {writeText(AssetIndex.JSON.encodeToString(IndexData.serializer(),
+                IndexData(projects=listOf(Project("p","Proyecto compartido",createdAt=1)),projectTransfers=listOf(receipt))))}
+            val peerFile=File(peerDir,"index.json")
+            val local=AssetIndex(localFile);val peer=AssetIndex(peerFile)
+            val syncDir=File(localDir,"sync")
+            val localSync=workspace(local,syncDir,cloud);val peerSync=workspace(peer,File(peerDir,"sync"),cloud)
+
+            localSync.cycle(null)
+            peerSync.cycle(null)
+            assertEquals("p",peer.snapshot().projects.single().id)
+            assertTrue(peer.snapshot().projectTransfers.isEmpty())
+            assertFalse(peerFile.readText().contains(privateMarker))
+            assertTrue(cloud.commits.values.all {!it.toString(Charsets.UTF_8).contains(privateMarker)})
+
+            peer.updateProject("p","Editado en el otro dispositivo")
+            peerSync.cycle(null)
+            localSync.cycle(null)
+            assertEquals("Editado en el otro dispositivo",local.snapshot().projects.single().description)
+            assertEquals(listOf(receipt),local.snapshot().projectTransfers)
+            val beforeApply=File(syncDir,"index-before-apply.json")
+            val serialized=Json.parseToJsonElement(beforeApply.readText()).jsonObject
+            assertTrue(serialized["projectTransfers"]?.jsonArray.orEmpty().isEmpty())
+            assertFalse(beforeApply.readText().contains(privateMarker))
+
+            // The diagnostic is written only when a remote snapshot is actually applied. A local
+            // receipt must not make every otherwise unchanged cycle take that path again.
+            val unchangedMarker="no-additional-index-apply"
+            beforeApply.writeText(unchangedMarker)
+            val commits=cloud.commits.size
+            repeat(2) {
+                localSync.cycle(null)
+                assertEquals(unchangedMarker,beforeApply.readText())
+                assertEquals(listOf(receipt),local.snapshot().projectTransfers)
+                assertEquals(commits,cloud.commits.size)
+            }
+            assertTrue(cloud.commits.values.all {!it.toString(Charsets.UTF_8).contains(privateMarker)})
+        } finally {localDir.deleteRecursively();peerDir.deleteRecursively()}
     }
 }

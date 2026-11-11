@@ -145,6 +145,8 @@ data class IndexData(
     val generations: List<GenerationRecord> = emptyList(),
     val projectSessions: List<ProjectSession> = emptyList(),
     val story: StoryState = StoryState(),
+    /** Local, resumable project operations; synchronization must not discard their receipts. */
+    val projectTransfers: List<ProjectTransferReceipt> = emptyList(),
 )
 
 data class PeerIndexMerge(val snapshot: IndexData, val conflicts: List<String>)
@@ -184,7 +186,7 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         require(projectIds.size==incoming.projects.size)
         require(incoming.assets.map {it.id}.distinct().size==incoming.assets.size)
         require(incoming.assets.all {it.projectId==null || it.projectId in projectIds}) {"Falta el proyecto de un medio sincronizado."}
-        incoming.copy(projectSessions=current.projectSessions,
+        incoming.copy(projectSessions=current.projectSessions, projectTransfers=current.projectTransfers,
             // A legacy peer cannot express deletion of the new narrative records.
             story=if(incoming.story==StoryState() && current.story!=StoryState()) current.story else incoming.story) to Unit
     }
@@ -200,16 +202,16 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
             val candidate = peerAssets[asset.id]?.uri
             if (candidate != null && candidate != asset.uri && !usableUri(asset.uri) && usableUri(candidate)) asset.uri to candidate else null
         }.toMap()
-        fun normalized(d: IndexData) = d.copy(projectSessions = emptyList(),
+        fun normalized(d: IndexData) = d.copy(projectSessions = emptyList(), projectTransfers = emptyList(),
             assets = d.assets.map { it.copy(uri = replacements[it.uri] ?: it.uri) },
             generations = d.generations.map { it.copy(referenceUris = it.referenceUris.map { uri -> replacements[uri] ?: uri }) })
         val result = com.vidadomu.nexus.agent.core.sync.SyncMerge.merge(
             JSON.encodeToJsonElement(IndexData.serializer(), normalized(local)),
-            JSON.encodeToJsonElement(IndexData.serializer(), remote.copy(projectSessions = emptyList())),
+            JSON.encodeToJsonElement(IndexData.serializer(), remote.copy(projectSessions = emptyList(), projectTransfers = emptyList())),
             base?.let { JSON.encodeToJsonElement(IndexData.serializer(), normalized(it)) }, deletions,
             localBase?.let { JSON.encodeToJsonElement(IndexData.serializer(), normalized(it)) })
         val merged = JSON.decodeFromJsonElement(IndexData.serializer(), result.value)
-        val next = merged.copy(projectSessions = local.projectSessions,
+        val next = merged.copy(projectSessions = local.projectSessions, projectTransfers = local.projectTransfers,
             projects = if (memory) merged.projects else local.projects,
             scenes = if (memory) merged.scenes else local.scenes,
             shots = if (memory) merged.shots else local.shots,
@@ -452,27 +454,29 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
     }
 
     fun search(q: AssetQuery): List<Asset> {
-        val project = q.projectId?.let { findProject(it) }
-        val chars = q.character?.let { name -> data.characters.filter { c -> norm(c.name).contains(norm(name)) || c.aliases.any { norm(it).contains(norm(name)) } }.map { it.id }.toSet() }
-        val shotIds = q.shotCode?.let { code -> data.shots.filter { (project == null || it.projectId == project.id) && norm(it.code) == norm(code) }.map { it.id }.toSet() }
-        val sceneIds = q.sceneCode?.let { code -> data.scenes.filter { (project == null || it.projectId == project.id) && (norm(it.code) == norm(code) || norm(it.title ?: "").contains(norm(code))) }.map { it.id }.toSet() }
-        val gens = data.generations.associateBy { it.id }
+        val project = q.projectId?.let { findProject(it) ?: return emptyList() }
+        val snapshot = data
+        val membership = ProjectAssetMembership(snapshot)
+        val chars = q.character?.let { name -> snapshot.characters.filter { c -> norm(c.name).contains(norm(name)) || c.aliases.any { norm(it).contains(norm(name)) } }.map { it.id }.toSet() }
+        val shotIds = q.shotCode?.let { code -> snapshot.shots.filter { (project == null || it.projectId == project.id) && norm(it.code) == norm(code) }.map { it.id }.toSet() }
+        val sceneIds = q.sceneCode?.let { code -> snapshot.scenes.filter { (project == null || it.projectId == project.id) && (norm(it.code) == norm(code) || norm(it.title ?: "").contains(norm(code))) }.map { it.id }.toSet() }
+        val gens = snapshot.generations.associateBy { it.id }
         val words = q.text?.let { norm(it).split(' ').filter { w -> w.length > 1 } }.orEmpty()
-        return data.assets.asSequence()
+        return snapshot.assets.asSequence()
             .filter { !it.libraryDeleted }
-            .filter { project == null || it.projectId == project.id }
+            .filter { project == null || membership.inProject(it, project.id) }
             .filter { q.type == null || it.type == q.type }
             .filter { q.role == null || it.role == q.role }
             .filter { chars == null || it.characterIds.any { c -> c in chars } }
-            .filter { shotIds == null || it.shotId in shotIds }
-            .filter { sceneIds == null || it.sceneId in sceneIds || data.shots.firstOrNull { s -> s.id == it.shotId }?.sceneId in sceneIds }
+            .filter { shotIds == null || membership.inShots(it, shotIds) }
+            .filter { sceneIds == null || membership.inScenes(it, sceneIds) }
             .filter { q.modelId == null || gens[it.generationId]?.modelId?.contains(q.modelId, true) == true }
             .filter { a ->
                 if (words.isEmpty()) true else {
                     val hay = norm(listOfNotNull(a.displayName, gens[a.generationId]?.prompt,
                         gens[a.generationId]?.providerId, gens[a.generationId]?.modelId, a.tags.joinToString(" "),
-                        a.characterIds.mapNotNull { id -> data.characters.firstOrNull { it.id == id }?.name }.joinToString(" "),
-                        data.scenes.firstOrNull { it.id == a.sceneId }?.title).joinToString(" "))
+                        a.characterIds.mapNotNull { id -> snapshot.characters.firstOrNull { it.id == id }?.name }.joinToString(" "),
+                        snapshot.scenes.firstOrNull { it.id == a.sceneId }?.title).joinToString(" "))
                     words.all { hay.contains(it) }
                 }
             }

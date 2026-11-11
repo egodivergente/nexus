@@ -83,6 +83,18 @@ class NexusAgentProvider:ContentProvider() {
             val result = tool.run(input["input"]?.jsonObject ?: buildJsonObject {}, session)
             return buildJsonObject { put("ok", !result.isError); put("result", result.result) }
         }
+        if (method == "project_transfer_tool") {
+            require(input.keys.all { it in setOf("tool", "project_id", "input") }) { "Campos de prueba desconocidos." }
+            val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            val tool = com.vidadomu.nexus.agent.core.tools.ProjectTransferTools.all(runtime.deps)
+                .singleOrNull { it.name == text("tool") } ?: error("Herramienta de proyectos desconocida.")
+            val projectId = text("project_id")
+            require(runtime.assets.findProject(projectId)?.id == projectId) { "Proyecto desconocido." }
+            val session = com.vidadomu.nexus.agent.core.tools.AgentSession("adb_project_transfer",
+                com.vidadomu.nexus.agent.core.config.AgentMode.AGENT, projectId)
+            val result = tool.run(input["input"]?.jsonObject ?: buildJsonObject {}, session)
+            return buildJsonObject { put("ok", !result.isError); put("result", result.result) }
+        }
         if(method=="device_sync_probe") {
             val id=text("id")
             require(id.matches(Regex("sync_probe_[a-f0-9]{32}")))

@@ -37,6 +37,7 @@ internal fun CutChatPanel(
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    onShowResults: () -> Unit,
     selectionLabel: String,
     agentActivity: String?,
     messageHeight: Dp,
@@ -114,6 +115,10 @@ internal fun CutChatPanel(
             if (!state.thinking && agentActivity != null) Text(agentActivity,
                 Modifier.padding(horizontal = 14.dp, vertical = 3.dp), color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (state.libraryResults.isNotEmpty()) TextButton(onClick = onShowResults,
+                modifier = Modifier.padding(horizontal = 10.dp).heightIn(min = 40.dp)) {
+                Text("Ver ${state.libraryResults.size} archivos encontrados")
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(top = 4.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

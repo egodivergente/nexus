@@ -102,6 +102,7 @@ class CutToolsTest {
         assertEquals(listOf("m2", "m1"), timeline.track("V1")!!.clips.map { it.mediaId })
         assertEquals("Mateo", timeline.videoTracks.flatMap { it.clips }.single { it.text != null }.text!!.text)
         assertEquals("Primeros planos", ui.state.value.undoLabel)
-        assertEquals(47, NexusToolkit.all(deps).size)   // las 42 de siempre más las cinco de Nexus Cut
+        assertEquals(51, NexusToolkit.all(deps).size)   // 42 base + cinco de Cut + cuatro de traslado verificado
+        assertTrue(NexusToolkit.all(deps).any { it.name == "transfer_project" })
     }
 }

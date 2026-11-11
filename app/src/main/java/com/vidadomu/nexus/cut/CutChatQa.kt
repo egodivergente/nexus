@@ -29,23 +29,50 @@ internal object CutChatQa {
         val projectId = input["project_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
         require(projectId.matches(Regex("[A-Za-z0-9_\\-]+"))) { "Indica un montaje válido." }
         when (action) {
-            "arm" -> {
+            "arm", "arm_search" -> {
                 val rawName = input["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 require(rawName.isNotBlank() && rawName.length <= 100) { "El nombre debe tener entre 1 y 100 caracteres." }
                 val name = rawName.trim()
                 // Opening an existing session validates the montage without editing it or changing the active one.
                 val session = NexusCut.workspace(app).session(projectId)
-                overrides[projectId] = Armed(name, scripted(projectId, name, session))
+                overrides[projectId] = Armed(name, if (action == "arm_search") scriptedSearch(name) else scripted(projectId, name, session))
             }
             "status" -> Unit
             "clear" -> overrides.remove(projectId)
-            else -> throw IllegalArgumentException("Acción de prueba desconocida: usa arm, status o clear.")
+            else -> throw IllegalArgumentException("Acción de prueba desconocida: usa arm, arm_search, status o clear.")
         }
         val armed = overrides[projectId]
         return buildJsonObject {
             put("ok", true); put("project_id", projectId); put("armed", armed != null)
             armed?.let { put("name", it.name) }
         }
+    }
+
+    private fun scriptedSearch(query: String): LlmProvider {
+        val token = UUID.randomUUID().toString()
+        val searchId = "cut-qa-search-$token"
+        val showId = "cut-qa-show-$token"
+        return ScriptedLlmProvider(listOf(
+            { request ->
+                check(request.tools.any { it.name == "search_assets" } && request.tools.any { it.name == "open_results_wall" }) {
+                    "El chat no recibió las herramientas para buscar y mostrar la Biblioteca."
+                }
+                ScriptedLlmProvider.tools(ContentBlock.ToolUse(searchId, "search_assets", buildJsonObject { put("text", query) }))
+            },
+            { request ->
+                val result = successfulResult(request, searchId)
+                val found = result["assets"] as? JsonArray ?: error("La búsqueda no devolvió assets.")
+                check(found.isNotEmpty()) { "La búsqueda local no encontró el archivo de prueba." }
+                val ids = found.map { it.jsonObject["asset_id"]!!.jsonPrimitive.content }
+                ScriptedLlmProvider.tools(ContentBlock.ToolUse(showId, "open_results_wall", buildJsonObject {
+                    put("asset_ids", JsonArray(ids.map(::JsonPrimitive)))
+                }))
+            },
+            { request ->
+                successfulResult(request, showId)
+                ScriptedLlmProvider.text("Prueba local sin modelo externo: he buscado en la Biblioteca y solicitado mostrar los resultados. No he añadido archivos al montaje.")
+            },
+        ))
     }
 
     private fun scripted(projectId: String, name: String, session: CutSession): LlmProvider {

@@ -107,7 +107,7 @@ internal fun projectCutHub(
 ): CutProjectHubSnapshot {
     val montageOrder = compareByDescending<ProjectStore.Summary> { it.modifiedAtMs }.thenBy { it.id }
     val knownProjects = index.projects.mapTo(HashSet()) { it.id }
-    val available = index.assets.filterNot { it.libraryDeleted }
+    val membership = com.vidadomu.nexus.agent.core.assets.ProjectAssetMembership(index)
     val assetsById = index.assets.associateBy { it.id }
     val assetsByGeneration = index.assets.filter { it.generationId != null }.groupBy { it.generationId }
     val generationOutputs = index.generations.associate { generation ->
@@ -116,13 +116,8 @@ internal fun projectCutHub(
     val projects = index.projects.map { project ->
         val scenes = index.scenes.filter { it.projectId == project.id }
         val shots = index.shots.filter { it.projectId == project.id }
-        val sceneIds = scenes.mapTo(HashSet()) { it.id }
-        val shotIds = shots.mapTo(HashSet()) { it.id }
-        val linkedIds = index.story.links.filter { it.projectId == project.id }.mapTo(HashSet()) { it.assetId }
-        val material = available.filter { asset ->
-            asset.projectId == project.id || asset.sceneId in sceneIds || asset.shotId in shotIds ||
-                asset.id in linkedIds
-        }.distinctBy { it.id }.sortedWith(compareByDescending<Asset> { it.createdAt }.thenBy { it.id })
+        val material = index.assets.filter { membership.inProject(it, project.id) }
+            .distinctBy { it.id }.sortedWith(compareByDescending<Asset> { it.createdAt }.thenBy { it.id })
         val materialIds = material.mapTo(HashSet()) { it.id }
         val generations = index.generations.filter { generation ->
             // Once outputs are indexed, their current assignments win over a generation's old owner.

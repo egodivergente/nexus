@@ -337,7 +337,9 @@ class DeviceSync private constructor(private val app: NexusApplication) {
             val data = AssistantRuntime.get(app).assets.snapshot()
             val scoped = data.copy(assets = if (o.gallery) data.assets else emptyList(), generations = if (o.gallery) data.generations else emptyList(),
                 projects = if (o.memory) data.projects else emptyList(), scenes = if (o.memory) data.scenes else emptyList(), shots = if (o.memory) data.shots else emptyList(),
-                characters = if (o.memory) data.characters else emptyList(), projectSessions = emptyList())
+                characters = if (o.memory) data.characters else emptyList(), projectSessions = emptyList(),
+                // Transfer receipts contain local undo snapshots, including unrelated project metadata.
+                projectTransfers = emptyList())
             addJson("index", "index.json", json.encodeToString(scoped))
         }
         if (o.gallery && !app.database.loading.value && app.database.loadError.value == null) {
@@ -501,7 +503,8 @@ class DeviceSync private constructor(private val app: NexusApplication) {
                         val incomingData = remoteData.copy(
                             projects = if (useMemory) remoteData.projects else emptyList(), scenes = if (useMemory) remoteData.scenes else emptyList(),
                             shots = if (useMemory) remoteData.shots else emptyList(), characters = if (useMemory) remoteData.characters else emptyList(),
-                            assets = if (useGallery) remoteData.assets else emptyList(), generations = if (useGallery) remoteData.generations else emptyList(), projectSessions = emptyList())
+                            assets = if (useGallery) remoteData.assets else emptyList(), generations = if (useGallery) remoteData.generations else emptyList(),
+                            projectSessions = emptyList(), projectTransfers = emptyList())
                         val oldRemote = base?.takeUnless { it is JsonPrimitive }?.let { json.decodeFromJsonElement<IndexData>(it) }
                         val oldLocal = oldState?.get("localBase")?.takeUnless { it is JsonPrimitive }?.let { json.decodeFromJsonElement<IndexData>(it) }
                         val result = runtime.assets.mergeFromPeer(incomingData, oldRemote, o.deletions, useMemory, useGallery,
@@ -509,7 +512,7 @@ class DeviceSync private constructor(private val app: NexusApplication) {
                         conflicts += result.conflicts.size
                         if (result.conflicts.isNotEmpty()) atomic(File(root, "conflicts/${incoming.device}/$stateKey-${doc.hash}.json"), bytes)
                         committedBase = json.encodeToJsonElement(incomingData)
-                        ownCommittedBase = json.encodeToJsonElement(result.snapshot)
+                        ownCommittedBase = json.encodeToJsonElement(result.snapshot.copy(projectTransfers = emptyList()))
                     }
                     "job" -> {
                         val job = json.decodeFromString<GenerationJob>(bytes.toString(Charsets.UTF_8))

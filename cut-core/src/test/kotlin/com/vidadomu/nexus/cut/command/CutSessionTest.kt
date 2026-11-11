@@ -264,6 +264,44 @@ class CutSessionTest {
         dir.deleteRecursively()
     }
 
+    @Test fun `migrar el vinculo del montaje conserva medios clips y escena y se deshace por el bus`() = runTest {
+        val dir = Files.createTempDirectory("cut-transfer").toFile()
+        try {
+            val store = ProjectStore(dir)
+            val s = session(project().copy(sceneId = "scene-source"), store = store)
+            s.placeTwo()
+            val before = s.state.value.project
+            val request = Request(listOf(Op("project.link_story", args("nexus_project_id" to "project-target"))),
+                Origin.AGENT, label = "Migrar proyecto", expectedRevision = before.revision, idempotencyKey = "transfer-one")
+            val result = s.execute(request).done()
+            val moved = store.load(before.id).project
+            assertTrue(result.committed)
+            assertEquals("project-target", moved.nexusProjectId)
+            assertEquals(before.sceneId, moved.sceneId)
+            assertEquals(before.media, moved.media)
+            assertEquals(before.timeline, moved.timeline)
+            assertEquals(before.id, moved.id)
+            assertTrue(s.execute(request).done().replayed)
+            assertEquals(moved.revision, s.state.value.revision)
+            s.undo(Origin.USER).done()
+            assertEquals(before.nexusProjectId, store.load(before.id).project.nexusProjectId)
+            assertEquals(before.timeline, s.timeline)
+            s.redo(Origin.USER).done()
+            assertEquals("project-target", store.load(before.id).project.nexusProjectId)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun `una edicion posterior al inventario impide migrar el montaje con revision antigua`() = runTest {
+        val s = session(); s.placeTwo()
+        val previewRevision = s.state.value.revision
+        s.run("project.rename", Origin.USER, "name" to "Edición posterior").done()
+        val before = s.state.value.project
+        val result = s.execute(Request(listOf(Op("project.link_story", args("nexus_project_id" to "project-target"))),
+            Origin.AGENT, expectedRevision = previewRevision, idempotencyKey = "transfer-stale"))
+        assertEquals(ErrorCode.REVISION_CONFLICT, result.error().code)
+        assertEquals(before, s.state.value.project)
+    }
+
     @Test fun `si no se puede guardar no cambia nada`() = runTest {
         val blocked = Files.createTempFile("cut", "file").toFile()   // un archivo donde debería ir una carpeta
         val s = session(store = ProjectStore(blocked))

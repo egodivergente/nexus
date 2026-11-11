@@ -200,12 +200,20 @@ internal fun EntranceSpring(key: String, seen: MutableSet<String>, modifier: Mod
 /** Full-screen stage with a horizontal carousel over every result of the set. */
 @Composable
 internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () -> Unit) {
+    ResultStage(results, initial, onDismiss, onAdd = null)
+}
+
+@Composable
+internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () -> Unit, onAdd: ((Attachment) -> Unit)? = null) {
     if (results.isEmpty()) return
     val pager = rememberPagerState(initialPage = initial.coerceIn(0, results.lastIndex)) { results.size }
+    var addFooterHeightPx by remember { mutableIntStateOf(0) }
+    val addFooterHeight = if (onAdd == null) 0.dp else if (addFooterHeightPx == 0) 104.dp
+        else with(LocalDensity.current) { addFooterHeightPx.toDp() }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().windowInsetsPadding(NexusInsets.fullScreen)) {
-                HorizontalPager(pager, Modifier.fillMaxSize(), key = { results[it].id }) { page ->
+                HorizontalPager(pager, Modifier.fillMaxSize().padding(bottom = addFooterHeight), key = { results[it].id }) { page ->
                     // Una imagen se abre ya a tamaño completo y con zoom: sin el paso intermedio de «Ampliar».
                     if (results[page].mimeType.startsWith("image/")) ZoomableImage(results[page], Modifier.padding(top = 56.dp, bottom = 40.dp))
                     else Box(Modifier.fillMaxSize().padding(horizontal = NexusTokens.space8), contentAlignment = Alignment.Center) {
@@ -219,7 +227,21 @@ internal fun ResultStage(results: List<Attachment>, initial: Int, onDismiss: () 
                         style = MaterialTheme.typography.labelLarge)
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cerrar escenario", tint = Color.White) }
                 }
-                if (results.size > 1) Row(Modifier.align(Alignment.BottomCenter).padding(NexusTokens.space16),
+                if (onAdd != null) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .onGloballyPositioned { addFooterHeightPx = it.size.height }.padding(NexusTokens.space16),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
+                    if (results.size > 1) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        repeat(results.size.coerceAtMost(12)) { i ->
+                            Box(Modifier.size(if (i == pager.currentPage) 8.dp else 6.dp).clip(CircleShape)
+                                .background(Color.White.copy(alpha = if (i == pager.currentPage) 1f else .4f)))
+                        }
+                    }
+                    Button(onClick = { results.getOrNull(pager.currentPage)?.let(onAdd) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch), shape = NexusTokens.action) {
+                        Text("Añadir al montaje")
+                    }
+                }
+                else if (results.size > 1) Row(Modifier.align(Alignment.BottomCenter).padding(NexusTokens.space16),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     repeat(results.size.coerceAtMost(12)) { i ->
                         Box(Modifier.size(if (i == pager.currentPage) 8.dp else 6.dp).clip(CircleShape)
