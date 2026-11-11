@@ -19,8 +19,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
 import com.vidadomu.nexus.assistant.PendingShares
 import com.vidadomu.nexus.assistant.PendingShare
 import com.vidadomu.nexus.assistant.ContinueProjectChooser
@@ -161,6 +163,110 @@ class MainActivity : ComponentActivity() {
                 }
                 val createViewModel: CreateViewModel = viewModel()
                 val assistantViewModel = (application as NexusApplication).assistantViewModel()
+                val cutRuntime = remember { com.vidadomu.nexus.assistant.AssistantRuntime.get(application as NexusApplication) }
+                val projectNavigationScope = rememberCoroutineScope()
+                val projectNavigationMutex = remember { kotlinx.coroutines.sync.Mutex() }
+                val pendingProjectLinks = remember { mutableSetOf<String>() }
+                var requestedStoryTab by rememberSaveable { mutableStateOf<Int?>(null) }
+                var cutReturnTab by rememberSaveable { mutableStateOf<String?>(null) }
+                var observedWorkspaceRoute by remember { mutableStateOf(tabs[pager.settledPage].route) }
+                var cutImportProjectId by rememberSaveable { mutableStateOf<String?>(null) }
+                var cutImportPending by rememberSaveable { mutableStateOf(false) }
+                var cutImporting by remember { mutableStateOf(false) }
+                val cutMediaPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments(),
+                ) { uris ->
+                    // The destination belongs to the picker request, never to whichever project is now active.
+                    val destination = cutImportProjectId
+                    cutImportPending = false
+                    if (uris.isNotEmpty()) {
+                        cutImporting = true
+                        lifecycleScope.launch {
+                            var imported = 0
+                            var failed = 0
+                            try {
+                                require(destination == null || cutRuntime.assets.snapshot().projects.firstOrNull { it.id == destination }?.archived == false) {
+                                    "El proyecto de destino ya no está disponible. Los originales se conservan."
+                                }
+                                for (uri in uris.distinct()) {
+                                    try {
+                                        com.vidadomu.nexus.assistant.AgentMediaStore.persist(
+                                            this@MainActivity, uri, contentResolver.getType(uri), destination,
+                                        )
+                                        imported++
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                    catch (_: Exception) { failed++ }
+                                }
+                                val detail = if (failed > 0) " No se pudieron importar $failed; los originales se conservan." else ""
+                                android.widget.Toast.makeText(this@MainActivity, "$imported archivos importados.$detail", android.widget.Toast.LENGTH_LONG).show()
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (error: Exception) {
+                                android.widget.Toast.makeText(this@MainActivity, error.message ?: "No se pudo importar el material.", android.widget.Toast.LENGTH_LONG).show()
+                            } finally { cutImporting = false }
+                        }
+                    }
+                }
+                fun openProjectFromCut(projectId: String, destination: Screen? = null, storyTab: Int? = null, draft: String? = null,
+                    resultToAttach: Pair<String, String>? = null) {
+                    val linkKey = listOf(projectId, destination?.route.orEmpty(), storyTab?.toString().orEmpty(), draft.orEmpty(), resultToAttach?.toString().orEmpty()).joinToString("\u0000")
+                    if (!pendingProjectLinks.add(linkKey)) return
+                    projectNavigationScope.launch {
+                        try {
+                            projectNavigationMutex.withLock {
+                                assistantViewModel.awaitChatsReady()
+                                val project = cutRuntime.assets.snapshot().projects.firstOrNull { it.id == projectId }
+                                require(project != null && !project.archived) { "El proyecto ya no está disponible." }
+                                val before = assistantViewModel.ui.value
+                                if (before.activeProjectId != projectId) {
+                                    require(!before.thinking && !before.carrying && before.plans.values.none { it.busy }) {
+                                        "Espera a que termine la operación del agente antes de abrir otro proyecto."
+                                    }
+                                    assistantViewModel.selectProject(projectId)
+                                    val selected = kotlinx.coroutines.withTimeoutOrNull(10_000) {
+                                        assistantViewModel.ui.first {
+                                            it.activeProjectId == projectId || (!it.thinking && it.message != before.message)
+                                        }
+                                    } ?: error("El proyecto todavía se está abriendo. Vuelve a intentarlo; no se ha enviado ninguna petición.")
+                                    check(selected.activeProjectId == projectId) { "No se pudo abrir la conversación de este proyecto. El historial se conserva." }
+                                }
+                                // switchConversation publishes the ID before synchronously restoring its saved items.
+                                kotlinx.coroutines.yield()
+                                check(assistantViewModel.ui.value.activeProjectId == projectId) { "El proyecto activo cambió. Vuelve a abrir el destino." }
+                                val conversationId = assistantViewModel.ui.value.conversationId
+                                com.vidadomu.nexus.assistant.story.StorySelectionStore.clear()
+                                if (draft != null) {
+                                    val text = listOf("Proyecto: «${project.name}».", draft.trim())
+                                        .filter { it.isNotBlank() }.joinToString("\n\n")
+                                    // Existing per-conversation draft text is appended to, with no call to send().
+                                    assistantViewModel.acceptShared(PendingShare(java.util.UUID.randomUUID().toString(), text = text))
+                                    check(assistantViewModel.ui.value.activeProjectId == projectId && assistantViewModel.ui.value.conversationId == conversationId) {
+                                        "La conversación cambió mientras se preparaba el borrador. Revisa el proyecto antes de enviarlo."
+                                    }
+                                }
+                                resultToAttach?.let { (jobId, outputId) -> assistantViewModel.attachLibraryResult(jobId, outputId) }
+                                if (destination == null) return@withLock
+                                focusManager.clearFocus(force = true)
+                                keyboard?.hide()
+                                if (destination == Screen.Generations) {
+                                    navController.navigate("${Screen.Generations.route}?projectId=${Uri.encode(projectId)}") { launchSingleTop = true }
+                                } else {
+                                    if (destination == Screen.Story) requestedStoryTab = storyTab ?: 0
+                                    cutReturnTab = destination.route.takeIf { destination == Screen.Story || destination == Screen.Assistant }
+                                    navController.popBackStack("workspace", false)
+                                    tabRequest = tabs.indexOf(destination)
+                                }
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (error: Exception) {
+                            android.widget.Toast.makeText(this@MainActivity, error.message ?: "No se pudo abrir el proyecto.", android.widget.Toast.LENGTH_LONG).show()
+                        } finally { pendingProjectLinks.remove(linkKey) }
+                    }
+                }
+                LaunchedEffect(pager.settledPage) {
+                    val route = tabs[pager.settledPage].route
+                    if (cutReturnTab != null && route != cutReturnTab && (route != Screen.Cut.route || observedWorkspaceRoute == cutReturnTab)) cutReturnTab = null
+                    observedWorkspaceRoute = route
+                }
                 LaunchedEffect(navController) {
                     NexusCut.openRequests.collect { projectId ->
                         focusManager.clearFocus(force = true)
@@ -277,7 +383,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 NexusBottomBar(navController = navController, selectedRoute=if(activeEntry?.destination?.route=="workspace") tabs[pager.currentPage].route else null,
-                                    onSelect={screen->tabRequest=tabs.indexOf(screen).takeIf {it>=0};navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
+                                    onSelect={screen->cutReturnTab=null;tabRequest=tabs.indexOf(screen).takeIf {it>=0};navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
                             }
                         }
                     }
@@ -292,6 +398,10 @@ class MainActivity : ComponentActivity() {
                             val workspaceScope = rememberCoroutineScope()
                             androidx.activity.compose.BackHandler(enabled = pager.currentPage != 0) {
                                 workspaceScope.launch { pager.animateScrollToPage(0) }
+                            }
+                            androidx.activity.compose.BackHandler(enabled = cutReturnTab == tabs[pager.currentPage].route) {
+                                cutReturnTab = null
+                                tabRequest = tabs.indexOf(Screen.Cut)
                             }
                             // Más sensible: con arrastrar un 20 % de la pantalla (o un gesto rápido) ya cambia de pestaña, en vez del 50 % por defecto.
                             HorizontalPager(state=pager,key={tabs[it].route},beyondViewportPageCount=0,
@@ -326,9 +436,19 @@ class MainActivity : ComponentActivity() {
                             Screen.Story -> com.vidadomu.nexus.assistant.story.StoryTabScreen(
                                 vm = assistantViewModel,
                                 isActive = pager.currentPage == index,
-                                onAgent = { tabRequest = tabs.indexOf(Screen.Assistant) },
+                                onAgent = {
+                                    if (cutReturnTab == Screen.Story.route) cutReturnTab = Screen.Assistant.route
+                                    tabRequest = tabs.indexOf(Screen.Assistant)
+                                },
                                 onGenerate = { com.vidadomu.nexus.assistant.story.StoryNavigation.request(com.vidadomu.nexus.assistant.story.StoryDestination.GENERATE) },
-                                onFlow = { tabRequest = tabs.indexOf(Screen.Flow) }
+                                onFlow = { tabRequest = tabs.indexOf(Screen.Flow) },
+                                requestedTab = requestedStoryTab,
+                                onTabRequestConsumed = { requestedStoryTab = null },
+                                onClose = {
+                                    val fromCut = cutReturnTab == Screen.Story.route
+                                    cutReturnTab = null
+                                    tabRequest = tabs.indexOf(if (fromCut) Screen.Cut else Screen.Assistant)
+                                },
                             )
                             Screen.Models -> {
                             ModelsScreen(
@@ -343,7 +463,45 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                            Screen.Cut -> CutHomeScreen(isActive = pager.currentPage == index)
+                            Screen.Cut -> CutHomeScreen(
+                                isActive = pager.currentPage == index,
+                                onOpenStory = { openProjectFromCut(it, Screen.Story, storyTab = 0) },
+                                onOpenMaterial = { openProjectFromCut(it, Screen.Story, storyTab = 2) },
+                                onOpenGenerations = { openProjectFromCut(it, Screen.Generations) },
+                                onOpenAgent = { projectId, prompt -> openProjectFromCut(projectId, Screen.Assistant, draft = prompt) },
+                                onSelectProject = { openProjectFromCut(it) },
+                                onArchivedProject = { projectId ->
+                                    projectNavigationScope.launch {
+                                        projectNavigationMutex.withLock {
+                                            assistantViewModel.awaitChatsReady()
+                                            val before = assistantViewModel.ui.value
+                                            if (!assistantViewModel.leaveArchivedProject(projectId)) {
+                                                android.widget.Toast.makeText(this@MainActivity,
+                                                    "El proyecto está archivado. El agente sigue ocupado; su conversación se conserva hasta que termine.",
+                                                    android.widget.Toast.LENGTH_LONG).show()
+                                            } else if (before.activeProjectId == projectId) {
+                                                val changed = kotlinx.coroutines.withTimeoutOrNull(10_000) {
+                                                    assistantViewModel.ui.first { it.activeProjectId != projectId || (!it.thinking && it.message != before.message) }
+                                                }
+                                                if (changed == null || changed.activeProjectId == projectId) {
+                                                    android.widget.Toast.makeText(this@MainActivity,
+                                                        "No se pudo dejar el contexto del proyecto archivado. Su conversación se conserva.",
+                                                        android.widget.Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                onImportMedia = { projectId ->
+                                    if (cutImportPending || cutImporting) {
+                                        android.widget.Toast.makeText(this@MainActivity, "Hay una importación en curso.", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        cutImportProjectId = projectId
+                                        cutImportPending = true
+                                        cutMediaPicker.launch(arrayOf("image/*", "video/*", "audio/*"))
+                                    }
+                                },
+                            )
                             Screen.Library -> {
                             LibraryScreen(
                                 onOpenHistory={navController.navigate(Screen.Generations.route)},
@@ -393,15 +551,24 @@ class MainActivity : ComponentActivity() {
                                 viewModel = createViewModel
                             )
                         }
-                        composable(Screen.Generations.route) {
+                        composable(
+                            "${Screen.Generations.route}?projectId={projectId}",
+                            arguments = listOf(navArgument("projectId") { type = NavType.StringType; nullable = true; defaultValue = null }),
+                        ) { entry ->
                             GenerationsScreen(
+                                projectId = entry.arguments?.getString("projectId"),
+                                onNavigateToResult = { jobId, outputIndex -> navController.navigate("output/$jobId?index=$outputIndex") },
                                 onNavigateToOutput = { jobId ->
                                     navController.navigate("output/$jobId")
                                 },
                                 onPrepareAgain = {job -> createViewModel.preparePrevious(job);navController.navigate(Screen.Create.route) {launchSingleTop=true}},
                                 onSendResultToAgent = { jobId, outputId ->
-                                    assistantViewModel.attachLibraryResult(jobId,outputId)
-                                    if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                    val projectId = entry.arguments?.getString("projectId")
+                                    if (projectId != null) openProjectFromCut(projectId, Screen.Assistant, resultToAttach = jobId to outputId)
+                                    else {
+                                        assistantViewModel.attachLibraryResult(jobId,outputId)
+                                        if (!navController.popBackStack(Screen.Assistant.route,false)) navController.navigate(Screen.Assistant.route) {launchSingleTop=true}
+                                    }
                                 }
                             )
                         }

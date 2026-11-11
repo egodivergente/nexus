@@ -27,21 +27,29 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(GenerationJob)->Unit,onSendResultToAgent:((String,String)->Unit)?=null) {
+fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(GenerationJob)->Unit,onSendResultToAgent:((String,String)->Unit)?=null,
+    projectId:String?=null,onNavigateToResult:((String,Int)->Unit)?=null) {
     val context=LocalContext.current
     val app=context.applicationContext as NexusApplication
-    val jobs by app.generationRepository.allJobs.collectAsState()
-    val outputConflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
+    val allJobs by app.generationRepository.allJobs.collectAsState()
+    val runtime = remember(app) { com.vidadomu.nexus.assistant.AssistantRuntime.get(app) }
+    val index by runtime.assets.changes.collectAsState()
+    val project = index.projects.firstOrNull { it.id == projectId }
+    val jobs = remember(allJobs, projectId, index) {
+        if (projectId == null) allJobs else projectGenerationJobs(index, allJobs, projectId)
+    }
+    val outputConflicts=remember(allJobs) {OutputFiles.conflictingLocalUris(allJobs.flatMap {it.outputs})}
     var attachJob by remember {mutableStateOf<GenerationJob?>(null)}
     attachJob?.let { job ->
         NexusSheet("Añadir al chat",{attachJob=null},subtitle="Elige el resultado que quieres adjuntar") {
             LazyColumn(Modifier.weight(1f)) { items(job.outputs,key={it.id}) { output ->
-                ListItem(headlineContent={Text("Resultado ${job.outputs.indexOf(output)+1}")},
+                val outputNumber = (allJobs.firstOrNull { it.id == job.id }?.outputs?.indexOfFirst { it.id == output.id } ?: -1) + 1
+                ListItem(headlineContent={Text("Resultado $outputNumber")},
                     supportingContent={Text(output.type.name)},leadingContent={
                         if(output.type in setOf(Modality.IMAGE,Modality.VIDEO)) coil.compose.AsyncImage(
                             model=coil.request.ImageRequest.Builder(context).data(OutputFiles.trustedLocalUri(output,outputConflicts) ?: output.url).apply {
                                 if(output.type==Modality.VIDEO) decoderFactory {result,options,_->coil.decode.VideoFrameDecoder(result.source,options)}
-                            }.build(),contentDescription="Resultado ${job.outputs.indexOf(output)+1}",modifier=Modifier.size(NexusTokens.minimumTouch))
+                            }.build(),contentDescription="Resultado $outputNumber",modifier=Modifier.size(NexusTokens.minimumTouch))
                         else Icon(Icons.Default.AttachFile,null)
                     },
                     modifier=Modifier.clickable {onSendResultToAgent?.invoke(job.id,output.id);attachJob=null})
@@ -54,7 +62,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
     var searchQuery by rememberSaveable {mutableStateOf("")}
     var searchVisible by rememberSaveable {mutableStateOf(false)}
     var comparisonId by rememberSaveable {mutableStateOf<String?>(null)}
-    comparisonId?.let { id -> com.vidadomu.nexus.ui.create.ComparisonResultsDialog(id,{comparisonId=null},onNavigateToOutput) }
+    if (projectId == null) comparisonId?.let { id -> com.vidadomu.nexus.ui.create.ComparisonResultsDialog(id,{comparisonId=null},onNavigateToOutput) }
     val currencyManager=app.currencyManager
     val scope=rememberCoroutineScope()
     val haptics=rememberNexusHaptics()
@@ -91,8 +99,24 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
         }
     }
 
+    fun openResult(job: GenerationJob) {
+        if (projectId == null) { onNavigateToOutput(job.id); return }
+        val original = allJobs.firstOrNull { it.id == job.id } ?: return
+        val allowedIds = job.outputs.map { it.id }.toSet()
+        val position = original.outputs.indexOfFirst { it.id in allowedIds }
+        if (position < 0 || onNavigateToResult == null) return
+        val collection = filteredJobs.flatMap { visible ->
+            val visibleIds = visible.outputs.map { it.id }.toSet()
+            allJobs.firstOrNull { it.id == visible.id }?.outputs?.mapIndexedNotNull { index, output ->
+                (visible.id to index).takeIf { output.id in visibleIds }
+            }.orEmpty()
+        }
+        com.vidadomu.nexus.ui.output.OutputViewerScope.prepare(job.id, collection)
+        onNavigateToResult(job.id, position)
+    }
+
     Scaffold(containerColor=ScreenBackground,topBar={
-        TopAppBar(title={Text("Historial",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
+        TopAppBar(title={Text(if (projectId == null) "Historial" else "Generaciones · ${project?.name ?: "Proyecto"}",style=com.vidadomu.nexus.ui.components.nexusScreenTitleStyle())},actions={
             IconButton(onClick={
                 archived=archived+jobs.filter {it.status in setOf(GenerationStatus.FAILED,GenerationStatus.CANCELLED)}.map {it.id}
                 archivePrefs.edit().putStringSet("ids",archived).apply()
@@ -182,9 +206,15 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                 supportingContent={Text("${group.count {it.status==GenerationStatus.COMPLETED}} completadas · ${group.size} enviadas",style=MaterialTheme.typography.labelMedium)},
                                 trailingContent={IconButton(onClick={expanded=!expanded}) {Icon(if(expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,"Desplegar lote")}},
                                 colors=ListItemDefaults.colors(containerColor=ScreenBackground))
-                            if(expanded) TextButton(onClick={comparisonId=id},modifier=Modifier.padding(horizontal=NexusTokens.screenMargin)) {Text("Ver comparativa",color=TextSecondary)}
+                            if(expanded && projectId == null) TextButton(onClick={comparisonId=id},modifier=Modifier.padding(horizontal=NexusTokens.screenMargin)) {Text("Ver comparativa",color=TextSecondary)}
+                            if(expanded && projectId != null) group.forEach { result ->
+                                TextButton(onClick={openResult(result)}, enabled=result.status==GenerationStatus.COMPLETED && result.outputs.isNotEmpty(),
+                                    modifier=Modifier.padding(horizontal=NexusTokens.screenMargin)) {
+                                    Text("Ver resultado · ${result.modelId.substringAfterLast('/')}",color=TextSecondary)
+                                }
+                            }
                         } else GenerationSummaryRow(job,currencyManager,
-                            onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) onNavigateToOutput(job.id) else selectedTechnicalJob=job},
+                            onOpen={if(job.status==GenerationStatus.COMPLETED && job.outputs.isNotEmpty()) openResult(job) else selectedTechnicalJob=job},
                             onRetry={onPrepareAgain(job)},
                             onDiscard={scope.launch {
                                 // Descartar no borra: deja de consultar al proveedor y manda el trabajo a «Archivados».

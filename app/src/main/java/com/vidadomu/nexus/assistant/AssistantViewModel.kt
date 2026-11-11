@@ -692,6 +692,22 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if(maximum>0 && attachments.any {a->runCatching {java.io.File(Uri.parse(a.uri).path.orEmpty()).length()>maximum.toLong()*1024*1024}.getOrDefault(false)}) notice("Hay un archivo mayor que tu aviso de $maximum MB. Se conserva completo; el envío comprobará el contrato del proveedor.")
     }
 
+    /** Navigation waits for restoration before selecting a project or appending its draft. */
+    internal suspend fun awaitChatsReady() { chatsReady.await() }
+
+    /** Archiving removes the active context through the normal history-preserving conversation switch. */
+    internal fun leaveArchivedProject(id: String): Boolean {
+        val current = _ui.value
+        if (current.activeProjectId != id) return true
+        if (current.thinking || current.carrying || current.plans.values.any { it.busy } || background != null) {
+            notice("El proyecto se ha archivado. Espera a que termine la operación del agente antes de dejar su contexto.")
+            return false
+        }
+        if (runtime.assets.snapshot().projects.firstOrNull { it.id == id }?.archived != true) return true
+        switchConversation(null, targetProject = null)
+        return true
+    }
+
     fun selectProject(id: String?) {
         if(id==null || id==_ui.value.activeProjectId) return
         viewModelScope.launch {

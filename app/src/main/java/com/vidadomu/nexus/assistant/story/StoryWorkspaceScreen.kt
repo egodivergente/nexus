@@ -80,6 +80,8 @@ fun StoryWorkspaceScreen(
     embedded: Boolean = false,
     isActive: Boolean = true,
     onChooseProject: (() -> Unit)? = null,
+    requestedTab: Int? = null,
+    onTabRequestConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
@@ -110,6 +112,19 @@ fun StoryWorkspaceScreen(
     var agentScope by rememberSaveable(projectId) { mutableStateOf("fragment") }
     var preservedIds by rememberSaveable(projectId) { mutableStateOf("") }
     var agentSettings by remember { mutableStateOf(false) }
+    LaunchedEffect(projectId, requestedTab, isActive) {
+        if (isActive && requestedTab != null) {
+            tab = requestedTab.coerceIn(0, 2)
+            if (tab == 2) {
+                materialContext = "project"
+                materialType = "all"
+                inboxOnly = false
+                chosenOnly = false
+                search = ""
+            }
+            onTabRequestConsumed()
+        }
+    }
     val view = remember(index, projectId, sceneId, shotId) {
         runCatching { runtime.assets.storyView(projectId,
             sceneId?.takeIf { selected -> index.scenes.any { it.id == selected && it.projectId == projectId } },

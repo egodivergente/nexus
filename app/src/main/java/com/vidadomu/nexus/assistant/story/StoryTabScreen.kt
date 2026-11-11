@@ -26,7 +26,8 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 /** A primary tab over the existing project; selecting it never invents or duplicates a project. */
 @Composable
 fun StoryTabScreen(vm: AssistantViewModel, isActive: Boolean, onAgent: () -> Unit,
-    onGenerate: (String) -> Unit, onFlow: () -> Unit) {
+    onGenerate: (String) -> Unit, onFlow: () -> Unit, requestedTab: Int? = null, onTabRequestConsumed: () -> Unit = {},
+    onClose: () -> Unit = onAgent) {
     val app = LocalContext.current.applicationContext as NexusApplication
     val runtime = remember(app) { AssistantRuntime.get(app) }
     val index by runtime.assets.changes.collectAsState()
@@ -44,8 +45,9 @@ fun StoryTabScreen(vm: AssistantViewModel, isActive: Boolean, onAgent: () -> Uni
     }
     if (active != null) {
         key(active.id) {
-            StoryWorkspaceScreen(active.id, onClose = onAgent, onAgent = onAgent, onGenerate = onGenerate,
-                onFlow = onFlow, embedded = true, isActive = isActive, onChooseProject = { choosing = true })
+            StoryWorkspaceScreen(active.id, onClose = onClose, onAgent = onAgent, onGenerate = onGenerate,
+                onFlow = onFlow, embedded = true, isActive = isActive, onChooseProject = { choosing = true },
+                requestedTab = requestedTab, onTabRequestConsumed = onTabRequestConsumed)
         }
     } else {
         Surface(Modifier.fillMaxSize()) {

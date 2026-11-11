@@ -16,16 +16,25 @@ import com.vidadomu.nexus.ui.theme.NexusThemeSpecs
 /** A neutral editing room keeps the image readable without changing the user's app theme. */
 @Composable
 internal fun CutEditorTheme(content: @Composable () -> Unit) {
-    val appearance = NexusAppearance.OBSIDIAN
-    val scheme = NexusThemeSpecs.forAppearance(appearance).colors.copy(
-        primary = Color(0xFF6AE4CE), onPrimary = Color(0xFF07251F),
-        primaryContainer = Color(0xFF173B34), onPrimaryContainer = Color(0xFFB8F6E8),
+    val appearance = LocalNexusAppearance.current
+    val brand = MaterialTheme.colorScheme
+    val darkBrand = brand.background.luminance() < 0.5f
+    val accent = if (darkBrand) brand.primary else brand.inversePrimary
+    val scheme = NexusThemeSpecs.forAppearance(NexusAppearance.OBSIDIAN).colors.copy(
+        primary = accent, onPrimary = Color(0xFF0B0D0F),
+        primaryContainer = accent.copy(alpha = .18f).compositeOver(Color(0xFF15171A)),
+        onPrimaryContainer = accent,
+        secondary = if (darkBrand) brand.secondary else brand.secondary.copy(alpha = .45f).compositeOver(Color.White),
+        tertiary = if (darkBrand) brand.tertiary else brand.tertiary.copy(alpha = .45f).compositeOver(Color.White),
         background = Color(0xFF0B0D0F), surface = Color(0xFF15171A),
         surfaceContainer = Color(0xFF1A1D21), surfaceContainerLow = Color(0xFF121416),
         surfaceContainerHigh = Color(0xFF24282D), surfaceContainerLowest = Color(0xFF0B0D0F),
     )
     CompositionLocalProvider(LocalNexusAppearance provides appearance,
-        LocalNexusVisuals provides NexusThemeSpecs.visuals(appearance)) {
+        LocalNexusVisuals provides NexusThemeSpecs.visuals(NexusAppearance.OBSIDIAN).copy(
+            promptBorder = scheme.outline, conversationSurface = scheme.primaryContainer,
+            responseSurface = scheme.surface, sheetSurface = scheme.surfaceContainerLow,
+        )) {
         MaterialTheme(colorScheme = scheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes, content = content)
     }
 }

@@ -264,6 +264,21 @@ class AssetIndex(private val file: File?, private val clock: () -> Long = System
         d.copy(projects = d.projects + p) to p
     }
 
+    /** Project hub metadata: archiving is reversible and keeps every media/story association. */
+    suspend fun updateProjectMetadata(projectId: String, name: String? = null, archived: Boolean? = null): Project = edit { d ->
+        val current = d.projects.firstOrNull { it.id == projectId }
+            ?: throw IllegalArgumentException("Proyecto desconocido: $projectId")
+        val title = name?.trim() ?: current.name
+        require(title.isNotBlank()) { "Escribe un nombre para el proyecto." }
+        require(name == null || d.projects.none { it.id != projectId && norm(it.name) == norm(title) }) {
+            "Ya existe un proyecto con ese nombre."
+        }
+        val isArchived = archived ?: current.archived
+        if (title == current.name && isArchived == current.archived) return@edit d to current
+        val next = current.copy(name = title, archived = isArchived, revision = current.revision + 1)
+        d.copy(projects = d.projects.map { if (it.id == projectId) next else it }) to next
+    }
+
     /** «Eliminar carpeta»: la archiva y devuelve sus archivos a la Biblioteca general. No borra ningún archivo. */
     suspend fun archiveProject(projectId: String): Int = edit { d ->
         if (d.projects.none { it.id == projectId }) return@edit d to 0

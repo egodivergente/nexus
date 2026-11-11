@@ -15,6 +15,8 @@ Rama de trabajo: `feat/nexus-cut-20261111`.
 
 Por petición posterior de Vidal, Nexus Cut tiene una sección propia en la barra inferior. Su estantería abre los montajes y el editor conserva la ruta inmersiva. El editor usa una apariencia oscura local y un chat persistente por montaje, separado del chat principal. Las órdenes quedan vinculadas al montaje y pasan por la misma sesión; la exportación del chat usa una capacidad JOB local. Detalles y validación: `docs/NEXUS-CUT-CHAT.md`.
 
+La continuación vc207 convierte esa portada en el centro de proyectos: lee el índice actual de Nexus y agrupa sus montajes sin copiar ni reasignar archivos. Cada proyecto reúne Guion, Material, Generaciones y acceso a su conversación del agente. Los borradores se preparan sin enviarlos. El archivado reversible usa `AssetIndex.updateProjectMetadata`, que conserva todas las asociaciones; la operación legacy de eliminar una carpeta mantiene su contrato anterior. La portada usa los componentes y el tema de Nexus, y el editor oscuro hereda su acento. Plan, criterios y resultados: `docs/NEXUS-CUT-PROJECTS.md`.
+
 ## Camino único
 
 ```
