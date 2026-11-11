@@ -2,6 +2,8 @@
 
 Petición de Vidal del 11/11/2026, posterior al hito B: Cut pasa a tener acceso propio en la barra inferior y un editor oscuro con conversación integrada. Sustituye la decisión inicial de no añadir una pestaña.
 
+La portada descrita aquí corresponde a vc206. Desde vc207, Cut reúne los proyectos y sus distintos montajes; estado y validación en `NEXUS-CUT-PROJECTS.md`. El chat propio de cada montaje se conserva.
+
 ## Acceso e interfaz
 
 - Barra: Agente / Guion / ArtBox / **Cut** / Biblioteca / Flow. Las rutas guardadas se conservan por nombre.

@@ -3,6 +3,8 @@
 Para quien continúe (Codex u otro agente). Rama: `feat/nexus-cut-20261111`. No trabajar sobre `main` (va muy atrás) ni sobre `feat/flow-live-20261108` (es la base vc204, no se toca).
 Decisiones de arquitectura: `docs/NEXUS-CUT.md`. Reglas del repositorio: `AGENTS.md`.
 
+**Estado actual vc207:** centro de proyectos implementado, fuente `71de517999e2ebf498051aabc681703e50624d6f`, **1.9.171-agent-preview**, compilado e instalado por ADB como actualización en Pixel y S25. Firma, versión y hash comprobados; proyectos originales conservados. Recorrido de proyectos, material, varios montajes, borrador del agente y archivado/restauración probado en Pixel; portada revisada en S25. App: 936 PASS y los mismos 7 FAIL previos; 13 pruebas nuevas correctas. Detalle y límites en `docs/NEXUS-CUT-PROJECTS.md`. Los apartados vc205/vc206 siguientes son antecedentes históricos.
+
 **Trabajo posterior solicitado por Vidal:** pestaña propia de Cut, editor oscuro y chat integrado; estado actual en `docs/NEXUS-CUT-CHAT.md`. Esa petición sustituye la decisión inicial de acceso sin pestaña descrita en la secuencia histórica de abajo.
 
 **Estado actual vc206:** fuente `97af8b48dee194012d038f78717fd37d636f26f2`, **1.9.170-agent-preview**, compilada en AXELPC e instalada como actualización en Pixel y S25 con certificado, versión y hash comprobados. Barra con seis pestañas, lista y creación de montajes, chat persistente y deshacer compartido comprobados por interfaz en Pixel. La prueba del chat usa un cerebro scripted local y herramientas reales; no se llamó a un LLM externo. El S25 recibió la APK por Tailscale y, tras la petición de Vidal de completar la instalación, se actualizó por ADB sin borrar datos; Vidal confirmó versión y pestaña Cut visible.
