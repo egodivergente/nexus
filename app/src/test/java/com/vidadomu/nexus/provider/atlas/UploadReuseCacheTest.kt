@@ -56,7 +56,7 @@ class UploadReuseCacheTest {
     }
 
     @Test fun `la clave depende del contenido, el tipo y la cuenta, no del nombre`() {
-        val dir = createTempDir()
+        val dir = kotlin.io.path.createTempDirectory("upload-reuse").toFile()
         try {
             val a = File(dir, "a.png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
             val b = File(dir, "copia con otro nombre.png").apply { writeBytes(byteArrayOf(1, 2, 3)) }

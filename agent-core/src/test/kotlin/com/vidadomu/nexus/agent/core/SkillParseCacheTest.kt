@@ -22,7 +22,7 @@ class SkillParseCacheTest {
     }
 
     @Test fun anEditedSkillIsParsedAgain() {
-        val dir = createTempDir("skills")
+        val dir = kotlin.io.path.createTempDirectory("skills").toFile()
         val skill = File(dir, "demo/SKILL.md").apply { parentFile.mkdirs() }
         fun write(title: String) = skill.writeText("---\nid: demo\nkind: expertise\ntitle: $title\nversion: 1\n---\n# $title\nCuerpo.\n")
         val cache = File(dir, "cache.json")
