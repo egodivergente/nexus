@@ -22,7 +22,7 @@ Estos archivos se compilaron por primera vez el 11/11/2026 en AXELPC, sobre `d68
 - `app/.../cut/NexusCut.kt` — espacio de trabajo único (`files/cut/projects`), implementación Android de `CutLibrary` y `CutRenderer`, `openWith()` (reutiliza el montaje del proyecto/escena, nunca duplica) y canal `openRequests`.
 - `app/.../ui/cut/` — `CutEditorViewModel`, `CutEditorScreen`, `CutTimelineCanvas` + `CutTimelineGeometry` (de Corte), `CutPalette` (colores del tema activo).
 
-## Pasos pendientes del hito B, en orden
+## Secuencia del hito B (estado de ejecución al final)
 
 1. **Compilar** en AXELPC: `C:\Users\User\nexus-flow-live\build-cut.ps1 -Tasks :cut-core:test,:agent-core:test,:app:assembleAgentPreview -Tag cut-b1` (deja `RESULTADO:` al final de `C:\Users\User\nexus-cut-b1-build.log`). Corregir errores de compilación de `app/.../cut` y `ui/cut`.
 2. **Manifest** (`app/src/main/AndroidManifest.xml`): añadir
@@ -52,3 +52,4 @@ No inventar estados ni resultados; un build fallido se informa como fallido. No 
 5. **Entradas: integradas.** Biblioteca: selección múltiple → «Montar», en orden visible y con proyecto activo; Guion: escena o proyecto en orden narrativo, con vínculos n:m y legacy; visor: «Editar en Nexus Cut». Todas llaman a `NexusCut.openWith` y editan mediante `CutSession`. Reabrir no duplica clips ni restaura los borrados; aperturas simultáneas se serializan y una edición concurrente del agente se protege por revisión. `:app:testAgentPreviewUnitTest` con filtros de Cut, Biblioteca, navegación y visor: **22 pruebas PASS**, sin omitidas (10 nuevas de Cut y 12 existentes). No es la suite completa.
 
    Solo se montan copias locales identificadas. Para resultados antiguos múltiples cuyas URIs se relocalizaron sin conservar una asociación inequívoca con cada output, el visor rechaza adivinar la posición; se puede elegir el asset local en Biblioteca. El fallback de generación monoresultado sí está cubierto por prueba.
+6. **Preparación de entrega.** Versión `1.9.169-agent-preview / versionCode 205`. `tools/release/entregar-tailscale.ps1` permite elegir el worktree y exige paquete/versión, certificado existente, alineación de 16 KiB y SHA-256 completo local/remoto/Descargas antes de solicitar el instalador. El wrapper privado de AXELPC acepta `-Worktree` para no firmar por error la APK de la rama base. Compilación final, suite completa y estado real de entrega se registrarán tras ejecutarlos; abrir el instalador no demuestra instalación ni prueba funcional.
