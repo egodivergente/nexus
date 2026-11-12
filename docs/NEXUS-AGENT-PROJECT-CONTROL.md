@@ -79,8 +79,14 @@ La primera ejecución física falló en el comprobador local porque exigía `ok=
 - Recorrido final: búsqueda en chat local → muro real → visor con cabecera y acción visibles → añadir una imagen como clip de 5 s → deshacer → montaje vacío. Cambios confirmados en el estado de `CutSession`. No se llamó a un modelo externo.
 - Conservación en Pixel: todos los IDs originales de proyectos, archivos, escenas, planos, personajes, generaciones, trabajos y outputs permanecen. La prueba añadió solo el proyecto destino; no añadió trabajos ni outputs. 121 archivos no transitorios de Assistant conservados. Los registros de material y proyectos reales comparados antes/después son idénticos; las preferencias de navegación/sync pueden cambiar. Ambos proyectos de prueba quedaron archivados de forma recuperable.
 
-### Entrega S25 pendiente por conexión
+### Entrega S25 completada el 12/11/2026
 
-La instalación por ADB de vc208 **no se completó**: el dispositivo LAN dejó de estar disponible. Reconectar por LAN y por la IP de Tailscale agotó el tiempo de conexión; SSH de Termux también agotó el tiempo. Tailscale sigue mostrando el S25, pero eso no acredita acceso ADB ni instalación. Se ha pedido al usuario reconectar Wi-Fi y depuración inalámbrica para completar personalmente la actualización. La última entrega verificada en S25 de este encargo es vc207; no se atribuyen al S25 las pruebas vc208 del Pixel.
+El intento del 11/11 quedó pendiente porque ADB por LAN/Tailscale y SSH agotaron el tiempo de conexión. Tras la indicación de Vidal de continuar, el 12/11 volvió el acceso ADB por Tailscale y se comprobó el dispositivo físico SM-S938B con vc207 instalada.
 
-Pendientes: instalar y comprobar esta misma APK en S25 cuando vuelva ADB; validación de interpretación de órdenes por el modelo externo, sin llamadas de pago realizadas; exportación 720p en S25 no repetida. El recorrido de edición/exportación 720p en Pixel pertenece a la validación histórica vc205.
+Se instaló la misma APK final con `adb install -r`: **Success**, sin desinstalar ni borrar datos. El paquete instalado declara **1.9.172-agent-preview / vc208** y el SHA-256 de su `base.apk` coincide exactamente con `8f6ef24a886715783b1dd0b4df920e6c9c3a522acc08de38989cf1b522ac52fd`; conserva el certificado indicado arriba. No se recompiló para esta entrega.
+
+La comparación con el inventario tomado inmediatamente antes de actualizar conserva todos los IDs, sin altas ni bajas: **8 proyectos, 1 escena, 3 planos, 9 personajes, 3.212 archivos, 786 registros de generación, 780 trabajos y 648 outputs**. SQLite devuelve `quick_check: ok`. Siguen presentes los 40 archivos de preferencias; cinco cambiaron durante el arranque/actividad, por lo que no se afirma igualdad de todo el perfil byte a byte.
+
+`am start -W` confirmó arranque en frío con `Status: ok`; una captura mostró la pantalla del agente. El volcado de UIAutomator no devolvió un árbol utilizable. La conversación visible estaba activa: no se enviaron mensajes de prueba ni se continuó navegando sobre ella. Esta comprobación acredita instalación y arranque; no sustituye el recorrido de proyectos, transferencia, búsqueda y visor realizado en Pixel.
+
+Pendientes: validación de interpretación de órdenes por el modelo externo, sin llamadas de pago de prueba realizadas; recorrido funcional vc208 y exportación 720p en S25 no repetidos. El recorrido de edición/exportación 720p en Pixel pertenece a la validación histórica vc205.
