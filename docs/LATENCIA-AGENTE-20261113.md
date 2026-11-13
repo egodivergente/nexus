@@ -43,11 +43,27 @@ Banco `AgentQualityBench.kt` (commit `b7c5ebc1`), mismo puente del Pixel, nivel 
 
 - **Guion:** los tres respetan las reglas del proyecto (chaqueta verde, gafas de Lucía, nunca de noche) sin herramientas: la memoria del proyecto ya va en el prompt.
 - **Conversación larga:** Terra no aplicó al vídeo de Seedance las reglas del primer turno (10 s y 1080p) en ninguna ronda, aunque al final las recordaba. Hydrogen y Argon, sí.
-- **Revisión:** Terra contestó «no puedo ver sus píxeles» en ambas rondas: las imágenes no llegan a Codex por el puente (limitación de Nexus/puente, no del modelo; no se inventó el veredicto). Hydrogen y Argon acertaron cuál cumplía con el orden alternado.
+- **Revisión:** Terra contestó «no puedo ver sus píxeles» en ambas rondas (no se inventó el veredicto). **Corrección tras medir Sol:** GPT-6.1 Sol, por el mismo puente de Codex, sí vio las imágenes y acertó; no es una limitación del puente sino de Terra en Codex. Hydrogen y Argon acertaron cuál cumplía con el orden alternado.
 - **Nexus Cut:** ningún modelo lo resolvió entero. Argon dejó bien orden, corte y rótulo tras varios intentos (5 a 11 `cut_edit`, de 1 a 5 rechazados) y en 3 pasos en vez de 1. Terra hizo un solo cambio sin errores pero colocó las tomas detrás de la música (en 12 s y 60 s), así que el corte cayó en otro sitio. Hydrogen falló a la primera y no reintentó; en otra ronda el puente devolvió una respuesta vacía.
 
 ## Defectos de Nexus que explican parte del fallo en Cut
 
 1. «Música a −12 dB» en un único cambio es imposible hoy: `audio.set` necesita el id del clip y ese id no existe hasta después de colocarlo. Propuesta: que lo colocado quede seleccionado dentro de la transacción (las operaciones siguientes sin `clip_ids` lo usan) y que `timeline.place` acepte volumen por elemento.
 2. `timeline.place` sin `at_us` coloca tras el final de todas las pistas destino, incluida la de audio vinculada: si la música cayó en A1, las tomas van detrás. Propuesta: al final de la pista de imagen.
-3. Las imágenes adjuntas no llegan a Codex por el puente.
+3. ~~Las imágenes adjuntas no llegan a Codex por el puente.~~ Descartado: con GPT-6.1 Sol sí llegan; el fallo es de Terra.
+
+# GPT-6.1 Sol (13-11-2026, mismas pruebas)
+
+Resultados crudos: `C:\Users\User\nexus-bench-sol-latency.jsonl` y `nexus-bench-sol-quality.jsonl`. Medido después que los otros tres, con el mismo puente y nivel medio.
+
+| | Sol | (Terra) | (Hydrogen) | (Argon) |
+|---|---|---|---|---|
+| Encargo, mediana | 73,8 s (82,8 / 73,8 / 59,5) | 42,9 s | 35,3 s | 49,0 s |
+| Consulta, mediana | 33,2 s | 39,6 s | 17,2 s | 30,9 s |
+| Guion (6) | 6/6 · 6/6 | 12/12 | 12/12 | 12/12 |
+| Conversación larga (7) | 7/7 · 7/7 (103–109 s) | 10/14 | 14/14 | 14/14 |
+| Nexus Cut (5) | 0/5 · 2/5 (208–212 s) | 4/10 | 0/10 | 6/10 |
+| Revisión con imagen (3) | 3/3 · 3/3 | 2/6 | 6/6 | 6/6 |
+| **Total acierto** | **34/42** | 28/42 | 32/42 | 38/42 |
+
+Sol acierta más que Terra (aplica las reglas de la conversación y ve las imágenes) pero es el más lento: en el encargo hizo 3–4 llamadas, rehízo Veo por la duración como Hydrogen y Argon y, en una ronda, dejó Veo sin preparar y preguntó. En Nexus Cut tardó más de 3 minutos y repitió los fallos de colocación de Terra.
