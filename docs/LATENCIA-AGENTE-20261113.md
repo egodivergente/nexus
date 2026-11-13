@@ -67,3 +67,32 @@ Resultados crudos: `C:\Users\User\nexus-bench-sol-latency.jsonl` y `nexus-bench-
 | **Total acierto** | **34/42** | 28/42 | 32/42 | 38/42 |
 
 Sol acierta más que Terra (aplica las reglas de la conversación y ve las imágenes) pero es el más lento: en el encargo hizo 3–4 llamadas, rehízo Veo por la duración como Hydrogen y Argon y, en una ronda, dejó Veo sin preparar y preguntó. En Nexus Cut tardó más de 3 minutos y repitió los fallos de colocación de Terra.
+
+# vc210: repetición tras los arreglos (13-11-2026)
+
+Mismos bancos y puente del Pixel, cuatro cerebros, nivel medio. Fuente `fadb42b9`. Crudos: `nexus-vc210-latency.jsonl`, `nexus-vc210-cut.jsonl`.
+
+## Latencia (mediana de 3 rondas)
+
+| Turno | Hydrogen | Argon | Terra | Sol |
+|---|---|---|---|---|
+| Encargo, antes | 35,3 s | 49,0 s | 42,9 s | 73,8 s |
+| Encargo, **vc210** | **31,2 s** | **24,2 s** | 40,5 s | 44,4 s |
+| Consulta, vc210 | **15,4 s** | 35,6 s | 29,5 s | 34,8 s |
+
+El ajuste de duración quitó la llamada extra: Hydrogen, Argon y Sol resuelven el lote con 2 llamadas (antes 3–4). Terra sigue sin indicar duración, así que su Veo se queda en el valor por defecto.
+
+## Nexus Cut: montaje de 4 pasos (5 comprobaciones, 2 rondas)
+
+| | Antes | vc210 |
+|---|---|---|
+| Hydrogen | 0/10 | **9/10** (5/5 y 4/5; 50 s y 67 s) |
+| Argon | 6/10 | **8/10** (4/5 y 4/5; 112–137 s) |
+| Sol | 2/10 | **7/10** (4/5 y 3/5; 130–229 s) |
+| Terra | 4/10 | 4/10 (2/5 y 2/5; 94–145 s) |
+
+Ya no hay `cut_edit` rechazados en ninguna ronda (antes Argon llegó a 5 de 11). Lo que queda:
+- `un_solo_paso`: Argon y, en una ronda, Hydrogen reparten el trabajo en 3 transacciones. Es legítimo (cada una se deshace por separado), pero no es lo pedido.
+- Terra sigue sin colocar bien el corte y el rótulo; es el único que no mejora.
+
+Ningún modelo envió una sola generación en ninguna de las pruebas.
