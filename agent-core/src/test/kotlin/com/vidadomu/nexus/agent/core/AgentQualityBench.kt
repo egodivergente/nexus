@@ -52,6 +52,7 @@ class AgentQualityBench {
     private data class Brain(val label: String, val engine: AntigravityProvider.BridgeEngine, val model: String, val effort: String? = null)
     private val brains = listOf(
         Brain("GPT-6.1 Terra (medio)", AntigravityProvider.BridgeEngine.CODEX, "gpt-6.1-terra", "medium"),
+        Brain("GPT-6.1 Sol (medio)", AntigravityProvider.BridgeEngine.CODEX, "gpt-6.1-sol", "medium"),
         Brain("Gemini 4 Hydrogen (medio)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "gemini-4-hydrogen-medium"),
         Brain("Gemini 4 Argon (medio)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "gemini-4-argon-medium"),
     )
