@@ -1310,11 +1310,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     /** Modo de razonamiento del cerebro activo (esfuerzo / pensar): se guarda en su perfil y se aplica ya. */
     fun setReasoning(effort: String?, thinking: String?): String? {
         val current = _ui.value.settings
-        if (current.backend == AssistantSettings.BACKEND_ANTIGRAVITY &&
-            com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.effort(current.modelId) != null) {
-            if (effort !in com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.efforts || thinking != null)
-                return "Argon admite bajo, medio o alto."
-            return saveSettings(current.copy(modelId = com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.model(effort!!)),null)
+        val agy = com.vidadomu.nexus.agent.core.llm.AntigravityReasoning
+        if (current.backend == AssistantSettings.BACKEND_ANTIGRAVITY && agy.family(current.modelId) != null) {
+            if (effort == null || thinking != null) return "Este modelo de AGY solo admite niveles fijos de razonamiento."
+            // Argon y Hydrogen llevan el nivel en el id; cada uno con los suyos (Hydrogen añade «muy alto»).
+            val target = try { agy.model(current.modelId, effort) } catch (e: IllegalArgumentException) { return e.message }
+            return saveSettings(current.copy(modelId = target), null)
         }
         if (current.backend == AssistantSettings.BACKEND_CODEX) {
             if (thinking != null || (effort != null && effort !in com.vidadomu.nexus.agent.core.llm.CodexReasoning.supported(current.modelId)))
@@ -1340,7 +1341,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         return saveSettings(current.copy(backend = backend, modelId = model), null)
     }
 
-    /** Modelo de AGY o Codex elegido en el menú «+» del chat (Vidal 06-11). Argon conserva su nivel; Codex guarda el suyo tal cual (al enviar se ajusta al modelo). */
+    /** Modelo de AGY o Codex elegido en el menú «+» del chat (Vidal 06-11). Argon e Hydrogen conservan su nivel; Codex guarda el suyo tal cual (al enviar se ajusta al modelo). */
     fun setBridgeModel(model: String): String? {
         val current = _ui.value.settings
         val options = when (current.backend) {
@@ -1349,9 +1350,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             else -> return "Este cerebro cambia de modelo en Ajustes del asistente."
         }
         if (options.none { it.first == model }) return "Ese modelo no está disponible para este cerebro."
-        val argon = com.vidadomu.nexus.agent.core.llm.AntigravityReasoning
-        val target = if (current.backend == AssistantSettings.BACKEND_ANTIGRAVITY && argon.effort(model) != null)
-            argon.effort(current.modelId)?.let(argon::model) ?: model else model
+        // Argon ↔ Hydrogen: se conserva el nivel elegido si el modelo nuevo lo tiene.
+        val target = if (current.backend == AssistantSettings.BACKEND_ANTIGRAVITY)
+            com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.switchTo(model, current.modelId) else model
         if (target == current.modelId) return null
         return saveSettings(current.copy(modelId = target), null)
     }

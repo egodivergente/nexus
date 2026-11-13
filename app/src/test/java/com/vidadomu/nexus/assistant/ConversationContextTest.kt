@@ -20,5 +20,7 @@ class ConversationContextTest {
         assertEquals("Bedrock · Claude Sonnet 4 6", agentLabel(AssistantSettings(modelId = "us.anthropic.claude-sonnet-4-6")))
         assertEquals("Codex · GPT 6.1 Sol", agentLabel(AssistantSettings(backend = AssistantSettings.BACKEND_CODEX, modelId = "gpt-6.1-sol")))
         assertEquals("Sol", shortModelName("Codex · GPT 6.1 Sol"))
+        assertEquals("Hidrógeno", shortModelName("AGY · Gemini 4 Hydrogen Xhigh"))
+        assertEquals("Hidrógeno", shortModelName("AGY · Gemini 4 Hydrogen Medium"))
     }
 }

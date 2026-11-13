@@ -17,10 +17,14 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 internal data class AgentReasoningMode(val name: String, val effort: String?, val thinking: String?)
 
 internal fun agentReasoningModes(antigravity: Boolean): List<AgentReasoningMode> =
-    if (antigravity) listOf(AgentReasoningMode("Bajo", "low", null), AgentReasoningMode("Medio", "medium", null), AgentReasoningMode("Alto", "high", null))
+    if (antigravity) antigravityReasoningModes(com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.DEFAULT_MODEL)
     else listOf(
         AgentReasoningMode("Auto", null, null), AgentReasoningMode("Rápido", null, "disabled"), AgentReasoningMode("Mínimo", "minimal", null),
         AgentReasoningMode("Bajo", "low", null), AgentReasoningMode("Medio", "medium", null), AgentReasoningMode("Alto", "high", null))
+
+/** AGY: los niveles del modelo elegido (Argon: bajo, medio, alto; Hydrogen añade muy alto). Sin «Auto»: el nivel va en el id. */
+internal fun antigravityReasoningModes(model: String): List<AgentReasoningMode> =
+    com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.efforts(model).map { AgentReasoningMode(CODEX_EFFORT_NAMES.getValue(it), it, null) }
 
 /** Codex: «Auto» (el nivel del modelo) y los niveles que admite el modelo elegido. */
 internal fun codexReasoningModes(model: String): List<AgentReasoningMode> =

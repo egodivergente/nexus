@@ -532,6 +532,12 @@ class ProjectAgentFlowTest {
         val antigravity = agentReasoningModes(antigravity = true)
         assertEquals(listOf("Bajo", "Medio", "Alto"), antigravity.map { it.name })
         assertEquals("Auto", agentReasoningCurrent(antigravity, null, null))
+        // Cada modelo de AGY ofrece sus niveles: Hydrogen añade «Muy alto», Argon no.
+        assertEquals(listOf("Bajo", "Medio", "Alto"), antigravityReasoningModes("gemini-4-argon-high").map { it.name })
+        val hydrogen = antigravityReasoningModes("gemini-4-hydrogen-medium")
+        assertEquals(listOf("Bajo", "Medio", "Alto", "Muy alto"), hydrogen.map { it.name })
+        assertEquals("Muy alto", agentReasoningCurrent(hydrogen, "xhigh", null))
+        assertTrue(antigravityReasoningModes("gemini-3.8-flash").isEmpty())
     }
 
     @Test fun brainLabelIsTheFullNameWithoutShortening() {

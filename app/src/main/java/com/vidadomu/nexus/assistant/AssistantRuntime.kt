@@ -143,6 +143,7 @@ data class AssistantSettings(
         /** Modelos expuestos por el puente de Antigravity CLI (`/root/axel-native-v2/bridge/server.ts`). */
         val ANTIGRAVITY_MODELS = listOf(
             com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.DEFAULT_MODEL to "Gemini 4 Argon",
+            com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.HYDROGEN_MODEL to "Gemini 4 Hydrogen",
             "gemini-3.8-flash" to "Gemini 3.8 Flash",
             "gemini-3.1-pro" to "Gemini 3.1 Pro",
             "gemini-3.7-flash" to "Gemini 3.7 Flash",
@@ -392,6 +393,7 @@ class AssistantSettingsStore(private val app: NexusApplication) {
                 AssistantSettings.KNOWN_MODELS.any { pair -> pair.first == it } ||
                     AssistantSettings.ANTHROPIC_MODELS.any { pair -> pair.first == it } ||
                     AssistantSettings.ANTIGRAVITY_MODELS.any { pair -> pair.first == it } ||
+                    com.vidadomu.nexus.agent.core.llm.AntigravityReasoning.family(it) != null ||
                     AssistantSettings.CODEX_MODELS.any { pair -> pair.first == it }
             )
             edit.putString("model_id", it)

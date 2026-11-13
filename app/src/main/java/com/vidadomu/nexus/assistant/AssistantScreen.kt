@@ -597,7 +597,7 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     }
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val modes = if (codex) codexReasoningModes(ui.settings.modelId) else agentReasoningModes(antigravity = argon != null)
+    val modes = if (codex) codexReasoningModes(ui.settings.modelId) else if (argon != null) antigravityReasoningModes(ui.settings.modelId) else agentReasoningModes(antigravity = false)
     val current = if (codex) agentReasoningCurrent(modes, CodexReasoning.effective(ui.settings.modelId, ui.settings.codexEffort), null)
         else agentReasoningCurrent(modes, argon ?: brain?.reasoningEffort, brain?.thinking)
     Box {
@@ -641,9 +641,9 @@ private fun BridgeModelPicker(ui: AssistantUiState, vm: AssistantViewModel) {
         AssistantSettings.BACKEND_CODEX -> AssistantSettings.CODEX_MODELS
         else -> return
     }
-    // Las variantes de Argon (bajo/medio/alto) son un solo modelo; el nivel se elige en «Razonamiento».
+    // Las variantes de nivel de Argon e Hydrogen son un solo modelo cada uno; el nivel se elige en «Razonamiento».
     val selected = all.firstOrNull { it.first == s.modelId ||
-        (s.backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(it.first) != null && AntigravityReasoning.effort(s.modelId) != null) }
+        (s.backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.family(it.first) != null && AntigravityReasoning.family(it.first) == AntigravityReasoning.family(s.modelId)) }
     val options = all.filter { !LEGACY_BRIDGE_MODEL.containsMatchIn(it.first) || it == selected }
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -950,19 +950,20 @@ private fun MessageSelectionDialog(text: String, onDismiss: () -> Unit) {
 
 /**
  * Only the distinctive name of who answered, for the line under each reply: «AGY · Gemini 4 Argon Medium» → «Argón»,
+ * «AGY · Gemini 4 Hydrogen Xhigh» → «Hidrógeno»,
  * «Bedrock · Claude Sonnet 4 6» → «Sonnet», «AGY · Gemini 3.8 Flash» → «Flash». Provider, family, version numbers
  * and effort words are dropped; a custom brain keeps its own name.
  */
 internal fun shortModelName(full: String): String {
     if (full.isBlank()) return full
     val model = if (" · " in full) full.substringAfter(" · ") else full
-    val noise = setOf("gemini", "claude", "gpt", "openai", "anthropic", "google", "low", "medium", "high", "preview", "latest")
+    val noise = setOf("gemini", "claude", "gpt", "openai", "anthropic", "google", "low", "medium", "high", "xhigh", "preview", "latest")
     val words = model.split(' ').filter { w -> w.isNotBlank() && w.lowercase() !in noise && !w.any(Char::isDigit) }
     val name = words.joinToString(" ").ifBlank { model }
     return SPANISH_NAMES[name.lowercase()] ?: name
 }
 
-private val SPANISH_NAMES = mapOf("argon" to "Argón", "neon" to "Neón", "xenon" to "Xenón", "kripton" to "Kriptón", "krypton" to "Kriptón")
+private val SPANISH_NAMES = mapOf("argon" to "Argón", "hydrogen" to "Hidrógeno", "neon" to "Neón", "xenon" to "Xenón", "kripton" to "Kriptón", "krypton" to "Kriptón")
 
 /** Who answers, short: provider then model («AGY · Gemini 3.8 Flash», «Bedrock · Claude Sonnet 4 6»), or the custom brain's name. */
 internal fun agentLabel(s: AssistantSettings): String {
@@ -1571,7 +1572,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                         val (older, current) = modelChips.partition { legacyModel.containsMatchIn(it.first) }
                         var showOlder by remember(backend) { mutableStateOf(false) }
                         val selectedIsOlder = older.any { it.first == modelId }
-                        @Composable fun chip(id: String, name: String) = StudioFilterChip((modelId == id || (backend == AssistantSettings.BACKEND_ANTIGRAVITY && id == AntigravityReasoning.DEFAULT_MODEL && AntigravityReasoning.effort(modelId) != null)), { modelId = id }, label = { Text(name) })
+                        @Composable fun chip(id: String, name: String) = StudioFilterChip((modelId == id || (backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.family(id) != null && AntigravityReasoning.family(id) == AntigravityReasoning.family(modelId))), { modelId = AntigravityReasoning.switchTo(id, modelId).takeIf { backend == AssistantSettings.BACKEND_ANTIGRAVITY } ?: id }, label = { Text(name) })
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                             current.forEach { (id, name) -> chip(id, name) }
                         }
@@ -1587,8 +1588,8 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     if(backend == AssistantSettings.BACKEND_ANTIGRAVITY && AntigravityReasoning.effort(modelId) != null) {
                         Text("Razonar",style=MaterialTheme.typography.titleSmall)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                            listOf("low" to "Bajo","medium" to "Medio","high" to "Alto").forEach { (effort,label) ->
-                                StudioFilterChip(AntigravityReasoning.effort(modelId)==effort,{modelId=AntigravityReasoning.model(effort)},label={Text(label)})
+                            AntigravityReasoning.efforts(modelId).map { it to CODEX_EFFORT_NAMES.getValue(it) }.forEach { (effort,label) ->
+                                StudioFilterChip(AntigravityReasoning.effort(modelId)==effort,{modelId=AntigravityReasoning.model(modelId,effort)},label={Text(label)})
                             }
                         }
                     }
