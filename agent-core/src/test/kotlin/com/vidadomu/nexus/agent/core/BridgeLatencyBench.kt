@@ -4,7 +4,10 @@ import com.vidadomu.nexus.agent.core.agent.AgentOrchestrator
 import com.vidadomu.nexus.agent.core.config.AgentConfig
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.llm.AntigravityProvider
+import com.vidadomu.nexus.agent.core.tools.AgentSession
+import com.vidadomu.nexus.agent.core.tools.AgentTool
 import com.vidadomu.nexus.agent.core.tools.Attachment
+import com.vidadomu.nexus.agent.core.tools.ToolOutcome
 import com.vidadomu.nexus.agent.core.tools.NexusToolkit
 import com.vidadomu.nexus.agent.core.tools.UiEvent
 import com.vidadomu.nexus.agent.core.tools.turnContext
@@ -59,7 +62,18 @@ class BridgeLatencyBench {
         val conversation = "bench-${brain.model}-${case.id}-$run-${System.currentTimeMillis()}"
         val provider = AntigravityProvider(endpoint, sessionId = { conversation }, engine = brain.engine, reasoningEffort = brain.effort)
         val config = AgentConfig(provider = brain.engine.providerId, modelId = brain.model, region = "-", endpoint = endpoint, mode = AgentMode.AGENT, sendImagesToLlm = false)
-        val o = AgentOrchestrator(provider, config, NexusToolkit.all(h.deps), h.skills, h.assets, uiContext = { h.deps.orders.turnContext(h.guard) })
+        // Cada llamada a herramienta queda anotada (nombre, error, resumen) para saber por qué se repite una.
+        val trace = mutableListOf<kotlinx.serialization.json.JsonObject>()
+        val tools = NexusToolkit.all(h.deps).map { t -> object : AgentTool by t {
+            override suspend fun run(input: kotlinx.serialization.json.JsonObject, session: AgentSession): ToolOutcome = t.run(input, session).also { out ->
+                trace += buildJsonObject {
+                    put("tool", t.name); put("error", out.isError)
+                    if (t.name == "prepare_orders") put("input_orders", (input["orders"] as? kotlinx.serialization.json.JsonArray)?.size ?: 0)
+                    put("result", out.result.toString().replace('\n', ' ').take(if (t.name == "prepare_orders") 700 else 160))
+                }
+            }
+        } }
+        val o = AgentOrchestrator(provider, config, tools, h.skills, h.assets, uiContext = { h.deps.orders.turnContext(h.guard) })
         val attachments = if (case.attach) listOf(Attachment("foto1", "file:///bench/mateo.jpg", "image/jpeg", "mateo.jpg", 1080, 1920)) else emptyList()
         val started = System.nanoTime()
         val r = o.send(o.newConversation(conversation, AgentMode.AGENT), case.prompt, attachments)
@@ -72,6 +86,7 @@ class BridgeLatencyBench {
             put("submitted", h.backend.submitted.size)
             put("stop", r.stop)
             put("text", r.text.replace('\n', ' ').take(220))
+            put("trace", kotlinx.serialization.json.JsonArray(trace))
         }.toString()
     }
 }
