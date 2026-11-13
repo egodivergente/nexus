@@ -49,10 +49,17 @@ import kotlin.test.Test
  * Solo con -Dnexus.bench.endpoint (ver BridgeLatencyBench).
  */
 class AgentQualityBench {
-    private data class Brain(val label: String, val engine: AntigravityProvider.BridgeEngine, val model: String, val effort: String? = null)
+    private data class Brain(val label: String, val engine: AntigravityProvider.BridgeEngine?, val model: String, val effort: String? = null) {
+        /** null = no es del puente: va por Bedrock con las credenciales del equipo (~/.aws). */
+        val bedrock: Boolean get() = engine == null
+    }
     private val brains = listOf(
         Brain("GPT-6.1 Terra (medio)", AntigravityProvider.BridgeEngine.CODEX, "gpt-6.1-terra", "medium"),
         Brain("GPT-6.1 Sol (medio)", AntigravityProvider.BridgeEngine.CODEX, "gpt-6.1-sol", "medium"),
+        Brain("Claude Sonnet 5.5 (AGY)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "claude-sonnet-5-5"),
+        Brain("Claude Opus 5.5 (AGY)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "claude-opus-5-5"),
+        Brain("Grok 4.6", AntigravityProvider.BridgeEngine.GROK, "grok-4.6"),
+        Brain("Claude Haiku 5.5 (Bedrock)", null, "us.anthropic.claude-haiku-5-5"),
         Brain("Gemini 4 Hydrogen (medio)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "gemini-4-hydrogen-medium"),
         Brain("Gemini 4 Argon (medio)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "gemini-4-argon-medium"),
     )
@@ -73,8 +80,8 @@ class AgentQualityBench {
                 }
             } }
             AgentOrchestrator(
-                AntigravityProvider(endpoint, sessionId = { conversation }, engine = brain.engine, reasoningEffort = brain.effort),
-                AgentConfig(provider = brain.engine.providerId, modelId = brain.model, region = "-", endpoint = endpoint, mode = AgentMode.AGENT, sendImagesToLlm = true, maxToolRounds = 10),
+                brain.engine?.let { BenchProviders.bridge(endpoint, it, conversation, brain.effort) } ?: BenchProviders.bedrock(),
+                AgentConfig(provider = brain.engine?.providerId ?: "bedrock-direct", modelId = brain.model, region = "-", endpoint = endpoint, mode = AgentMode.AGENT, sendImagesToLlm = true, maxToolRounds = 10),
                 tools, h.skills, h.assets,
                 images = AttachmentImageLoader { a -> images[a.id]?.let { ContentBlock.Image("png", it) } },
                 uiContext = { listOfNotNull(deps.orders.turnContext(h.guard), CutTools.context(cut)).joinToString("\n\n") },

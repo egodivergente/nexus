@@ -69,6 +69,7 @@ class AntigravityProvider(
     ) {
         ANTIGRAVITY("antigravity", "gemini", "Antigravity (AGY)", "AGY", "nexus-agy-", AntigravityProvider.DEFAULT_MODEL, "generate_image (Nano Banana)"),
         CODEX("codex", "codex", "Codex", "Codex", "nexus-codex-", AntigravityProvider.CODEX_DEFAULT_MODEL, "generación de imágenes de Codex (GPT Image)"),
+        GROK("grok", "grok", "Grok Build", "Grok", "nexus-grok-", GROK_DEFAULT_MODEL, "generación de imágenes de Grok"),
     }
 
     override val id: String = engine.providerId
@@ -742,6 +743,8 @@ class AntigravityProvider(
         private val ALLOWED_HTTP_HOST = Regex(
             "^http://(127\\.0\\.0\\.1|localhost|100\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|[a-zA-Z0-9.-]+\\.ts\\.net)(:\\d+)?(/.*)?$"
         )
+
+        const val GROK_DEFAULT_MODEL = "grok-4.6"
 
         fun isAllowedEndpoint(url: String): Boolean {
             val clean = url.trim().trimEnd('/')

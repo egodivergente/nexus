@@ -26,12 +26,19 @@ import kotlin.test.Test
  * herramienta que confirme gasto y el backend es falso). Mide el turno completo como lo vive el usuario.
  */
 class BridgeLatencyBench {
-    private data class Brain(val label: String, val engine: AntigravityProvider.BridgeEngine, val model: String, val effort: String? = null)
+    private data class Brain(val label: String, val engine: AntigravityProvider.BridgeEngine?, val model: String, val effort: String? = null) {
+        /** null = no es del puente: va por Bedrock con las credenciales del equipo (~/.aws). */
+        val bedrock: Boolean get() = engine == null
+    }
     private data class Case(val id: String, val prompt: String, val attach: Boolean)
 
     private val brains = listOf(
         Brain("GPT-6.1 Terra (medio)", AntigravityProvider.BridgeEngine.CODEX, "gpt-6.1-terra", "medium"),
         Brain("GPT-6.1 Sol (medio)", AntigravityProvider.BridgeEngine.CODEX, "gpt-6.1-sol", "medium"),
+        Brain("Claude Sonnet 5.5 (AGY)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "claude-sonnet-5-5"),
+        Brain("Claude Opus 5.5 (AGY)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "claude-opus-5-5"),
+        Brain("Grok 4.6", AntigravityProvider.BridgeEngine.GROK, "grok-4.6"),
+        Brain("Claude Haiku 5.5 (Bedrock)", null, "us.anthropic.claude-haiku-5-5"),
         Brain("Gemini 4 Hydrogen (medio)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "gemini-4-hydrogen-medium"),
         Brain("Gemini 4 Argon (medio)", AntigravityProvider.BridgeEngine.ANTIGRAVITY, "gemini-4-argon-medium"),
     )
@@ -61,8 +68,8 @@ class BridgeLatencyBench {
     private suspend fun turn(endpoint: String, brain: Brain, case: Case, run: Int): String {
         val h = Harness()
         val conversation = "bench-${brain.model}-${case.id}-$run-${System.currentTimeMillis()}"
-        val provider = AntigravityProvider(endpoint, sessionId = { conversation }, engine = brain.engine, reasoningEffort = brain.effort)
-        val config = AgentConfig(provider = brain.engine.providerId, modelId = brain.model, region = "-", endpoint = endpoint, mode = AgentMode.AGENT, sendImagesToLlm = false)
+        val provider = brain.engine?.let { BenchProviders.bridge(endpoint, it, conversation, brain.effort) } ?: BenchProviders.bedrock()
+        val config = AgentConfig(provider = brain.engine?.providerId ?: "bedrock-direct", modelId = brain.model, region = "-", endpoint = endpoint, mode = AgentMode.AGENT, sendImagesToLlm = false)
         // Cada llamada a herramienta queda anotada (nombre, error, resumen) para saber por qué se repite una.
         val trace = mutableListOf<kotlinx.serialization.json.JsonObject>()
         val tools = NexusToolkit.all(h.deps).map { t -> object : AgentTool by t {
