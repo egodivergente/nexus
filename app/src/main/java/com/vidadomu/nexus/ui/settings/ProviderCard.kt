@@ -37,6 +37,27 @@ internal fun CategoryTile(icon: ImageVector, tint: Color, size: Dp = 44.dp) {
     }
 }
 
+/**
+ * Baldosa de una marca: su logo real cuando Nexus lo tiene (los mismos del catálogo) y, si no, las
+ * iniciales de la marca. Nunca el icono genérico, que hacía que todos los proveedores pareciesen el mismo.
+ */
+@Composable
+internal fun BrandTile(brand: String, tint: Color, size: Dp = 44.dp) {
+    val asset = remember(brand) { com.vidadomu.nexus.ui.components.ProviderBrandRegistry.resolve(organization = brand, modelId = brand) }
+    Box(Modifier.size(size).background(tint.copy(alpha = .16f), NexusTokens.card), contentAlignment = Alignment.Center) {
+        if (asset is com.vidadomu.nexus.ui.components.BrandAsset.Resource) {
+            com.vidadomu.nexus.ui.components.DefaultBrandLogo(organization = brand, modelId = brand, size = size * .62f)
+        } else {
+            // Sin logo propio: sus iniciales con el color del tema, que distinguen mejor que un icono repetido.
+            Text(initialsOf(brand), style = MaterialTheme.typography.titleSmall, color = tint)
+        }
+    }
+}
+
+internal fun initialsOf(brand: String): String = brand.split(' ', '-', '_', '.')
+    .filter { it.isNotBlank() }.take(2).map { it.first().uppercaseChar() }.joinToString("")
+    .ifEmpty { brand.take(2).uppercase() }
+
 /** Pastilla de estado: punto de color y texto corto. */
 @Composable
 internal fun StatusPill(connected: Boolean, label: String) {
@@ -53,7 +74,7 @@ internal fun StatusPill(connected: Boolean, label: String) {
 /** Tarjeta única de proveedor: cabecera con estado y, debajo, el contenido de cada uno (clave, saldo, prueba). */
 @Composable
 internal fun ProviderCard(name: String, subtitle: String, icon: ImageVector, tint: Color, connected: Boolean,
-    idleLabel: String = "Sin clave", content: @Composable ColumnScope.() -> Unit) {
+    idleLabel: String = "Sin clave", brand: String? = null, content: @Composable ColumnScope.() -> Unit) {
     // Plegada por defecto: todas las tarjetas de proveedor miden lo mismo; se despliegan con un toque.
     var open by androidx.compose.runtime.saveable.rememberSaveable(name) { androidx.compose.runtime.mutableStateOf(false) }
     Surface(Modifier.fillMaxWidth(), shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 2.dp) {
@@ -62,7 +83,7 @@ internal fun ProviderCard(name: String, subtitle: String, icon: ImageVector, tin
                 .semantics { stateDescription = if (open) "Desplegado" else "Plegado" }
                 .clickable(role = Role.Button, onClickLabel = if (open) "Plegar $name" else "Desplegar $name") { open = !open },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                CategoryTile(icon, tint)
+                if (brand != null) BrandTile(brand, tint) else CategoryTile(icon, tint)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
                     Text(name, style = MaterialTheme.typography.titleMedium)
                     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)

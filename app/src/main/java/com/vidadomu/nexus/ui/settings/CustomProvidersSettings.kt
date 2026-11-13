@@ -1,7 +1,11 @@
 package com.vidadomu.nexus.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,26 +28,40 @@ import com.vidadomu.nexus.ui.theme.TextSecondary
 
 /** Una fila de lista: título, detalle discreto y, a la derecha, una acción o una marca. */
 @Composable
-private fun ProviderRow(title: String, detail: String, warn: Boolean, onClick: () -> Unit, trailing: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
+private fun ProviderRow(title: String, detail: String, warn: Boolean, onClick: () -> Unit, brand: String? = null,
+    ready: Boolean = true, active: Boolean = false, onActivate: (() -> Unit)? = null) {
+    val shape = NexusTokens.thumbnail
+    Row(
+        Modifier.fillMaxWidth().clip(shape)
+            .then(if (active) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = .10f)) else Modifier)
+            .clickable(onClick = onClick, onClickLabel = "Configurar $title")
+            .padding(horizontal = if (active) NexusTokens.space8 else 0.dp, vertical = NexusTokens.space8),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12),
+    ) {
+        brand?.let { BrandTile(it, MaterialTheme.colorScheme.primary, size = NexusTokens.space32) }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
             Text(detail, style = MaterialTheme.typography.labelMedium, color = if (warn) MaterialTheme.colorScheme.error else TextSecondary, maxLines = 1)
         }
-        trailing()
+        // El activo se marca como seleccionado; los demás ofrecen la acción. Antes «Activo» parecía un botón inerte.
+        if (active) Icon(Icons.Default.CheckCircle, "Motor activo", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NexusTokens.iconDefault))
+        else if (onActivate != null) TextButton(onClick = onActivate, enabled = ready) { Text("Usar") }
     }
 }
 
 /** Un motor integrado de la app (Bedrock, Claude API…): se activa desde aquí y se configura en los ajustes del asistente. */
-private data class BuiltinEngine(val backend: String, val name: String, val summary: String)
+private data class BuiltinEngine(val backend: String, val name: String, val summary: String, val brand: String)
+
+/** El mismo vocabulario que las tarjetas de proveedor: «Listo» o «Sin configurar», nunca dos formas de decirlo. */
+private fun engineStatus(ready: Boolean) = if (ready) "Listo" else "Sin configurar"
 
 private val builtinEngines = listOf(
-    BuiltinEngine(AssistantSettings.BACKEND_DIRECT, "Amazon Bedrock", "Claude con tus claves de AWS"),
-    BuiltinEngine(AssistantSettings.BACKEND_ANTHROPIC, "Claude API", "API de Anthropic con tu clave"),
-    BuiltinEngine(AssistantSettings.BACKEND_OPENAI, "Compatible OpenAI", "OpenAI, OpenRouter, Gemini, DeepSeek, local…"),
-    BuiltinEngine(AssistantSettings.BACKEND_PROXY, "Proxy", "APK → proxy → Bedrock"),
-    BuiltinEngine(AssistantSettings.BACKEND_ANTIGRAVITY, "Antigravity (AGY)", "Puente local de Antigravity CLI"),
-    BuiltinEngine(AssistantSettings.BACKEND_CODEX, "Codex", "Codex CLI por el mismo puente local"),
+    BuiltinEngine(AssistantSettings.BACKEND_DIRECT, "Amazon Bedrock", "Claude con tus claves de AWS", "anthropic"),
+    BuiltinEngine(AssistantSettings.BACKEND_ANTHROPIC, "Claude API", "API de Anthropic con tu clave", "anthropic"),
+    BuiltinEngine(AssistantSettings.BACKEND_OPENAI, "Compatible OpenAI", "OpenAI, OpenRouter, Gemini, DeepSeek, local…", "openai"),
+    BuiltinEngine(AssistantSettings.BACKEND_PROXY, "Proxy", "APK → proxy → Bedrock", "anthropic"),
+    BuiltinEngine(AssistantSettings.BACKEND_ANTIGRAVITY, "Antigravity (AGY)", "Puente local de Antigravity CLI", "google"),
+    BuiltinEngine(AssistantSettings.BACKEND_CODEX, "Codex", "Codex CLI por el mismo puente local", "openai"),
 )
 
 /**
@@ -77,20 +95,16 @@ internal fun BrainsSettingsSection(onOpenAssistantSettings: () -> Unit = {}) {
         builtinEngines.forEach { e ->
             val ready = builtinReady(e)
             val model = settings.savedModelFor(e.backend)
-            ProviderRow(e.name, listOf(model.ifBlank { e.summary }, if (ready) "listo" else "sin configurar").joinToString(" · "), !ready, onOpenAssistantSettings) {
-                if (active == e.backend) Text("Activo", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                else TextButton(onClick = { activate(e.backend, model) }, enabled = ready) { Text("Usar") }
-            }
+            ProviderRow(e.name, listOf(model.ifBlank { e.summary }, engineStatus(ready)).joinToString(" · "), !ready, onOpenAssistantSettings,
+                brand = e.brand, ready = ready, active = active == e.backend, onActivate = { activate(e.backend, model) })
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         brains.forEach { b ->
             val ready = settings.brains.hasKey(b.id) || b.auth.mode == BrainAuthMode.NONE
             val mine = active == BrainStore.backendFor(b.id)
             ProviderRow(b.name, listOf(b.modelId.ifBlank { "sin modelo" }, when (b.protocol) { BrainProtocol.OPENAI_RESPONSES -> "Responses"; BrainProtocol.CUSTOM_REST -> "REST"; else -> "Chat" },
-                if (ready) "clave lista" else "falta la clave").joinToString(" · "), !ready, { editing = b }) {
-                if (mine) Text("Activo", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                else TextButton(onClick = { activate(BrainStore.backendFor(b.id), b.modelId) }) { Text("Usar") }
-            }
+                engineStatus(ready)).joinToString(" · "), !ready, { editing = b },
+                brand = b.modelId.ifBlank { b.name }, ready = ready, active = mine, onActivate = { activate(BrainStore.backendFor(b.id), b.modelId) })
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         TextButton(onClick = { adding = true }, contentPadding = PaddingValues(0.dp)) { Text("+ Añadir motor personalizado") }

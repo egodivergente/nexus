@@ -178,7 +178,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                     item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
                     item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
                     item {val atlasPill=providerPill(maskedApiKey!="Not configured",atlasCheck)
-                        ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=atlasPill.healthy,idleLabel=atlasPill.label) {
+                        ProviderCard(name="Atlas Cloud",subtitle="Imagen y vídeo · consumo oficial por uso",icon=Icons.Default.CloudQueue,tint=ProviderTint,connected=atlasPill.healthy,idleLabel=atlasPill.label,brand="atlascloud") {
                         ProviderKeyRow(maskedApiKey.takeUnless{it=="Not configured"},{apiKeyInput=settingsRepo.getAtlasApiKey();showEditKeyDialog=true},{app.secureStorage.clearProviderApiKey("atlas_cloud");maskedApiKey=settingsRepo.getMaskedAtlasApiKey();accountBalance=null;atlasCheck=ProviderCheck.NotChecked},providerName="Atlas Cloud")
                         ProviderBalance(accountBalance?.let{currencyManager.formatBalance(it.availableUsd)} ?: "Sin consultar",accountBalance?.let{"${currencyManager.formatUsdDetails(it.availableUsd)} · Efectivo ${currencyManager.formatBalance(it.cashUsd)} · Bonos ${currencyManager.formatBalance(it.bonusUsd)} · ${readingAge(it.lastUpdated,System.currentTimeMillis(),java.time.ZoneId.systemDefault())}"},isRefreshingBalance,{refreshBalance()})
                         (atlasCheck as? ProviderCheck.Failed)?.takeIf {connectionStatusMessage==null}?.let {InlineNotice(it.message)}
@@ -390,7 +390,7 @@ private fun ProviderCredentialCard(
     }
     val hasKey = maskedKey != "Not configured"
     val pill = providerPill(hasKey, lastCheck)
-    ProviderCard(name = provider.displayName, subtitle = provider.description, icon = Icons.Default.CloudQueue,
+    ProviderCard(name = provider.displayName, subtitle = provider.description, icon = Icons.Default.CloudQueue, brand = provider.id,
         tint = ProviderTint, connected = pill.healthy, idleLabel = pill.label) {
         ProviderKeyRow(if (hasKey) maskedKey else null, onEdit, if (hasKey) onClear else null, providerName = provider.displayName)
         if (accountStatus != null || loadingBalance) ProviderBalance(
