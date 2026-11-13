@@ -180,6 +180,8 @@ data class AssistantSettings(
         val KNOWN_MODELS = listOf(
             "us.anthropic.claude-sonnet-5-5" to "Sonnet 5.5",
             "us.anthropic.claude-opus-5-5" to "Opus 5.5",
+            // Perfil de inferencia confirmado el 13-11-2026 con list_inference_profiles de la cuenta de Vidal.
+            "us.anthropic.claude-haiku-5-5" to "Haiku 5.5",
             "us.anthropic.claude-sonnet-4-6" to "Sonnet 4.6",
             "us.anthropic.claude-opus-4-6-v1" to "Opus 4.6",
             "us.anthropic.claude-haiku-4-5-20251001-v1:0" to "Haiku 4.5",
