@@ -526,7 +526,7 @@ class ProjectAgentFlowTest {
     @Test fun bedrockOffersTheCurrentClaudeTrioWithVerifiedProfiles() {
         val ids = AssistantSettings.KNOWN_MODELS.map { it.first }
         // Perfiles comprobados contra la cuenta real (list_inference_profiles, 13-11-2026).
-        for (id in listOf("us.anthropic.claude-sonnet-5-5", "us.anthropic.claude-opus-5-5", "us.anthropic.claude-haiku-5-5")) assertTrue(id in ids, id)
+        for (id in listOf("us.anthropic.claude-sonnet-5-5", "us.anthropic.claude-opus-5-5", "us.anthropic.claude-haiku-5-5")) assertTrue(id, id in ids)
         assertEquals("Haiku 5.5", AssistantSettings.KNOWN_MODELS.first { it.first == "us.anthropic.claude-haiku-5-5" }.second)
         // La generación anterior no se borra: queda plegada bajo «Modelos anteriores».
         assertTrue("us.anthropic.claude-haiku-4-5-20251001-v1:0" in ids)
