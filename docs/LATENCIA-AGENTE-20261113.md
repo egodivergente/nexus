@@ -26,3 +26,28 @@ El tiempo de herramientas de Nexus fue de 4–290 ms por turno: casi todo el tie
 - Resumen final del lote: contar todas las tarjetas preparadas en el turno, no solo las de la última llamada.
 
 Límites: catálogo de prueba de 6 modelos (el real tiene cientos), un solo dispositivo y red, 3 repeticiones.
+
+# Acierto en tareas complejas (13-11-2026)
+
+Banco `AgentQualityBench.kt` (commit `b7c5ebc1`), mismo puente del Pixel, nivel medio, 2 rondas con orden alterno, ninguna generación enviada. Resultados crudos: `C:\Users\User\nexus-quality-q1.jsonl`.
+
+| Caso (comprobaciones) | Terra | Hydrogen | Argon |
+|---|---|---|---|
+| Guion de escena con reglas del proyecto (6) | 6/6 · 6/6 (≈19 s) | 6/6 · 6/6 (≈16–21 s) | 6/6 · 6/6 (≈13–18 s) |
+| Conversación larga, 4 turnos con reglas iniciales (7) | 5/7 · 5/7 (86–109 s) | **7/7 · 7/7** (35–83 s) | 7/7 · 7/7 (100–170 s) |
+| Montaje en Nexus Cut de 4 pasos en un cambio (5) | 2/5 · 2/5 (68–80 s) | error del puente · 0/5 | **3/5 · 3/5** (130 s) |
+| Revisión de 2 imágenes contra un encargo (3) | 1/3 · 1/3 | **3/3 · 3/3** (17–19 s) | 3/3 · 3/3 (25–27 s) |
+| **Total** | 28/42 | 32/42 | **38/42** |
+
+## Qué hay detrás
+
+- **Guion:** los tres respetan las reglas del proyecto (chaqueta verde, gafas de Lucía, nunca de noche) sin herramientas: la memoria del proyecto ya va en el prompt.
+- **Conversación larga:** Terra no aplicó al vídeo de Seedance las reglas del primer turno (10 s y 1080p) en ninguna ronda, aunque al final las recordaba. Hydrogen y Argon, sí.
+- **Revisión:** Terra contestó «no puedo ver sus píxeles» en ambas rondas: las imágenes no llegan a Codex por el puente (limitación de Nexus/puente, no del modelo; no se inventó el veredicto). Hydrogen y Argon acertaron cuál cumplía con el orden alternado.
+- **Nexus Cut:** ningún modelo lo resolvió entero. Argon dejó bien orden, corte y rótulo tras varios intentos (5 a 11 `cut_edit`, de 1 a 5 rechazados) y en 3 pasos en vez de 1. Terra hizo un solo cambio sin errores pero colocó las tomas detrás de la música (en 12 s y 60 s), así que el corte cayó en otro sitio. Hydrogen falló a la primera y no reintentó; en otra ronda el puente devolvió una respuesta vacía.
+
+## Defectos de Nexus que explican parte del fallo en Cut
+
+1. «Música a −12 dB» en un único cambio es imposible hoy: `audio.set` necesita el id del clip y ese id no existe hasta después de colocarlo. Propuesta: que lo colocado quede seleccionado dentro de la transacción (las operaciones siguientes sin `clip_ids` lo usan) y que `timeline.place` acepte volumen por elemento.
+2. `timeline.place` sin `at_us` coloca tras el final de todas las pistas destino, incluida la de audio vinculada: si la música cayó en A1, las tomas van detrás. Propuesta: al final de la pista de imagen.
+3. Las imágenes adjuntas no llegan a Codex por el puente.
