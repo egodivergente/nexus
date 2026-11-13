@@ -139,6 +139,7 @@ class AgentOrchestrator(
         val session = conv.session
         val before = conv.messages.toList()
         newAttachments.forEach { a -> if (session.attachment(a.id) == null) session.attachments += a }
+        session.preparedThisTurn.clear(); session.turnOrderLines.clear()
 
         val blocks = mutableListOf<ContentBlock>()
         val imageCache=mutableMapOf<String,ContentBlock.Image?>()

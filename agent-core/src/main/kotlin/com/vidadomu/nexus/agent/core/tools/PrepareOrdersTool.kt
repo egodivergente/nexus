@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.agent.core.tools
 
 import com.vidadomu.nexus.agent.core.registry.ModelSchema
+import com.vidadomu.nexus.agent.core.registry.ParamSpec
 import com.vidadomu.nexus.agent.core.registry.ModelSummary
 import kotlin.math.abs
 import kotlinx.coroutines.async
@@ -83,6 +84,8 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
         var total = 0.0; var unknownCost = false
         val seenModels = mutableSetOf<String>()
         var ready = 0
+        // order_id → (línea del resumen, coste); vive en la sesión para que varias llamadas del mismo turno sumen.
+        val turnLines = session.turnOrderLines
         val results = buildJsonArray {
             for (item in items) {
                 val modelId = item.input.str("model_id").orEmpty()
@@ -110,11 +113,16 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
                 events += outcome.events
                 if (!outcome.isError) {
                     ready++
-                    val plan = (outcome.result as? JsonObject)?.str("order_id")?.let { d.orders.get(it) }?.let { d.guard.plan(it.planId) }
+                    val orderId = (outcome.result as? JsonObject)?.str("order_id")
+                    val plan = orderId?.let { d.orders.get(it) }?.let { d.guard.plan(it.planId) }
                     val cost = plan?.estimate?.amountUsd
                     if (cost != null) total += cost else unknownCost = true
-                    lines += "- **${item.model.name}**" + (plan?.params?.takeIf { it.isNotEmpty() }?.let { p -> ": " + p.entries.joinToString(", ") { "${it.key} ${it.value}" } } ?: "") +
+                    val line = "- **${item.model.name}**" + (plan?.params?.takeIf { it.isNotEmpty() }?.let { p -> ": " + p.entries.joinToString(", ") { "${it.key} ${it.value}" } } ?: "") +
                         " · " + (cost?.let { usd(it) } ?: "coste por confirmar") + notes.joinToString("") { " · $it" }
+                    lines += line
+                    // El lote puede completarse en varias llamadas (un modelo que hubo que corregir): el resumen las suma.
+                    orderId?.let { if (it !in session.preparedThisTurn) session.preparedThisTurn += it }
+                    if (orderId != null) turnLines[orderId] = line to (cost ?: Double.NaN)
                 }
                 add(buildJsonObject {
                     put("model_id", item.model.ref.modelId); put("ok", !outcome.isError)
@@ -134,14 +142,21 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
             }
         }
         val failed = items.size - ready
+        // Todo lo preparado en el turno y que sigue pendiente de confirmación, en el orden en que se preparó.
+        val turnOrders = session.preparedThisTurn.filter { id ->
+            d.orders.get(id)?.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.AWAITING_CONFIRMATION
+        }
+        val turnReady = turnOrders.size
+        val turnTotal = turnOrders.mapNotNull { turnLines[it]?.second?.takeUnless(Double::isNaN) }.sum()
+        val turnUnknown = turnOrders.any { turnLines[it]?.second?.isNaN() != false }
         val summary = buildJsonObject {
             put("prepared", ready); put("failed", failed); put("orders", results)
             // Con todo preparado, este texto ES la respuesta al usuario: el turno termina sin otra llamada al modelo.
-            if (failed == 0) put("summary_for_user", buildString {
-                appendLine(if (ready == 1) "Preparado 1 encargo:" else "Preparados $ready encargos:")
-                lines.forEach { appendLine(it) }
+            if (failed == 0 && turnReady > 0) put("summary_for_user", buildString {
+                appendLine(if (turnReady == 1) "Preparado 1 encargo:" else "Preparados $turnReady encargos:")
+                turnOrders.forEach { id -> turnLines[id]?.let { appendLine(it.first) } }
                 appendLine()
-                if (ready > 1) appendLine("Coste estimado total: **${usd(total)}**" + if (unknownCost) " (sin contar los que están por confirmar)." else ".")
+                if (turnReady > 1) appendLine("Coste estimado total: **${usd(turnTotal)}**" + if (turnUnknown) " (sin contar los que están por confirmar)." else ".")
                 append("Nada se ha enviado todavía. Revisa las tarjetas y pulsa **GENERAR**.")
             })
             put("next", when {
@@ -168,6 +183,13 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
             if (own?.containsKey(key) != true) { out[key] = JsonPrimitive(value); if (value != ratio) notes += "Formato $ratio → $key=$value." }
         }
         own?.forEach { (k, v) -> out[k] = v }
+        // Un valor que el modelo no admite (5 s donde solo hay 4, 6 u 8) se lleva al más cercano en vez de fallar.
+        for ((k, v) in out.toList()) {
+            val spec = schema.param(k) ?: continue
+            val fixed = nearestAllowed(spec, v) ?: continue
+            out[k] = fixed
+            notes += "$k ${(v as? JsonPrimitive)?.content ?: v} no está disponible en este modelo: se usa ${(fixed as? JsonPrimitive)?.content ?: fixed}."
+        }
         return out
     }
 
@@ -201,6 +223,30 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
         private val RATIO_KEYS = setOf("aspect_ratio", "aspectRatio", "ratio")
         private val SIZE_KEYS = setOf("size", "image_size", "resolution")
         private val DIMENSIONS = Regex("""(\d{2,5})\s*[x*×]\s*(\d{2,5})""")
+
+        /**
+         * El valor admitido más cercano cuando el pedido no vale, o null si ya vale o no se puede decidir.
+         * Solo para números: en texto (un estilo, un modo de cámara) elegir «el más parecido» cambiaría la intención.
+         */
+        internal fun nearestAllowed(spec: ParamSpec, value: kotlinx.serialization.json.JsonElement): kotlinx.serialization.json.JsonElement? {
+            val raw = (value as? JsonPrimitive)?.content?.trim() ?: return null
+            val wanted = raw.toDoubleOrNull() ?: return null
+            if (spec.options.isNotEmpty()) {
+                if (raw in spec.options) return null
+                val numeric = spec.options.mapNotNull { o -> o.trim().toDoubleOrNull()?.let { o to it } }
+                // Todas las opciones han de ser números: si alguna no lo es, es una lista de nombres, no una escala.
+                if (numeric.size != spec.options.size || numeric.isEmpty()) return null
+                val best = numeric.minWith(compareBy({ abs(it.second - wanted) }, { it.second }))
+                return JsonPrimitive(best.first).takeIf { best.first != raw }
+            }
+            val min = spec.min; val max = spec.max
+            if (min == null && max == null) return null
+            val clamped = wanted.coerceIn(min ?: Double.NEGATIVE_INFINITY, max ?: Double.POSITIVE_INFINITY)
+            if (clamped == wanted) return null
+            val text = if (spec.nativeType == "integer" || spec.uiType in setOf("DURATION", "INTEGER", "SEED") || raw.toIntOrNull() != null)
+                clamped.toLong().toString() else clamped.toString()
+            return JsonPrimitive(text)
+        }
 
         /** Traduce «16:9» al parámetro real del modelo: su clave de formato o, si solo tiene tamaños, el tamaño con esa proporción. */
         internal fun aspectParam(schema: ModelSchema, ratio: String): Pair<String, String>? {

@@ -28,6 +28,8 @@ class PrepareOrdersTest {
     private fun session(images: Int = 11) = AgentSession("lote", AgentMode.AGENT).apply {
         repeat(images) { attachments += Attachment("ref$it", "file:///ref$it.png", "image/png") }
     }
+    /** Los modelos de vídeo del catálogo de prueba parten de un fotograma inicial, no de referencias sueltas. */
+    private fun frame() = """{"role":"first_frame","attachment_id":"ref0"}"""
     private fun refs(n: Int) = (0 until n).joinToString(",") { """{"role":"reference","attachment_id":"ref$it"}""" }
     private fun call(body: String) = Json.parseToJsonElement(body).jsonObject
     private fun orders(o: ToolOutcome) = o.result.jsonObject["orders"]!!.jsonArray.map { it.jsonObject }
@@ -80,6 +82,37 @@ class PrepareOrdersTest {
         assertTrue(PrepareOrdersTool(h.deps).run(call("""{"orders":[]}"""), s).isError)
         val out = PrepareOrdersTool(h.deps).run(call("""{"prompt":"x","orders":[{"model_id":"no/existe"}]}"""), s)
         assertTrue(out.isError); assertTrue(h.guard.plans().isEmpty()); assertTrue(out.events.isEmpty())
+    }
+
+    @Test fun `un valor que el modelo no admite se lleva al mas cercano y se dice, en vez de fallar`() = runTest {
+        val h = harness(); val s = session(1)
+        // Veo solo admite 4, 6 u 8 segundos: pedir 5 no puede costar una ronda entera del modelo.
+        val out = PrepareOrdersTool(h.deps).run(call("""{"prompt":"Mateo en el Retiro","media":[${frame()}],"params":{"duration":"5"},
+            "orders":[{"model_id":"${VEO.modelId}"},{"model_id":"${SEEDANCE.modelId}"}]}"""), s)
+        assertFalse(out.isError, out.result.toString())
+        assertEquals(2, out.result.jsonObject["prepared"]!!.jsonPrimitive.int)
+        val plans = h.guard.plans().associateBy { it.ref }
+        assertEquals("4", plans.getValue(VEO).params["duration"])        // 5 → 4 (empate 4/6: el menor, más barato)
+        assertEquals("5", plans.getValue(SEEDANCE).params["duration"])   // Seedance sí admite 5: no se toca
+        val veo = orders(out).first { it["model_id"]!!.jsonPrimitive.content == VEO.modelId }
+        assertTrue(veo["adaptations"]!!.jsonArray.single().jsonPrimitive.content.let { "duration" in it && "4" in it })
+        assertNull(orders(out).first { it["model_id"]!!.jsonPrimitive.content == SEEDANCE.modelId }["adaptations"])
+    }
+
+    @Test fun `el resumen cuenta todas las tarjetas del turno aunque el lote se complete en dos llamadas`() = runTest {
+        val h = harness(); val s = session(1); val tool = PrepareOrdersTool(h.deps)
+        fun summary(o: ToolOutcome) = o.result.jsonObject["summary_for_user"]?.jsonPrimitive?.content
+        val first = tool.run(call("""{"prompt":"Mateo","media":[${frame()}],"orders":[{"model_id":"${KLING_PRO.modelId}"},{"model_id":"${SEEDANCE.modelId}"}]}"""), s)
+        assertTrue(summary(first)!!.startsWith("Preparados 2 encargos"))
+        // Segunda llamada del MISMO turno (p. ej. el modelo corrige uno que falló): el resumen cuenta los tres.
+        val second = tool.run(call("""{"prompt":"Mateo","media":[${frame()}],"orders":[{"model_id":"${VEO.modelId}"}]}"""), s)
+        val text = summary(second)!!
+        assertTrue(text.startsWith("Preparados 3 encargos"), text)
+        for (name in listOf("Kling O3 Pro", "Seedance 2.0", "Veo 3.1")) assertTrue(name in text, "$name en «$text»")
+        assertEquals(3, h.guard.plans().size)
+        // Otro turno empieza de cero: no arrastra las tarjetas del anterior.
+        s.preparedThisTurn.clear(); s.turnOrderLines.clear()
+        assertTrue(summary(tool.run(call("""{"prompt":"Otro","media":[${frame()}],"orders":[{"model_id":"${KLING_PRO.modelId}"}]}"""), s))!!.startsWith("Preparado 1 encargo"))
     }
 
     @Test fun `un lote preparado cierra el turno en una sola llamada al modelo y el siguiente turno ya trae su detalle`() = runTest {

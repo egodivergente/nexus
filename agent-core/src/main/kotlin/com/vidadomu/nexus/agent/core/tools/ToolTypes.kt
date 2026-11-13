@@ -80,6 +80,10 @@ class AgentSession(
     val pendingActions = linkedMapOf<String, PendingAction>()
     /** Skills de modelo cuya guía ya recibió el agente en esta conversación (no se repite). */
     val deliveredSkills = mutableSetOf<String>()
+    /** Encargos preparados en ESTE turno, en orden. Un lote puede necesitar varias llamadas; el resumen los cuenta todos. */
+    val preparedThisTurn = mutableListOf<String>()
+    /** Línea del resumen y coste de cada encargo preparado en el turno (order_id → línea a coste). */
+    val turnOrderLines = mutableMapOf<String, Pair<String, Double>>()
 
     fun attachment(id: String): Attachment? = attachments.firstOrNull { it.id == id }
 }
