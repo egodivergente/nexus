@@ -35,4 +35,9 @@ tasks.test {
     maxHeapSize = "64m"
     // Las pruebas de skills leen la carpeta real del repositorio.
     systemProperty("nexus.skills.dir", rootProject.file("agent-skills/skills").absolutePath)
+    // Banco de latencia (BridgeLatencyBench): solo si se pasa el endpoint del puente con -Dnexus.bench.endpoint=…
+    listOf("nexus.bench.endpoint", "nexus.bench.runs", "nexus.bench.only", "nexus.bench.out").forEach { key ->
+        System.getProperty(key)?.let { systemProperty(key, it) }
+    }
+    if (System.getProperty("nexus.bench.endpoint") != null) { maxHeapSize = "512m"; outputs.upToDateWhen { false } }
 }
