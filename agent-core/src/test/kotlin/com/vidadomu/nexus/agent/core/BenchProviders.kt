@@ -23,8 +23,10 @@ internal object BenchProviders {
         System.getenv("AWS_ACCESS_KEY_ID")?.let { id ->
             System.getenv("AWS_SECRET_ACCESS_KEY")?.let { return AwsCredentials(id, it, System.getenv("AWS_SESSION_TOKEN")) }
         }
+        val file = File(System.getProperty("user.home"), ".aws/credentials")
         val profile = System.getenv("AWS_PROFILE") ?: "default"
-        val values = iniSection(File(System.getProperty("user.home"), ".aws/credentials"), profile) ?: return null
+        // Un equipo con un único perfil con otro nombre (p. ej. «vidaltb») es lo normal: se usa ese.
+        val values = iniSection(file, profile) ?: sections(file).singleOrNull()?.let { iniSection(file, it) } ?: return null
         val id = values["aws_access_key_id"] ?: return null
         val secret = values["aws_secret_access_key"] ?: return null
         return AwsCredentials(id, secret, values["aws_session_token"])
@@ -35,6 +37,11 @@ internal object BenchProviders {
         val file = File(System.getProperty("user.home"), ".aws/config")
         return iniSection(file, "profile $profile")?.get(key) ?: iniSection(file, profile)?.get(key)
     }
+
+    /** Nombres de sección del archivo, en orden. */
+    private fun sections(file: File): List<String> =
+        if (!file.isFile) emptyList() else file.readLines().map { it.substringBefore('#').substringBefore(';').trim() }
+            .filter { it.startsWith("[") && it.endsWith("]") }.map { it.substring(1, it.length - 1).trim() }
 
     /** Lector mínimo del formato INI de AWS: solo la sección pedida, sin dependencias. */
     private fun iniSection(file: File, section: String): Map<String, String>? {
