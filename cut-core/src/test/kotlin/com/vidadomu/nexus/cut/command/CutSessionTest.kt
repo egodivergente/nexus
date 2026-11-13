@@ -238,6 +238,38 @@ class CutSessionTest {
         assertEquals(-1.0, full["video"]!!.jsonObject["color"]!!.jsonObject["saturation"]!!.jsonPrimitive.content.toDouble(), 1e-6)
     }
 
+    @Test fun `lo colocado queda seleccionado y va al final de su pista, no detras de la musica`() = runTest {
+        val s = session()
+        // Una cama de música larga ya puesta no debe empujar las tomas al final de la película…
+        s.run("timeline.place", Origin.USER, "items" to listOf(mapOf("media_id" to "m4")), "audio_track_id" to "A2").done()
+        s.run("timeline.place", Origin.USER, "items" to listOf(mapOf("media_id" to "m1"))).done()
+        assertEquals(0L, s.clipsOn("V1").single().timelineStartUs)
+        // …y el montaje sigue creciendo por su propia pista.
+        s.run("timeline.place", Origin.USER, "items" to listOf(mapOf("media_id" to "m3"))).done()
+        assertEquals(listOf(0L, 10_000_000L), s.clipsOn("V1").map { it.timelineStartUs })
+        // «Música a −12 dB» en el mismo paso: audio.set usa lo recién colocado sin conocer su id.
+        val out = s.execute(Request(listOf(
+            Op("timeline.place", args("items" to listOf(mapOf("media_id" to "m4")), "audio_track_id" to "A2")),
+            Op("audio.set", args("gain_db" to -12)),
+        ), Origin.AGENT, label = "Añadir música")).done()
+        assertTrue(out.committed)
+        val music = s.timeline.track("A2")!!.clips
+        assertEquals(2, music.size)
+        assertEquals(-12.0, music.last().audio.gainDb, 1e-9)
+        assertEquals(0.0, music.first().audio.gainDb, 1e-9)   // la cama anterior no se toca
+    }
+
+    @Test fun `con un video con sonido, la mezcla de lo seleccionado va a su pista de audio`() = runTest {
+        val s = session()
+        s.run("timeline.place", Origin.USER, "items" to listOf(mapOf("media_id" to "m1"))).done()
+        s.run("audio.set", Origin.AGENT, "gain_db" to -6).done()
+        assertEquals(-6.0, s.clipsOn("A1").single().audio.gainDb, 1e-9)
+        assertEquals(0.0, s.clipsOn("V1").single().audio.gainDb, 1e-9)
+        // Con un id explícito se respeta lo pedido, aunque sea el clip de imagen.
+        s.run("audio.set", Origin.AGENT, "clip_ids" to listOf(s.clipsOn("V1").single().id), "gain_db" to -3).done()
+        assertEquals(-3.0, s.clipsOn("V1").single().audio.gainDb, 1e-9)
+    }
+
     @Test fun `una capacidad que el dispositivo no ofrece se anuncia y no se ejecuta, y un trabajo largo va solo`() = runTest {
         var started = 0
         val export = Capability("render.export", CapabilityKind.JOB, "Exporta el montaje a un archivo de vídeo en segundo plano.", requires = setOf("engine.export"),

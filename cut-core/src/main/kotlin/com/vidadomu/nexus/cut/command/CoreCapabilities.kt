@@ -339,7 +339,10 @@ object CoreCapabilities {
                     placements += Placement(audio.id, ClipKind.AUDIO, m.id, sourceIn, duration, name = name)
                 }
             }
-            val start = at ?: placements.maxOf { d.track(it.trackId).endUs }
+            // «Al final» es el final de la pista principal de lo que se coloca (la imagen, o el audio si solo hay audio):
+            // una cama de música larga ya puesta no debe empujar las tomas al final de la película.
+            val lead = placements.firstOrNull { it.kind != ClipKind.AUDIO } ?: placements.first()
+            val start = at ?: d.track(lead.trackId).endUs
             val r = d.timeline { t, c -> TimelineEditor.place(t, c, placements, start, mode) }
             val clips = r.createdIds.filter { d.timeline.clip(it) != null }
             val story = StoryLink(item.str("scene_id"), item.str("shot_id"))
@@ -347,6 +350,9 @@ object CoreCapabilities {
             created += clips
             at = start + duration
         }
+        // Lo recién colocado queda seleccionado: dentro de la misma transacción, «ponle la música a −12 dB»
+        // puede resolverse sin saber el id del clip, que no existía cuando se pidió.
+        if (created.isNotEmpty()) d.view = d.view.copy(selection = created.toSet())
         return ids("clip_ids", created)
     }
 

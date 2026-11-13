@@ -143,7 +143,11 @@ internal object EffectCapabilities {
             },
             errors = ENGINE,
             handler = Handler.Edit { d, a ->
-                val clips = d.targets(a)
+                // Sobre una selección que mezcla imagen y sonido (lo que deja timeline.place con un vídeo con audio),
+                // la mezcla se aplica a los clips de sonido. Con ids explícitos se respeta lo pedido.
+                val chosen = d.targets(a)
+                val clips = if (a.ids("clip_ids").isNotEmpty()) chosen
+                    else chosen.filter { d.clip(it).kind == ClipKind.AUDIO }.toSet().ifEmpty { chosen }
                 CoreCapabilities.warnAnimated(d, clips, mapOf("gain_db" to AnimParam.GAIN_DB), a)
                 d.timeline { t, c ->
                     TimelineEditor.updateClips(t, c, clips, "Audio") { clip ->
