@@ -10,7 +10,7 @@ class ClipExportRangesTest {
     private fun montage(): Project {
         var cursor = 0L
         val clips = durations.mapIndexed { i, duration ->
-            Clip("v$i", "source", ClipKind.VIDEO, cursor, duration, sourceInUs = cursor, linkId = "link$i").also { cursor += duration }
+            Clip("v$i", ClipKind.VIDEO, "source", cursor, duration, sourceInUs = cursor, linkId = "link$i").also { cursor += duration }
         }
         val audio = clips.mapIndexed { i, c -> c.copy(id = "a$i", kind = ClipKind.AUDIO) }
         return CutProjects.create("Montaje", 1, IdGenerator.sequential()).copy(revision = 6,

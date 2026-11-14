@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
+import android.graphics.Bitmap
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.os.SystemClock
@@ -45,11 +46,24 @@ class CutFeedbackDeviceTest {
     private fun nodes(): List<AccessibilityNodeInfo> {
         val out = mutableListOf<AccessibilityNodeInfo>()
         fun add(n: AccessibilityNodeInfo?) { if (n == null) return; out += n; for (i in 0 until n.childCount) add(n.getChild(i)) }
-        add(inst.uiAutomation.rootInActiveWindow); return out
+        val root = inst.uiAutomation.rootInActiveWindow
+        if (root?.packageName?.toString() != inst.targetContext.packageName) return out
+        add(root); return out
+    }
+    private fun requireForeground() {
+        assertEquals("Stop gestures if another app is foreground", inst.targetContext.packageName,
+            inst.uiAutomation.rootInActiveWindow?.packageName?.toString())
+    }
+    private fun screenshot(name: String) {
+        requireForeground()
+        val bitmap = requireNotNull(inst.uiAutomation.takeScreenshot())
+        File(app.cacheDir, "cut-feedback-$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
     }
     private fun node(label: String) = nodes().firstOrNull { it.contentDescription?.toString() == label || it.text?.toString() == label }
     private fun click(label: String) {
         waitFor { node(label) != null }
+        requireForeground()
         var n = requireNotNull(node(label))
         while (!n.isClickable && n.parent != null) n = n.parent
         assertTrue("Could not click $label", n.performAction(AccessibilityNodeInfo.ACTION_CLICK)); inst.waitForIdleSync()
@@ -58,6 +72,7 @@ class CutFeedbackDeviceTest {
     private fun drag(x: Float, y: Float, dx: Float, dy: Float) {
         val start = SystemClock.uptimeMillis()
         for (i in 0..12) {
+            requireForeground()
             val action = when (i) { 0 -> MotionEvent.ACTION_DOWN; 12 -> MotionEvent.ACTION_UP; else -> MotionEvent.ACTION_MOVE }
             val e = MotionEvent.obtain(start, start + i * 30, action, x + dx * i / 12, y + dy * i / 12, 0)
             e.source = InputDevice.SOURCE_TOUCHSCREEN; assertTrue(inst.uiAutomation.injectInputEvent(e, true)); e.recycle()
@@ -68,6 +83,7 @@ class CutFeedbackDeviceTest {
         val start = SystemClock.uptimeMillis()
         val props = Array(2) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
         fun send(action: Int, count: Int, span: Float, tick: Int) {
+            requireForeground()
             val coordinates = Array(count) { i -> MotionEvent.PointerCoords().apply {
                 x = r.exactCenterX() + (if (i == 0) -span else span); y = r.exactCenterY(); pressure = 1f; size = 1f
             } }
@@ -89,13 +105,14 @@ class CutFeedbackDeviceTest {
         val entries = listOf(ChatCopyEntry("1", "Tú", "Primero"), ChatCopyEntry("2", "Nexus", "Respuesta completa\n".repeat(200)), ChatCopyEntry("3", "Tú", "Último"))
         fun open() { inst.runOnMainSync { activity.setContent { NexusTheme { ChatCopySheet(entries, onDismiss = {}) } } }; inst.waitForIdleSync() }
         try {
-            open(); click("Copiar todo")
+            open(); screenshot("copy-all"); click("Copiar todo")
             assertEquals(entries.joinToString("\n\n") { "${it.speaker}\n${it.text}" }, clipboard.primaryClip!!.getItemAt(0).text.toString())
             val boxes = nodes().filter { it.className?.toString() == "android.widget.CheckBox" }
             assertTrue(boxes.size >= 4)
-            boxes[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            requireForeground(); boxes[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
             inst.waitForIdleSync()
-            for (i in 1..2) { nodes().filter { it.className?.toString() == "android.widget.CheckBox" }[i].performAction(AccessibilityNodeInfo.ACTION_CLICK); inst.waitForIdleSync() }
+            for (i in 1..2) { requireForeground(); nodes().filter { it.className?.toString() == "android.widget.CheckBox" }[i].performAction(AccessibilityNodeInfo.ACTION_CLICK); inst.waitForIdleSync() }
+            screenshot("copy-selected")
             click("Copiar selección")
             assertEquals(entries.take(2).joinToString("\n\n") { "${it.speaker}\n${it.text}" }, clipboard.primaryClip!!.getItemAt(0).text.toString())
         } finally { inst.runOnMainSync { if (old != null) clipboard.setPrimaryClip(old) else clipboard.clearPrimaryClip() }; activity.finish() }
@@ -109,12 +126,14 @@ class CutFeedbackDeviceTest {
         inst.runOnMainSync { NexusCut.open(id) }
         waitFor { node("Previsualización del montaje") != null }
         try {
+            screenshot("workspace")
             val before = bounds("Previsualización del montaje")
             val handle = bounds("Tamaño de la previsualización y la línea de tiempo")
             drag(handle.exactCenterX(), handle.exactCenterY(), 0f, 100f)
             assertTrue(bounds("Previsualización del montaje").height() > before.height())
             pinch(bounds("Previsualización del montaje"))
             waitFor { node("Ajustar") != null }
+            screenshot("zoom")
             click("Ajustar")
             click("Reproducir")
             waitFor { node("Pausa") != null }
@@ -126,6 +145,7 @@ class CutFeedbackDeviceTest {
             click("Minimizar agente")
             waitFor { node("Mostrar agente del montaje") != null }
             assertTrue(bounds("Previsualización del montaje").height() > visible)
+            screenshot("agent-hidden")
             click("Mostrar agente del montaje")
             waitFor { node("Minimizar agente") != null }
             assertEquals(original, session.state.value.project)
@@ -137,7 +157,7 @@ class CutFeedbackDeviceTest {
         val activity = activity()
         val dir = File(app.cacheDir, "cut-feedback-${System.nanoTime()}").apply { mkdirs() }
         val source = File(dir, "source.mp4").apply { inst.context.assets.open("media-edit/red.mp4").use { input -> outputStream().use { input.copyTo(it) } } }
-        val video = Clip("video", "m", ClipKind.VIDEO, 0, 3_000_000, linkId = "linked")
+        val video = Clip("video", ClipKind.VIDEO, "m", 0, 3_000_000, linkId = "linked")
         val audio = video.copy(id = "audio", kind = ClipKind.AUDIO)
         val project = CutProjects.create("Prueba privada de exportación", 1, IdGenerator.sequential()).copy(
             media = listOf(MediaRef("m", source.toURI().toString(), "Fixture", MediaKind.VIDEO, 3_000_000, 320, 240, hasVideo = true, hasAudio = true)),
