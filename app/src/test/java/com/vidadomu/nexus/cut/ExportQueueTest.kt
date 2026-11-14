@@ -16,19 +16,31 @@ class ExportQueueTest {
     @Test fun batchRunsSequentiallyAndReportsAllCompletedAssets() {
         assertTrue(ExportManager.enqueueBatch(listOf(job(1), job(2), job(3))))
         assertFalse(ExportManager.enqueue(job(4)))
-        assertNotNull(ExportManager.take())
-        assertNotNull(ExportManager.complete(done(1)))
+        val first = requireNotNull(ExportManager.take())
+        val second = requireNotNull(ExportManager.complete(first, done(1)))
         ExportManager.update(ExportState.Running(project.id, project.name, 50, "Renderizando"))
         assertEquals(50, (ExportManager.state.value as ExportState.Running).progress)
-        assertNotNull(ExportManager.complete(done(2)))
-        assertNull(ExportManager.complete(done(3)))
+        val third = requireNotNull(ExportManager.complete(second, done(2)))
+        assertNull(ExportManager.complete(third, done(3)))
         assertEquals(listOf("asset1", "asset2", "asset3"), (ExportManager.state.value as ExportState.Done).assetIds)
     }
     @Test fun cancellationKeepsCompletedFilesAndDropsPendingJobs() {
         assertTrue(ExportManager.enqueueBatch(listOf(job(1), job(2), job(3))))
-        ExportManager.take(); ExportManager.complete(done(1))
+        val first = requireNotNull(ExportManager.take()); ExportManager.complete(first, done(1))
         ExportManager.update(ExportState.Cancelled(project.id))
         assertNull(ExportManager.take())
         assertEquals(listOf("asset1"), (ExportManager.state.value as ExportState.Cancelled).assetIds)
+    }
+    @Test fun lateCompletionCannotConsumeOrOverwriteANewBatch() {
+        assertTrue(ExportManager.enqueue(job(1)))
+        val old = requireNotNull(ExportManager.take())
+        ExportManager.update(ExportState.Cancelled(project.id))
+        assertTrue(ExportManager.enqueue(job(2)))
+        val current = ExportManager.state.value
+        assertNull(ExportManager.complete(old, done(1)))
+        assertEquals(current, ExportManager.state.value)
+        val next = requireNotNull(ExportManager.take())
+        assertNull(ExportManager.complete(next, done(2)))
+        assertEquals(listOf("asset2"), (ExportManager.state.value as ExportState.Done).assetIds)
     }
 }

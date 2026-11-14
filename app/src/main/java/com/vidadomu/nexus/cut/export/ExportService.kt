@@ -237,7 +237,7 @@ class ExportService : Service() {
                 fail("El vídeo se renderizó pero no se pudo añadir a la Biblioteca: ${e.message}"); return@launch
             }
             val detail = "${result.width}×${result.height} · ${result.videoEncoderName ?: "?"} · ${(result.averageVideoBitrate / 1000).coerceAtLeast(0)} kbps"
-            val next = ExportManager.complete(ExportState.Done(j.project.id, assetId, j.destination, size, j.plan.durationUs, detail))
+            val next = ExportManager.complete(j, ExportState.Done(j.project.id, assetId, j.destination, size, j.plan.durationUs, detail))
             if (ended) return@launch
             if (next != null) {
                 transformer = null; job = next; lastNotified = -1

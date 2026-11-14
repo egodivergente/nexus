@@ -40,22 +40,26 @@ object ExportManager {
     private val completed = mutableListOf<String>()
     private var total = 1
     private var item = 0
+    private var active: ExportJob? = null
 
     fun enqueue(job: ExportJob): Boolean = enqueueBatch(listOf(job))
 
     fun enqueueBatch(jobs: List<ExportJob>): Boolean = synchronized(this) {
         require(jobs.isNotEmpty())
         if (_state.value is ExportState.Running) return false
-        queue.clear(); completed.clear(); total = jobs.size; item = 0
+        queue.clear(); completed.clear(); total = jobs.size; item = 0; active = null
         queue.addAll(jobs)
         val job = jobs.first()
         _state.value = ExportState.Running(job.project.id, job.project.name, 0, "Preparando…", item = 1, total = total)
         true
     }
 
-    internal fun take(): ExportJob? = synchronized(this) { queue.removeFirstOrNull()?.also { item++ } }
+    internal fun take(): ExportJob? = synchronized(this) { queue.removeFirstOrNull()?.also { item++; active = it } }
 
-    internal fun complete(done: ExportState.Done): ExportJob? = synchronized(this) {
+    internal fun complete(job: ExportJob, done: ExportState.Done): ExportJob? = synchronized(this) {
+        // A cancelled save may finish after a new batch has started. Never mix their results.
+        if (active !== job) return null
+        active = null
         completed += done.assetId
         if (_state.value !is ExportState.Running) {
             update(_state.value)
