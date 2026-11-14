@@ -22,6 +22,7 @@ import com.vidadomu.nexus.cut.command.ErrorCode
 import com.vidadomu.nexus.cut.command.ExportOverrides
 import com.vidadomu.nexus.cut.command.LibraryMedia
 import com.vidadomu.nexus.cut.command.cutFail
+import com.vidadomu.nexus.cut.command.clipExportRanges
 import com.vidadomu.nexus.cut.export.ExportJob
 import com.vidadomu.nexus.cut.export.ExportManager
 import com.vidadomu.nexus.cut.export.ExportMath
@@ -35,6 +36,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
@@ -117,14 +120,25 @@ object NexusCut {
             if (project.timeline.durationUs <= 0) cutFail(ErrorCode.PRECONDITION_FAILED, "La línea de tiempo está vacía: no hay nada que exportar.")
             if (ExportManager.state.value is ExportState.Running) cutFail(ErrorCode.PRECONDITION_FAILED, "Ya hay una exportación en curso.")
             val settings = project.export.copy(resolution = overrides.resolution ?: project.export.resolution, codec = overrides.codec ?: project.export.codec)
-            val plan = ExportMath.plan(project.settings, settings, project.timeline.durationUs)
+            val ranges = clipExportRanges(project, overrides.clipIds, overrides.eachClip)
             val offline = withContext(Dispatchers.IO) { project.media.filterNot { MediaProbe.isReachable(app, it.uri) }.map { it.id }.toSet() }
             val usedOffline = offline.filter { project.timeline.usesMedia(it) }
             val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ROOT).format(java.util.Date())
             val slug = project.name.replace(Regex("[^\\p{L}\\p{N} _-]"), "").trim().replace(' ', '_').take(48).ifBlank { "montaje" }
-            val destination = File(app.filesDir, "cut/exports/$slug-$stamp.mp4")
-            val job = ExportJob(project, plan, destination, project.media.map { it.id }.toSet() - offline) { file -> register(app, file, project, plan.durationUs) }
-            if (!ExportManager.enqueue(job)) cutFail(ErrorCode.PRECONDITION_FAILED, "Ya hay una exportación en curso.")
+            val token = java.util.UUID.randomUUID().toString().take(8)
+            val windows = if (ranges.isEmpty()) listOf(null) else ranges
+            val jobs = windows.mapIndexed { index, range ->
+                val name = if (range == null) project.name else "${project.name} · Clip ${index + 1}"
+                val snapshot = project.copy(name = name)
+                val plan = ExportMath.plan(project.settings, settings, range?.durationUs ?: project.timeline.durationUs)
+                val suffix = if (range == null) "" else "-clip-${(index + 1).toString().padStart(2, '0')}"
+                val destination = File(app.filesDir, "cut/exports/$slug-$stamp-$token$suffix.mp4")
+                ExportJob(snapshot, plan, destination, project.media.map { it.id }.toSet() - offline,
+                    fromUs = range?.startUs ?: 0, untilUs = range?.endUs ?: project.timeline.durationUs) { file ->
+                    register(app, file, snapshot, plan.durationUs)
+                }
+            }
+            if (!ExportManager.enqueueBatch(jobs)) cutFail(ErrorCode.PRECONDITION_FAILED, "Ya hay una exportación en curso.")
             try {
                 ExportService.start(app)
             } catch (e: IllegalStateException) {
@@ -134,20 +148,23 @@ object NexusCut {
                 cutFail(ErrorCode.UNAVAILABLE, "Android no ha permitido exportar con Nexus en segundo plano. Abre Nexus y vuelve a exportar.")
             }
             return buildJsonObject {
+                val plan = jobs.first().plan
                 put("state", "running"); put("progress", 0); put("width", plan.width); put("height", plan.height)
-                put("codec", settings.codec.label); put("estimated_bytes", plan.estimatedBytes)
+                put("codec", settings.codec.label); put("estimated_bytes", jobs.sumOf { it.plan.estimatedBytes }); put("file_count", jobs.size)
+                put("project_revision", project.revision)
                 if (usedOffline.isNotEmpty()) put("warning", "${usedOffline.size} medio(s) no están disponibles: saldrán como negro o silencio.")
             }
         }
 
         override fun status(): JsonObject = when (val s = ExportManager.state.value) {
             ExportState.Idle -> buildJsonObject { put("state", "idle") }
-            is ExportState.Running -> buildJsonObject { put("state", "running"); put("project_id", s.projectId); put("progress", s.progress); put("stage", s.stage) }
+            is ExportState.Running -> buildJsonObject { put("state", "running"); put("project_id", s.projectId); put("progress", s.progress); put("stage", s.stage); put("item", s.item); put("file_count", s.total); put("asset_ids", JsonArray(s.assetIds.map { JsonPrimitive(it) })) }
             is ExportState.Done -> buildJsonObject {
                 put("state", "done"); put("project_id", s.projectId); put("asset_id", s.assetId); put("bytes", s.bytes); put("duration_us", s.durationUs); put("detail", s.detail)
+                put("asset_ids", JsonArray(s.assetIds.map { JsonPrimitive(it) })); put("file_count", s.assetIds.size)
             }
-            is ExportState.Failed -> buildJsonObject { put("state", "failed"); s.projectId?.let { put("project_id", it) }; put("error", s.message) }
-            is ExportState.Cancelled -> buildJsonObject { put("state", "cancelled"); s.projectId?.let { put("project_id", it) } }
+            is ExportState.Failed -> buildJsonObject { put("state", "failed"); s.projectId?.let { put("project_id", it) }; put("error", s.message); put("asset_ids", JsonArray(s.assetIds.map { JsonPrimitive(it) })) }
+            is ExportState.Cancelled -> buildJsonObject { put("state", "cancelled"); s.projectId?.let { put("project_id", it) }; put("asset_ids", JsonArray(s.assetIds.map { JsonPrimitive(it) })) }
         }
 
         override fun cancel(): Boolean {

@@ -199,7 +199,9 @@ class CutEditorViewModel(app: Application, val projectId: String) : AndroidViewM
         }
     }
 
-    fun export() = run("render.export")
+    fun export(resolution: com.vidadomu.nexus.cut.model.ExportResolution? = null,
+        codec: com.vidadomu.nexus.cut.model.VideoCodec? = null, eachClip: Boolean = false, clipIds: Set<String> = emptySet()) =
+        run("render.export", "resolution" to resolution?.label, "codec" to codec?.name?.lowercase(), "each_clip" to eachClip, "clip_ids" to clipIds.toList())
     fun cancelExport() = run("render.cancel", quiet = true)
 
     // ------------------------------------------------------------------ arrastres

@@ -67,6 +67,7 @@ object CompositionFactory {
     fun build(
         project: Project, isOnline: (String) -> Boolean, width: Int, height: Int, maxFrameRate: Int?,
         fromUs: Long = 0,
+        untilUs: Long = project.timeline.durationUs,
         luts: (String) -> CubeLut? = { null },
     ): Built? {
         val fullPlan = RenderPlanner.plan(project.timeline, isOnline)
@@ -74,7 +75,7 @@ object CompositionFactory {
         if (fullPlan.durationUs <= 0 || (fullPlan.isEmpty && titles.isEmpty)) return null
         // Preview playback starts at the playhead by rendering a window of the plan (see
         // PreviewController for why). Export always uses fromUs = 0.
-        val plan = fullPlan.window(fromUs.coerceAtLeast(0))
+        val plan = fullPlan.window(fromUs.coerceAtLeast(0), untilUs)
         if (plan.durationUs <= 0) return null
         val media = project.media.associateBy { it.id }
         val videoEval = VideoEvaluator(project.timeline, fullPlan)

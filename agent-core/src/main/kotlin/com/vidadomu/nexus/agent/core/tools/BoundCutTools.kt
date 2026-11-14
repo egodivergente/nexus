@@ -36,7 +36,7 @@ private class BoundCutTool(private val tool: AgentTool, private val projectId: S
 /** Solo aparece en el editor. Los trabajos locales pasan por el mismo bus que el botón Exportar. */
 private class CutRunTool(private val w: CutWorkspace) : BaseTool(
     "cut_run", ToolCategory.ORGANIZE,
-    "Ejecuta UNA capacidad de tipo job del montaje, como render.export o render.cancel. Consulta su contrato con cut_describe; el estado se lee con cut_read (render.status). Es local, no genera medios con proveedores ni autoriza gastos.",
+    "Ejecuta UNA capacidad de tipo job del montaje, como render.export o render.cancel. render.export admite each_clip=true o clip_ids para sacar archivos separados con audio SIN borrar clips ni hacer undo. Consulta el contrato con cut_describe; el estado y los asset_ids se leen con cut_read (render.status). Es local, no genera medios con proveedores ni autoriza gastos.",
     schema {
         string("project_id", "Montaje de esta conversación; no se permite otro.")
         objectArray("ops", "Exactamente una operación de tipo job.", required = true) {

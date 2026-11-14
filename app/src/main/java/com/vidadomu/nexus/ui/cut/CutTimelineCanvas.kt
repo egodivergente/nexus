@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.TextStyle
@@ -74,6 +76,7 @@ internal fun TimelineCanvas(
     timeline: Timeline,
     selection: Set<String>,
     playheadUs: Long,
+    playing: Boolean = false,
     frameRate: FrameRate,
     media: Map<String, MediaRef>,
     offline: Set<String>,
@@ -105,6 +108,7 @@ internal fun TimelineCanvas(
     val latestTimeline by rememberUpdatedState(timeline)
     val latestSelection by rememberUpdatedState(selection)
     val latestPlayhead by rememberUpdatedState(playheadUs)
+    val latestPlaying by rememberUpdatedState(playing)
     val latestActions by rememberUpdatedState(actions)
 
     fun geometry(width: Float, t: Timeline = latestTimeline, ph: Long = latestPlayhead) = TimelineGeometry(
@@ -113,7 +117,7 @@ internal fun TimelineCanvas(
     )
 
     Canvas(
-        modifier.pointerInput(Unit) {
+        modifier.semantics { contentDescription = "Línea de tiempo del montaje" }.pointerInput(Unit) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 val width = size.width.toFloat()
@@ -121,10 +125,13 @@ internal fun TimelineCanvas(
                 val hit = g0.hit(down.position.x, down.position.y, latestSelection)
                 val inRuler = down.position.y < rulerPx
                 val startPlayhead = latestPlayhead
+                val playingAtDown = latestPlaying
                 val startScroll = viewport.scrollY
                 var kind: DragKind? = null
                 var total = Offset.Zero
                 var dragging = false
+                var scrubbed = false
+                try {
                 while (true) {
                     val ev = awaitPointerEvent()
                     val pressed = ev.changes.filter { it.pressed }
@@ -146,7 +153,7 @@ internal fun TimelineCanvas(
                                 latestActions.tap(hit?.clip?.id, hit?.row?.track?.id, long)
                             }
                         } else when (kind) {
-                            DragKind.PAN -> latestActions.scrubEnd()
+                            DragKind.PAN -> Unit // ended in finally, also on cancellation
                             DragKind.ZOOM, null -> Unit
                             else -> latestActions.endDrag(commit = true)
                         }
@@ -158,7 +165,7 @@ internal fun TimelineCanvas(
                         dragging = true
                         val c = hit?.clip
                         kind = when {
-                            inRuler || c == null || c.id !in latestSelection -> DragKind.PAN
+                            playingAtDown || inRuler || c == null || c.id !in latestSelection -> DragKind.PAN
                             hit.row.track.locked -> DragKind.PAN
                             hit.zone == Zone.HEAD -> DragKind.TRIM_HEAD
                             hit.zone == Zone.TAIL -> DragKind.TRIM_TAIL
@@ -178,6 +185,7 @@ internal fun TimelineCanvas(
                     val clip = hit?.clip
                     when (kind) {
                         DragKind.PAN -> {
+                            scrubbed = true
                             latestActions.seek((startPlayhead - dUs).coerceAtLeast(0), true)
                             val maxScroll = maxOf(0f, g0.contentHeight - (size.height - rulerPx))
                             viewport.scrollY = (startScroll - total.y).coerceIn(0f, maxScroll)
@@ -200,6 +208,9 @@ internal fun TimelineCanvas(
                         }
                         else -> Unit
                     }
+                }
+                } finally {
+                    if (scrubbed) latestActions.scrubEnd()
                 }
             }
         },

@@ -136,6 +136,14 @@ fun AssistantScreen(
     var input by rememberSaveable(ui.conversationId, stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey, draftPrefs.getString("text", "")).orEmpty())) }
     LaunchedEffect(ui.draftRevision) {if(ui.draftRevision>0) input=androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey,"").orEmpty())}
     var showSettings by remember { mutableStateOf(false) }
+    var copyMessageIds by remember(ui.conversationId) { mutableStateOf<Set<String>?>(null) }
+    var showChatCopy by remember(ui.conversationId) { mutableStateOf(false) }
+    if (showChatCopy) ChatCopySheet(ui.items.mapNotNull { item -> when (item) {
+        is ChatItem.User -> ChatCopyEntry(item.id, "Tú", item.text)
+        is ChatItem.Assistant -> item.text.takeIf { it.isNotBlank() }?.let { ChatCopyEntry(item.id, item.by.ifBlank { "Nexus" }, it) }
+        is ChatItem.Notice -> ChatCopyEntry(item.id, "Nexus · Aviso", item.text)
+        else -> null
+    } }, copyMessageIds) { showChatCopy = false }
     var showProject by remember {mutableStateOf(false)}
     val projectDrafts = rememberSaveable(saver = ProjectMemoryDraftsSaver) { mutableStateMapOf<String, ProjectMemoryDraft>() }
     var editingProjectId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -421,9 +429,10 @@ fun AssistantScreen(
                     val item = row as ChatItem
                     EntranceSpring(item.id, seenRows, if (motion) Modifier.animateItem() else Modifier) {
                     when (item) {
-                        is ChatItem.User -> Box { UserBubble(item) }
+                        is ChatItem.User -> Box { UserBubble(item) { copyMessageIds = setOf(item.id); showChatCopy = true } }
                         is ChatItem.Assistant -> Box {
                             AssistantBubble(item, onOpenHistory,
+                                onSelectMessages = { copyMessageIds = setOf(item.id); showChatCopy = true },
                                 answered = if ("nexus-ui" in item.text) answerAfter(visibleItems, item) else null,
                                 onReply = { vm.send(it) })
                         }
@@ -520,8 +529,7 @@ fun AssistantScreen(
             ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
                 onSettings = onOpenSettings, barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
                 onCopyChat = {
-                    clipboard.setText(AnnotatedString(chatTranscript(ui)))
-                    Toast.makeText(chatContext, "Chat copiado", Toast.LENGTH_SHORT).show()
+                    copyMessageIds = null; showChatCopy = true
                 },
                 onShareChat = { shareChat(chatContext, ui) },
                 onImportImages = { boardPicker.launch(arrayOf("image/*"), Int.MAX_VALUE) })
@@ -886,7 +894,7 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
 }
 
 @Composable
-internal fun UserBubble(item:ChatItem.User) {
+internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {}) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var actions by rememberSaveable(item.id) { mutableStateOf(false) }
@@ -923,6 +931,7 @@ internal fun UserBubble(item:ChatItem.User) {
                     DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, leadingIcon={Icon(Icons.Default.ContentCopy,null)}, onClick = {
                         clipboard.setText(AnnotatedString(item.text)); actions = false
                     })
+                    DropdownMenuItem(text = { Text("Seleccionar mensajes") }, onClick = { actions = false; onSelectMessages() })
                     DropdownMenuItem(text = { Text("Compartir mensaje") }, leadingIcon={Icon(Icons.Default.Share,null)}, onClick = {
                         actions = false
                         runCatching {
@@ -1008,7 +1017,7 @@ private fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): String
 }
 
 @Composable
-internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null) {
+internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {}) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
@@ -1044,6 +1053,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
                         Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()
                     })
+                    DropdownMenuItem(text = { Text("Seleccionar mensajes") }, onClick = { actionsExpanded = false; onSelectMessages() })
                     DropdownMenuItem(text={Text("Compartir respuesta")},leadingIcon={Icon(Icons.Default.Share,null)},onClick={
                         actionsExpanded=false
                         runCatching {

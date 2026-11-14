@@ -52,24 +52,17 @@ data class RenderPlan(
      * straddle [startUs] are cut and their source start advanced (respecting speed). Lane order,
      * and therefore lane indices, is preserved; a lane may end up as a single gap.
      */
-    fun window(startUs: Long): RenderPlan {
-        if (startUs <= 0) return this
-        val s = minOf(startUs, durationUs)
+    fun window(startUs: Long, endUs: Long = durationUs): RenderPlan {
+        val s = startUs.coerceIn(0, durationUs)
+        val end = endUs.coerceIn(s, durationUs)
+        if (s == 0L && end == durationUs) return this
         fun cut(l: Lane) = l.copy(segments = l.segments.mapNotNull { seg ->
-            when {
-                seg.endUs <= s -> null
-                seg.timelineStartUs >= s -> seg.copy(timelineStartUs = seg.timelineStartUs - s)
-                else -> {
-                    val skip = s - seg.timelineStartUs
-                    seg.copy(
-                        timelineStartUs = 0,
-                        durationUs = seg.durationUs - skip,
-                        sourceStartUs = if (seg.isGap) seg.sourceStartUs else seg.sourceStartUs + seg.speed.scale(skip),
-                    )
-                }
-            }
+            val from = maxOf(s, seg.timelineStartUs)
+            val until = minOf(end, seg.endUs)
+            if (until <= from) null else seg.copy(timelineStartUs = from - s, durationUs = until - from,
+                sourceStartUs = if (seg.isGap) seg.sourceStartUs else seg.sourceStartUs + seg.speed.scale(from - seg.timelineStartUs))
         })
-        return RenderPlan(durationUs - s, videoLanes.map(::cut), audioLanes.map(::cut), notes)
+        return RenderPlan(end - s, videoLanes.map(::cut), audioLanes.map(::cut), notes)
     }
 }
 

@@ -2,6 +2,8 @@ package com.vidadomu.nexus.ui.cut
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +18,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,16 +38,21 @@ internal fun CutChatPanel(
     state: CutChatUiState,
     expanded: Boolean,
     onExpanded: (Boolean) -> Unit,
+    onMinimize: () -> Unit,
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onShowResults: () -> Unit,
     selectionLabel: String,
     agentActivity: String?,
-    messageHeight: Dp,
     compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    var copyChat by remember { mutableStateOf(false) }
+    if (copyChat) com.vidadomu.nexus.assistant.ChatCopySheet(state.messages.map { message ->
+        com.vidadomu.nexus.assistant.ChatCopyEntry(message.id,
+            if (message.role == CutChatRole.USER) "Tú" else message.by?.takeIf { it.isNotBlank() } ?: "Nexus", message.text)
+    }, onDismiss = { copyChat = false })
     val list = rememberLazyListState()
     LaunchedEffect(state.messages.size, state.streamingText, expanded) {
         if (expanded && (state.messages.isNotEmpty() || state.thinking)) {
@@ -51,7 +60,7 @@ internal fun CutChatPanel(
         }
     }
     Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
-        Column {
+        Column(Modifier.fillMaxSize()) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))
             if (!compact) {
             Row(Modifier.fillMaxWidth().heightIn(min = 38.dp).clickable { onExpanded(!expanded) }.padding(start = 14.dp, end = 8.dp),
@@ -63,12 +72,16 @@ internal fun CutChatPanel(
                 Text(if (state.thinking) "Trabajando…" else selectionLabel, Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (state.messages.isNotEmpty()) IconButton(onClick = { copyChat = true }) {
+                    Icon(Icons.Default.ContentCopy, "Copiar chat o seleccionar mensajes")
+                }
                 Icon(if (expanded) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
                     if (expanded) "Ocultar conversación" else "Mostrar conversación", Modifier.padding(4.dp).size(20.dp))
+                IconButton(onClick = onMinimize) { Icon(Icons.Default.Close, "Minimizar agente") }
             }
             if (expanded) {
                 if (state.messages.isEmpty() && !state.thinking) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp).padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("Dime qué quieres cambiar en este montaje.", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -77,7 +90,7 @@ internal fun CutChatPanel(
                         }
                     }
                 } else {
-                    LazyColumn(state = list, modifier = Modifier.fillMaxWidth().height(messageHeight),
+                    LazyColumn(state = list, modifier = Modifier.fillMaxWidth().weight(1f),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.messages, key = { it.id }) { message ->
                             val user = message.role == CutChatRole.USER
@@ -108,7 +121,7 @@ internal fun CutChatPanel(
             } else {
                 val preview = if (state.thinking) state.activity.ifBlank { "Pensando el cambio…" }
                     else state.messages.lastOrNull()?.text ?: "Habla con el agente sin salir del editor"
-                Text(preview, Modifier.fillMaxWidth().clickable { onExpanded(true) }.padding(horizontal = 14.dp, vertical = 3.dp),
+                Text(preview, Modifier.weight(1f).fillMaxWidth().clickable { onExpanded(true) }.padding(horizontal = 14.dp, vertical = 3.dp),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

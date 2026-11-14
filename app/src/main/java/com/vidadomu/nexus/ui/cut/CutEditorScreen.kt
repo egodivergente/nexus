@@ -3,13 +3,13 @@ package com.vidadomu.nexus.ui.cut
 import android.app.Application
 import android.content.res.Configuration
 import android.net.Uri
-import android.view.SurfaceHolder
-import android.view.SurfaceView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -91,6 +92,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -106,7 +112,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import com.vidadomu.nexus.NexusApplication
@@ -189,6 +194,14 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
     var resultStage by remember(vm.projectId) { mutableStateOf<Pair<List<com.vidadomu.nexus.agent.core.tools.Attachment>, Int>?>(null) }
     var addingFromResults by remember(vm.projectId) { mutableStateOf(false) }
     var chatExpanded by rememberSaveable(vm.projectId) { mutableStateOf(true) }
+    var chatHidden by rememberSaveable(vm.projectId) { mutableStateOf(false) }
+    var timelineFraction by rememberSaveable(vm.projectId) { mutableFloatStateOf(.4f) }
+    var chatFraction by rememberSaveable(vm.projectId) { mutableFloatStateOf(.3f) }
+    var previewScale by rememberSaveable(vm.projectId) { mutableFloatStateOf(1f) }
+    var previewX by rememberSaveable(vm.projectId) { mutableFloatStateOf(0f) }
+    var previewY by rememberSaveable(vm.projectId) { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    var toolsHeight by remember { mutableFloatStateOf(64f) }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val viewport = remember { TimelineViewport() }
@@ -235,7 +248,7 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
     LaunchedEffect(export) {
         val e = export
         if (e is ExportState.Done && e.projectId == project.id) {
-            val r = snackbar.showSnackbar("Exportado y guardado en la Biblioteca · ${ExportMath.formatBytes(e.bytes)}", actionLabel = "Ver", duration = SnackbarDuration.Long)
+            val r = snackbar.showSnackbar(if (e.assetIds.size > 1) "${e.assetIds.size} clips exportados y guardados en la Biblioteca" else "Exportado y guardado en la Biblioteca · ${ExportMath.formatBytes(e.bytes)}", actionLabel = "Ver", duration = SnackbarDuration.Long)
             if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) onOpenLibraryAsset(e.assetId)
             ExportStateAck.ack()
         } else if (e is ExportState.Failed && e.projectId == project.id) {
@@ -286,17 +299,27 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     @Composable
     fun PreviewPane(modifier: Modifier) {
-        Box(modifier.fillMaxWidth().background(Color.Black), contentAlignment = Alignment.Center) {
-            Box(Modifier.aspectRatio(project.settings.width.toFloat() / project.settings.height, matchHeightConstraintsFirst = true)) {
-                AndroidView(factory = { ctx ->
-                    SurfaceView(ctx).apply {
-                        holder.addCallback(object : SurfaceHolder.Callback {
-                            override fun surfaceCreated(holder: SurfaceHolder) = Unit
-                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = vm.preview.attachSurface(holder.surface, width, height)
-                            override fun surfaceDestroyed(holder: SurfaceHolder) = vm.preview.detachSurface()
-                        })
-                    }
-                }, modifier = Modifier.fillMaxSize())
+        fun fit() { previewScale = 1f; previewX = 0f; previewY = 0f }
+        Box(modifier.fillMaxWidth().clipToBounds().background(Color.Black)
+            .semantics {
+                contentDescription = "Previsualización del montaje"
+                stateDescription = "Ampliación ${((previewScale * 100).toInt())} por ciento"
+                customActions = listOf(
+                    CustomAccessibilityAction("Ampliar previsualización") { previewScale = (previewScale * 1.5f).coerceAtMost(6f); true },
+                    CustomAccessibilityAction("Ajustar previsualización") { fit(); true })
+            }
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { fit() }) }
+            .pointerInput(Unit) {
+                detectTransformGestures { centroid, pan, zoom, _ ->
+                    val transformed = CutPreviewTransform(previewScale, previewX, previewY).transform(
+                        zoom, pan.x, pan.y, centroid.x - size.width / 2f, centroid.y - size.height / 2f,
+                        size.width.toFloat(), size.height.toFloat())
+                    previewScale = transformed.scale; previewX = transformed.x; previewY = transformed.y
+                }
+            }, contentAlignment = Alignment.Center) {
+            Box(Modifier.aspectRatio(project.settings.width.toFloat() / project.settings.height, matchHeightConstraintsFirst = true)
+                .graphicsLayer { scaleX = previewScale; scaleY = previewScale; translationX = previewX; translationY = previewY }) {
+                CutPreviewSurface(vm.preview, Modifier.fillMaxSize())
                 val frame = still
                 if (showStill && frame != null && timeline.durationUs > 0) {
                     Image(frame.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
@@ -308,6 +331,9 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                     Button(onClick = { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }) { Text("Añadir de la Biblioteca") }
                 }
                 if (buffering) CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp), strokeWidth = 2.dp, color = Color.White)
+            }
+            if (previewScale > 1.01f) TextButton(onClick = ::fit, modifier = Modifier.align(Alignment.TopEnd)) {
+                Text("Ajustar", color = Color.White)
             }
             previewError?.let {
                 Text(it, fontSize = 11.sp, color = Color.White, modifier = Modifier.align(Alignment.TopStart).background(Color(0xCC8B0000)).padding(6.dp).clickable { vm.preview.clearError() })
@@ -322,11 +348,11 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
             Text(" / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             val rate = project.settings.frameRate
-            IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) { Icon(Icons.Default.SkipPrevious, "Fotograma anterior") }
+            IconButton(onClick = { vm.preview.pause(); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) { Icon(Icons.Default.SkipPrevious, "Fotograma anterior") }
             Surface(onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) }, shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary) }
             }
-            IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) { Icon(Icons.Default.SkipNext, "Fotograma siguiente") }
+            IconButton(onClick = { vm.preview.pause(); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) { Icon(Icons.Default.SkipNext, "Fotograma siguiente") }
             Spacer(Modifier.weight(1f))
             Text(if (selectedClips.isEmpty()) timeline.allTracks.sumOf { it.clips.size }.let { "$it ${if (it == 1) "clip" else "clips"}" } else "${selectedClips.size} seleccionado${if (selectedClips.size > 1) "s" else ""}",
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -338,12 +364,12 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
         Row(modifier.fillMaxWidth()) {
             TrackHeaders(timeline, viewport.scrollY, palette, onToggleLock = { t -> vm.toggleTrack(t.id, locked = !t.locked) }, onToggleMute = { t -> vm.toggleTrack(t.id, muted = !t.muted) })
             TimelineCanvas(
-                timeline = timeline, selection = selection, playheadUs = playhead, frameRate = project.settings.frameRate, media = media,
+                timeline = timeline, selection = selection, playheadUs = playhead, playing = playing, frameRate = project.settings.frameRate, media = media,
                 offline = offline, waveforms = waveforms, thumbnails = vm.thumbnails, thumbVersion = thumbVersion, snapLineUs = snapLine,
                 viewport = viewport, palette = palette, modifier = Modifier.weight(1f).fillMaxHeight(),
                 actions = object : TimelineActions {
                     override fun seek(us: Long, scrubbing: Boolean) = vm.preview.seekTo(us, scrubbing)
-                    override fun scrubEnd() = vm.preview.seekTo(vm.preview.positionUs.value)
+                    override fun scrubEnd() = vm.preview.endScrub()
                     override fun tap(clipId: String?, trackId: String?, additive: Boolean) { vm.select(clipId, additive); if (clipId != null) haptics.perform(NexusHapticEvent.SELECTION) }
                     override fun beginDrag(exclude: Set<String>) { vm.beginDrag(exclude); haptics.perform(NexusHapticEvent.GESTURE_START) }
                     override fun trim(clipId: String, edge: Edge, deltaUs: Long, snapUs: Long) = vm.dragTrim(clipId, edge, deltaUs, snapUs)
@@ -357,8 +383,9 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     @Composable
     fun Tools() {
-        Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
-                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Surface(modifier = Modifier.onSizeChanged { toolsHeight = it.height / density.density }, color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 if (selectedClips.isEmpty()) {
                                     Tool(Icons.Default.AddPhotoAlternate, "Añadir") { picker.launch(arrayOf("video/*", "image/*")) }
                                     Tool(Icons.Default.MusicNote, "Audio") { picker.launch(arrayOf("audio/*")) }
@@ -378,6 +405,13 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                                     Tool(Icons.Default.Close, "Deseleccionar") { vm.select(null, false) }
                                 }
                             }
+                if (chatHidden) IconButton(onClick = { chatHidden = false; chatExpanded = true },
+                    modifier = Modifier.padding(end = NexusTokens.space8).size(NexusTokens.minimumTouch)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)) {
+                    Icon(Icons.Default.AutoAwesome, if (chatState.thinking) "Mostrar agente trabajando" else "Mostrar agente del montaje",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
                         }
     }
 
@@ -385,10 +419,9 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
         BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)) {
             val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
             val typing = WindowInsets.isImeVisible
-            val trackHeight = (RULER_DP + timeline.allTracks.sumOf {
-                (if (it.collapsed) COLLAPSED_ROW_DP else if (it.kind == TrackKind.VIDEO) VIDEO_ROW_DP else AUDIO_ROW_DP).toDouble()
-            }.toFloat()).dp
-            val timelineHeight = if (typing) 96.dp else minOf(trackHeight, 212.dp, maxHeight * .28f).coerceAtLeast(120.dp)
+            val available = (maxHeight.value - NexusTokens.topBarHeight.value - 42f -
+                (if (typing || wide) 0f else toolsHeight) - (if (wide) 0f else 24f) - (if (chatHidden) 0f else 24f)).coerceAtLeast(0f)
+            val panels = cutPanelSizes(available, timelineFraction, if (chatExpanded) chatFraction else .15f, !chatHidden, typing)
             Column(Modifier.fillMaxSize()) {
                 EditorHeader()
                 if (wide && !typing) {
@@ -403,16 +436,25 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                         }
                     }
                 } else if (!wide) {
-                    PreviewPane(Modifier.weight(1f))
+                    PreviewPane(Modifier.height(panels.preview.dp))
+                    CutResizeHandle("Tamaño de la previsualización y la línea de tiempo", onDrag = { delta ->
+                        timelineFraction = (timelineFraction - delta / density.density / (panels.preview + panels.timeline).coerceAtLeast(1f)).coerceIn(.15f, .8f)
+                    }, onReset = { timelineFraction = .4f })
                     Transport()
-                    TimelinePane(Modifier.height(timelineHeight))
+                    TimelinePane(Modifier.height(panels.timeline.dp))
                     if (!typing) Tools()
                 } else {
                     // In landscape the keyboard needs the conversation's space; editing returns on dismissal.
                     Spacer(Modifier.weight(1f))
                 }
-                CutChatPanel(
+                if (!chatHidden) {
+                CutResizeHandle("Tamaño del panel del agente", onDrag = { delta ->
+                    chatExpanded = true
+                    chatFraction = (chatFraction - delta / density.density / available.coerceAtLeast(1f)).coerceIn(.15f, .7f)
+                }, onReset = { chatFraction = .3f })
+                CutChatPanel(modifier = Modifier.height(panels.chat.dp),
                     state = chatState, expanded = chatExpanded, onExpanded = { chatExpanded = it },
+                    onMinimize = { chatHidden = true; focusManager.clearFocus(force = true); keyboard?.hide() },
                     onDraft = chat::setDraft,
                     onSend = {
                         if (chat.send()) {
@@ -425,9 +467,9 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                     onShowResults = chat::showLibraryResults,
                     selectionLabel = if (selection.isEmpty()) "Este montaje" else "${selection.size} clip${if (selection.size == 1) "" else "s"} seleccionado${if (selection.size == 1) "" else "s"}",
                     agentActivity = agentActivity,
-                    messageHeight = if (wide) 64.dp else if (typing) 96.dp else 140.dp,
-                    compact = typing && wide,
+                    compact = typing,
                 )
+                }
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 84.dp))
         }
@@ -444,8 +486,11 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
             label = { "${it}×" }, onDismiss = { dialog = null }) { vm.setSpeed(d.clip.id, it); dialog = null }
         is CutDialog.Volume -> VolumeDialog(d.clips, onDismiss = { dialog = null }, onMute = { vm.setMuted(d.clips.map { it.id }.toSet(), it); dialog = null }) { db -> vm.setVolume(d.clips.map { it.id }.toSet(), db); dialog = null }
         CutDialog.Format -> ChoiceDialog("Formato", listOf("16:9", "9:16", "1:1", "4:5", "4:3", "21:9"), null, label = { it }, onDismiss = { dialog = null }) { vm.setAspect(it); dialog = null }
-        CutDialog.Export -> ExportSheet(project.export.resolution, project.export.codec, project.timeline.durationUs, onDismiss = { dialog = null }) { res, codec ->
-            vm.run("project.set_export", "resolution" to res.label, "codec" to codec.name.lowercase(), quiet = true) { vm.export() }
+        CutDialog.Export -> ExportSheet(project.export.resolution, project.export.codec, project.timeline.durationUs,
+            clipCount = project.timeline.videoTracks.sumOf { track -> track.clips.count { it.kind == ClipKind.VIDEO || it.kind == ClipKind.IMAGE } },
+            selectedCount = runCatching { com.vidadomu.nexus.cut.command.clipExportRanges(project, selection, false).size }.getOrDefault(0),
+            onDismiss = { dialog = null }) { res, codec, mode ->
+            vm.export(res, codec, eachClip = mode == 1, clipIds = if (mode == 2) selection else emptySet())
             dialog = null
         }
     }
@@ -531,14 +576,23 @@ private fun VolumeDialog(clips: List<Clip>, onDismiss: () -> Unit, onMute: (Bool
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun ExportSheet(resolution: ExportResolution, codec: VideoCodec, durationUs: Long, onDismiss: () -> Unit, onExport: (ExportResolution, VideoCodec) -> Unit) {
+private fun ExportSheet(resolution: ExportResolution, codec: VideoCodec, durationUs: Long, clipCount: Int, selectedCount: Int,
+    onDismiss: () -> Unit, onExport: (ExportResolution, VideoCodec, Int) -> Unit) {
     var res by remember { mutableStateOf(resolution) }
     var cod by remember { mutableStateOf(codec) }
+    var mode by remember { mutableStateOf(0) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Exportar montaje", style = MaterialTheme.typography.titleMedium)
             Text("Duración ${Timecode.formatMillis(durationUs)} · el vídeo se guardará en la Biblioteca del proyecto.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
+            Text("Qué exportar", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(mode == 0, { mode = 0 }, { Text("Montaje completo") })
+                FilterChip(mode == 1, { mode = 1 }, { Text("Cada clip · $clipCount") }, enabled = clipCount > 0)
+                FilterChip(mode == 2, { mode = 2 }, { Text("Selección · $selectedCount") }, enabled = selectedCount > 0)
+            }
+            if (mode != 0) Text("Un MP4 por segmento, con su audio y capas. El montaje se conserva intacto.", style = MaterialTheme.typography.bodySmall)
             Text("Resolución", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { for (r in ExportResolution.entries) FilterChip(r == res, { res = r }, { Text(r.label) }) }
             Spacer(Modifier.height(8.dp))
@@ -548,7 +602,9 @@ private fun ExportSheet(resolution: ExportResolution, codec: VideoCodec, duratio
                 FilterChip(cod == VideoCodec.H265, { cod = VideoCodec.H265 }, { Text("H.265 · más ligero") })
             }
             Spacer(Modifier.height(20.dp))
-            Button(onClick = { onExport(res, cod) }, modifier = Modifier.fillMaxWidth()) { Text("Exportar") }
+            Button(onClick = { onExport(res, cod, mode) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (mode == 0) "Exportar montaje" else "Exportar ${if (mode == 1) clipCount else selectedCount} clips")
+            }
         }
     }
 }

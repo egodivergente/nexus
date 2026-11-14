@@ -112,7 +112,8 @@ class ExportService : Service() {
             return
         }
         val built = try {
-            CompositionFactory.build(j.project, { it in j.online }, j.plan.width, j.plan.height, j.plan.frameRate, luts = { LutStore.peek(it) })
+            CompositionFactory.build(j.project, { it in j.online }, j.plan.width, j.plan.height, j.plan.frameRate,
+                fromUs = j.fromUs, untilUs = j.untilUs, luts = { LutStore.peek(it) })
         } catch (e: IllegalArgumentException) {
             fail("No se pudo preparar la composición: ${e.message}"); return
         } catch (e: IllegalStateException) {
@@ -200,9 +201,10 @@ class ExportService : Service() {
     private fun report(progress: Int, stage: String) {
         val j = job ?: return
         ExportManager.update(ExportState.Running(j.project.id, j.project.name, progress, stage))
+        val published = ExportManager.state.value as? ExportState.Running
         if (progress != lastNotified) {
             lastNotified = progress
-            getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification(j.project.name, progress, stage, ongoing = true))
+            getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification(j.project.name, published?.progress ?: progress, published?.stage ?: stage, ongoing = true))
         }
     }
 
@@ -234,10 +236,16 @@ class ExportService : Service() {
                 j.destination.delete()
                 fail("El vídeo se renderizó pero no se pudo añadir a la Biblioteca: ${e.message}"); return@launch
             }
-            if (ended) return@launch
-            ended = true
             val detail = "${result.width}×${result.height} · ${result.videoEncoderName ?: "?"} · ${(result.averageVideoBitrate / 1000).coerceAtLeast(0)} kbps"
-            ExportManager.update(ExportState.Done(j.project.id, assetId, j.destination, size, j.plan.durationUs, detail))
+            val next = ExportManager.complete(ExportState.Done(j.project.id, assetId, j.destination, size, j.plan.durationUs, detail))
+            if (ended) return@launch
+            if (next != null) {
+                transformer = null; job = next; lastNotified = -1
+                report(0, "Preparando…")
+                prepareAndRender(next)
+                return@launch
+            }
+            ended = true
             finish("Exportado: ${j.project.name}", "En la Biblioteca · ${ExportMath.formatBytes(size)}")
         }
     }

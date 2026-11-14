@@ -33,7 +33,8 @@ interface CutRenderer {
     fun cancel(): Boolean
 }
 
-data class ExportOverrides(val resolution: ExportResolution? = null, val codec: VideoCodec? = null)
+data class ExportOverrides(val resolution: ExportResolution? = null, val codec: VideoCodec? = null,
+    val clipIds: Set<String> = emptySet(), val eachClip: Boolean = false)
 
 /** Capacidades que dependen del dispositivo: entrar archivos de la Biblioteca y exportar. */
 object DeviceCapabilities {
@@ -92,20 +93,22 @@ object DeviceCapabilities {
 
     private fun render(r: CutRenderer) = listOf(
         Capability("render.export", JOB,
-            "Exporta el montaje a un MP4 en segundo plano, con notificación y opción de cancelar. El resultado se valida (pistas y duración) y entra en la Biblioteca de Nexus vinculado al proyecto. Usa los ajustes de exportación del montaje salvo lo que se indique. Es local y gratis.",
+            "Exporta el montaje o cada clip por separado a MP4 en segundo plano. each_clip=true exporta todos los segmentos visuales; clip_ids elige algunos. Cada intervalo conserva el audio y las capas del montaje. Usa una instantánea inmutable: NO hay que borrar clips, hacer ripple ni deshacer para exportar. Cola secuencial con notificación, cancelar y resultados en Biblioteca. Usa los ajustes del montaje salvo overrides. Local y gratis.",
             input = Schema.obj {
                 str("resolution", "Resolución de salida.", enum = ExportResolution.entries.map { it.label })
                 str("codec", "Códec de vídeo; h265 solo si el dispositivo lo codifica.", enum = listOf("h264", "h265"))
+                ids("clip_ids", "Clips concretos que se exportan a archivos independientes, con su audio. Los vinculados se agrupan.")
+                bool("each_clip", "true: un archivo por cada segmento visual del montaje, sin modificarlo.")
             },
-            output = Schema.obj { str("state", "running, done, failed, cancelled o idle."); int("progress", "Porcentaje.") },
+            output = Schema.obj { str("state", "running, done, failed, cancelled o idle."); int("progress", "Porcentaje."); int("file_count", "Número de archivos del lote.") },
             preconditions = listOf("La línea de tiempo tiene imagen.", "No hay otra exportación en curso."), requires = setOf(EXPORT),
             errors = setOf(ErrorCode.PRECONDITION_FAILED),
             handler = Handler.Job { session, a, _ ->
                 val res = a.str("resolution")?.let { v -> ExportResolution.entries.firstOrNull { it.label.equals(v, true) } ?: a.bad("«resolution» no admite «$v»") }
-                r.start(session, ExportOverrides(res, a.enum<VideoCodec>("codec")))
+                r.start(session, ExportOverrides(res, a.enum<VideoCodec>("codec"), a.ids("clip_ids"), a.bool("each_clip", false)))
             }),
         Capability("render.status", READ, "Estado de la exportación: en curso con su progreso, terminada (con el archivo de la Biblioteca), fallida con el motivo, o cancelada.",
-            output = Schema.obj { str("state", "Estado."); int("progress", "Porcentaje."); str("asset_id", "Archivo exportado en la Biblioteca.") },
+            output = Schema.obj { str("state", "Estado."); int("progress", "Porcentaje total."); str("asset_id", "Último archivo exportado."); ids("asset_ids", "Todos los archivos ya guardados, también si se cancela o falla el resto."); int("file_count", "Archivos del lote."); int("item", "Archivo actual.") },
             requires = setOf(EXPORT), handler = Handler.Read { _, _ -> r.status() }),
         Capability("render.cancel", JOB, "Cancela la exportación en curso. No deja ningún archivo a medias.",
             requires = setOf(EXPORT), handler = Handler.Job { _, _, _ -> buildJsonObject { put("cancelled", r.cancel()) } }),

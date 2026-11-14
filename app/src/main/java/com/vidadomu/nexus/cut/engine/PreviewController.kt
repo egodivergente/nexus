@@ -46,6 +46,7 @@ enum class PreviewLevel(val label: String, val factor: Float) {
 @UnstableApi
 @androidx.annotation.OptIn(markerClass = [ExperimentalApi::class]) // CompositionPlayer is experimental in Media3 1.11
 class PreviewController(private val context: Context, private val scope: CoroutineScope) {
+    private val scrub = PreviewScrubState()
     private var player: CompositionPlayer? = null
     private var playOriginUs = 0L
     private var surface: Surface? = null
@@ -118,8 +119,9 @@ class PreviewController(private val context: Context, private val scope: Corouti
         requestStill(exact = true)
     }
 
-    fun detachSurface() {
+    fun detachSurface(expected: Surface? = null) {
         val s = surface ?: return
+        if (expected != null && expected !== s) return
         surface = null
         // CompositionPlayer only accepts clearing the exact output that was set.
         player?.clearVideoSurface(s)
@@ -231,6 +233,7 @@ class PreviewController(private val context: Context, private val scope: Corouti
     }
 
     fun pause() {
+        scrub.cancel()
         if (!_playing.value) return
         stopPlayback(atUs = currentPosition())
     }
@@ -252,11 +255,20 @@ class PreviewController(private val context: Context, private val scope: Corouti
 
     /** Moves the playhead. While scrubbing, sync frames are shown (fast); otherwise the exact frame. */
     fun seekTo(us: Long, scrubbing: Boolean = false) {
+        if (scrubbing) scrub.begin(_playing.value)
+        val resume = !scrubbing && _playing.value
         if (_playing.value) stopPlayback(us)
         val rate = project?.settings?.frameRate
         val t = us.coerceIn(0, maxOf(0, durationUs))
         _positionUs.value = if (scrubbing || rate == null) t else rate.timeOf(rate.frameAt(t))
         requestStill(exact = !scrubbing)
+        if (resume) play()
+    }
+
+    fun endScrub() {
+        val resume = scrub.finish()
+        seekTo(_positionUs.value)
+        if (resume) play()
     }
 
     /** Sets the playhead without rendering (used while the timeline has no media). */
@@ -289,6 +301,7 @@ class PreviewController(private val context: Context, private val scope: Corouti
     }
 
     fun release() {
+        scrub.cancel()
         pendingRestart?.cancel()
         ticker?.cancel()
         releasePlayer()
