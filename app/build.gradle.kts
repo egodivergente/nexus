@@ -112,7 +112,9 @@ android {
     // Skills del asistente (Markdown + YAML): se empaquetan como assets/skills/** y ademÃ¡s se pueden
     // sustituir sin recompilar desde files/skills o Documents/ALEXIA/Nexus/Skills.
     sourceSets["main"].assets.srcDir(rootProject.file("agent-skills"))
-    testBuildType = "offlineQa"
+    // Explicit opt-in for read-only UI checks and private export fixtures on the installed Agent.
+    // Normal CI keeps its isolated offlineQa target.
+    testBuildType = if (providers.gradleProperty("nexusFeedbackDeviceTests").orNull == "true") "agentPreview" else "offlineQa"
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.all { it.maxHeapSize = "64m" }
