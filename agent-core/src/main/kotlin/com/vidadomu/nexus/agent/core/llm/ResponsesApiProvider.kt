@@ -75,10 +75,11 @@ class ResponsesApiStreamingProvider(
             SseStream.open(client, http).use { resp ->
                 if (!resp.isSuccessful) throw LlmHttpErrors.map(resp.code, resp.body?.string().orEmpty(), who)
                 var finalResponse: JsonObject? = null
+                var sawDone = false
                 val items = mutableListOf<JsonElement>()
                 val text = StringBuilder()
                 SseStream.read(resp) { ev ->
-                    if (ev.data == "[DONE]") return@read false
+                    if (ev.data == "[DONE]") { sawDone = true; return@read false }
                     val data = runCatching { Json.parseToJsonElement(ev.data).jsonObject }.getOrNull() ?: return@read true
                     when (data["type"]?.jsonPrimitive?.contentOrNull ?: ev.event) {
                         "response.output_text.delta" -> data["delta"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotEmpty() }
@@ -91,15 +92,23 @@ class ResponsesApiStreamingProvider(
                     true
                 }
                 finalResponse?.let { return@use ResponsesCodec.decode(it) }
-                // El servidor cortó antes del evento final: se aprovecha lo recibido si hay algo útil.
-                if (items.isEmpty() && text.isEmpty()) throw LlmException(LlmException.Kind.PROTOCOL, "La respuesta en streaming terminó sin contenido.")
-                ResponsesCodec.decode(buildJsonObject {
-                    put("status", "completed")
-                    put("output", JsonArray(if (items.isNotEmpty()) items else listOf(buildJsonObject {
-                        put("type", "message")
-                        put("content", buildJsonArray { add(buildJsonObject { put("type", "output_text"); put("text", text.toString()) }) })
-                    })))
+                // Sin evento final. Con [DONE] el servidor cerró el flujo a propósito y lo recibido vale como respuesta completa.
+                // Sin él es un corte y no se sabe si faltaban más salidas: nunca se ejecuta una herramienta de una respuesta
+                // incompleta; el texto recibido se aprovecha, marcado como incompleto.
+                val cut = !sawDone
+                fun type(item: JsonElement) = ((item as? JsonObject)?.get("type") as? JsonPrimitive)?.contentOrNull
+                if (cut && items.any { type(it) == "function_call" }) throw SseStream.cutDuringTool(who)
+                val streamedText = if (items.none { type(it) == "message" } && text.isNotBlank()) listOf(buildJsonObject {
+                    put("type", "message")
+                    put("content", buildJsonArray { add(buildJsonObject { put("type", "output_text"); put("text", text.toString()) }) })
+                }) else emptyList()
+                val received = ResponsesCodec.decode(buildJsonObject {
+                    put("status", if (cut) "incomplete" else "completed")
+                    put("output", JsonArray(streamedText + items))
                 })
+                if (received.message.content.isEmpty())
+                    throw LlmException(LlmException.Kind.PROTOCOL, "La respuesta en streaming terminó sin contenido.")
+                if (cut) received.copy(notices = received.notices + SseStream.cutNotice(who)) else received
             }
         } catch (e: IOException) {
             throw LlmException(LlmException.Kind.NETWORK, "Se perdió la conexión con $who (${e.javaClass.simpleName}).")
@@ -180,6 +189,10 @@ object ResponsesCodec {
 
     fun decode(json: JsonObject): LlmResponse {
         (json["error"] as? JsonObject)?.let { throw failure(it, "el proveedor") }
+        val status = json["status"]?.jsonPrimitive?.contentOrNull
+        val reason = ((json["incomplete_details"] as? JsonObject)?.get("reason") as? JsonPrimitive)?.contentOrNull
+        // Igual que «length» en Chat Completions: las llamadas de una respuesta cortada por tokens no se ejecutan.
+        val truncated = status == "incomplete" && reason in setOf("max_output_tokens", "max_tokens", "length")
         val blocks = mutableListOf<ContentBlock>()
         val output = (json["output"] as? JsonArray).orEmpty()
         for (item in output) {
@@ -193,25 +206,25 @@ object ResponsesCodec {
                     }
                 }
                 "function_call" -> {
-                    val args = o["arguments"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                    val input = runCatching { Json.parseToJsonElement(args.ifBlank { "{}" }).jsonObject }.getOrElse { JsonObject(emptyMap()) }
+                    val name = o["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    val input = ToolArguments.parse(o["arguments"])
+                        ?: if (truncated) JsonObject(emptyMap()) else throw ToolArguments.invalid(name)
                     blocks += ContentBlock.ToolUse(
                         o["call_id"]?.jsonPrimitive?.contentOrNull ?: o["id"]?.jsonPrimitive?.contentOrNull ?: "call_${blocks.size}",
-                        o["name"]?.jsonPrimitive?.contentOrNull.orEmpty(), input)
+                        name, input)
                 }
                 // El razonamiento no se reenvía: cada petición es autosuficiente.
                 else -> Unit
             }
         }
         if (blocks.none { it is ContentBlock.Text }) (json["output_text"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let { blocks.add(0, ContentBlock.Text(it)) }
-        if (blocks.isEmpty() && json["status"]?.jsonPrimitive?.contentOrNull == "failed")
+        if (blocks.isEmpty() && status == "failed")
             throw LlmException(LlmException.Kind.UPSTREAM, "El proveedor no pudo completar la respuesta.")
-        val reason = ((json["incomplete_details"] as? JsonObject)?.get("reason") as? JsonPrimitive)?.contentOrNull
         val stop = when {
+            truncated -> StopReason.MAX_TOKENS
             blocks.any { it is ContentBlock.ToolUse } -> StopReason.TOOL_USE
-            json["status"]?.jsonPrimitive?.contentOrNull == "incomplete" && reason in setOf("max_output_tokens", "max_tokens", "length") -> StopReason.MAX_TOKENS
             reason == "content_filter" -> StopReason.CONTENT_FILTERED
-            json["status"]?.jsonPrimitive?.contentOrNull == "incomplete" -> StopReason.OTHER
+            status == "incomplete" -> StopReason.OTHER
             else -> StopReason.END_TURN
         }
         val usage = json["usage"] as? JsonObject

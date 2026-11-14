@@ -1,3 +1,31 @@
+# Pruebas en verde y streaming cortado - 14/11/2026
+
+Rama `aki/fix-tests-stream-20261114`, sobre `feat/agy-hydrogen-20261113` (`7f838f27`, vc212). Sin cambio de version ni APK.
+Origen: auditoria de codigo del 13/14-11 (pruebas en rojo y hallazgo 02.2).
+
+**Pruebas.** En vc212 fallaban 7 de 950 pruebas de `app`. Dos se arreglan en codigo, recuperando `be47d87` (03-11), que no
+estaba en esta linea: Suno sin descripcion lleva al prompt (`CrunTextCatalog.SUNO_DESCRIPTION_MESSAGE`, `CreationReadiness`)
+y un campo nativo `prompt` exigido cuenta como el editor de prompt (`CapabilityConstraintEngine`). Cinco eran pruebas
+desactualizadas: barra de 6 pestanas, texto «la app externa», contrato en lugar del modo de Google Flow, entrada declarada
+y tarjeta H3.
+
+**Decision pendiente de Vidal.** MiniMax H3 Fast comparte tarjeta con H3 base en el catalogo: `computeGroupTitle` quita
+«Fast» de un titulo sin version y el patron de version de la familia «MiniMax H3» no casa con `minimax/h3/...`.
+`ProviderTwinMergeTest` pedia tarjeta propia para Fast; ahora describe lo que hace el codigo. El catalogo no se ha tocado.
+
+**Streaming.** `OpenAiCompatibleStreamingProvider` y `ResponsesApiStreamingProvider`: un flujo sin marca de final
+(`[DONE]`, `finish_reason` o evento final) es un corte. Con una herramienta recibida: `LlmException` NETWORK y no se ejecuta
+nada. Solo texto: se entrega con `StopReason.OTHER` y un aviso al usuario. Argumentos de herramienta que no son un objeto
+JSON: PROTOCOL en vez de `{}` (tambien sin streaming). Cortados por limite de tokens: `MAX_TOKENS`, que el orquestador
+contesta sin ejecutar. 17 pruebas nuevas en `StreamCutTest`.
+Sin tocar: `desktop/agent/core` (copia sin `LlmResponse.notices`) y el puente AGY (`AntigravityProvider`), que sigue
+entregando el texto de un flujo cortado sin aviso.
+
+AWS CodeBuild, 0 fallos: agent-core 503 (499 ok, 4 omitidas) y cut-core 105 (`3eb2baa8`); app 950/950 en debug (`3eb2baa8`),
+agentPreview (`9e7a8910`), release y offlineQa (`5fc38eaa`, con assembleOfflineQa y assembleOfflineQaAndroidTest).
+`3eb2baa8` figura como FAILED por memoria del compilador al compilar dos variantes a la vez, no por pruebas.
+Sin verificar: GitHub Actions (rama sin subir), pruebas de UI en emulador y APK instalable. Sin llamadas de pago.
+
 # Guion como pestaña principal vc191 - 08/11/2026
 
 Peticion de Vidal: el proyecto audiovisual pasa a primer nivel. Barra: **Agente / Guion / ArtBox / Biblioteca / Flow**.

@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -94,8 +96,9 @@ class OpenAiCompatibleStreamingProvider(
                 var finish: String? = null
                 var usage: JsonObject? = null
                 var sawChunk = false
+                var sawDone = false
                 SseStream.read(resp) { ev ->
-                    if (ev.data == "[DONE]") return@read false
+                    if (ev.data == "[DONE]") { sawDone = true; return@read false }
                     val chunk = runCatching { Json.parseToJsonElement(ev.data).jsonObject }.getOrNull() ?: return@read true
                     (chunk["error"] as? JsonObject)?.let { throw ResponsesCodec.failure(it, who) }
                     sawChunk = true
@@ -116,7 +119,11 @@ class OpenAiCompatibleStreamingProvider(
                     true
                 }
                 if (!sawChunk) throw LlmException(LlmException.Kind.PROTOCOL, "La respuesta en streaming terminó sin contenido.")
-                OpenAiCodec.decode(buildJsonObject {
+                // Sin [DONE] ni finish_reason el flujo se cortó: pueden faltar texto, llamadas o parte de sus argumentos.
+                val cut = !sawDone && finish == null
+                if (cut && calls.isNotEmpty()) throw SseStream.cutDuringTool(who)
+                if (cut && text.isBlank()) throw LlmException(LlmException.Kind.PROTOCOL, "La respuesta en streaming se cortó sin contenido.")
+                val decoded = OpenAiCodec.decode(buildJsonObject {
                     put("choices", buildJsonArray { add(buildJsonObject {
                         put("message", buildJsonObject {
                             put("content", text.toString())
@@ -131,6 +138,7 @@ class OpenAiCompatibleStreamingProvider(
                     }) })
                     usage?.let { put("usage", it) }
                 })
+                if (cut) decoded.copy(stopReason = StopReason.OTHER, notices = decoded.notices + SseStream.cutNotice(who)) else decoded
             }
         } catch (e: IOException) {
             throw LlmException(LlmException.Kind.NETWORK, "Se perdió la conexión con $who (${e.javaClass.simpleName}).")
@@ -210,16 +218,19 @@ object OpenAiCodec {
         val choice = json["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?: throw LlmException(LlmException.Kind.PROTOCOL, "El proveedor no devolvió ninguna respuesta.")
         val message = choice["message"]?.jsonObject ?: JsonObject(emptyMap())
+        val finishReason = choice["finish_reason"]?.jsonPrimitive?.contentOrNull
         val blocks = mutableListOf<ContentBlock>()
         (message["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock.Text(it) }
         (message["tool_calls"] as? JsonArray)?.forEach { call ->
             val o = call.jsonObject
             val fn = o["function"]?.jsonObject ?: return@forEach
-            val args = fn["arguments"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            val input = runCatching { Json.parseToJsonElement(args.ifBlank { "{}" }).jsonObject }.getOrElse { JsonObject(emptyMap()) }
-            blocks += ContentBlock.ToolUse(o["id"]?.jsonPrimitive?.contentOrNull ?: "call_${blocks.size}", fn["name"]?.jsonPrimitive?.contentOrNull.orEmpty(), input)
+            val name = fn["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            // Cortada por el límite de tokens («length») se conserva vacía: el orquestador la contesta como truncada sin ejecutarla.
+            val input = ToolArguments.parse(fn["arguments"])
+                ?: if (finishReason == "length") JsonObject(emptyMap()) else throw ToolArguments.invalid(name)
+            blocks += ContentBlock.ToolUse(o["id"]?.jsonPrimitive?.contentOrNull ?: "call_${blocks.size}", name, input)
         }
-        val stop = when (choice["finish_reason"]?.jsonPrimitive?.contentOrNull) {
+        val stop = when (finishReason) {
             "stop" -> StopReason.END_TURN
             "tool_calls", "function_call" -> StopReason.TOOL_USE
             "length" -> StopReason.MAX_TOKENS
@@ -231,6 +242,21 @@ object OpenAiCodec {
         return LlmResponse(LlmMessage(Role.ASSISTANT, blocks), stop,
             Usage(usage?.get("prompt_tokens")?.jsonPrimitive?.intOrNull ?: 0, usage?.get("completion_tokens")?.jsonPrimitive?.intOrNull ?: 0))
     }
+}
+
+/** Argumentos de una llamada a herramienta. Unos argumentos rotos nunca se sustituyen por `{}`: se ejecutaría con entrada vacía. */
+internal object ToolArguments {
+    /** El objeto de argumentos, o null si no son un objeto JSON válido. Ausentes, vacíos o `null` = sin argumentos. */
+    fun parse(raw: JsonElement?): JsonObject? {
+        if (raw == null || raw is JsonNull) return JsonObject(emptyMap())
+        if (raw is JsonObject) return raw
+        val text = (raw as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+        if (text.isBlank() || text.trim() == "null") return JsonObject(emptyMap())
+        return runCatching { Json.parseToJsonElement(text) as? JsonObject }.getOrNull()
+    }
+
+    fun invalid(name: String) = LlmException(LlmException.Kind.PROTOCOL,
+        "El modelo pidió la herramienta «${name.take(80)}» con argumentos incompletos o que no son JSON válido; no se ha ejecutado. Reintenta el mensaje.")
 }
 
 /** Errores HTTP de proveedores de LLM traducidos a mensajes sin secretos. */

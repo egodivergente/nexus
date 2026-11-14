@@ -33,7 +33,17 @@ internal object SseStream {
         })
     }
 
-    /** Recorre los eventos hasta el fin o hasta que [onEvent] devuelva false. */
+    /** Aviso para el usuario cuando el flujo terminó sin su marca de final: el texto puede estar incompleto. */
+    fun cutNotice(who: String) = "La conexión con $who se cortó antes de terminar: esta respuesta puede estar incompleta."
+
+    /** Corte a mitad de una llamada a herramienta: nunca se ejecuta lo recibido. */
+    fun cutDuringTool(who: String) = LlmException(LlmException.Kind.NETWORK,
+        "Se cortó la conexión con $who mientras preparaba una herramienta; no se ha ejecutado nada. Reintenta el mensaje.")
+
+    /**
+     * Recorre los eventos hasta el fin o hasta que [onEvent] devuelva false. Un fin de flujo sin la marca de final del
+     * protocolo es indistinguible de un corte de red: cada proveedor debe comprobar esa marca.
+     */
     suspend fun read(response: Response, onEvent: (SseEvent) -> Boolean) = withContext(Dispatchers.IO) {
         val source = response.body?.source() ?: return@withContext
         var event = ""
