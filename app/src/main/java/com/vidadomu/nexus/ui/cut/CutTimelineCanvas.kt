@@ -87,6 +87,7 @@ internal fun TimelineCanvas(
     modifier: Modifier = Modifier,
 ) {
     val Palette = palette
+    val haptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val density = LocalDensity.current
     val rulerPx = with(density) { RULER_DP.dp.toPx() }
     val videoRowPx = with(density) { VIDEO_ROW_DP.dp.toPx() }
@@ -98,9 +99,22 @@ internal fun TimelineCanvas(
     val slop = LocalViewConfiguration.current.touchSlop
     val measurer = rememberTextMeasurer()
     val labelStyle = TextStyle(color = Palette.text, fontSize = 10.sp)
-    val rulerStyle = TextStyle(color = Palette.textDim, fontSize = 9.sp)
+    val rulerStyle = TextStyle(
+        color = Palette.textDim,
+        fontSize = 9.sp,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        fontFeatureSettings = "tnum",
+    )
     val mins = remember { FloatArray(2048) }
     val maxs = remember { FloatArray(2048) }
+
+    var lastSnapUs by remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
+    androidx.compose.runtime.LaunchedEffect(snapLineUs) {
+        if (snapLineUs != null && snapLineUs != lastSnapUs) {
+            haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
+        }
+        lastSnapUs = snapLineUs
+    }
 
     val latestTimeline by rememberUpdatedState(timeline)
     val latestSelection by rememberUpdatedState(selection)
@@ -125,6 +139,8 @@ internal fun TimelineCanvas(
                 var kind: DragKind? = null
                 var total = Offset.Zero
                 var dragging = false
+                var lastScrubBucket = startPlayhead / 250_000L
+                var lastScrubTickMs = 0L
                 while (true) {
                     val ev = awaitPointerEvent()
                     val pressed = ev.changes.filter { it.pressed }
@@ -140,8 +156,10 @@ internal fun TimelineCanvas(
                     val ch = ev.changes.firstOrNull { it.id == down.id } ?: ev.changes.first()
                     if (!ch.pressed) {
                         if (!dragging) {
-                            if (inRuler) latestActions.seek(g0.tOf(down.position.x).coerceAtLeast(0), false)
-                            else {
+                            if (inRuler) {
+                                haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.GESTURE_TICK)
+                                latestActions.seek(g0.tOf(down.position.x).coerceAtLeast(0), false)
+                            } else {
                                 val long = ch.uptimeMillis - down.uptimeMillis > LONG_TAP_MS
                                 latestActions.tap(hit?.clip?.id, hit?.row?.track?.id, long)
                             }
@@ -178,7 +196,14 @@ internal fun TimelineCanvas(
                     val clip = hit?.clip
                     when (kind) {
                         DragKind.PAN -> {
-                            latestActions.seek((startPlayhead - dUs).coerceAtLeast(0), true)
+                            val targetUs = (startPlayhead - dUs).coerceAtLeast(0)
+                            val bucket = targetUs / 250_000L
+                            if (bucket != lastScrubBucket && ch.uptimeMillis - lastScrubTickMs >= 42L) {
+                                haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.GESTURE_TICK)
+                                lastScrubTickMs = ch.uptimeMillis
+                            }
+                            lastScrubBucket = bucket
+                            latestActions.seek(targetUs, true)
                             val maxScroll = maxOf(0f, g0.contentHeight - (size.height - rulerPx))
                             viewport.scrollY = (startScroll - total.y).coerceIn(0f, maxScroll)
                         }
@@ -382,16 +407,21 @@ private fun DrawScope.drawRuler(Palette: CutPalette, g: TimelineGeometry, rate: 
         val isMajor = abs((t / major) - Math.round(t / major)) < 1e-6
         drawLine(Palette.textDim, Offset(x, g.rulerPx - if (isMajor) 10f else 5f), Offset(x, g.rulerPx), 1f)
         if (isMajor) {
-            val label = if (major < 1e6) com.vidadomu.nexus.cut.model.Timecode.formatFrames(t, rate).substring(3) else formatShort(t)
+            val label = formatTimelineRulerLabel(t, major, rate)
             drawText(measurer.measure(label, style), topLeft = Offset(x + 3f, 2f))
         }
         k++
     }
 }
 
+internal fun formatTimelineRulerLabel(us: Long, majorUs: Double, rate: FrameRate): String =
+    if (majorUs < 1e6) com.vidadomu.nexus.cut.model.Timecode.formatFrames(us, rate).substring(3)
+    else formatShort(us)
+
 private fun formatShort(us: Long): String {
-    val s = us / 1_000_000
-    return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+    val s = (us / 1_000_000).coerceAtLeast(0L)
+    return if (s >= 3600) "%d:%02d:%02d".format(java.util.Locale.ROOT, s / 3600, (s / 60) % 60, s % 60)
+    else "%02d:%02d".format(java.util.Locale.ROOT, s / 60, s % 60)
 }
 
 internal const val RULER_DP = 22

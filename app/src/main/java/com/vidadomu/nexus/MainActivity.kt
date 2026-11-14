@@ -573,7 +573,10 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.Settings.route) {
-                            SettingsScreen(assistantViewModel = assistantViewModel)
+                            SettingsScreen(
+                                assistantViewModel = assistantViewModel,
+                                onCloseInitialPage = { navController.popBackStack() }
+                            )
                         }
                         composable("byteplus/{page}",arguments=listOf(navArgument("page") {type=NavType.StringType})) {entry ->
                             SettingsScreen(initialPage=entry.arguments?.getString("page"),onCloseInitialPage={navController.popBackStack()},assistantViewModel=assistantViewModel)

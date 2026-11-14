@@ -95,8 +95,21 @@ internal fun PremiumAppearancePicker(appearance:AppearancePreferences,onDismiss:
                         AmbientMode.IMMERSIVE -> "Un ambiente más envolvente, con mayor presencia."
                     },style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Intensidad · ${(selection.intensity*100).roundToInt()} %",style=MaterialTheme.typography.labelLarge)
-                    Slider(value=selection.intensity,onValueChange={selection=selection.copy(intensity=it)},valueRange=0f..1f,
-                        modifier=Modifier.semantics {contentDescription="Intensidad del ambiente"})
+                    var intensityBucket by remember { mutableIntStateOf((selection.intensity * 10f).roundToInt()) }
+                    Slider(
+                        value = selection.intensity,
+                        onValueChange = {
+                            val bucket = (it * 10f).roundToInt()
+                            if (bucket != intensityBucket) {
+                                intensityBucket = bucket
+                                haptics.perform(NexusHapticEvent.GESTURE_TICK)
+                            }
+                            selection = selection.copy(intensity = it)
+                        },
+                        valueRange = 0f..1f,
+                        onValueChangeFinished = { haptics.perform(NexusHapticEvent.SELECTION) },
+                        modifier = Modifier.semantics { contentDescription = "Intensidad del ambiente" }
+                    )
                     Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)
                         .toggleable(selection.reduceMotion,role=Role.Switch,onValueChange={value ->
                             haptics.perform(NexusHapticEvent.TOGGLE_DECISIVE,changed=value!=selection.reduceMotion)
@@ -109,7 +122,10 @@ internal fun PremiumAppearancePicker(appearance:AppearancePreferences,onDismiss:
                         }
                         Switch(selection.reduceMotion,onCheckedChange=null)
                     }
-                    TextButton(onClick={selection=AppearanceSelection(NexusAppearance.AURORA)}) {Text("Restaurar predeterminado")}
+                    TextButton(onClick={
+                        haptics.perform(NexusHapticEvent.CONFIRMATION)
+                        selection=AppearanceSelection(NexusAppearance.AURORA)
+                    }) {Text("Restaurar predeterminado")}
                 }
             }
         }
@@ -119,6 +135,7 @@ internal fun PremiumAppearancePicker(appearance:AppearancePreferences,onDismiss:
 /** Five real palettes, with the selected card sharing the app's ambient clock instead of starting its own. */
 @Composable
 internal fun ThemeGallery(selection:AppearanceSelection,onSelect:(NexusAppearance)->Unit) {
+    val galleryHaptics=rememberNexusHaptics()
     val selectedIndex=NexusAppearance.premiumThemes.indexOf(selection.theme)
     val galleryState=rememberLazyListState(initialFirstVisibleItemIndex=selectedIndex.coerceAtLeast(0))
     LaunchedEffect(selectedIndex) {if(selectedIndex>=0) galleryState.scrollToItem(selectedIndex)}
@@ -129,7 +146,10 @@ internal fun ThemeGallery(selection:AppearanceSelection,onSelect:(NexusAppearanc
             Surface(shape=NexusTokens.card,color=MaterialTheme.colorScheme.surfaceContainerLow,
                 border=BorderStroke(if(selected) NexusTokens.divider*4 else NexusTokens.divider,
                     if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
-                modifier=Modifier.width(NexusTokens.minimumTouch*4).selectable(selected,role=Role.RadioButton,onClick={onSelect(option)})
+                modifier=Modifier.width(NexusTokens.minimumTouch*4).selectable(selected,role=Role.RadioButton,onClick={
+                    galleryHaptics.perform(NexusHapticEvent.SELECTION, changed = !selected)
+                    onSelect(option)
+                })
                     .semantics(mergeDescendants=true) {stateDescription=if(selected) "Vista previa seleccionada" else "Elegir tema"}) {
                 Column(Modifier.padding(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     ThemeMiniature(option,selection,selected)

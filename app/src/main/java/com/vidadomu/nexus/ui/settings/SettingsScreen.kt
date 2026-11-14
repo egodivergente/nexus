@@ -100,11 +100,14 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
     var currencyDetails by remember {mutableStateOf(false)}
     var settingsSearch by rememberSaveable {mutableStateOf("")}
     var pageName by rememberSaveable(initialPage) { mutableStateOf(initialPage) }
-    val closePage: () -> Unit = {if(initialPage!=null && onCloseInitialPage!=null) onCloseInitialPage() else pageName=null}
     val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
+    val closePage: () -> Unit = {
+        if (page != null && initialPage == null) pageName = null else onCloseInitialPage?.invoke()
+    }
     var assistantSettingsOpen by remember { mutableStateOf(false) }
     var advancedAppearance by rememberSaveable {mutableStateOf(false)}
     val goBack: () -> Unit = { if(page==SettingsPage.VISUAL && advancedAppearance) advancedAppearance=false else closePage() }
+    val canNavigateBack = page != null || onCloseInitialPage != null
     androidx.activity.compose.BackHandler(enabled = page != null) { goBack() }
     val keysConfigured = remember(maskedApiKey, providerKeyRevision) {
         listOf(maskedApiKey != "Not configured", app.secureStorage.getMaskedProviderApiKey("crun") != "Not configured", app.secureStorage.getMaskedProviderApiKey("runway") != "Not configured", app.secureStorage.getMaskedProviderApiKey("fal") != "Not configured").count { it }
@@ -113,7 +116,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                 // Same pattern as the tabs: the root «Ajustes» is a screen title; sub-pages are a level below.
                 Text(page?.title ?: "Ajustes",style=if(page==null) MaterialTheme.typography.headlineSmall else com.vidadomu.nexus.ui.components.nexusScreenTitleStyle()) }},
         showBalance=page != SettingsPage.BYTEPLUS,
-        navigationIcon={ if(page != null) IconButton(onClick=goBack) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(page==SettingsPage.VISUAL && advancedAppearance) "Volver a Fondo, movimiento y háptica" else if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
+        navigationIcon={ if(canNavigateBack) IconButton(onClick={ haptics.perform(NexusHapticEvent.SELECTION); goBack() }) {Icon(Icons.AutoMirrored.Filled.ArrowBack,if(page==SettingsPage.VISUAL && advancedAppearance) "Volver a Fondo, movimiento y háptica" else if(page==null) "Cerrar Ajustes" else if(initialPage!=null) "Volver al Lienzo" else "Volver a Ajustes")} })}) {padding ->
         if(page in setOf(SettingsPage.RULES,SettingsPage.PROJECTS,SettingsPage.CATALOG,SettingsPage.AUTOMATION) || page==SettingsPage.VISUAL && advancedAppearance) {
             Box(Modifier.padding(padding)) {com.vidadomu.nexus.settings.RuntimeSettingsEditor(when(page) {SettingsPage.PROJECTS->"Proyectos y conversaciones";SettingsPage.CATALOG->"Catálogo y workflows";SettingsPage.AUTOMATION->"Automatización";SettingsPage.VISUAL->"Personalización";else->null})}
         } else LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space12),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -274,14 +277,14 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                 com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
                 Text(
                     text = "Configurar Clave API de Atlas",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                     Text(
                         text = "Tu clave API se almacena cifrada con AES256-GCM respaldada por el Keystore de Android.",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                     StudioCredentialField(
                         value = apiKeyInput,
@@ -303,19 +306,20 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                         settingsRepo.saveAtlasApiKey(apiKeyInput.trim())
                         maskedApiKey = settingsRepo.getMaskedAtlasApiKey()
                         atlasCheck = ProviderCheck.NotChecked
+                        haptics.perform(NexusHapticEvent.CONFIRMATION)
                         showEditKeyDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = MaterialTheme.colorScheme.onPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) {
                     Text("Guardar clave", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEditKeyDialog = false }) {
-                    Text("Cancelar", color = TextSecondary)
+                    Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            containerColor = SurfaceDark,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 8.dp,
             shape = NexusTokens.card
         )
@@ -325,11 +329,11 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
         val provider = app.providerRegistry.getProviderById(providerId)
         AlertDialog(
             onDismissRequest = { providerKeyDialogId = null },
-            title = { Text("Configurar clave de ${provider?.displayName ?: providerId}", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            title = { Text("Configurar clave de ${provider?.displayName ?: providerId}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
             text = {
                 com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
                 Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                    Text("La clave se guarda cifrada en el Keystore de Android.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                    Text("La clave se guarda cifrada en el Keystore de Android.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     StudioCredentialField(
                         value = providerKeyInput,
                         onValueChange = { providerKeyInput = it },
@@ -347,11 +351,12 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                     }
                     app.secureStorage.saveProviderApiKey(providerId, providerKeyInput.trim())
                     providerKeyRevision++
+                    haptics.perform(NexusHapticEvent.CONFIRMATION)
                     providerKeyDialogId = null
                 }) { Text("Guardar clave", fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { providerKeyDialogId = null }) { Text("Cancelar") } },
-            containerColor = SurfaceDark,
+            dismissButton = { TextButton(onClick = { providerKeyDialogId = null }) { Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = NexusTokens.card
         )
     }

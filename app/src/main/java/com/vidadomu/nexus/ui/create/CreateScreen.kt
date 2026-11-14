@@ -49,7 +49,9 @@ import com.vidadomu.nexus.core.model.NexusModel
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import com.vidadomu.nexus.ui.components.StudioChrome
+import com.vidadomu.nexus.ui.components.StudioTactileCard
 import com.vidadomu.nexus.ui.components.StudioToolChip
+import com.vidadomu.nexus.ui.components.studioSpecularBorder
 import com.vidadomu.nexus.ui.theme.*
 import com.vidadomu.nexus.ui.create.capability.ModelCapabilityRegistry
 
@@ -221,6 +223,7 @@ fun CreateScreen(
     ) { innerPadding ->
         FixedLauncherWorkspace(
             modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)
+                .windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.top)
                 .padding(horizontal=screenMargin,vertical=NexusTokens.space4),
             scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,promptVisible=capabilities?.promptVisible==true,
             header={LauncherWorkspaceHeader(state.selectedModality,viewModel::selectModality)},
@@ -234,14 +237,47 @@ fun CreateScreen(
                 ruleScope=com.vidadomu.nexus.agent.core.config.RuleScope(provider=state.selectedModel?.providerId,
                     model=state.selectedModel?.providerModelId ?: state.selectedModel?.id,workflow=state.selectedModel?.inputMode?.name),
                 onFocusChanged={mainPromptFocused=it},onExpand={showPromptEditor=true})},
-            inputs={CompactCapabilityMediaInputs(inputFields,state.selectedModel,state.attachedMedia,
-                enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
-                onAdd={field,items ->
-                    val modelKey=state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty()
-                    viewModel.addCanvasMedia(field.key,modelKey,items)
-                },onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)},
-            parameters={state.selectedModel?.let {model -> CompactPrimaryParameterControls(model,
-                capabilities?.primaryParameters.orEmpty().filter {it.key!=countParam?.key},state.parameters,viewModel::updateParameter)}},
+            inputs={
+                if (inputFields.isNotEmpty()) {
+                    StudioTactileCard(
+                        shape = NexusTokens.card,
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                        shadowElevation = 2.dp
+                    ) {
+                        Box(Modifier.fillMaxWidth().padding(NexusTokens.space8)) {
+                            CompactCapabilityMediaInputs(inputFields,state.selectedModel,state.attachedMedia,
+                                enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
+                                onAdd={field,items ->
+                                    val modelKey=state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty()
+                                    viewModel.addCanvasMedia(field.key,modelKey,items)
+                                },onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)
+                        }
+                    }
+                } else {
+                    CompactCapabilityMediaInputs(inputFields,state.selectedModel,state.attachedMedia,
+                        enabled=!state.isPreparingMedia && !state.isSubmitting && !state.isUploading,
+                        onAdd={field,items ->
+                            val modelKey=state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty()
+                            viewModel.addCanvasMedia(field.key,modelKey,items)
+                        },onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)
+                }
+            },
+            parameters={
+                state.selectedModel?.let { model ->
+                    val primaryParams = capabilities?.primaryParameters.orEmpty().filter { it.key != countParam?.key }
+                    if (primaryParams.isNotEmpty()) {
+                        StudioTactileCard(
+                            shape = NexusTokens.card,
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
+                            shadowElevation = 2.dp
+                        ) {
+                            Box(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space8)) {
+                                CompactPrimaryParameterControls(model, primaryParams, state.parameters, viewModel::updateParameter)
+                            }
+                        }
+                    }
+                }
+            },
             status={
                 if(state.isLoadingSchema || state.isPreparingMedia || state.isUploading) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -260,16 +296,33 @@ fun CreateScreen(
                 }
             },
             advanced={
-                FilledTonalButton(onClick={showAdvanced=true},modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),
-                    shape=NexusTokens.field) {
-                    Icon(Icons.Default.Tune,null,Modifier.size(NexusTokens.iconSmall))
-                    Spacer(Modifier.width(NexusTokens.space8))
-                    Text("Avanzado"+if(state.retainedMedia.isNotEmpty()) " · ${state.retainedMedia.size} conservados" else "",
-                        style=MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.weight(1f))
-                    if(capabilities?.promptVisible==true && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO))
-                        Text("×${quantity.count}",style=MaterialTheme.typography.labelMedium)
-                    Icon(Icons.Default.ExpandMore,null,Modifier.size(NexusTokens.iconSmall))
+                val advancedHaptics = rememberNexusHaptics()
+                StudioTactileCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = NexusTokens.field,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
+                    shadowElevation = 2.dp,
+                    border = studioSpecularBorder(accentTint = if (state.retainedMedia.isNotEmpty()) MaterialTheme.colorScheme.primary.copy(alpha = 0.28f) else null)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .heightIn(min = NexusTokens.minimumTouch)
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                                advancedHaptics.perform(NexusHapticEvent.SELECTION)
+                                showAdvanced = true
+                            }
+                            .padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space8),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Tune, null, Modifier.size(NexusTokens.iconSmall), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(NexusTokens.space8))
+                        Text("Avanzado" + if (state.retainedMedia.isNotEmpty()) " · ${state.retainedMedia.size} conservados" else "",
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.weight(1f))
+                        if (capabilities?.promptVisible == true && state.selectedModality in setOf(Modality.IMAGE, Modality.VIDEO))
+                            Text("×${quantity.count}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = NexusTokens.space4))
+                        Icon(Icons.Default.ExpandMore, null, Modifier.size(NexusTokens.iconSmall), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             })
     }

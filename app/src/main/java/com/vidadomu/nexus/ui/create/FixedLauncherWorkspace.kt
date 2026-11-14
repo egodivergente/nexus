@@ -60,8 +60,8 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
             layout(placeable.width,placeable.height) {placeable.placeRelative(0,0)}
         }
         CompositionLocalProvider(LocalLauncherContentSizing provides sizing) {
-        Column(Modifier.fillMaxWidth()
-            .then(if(fallback) Modifier.fillMaxHeight().verticalScroll(scroll) else Modifier.wrapContentHeight(unbounded=true)),
+        Column(Modifier.fillMaxWidth().fillMaxHeight()
+            .then(if(fallback) Modifier.verticalScroll(scroll) else Modifier),
             verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             if(!compactEditor) Box(measuredPart(WorkspacePart.HEADER)) {header()}
             // IME changes visibility/width, never the focused editor's Row/Column ancestry or call site.
@@ -84,6 +84,7 @@ internal fun FixedLauncherWorkspace(modifier:Modifier,scroll:ScrollState,imeVisi
                     Box(measuredPart(WorkspacePart.PARAMETERS)) {parameterContent()}
                 }
             }
+            if(!fallback && !compactEditor && measured) Spacer(Modifier.weight(1f))
             Column(measuredPart(WorkspacePart.STATUS),verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {status()}
             if(!compactEditor) Box(measuredPart(WorkspacePart.ADVANCED)) {advanced()}
         }

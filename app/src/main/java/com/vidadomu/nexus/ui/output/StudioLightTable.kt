@@ -23,7 +23,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -32,7 +31,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.ui.theme.MediaForeground
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -57,7 +58,7 @@ fun SplitWipeCompare(
 ) {
     var split by remember { mutableFloatStateOf(0.5f) }
     var widthPx by remember { mutableFloatStateOf(1f) }
-    val haptic = LocalHapticFeedback.current
+    val haptics = rememberNexusHaptics()
     val density = LocalDensity.current
 
     Box(
@@ -74,7 +75,7 @@ fun SplitWipeCompare(
                     val prev = split
                     val next = (split + dragAmount / widthPx).coerceIn(0.05f, 0.95f)
                     if ((prev < 0.5f && next >= 0.5f) || (prev > 0.5f && next <= 0.5f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        haptics.perform(NexusHapticEvent.SELECTION)
                     }
                     split = next
                 }

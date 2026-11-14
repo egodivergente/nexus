@@ -2,7 +2,11 @@ package com.vidadomu.nexus.assistant
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
+import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -65,8 +69,10 @@ private fun indicesOf(key: String): Set<Int> = key.split(',').mapNotNull { it.tr
 @Composable
 private fun CheckMark(selected: Boolean, round: Boolean) {
     val cs = MaterialTheme.colorScheme
-    val fill by animateColorAsState(if (selected) cs.primary else Color.Transparent, tween(NexusTokens.contentDuration), label = "Marca")
-    val edge by animateColorAsState(if (selected) cs.primary else cs.outline, tween(NexusTokens.contentDuration), label = "Borde marca")
+    val motion = rememberNexusMotionAllowed()
+    val spec = if (motion) spring<Color>(dampingRatio = 0.84f, stiffness = 480f) else snap()
+    val fill by animateColorAsState(if (selected) cs.primary else Color.Transparent, spec, label = "Marca")
+    val edge by animateColorAsState(if (selected) cs.primary else cs.outline, spec, label = "Borde marca")
     val shape = if (round) CircleShape else RoundedCornerShape(6.dp)
     Box(Modifier.size(22.dp).clip(shape).background(fill).border(1.5.dp, edge, shape), contentAlignment = Alignment.Center) {
         if (selected) Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = cs.onPrimary)
@@ -76,8 +82,10 @@ private fun CheckMark(selected: Boolean, round: Boolean) {
 @Composable
 private fun ChoiceRow(option: WidgetOption, selected: Boolean, dimmed: Boolean, enabled: Boolean, round: Boolean, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val bg by animateColorAsState(if (selected) cs.primary.copy(alpha = 0.12f) else Color.Transparent, tween(NexusTokens.contentDuration), label = "Fondo opción")
-    val edge by animateColorAsState(if (selected) cs.primary else cs.outlineVariant, tween(NexusTokens.contentDuration), label = "Borde opción")
+    val motion = rememberNexusMotionAllowed()
+    val spec = if (motion) spring<Color>(dampingRatio = 0.84f, stiffness = 460f) else snap()
+    val bg by animateColorAsState(if (selected) cs.primary.copy(alpha = 0.12f) else Color.Transparent, spec, label = "Fondo opción")
+    val edge by animateColorAsState(if (selected) cs.primary else cs.outlineVariant, spec, label = "Borde opción")
     Surface(onClick = onClick, enabled = enabled, color = bg, shape = NexusTokens.field, border = BorderStroke(1.dp, edge),
         modifier = Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch).alpha(if (dimmed) 0.5f else 1f)
             .semantics { stateDescription = if (selected) "Elegida" else "No elegida" }) {
@@ -94,6 +102,7 @@ private fun ChoiceRow(option: WidgetOption, selected: Boolean, dimmed: Boolean, 
 
 @Composable
 private fun PollPanel(p: WidgetSpec.Poll, ctx: WidgetCtx) {
+    val haptics = rememberNexusHaptics()
     var pickedKey by rememberSaveable(p.id) { mutableStateOf("") }
     val picked = indicesOf(pickedKey)
     PanelSurface {
@@ -101,6 +110,7 @@ private fun PollPanel(p: WidgetSpec.Poll, ctx: WidgetCtx) {
         p.options.forEachIndexed { i, option ->
             val selected = if (ctx.answered != null) ctx.chose(option.label) else i in picked
             ChoiceRow(option, selected = selected, dimmed = ctx.answered != null && !selected, enabled = !ctx.locked, round = !p.multi) {
+                haptics.perform(NexusHapticEvent.SELECTION)
                 if (p.multi) {
                     pickedKey = (if (i in picked) picked - i else picked + i).sorted().joinToString(",")
                 } else {
@@ -111,6 +121,7 @@ private fun PollPanel(p: WidgetSpec.Poll, ctx: WidgetCtx) {
         }
         if (p.multi && !ctx.locked) {
             Button(onClick = {
+                haptics.perform(NexusHapticEvent.CONFIRMATION)
                 val labels = p.options.filterIndexed { i, _ -> i in picked }.joinToString("\n") { it.label }
                 ctx.onReply?.invoke(labels)
             }, enabled = picked.isNotEmpty(), modifier = Modifier.align(Alignment.End)) {
@@ -135,8 +146,14 @@ private fun ComparePanel(c: WidgetSpec.Compare, ctx: WidgetCtx) {
 @Composable
 private fun CompareCard(option: WidgetOption, ctx: WidgetCtx, modifier: Modifier) {
     val cs = MaterialTheme.colorScheme
+    val haptics = rememberNexusHaptics()
+    val motion = rememberNexusMotionAllowed()
     val chosen = ctx.chose(option.label)
-    val edge by animateColorAsState(if (chosen) cs.primary else cs.outlineVariant, tween(NexusTokens.contentDuration), label = "Borde tarjeta")
+    val edge by animateColorAsState(
+        if (chosen) cs.primary else cs.outlineVariant,
+        if (motion) spring(dampingRatio = 0.84f, stiffness = 460f) else snap(),
+        label = "Borde tarjeta"
+    )
     Surface(color = if (chosen) cs.primary.copy(alpha = 0.10f) else Color.Transparent, shape = NexusTokens.field, border = BorderStroke(1.dp, edge),
         modifier = modifier.alpha(if (ctx.answered != null && !chosen) 0.5f else 1f)) {
         Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
@@ -144,7 +161,7 @@ private fun CompareCard(option: WidgetOption, ctx: WidgetCtx, modifier: Modifier
             option.hint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant) }
             Spacer(Modifier.height(NexusTokens.space4))
             if (chosen) Text("Elegida", style = MaterialTheme.typography.labelMedium, color = cs.primary)
-            else OutlinedButton(onClick = { ctx.onReply?.invoke("Elijo: ${option.label}") }, enabled = !ctx.locked,
+            else OutlinedButton(onClick = { haptics.perform(NexusHapticEvent.SELECTION); ctx.onReply?.invoke("Elijo: ${option.label}") }, enabled = !ctx.locked,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = 0.dp)) { Text("Elegir") }
         }
     }
@@ -153,9 +170,15 @@ private fun CompareCard(option: WidgetOption, ctx: WidgetCtx, modifier: Modifier
 @Composable
 private fun StepsPanel(s: WidgetSpec.Steps) {
     val cs = MaterialTheme.colorScheme
+    val haptics = rememberNexusHaptics()
+    val motion = rememberNexusMotionAllowed()
     var doneKey by rememberSaveable(s.id) { mutableStateOf("") }
     val done = indicesOf(doneKey)
-    val progress by animateFloatAsState(done.size.toFloat() / s.items.size, tween(NexusTokens.contentDuration), label = "Avance")
+    val progress by animateFloatAsState(
+        done.size.toFloat() / s.items.size,
+        if (motion) spring(dampingRatio = 0.82f, stiffness = 440f) else snap(),
+        label = "Avance"
+    )
     PanelSurface {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(s.title ?: "Pasos", style = MaterialTheme.typography.titleSmall, color = cs.onSurface, modifier = Modifier.weight(1f))
@@ -164,7 +187,11 @@ private fun StepsPanel(s: WidgetSpec.Steps) {
         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
         s.items.forEachIndexed { i, item ->
             val checked = i in done
-            Surface(onClick = { doneKey = (if (checked) done - i else done + i).sorted().joinToString(",") }, color = Color.Transparent, shape = NexusTokens.thumbnail,
+            Surface(onClick = {
+                val nextDone = if (checked) done - i else done + i
+                haptics.perform(if (nextDone.size == s.items.size && !checked) NexusHapticEvent.CONFIRMATION else NexusHapticEvent.TOGGLE_DECISIVE)
+                doneKey = nextDone.sorted().joinToString(",")
+            }, color = Color.Transparent, shape = NexusTokens.thumbnail,
                 modifier = Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch).semantics { stateDescription = if (checked) "Hecho" else "Pendiente" }) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = NexusTokens.space4)) {
                     CheckMark(checked, round = false)
