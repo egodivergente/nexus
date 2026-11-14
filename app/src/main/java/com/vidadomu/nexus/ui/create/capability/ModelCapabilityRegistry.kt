@@ -275,11 +275,16 @@ internal object ModelCapabilityRegistry {
             }.toSet()
             return types.size == 2 && "null" in types && types.any {it in setOf("string", "integer", "number", "boolean")}
         }
+        // A then/else branch of a top-level rule may forbid fields with `not: {required: [...]}`: the allOf pass
+        // above turns it into hidden constraints. Vidal 14-11: GPT Image 2.6 Sunburst Edit was blocked with
+        // «Regla todavía no representada en Input.allOf[1].then: not.» because this walk still flagged it.
+        val conditionalBranch = Regex("""Input\.allOf\[\d+]\.(then|else)""")
         fun visit(element: JsonElement, path: String, top: Boolean = false) {
             when (element) {
                 is JsonObject -> {
+                    val representedNot = conditionalBranch.matches(path) && forbiddenFields(element).isNotEmpty()
                     val unsupported = element.keys.filter {it in setOf("oneOf", "not", "dependentSchemas", "dependentRequired", "pattern", "exclusiveMinimum", "exclusiveMaximum") ||
-                        it == "anyOf" && !simpleNullable(element) || it == "allOf" && !top}
+                        it == "anyOf" && !simpleNullable(element) || it == "allOf" && !top}.filterNot {it == "not" && representedNot}
                     if (unsupported.isNotEmpty()) add("Regla todavía no representada en $path: ${unsupported.joinToString()}.")
                     if ("multipleOf" in element && ParameterBounds.exact((element["multipleOf"] as? JsonPrimitive)?.contentOrNull)
                             ?.toBigDecimalOrNull()?.let {it > BigDecimal.ZERO} != true)

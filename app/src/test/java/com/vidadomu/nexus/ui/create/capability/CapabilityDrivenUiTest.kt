@@ -351,6 +351,27 @@ class CapabilityDrivenUiTest {
         assertEquals(CapabilitySupport.UNKNOWN, ModelCapabilityRegistry.resolve(model, Modality.VIDEO, inputSchema = extraPredicate).support)
     }
 
+    /** Vidal 14-11: GPT Image 2.6 Sunburst Edit failed with «Regla todavía no representada en Input.allOf[1].then: not.». */
+    @Test fun aRuleThatForbidsAFieldInItsThenBranchIsRepresentedNotUnknown() {
+        val (model, original) = syntheticDurationContract()
+        val forbid = Json.parseToJsonElement(
+            """{"if":{"properties":{"duration":{"const":10}},"required":["duration"]},"then":{"not":{"required":["seed"]}}}""")
+        val schema = JsonObject(original + ("properties" to JsonObject(original["properties"]!!.jsonObject +
+            ("seed" to Json.parseToJsonElement("""{"type":"integer"}""")))) + ("allOf" to JsonArray(original["allOf"]!!.jsonArray + forbid)))
+        val declared = model.copy(parameters = model.parameters + ModelParameter("seed", "Seed", ParameterType.INTEGER, "", nativeType = "integer"))
+        val short = ModelCapabilityRegistry.resolve(declared, Modality.VIDEO, mapOf("duration" to "5"), inputSchema = schema)
+        assertFalse(short.unknownReasons.joinToString(), short.unknownReasons.any {"not" in it})
+        assertEquals(CapabilitySupport.CONFIRMED, short.support)
+        assertTrue((short.primaryParameters + short.advancedParameters).any {it.key == "seed"})
+        val long = ModelCapabilityRegistry.resolve(declared, Modality.VIDEO, mapOf("duration" to "10", "resolution" to "720p"), inputSchema = schema)
+        assertEquals(CapabilitySupport.CONFIRMED, long.support)
+        assertFalse((long.primaryParameters + long.advancedParameters).any {it.key == "seed"})
+        // Any other shape of `not` is still reported instead of being silently accepted.
+        val unknown = JsonObject(schema + ("allOf" to JsonArray(original["allOf"]!!.jsonArray + Json.parseToJsonElement(
+            """{"if":{"properties":{"duration":{"const":10}},"required":["duration"]},"then":{"not":{"properties":{"seed":{"const":1}}}}}"""))))
+        assertEquals(CapabilitySupport.UNKNOWN, ModelCapabilityRegistry.resolve(declared, Modality.VIDEO, inputSchema = unknown).support)
+    }
+
     @Test fun simpleNullableMetadataDoesNotDisableAnAlreadyRepresentedScalar() {
         val (model, schema) = syntheticDurationContract()
         val nullable = JsonObject(schema + ("properties" to JsonObject(schema["properties"]!!.jsonObject +

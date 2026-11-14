@@ -147,16 +147,25 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
             d.orders.get(id)?.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.AWAITING_CONFIRMATION
         }
         val turnReady = turnOrders.size
-        val turnTotal = turnOrders.mapNotNull { turnLines[it]?.second?.takeUnless(Double::isNaN) }.sum()
-        val turnUnknown = turnOrders.any { turnLines[it]?.second?.isNaN() != false }
+        // Vidal 14-11: en un turno que corrige tarjetas y prepara otras, el resumen solo nombraba las nuevas y
+        // ocultaba las corregidas («Preparado 1 encargo» cuando también cambiaron otras dos).
+        val revised = session.revisedThisTurn.filterKeys { id -> id !in turnOrders &&
+            d.orders.get(id)?.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.AWAITING_CONFIRMATION }
+        val turnCosts = turnOrders.map { turnLines[it]?.second ?: Double.NaN } + revised.values.map { it.second }
+        val turnTotal = turnCosts.filterNot(Double::isNaN).sum()
+        val turnUnknown = turnCosts.any(Double::isNaN)
         val summary = buildJsonObject {
             put("prepared", ready); put("failed", failed); put("orders", results)
             // Con todo preparado, este texto ES la respuesta al usuario: el turno termina sin otra llamada al modelo.
             if (failed == 0 && turnReady > 0) put("summary_for_user", buildString {
                 appendLine(if (turnReady == 1) "Preparado 1 encargo:" else "Preparados $turnReady encargos:")
                 turnOrders.forEach { id -> turnLines[id]?.let { appendLine(it.first) } }
+                if (revised.isNotEmpty()) {
+                    appendLine(if (revised.size == 1) "Y 1 corregido en su tarjeta:" else "Y ${revised.size} corregidos en su tarjeta:")
+                    revised.values.forEach { appendLine(it.first) }
+                }
                 appendLine()
-                if (turnReady > 1) appendLine("Coste estimado total: **${usd(turnTotal)}**" + if (turnUnknown) " (sin contar los que están por confirmar)." else ".")
+                if (turnReady + revised.size > 1) appendLine("Coste estimado total: **${usd(turnTotal)}**" + if (turnUnknown) " (sin contar los que están por confirmar)." else ".")
                 append("Nada se ha enviado todavía. Revisa las tarjetas y pulsa **GENERAR**.")
             })
             put("next", when {
@@ -176,7 +185,7 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
         val own = item.input["params"] as? JsonObject
         input.str("aspect_ratio")?.let { ratio ->
             val (key, value) = aspectParam(schema, ratio) ?: run {
-                if (schema.parameters.any { p -> p.key in RATIO_KEYS || p.uiType == "ASPECT_RATIO" || (p.key in SIZE_KEYS && p.options.any { DIMENSIONS.containsMatchIn(it) }) })
+                if (com.vidadomu.nexus.agent.core.schema.AspectFormat.offersFormats(schema))
                     notes += "Este modelo no ofrece el formato $ratio; se deja su valor por defecto."
                 return@let
             }
@@ -219,10 +228,7 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
 
     companion object {
         const val MAX_ORDERS = 20
-        private fun usd(v: Double) = String.format(java.util.Locale.US, "%.4f", v).trimEnd('0').trimEnd('.').replace('.', ',') + " USD"
-        private val RATIO_KEYS = setOf("aspect_ratio", "aspectRatio", "ratio")
-        private val SIZE_KEYS = setOf("size", "image_size", "resolution")
-        private val DIMENSIONS = Regex("""(\d{2,5})\s*[x*×]\s*(\d{2,5})""")
+        internal fun usd(v: Double) = String.format(java.util.Locale.US, "%.4f", v).trimEnd('0').trimEnd('.').replace('.', ',') + " USD"
 
         /**
          * El valor admitido más cercano cuando el pedido no vale, o null si ya vale o no se puede decidir.
@@ -249,23 +255,7 @@ class PrepareOrdersTool(private val d: ToolDeps) : BaseTool(
         }
 
         /** Traduce «16:9» al parámetro real del modelo: su clave de formato o, si solo tiene tamaños, el tamaño con esa proporción. */
-        internal fun aspectParam(schema: ModelSchema, ratio: String): Pair<String, String>? {
-            val wanted = ratio.split(':').mapNotNull { it.trim().toDoubleOrNull() }.takeIf { it.size == 2 && it[1] > 0 }?.let { it[0] / it[1] }
-            schema.parameters.firstOrNull { it.key in RATIO_KEYS || it.uiType == "ASPECT_RATIO" }?.let { p ->
-                if (p.options.isEmpty() || ratio in p.options) return p.key to ratio
-            }
-            if (wanted == null) return null
-            for (p in schema.parameters.filter { it.key in SIZE_KEYS }) {
-                // Entre los tamaños con esa proporción (±2 %), el mayor.
-                val match = p.options.mapNotNull { option ->
-                    DIMENSIONS.find(option)?.let { m ->
-                        val w = m.groupValues[1].toDouble(); val h = m.groupValues[2].toDouble()
-                        if (h > 0 && abs(w / h - wanted) / wanted <= 0.02) option to w * h else null
-                    }
-                }.maxByOrNull { it.second }
-                if (match != null) return p.key to match.first
-            }
-            return null
-        }
+        internal fun aspectParam(schema: ModelSchema, ratio: String): Pair<String, String>? =
+            com.vidadomu.nexus.agent.core.schema.AspectFormat.param(schema, ratio)
     }
 }

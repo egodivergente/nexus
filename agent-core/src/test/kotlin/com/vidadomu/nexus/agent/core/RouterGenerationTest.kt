@@ -73,6 +73,28 @@ class RouterGenerationTest {
         assertNotNull(router.route(task.copy(expertQuality = true, resolution = "1080p")).recommended)
     }
 
+    /** Vidal 14-11: con 9:16 recomendaba Flux 2 Flex o Seedream v4 porque descartaba los que publican 9:16 en píxeles. */
+    @Test fun `experto acepta el formato publicado como tamano en pixeles`() = runTest {
+        val pixels = ModelRef(ATLAS, "bytedance/seedream-v5.5/text-to-image")
+        val ratio = ModelRef(ATLAS, "bytedance/seedream-v4/text-to-image")
+        fun image(ref: ModelRef, name: String) = ModelSummary(ref = ref, name = name, modalities = setOf("IMAGE"),
+            capabilities = setOf("TEXT_TO_IMAGE"), inputMode = "TEXT_ONLY", releaseMonth = null, isFlagship = false,
+            supportsAudio = false, catalogDurations = emptyList())
+        val schemas = mapOf(
+            pixels to ModelSchema(pixels, listOf(ParamSpec("size", "Tamaño", "ENUM", "string",
+                options = listOf("2048*2048", "2816*1584", "1584*2816", "1152*2048"), default = "2048*2048")), MediaSpec(inputMode = "TEXT_ONLY")),
+            ratio to ModelSchema(ratio, listOf(ParamSpec("aspect_ratio", "Formato", "ASPECT_RATIO", "string",
+                options = listOf("1:1", "9:16", "16:9"), default = "1:1")), MediaSpec(inputMode = "TEXT_ONLY")))
+        val router = ModelRouter(FakeRegistry(listOf(image(pixels, "Seedream v5.5"), image(ratio, "Seedream v4")), schemas), realSkills(), prices())
+        val r = router.route(TaskSpec("IMAGE", "text_to_image", aspectRatio = "9:16", expertQuality = true, limit = 3))
+        val all = listOfNotNull(r.recommended) + r.alternatives
+        val chosen = all.firstOrNull { it.ref == pixels }
+        assertNotNull(chosen, "el modelo en píxeles debe seguir en la lista: ${all.map { it.ref.modelId }} rechazos ${r.rejected}")
+        assertEquals("1584*2816", chosen.suggestedParams["size"], "el mayor tamaño 9:16")
+        assertEquals("9:16", all.first { it.ref == ratio }.suggestedParams["aspect_ratio"])
+        assertNull(router.route(TaskSpec("IMAGE", "text_to_image", aspectRatio = "21:9", expertQuality = true)).recommended)
+    }
+
     @Test fun `rapidez no cambia la eleccion experta`() = runTest {
         val router = ModelRouter(registry, realSkills(), prices())
         val quality = task.copy(expertQuality = true)
