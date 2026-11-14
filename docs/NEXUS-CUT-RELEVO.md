@@ -112,3 +112,88 @@ El primer intento falló por timeout de SSH con el S25 offline, sin transferenci
 La instalación final se completó por ADB en el **S25 físico**, inicialmente vc205 / 1.9.169, tras verificar el acceso y el certificado de su APK instalada: coincide con la identidad existente. `adb install -r` de vc206 terminó **Success**. `dumpsys package` confirmó **versionCode 206 / 1.9.170-agent-preview**; el SHA-256 de `base.apk` instalada coincide con `bcc31fd6bc7f6ee20d67c6efc68cd8c49a90a8f0e354c891e347fe91b9396a98`. No hubo desinstalación ni borrado de datos. Vidal confirmó «Instalada: 1.9.170 y Cut visible».
 
 Comparación de IDs antes/después en S25: **0 ausentes y 0 añadidos**, con 7 proyectos, 1 escena, 3 planos, 9 personajes, 3177 assets, 780 generaciones, 774 trabajos y 642 outputs. El log disponible del PID de Nexus no muestra FATAL EXCEPTION ni ANR. Los intentos de capturar la jerarquía de UI devolvieron `null root node returned by UiTestAutomationBridge`; no se presenta como un recorrido automatizado del editor en S25. Las pruebas funcionales de chat, teclado y deshacer de vc206 y de montaje/exportación de vc205 corresponden al Pixel.
+
+## Continuación 14/11/2026 — trabajo en contenedor, sin dispositivo
+
+Rama `feat/agy-hydrogen-20261113`, de `7f838f27` (vc212) a `790aba08`. **Ninguna de las comprobaciones de
+este día se hizo en un móvil**: no se compiló APK, no se firmó ni se instaló nada, y no hay recorrido de
+interfaz. Lo que se afirma es compilación y pruebas unitarias ejecutadas en el contenedor.
+
+### El contenedor como máquina de compilación
+
+Se instaló el SDK de Android (plataforma 36, build-tools 36.0.0, platform-tools y NDK 27.2.12479018,
+2,8 GB) en `/root/android-sdk`, con `sdk.dir` en `local.properties`. `:app:compileDebugKotlin` y
+`:app:testDebugUnitTest` se ejecutan aquí. El proxy de salida devuelve 429 contra
+`repo.maven.apache.org`, así que los artefactos de Kotlin se resuelven por el espejo de Maven Central en
+GCS mediante un init script **fuera del repositorio** (`/root/mirror.init.gradle.kts`): la configuración
+del proyecto no se toca y AXELPC compila igual que antes. Para los núcleos puros sin SDK se añadió
+`settings-jvm.gradle.kts` (`./gradlew -c settings-jvm.gradle.kts :cut-core:test :agent-core:test`).
+**Aquí no está el keystore**: este contenedor no puede producir un APK que se instale sobre el existente.
+
+### `audio.find_silences`
+
+`cut-core` gana la envolvente de volumen (`CutAudioAnalyzer`), la detección pura (`Silences`) y la
+capacidad `audio.find_silences`, que devuelve los mismos `ranges` que consume `timeline.delete_ranges`.
+El agente la alcanza por `cut_read` sin código nuevo. Donde el motor no declara `engine.audio_analysis`
+sigue en el catálogo marcada como no disponible. `cut-core`: 105 → 117 pruebas, 0 fallos; `agent-core`:
+486, 0 fallos. **Falta el analizador Android (MediaCodec)**: hasta que exista y la app declare la
+capacidad, la operación no funciona en el móvil.
+
+### Dos fallos reales que las «pruebas caducadas» estaban avisando
+
+`CapabilityConstraintEngine` daba por representado el prompt solo con `contractPromptField`
+(«promptText» por defecto) mientras los adaptadores lo declaran como `prompt`. **24 de las 64 rutas de
+Runway** quedaban sin poder enviarse con «El contrato exige una entrada aún no representada: prompt» y
+el aviso llevaba a Parámetros. Igual con los campos con forma de objeto: las locuciones de ElevenLabs
+declaran `voice` y se rellenan con `voice.presetId`. Lo avisaba `AssistantReferenceInputTest`, dada por
+caducada. La prueba nueva recorre el catálogo real (Runway, Crun y Suno) en vez de una fixture.
+
+Además, cualquier rechazo de un adaptador se etiquetaba como «opciones»: Suno en modo simple pedía
+«Describe la canción» y el botón llevaba a Parámetros. Se introdujo `ContractInputError` con `fieldKey`
+para que el adaptador diga de qué entrada se queja; en modo custom la queja es del título y sigue siendo
+de opciones. Un primer intento que lo deducía del prompt vacío rompía ese caso y se descartó.
+
+Cuatro pruebas sí estaban atrasadas y se revisaron una por una: la barra tiene seis destinos, el aviso
+de app externa se generalizó, el estrechamiento por modos se fue con `google_flow` (retirado) y dos
+fixtures de `CreationFixTarget` eran irreales. `app`: 950 → 953 pruebas, de 7 fallos a 1.
+
+**Queda abierto a propósito** `ProviderTwinMergeTest.crunH3JoinsTheAtlasCardWithoutLosingRoutes`:
+`minimax/h3-fast/*` se fusiona dentro de la tarjeta de H3 mientras Developer y Max conservan la suya, y
+la prueba lleva anotada la decisión contraria («Vidal 01-11»). Es una decisión de producto, no se tocó.
+
+### Ajustes
+
+«Moneda» pasa de Personalización a Proveedores; «Edición y Whisper» de Sistema a Agentes y memoria;
+Drive y la sincronización a «Conexiones», que **existía como pantalla y no se abría desde ningún sitio**;
+la versión encabeza su tarjeta en vez de ser el subtítulo del diagnóstico; las filas de reglas solo
+etiquetan la excepción. El diagnóstico afirmaba «Media3 ExoPlayer 1.4.1 · WorkManager 2.9» con 1.11.1 y
+2.10 en el `build.gradle`: corregido.
+
+### Bedrock: la familia 5.5 no es invocable en la cuenta
+
+Se aceptó en nombre de Vidal el acuerdo de `anthropic.claude-haiku-5-5` (oferta `offer-u3aih6zr7uw5u`).
+`get_foundation_model_availability` responde AUTHORIZED y AVAILABLE en us-east-1 y us-west-2, pero
+`converse` sigue devolviendo AccessDenied para **haiku 5.5, sonnet 5.5 y opus 5.5**, con prefijos `us.`,
+`global.` y `eu.` y en tres regiones. `opus-4-6`, `sonnet-4-6` y `haiku-4-5` responden. No lo causó
+añadir Haiku: los chips de Sonnet 5.5 y Opus 5.5 tampoco funcionaban. Las latencias de 5.5 medidas antes
+salieron por el puente de Claude, no por Bedrock.
+
+### Tailscale y el puente del S25
+
+El contenedor entró en la tailnet con la clave que dio Vidal, nodo `nexus-cloud-session`
+(100.91.119.88). **Es la cuenta `vidalotb94@`, distinta de `vidaltb94@`**: desde aquí solo se ven el S25
+(100.126.24.117) y `grokbot`; AXELPC, el Pixel y ASUSVIDAL están en la otra tailnet. Por relay DERP se
+alcanzaron el puente AGY en `:8788` (listando argon con sus cuatro niveles, `claude-sonnet-5-5`,
+`claude-opus-5-5`, `gpt-oss-120b`, codex con sol/terra/astra/luna, grok 4.6/4.5 y atlas; **sin
+`gemini-4-hydrogen`**) y «Axel Bridge v2» en `:8765`, vivo y autenticado. `adb` llega al S25 pero el
+móvil no autoriza la clave de este contenedor (huella `56:7E:2A:48:0B:1F:4B:2E:C1:F7:70:C2:E7:BA:89:58`).
+El S25 salió de la tailnet sobre las 06:40 y no volvió.
+
+### Banco de precisión: lo que vale y lo que no
+
+Con el puente accesible se ejecutó `AgentQualityBench` desde el contenedor. Caso `guion`: **Claude
+Sonnet 5.5 6/6 en 27,0 s; Claude Opus 5.5 6/6 en 34,2 s; Gemini 4 Argon medio 6/6 en 28,0 s**. Caso
+`cut` con Sonnet 5.5: **3/5 en 108,7 s**, fallando `quita_3_a_5_dura_12s` (colocó las tomas en 58 s y
+64 s) y `musica_menos12db`. Los tiempos incluyen el relay y no son comparables con las medidas por ADB.
+Los registros del caso `larga` **se descartan**: el contenedor se reinició con el JVM a medias y uno de
+los errores es un nombre de clase, firma de `NoClassDefFoundError`. La matriz queda incompleta.
