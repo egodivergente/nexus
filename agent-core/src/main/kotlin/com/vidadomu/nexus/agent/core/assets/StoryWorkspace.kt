@@ -88,10 +88,10 @@ private fun canonical(value: JsonElement): String = when (value) {
     else -> value.toString()
 }
 private fun id(prefix: String) = AssetIndex.newId(prefix)
-private fun creationId(d: IndexData, q: JsonObject, prefix: String): String {
-    val value = q.s("id") ?: return id(prefix)
+private fun creationId(d: IndexData, q: JsonObject, prefix: String, field: String = "id"): String {
+    val value = q.s(field) ?: return id(prefix)
     if (!value.matches(Regex("[A-Za-z0-9_-]{3,100}"))) invalid("El identificador estable contiene caracteres no admitidos.")
-    if (value in (d.projects.map { it.id } + d.scenes.map { it.id } + d.shots.map { it.id } + d.characters.map { it.id } + d.story.blocks.map { it.id } + d.story.elements.map { it.id })) invalid("El identificador estable ya existe.")
+    if (value in (d.projects.map { it.id } + d.scenes.map { it.id } + d.shots.map { it.id } + d.characters.map { it.id } + d.assets.map { it.id } + d.generations.map { it.id } + d.story.blocks.map { it.id } + d.story.elements.map { it.id } + d.story.links.map { it.id } + d.story.preferences.map { it.id } + d.story.tasks.map { it.id })) invalid("El identificador estable ya existe.")
     return value
 }
 private fun result(entityId: String, revision: Long = 0, extra: Map<String, JsonElement> = emptyMap()) = buildJsonObject {
@@ -232,12 +232,13 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
         "import_script" -> {
             val text = q.need("text")
             val existing = q.s("scene_id")?.let { scene(d, p, it) }
-            val parent = existing ?: Scene(id("scn"), p, "E${d.scenes.count { it.projectId == p } + 1}", q.s("title") ?: "Guion importado",
+            val parent = existing ?: Scene(creationId(d, q, "scn"), p, "E${d.scenes.count { it.projectId == p } + 1}", q.s("title") ?: "Guion importado",
                 order = (d.scenes.filter { it.projectId == p }.maxOfOrNull { it.order } ?: -1) + 1)
             // Literal paragraphs, with no screenplay syntax or guessed scene boundaries imposed.
             val start = (st.blocks.filter { it.sceneId == parent.id }.maxOfOrNull { it.order } ?: -1) + 1
             val paragraphs = text.split(Regex("\\r?\\n[\\t ]*\\r?\\n"))
-            val blocks = paragraphs.mapIndexed { index, paragraph -> StoryBlock(id("blk"), p, parent.id, "action", text = paragraph, order = start + index) }
+            val stableBlocks = q.strings("block_ids")?.also { if (it.size != paragraphs.size || it.distinct().size != it.size) invalid("Los identificadores de los párrafos no coinciden con el guion.") }
+            val blocks = paragraphs.mapIndexed { index, paragraph -> StoryBlock(stableBlocks?.get(index)?.let { creationId(d, buildJsonObject { put("id", it) }, "blk") } ?: id("blk"), p, parent.id, "action", text = paragraph, order = start + index) }
             d.copy(scenes = if (existing == null) d.scenes + parent else d.scenes,
                 story = st.copy(blocks = st.blocks + blocks)) to result(parent.id, parent.revision, mapOf("blocks_imported" to JsonPrimitive(blocks.size)))
         }
@@ -298,7 +299,7 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
         "create_shot" -> {
             val parent = (q.s("scene_id") ?: (q.s("origin_block_id") ?: q.s("block_id"))?.let { block(d, p, it).sceneId })?.also { scene(d, p, it) }
             val next = patchShot(d, p, Shot(creationId(d, q, "sht"), p, parent, q.s("code") ?: "P${d.shots.count { it.projectId == p } + 1}", order = (d.shots.filter { it.projectId == p && it.sceneId == parent }.maxOfOrNull { it.order } ?: -1) + 1), q, creating = true)
-            val b = parent?.let { StoryBlock(id("blk"), p, it, "shot", shotId = next.id, order = q.i("block_order") ?: ((st.blocks.filter { b -> b.sceneId == it }.maxOfOrNull { b -> b.order } ?: -1) + 1)) }
+            val b = parent?.let { StoryBlock(creationId(d, q, "blk", "shot_block_id"), p, it, "shot", shotId = next.id, order = q.i("block_order") ?: ((st.blocks.filter { b -> b.sceneId == it }.maxOfOrNull { b -> b.order } ?: -1) + 1)) }
             val origin = q.s("origin_block_id") ?: q.s("block_id")
             val originals = st.blocks.map { original -> if (original.id == origin && original.projectId == p) original.copy(shotId = next.id, revision = original.revision + 1) else original }
             d.copy(shots = d.shots + next, story = st.copy(blocks = originals + listOfNotNull(b))) to result(next.id)
@@ -311,11 +312,11 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
                     links = st.links.filterNot { it.scope == "shot" && it.targetId == old.id || it.scope == "block" && st.blocks.any { b -> b.id == it.targetId && b.shotId == old.id && b.kind == "shot" && b.text.isBlank() } },
                 )) to result(old.id, old.revision + 1)
                 "duplicate_shot" -> {
-                    val copy = old.copy(id = id("sht"), code = q.s("code") ?: "${old.code} · variante", title = q.s("title") ?: old.title,
+                    val copy = old.copy(id = creationId(d, q, "sht"), code = q.s("code") ?: "${old.code} · variante", title = q.s("title") ?: old.title,
                         order = (d.shots.filter { it.sceneId == old.sceneId && it.projectId == p }.maxOfOrNull { it.order } ?: -1) + 1,
                         variantOf = old.variantOf ?: old.id, productionState = "pending", revision = 0, contentRevision = 0)
-                    val b = old.sceneId?.let { StoryBlock(id("blk"), p, it, "shot", shotId = copy.id, order = (st.blocks.filter { b -> b.sceneId == it }.maxOfOrNull { b -> b.order } ?: -1) + 1) }
-                    val references = st.links.filter { it.scope == "shot" && it.targetId == old.id && it.role in referenceRoles }.map { it.copy(id = id("lnk"), targetId = copy.id, selected = false, revision = 0) }
+                    val b = old.sceneId?.let { StoryBlock(creationId(d, q, "blk", "shot_block_id"), p, it, "shot", shotId = copy.id, order = (st.blocks.filter { b -> b.sceneId == it }.maxOfOrNull { b -> b.order } ?: -1) + 1) }
+                    val references = st.links.filter { it.scope == "shot" && it.targetId == old.id && it.role in referenceRoles }.sortedBy { it.id }.map { it.copy(id = "lnk_" + sha(copy.id + ":" + it.id).take(12), targetId = copy.id, selected = false, revision = 0) }
                     d.copy(shots = d.shots + copy, story = st.copy(blocks = st.blocks + listOfNotNull(b), links = st.links + references)) to result(copy.id)
                 }
                 else -> {
@@ -342,7 +343,7 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
             val behavior = q.s("behavior") ?: q.s("mode") ?: "complement"; if (behavior !in setOf("complement", "replace")) invalid("Comportamiento de referencia desconocido.")
             val old = st.links.firstOrNull { it.projectId == p && it.assetId == asset.id && it.scope == scope && it.targetId == target && it.role == role && it.characterId == characterId }
             if (old != null) rev(q, old.revision)
-            val next = StoryLink(old?.id ?: id("lnk"), p, asset.id, scope, target, role,
+            val next = StoryLink(old?.id ?: creationId(d, q, "lnk"), p, asset.id, scope, target, role,
                 q.b("selected") ?: (role in setOf("chosen", "final")), behavior, characterId, q.s("note"), (old?.revision?.plus(1) ?: 0), old?.context, old?.createdAt ?: now)
             val links = st.links.mapNotNull { link ->
                 if (link.id == next.id) null else if (next.selected && scope == "shot" && link.projectId == p && link.scope == scope && link.targetId == target && link.selected && d.assets.firstOrNull { it.id == link.assetId }?.type == asset.type) link.copy(selected = false, revision = link.revision + 1) else link
@@ -366,18 +367,22 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
             val old = q.s("preference_id")?.let { value -> st.preferences.firstOrNull { it.id == value && it.projectId == p } ?: invalid("Indicación desconocida.") }
             val scope = q.s("scope") ?: old?.scope ?: "project"; val target = q.s("target_id") ?: old?.targetId ?: p; checkTarget(d, p, scope, target)
             old?.let { rev(q, it.revision) }
-            val next = StoryPreference(old?.id ?: id("pref"), p, scope, target, q.s("text") ?: old?.text ?: invalid("Falta la indicación."), old?.revision?.plus(1) ?: 0, q.b("enabled") ?: old?.enabled ?: true)
+            val next = StoryPreference(old?.id ?: creationId(d, q, "pref"), p, scope, target, q.s("text") ?: old?.text ?: invalid("Falta la indicación."), old?.revision?.plus(1) ?: 0, q.b("enabled") ?: old?.enabled ?: true)
             d.copy(story = st.copy(preferences = st.preferences.filterNot { it.id == next.id } + next)) to result(next.id, next.revision)
         }
         "propose" -> {
+            val proposalIdentity = id("prop")
             val changes = (q["changes"] as? JsonArray)?.mapIndexed { index, value ->
-                val cmd = value as? JsonObject ?: invalid("Cada cambio debe ser una operación estructurada.")
+                var cmd = value as? JsonObject ?: invalid("Cada cambio debe ser una operación estructurada.")
                 if (cmd.s("action") in setOf("propose", "apply_proposal", "reject_proposal", "undo", "register_result", "update_task", "set_autonomy")) invalid("Esa operación no puede formar parte de una propuesta editorial.")
+                // IDs belong to the proposal, not to the accepting device. Offline acceptance on two
+                // peers must create the same entities, including their automatic screenplay blocks.
+                cmd = materializeCreation(cmd, "$proposalIdentity:c$index")
                 StoryChange("c$index", withScope(cmd, q))
             }?.takeIf { it.isNotEmpty() } ?: invalid("La propuesta no contiene cambios.")
             var trial = d
             for (change in changes) trial = mutate(trial, p, change.command, actor, now).first
-            val next = StoryProposal(id("prop"), p, q.s("title") ?: "Propuesta del agente", changes, q.s("scope_scene_id"), q.s("scope_shot_id"), q.s("scope_block_id"), q.strings("preserve_ids").orEmpty(), actor = actor, createdAt = now)
+            val next = StoryProposal(proposalIdentity, p, q.s("title") ?: "Propuesta del agente", changes, q.s("scope_scene_id"), q.s("scope_shot_id"), q.s("scope_block_id"), q.strings("preserve_ids").orEmpty(), actor = actor, createdAt = now)
             d.copy(story = st.copy(proposals = st.proposals + next)) to result(next.id)
         }
         "apply_proposal", "reject_proposal" -> {
@@ -392,7 +397,7 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
                 if (ids.isEmpty() || ids.any { selected -> old.changes.none { it.id == selected } } || ids.any { it in old.appliedIds }) invalid("Selecciona cambios pendientes de esta propuesta.")
                 var nextData = d
                 val effectiveScope = buildJsonObject { old.scopeSceneId?.let { put("scope_scene_id", it) }; old.scopeShotId?.let { put("scope_shot_id", it) }; old.scopeBlockId?.let { put("scope_block_id", it) }; put("preserve_ids", JsonArray(old.preserveIds.map(::JsonPrimitive))) }
-                for (change in old.changes.filter { it.id in ids }) nextData = mutate(nextData, p, withScope(withScope(change.command, effectiveScope), q), actor, now).first
+                for (change in old.changes.filter { it.id in ids }) nextData = mutate(nextData, p, withScope(withScope(materializeCreation(change.command, "${old.id}:${change.id}"), effectiveScope), q), actor, old.createdAt).first
                 val applied = (old.appliedIds + ids).distinct()
                 val next = old.copy(appliedIds = applied, status = if (applied.size == old.changes.size) "applied" else "partial", revision = old.revision + 1)
                 nextData.copy(story = nextData.story.copy(proposals = nextData.story.proposals.map { if (it.id == old.id) next else it })) to result(next.id, next.revision)
@@ -412,7 +417,7 @@ private fun mutate(d: IndexData, p: String, q: JsonObject, actor: String, now: L
             val duplicate = st.tasks.firstOrNull { it.projectId == p && it.sceneId == sceneId && it.shotId == shotId && it.kind == kind && it.title == title && it.status !in setOf("complete", "cancelled", "error") }
             if (duplicate != null) d to result(duplicate.id, duplicate.revision, mapOf("task" to taskJson(duplicate), "context" to (duplicate.context?.let { storyJson.encodeToJsonElement(it) } ?: JsonNull)))
             else {
-                val next = StoryTask(id("task"), p, title, kind, sceneId ?: shotId?.let { shot(d, p, it).sceneId }, shotId, if (generation) "prepared" else "queued", q.s("detail"), context, updatedAt = now)
+                val next = StoryTask(creationId(d, q, "task"), p, title, kind, sceneId ?: shotId?.let { shot(d, p, it).sceneId }, shotId, if (generation) "prepared" else "queued", q.s("detail"), context, updatedAt = now)
                 d.copy(story = st.copy(tasks = st.tasks + next)) to result(next.id, extra = mapOf("task" to taskJson(next), "context" to (context?.let { storyJson.encodeToJsonElement(it) } ?: JsonNull), "requires_cost_authorization" to JsonPrimitive(true)))
             }
         }
@@ -485,6 +490,18 @@ private fun withScope(command: JsonObject, parent: JsonObject): JsonObject = bui
     }
     val keep = (command.strings("preserve_ids").orEmpty() + parent.strings("preserve_ids").orEmpty()).distinct()
     if (keep.isNotEmpty()) put("preserve_ids", JsonArray(keep.map(::JsonPrimitive)))
+}
+
+/** Also normalizes pending proposals saved by older versions, without changing their authored text. */
+private fun materializeCreation(command: JsonObject, seed: String): JsonObject {
+    var result = command
+    fun stable(prefix: String, field: String) = prefix + "_" + sha(seed + ":" + field).take(12)
+    val action = command.s("action")
+    val prefix = when (action) { "create_scene", "import_script" -> "scn"; "create_block" -> "blk"; "create_shot", "duplicate_shot" -> "sht"; "link_material" -> "lnk"; "set_preference" -> "pref"; "upsert_element" -> if (command.s("kind") in setOf(null, "character")) "chr" else "elm"; "enqueue_task", "prepare_generation" -> "task"; else -> null }
+    if (prefix != null && command.s("id") == null) result = JsonObject(result + ("id" to JsonPrimitive(stable(prefix, "entity"))))
+    if (action in setOf("create_shot", "duplicate_shot") && command.s("shot_block_id") == null) result = JsonObject(result + ("shot_block_id" to JsonPrimitive(stable("blk", "shot-block"))))
+    if (action == "import_script" && "block_ids" !in command) result = JsonObject(result + ("block_ids" to JsonArray(command.need("text").split(Regex("\\r?\\n[\\t ]*\\r?\\n")).mapIndexed { index, _ -> JsonPrimitive(stable("blk", "paragraph:$index")) })))
+    return result
 }
 
 private fun patchShot(d: IndexData, p: String, old: Shot, q: JsonObject, creating: Boolean = false): Shot {

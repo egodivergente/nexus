@@ -45,6 +45,23 @@ class NexusAgentProvider:ContentProvider() {
     private suspend fun execute(method:String,input:JsonObject):JsonObject {
         val app=context!!.applicationContext as NexusApplication
         app.ready.await() // arranque en frío: no tocar los lateinit antes de Application.onCreate
+        if (method == "drive_sync") {
+            require(input.keys.all { it == "op" }) { "La consulta solo admite op." }
+            val op = input["op"]?.jsonPrimitive?.contentOrNull ?: "status"
+            require(op in setOf("status", "run")) { "Operación de Drive no admitida." }
+            val manager = com.vidadomu.nexus.sync.NexusDriveSync.get(app)
+            val connected = manager.prefs.getString("account", null) != null
+            if (op == "run") {
+                require(connected) { "Conecta Google Drive desde Ajustes antes de sincronizar." }
+                manager.enqueue(manual = true)
+            }
+            return buildJsonObject {
+                put("ok", true); put("configured", connected)
+                put("enabled", manager.prefs.getBoolean("enabled", false))
+                put("storyEnabled", manager.prefs.getBoolean("story", false))
+                put("requested", op == "run"); put("status", manager.status.value)
+            }
+        }
         if (method == "cut_chat_qa") return com.vidadomu.nexus.cut.CutChatQa.handle(app, input)
         if(method=="agent_model_availability") {
             require(input.keys==setOf("modelId")) {"La consulta solo admite modelId."}
@@ -141,6 +158,9 @@ class NexusAgentProvider:ContentProvider() {
             put("paidExecutionEnabled",false);put("profile",0)
             put("credentialStorageAvailable",app.secureStorage.credentialStorageAvailable)
             put("jobs",app.generationRepository.allJobs.value.size)
+            put("activeJobs",app.generationRepository.allJobs.value.count {
+                it.status.toString() in setOf("QUEUED", "RUNNING", "PROCESSING", "SENDING", "SUBMITTED")
+            })
             put("historyLoading",app.generationRepository.historyLoading.value)
             put("historyError",app.generationRepository.historyError.value != null)
             val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)

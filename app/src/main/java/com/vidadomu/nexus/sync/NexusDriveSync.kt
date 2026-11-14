@@ -108,6 +108,7 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
     }
     fun setEnabled(enabled:Boolean) {prefs.edit().putBoolean("enabled",enabled).apply();if(enabled){initialize();enqueue()}else {WorkManager.getInstance(app).cancelUniqueWork("nexus-drive-now");WorkManager.getInstance(app).cancelUniqueWork("nexus-drive-periodic")}}
     fun setWifi(value:Boolean) {prefs.edit().putBoolean("wifi",value).apply();if(prefs.getBoolean("enabled",false)){initialize();enqueue()}}
+    fun setStoryEnabled(value:Boolean) {prefs.edit().putBoolean("story",value).apply();enqueue(manual=true)}
     fun selectProject(id:String,selected:Boolean) {
         val ids=prefs.getStringSet("projects",emptySet())!!.toMutableSet();if(selected)ids+=id else ids-=id
         prefs.edit().putStringSet("projects",ids).apply();enqueue(manual=true)
@@ -124,7 +125,9 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         val connectedAccount=prefs.getString("account",null)
         if(BuildConfig.OFFLINE_QA || connectedAccount==null || (!manual && !prefs.getBoolean("enabled",false)))return@withLock true
         prefs.edit().putBoolean("dirty",false).apply()
-        setStatus(buildJsonObject {put("state","syncing")})
+        setStatus(buildJsonObject {put("state","syncing");put("narrativeSync",buildJsonObject {
+            put("supported",true);put("enabled",prefs.getBoolean("story",false));put("state",if(prefs.getBoolean("story",false))"syncing" else "disabled")
+        })})
         try {
             var cachedToken=token();var tokenAt=System.currentTimeMillis()
             val workContext=currentCoroutineContext()
@@ -142,7 +145,8 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
                     "https"->{val response=http.newCall(Request.Builder().url(value).build()).execute();if(!response.isSuccessful){response.close();null}else {val body=response.body!!;SyncInput(ext,object:java.io.FilterInputStream(body.byteStream()){override fun close(){super.close();response.close()}})}}
                     else->null
                 }
-            },localUri={Uri.fromFile(it).toString()},deviceLabel=android.os.Build.MODEL)
+            },localUri={Uri.fromFile(it).toString()},deviceLabel=android.os.Build.MODEL,
+                storyRemote=remote.storyChannel(),storyEnabled={prefs.getBoolean("story",false)})
             val documents=SyncDocuments(directory)
             val conversationDir=File(app.filesDir,"assistant/conversations")
             val chatFiles=conversationDir.listFiles().orEmpty().filter {it.extension=="json" && !it.name.startsWith("sync_")}+listOf(File(app.filesDir,"assistant/chat-v1.json")).filter {it.exists()}
@@ -171,6 +175,10 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         catch(e:Exception){setStatus(buildJsonObject {
             put("state",if(e.message=="authorization_required")"authorization_required" else "retry")
             put("message",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "Sincronización pendiente. Tus archivos locales se conservan.")
+            put("narrativeSync",buildJsonObject {
+                put("supported",true);put("enabled",prefs.getBoolean("story",false));put("state",if(prefs.getBoolean("story",false))"error" else "disabled")
+                put("reason",if(e.message=="authorization_required")"Vuelve a conectar Google Drive." else "El intercambio no ha terminado. Tus cambios locales se conservan.")
+            })
             // Support data is private and contains no exception messages, URLs or tokens.
             put("diagnostic",e.javaClass.simpleName+":"+(e.stackTrace.firstOrNull {it.className.startsWith("com.vidadomu.nexus.")}?.let {it.fileName+":"+it.lineNumber}?:"external"))
         });false}
