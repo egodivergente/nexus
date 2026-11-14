@@ -160,8 +160,6 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                 SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true})
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 FontScaleRow(appearance)
-                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-                SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true})
             }}
                 }
                 SettingsPage.BYTEPLUS -> { item { BytePlusConsumptionSettings() } }
@@ -169,12 +167,17 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                     // The category promises model controls first; keep the common entry above
                     // the potentially long Drive project list so it never requires scrolling.
                     if(assistantViewModel != null) item {SettingsCard {SettingRow("Ajustes del asistente","Proveedor, modelo, respuesta y herramientas",{assistantSettingsOpen=true})}}
-                    item {SettingsCard {com.vidadomu.nexus.sync.DriveSyncSettings()}}
-                    item {SettingsCard {SettingRow("Sincronización entre móviles","Chats, memoria, skills, galería y adjuntos",{syncOpen=true})}}
+                    // Lo que el agente sabe hacer con los archivos va con el agente, no en «Sistema».
+                    item {SettingsCard {com.vidadomu.nexus.assistant.MediaEditingSettings()}}
+                    // Drive y la sincronización tienen su propia pantalla: la lista de proyectos puede ser
+                    // larga y aquí tapaba los motores. «Conexiones» ya existía y no se abría desde ningún sitio.
+                    item {HubRow(SettingsPage.CONNECTIONS,"Google Drive, chats, memoria y archivos entre dispositivos") {pageName=SettingsPage.CONNECTIONS.name}}
                     item {SettingsHeader("Motores del agente",Icons.Default.AutoAwesome,top=NexusTokens.space12)}
                     item {SettingsCard {BrainsSettingsSection {assistantSettingsOpen=true}}}
                 }
                 SettingsPage.PROVIDERS -> {
+                    // La moneda decide cómo se leen los saldos y las tarifas de esta misma pantalla.
+                    item {SettingsCard {SettingRow("Moneda",currencyState.preference.displayName,{currencyOpen=true})}}
                     item {HubRow(SettingsPage.BYTEPLUS,"Tokens, facturación y paquetes gratuitos") {pageName=SettingsPage.BYTEPLUS.name}}
                     item {HubRow(SettingsPage.CUSTOM,"BytePlus y otros generadores por API") {pageName=SettingsPage.CUSTOM.name}}
                     item {val atlasPill=providerPill(maskedApiKey!="Not configured",atlasCheck)
@@ -210,17 +213,22 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                 SettingsPage.SYSTEM -> {
             item {SettingsCard {SettingRow("Reglas y límites","Preferencias por ámbito, exportar e importar",{pageName=SettingsPage.RULES.name})}}
             item {SettingsCard {SettingRow("Catálogo y workflows","Densidad, antigüedad y orden de workflows",{pageName=SettingsPage.CATALOG.name})}}
-            item {SettingsCard {com.vidadomu.nexus.assistant.MediaEditingSettings()}}
             item {SettingsCard {ReleaseNotesCard()}}
             item {SettingsCard {TelemetryCard()}}
+            // La versión era el subtítulo de otra cosa: ahora encabeza la tarjeta, el diagnóstico es una
+            // acción con su propia descripción y el interruptor de pruebas queda al final, que es su sitio.
             item {SettingsCard {
+                Column(Modifier.padding(NexusTokens.space16),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+                    Text("Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»",style=MaterialTheme.typography.titleMedium)
+                    Text("Compilación ${com.vidadomu.nexus.BuildConfig.VERSION_CODE} · ${com.vidadomu.nexus.BuildConfig.BUILD_TYPE}\n${com.vidadomu.nexus.BuildConfig.SOURCE_REVISION} · ${com.vidadomu.nexus.BuildConfig.BUILD_DATE}",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
+                }
+                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                SettingRow("Diagnóstico del sistema","Dispositivo, Android y almacenamiento cifrado",{showDiagnostics=true})
+                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {Text("Proveedor simulado",style=MaterialTheme.typography.bodyLarge);Text("Generaciones locales de prueba sin consumir créditos.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)}
                     Switch(isMockMode,{checked->isMockMode=checked;settingsRepo.setMockMode(checked);app.modelCatalogRepository.refreshModels()},modifier=Modifier.semantics {contentDescription="Proveedor simulado"})
                 }
-                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-                SettingRow("Diagnóstico del sistema","Nexus ${com.vidadomu.nexus.BuildConfig.VERSION_NAME} «${com.vidadomu.nexus.BuildConfig.CODENAME}»",{showDiagnostics=true})
-                Text("Compilación ${com.vidadomu.nexus.BuildConfig.VERSION_CODE} · ${com.vidadomu.nexus.BuildConfig.BUILD_TYPE}\n${com.vidadomu.nexus.BuildConfig.SOURCE_REVISION} · ${com.vidadomu.nexus.BuildConfig.BUILD_DATE}",style=MaterialTheme.typography.labelSmall,color=TextSecondary)
             }}
                 }
             }
@@ -260,7 +268,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
             Text("Dispositivo: ${Build.MANUFACTURER} ${Build.MODEL}",style=MaterialTheme.typography.bodyMedium)
             Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",style=MaterialTheme.typography.bodyMedium)
             Text(if(app.secureStorage.credentialStorageAvailable) "Almacenamiento cifrado disponible" else "Almacenamiento cifrado no disponible",style=MaterialTheme.typography.bodyMedium)
-            Text("Media3 ExoPlayer 1.4.1 · WorkManager 2.9",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+            Text("Media3 ExoPlayer 1.11.1 · WorkManager 2.10",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             Text("Divisas: BCE / Frankfurter",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
             }
         }

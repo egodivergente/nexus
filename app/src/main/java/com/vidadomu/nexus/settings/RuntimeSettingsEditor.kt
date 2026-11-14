@@ -129,7 +129,8 @@ private fun usesStepper(rule: RuleDefinition) = rule.type==RuleType.INTEGER && r
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                     Text(rule.title,style=MaterialTheme.typography.titleSmall)
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically) {
-                        NexusStatusTag(if(own) "Personalizado" else origin,emphasized=own)
+                        // Solo se etiqueta la excepción: una fila sin etiqueta ya dice que está como viene.
+                        if(own) NexusStatusTag("Personalizado",emphasized=true)
                         if(showSection) Text(rule.section,style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
                     }
                 }
