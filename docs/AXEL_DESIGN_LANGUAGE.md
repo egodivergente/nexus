@@ -2,7 +2,7 @@
 
 ## ADN compartido
 
-La referencia es el zorro de `nexus_logo.png`, no una mascota nueva: orejas triangulares altas, mejillas angulares, mirada oblicua, malla convergente y hocico fino. `AxelMark` reduce esa malla a pocos trazos vectoriales para funcionar a 24–56 dp. El contorno y el punto central son constantes; el tema aporta tinta, luz y acento de la mirada. No hay stickers ni animación independiente del animal.
+Desde el 14/11/2026 el logo es el lobo de `drawable-nodpi/nexus_logo.png` (1024 px): facetas negras con contorno dorado, ojos y rayo azules. `AxelMark` muestra ese mismo lobo a tamaño de icono (`nexus_mark_small.png`, 192 px) en vez de una reducción vectorial teñida por el tema; el icono del lanzador usa `nexus_mark.png` (512 px) con un 23 % de margen y la silueta `ic_launcher_foreground.xml` como capa monocroma y como icono de notificación. Hasta esa fecha la referencia era el zorro de malla. No hay stickers ni animación independiente del animal.
 
 La firma explícita aparece en cabeceras compartidas y vacíos de conversación/Biblioteca; en fondos se sugiere mediante curvas de cola, convergencia y luz periférica. Los controles funcionales mantienen una escala común y superficies opacas. No se sobrepone un logo a cada mensaje o miniatura. El icono adaptable de arranque reutiliza orejas, mejillas y hocico; es una firma estática que no depende de preferencias aún no cargadas.
 

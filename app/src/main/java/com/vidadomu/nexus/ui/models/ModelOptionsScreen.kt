@@ -127,6 +127,9 @@ internal fun ModelOptionsScreen(group:CatalogModelGroup,favorites:Set<String>,to
                     if(resources.isNotEmpty() && onUseWithMedia!=null) {
                         onUseWithMedia(selected,resources)
                         ArtBoxInbox.images.value=emptyList()
+                        // Vidal 14-11: las fotos ya viajan al Lienzo. Si la selección de ArtBox seguía viva,
+                        // cada «Crear con este modelo» posterior las volvía a subir y se acumulaban por decenas.
+                        pickedImages=emptyList()
                     } else {
                         if(resources.isNotEmpty()) ArtBoxInbox.images.value=resources
                         onUse(selected)

@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Icono sin fondo: solo el logo de NEXUS (PNG con transparencia) sobre capa transparente. -->
+<!-- Lobo de NEXUS (14/11/2026) sobre el azul de marca. El 23 % de margen deja las puntas de las orejas
+     dentro de la máscara circular de 72 dp; la capa monocroma es la silueta para los iconos temáticos. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/nexus_launcher_background" />
     <foreground>
-        <inset android:drawable="@drawable/nexus_mark" android:inset="16%" />
+        <inset android:drawable="@drawable/nexus_mark" android:inset="23%" />
     </foreground>
+    <monochrome>
+        <inset android:drawable="@drawable/ic_launcher_foreground" android:inset="23%" />
+    </monochrome>
 </adaptive-icon>

@@ -109,9 +109,14 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val generationRepo = app.generationRepository
     val creationPreferences = CreationPreferences(app)
     val comparison = ComparisonController(app, viewModelScope)
-    private val restoredDraft = creationPreferences.draft()
     private val workDraftStore = ModelWorkDraftStore(app)
-    @Volatile private var workDrafts = workDraftStore.load()
+    private val mediaAgeStore = DraftMediaAgeStore(app)
+    // Vidal 14-11: references older than 24 h leave the drafts before the form is rebuilt from them.
+    private val startupMedia = DraftMediaAge.startup(creationPreferences.draft(), workDraftStore.load(),
+        mediaAgeStore.load(), System.currentTimeMillis())
+    private val restoredDraft = startupMedia.draft
+    @Volatile private var workDrafts = startupMedia.workDrafts
+    @Volatile private var mediaAges = startupMedia.ages
     private var pendingSwitchParameters: PendingWorkParameters? = null
     private var pendingParameterTransfer: PendingParameterTransfer? = null
     private var pendingSwitchAnnouncement: CapabilityKey? = null
@@ -181,7 +186,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<CreateUiState> = _uiState.asStateFlow()
 
     init {
+        if(startupMedia.expired.isNotEmpty()) {
+            workDraftStore.save(workDrafts)
+            restoredDraft?.let(creationPreferences::replaceDraft)
+        }
+        mediaAgeStore.save(mediaAges)
         observeDraft()
+        trackDraftMedia()
         viewModelScope.launch {
             modelCatalogRepo.models.collect { models ->
                 if(localPreview) return@collect
@@ -209,6 +220,38 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.value.selectedModel?.let { loadNativeConfiguration(it) }
             }
         }
+    }
+
+    /** Dates each reference the first time it enters the form; the age survives model switches. */
+    private fun trackDraftMedia() = viewModelScope.launch {
+        _uiState.map {state -> (state.attachedMedia+state.retainedMedia).map {it.uriString}.toSet()}
+            .distinctUntilChanged().collect {trackMediaAges()}
+    }
+    private fun trackMediaAges(now:Long=System.currentTimeMillis()) {
+        val state=_uiState.value
+        val referenced=(state.attachedMedia+state.retainedMedia+workDrafts.flatMap {it.media}+
+            switchUndo?.media.orEmpty()+switchUndo?.retainedMedia.orEmpty()).map {it.uriString}.toSet()
+        val next=DraftMediaAge.track(mediaAges,referenced,now)
+        if(next!=mediaAges) {mediaAges=next;mediaAgeStore.save(next)}
+    }
+    /**
+     * Vidal 14-11: references attached more than 24 h ago leave the form and every model draft, so opening a
+     * model never brings back yesterday's pile. Runs when the Canvas opens or ArtBox hands over files, never
+     * in the middle of an import or a submission.
+     */
+    fun expireStaleMedia(now:Long=System.currentTimeMillis()) {
+        val state=_uiState.value
+        if(state.isSubmitting || state.isUploading || state.isPreparingMedia || pendingMediaCopies>0) return
+        trackMediaAges(now)
+        val stale=DraftMediaAge.expired(mediaAges,now)
+        if(stale.isEmpty()) return
+        forgetModelSwitch()
+        state.attachedMedia.filter {it.uriString in stale}.forEach {mediaSession.invalidate(it.slotType,it.fieldKey)}
+        forgetResources(emptySet(),stale)
+        _uiState.update {it.copy(attachedMedia=DraftMediaAge.prune(it.attachedMedia,uris=stale),
+            retainedMedia=DraftMediaAge.prune(it.retainedMedia,uris=stale))}
+        mediaAges=mediaAges-stale
+        mediaAgeStore.save(mediaAges)
     }
 
     @OptIn(kotlinx.coroutines.FlowPreview::class)
@@ -807,41 +850,64 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Vidal 14-11: an explicit removal forgets the file everywhere: in every model draft and in Conservados,
+    // including copies of the same file that entered under another id. Otherwise the next model switch merged
+    // the drafts back and the photos reappeared. A file the form still uses in another field stays.
     fun removeMedia(id: String) { forgetModelSwitch();
-        forgetResource(id)
-        _uiState.value.attachedMedia.find { it.id == id }?.let { mediaSession.invalidate(it.slotType,it.fieldKey) }
+        val before = _uiState.value
+        val removed = (before.attachedMedia + before.retainedMedia).filter { it.id == id }
+        before.attachedMedia.find { it.id == id }?.let { mediaSession.invalidate(it.slotType,it.fieldKey) }
         _uiState.update { current ->
-            current.copy(attachedMedia = current.attachedMedia.filter { it.id != id })
+            val attached = current.attachedMedia.filter { it.id != id }
+            current.copy(attachedMedia = attached,
+                retainedMedia = DraftMediaAge.prune(current.retainedMedia, setOf(id), DraftMediaAge.forgottenUris(removed, attached)))
         }
+        forgetResources(setOf(id), DraftMediaAge.forgottenUris(removed, _uiState.value.attachedMedia))
     }
 
     /** Explicit removal from the workspace; model/mode changes never call this. */
     fun removeRetainedMedia(id: String) { forgetModelSwitch()
-        forgetResource(id)
-        _uiState.update {it.copy(retainedMedia=it.retainedMedia.filterNot {media -> media.id==id})}
+        val removed = (_uiState.value.retainedMedia + _uiState.value.attachedMedia).filter { it.id == id }
+        _uiState.update {it.copy(retainedMedia=DraftMediaAge.prune(it.retainedMedia,setOf(id),
+            DraftMediaAge.forgottenUris(removed,it.attachedMedia)))}
+        forgetResources(setOf(id), DraftMediaAge.forgottenUris(removed, _uiState.value.attachedMedia))
     }
 
-    private fun forgetResource(id:String) {
-        workDrafts=workDrafts.map {it.copy(media=it.media.filterNot {media -> media.id==id})}
+    /** «Quitar todos» in Conservados: the whole parked pile leaves this form and every model draft. */
+    fun clearRetainedMedia() { forgetModelSwitch()
+        val removed = _uiState.value.retainedMedia
+        if (removed.isEmpty()) return
+        _uiState.update { it.copy(retainedMedia = emptyList()) }
+        forgetResources(removed.map { it.id }.toSet(), DraftMediaAge.forgottenUris(removed, _uiState.value.attachedMedia))
+    }
+
+    private fun forgetResources(ids:Set<String>, uris:Set<String>) {
+        if(ids.isEmpty() && uris.isEmpty()) return
+        workDrafts=DraftMediaAge.pruneDrafts(workDrafts,ids,uris)
         workDraftStore.save(workDrafts)
     }
 
     fun clearSlot(slotType: MediaSlotType) { forgetModelSwitch();
         mediaSession.invalidate(slotType)
+        val removed = _uiState.value.attachedMedia.filter { it.slotType == slotType }
         _uiState.update { current ->
             current.copy(attachedMedia = current.attachedMedia.filter { it.slotType != slotType })
         }
+        forgetResources(removed.map { it.id }.toSet(), DraftMediaAge.forgottenUris(removed, _uiState.value.attachedMedia))
     }
 
     fun clearAllMedia() { forgetModelSwitch();
         mediaSession.reset()
+        val removed = _uiState.value.attachedMedia
         _uiState.update { it.copy(attachedMedia = emptyList()) }
+        forgetResources(removed.map { it.id }.toSet(), DraftMediaAge.forgottenUris(removed, emptyList()))
     }
 
     /** Wait for the real media contract before attaching a frame or animating an image. */
     private var reuseImageJob: kotlinx.coroutines.Job? = null
     /** ArtBox transfers the whole selection; incompatible/excess files remain conserved. Nothing is sent. */
     fun prepareWithMedia(model: NexusModel, selection: List<Pair<Uri, String>>) {
+        expireStaleMedia()
         selectModality(model.modalities.first())
         selectModel(model)
         if (selection.isEmpty()) return

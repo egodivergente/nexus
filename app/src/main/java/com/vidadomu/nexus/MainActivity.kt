@@ -1,5 +1,6 @@
 package com.vidadomu.nexus
 
+import androidx.compose.ui.res.imageResource
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.agent.core.assets.storyGenerationContext
 
@@ -738,15 +739,18 @@ private fun NexusStartupOnboardingOverlay(epoch: Int) {
                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
             ) {
-                // Sin recorte ni tarjeta: el logo entero (orejas incluidas) ocupa casi todo el ancho.
+                // Sin recorte ni tarjeta: el lobo entero (orejas incluidas) ocupa casi todo el ancho, a 1024 px.
+                // En horizontal cede altura al texto en vez de empujarlo fuera de la pantalla.
                 androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.nexus_logo),
+                    bitmap = androidx.compose.ui.graphics.ImageBitmap.imageResource(R.drawable.nexus_logo),
                     contentDescription = "Logo oficial de NEXUS",
                     modifier = Modifier
-                        .fillMaxWidth(.8f)
-                        .heightIn(max = 380.dp)
+                        .weight(1f, fill = false)
+                        .fillMaxWidth(.92f)
+                        .heightIn(max = 480.dp)
                         .graphicsLayer { scaleX = logoScale; scaleY = logoScale },
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.High
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.height(20.dp))
                 androidx.compose.material3.Text(

@@ -1,8 +1,13 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Axel: pointed ears, angular cheeks and convergent muzzle from the existing Nexus fox. -->
-    <path android:strokeColor="#83E5EC" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#101D30"
-        android:pathData="M25,20 L43,34 L54,31 L65,34 L83,20 L79,51 L85,64 L65,78 L54,90 L43,78 L23,64 L29,51 Z" />
-    <path android:strokeColor="#83E5EC" android:strokeWidth="1.1" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
-        android:pathData="M25,20 L47,58 L54,80 L61,58 L83,20 M29,51 L43,56 L54,80 L65,56 L79,51 M23,64 L47,68 L54,90 L61,68 L85,64 M43,34 L54,49 L65,34 M54,31 L54,49" />
-    <path android:fillColor="#E9C392" android:pathData="M34,54 L47,59 L43,63 Z M74,54 L61,59 L65,63 Z M49,78 L59,78 L54,83 Z" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Silueta del lobo de NEXUS (logo del 14/11/2026) con los ojos calados.
+     Icono de notificación y capa monocroma del icono del lanzador; el logo a color es nexus_mark / nexus_logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M20.6,4.2 L16.7,19.6 L21.1,46.9 L11.8,64.7 L20.7,61.2 L20.7,61.7 L15.4,70.0 L28.3,73.1 L28.3,73.5 L23.2,74.8 L36.5,86.7 L54.0,103.7 L68.2,89.9 L84.9,74.8 L79.7,73.5 L79.7,73.1 L92.7,69.9 L87.3,61.7 L87.3,61.2 L96.2,64.7 L87.1,47.0 L91.4,20.0 L87.6,4.4 L77.4,13.6 L65.6,23.6 L42.4,23.6 L32.0,14.7 Z M73.0,54.2 L72.9,55.4 L69.4,58.0 L65.4,59.3 L64.1,58.6 L64.3,57.3 L68.3,54.0 L71.9,53.4 Z M35.1,54.0 L36.3,53.3 L40.2,54.0 L44.0,57.2 L44.2,58.4 L43.0,59.1 L39.0,57.9 L35.3,55.2 Z" />
 </vector>

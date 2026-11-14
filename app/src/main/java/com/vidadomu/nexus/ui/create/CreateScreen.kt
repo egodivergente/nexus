@@ -64,6 +64,8 @@ fun CreateScreen(
     onBytePlusSettings: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
+    // Vidal 14-11: al abrir el Lienzo salen las referencias de hace más de 24 h (nunca a mitad de edición).
+    LaunchedEffect(Unit) { viewModel.expireStaleMedia() }
     val comparisonState by viewModel.comparison.state.collectAsState()
     var showComparison by rememberSaveable { mutableStateOf(false) }
     if(showComparison) ComparisonScreen(viewModel.comparison, { showComparison = false }) {
@@ -369,7 +371,7 @@ fun CreateScreen(
                 onAdd={field,items -> viewModel.addCanvasMedia(field.key,state.selectedModel?.let {it.providerId+"/"+it.id}.orEmpty(),items)},
                 onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)
         }
-        if(state.retainedMedia.isNotEmpty()) ConservedMediaSection(state.retainedMedia,!state.isSubmitting,viewModel::removeRetainedMedia)
+        if(state.retainedMedia.isNotEmpty()) ConservedMediaSection(state.retainedMedia,!state.isSubmitting,viewModel::removeRetainedMedia,viewModel::clearRetainedMedia)
         if(state.schemaReady && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && capabilities?.promptVisible==true)
             GenerationQuantityControl(quantity.count,!state.isSubmitting,onCount={count ->
                 batchCount=count
