@@ -21,13 +21,20 @@ ahora describe eso. El catalogo no se ha tocado. El escritorio (`desktop/ui`) mu
 nada. Solo texto: se entrega con `StopReason.OTHER` y un aviso al usuario. Argumentos de herramienta que no son un objeto
 JSON: PROTOCOL en vez de `{}` (tambien sin streaming). Cortados por limite de tokens: `MAX_TOKENS`, que el orquestador
 contesta sin ejecutar. 17 pruebas nuevas en `StreamCutTest`.
-Sin tocar: `desktop/agent/core` (copia sin `LlmResponse.notices`) y el puente AGY (`AntigravityProvider`), que sigue
-entregando el texto de un flujo cortado sin aviso.
 
-AWS CodeBuild, 0 fallos: agent-core 503 (499 ok, 4 omitidas) y cut-core 105 (`3eb2baa8`); app 950/950 en debug (`3eb2baa8`),
-agentPreview (`9e7a8910`), release y offlineQa (`5fc38eaa`, con assembleOfflineQa y assembleOfflineQaAndroidTest).
-`3eb2baa8` figura como FAILED por memoria del compilador al compilar dos variantes a la vez, no por pruebas.
-Sin verificar: GitHub Actions (rama sin subir), pruebas de UI en emulador y APK instalable. Sin llamadas de pago.
+**Puente AXEL (`AntigravityProvider`: AGY, Codex y Grok).** Mismo criterio. Cierran la respuesta el evento `final` con
+estado correcto, `done` (puente heredado) y `[DONE]`. Sin final y con `<NEXUS_TOOL_CALL>` en el texto, cerrado o a medias:
+NETWORK y no se ejecuta nada. Solo texto: `StopReason.OTHER` y aviso. Argumentos que no son un objeto JSON: PROTOCOL en vez
+de `{}`. 10 pruebas mas en `StreamCutTest` (27 en total); una recorre el orquestador de extremo a extremo.
+Contrato leido en la copia de referencia del puente (`axel-native`, `bridge/server.ts`, `bbc90de` del 06-10): Codex, Grok y
+Gemini escriben `final` antes de cerrar en todos los caminos de `/v1/chat`. Sin comprobar contra el puente desplegado en el S25.
+Sin tocar: `desktop/agent/core` (copias propias de los tres proveedores, sin `LlmResponse.notices`).
+
+AWS CodeBuild, 0 fallos. Con el puente incluido (`d56cced2`): agent-core 513 (509 ok, 4 omitidas), cut-core 105 y app
+950/950 en debug. Antes del puente: app 950/950 tambien en agentPreview (`9e7a8910`), release y offlineQa (`5fc38eaa`, con
+assembleOfflineQa y assembleOfflineQaAndroidTest); el puente no toca `app`.
+Sin verificar al escribir esto: GitHub Actions (arranca al subir la rama), pruebas de UI en emulador, APK instalable y el
+puente real. Sin llamadas de pago.
 
 # Guion como pestaña principal vc191 - 08/11/2026
 

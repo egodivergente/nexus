@@ -260,6 +260,8 @@ class AntigravityProvider(
         val dataLines = mutableListOf<String>()
         var streamError: LlmException? = null
         var cancelledByBridge = false
+        // Marca de final del puente: `final` (contrato actual), `done` (puente heredado) o `[DONE]`. Sin ella, el flujo se cortó.
+        var sawEnd = false
         var lastEmittedVisible = ""
         var inputTokens = 0
         var outputTokens = 0
@@ -267,6 +269,7 @@ class AntigravityProvider(
 
         fun flushEvent() {
             if (dataLines.isEmpty()) {
+                if (currentEvent == "done") sawEnd = true
                 currentEvent = "message"
                 return
             }
@@ -274,6 +277,7 @@ class AntigravityProvider(
             dataLines.clear()
             val eventType = currentEvent
             currentEvent = "message"
+            if (rawData == "[DONE]" || eventType == "done") sawEnd = true
             if (rawData.isEmpty() || rawData == "[DONE]") return
             val payload = runCatching { json.parseToJsonElement(rawData).jsonObject }.getOrNull() ?: return
             val effectiveType = payload["type"]?.jsonPrimitive?.contentOrNull ?: eventType
@@ -297,6 +301,7 @@ class AntigravityProvider(
                     inputTokens = payload["input_tokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: inputTokens
                     outputTokens = payload["output_tokens"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: outputTokens
                 }
+                "done" -> sawEnd = true
                 "error" -> {
                     val msg = payload["message"]?.jsonPrimitive?.contentOrNull
                         ?: payload["error"]?.jsonPrimitive?.contentOrNull
@@ -314,6 +319,7 @@ class AntigravityProvider(
                             streamError = mapBridgeError("final_failed", errorMsg ?: "El puente de ${engine.label} no pudo completar la respuesta.")
                         }
                         else -> {
+                            sawEnd = true
                             val current = fullText.toString()
                             if (finalText.isNotEmpty() && (current.isEmpty() || finalText.length > current.length || (TOOL_OPEN_TAG in finalText && TOOL_OPEN_TAG !in current))) {
                                 fullText.setLength(0)
@@ -364,6 +370,11 @@ class AntigravityProvider(
         streamError?.let { throw it }
 
         val raw = fullText.toString()
+        // Sin marca de final el flujo se cortó y no se sabe si faltaba texto u otra llamada: nunca se ejecuta una herramienta de
+        // una respuesta incompleta (tampoco una ya cerrada); el texto recibido se entrega marcado como incompleto.
+        val cut = !sawEnd
+        val who = "el puente de ${engine.label}"
+        if (cut && TOOL_OPEN_TAG in raw) throw SseStream.cutDuringTool(who)
         val parsed = parseAssistantOutput(raw)
         if (parsed.visibleText != lastEmittedVisible) {
             onTextDelta(parsed.visibleText)
@@ -380,7 +391,12 @@ class AntigravityProvider(
             throw LlmException(LlmException.Kind.PROTOCOL,
                 "${engine.label} terminó sin devolver texto ni herramientas. El mensaje se conserva; puedes reintentar la respuesta.")
         }
-        val stopReason = if (parsed.toolUses.isNotEmpty()) StopReason.TOOL_USE else StopReason.END_TURN
+        val stopReason = when {
+            parsed.toolUses.isNotEmpty() -> StopReason.TOOL_USE
+            cut -> StopReason.OTHER
+            else -> StopReason.END_TURN
+        }
+        if (cut) notices += SseStream.cutNotice(who)
         return LlmResponse(
             message = LlmMessage(Role.ASSISTANT, content),
             stopReason = stopReason,
@@ -592,22 +608,25 @@ class AntigravityProvider(
             .replace(INCOMPLETE_TOOL_TAIL_REGEX, "")
             .trim()
 
-    private fun parseToolCallJson(rawJson: String): ContentBlock.ToolUse? = runCatching {
-        val normalized = rawJson.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-        val obj = json.parseToJsonElement(normalized).jsonObject
-        val name = obj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-            ?: obj["tool"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-            ?: return null
-        val id = obj["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-            ?: "agy_tool_${UUID.randomUUID().toString().take(8)}"
-        val inputElement: JsonElement? = obj["input"] ?: obj["arguments"]
-        val inputObj = when (inputElement) {
-            is JsonObject -> inputElement
-            is JsonPrimitive -> runCatching { json.parseToJsonElement(inputElement.content).jsonObject }.getOrNull() ?: buildJsonObject {}
-            else -> buildJsonObject {}
-        }
-        ContentBlock.ToolUse(id = id, name = name, input = inputObj)
-    }.getOrNull()
+    /**
+     * Null si el bloque no es una llamada reconocible (se queda como texto). Unos argumentos que no son un objeto JSON nunca
+     * se sustituyen por `{}`: la herramienta se ejecutaría con la entrada vacía. Ausentes, vacíos o `null` = sin argumentos.
+     */
+    private fun parseToolCallJson(rawJson: String): ContentBlock.ToolUse? {
+        val call = runCatching {
+            val normalized = rawJson.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            val obj = json.parseToJsonElement(normalized).jsonObject
+            val toolName = obj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: obj["tool"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: return null
+            val callId = obj["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: "agy_tool_${UUID.randomUUID().toString().take(8)}"
+            val rawInput: JsonElement? = obj["input"] ?: obj["arguments"]
+            Triple(callId, toolName, rawInput)
+        }.getOrNull() ?: return null
+        val input = ToolArguments.parse(call.third) ?: throw ToolArguments.invalid(call.second)
+        return ContentBlock.ToolUse(id = call.first, name = call.second, input = input)
+    }
 
     internal class BridgeImage(val key: String, val name: String, val mimeType: String, val bytes: ByteArray)
 
