@@ -117,8 +117,16 @@ internal object CapabilityConstraintEngine {
                 issue(CapabilityIssueKind.DEPENDENCY, rule.fieldKey,
                     "«${rule.fieldKey}» no es compatible con ${rule.whenValues.keys.joinToString()}. Elige una combinación publicada.")
         }
-        val represented = known + capabilities.inputs.map {it.field.key} + capabilities.prompt.fieldKey + "model"
-        model.nativeRequiredFields.filter {it !in represented}.forEach { key ->
+        // El prompt se declara de dos maneras: con el nombre del contrato (contractPromptField) o con el
+        // genérico «prompt», que es como lo piden casi todos los adaptadores. El compositor siempre muestra
+        // la caja de texto, así que ambos nombres están representados; contar solo uno bloqueaba modelos
+        // perfectamente utilizables pidiendo arreglar unos parámetros que no tenían nada que arreglar.
+        val represented = known + capabilities.inputs.map {it.field.key} + capabilities.prompt.fieldKey + "prompt" + "model"
+        // Un campo con forma de objeto se declara requerido por su raíz («voice») pero se rellena con sus
+        // hijos («voice.presetId», «voice.type»): si alguno está representado, la entrada está cubierta.
+        model.nativeRequiredFields.filter { key ->
+            key !in represented && represented.none {it != null && it.startsWith("$key.")}
+        }.forEach { key ->
             issue(CapabilityIssueKind.UNKNOWN, key, "El contrato exige una entrada aún no representada: $key.")
         }
         // Keep reviewed provider-specific compatibility checks in their original adapter.
