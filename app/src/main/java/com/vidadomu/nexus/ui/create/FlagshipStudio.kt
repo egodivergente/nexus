@@ -9,7 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -176,19 +176,19 @@ internal fun FlagshipStudioHeader(
             androidx.compose.foundation.text.selection.SelectionContainer {Text(identity.exactId,style=MaterialTheme.typography.bodySmall)}
         }},confirmButton={TextButton(onClick={showIdentity=false}) {Text("Cerrar")}})
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-        Surface(onClick=onAllModels, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(onClick={ haptics.perform(NexusHapticEvent.SELECTION); onAllModels() }, shape=NexusTokens.card, color=MaterialTheme.colorScheme.surfaceContainerHigh) {
             Row(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8), verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
+                horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 BrandLogo(organization=selectedModel?.organization, modelId=selectedModel?.id, size=28.dp)
                 Column(Modifier.weight(1f)) {
-                    Text(family ?: "Elegir familia",style=MaterialTheme.typography.titleSmall,maxLines=2)
+                    Text(family ?: "Elegir familia",style=MaterialTheme.typography.titleSmall,maxLines=2,overflow=TextOverflow.Ellipsis)
                     Text(identity?.detail ?: "Elegir modelo",style=MaterialTheme.typography.labelSmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
                 }
                 if(currentVariant!=null) CatalogVariantSelector(variants,currentVariant,{group ->
                     catalogVariantContinuation(group,selectedModel)?.let(onChoose) ?: onVariants(group)
-                },modifier=Modifier.widthIn(max=NexusTokens.minimumTouch*2+NexusTokens.space16),compact=true)
-                if(selectedModel!=null) IconButton(onClick={showIdentity=true}) {Icon(Icons.Default.Info,"Identidad exacta del modelo",Modifier.size(NexusTokens.iconSmall))}
+                },modifier=Modifier.widthIn(max=132.dp),compact=true)
+                if(selectedModel!=null) IconButton(onClick={ haptics.perform(NexusHapticEvent.SELECTION); showIdentity=true }, modifier=Modifier.size(40.dp)) {Icon(Icons.Default.Info,"Identidad exacta del modelo",Modifier.size(NexusTokens.iconSmall))}
                 Icon(Icons.Default.SwapHoriz,"Cambiar modelo",Modifier.size(NexusTokens.iconMedium))
             }
         }
@@ -201,8 +201,8 @@ internal fun FlagshipStudioHeader(
 internal fun LauncherWorkspaceHeader(modality:Modality,onModality:(Modality)->Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),verticalAlignment=Alignment.CenterVertically,
         horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-        Text("Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
-        Box(Modifier.width(176.dp)) {StudioModalitySegments(modality,rememberSystemAnimatorsEnabled(),onModality)}
+        Text("Lanzadera",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+        Box(Modifier.widthIn(min=176.dp, max=196.dp)) {StudioModalitySegments(modality,rememberSystemAnimatorsEnabled(),onModality)}
         com.vidadomu.nexus.ui.components.NexusSettingsButton()
     }
 }
@@ -221,10 +221,11 @@ private fun StudioModalitySegments(
         Row(Modifier.padding(NexusTokens.space4)) {
             listOf(Modality.IMAGE to "Imagen", Modality.VIDEO to "Vídeo").forEach { (target, label) ->
                 val selected = modality == target
+                val colorSpec = if (animate) spring<Color>(dampingRatio = 0.82f, stiffness = 500f) else snap()
                 val container by animateColorAsState(if (selected) scheme.primary else Color.Transparent,
-                    if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Segment $label")
+                    colorSpec, label = "Segment $label")
                 val content by animateColorAsState(if (selected) scheme.onPrimary else scheme.onSurfaceVariant,
-                    if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Segment text $label")
+                    colorSpec, label = "Segment text $label")
                 Surface(Modifier.weight(1f).heightIn(min = segmentHeight)
                     .semantics { this.selected = selected }
                     .clickable(role = Role.Tab) {
@@ -234,8 +235,9 @@ private fun StudioModalitySegments(
                         }
                     },
                     shape = NexusTokens.action, color = container) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.heightIn(min = segmentHeight).padding(vertical = NexusTokens.space4)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.heightIn(min = segmentHeight).padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
                         Text(label, style = MaterialTheme.typography.labelLarge, color = content,
+                            maxLines = 1, softWrap = false,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                     }
                 }
@@ -247,16 +249,18 @@ private fun StudioModalitySegments(
 @Composable
 private fun FlagshipCard(match: FlagshipMatch, active: Boolean, animate: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = rememberNexusHaptics()
+    val spec = if (animate) spring<Color>(dampingRatio = 0.84f, stiffness = 480f) else snap()
     val border by animateColorAsState(if (active) scheme.primary else scheme.outlineVariant,
-        if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Flagship border")
+        spec, label = "Flagship border")
     val container by animateColorAsState(if (active) scheme.primary.copy(alpha = .10f) else scheme.surface,
-        if (animate) tween(NexusTokens.contentDuration) else snap(), label = "Flagship container")
+        spec, label = "Flagship container")
     Surface(Modifier.width(128.dp).height(112.dp)
         .semantics(mergeDescendants = true) {
             contentDescription = "Modelo ${match.model.displayName}" + if (active) ", activo" else ""
             selected = active
         }
-        .clickable(role = Role.Button, onClick = onClick),
+        .clickable(role = Role.Button) { haptics.perform(NexusHapticEvent.SELECTION); onClick() },
         shape = NexusTokens.card, color = container, border = BorderStroke(if (active) 1.5.dp else .5.dp, border)) {
         Column(Modifier.padding(NexusTokens.space8), verticalArrangement = Arrangement.SpaceBetween) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {

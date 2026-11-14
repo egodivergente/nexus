@@ -1,7 +1,9 @@
 package com.vidadomu.nexus.ui.navigation
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.graphics.Color
 import com.vidadomu.nexus.ui.components.StudioChrome
 import androidx.compose.foundation.background
@@ -33,19 +35,28 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
     val currentRoute=selectedRoute ?: entry?.destination?.route
     if(currentRoute?.startsWith("output")==true) return
     val haptic = rememberNexusHaptics()
+    val motionAllowed = rememberNexusMotionAllowed()
     // Visible by default; the optional hidden mode retains the edge-swipe shortcut.
     val visible = ChromeVisibility.shown
     androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
     StudioChrome(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
-            HorizontalDivider(thickness=NexusTokens.divider,color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.45f))
             Row(Modifier.fillMaxWidth().navigationBarsPadding()
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .padding(vertical=NexusTokens.space4),
                 verticalAlignment=Alignment.CenterVertically) {
                 Screen.bottomNavItems.forEach { screen ->
                     val selected=currentRoute==screen.route
-                    val tone by animateColorAsState(if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent, tween(NexusTokens.pressDuration), label="Navigation tone")
+                    val tone by animateColorAsState(
+                        if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent,
+                        if (motionAllowed) spring(dampingRatio = 0.82f, stiffness = 500f) else snap(),
+                        label="Navigation tone"
+                    )
+                    val pillWidth by animateDpAsState(
+                        if (selected) 52.dp else 32.dp,
+                        if (motionAllowed) spring(dampingRatio = 0.80f, stiffness = 480f) else snap(),
+                        label = "Navigation pill"
+                    )
                     Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
                         .semantics { contentDescription=screen.title }
                         .selectable(selected=selected,role=Role.Tab,onClick={
@@ -68,7 +79,7 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(0.dp)) {
-                        Box(Modifier.width(52.dp).height(NexusTokens.space24).clip(MaterialTheme.shapes.small)
+                        Box(Modifier.width(pillWidth).height(NexusTokens.space24).clip(MaterialTheme.shapes.small)
                             .background(tone),
                             contentAlignment=Alignment.Center) {
                             Icon(screen.icon,contentDescription=null,

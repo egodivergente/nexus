@@ -664,9 +664,21 @@ private fun reasoningAvailable(ui: AssistantUiState): Boolean =
     ui.settings.backend == AssistantSettings.BACKEND_CODEX ||
     ui.settings.brain?.let { it.capabilities.reasoning && it.protocol != BrainProtocol.CUSTOM_REST } == true
 
-/** Los IDs internos (ord_…) no se enseñan en el chat; la tarjeta y su «Detalles» ya identifican el encargo. Copiar conserva el texto original. */
+private val HIDE_ID_GROUP_PARENS = Regex("""[ \t]*\(\s*`?(?:ord|ast|att|job|req)_[0-9a-zA-Z_-]{6,24}`?(?:\s*[,;·•]\s*`?(?:ord|ast|att|job|req)_[0-9a-zA-Z_-]{6,24}`?)*\s*\)""")
+private val HIDE_SINGLE_INTERNAL_ID = Regex("""[ \t]*`?(?:ord|ast|att|job|req)_[0-9a-zA-Z_-]{6,24}`?""")
+
+/** Los IDs internos (ord_, ast_, att_…) no se enseñan en el chat; tampoco quedan paréntesis ni comas huérfanas. */
 internal fun hideOrderIds(text: String): String =
-    text.replace(Regex("""[ \t]*\(?`?ord_[0-9a-f]{6,}`?\)?"""), "").replace(Regex(" {2,}"), " ")
+    text.replace(HIDE_ID_GROUP_PARENS, "")
+        .replace(HIDE_SINGLE_INTERNAL_ID, "")
+        .replace(Regex("""\(\s*[,;·•\s]+\)"""), "")
+        .replace(Regex("""\(\s*[,;·•]+\s*"""), "(")
+        .replace(Regex("""\s*[,;·•]+\s*\)"""), ")")
+        .replace(Regex("""[ \t]*,[ \t]*(?:,[ \t]*)+"""), ", ")
+        .replace(Regex("""^[ \t]*,[ \t]*""", RegexOption.MULTILINE), "")
+        .replace(Regex("""([:;(\[])\s*,\s*"""), "$1 ")
+        .replace(Regex("""[ \t]*,[ \t]*(?=[.;:!?])"""), "")
+        .replace(Regex(""" {2,}"""), " ")
 
 /** Panel propio de encargos: estado con icono, modelo y coste; tocar uno lleva a su tarjeta en el chat. Sin IDs. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -714,9 +726,9 @@ private fun EmptyHint() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = NexusTokens.space8, start = NexusTokens.space8, end = NexusTokens.space8),
+            .padding(top = NexusTokens.space12, start = NexusTokens.space16, end = NexusTokens.space16),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)
+        verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
     ) {
         com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(56.dp),contentDescription="Axel · Nexus")
         Text(
@@ -725,11 +737,6 @@ private fun EmptyHint() {
             color = TextPrimary
         )
         Text("¿Una imagen, un vídeo o una idea por desarrollar?", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-        Text(
-            text = "v${com.vidadomu.nexus.BuildConfig.VERSION_NAME} · ${com.vidadomu.nexus.BuildConfig.CODENAME} · build ${com.vidadomu.nexus.BuildConfig.VERSION_CODE}",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextMuted
-        )
     }
 }
 
@@ -915,12 +922,14 @@ internal fun UserBubble(item:ChatItem.User) {
                 }
         }
         Row(Modifier.padding(end=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            val bubbleHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
             Box {
-                IconButton(onClick={actions=true},modifier=Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreHoriz,"Acciones del mensaje",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
+                IconButton(onClick={ bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); actions=true },modifier=Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreVert,"Acciones del mensaje",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
                 }
                 DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
                     DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, leadingIcon={Icon(Icons.Default.ContentCopy,null)}, onClick = {
+                        bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
                         clipboard.setText(AnnotatedString(item.text)); actions = false
                     })
                     DropdownMenuItem(text = { Text("Compartir mensaje") }, leadingIcon={Icon(Icons.Default.Share,null)}, onClick = {
@@ -1033,13 +1042,15 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
             }
         }
         if(item.text.isNotBlank() && item.stop!="STREAMING") Row(Modifier.padding(horizontal=NexusTokens.space12),verticalAlignment=Alignment.CenterVertically) {
+            val responseHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
             MessageMeta(item.at,item.tookMs,Modifier.weight(1f),item.by)
             Box {
-                IconButton(onClick={actionsExpanded=true},modifier=Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreHoriz,"Acciones de la respuesta",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
+                IconButton(onClick={ responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); actionsExpanded=true },modifier=Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreVert,"Acciones de la respuesta",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
                 }
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
+                        responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
                         Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()
                     })

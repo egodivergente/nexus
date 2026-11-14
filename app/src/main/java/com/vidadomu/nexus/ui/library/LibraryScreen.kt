@@ -571,7 +571,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
-            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            val filterHaptics = rememberNexusHaptics()
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.space24, top = NexusTokens.space4, bottom = NexusTokens.space4),
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 item {StudioFilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
@@ -586,7 +592,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     DropdownMenu(expanded=originMenu,onDismissRequest={originMenu=false}) {
                         origins.forEach {origin -> DropdownMenuItem(text={Text(origin.label)},
                             trailingIcon={if(origin==originFilter) Icon(Icons.Default.Check,null,tint=MaterialTheme.colorScheme.primary)},
-                            onClick={originFilter=origin;originMenu=false})}
+                            onClick={filterHaptics.perform(NexusHapticEvent.SELECTION, changed = origin != originFilter); originFilter=origin; originMenu=false})}
                     }
                 }}
                 item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Icon(Icons.Default.Star,null,Modifier.size(NexusTokens.space16))},

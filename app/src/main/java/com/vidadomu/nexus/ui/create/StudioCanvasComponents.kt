@@ -97,22 +97,22 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     val visuals=LocalNexusVisuals.current
     val borderColor by animateColorAsState(
         if(focused) MaterialTheme.colorScheme.primary else visuals.promptBorder,
-        tween(if(motion) NexusTokens.contentDuration else 0), label = "Prompt focus")
+        if(motion) spring(dampingRatio = 0.84f, stiffness = 480f) else snap(), label = "Prompt focus")
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
     val toolbarTint=if(enabled) MaterialTheme.colorScheme.onSurfaceVariant else visuals.disabledText
     Column(modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(visuals.promptSurface)
         .border(if(focused) NexusTokens.divider*2 else NexusTokens.divider,borderColor,MaterialTheme.shapes.medium)
-        .then(if(initiallyExpanded || onExpand==null) Modifier.animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0)) else Modifier)) {
+        .then(if(initiallyExpanded || onExpand==null) Modifier.animateContentSize(if(motion) spring(dampingRatio = 0.84f, stiffness = 460f) else snap()) else Modifier)) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .bringIntoViewRequester(bringPromptIntoView)
             .onFocusChanged { focused = it.isFocused;onEditorFocusChanged(it.isFocused) }
             .semantics { contentDescription = "Prompt de creación" }
-            .heightIn(min = if(expanded) 176.dp else 72.dp)
-            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8),
+            .heightIn(min = if(expanded) 176.dp else 96.dp)
+            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space12, bottom = NexusTokens.space4),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            // Collapsed editor stays around 120–128 dp including its toolbar. Text scrolls; no text is discarded.
-            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 3,
+            // Dedicated prompt drawer breathes cleanly; longer drafts scroll without losing content.
+            enabled = enabled, minLines = 3, maxLines = if(expanded) 18 else 5,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,

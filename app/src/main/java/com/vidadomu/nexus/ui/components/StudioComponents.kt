@@ -2,13 +2,15 @@ package com.vidadomu.nexus.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
@@ -47,6 +49,11 @@ fun StudioChrome(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     // Barras con tono propio (jerarquía: barras > fondo > tarjetas), sin mezclarse con el contenido.
     Box(modifier.clip(RectangleShape).background(com.vidadomu.nexus.ui.theme.LocalChromeColor.current)) {
         content()
+        HorizontalDivider(
+            modifier = Modifier.align(Alignment.TopCenter),
+            thickness = NexusTokens.divider,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+        )
     }
 }
 
@@ -78,10 +85,12 @@ fun StudioTextField(
     minLines: Int = 1, maxLines: Int = Int.MAX_VALUE,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     TextField(value, onValueChange, modifier, enabled = enabled, readOnly = readOnly,
         singleLine = singleLine, label = label, placeholder = placeholder, leadingIcon = leadingIcon,
-        minLines = minLines, maxLines = maxLines, keyboardOptions = keyboardOptions, visualTransformation = visualTransformation,
+        minLines = minLines, maxLines = maxLines, keyboardOptions = keyboardOptions, keyboardActions = keyboardActions,
+        visualTransformation = visualTransformation,
         trailingIcon = trailingIcon, supportingText = supportingText, textStyle = textStyle,
         shape = shape, colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -95,12 +104,19 @@ fun StudioTextField(
 fun StudioToolChip(label: String, description: String = label, enabled: Boolean = true,
     selected: Boolean = false, onClick: () -> Unit) {
     val haptic = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
+    val motionAllowed = com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed()
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(NexusTokens.pressDuration), label = "Chip press")
+    val scale by animateFloatAsState(
+        if (pressed) .97f else 1f,
+        if (motionAllowed) spring(dampingRatio = 0.82f, stiffness = 520f) else snap(),
+        label = "Chip press"
+    )
     val color by animateColorAsState(
         if(selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-        tween(NexusTokens.pressDuration), label = "Chip tone")
+        if (motionAllowed) spring(dampingRatio = 0.85f, stiffness = 480f) else snap(),
+        label = "Chip tone"
+    )
     Box(Modifier.heightIn(min = NexusTokens.minimumTouch).stylusHover(enabled), contentAlignment = Alignment.Center) {
         Surface(onClick = { haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled, interactionSource = interactions, color = color,

@@ -53,9 +53,19 @@ import com.vidadomu.nexus.settings.RuntimePreferences
         if(configuration.value("ui.photo").isNotBlank()) {
             val saved=configuration.value("ui.photoBlur").toFloatOrNull() ?: 0f
             var draft by remember(saved) {mutableFloatStateOf(saved)}
+            var lastStep by remember(saved) {mutableIntStateOf((saved / 10f).toInt())}
             Text("Desenfoque de la foto · ${draft.toInt()} %",style=MaterialTheme.typography.labelLarge)
-            Slider(draft,{draft=it},valueRange=0f..100f,onValueChangeFinished={store.set("ui.photoBlur",draft.toString())},
-                modifier=Modifier.semantics {contentDescription="Desenfoque de la foto"})
+            Slider(draft,{
+                val step = (it / 10f).toInt()
+                if (step != lastStep) {
+                    lastStep = step
+                    haptics.perform(NexusHapticEvent.GESTURE_TICK)
+                }
+                draft = it
+            },valueRange=0f..100f,onValueChangeFinished={
+                store.set("ui.photoBlur",draft.toString())
+                haptics.perform(NexusHapticEvent.SELECTION)
+            },modifier=Modifier.semantics {contentDescription="Desenfoque de la foto"})
         }
         FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
             OutlinedButton(onClick={photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))}) {Text("Elegir foto")}

@@ -26,15 +26,17 @@ android {
         targetSdk = 35
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {cmake {arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")}}
-        versionCode = 208
-        versionName = "1.9.172-agent"
+        versionCode = 209
+        versionName = "1.9.173-agent"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "OFFLINE_QA", "false")
         buildConfigField("String", "CODENAME", "\"${versionCodename(versionCode!!)}\"")
-        val revision = providers.gradleProperty("nexusRevision").orElse(providers.exec {
+        val gitRevision = providers.exec {
             commandLine("git", "rev-parse", "--short=12", "HEAD")
-        }.standardOutput.asText.map { it.trim() }).get()
+            isIgnoreExitValue = true
+        }.standardOutput.asText.map { it.trim().ifEmpty { "unknown" } }
+        val revision = providers.gradleProperty("nexusRevision").orElse(gitRevision).get()
         buildConfigField("String", "SOURCE_REVISION", "\"${revision.replace(Regex("[^a-zA-Z0-9._-]"), "")}\"")
         buildConfigField("String", "BUILD_DATE", "\"${LocalDate.now(ZoneOffset.UTC)}\"")
         // Claves de Bedrock opcionales desde un fichero local FUERA del repo: -PnexusBedrockFile=<ruta a .properties>

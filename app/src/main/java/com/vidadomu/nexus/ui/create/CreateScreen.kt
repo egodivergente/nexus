@@ -221,6 +221,7 @@ fun CreateScreen(
     ) { innerPadding ->
         FixedLauncherWorkspace(
             modifier=Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)
+                .windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.top)
                 .padding(horizontal=screenMargin,vertical=NexusTokens.space4),
             scroll=canvasScroll,imeVisible=compactTyping,compactEditor=compactEditor,promptVisible=capabilities?.promptVisible==true,
             header={LauncherWorkspaceHeader(state.selectedModality,viewModel::selectModality)},

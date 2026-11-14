@@ -79,29 +79,52 @@ private fun mdStyles(): MdStyles {
     )
 }
 
-private val TECHNICAL_ID = Regex("^att_[0-9a-zA-Z]{6,16}$")
+private val TECHNICAL_ID = Regex("^(?:att|ord|ast|job|req)_[0-9a-zA-Z_-]{4,24}$")
 
 /**
- * Internal attachment ids (`att_da34bd2a`) mean nothing to the reader: they are dropped together with the
- * parentheses around them, so «padre (`att_…`)» reads «padre». The agent still has the ids in its own context.
+ * Internal asset/order/attachment ids (`att_…`, `ast_…`, `ord_…`, `job_…`, `req_…`) mean nothing to the reader:
+ * they are dropped together with empty delimiters/separators around them so lists never leave `( , , )`.
  */
 internal fun hideTechnicalIds(spans: List<MdSpan>): List<MdSpan> {
     if (spans.none { it.code && TECHNICAL_ID.matches(it.text.trim()) }) return spans
-    val out = spans.toMutableList()
-    var i = 0
-    while (i < out.size) {
-        val sp = out[i]
+    val removedAt = MutableList(spans.size) { false }
+    val out = mutableListOf<MdSpan>()
+    spans.forEach { sp ->
         if (sp.code && TECHNICAL_ID.matches(sp.text.trim())) {
-            val prev = out.getOrNull(i - 1); val next = out.getOrNull(i + 1)
-            val wrapped = prev != null && !prev.code && prev.text.trimEnd().endsWith("(") && next != null && !next.code && next.text.startsWith(")")
-            if (wrapped) {
-                out[i - 1] = prev!!.copy(text = prev.text.trimEnd().removeSuffix("(").trimEnd())
-                out[i + 1] = next!!.copy(text = next.text.removePrefix(")"))
-            }
-            out.removeAt(i)
-        } else i++
+            removedAt[out.size] = true
+        } else {
+            out += sp
+        }
     }
-    return out
+    if (out.isEmpty()) return emptyList()
+    // Clean comma/paren artifacts left where technical ids used to sit.
+    val cleaned = out.mapIndexed { idx, sp ->
+        if (sp.code || sp.link != null) sp
+        else {
+            var txt = sp.text
+            if (idx < removedAt.size && removedAt[idx]) {
+                txt = txt.replace(Regex("""^[ \t]*[,;·•]+[ \t]*"""), "")
+            }
+            if (idx + 1 < removedAt.size && removedAt[idx + 1]) {
+                txt = txt.replace(Regex("""[ \t]*[,;·•]+[ \t]*$"""), "")
+            }
+            txt = txt.replace(Regex("""\s*\(\s*[,;·•\s]*\)"""), "")
+            sp.copy(text = txt)
+        }
+    }.filter { it.code || it.text.isNotEmpty() }.toMutableList()
+    var i = 0
+    while (i + 1 < cleaned.size) {
+        val a = cleaned[i]
+        val b = cleaned[i + 1]
+        if (!a.code && !b.code && a.link == null && b.link == null &&
+            a.text.trimEnd().endsWith("(") && b.text.trimStart().startsWith(")")
+        ) {
+            cleaned[i] = a.copy(text = a.text.trimEnd().removeSuffix("(").trimEnd())
+            cleaned[i + 1] = b.copy(text = b.text.trimStart().removePrefix(")"))
+        }
+        i++
+    }
+    return cleaned.filter { it.code || it.text.isNotEmpty() }
 }
 
 private val TOOL_NAME = Regex("^[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?:\\(.*\\))?$")
@@ -275,6 +298,7 @@ private fun MdListRow(item: ListItem, st: MdStyles) {
 @Composable
 private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
     val clipboard = LocalClipboardManager.current
+    val haptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(1600); copied = false } }
     val label = when (b.language?.lowercase()) {
@@ -285,7 +309,7 @@ private fun MdCodeBlock(b: MdBlock.Code, st: MdStyles) {
         Column {
             Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space12, end = NexusTokens.space4, top = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
                 Text(label, style = st.label.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize), color = st.accent.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
-                TextButton(onClick = { clipboard.setText(AnnotatedString(b.code)); copied = true }, contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = 0.dp)) {
+                TextButton(onClick = { haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION); clipboard.setText(AnnotatedString(b.code)); copied = true }, contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = 0.dp)) {
                     Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, null, Modifier.size(15.dp), tint = st.accent)
                     Spacer(Modifier.width(NexusTokens.space4))
                     Text(if (copied) "Copiado" else "Copiar", style = MaterialTheme.typography.labelMedium, color = st.accent)

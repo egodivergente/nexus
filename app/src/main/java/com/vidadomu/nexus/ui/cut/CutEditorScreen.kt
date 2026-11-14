@@ -317,26 +317,61 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     @Composable
     fun Transport() {
-        Row(Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(Timecode.formatFrames(playhead, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Text(" / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.weight(1f))
-            val rate = project.settings.frameRate
-            IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) { Icon(Icons.Default.SkipPrevious, "Fotograma anterior") }
-            Surface(onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) }, shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary) }
+        Box(Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 12.dp)) {
+            Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                val tcStyle = MaterialTheme.typography.labelSmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontFeatureSettings = "tnum",
+                )
+                Text(
+                    Timecode.formatFrames(playhead, project.settings.frameRate),
+                    style = tcStyle,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    " / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate),
+                    style = tcStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            IconButton(onClick = { vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) { Icon(Icons.Default.SkipNext, "Fotograma siguiente") }
-            Spacer(Modifier.weight(1f))
-            Text(if (selectedClips.isEmpty()) timeline.allTracks.sumOf { it.clips.size }.let { "$it ${if (it == 1) "clip" else "clips"}" } else "${selectedClips.size} seleccionado${if (selectedClips.size > 1) "s" else ""}",
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val rate = project.settings.frameRate
+            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { haptics.perform(NexusHapticEvent.GESTURE_TICK); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) {
+                    Icon(Icons.Default.SkipPrevious, "Fotograma anterior")
+                }
+                Surface(
+                    onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+                IconButton(onClick = { haptics.perform(NexusHapticEvent.GESTURE_TICK); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) {
+                    Icon(Icons.Default.SkipNext, "Fotograma siguiente")
+                }
+            }
+            Text(
+                if (selectedClips.isEmpty()) timeline.allTracks.sumOf { it.clips.size }.let { "$it ${if (it == 1) "clip" else "clips"}" }
+                else "${selectedClips.size} selecc.",
+                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
         }
     }
 
     @Composable
     fun TimelinePane(modifier: Modifier) {
         Row(modifier.fillMaxWidth()) {
-            TrackHeaders(timeline, viewport.scrollY, palette, onToggleLock = { t -> vm.toggleTrack(t.id, locked = !t.locked) }, onToggleMute = { t -> vm.toggleTrack(t.id, muted = !t.muted) })
+            TrackHeaders(
+                timeline, viewport.scrollY, palette,
+                onToggleLock = { t -> haptics.perform(NexusHapticEvent.TOGGLE_DECISIVE); vm.toggleTrack(t.id, locked = !t.locked) },
+                onToggleMute = { t -> haptics.perform(NexusHapticEvent.TOGGLE_DECISIVE); vm.toggleTrack(t.id, muted = !t.muted) }
+            )
             TimelineCanvas(
                 timeline = timeline, selection = selection, playheadUs = playhead, frameRate = project.settings.frameRate, media = media,
                 offline = offline, waveforms = waveforms, thumbnails = vm.thumbnails, thumbVersion = thumbVersion, snapLineUs = snapLine,
@@ -382,7 +417,11 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
     }
 
     Surface(Modifier.fillMaxSize(), color = palette.bg) {
-        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)) {
+        BoxWithConstraints(
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.top)
+                .windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
+        ) {
             val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
             val typing = WindowInsets.isImeVisible
             val trackHeight = (RULER_DP + timeline.allTracks.sumOf {
@@ -465,8 +504,12 @@ private object ExportStateAck { fun ack() = com.vidadomu.nexus.cut.export.Export
 
 @Composable
 private fun Tool(icon: ImageVector, label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val toolHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     Column(
-        Modifier.clip(NexusTokens.radiusSmall).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp).width(56.dp),
+        Modifier.clip(NexusTokens.radiusSmall).clickable(enabled = enabled) {
+            toolHaptics.perform(NexusHapticEvent.SELECTION)
+            onClick()
+        }.padding(horizontal = 10.dp, vertical = 6.dp).width(56.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f)
@@ -480,17 +523,27 @@ private fun Tool(icon: ImageVector, label: String, enabled: Boolean = true, onCl
 @Composable
 private fun TrackHeaders(timeline: com.vidadomu.nexus.cut.model.Timeline, scrollY: Float, palette: CutPalette, onToggleLock: (Track) -> Unit, onToggleMute: (Track) -> Unit) {
     val density = LocalDensity.current
-    Box(Modifier.width(52.dp).fillMaxHeight().background(palette.panel).clip(androidx.compose.ui.graphics.RectangleShape)) {
+    Box(Modifier.width(64.dp).fillMaxHeight().background(palette.panel).clip(androidx.compose.ui.graphics.RectangleShape)) {
         Column(Modifier.offset { IntOffset(0, (with(density) { RULER_DP.dp.toPx() } - scrollY).toInt()) }) {
             for (t in timeline.videoTracks.asReversed() + timeline.audioTracks) {
                 val h = if (t.collapsed) COLLAPSED_ROW_DP else if (t.kind == TrackKind.VIDEO) VIDEO_ROW_DP else AUDIO_ROW_DP
-                Column(Modifier.height(h.dp).fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.Center) {
+                Column(Modifier.height(h.dp).fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.Center) {
                     Text(t.name.substringBefore(' '), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = palette.textDim, maxLines = 1)
-                    Row {
-                        Icon(if (t.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (t.locked) "Desbloquear ${t.name}" else "Bloquear ${t.name}",
-                            Modifier.size(20.dp).clickable { onToggleLock(t) }.padding(2.dp), tint = if (t.locked) palette.accent else palette.textDim)
-                        Icon(if (t.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, if (t.muted) "Activar ${t.name}" else "Silenciar ${t.name}",
-                            Modifier.size(20.dp).clickable { onToggleMute(t) }.padding(2.dp), tint = if (t.muted) palette.accent else palette.textDim)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(if (t.collapsed) 20.dp else 26.dp).clip(CircleShape).clickable { onToggleLock(t) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(if (t.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (t.locked) "Desbloquear ${t.name}" else "Bloquear ${t.name}",
+                                Modifier.size(15.dp), tint = if (t.locked) palette.accent else palette.textDim)
+                        }
+                        Box(
+                            Modifier.size(if (t.collapsed) 20.dp else 26.dp).clip(CircleShape).clickable { onToggleMute(t) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(if (t.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, if (t.muted) "Activar ${t.name}" else "Silenciar ${t.name}",
+                                Modifier.size(15.dp), tint = if (t.muted) palette.accent else palette.textDim)
+                        }
                     }
                 }
             }
@@ -510,8 +563,9 @@ private fun TextDialog(title: String, initial: String, multiline: Boolean = fals
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChoiceDialog(title: String, options: List<String>, current: String?, label: (String) -> String, onDismiss: () -> Unit, onChoose: (String) -> Unit) {
+    val choiceHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) },
-        text = { FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { for (o in options) FilterChip(selected = o == current, onClick = { onChoose(o) }, label = { Text(label(o)) }) } },
+        text = { FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { for (o in options) FilterChip(selected = o == current, onClick = { choiceHaptics.perform(NexusHapticEvent.SELECTION); onChoose(o) }, label = { Text(label(o)) }) } },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
 }
 
