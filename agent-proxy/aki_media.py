@@ -95,7 +95,8 @@ def prepare(request, profile_root=None):
                 else:
                     raise media_error("Este puente lee PDF, imágenes y documentos de texto. Exporta este documento de Office a PDF.")
             converted["messages"].append({**message, "content": content})
-        if not views:
+        llm = request.get("akiProfileLlm")
+        if not views and llm is None:
             yield converted, "nexus-bridge", set()
             return
         if len(views) > 40:
@@ -106,6 +107,13 @@ def prepare(request, profile_root=None):
             base = Path(__file__).parent / "aki-profile"
             manifest = json.loads((base / "manifest.json").read_text())
             manifest["metadata"]["name"] = profile.name
+            if llm is not None:
+                manifest["llm"] = llm
+            if not views:
+                (profile / "manifest.json").write_text(json.dumps(manifest))
+                shutil.copyfile(base / "system.txt", profile / "system.txt")
+                yield converted, profile.name, set()
+                return
             commands = {"view " + path for path in views}
             manifest["tools"]["permissions"] = {
                 "deny": ["Write(*)", "Edit(*)", "Glob(*)", "Task(*)", "Agent(*)"],

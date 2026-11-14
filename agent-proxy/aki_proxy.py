@@ -13,10 +13,25 @@ import subprocess
 import threading
 import time
 from http.server import ThreadingHTTPServer
-from nexus_proxy import NexusProxy, ProxyError, load_config, make_handler
+from nexus_proxy import NexusProxy, ProxyError, load_config
 from aki_media import prepare
 
 MODEL = "openai.gpt-5.6-sol"
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+CLAUDE_MODELS = {f"global.anthropic.claude-{family}-5-5": default for family, default in
+                 (("haiku", "medium"), ("sonnet", "high"), ("opus", "medium"))}
+SUPPORTED_MODELS = {MODEL, *CLAUDE_MODELS,
+                    *(f"{model}@{effort}" for model in CLAUDE_MODELS for effort in EFFORTS)}
+
+
+def resolve_model(model_id, effort=None):
+    if model_id not in SUPPORTED_MODELS:
+        raise ProxyError(422, "model_not_allowed", "Modelo no admitido por el puente AKI.")
+    model, _, suffix = model_id.partition("@")
+    effort = effort or suffix or CLAUDE_MODELS.get(model, "low")
+    if effort not in EFFORTS:
+        raise ProxyError(422, "effort_not_allowed", "Esfuerzo admitido: low, medium, high, xhigh o max.")
+    return model, effort
 
 
 class AkiClient:
@@ -25,8 +40,10 @@ class AkiClient:
         self.lock = threading.Lock()
 
     def converse(self, **request):
-        if request.get("modelId") != MODEL:
-            raise ProxyError(422, "model_not_allowed", "Este puente solo admite GPT-5.6 Sol.")
+        model, effort = resolve_model(request.get("modelId"), request.get("akiEffort"))
+        if model != MODEL:
+            request = {**request, "akiProfileLlm": {"provider": "bedrock", "modelId": model,
+                       "effort": effort, "reasoning": {"enabled": True}}}
         env = dict(os.environ)
         for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_BEARER_TOKEN_BEDROCK",
                     "AWS_PROFILE", "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
@@ -39,8 +56,9 @@ class AkiClient:
             try:
                 started = time.monotonic()
                 with prepare(request) as (converted, profile, allowed_views):
+                    converted = {k: v for k, v in converted.items() if k not in {"akiProfileLlm", "akiEffort"}}
                     prompt = "Continue this Nexus request. Return only the specified response JSON:\n" + json.dumps(converted, ensure_ascii=False, separators=(",", ":"))
-                    result = self.runner([self.binary, "--profile", profile, "--model", MODEL,
+                    result = self.runner([self.binary, "--profile", profile, "--model", model,
                                           "--output-format", "stream-json"],
                                          input=prompt, text=True, capture_output=True, cwd=self.workspace,
                                          env=env, timeout=max(1, 150 - (time.monotonic() - started)))
@@ -48,6 +66,8 @@ class AkiClient:
                 raise ProxyError(504, "aki_timeout", "AKI no terminó dentro del plazo; no se reintentó automáticamente.")
         finally:
             self.lock.release()
+        if "unknown model" in (result.stderr or "").lower():
+            raise ProxyError(502, "aki_model_unavailable", "Este AKI no reconoce el modelo; actualiza el binario. No se acepta una respuesta de otro modelo.")
         if result.returncode:
             # Never forward CLI stderr: it may contain account information.
             raise ProxyError(502, "aki_failed", "AKI rechazó la petición. Comprueba su sesión y el modelo; no se utilizó AWS directo.")
@@ -108,6 +128,14 @@ class AkiClient:
 
 
 class AkiProxy(NexusProxy):
+    def build_request(self, body):
+        request = super().build_request(body)
+        effort = body.get("akiEffort")
+        if effort is not None:
+            resolve_model(request["modelId"], effort)
+            request["akiEffort"] = effort
+        return request
+
     @staticmethod
     def _map_aws_error(error):
         if isinstance(error, ProxyError):
@@ -122,11 +150,12 @@ def main():
     cfg = load_config(args.config)
     if cfg.get("bind", "127.0.0.1") != "127.0.0.1":
         raise ValueError("AKI bridge must bind only to 127.0.0.1")
-    if cfg.get("allowed_models") != [MODEL]:
-        raise ValueError("Explicit Sol-only allowlist required")
+    if not cfg.get("allowed_models") or not set(cfg["allowed_models"]) <= SUPPORTED_MODELS:
+        raise ValueError("Explicit supported AKI model allowlist required")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     proxy = AkiProxy(cfg, bedrock=AkiClient(cfg["aki_binary"], cfg["aki_workspace"]))
-    handler = make_handler(proxy)
+    from aki_openai import make_aki_handler
+    handler = make_aki_handler(proxy)
     # OkHttp reuses connections across tool rounds; frame every reply with Content-Length.
     handler.protocol_version = "HTTP/1.1"
     server = ThreadingHTTPServer(("127.0.0.1", int(proxy.cfg["port"])), handler)
