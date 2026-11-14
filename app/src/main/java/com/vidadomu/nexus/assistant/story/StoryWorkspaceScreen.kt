@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,7 @@ import com.vidadomu.nexus.assistant.AssistantRuntime
 import com.vidadomu.nexus.cut.NexusCut
 import com.vidadomu.nexus.cut.isLocalCutUri
 import com.vidadomu.nexus.cut.storyCutAssetIds
+import com.vidadomu.nexus.ui.components.StudioTactileCard
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.library.Thumb
@@ -216,16 +218,24 @@ fun StoryWorkspaceScreen(
     BackHandler(enabled = isActive) { if (shotId != null) select(shot = null) else onClose() }
     val storyHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     StoryWorkspaceContainer(embedded, onClose) {
-        Surface(Modifier.fillMaxSize()) {
+        Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
             Scaffold(
                 modifier = if (embedded) Modifier.fillMaxSize() else Modifier.imePadding().safeDrawingPadding(),
+                containerColor = Color.Transparent,
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
                     com.vidadomu.nexus.ui.components.StudioChrome(Modifier.fillMaxWidth()) {
                         Column(if (embedded) Modifier.windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.top) else Modifier) {
-                            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { storyHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); if (shotId != null) select(shot = null) else onClose() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-                                Column(Modifier.weight(1f).clickable { projectEditor = true }) {
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                com.vidadomu.nexus.ui.components.StudioCircleButton(
+                                    onClick = { if (shotId != null) select(shot = null) else onClose() },
+                                    contentDescription = "Volver",
+                                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(NexusTokens.iconMedium)) }
+                                Column(Modifier.weight(1f).padding(start = 4.dp).clickable { projectEditor = true }) {
                                     Text(project?.name ?: "Proyecto", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(currentShot?.text("title")?.ifBlank { currentShot.text("code") } ?: "Guion vivo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
@@ -251,18 +261,23 @@ fun StoryWorkspaceScreen(
                                     }
                                 }
                             }
-                            TabRow(selectedTabIndex = tab) {
-                                listOf("Guion", "Storyboard", "Material").forEachIndexed { i, title -> Tab(tab == i, {
-                                    if (tab != i) storyHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
-                                    tab = i
-                                }, text = { Text(title) }) }
-                            }
-                            if (scenes.isNotEmpty()) LazyRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            com.vidadomu.nexus.ui.components.StudioSegmentedTabs(
+                                tabs = listOf("Guion", "Storyboard", "Material"),
+                                selectedIndex = tab,
+                                onSelect = { tab = it },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            )
+                            if (scenes.isNotEmpty()) LazyRow(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 items(scenes, key = { it.text("id") }) { scene ->
-                                    FilterChip(scene.text("id") == sceneId, {
-                                        storyHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
-                                        select(scene.text("id"), null)
-                                    }, label = { Text(scene.text("title").ifBlank { scene.text("code") }, maxLines = 1) })
+                                    com.vidadomu.nexus.ui.components.StudioFilterChip(
+                                        selected = scene.text("id") == sceneId,
+                                        onClick = { select(scene.text("id"), null) },
+                                        label = { Text(scene.text("title").ifBlank { scene.text("code") }, maxLines = 1) },
+                                    )
                                 }
                                 item { IconButton(onClick = { edit = "scene:new" }, enabled = !busy) { Icon(Icons.Default.Add, "Nueva escena") } }
                             }
@@ -306,8 +321,13 @@ fun StoryWorkspaceScreen(
                         items(blocks.filter { it.text("scene_id") == sceneId }, key = { it.text("id") }) { block ->
                             val shot = shots.firstOrNull { it.text("id") == block.text("shot_id") }
                             if (shot != null) ShotTile(shot, media, links, { select(shot = shot.text("id")); edit = "shot:${shot.text("id")}" }, { select(shot = shot.text("id")); tab = 1 }, { delta -> run(command("move_shot") { put("shot_id", shot.text("id")); put("scene_id", sceneId); put("order", shot.number("order") + delta); put("expected_revision", shot.number("revision")) }) })
-                            else Surface(tonalElevation = if (block.text("kind") in listOf("note", "idea")) 2.dp else 0.dp, shape = NexusTokens.thumbnail) {
-                                Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                            else StudioTactileCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = NexusTokens.card,
+                                containerColor = if (block.text("kind") in listOf("note", "idea")) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
+                                shadowElevation = 4.dp,
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(blockKindLabel(block.text("kind")) + if (block.text("narrative_state") == "story") " · Incorporado" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                                         IconButton(onClick = { edit = "block:${block.text("id")}" }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Edit, "Editar bloque", Modifier.size(18.dp)) }

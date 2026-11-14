@@ -2,10 +2,12 @@ package com.vidadomu.nexus.ui.navigation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.graphics.Color
 import com.vidadomu.nexus.ui.components.StudioChrome
+import com.vidadomu.nexus.ui.components.studioSpecularBorder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
@@ -17,10 +19,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,6 +41,7 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
     if(currentRoute?.startsWith("output")==true) return
     val haptic = rememberNexusHaptics()
     val motionAllowed = rememberNexusMotionAllowed()
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     // Visible by default; the optional hidden mode retains the edge-swipe shortcut.
     val visible = ChromeVisibility.shown
     androidx.compose.animation.AnimatedVisibility(visible, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
@@ -43,19 +49,27 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().navigationBarsPadding()
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                .padding(vertical=NexusTokens.space4),
+                .padding(top = 6.dp, bottom = 4.dp),
                 verticalAlignment=Alignment.CenterVertically) {
                 Screen.bottomNavItems.forEach { screen ->
                     val selected=currentRoute==screen.route
                     val tone by animateColorAsState(
-                        if(selected) MaterialTheme.colorScheme.primary.copy(alpha=.18f) else Color.Transparent,
+                        if (selected) {
+                            if (isDark) MaterialTheme.colorScheme.primary.copy(alpha = .24f)
+                            else MaterialTheme.colorScheme.surface
+                        } else Color.Transparent,
                         if (motionAllowed) spring(dampingRatio = 0.82f, stiffness = 500f) else snap(),
                         label="Navigation tone"
                     )
                     val pillWidth by animateDpAsState(
-                        if (selected) 52.dp else 32.dp,
+                        if (selected) 56.dp else 32.dp,
                         if (motionAllowed) spring(dampingRatio = 0.80f, stiffness = 480f) else snap(),
                         label = "Navigation pill"
+                    )
+                    val iconScale by animateFloatAsState(
+                        if (selected) 1.08f else 1f,
+                        if (motionAllowed) spring(dampingRatio = 0.78f, stiffness = 520f) else snap(),
+                        label = "Navigation icon scale"
                     )
                     Column(Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)
                         .semantics { contentDescription=screen.title }
@@ -78,17 +92,24 @@ fun NexusBottomBar(navController: NavController, selectedRoute: String? = null, 
                             haptic.perform(NexusHapticEvent.SELECTION)
                             }
                         }),horizontalAlignment=Alignment.CenterHorizontally,
-                        verticalArrangement=Arrangement.spacedBy(0.dp)) {
-                        Box(Modifier.width(pillWidth).height(NexusTokens.space24).clip(MaterialTheme.shapes.small)
-                            .background(tone),
-                            contentAlignment=Alignment.Center) {
-                            Icon(screen.icon,contentDescription=null,
-                                tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier=Modifier.size(NexusTokens.iconMedium))
+                        verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                        Surface(
+                            modifier = Modifier.width(pillWidth).height(28.dp),
+                            shape = NexusTokens.pill,
+                            color = tone,
+                            shadowElevation = if (selected) (if (isDark) 2.dp else 4.dp) else 0.dp,
+                            border = if (selected) studioSpecularBorder() else null,
+                        ) {
+                            Box(contentAlignment=Alignment.Center) {
+                                Icon(screen.icon,contentDescription=null,
+                                    tint=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier=Modifier.size(NexusTokens.iconMedium).graphicsLayer { scaleX = iconScale; scaleY = iconScale })
+                            }
                         }
                         // Let labels wrap at the user's font scale; TalkBack reads the tab name once.
                         Text(screen.title,style=MaterialTheme.typography.labelMedium,
-                            color=if(selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color=if(selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign=TextAlign.Center,maxLines=2,overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(horizontal=NexusTokens.space4).clearAndSetSemantics {})
                     }

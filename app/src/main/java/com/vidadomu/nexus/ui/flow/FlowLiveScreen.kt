@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import com.vidadomu.nexus.ui.components.NexusSettingsButton
 import com.vidadomu.nexus.ui.components.StudioChrome
+import com.vidadomu.nexus.ui.components.StudioTactileCard
 import com.vidadomu.nexus.ui.components.StudioTextField
 import com.vidadomu.nexus.ui.theme.NexusInsets
 import androidx.compose.foundation.lazy.LazyRow
@@ -204,9 +205,9 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
             Row(
                 Modifier.fillMaxWidth()
                     .windowInsetsPadding(NexusInsets.top)
-                    .height(NexusTokens.topBarHeight)
-                    .padding(start = NexusTokens.space12, end = NexusTokens.space4),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = NexusTokens.space12, end = NexusTokens.space8, top = NexusTokens.space4, bottom = NexusTokens.space8),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
             ) {
                 val dot = when (phase) {
                     FlowLiveClient.Phase.LIVE -> MaterialTheme.colorScheme.primary
@@ -214,10 +215,18 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
                     FlowLiveClient.Phase.ERROR -> MaterialTheme.colorScheme.error
                     FlowLiveClient.Phase.IDLE -> MaterialTheme.colorScheme.outline
                 }
-                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-                Spacer(Modifier.width(NexusTokens.space8))
+                Box(
+                    Modifier.size(18.dp).clip(CircleShape).background(dot.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+                }
                 Column(Modifier.weight(1f)) {
-                    Text("Flow", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    Text(
+                        "Flow",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                        maxLines = 1
+                    )
                     val sub = when (phase) {
                         FlowLiveClient.Phase.LIVE -> page.title.removePrefix("Google Flow - ").removePrefix("Google Flow: ").ifBlank { "En directo · AXELPC" }
                         FlowLiveClient.Phase.CONNECTING -> "Conectando con AXELPC…"
@@ -227,33 +236,53 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
                     Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (page.loading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                IconButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); client.simple("back") }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás en Flow") }
-                IconButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); client.simple("home") }) { Icon(Icons.Default.Home, "Inicio de Flow") }
-                IconButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); keyboard = !keyboard }) { Icon(if (keyboard) Icons.Default.KeyboardHide else Icons.Default.Keyboard, "Teclado") }
-                NexusSettingsButton()
-                Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Recargar la página") }, leadingIcon = { Icon(Icons.Default.Refresh, null) },
-                            onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); client.simple("reload") })
-                        DropdownMenuItem(text = { Text("Abrir la Biblioteca") }, leadingIcon = { Icon(Icons.Default.Collections, null) },
-                            onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); onOpenLibrary() })
-                        HorizontalDivider()
-                        Text("Vista", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-                        VIEWS.forEachIndexed { i, v ->
-                            DropdownMenuItem(text = { Text((if (i == viewIndex) "✓ " else "    ") + v.label) },
-                                onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); viewIndex = i; FlowLivePrefs.putString(context, "view", "$i"); zoom = 1f; panX = 0f; panY = 0f })
+                StudioTactileCard(
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    shadowElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); client.simple("back") }, modifier = Modifier.size(38.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás en Flow", modifier = Modifier.size(19.dp))
                         }
-                        HorizontalDivider()
-                        Text("Calidad", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-                        QUALITIES.forEachIndexed { i, q ->
-                            DropdownMenuItem(text = { Text((if (i == qualityIndex) "✓ " else "    ") + q.label) },
-                                onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); qualityIndex = i; FlowLivePrefs.putString(context, "quality", "$i") })
+                        IconButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); client.simple("home") }, modifier = Modifier.size(38.dp)) {
+                            Icon(Icons.Default.Home, "Inicio de Flow", modifier = Modifier.size(19.dp))
                         }
-                        HorizontalDivider()
-                        DropdownMenuItem(text = { Text("Dirección de AXELPC…") }, onClick = { menu = false; serverDialog = true })
+                        IconButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); keyboard = !keyboard }, modifier = Modifier.size(38.dp)) {
+                            Icon(if (keyboard) Icons.Default.KeyboardHide else Icons.Default.Keyboard, "Teclado", modifier = Modifier.size(19.dp),
+                                tint = if (keyboard) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Box {
+                            IconButton(onClick = { menu = true }, modifier = Modifier.size(38.dp)) {
+                                Icon(Icons.Default.MoreVert, "Más opciones", modifier = Modifier.size(19.dp))
+                            }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Recargar la página") }, leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                                    onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); client.simple("reload") })
+                                DropdownMenuItem(text = { Text("Abrir la Biblioteca") }, leadingIcon = { Icon(Icons.Default.Collections, null) },
+                                    onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); onOpenLibrary() })
+                                HorizontalDivider()
+                                Text("Vista", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                                VIEWS.forEachIndexed { i, v ->
+                                    DropdownMenuItem(text = { Text((if (i == viewIndex) "✓ " else "    ") + v.label) },
+                                        onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); viewIndex = i; FlowLivePrefs.putString(context, "view", "$i"); zoom = 1f; panX = 0f; panY = 0f })
+                                }
+                                HorizontalDivider()
+                                Text("Calidad", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                                QUALITIES.forEachIndexed { i, q ->
+                                    DropdownMenuItem(text = { Text((if (i == qualityIndex) "✓ " else "    ") + q.label) },
+                                        onClick = { menu = false; haptic.perform(NexusHapticEvent.SELECTION); qualityIndex = i; FlowLivePrefs.putString(context, "quality", "$i") })
+                                }
+                                HorizontalDivider()
+                                DropdownMenuItem(text = { Text("Dirección de AXELPC…") }, onClick = { menu = false; serverDialog = true })
+                            }
+                        }
                     }
                 }
+                NexusSettingsButton()
             }
         }
 
@@ -344,12 +373,34 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
                         dstSize = IntSize(rect.width.roundToInt().coerceAtLeast(1), rect.height.roundToInt().coerceAtLeast(1)), filterQuality = FilterQuality.Medium)
                 }
             } else {
-                Column(Modifier.align(Alignment.Center).padding(NexusTokens.space24), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (phase != FlowLiveClient.Phase.ERROR) CircularProgressIndicator()
-                    Spacer(Modifier.height(NexusTokens.space12))
-                    Text(if (phase == FlowLiveClient.Phase.ERROR) (error ?: "Sin conexión con AXELPC") else "Abriendo tu Flow en AXELPC…",
-                        color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                    if (phase == FlowLiveClient.Phase.ERROR) TextButton(onClick = { client.reconnect() }) { Text("Reintentar") }
+                StudioTactileCard(
+                    modifier = Modifier.align(Alignment.Center).padding(NexusTokens.space24),
+                    shape = NexusTokens.card,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    shadowElevation = 8.dp
+                ) {
+                    Column(
+                        Modifier.padding(horizontal = NexusTokens.space24, vertical = NexusTokens.space16),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)
+                    ) {
+                        if (phase != FlowLiveClient.Phase.ERROR) CircularProgressIndicator()
+                        Text(
+                            if (phase == FlowLiveClient.Phase.ERROR) (error ?: "Sin conexión con AXELPC") else "Abriendo tu Flow en AXELPC…",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if (phase == FlowLiveClient.Phase.ERROR) {
+                            androidx.compose.material3.FilledTonalButton(
+                                onClick = { haptic.perform(NexusHapticEvent.SELECTION); client.reconnect() },
+                                shape = NexusTokens.pill
+                            ) {
+                                Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(NexusTokens.space8))
+                                Text("Reintentar")
+                            }
+                        }
+                    }
                 }
             }
             if (img != null && phase == FlowLiveClient.Phase.ERROR) {
@@ -365,21 +416,23 @@ fun FlowLiveScreen(onOpenLibrary: () -> Unit) {
 
         // Resultados que ya están en la Biblioteca.
         AnimatedVisibility(recent.isNotEmpty() || download != null || failure != null || order != null) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
-                if (recent.isNotEmpty()) {
-                    LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
-                        items(recent.take(12), key = { it.assetId }) { item ->
-                            AsyncImage(model = item.uri, contentDescription = item.name, contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(44.dp).clip(NexusTokens.thumbnail).clickable { linkImported = item })
+            StudioChrome(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
+                    if (recent.isNotEmpty()) {
+                        LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+                            items(recent.take(12), key = { it.assetId }) { item ->
+                                AsyncImage(model = item.uri, contentDescription = item.name, contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(44.dp).clip(NexusTokens.thumbnail).clickable { linkImported = item })
+                            }
                         }
+                        TextButton(onClick = onOpenLibrary) { Text("${recent.size} en Biblioteca") }
+                        IconButton(onClick = { recent.clear(); failure = null }) { Icon(Icons.Default.Close, "Ocultar") }
+                    } else {
+                        val text = failure ?: download?.let { "Descargando «$it»…" } ?: order ?: ""
+                        Text(text, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            color = if (failure != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (failure != null || order != null) IconButton(onClick = { failure = null; client.order.value = null }) { Icon(Icons.Default.Close, "Ocultar") }
                     }
-                    TextButton(onClick = onOpenLibrary) { Text("${recent.size} en Biblioteca") }
-                    IconButton(onClick = { recent.clear(); failure = null }) { Icon(Icons.Default.Close, "Ocultar") }
-                } else {
-                    val text = failure ?: download?.let { "Descargando «$it»…" } ?: order ?: ""
-                    Text(text, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                        color = if (failure != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (failure != null || order != null) IconButton(onClick = { failure = null; client.order.value = null }) { Icon(Icons.Default.Close, "Ocultar") }
                 }
             }
         }

@@ -122,6 +122,10 @@ import com.vidadomu.nexus.cut.model.Track
 import com.vidadomu.nexus.cut.model.TrackKind
 import com.vidadomu.nexus.cut.model.VideoCodec
 import com.vidadomu.nexus.cut.timeline.Edge
+import com.vidadomu.nexus.ui.components.StudioChrome
+import com.vidadomu.nexus.ui.components.StudioCircleButton
+import com.vidadomu.nexus.ui.components.StudioTactileCard
+import com.vidadomu.nexus.ui.components.studioSpecularBorder
 import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
@@ -253,33 +257,64 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     @Composable
     fun EditorHeader() {
-        Row(Modifier.fillMaxWidth().height(NexusTokens.topBarHeight).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-            Column(Modifier.weight(1f).clickable { dialog = CutDialog.Rename }) {
-                Text("NEXUS CUT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                Text(project.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = { vm.undo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, st.undoLabel?.let { "Deshacer: $it" } ?: "Deshacer") }
-            IconButton(onClick = { vm.redo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canRedo) { Icon(Icons.AutoMirrored.Filled.Redo, st.redoLabel?.let { "Rehacer: $it" } ?: "Rehacer") }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Ripple: lo posterior acompaña") }, trailingIcon = { Switch(ripple, null) }, onClick = { vm.ripple.value = !ripple })
-                    DropdownMenuItem(text = { Text("Imán en cortes y marcadores") }, trailingIcon = { Switch(snapping, null) }, onClick = { vm.snapping.value = !snapping })
-                    DropdownMenuItem(text = { Text("Formato del montaje") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) }, onClick = { menu = false; dialog = CutDialog.Format })
-                    DropdownMenuItem(text = { Text("Renombrar") }, onClick = { menu = false; dialog = CutDialog.Rename })
+        StudioChrome(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .padding(horizontal = NexusTokens.space8, vertical = NexusTokens.space4),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)
+                ) {
+                    StudioCircleButton(onClick = onBack, contentDescription = "Volver") {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(19.dp))
+                    }
+                    Column(Modifier.weight(1f).clickable { dialog = CutDialog.Rename }) {
+                        Text("NEXUS CUT", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Text(project.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    StudioTactileCard(
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                        shadowElevation = 2.dp
+                    ) {
+                        Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { vm.undo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canUndo, modifier = Modifier.size(38.dp)) {
+                                Icon(Icons.AutoMirrored.Filled.Undo, st.undoLabel?.let { "Deshacer: $it" } ?: "Deshacer", Modifier.size(19.dp))
+                            }
+                            IconButton(onClick = { vm.redo(); haptics.perform(NexusHapticEvent.SELECTION) }, enabled = st.canRedo, modifier = Modifier.size(38.dp)) {
+                                Icon(Icons.AutoMirrored.Filled.Redo, st.redoLabel?.let { "Rehacer: $it" } ?: "Rehacer", Modifier.size(19.dp))
+                            }
+                            Box {
+                                IconButton(onClick = { menu = true }, modifier = Modifier.size(38.dp)) {
+                                    Icon(Icons.Default.MoreVert, "Más", Modifier.size(19.dp))
+                                }
+                                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                    DropdownMenuItem(text = { Text("Ripple: lo posterior acompaña") }, trailingIcon = { Switch(ripple, null) }, onClick = { vm.ripple.value = !ripple })
+                                    DropdownMenuItem(text = { Text("Imán en cortes y marcadores") }, trailingIcon = { Switch(snapping, null) }, onClick = { vm.snapping.value = !snapping })
+                                    DropdownMenuItem(text = { Text("Formato del montaje") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) }, onClick = { menu = false; dialog = CutDialog.Format })
+                                    DropdownMenuItem(text = { Text("Renombrar") }, onClick = { menu = false; dialog = CutDialog.Rename })
+                                }
+                            }
+                        }
+                    }
+                    val canExport = timeline.durationUs > 0 && export !is ExportState.Running
+                    Button(
+                        onClick = { dialog = CutDialog.Export },
+                        enabled = canExport,
+                        border = if (canExport) studioSpecularBorder(accentTint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.28f)) else null,
+                        modifier = Modifier.height(38.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)
+                    ) {
+                        Icon(Icons.Default.Upload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Exportar")
+                    }
                 }
-            }
-            Button(onClick = { dialog = CutDialog.Export }, enabled = timeline.durationUs > 0 && export !is ExportState.Running,
-                modifier = Modifier.padding(start = 4.dp, end = 8.dp).height(36.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)) {
-                Icon(Icons.Default.Upload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Exportar")
-            }
-        }
-        (export as? ExportState.Running)?.takeIf { it.projectId == project.id }?.let { r ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(progress = { r.progress / 100f }, modifier = Modifier.weight(1f))
-                Text("  ${r.stage} · ${r.progress} %", style = MaterialTheme.typography.labelSmall)
-                IconButton(onClick = vm::cancelExport, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Cancelar exportación", Modifier.size(18.dp)) }
+                (export as? ExportState.Running)?.takeIf { it.projectId == project.id }?.let { r ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LinearProgressIndicator(progress = { r.progress / 100f }, modifier = Modifier.weight(1f))
+                        Text("  ${r.stage} · ${r.progress} %", style = MaterialTheme.typography.labelSmall)
+                        IconButton(onClick = vm::cancelExport, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Cancelar exportación", Modifier.size(18.dp)) }
+                    }
+                }
             }
         }
     }
@@ -317,50 +352,54 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     @Composable
     fun Transport() {
-        Box(Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 12.dp)) {
-            Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
-                val tcStyle = MaterialTheme.typography.labelSmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    fontFeatureSettings = "tnum",
-                )
-                Text(
-                    Timecode.formatFrames(playhead, project.settings.frameRate),
-                    style = tcStyle,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    " / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate),
-                    style = tcStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            val rate = project.settings.frameRate
-            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { haptics.perform(NexusHapticEvent.GESTURE_TICK); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) {
-                    Icon(Icons.Default.SkipPrevious, "Fotograma anterior")
+        StudioChrome(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp)) {
+                Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                    val tcStyle = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontFeatureSettings = "tnum",
+                    )
+                    Text(
+                        Timecode.formatFrames(playhead, project.settings.frameRate),
+                        style = tcStyle,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        " / " + Timecode.formatFrames(timeline.durationUs, project.settings.frameRate),
+                        style = tcStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Surface(
-                    onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary)
+                val rate = project.settings.frameRate
+                Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { haptics.perform(NexusHapticEvent.GESTURE_TICK); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) - 1).coerceAtLeast(0)) }) {
+                        Icon(Icons.Default.SkipPrevious, "Fotograma anterior")
+                    }
+                    Surface(
+                        onClick = { vm.preview.togglePlay(); haptics.perform(NexusHapticEvent.SELECTION) },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        shadowElevation = 4.dp,
+                        border = studioSpecularBorder(accentTint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.30f)),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pausa" else "Reproducir", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                    }
+                    IconButton(onClick = { haptics.perform(NexusHapticEvent.GESTURE_TICK); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) {
+                        Icon(Icons.Default.SkipNext, "Fotograma siguiente")
                     }
                 }
-                IconButton(onClick = { haptics.perform(NexusHapticEvent.GESTURE_TICK); vm.preview.seekTo(rate.timeOf(rate.frameAt(playhead) + 1)) }) {
-                    Icon(Icons.Default.SkipNext, "Fotograma siguiente")
-                }
+                Text(
+                    if (selectedClips.isEmpty()) timeline.allTracks.sumOf { it.clips.size }.let { "$it ${if (it == 1) "clip" else "clips"}" }
+                    else "${selectedClips.size} selecc.",
+                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
             }
-            Text(
-                if (selectedClips.isEmpty()) timeline.allTracks.sumOf { it.clips.size }.let { "$it ${if (it == 1) "clip" else "clips"}" }
-                else "${selectedClips.size} selecc.",
-                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterEnd)
-            )
         }
     }
 
@@ -392,7 +431,7 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
 
     @Composable
     fun Tools() {
-        Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
+        StudioChrome(Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 if (selectedClips.isEmpty()) {
                                     Tool(Icons.Default.AddPhotoAlternate, "Añadir") { picker.launch(arrayOf("video/*", "image/*")) }

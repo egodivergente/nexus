@@ -329,16 +329,19 @@ fun AssistantScreen(
                     drawContent()
                     drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(
                         0f to androidx.compose.ui.graphics.Color.Transparent,
-                        .56f to androidx.compose.ui.graphics.Color.Transparent,
-                        .70f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .30f),
-                        .86f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .78f),
+                        .66f to androidx.compose.ui.graphics.Color.Transparent,
+                        .82f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f),
                         1f to androidx.compose.ui.graphics.Color.Black,
-                        startY = 0f, endY = 64.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                        startY = 0f, endY = 76.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
                 }, state = listState,
-                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 64.dp,
+                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 72.dp,
                     // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
                     bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
-                if (ui.items.isEmpty() && ui.streamingText.isBlank()) item { EmptyHint() }
+                if (ui.items.isEmpty() && ui.streamingText.isBlank()) item {
+                    EmptyHint(onSuggest = { suggestion ->
+                        input = androidx.compose.ui.text.input.TextFieldValue(suggestion, androidx.compose.ui.text.TextRange(suggestion.length))
+                    })
+                }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; is PendingHeader -> "ph:" + it.firstId; else -> it.hashCode() } }) { row ->
                     if (row is PendingHeader) {
                         val open = row.firstId in expandedPending
@@ -431,7 +434,8 @@ fun AssistantScreen(
                             onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null,
                             onChangeModel = { showSettings = true },
                             onNewChat = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn() &&
-                                (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true))) ({ vm.continueFailedTurnInNewChat() }) else null)
+                                (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true))) ({ vm.continueFailedTurnInNewChat() }) else null,
+                            compact = item.id != latestFailure?.id)
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -507,14 +511,72 @@ fun AssistantScreen(
             // The header icons float over the conversation; the list itself fades out under them (see the LazyColumn mask),
             // so scrolled text never collides with them («Expandir» under the gear, revision video 1, 08:48) nor ends in a hard edge.
             // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
-            IconButton(onClick = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.TopStart)) {
-                Icon(Icons.Default.Menu, "Conversaciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            val headerHaptics = rememberNexusHaptics()
+            val activeProjectName = remember(ui.projects, ui.activeProjectId) {
+                ui.projects.firstOrNull { it.id == ui.activeProjectId }?.name?.takeIf { it.isNotBlank() } ?: "Nexus"
             }
-            // Sin margen superior: el engranaje queda a la misma altura que la hamburguesa (auditoria 05-11).
-            Row(Modifier.align(Alignment.TopEnd).padding(end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
-                IconButton(onClick = onOpenSettings, modifier = Modifier.size(NexusTokens.minimumTouch)) {
-                    Icon(Icons.Default.Settings, "Ajustes", Modifier.size(NexusTokens.iconMedium), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            val activeModelShort = remember(ui.settings) {
+                shortModelName(agentLabel(ui.settings)).ifBlank { agentLabel(ui.settings) }
+            }
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StudioCircleButton(
+                    onClick = { scope.launch { drawer.open() } },
+                    contentDescription = "Conversaciones",
+                ) {
+                    Icon(Icons.Default.Menu, contentDescription = null, modifier = Modifier.size(NexusTokens.iconMedium))
+                }
+                StudioTactileCard(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(horizontal = NexusTokens.space8),
+                    shape = NexusTokens.pill,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(NexusTokens.pill)
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                                headerHaptics.perform(NexusHapticEvent.SELECTION)
+                                showProject = true
+                            }
+                            .padding(horizontal = NexusTokens.space12, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .size(7.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                        Text(
+                            text = if (activeModelShort.isNotBlank()) "$activeProjectName · $activeModelShort" else activeProjectName,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Cambiar proyecto o modelo",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                StudioCircleButton(
+                    onClick = onOpenSettings,
+                    contentDescription = "Ajustes",
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(NexusTokens.iconMedium))
                 }
             }
             ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
@@ -722,21 +784,73 @@ private fun QuickLink(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmptyHint() {
+private fun EmptyHint(onSuggest: ((String) -> Unit)? = null) {
+    val haptics = rememberNexusHaptics()
+    val suggestions = remember {
+        listOf(
+            "Diseña un plano cinematográfico con referencias",
+            "Propón un guion corto de 3 escenas",
+            "Revisa qué modelos me convienen para vídeo",
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = NexusTokens.space12, start = NexusTokens.space16, end = NexusTokens.space16),
+            .padding(top = NexusTokens.space24, start = NexusTokens.space16, end = NexusTokens.space16),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)
+        verticalArrangement = Arrangement.spacedBy(NexusTokens.space12),
     ) {
-        com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(56.dp),contentDescription="Axel · Nexus")
+        StudioTactileCard(
+            modifier = Modifier.size(72.dp),
+            shape = androidx.compose.foundation.shape.CircleShape,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shadowElevation = 6.dp,
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(44.dp), contentDescription = "Axel · Nexus")
+            }
+        }
         Text(
             text = "Las buenas ideas empiezan aquí.",
-            style = MaterialTheme.typography.titleSmall,
-            color = TextPrimary
+            style = MaterialTheme.typography.titleMedium,
+            color = TextPrimary,
         )
-        Text("¿Una imagen, un vídeo o una idea por desarrollar?", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        Text(
+            "¿Una imagen, un vídeo o una idea por desarrollar?",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextMuted,
+        )
+        if (onSuggest != null) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = NexusTokens.space8),
+                verticalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+            ) {
+                suggestions.forEach { prompt ->
+                    StudioTactileCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = NexusTokens.pill,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 3.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(NexusTokens.pill)
+                                .clickable {
+                                    haptics.perform(NexusHapticEvent.SELECTION)
+                                    onSuggest(prompt)
+                                }
+                                .padding(horizontal = NexusTokens.space16, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text(prompt, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -901,48 +1015,84 @@ internal fun UserBubble(item:ChatItem.User) {
     if (selection) MessageSelectionDialog(item.text) { selection = false }
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
-        // Tu mensaje: completo (nunca truncado), ancho casi total para ganar altura, con el acento en degradado y seleccionable.
-        val accent=MaterialTheme.colorScheme.primary
-        val brush=remember(accent) {androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.copy(alpha=.12f),accent.copy(alpha=.06f)))}
+        // Tu mensaje: completo (nunca truncado), burbuja 3D táctil con brillo superior, sombra y menú discreto al tocar la hora.
+        val accent = MaterialTheme.colorScheme.primary
+        val tintOverlay = remember(accent) {
+            androidx.compose.ui.graphics.Brush.linearGradient(
+                listOf(accent.copy(alpha = .11f), accent.copy(alpha = .04f))
+            )
+        }
+        val bubbleShape = androidx.compose.foundation.shape.RoundedCornerShape(
+            topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp
+        )
         val foldable = remember(item.text) { UserMessageFold.shouldFold(item.text) }
         var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
-        Box(Modifier.fillMaxWidth(.96f).wrapContentWidth(Alignment.End).padding(top=NexusTokens.space4)
-            .background(brush,NexusTokens.card)) {
-                Column(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-                    // Pulsación larga = selección nativa de Android (arrastrar para elegir fragmento); las acciones están en «⋯».
+        StudioTactileCard(
+            modifier = Modifier
+                .fillMaxWidth(.94f)
+                .wrapContentWidth(Alignment.End)
+                .padding(top = NexusTokens.space4),
+            shape = bubbleShape,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
+            border = studioSpecularBorder(accentTint = accent.copy(alpha = 0.30f)),
+        ) {
+            Box(Modifier.background(tintOverlay)) {
+                Column(Modifier.padding(horizontal = NexusTokens.space16, vertical = 10.dp)) {
                     androidx.compose.foundation.text.selection.SelectionContainer {
-                        Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextPrimary,
-                            maxLines=if(foldable && !expanded) UserMessageFold.PREVIEW_LINES else Int.MAX_VALUE,
-                            overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(
+                            item.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary,
+                            maxLines = if (foldable && !expanded) UserMessageFold.PREVIEW_LINES else Int.MAX_VALUE,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
                     }
-                    if(foldable) TextButton(onClick={expanded=!expanded},contentPadding=PaddingValues(horizontal=0.dp),
-                        modifier=Modifier.align(Alignment.End).heightIn(min=NexusTokens.minimumTouch)) {
-                        Text(if(expanded) "Contraer" else "Expandir",style=MaterialTheme.typography.labelLarge)
+                    if (foldable) TextButton(
+                        onClick = { expanded = !expanded },
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                        modifier = Modifier.align(Alignment.End).heightIn(min = NexusTokens.minimumTouch),
+                    ) {
+                        Text(if (expanded) "Contraer" else "Expandir", style = MaterialTheme.typography.labelLarge)
                     }
-                }
-        }
-        Row(Modifier.padding(end=NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
-            val bubbleHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
-            Box {
-                IconButton(onClick={ bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); actions=true },modifier=Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreVert,"Acciones del mensaje",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
-                }
-                DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
-                    DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, leadingIcon={Icon(Icons.Default.ContentCopy,null)}, onClick = {
-                        bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
-                        clipboard.setText(AnnotatedString(item.text)); actions = false
-                    })
-                    DropdownMenuItem(text = { Text("Compartir mensaje") }, leadingIcon={Icon(Icons.Default.Share,null)}, onClick = {
-                        actions = false
-                        runCatching {
-                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"; putExtra(Intent.EXTRA_TEXT, item.text)
-                            }, "Compartir mensaje"))
-                        }.onFailure { Toast.makeText(context, "No se pudo compartir el mensaje", Toast.LENGTH_SHORT).show() }
-                    })
                 }
             }
-            MessageMeta(item.at,0L)
+        }
+        val bubbleHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
+        Box(Modifier.padding(end = NexusTokens.space8, top = 2.dp)) {
+            Row(
+                modifier = Modifier
+                    .clip(NexusTokens.pill)
+                    .clickable(onClickLabel = "Acciones del mensaje") {
+                        bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
+                        actions = true
+                    }
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                MessageMeta(item.at, 0L)
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Acciones del mensaje",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                )
+            }
+            DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
+                DropdownMenuItem(text = { Text("Copiar mensaje íntegro") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = {
+                    bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
+                    clipboard.setText(AnnotatedString(item.text)); actions = false
+                })
+                DropdownMenuItem(text = { Text("Compartir mensaje") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = {
+                    actions = false
+                    runCatching {
+                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"; putExtra(Intent.EXTRA_TEXT, item.text)
+                        }, "Compartir mensaje"))
+                    }.onFailure { Toast.makeText(context, "No se pudo compartir el mensaje", Toast.LENGTH_SHORT).show() }
+                })
+            }
         }
     }
 }
@@ -1024,45 +1174,74 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
     if (selection) MessageSelectionDialog(item.text) { selection = false }
     var showSteps by rememberSaveable(item.id) {mutableStateOf(false)}
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-        if(item.text.isNotBlank()) {
-            // Sin fila de botones bajo cada respuesta: mantener pulsado abre copiar, compartir y pasos.
-            // Casi sin fondo: tus mensajes llevan el acento y las respuestas quedan limpias, a todo el ancho.
-            Surface(color=androidx.compose.ui.graphics.Color.Transparent,shape=NexusTokens.card,modifier=Modifier.fillMaxWidth()) {
-              Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
-                val streaming = item.stop == "STREAMING"
-                val responseText = remember(item.text, streaming) {
-                    if(item.text.trim() in setOf("…", "...")) {
-                        if(streaming) "Recibiendo respuesta…" else "La respuesta guardada no contiene texto. Revisa los pasos de este turno."
-                    } else hideOrderIds(item.text)
+        if (item.text.isNotBlank()) {
+            // Tarjeta editorial limpia con relieve suave y lectura clara, sin ruido visual alrededor.
+            val replyShape = androidx.compose.foundation.shape.RoundedCornerShape(
+                topStart = 20.dp, topEnd = 20.dp, bottomStart = 6.dp, bottomEnd = 20.dp
+            )
+            StudioTactileCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = replyShape,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                shadowElevation = 2.dp,
+            ) {
+                Box(Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)) {
+                    val streaming = item.stop == "STREAMING"
+                    val responseText = remember(item.text, streaming) {
+                        if (item.text.trim() in setOf("…", "...")) {
+                            if (streaming) "Recibiendo respuesta…" else "La respuesta guardada no contiene texto. Revisa los pasos de este turno."
+                        } else hideOrderIds(item.text)
+                    }
+                    ChatMarkdownView(
+                        responseText,
+                        streaming = streaming,
+                        answered = answered,
+                        onReply = if (streaming) null else onReply,
+                        selectable = !streaming,
+                    )
                 }
-                // Selección nativa con pulsación larga y arrastre (al terminar de escribir; durante el streaming el texto cambia).
-                ChatMarkdownView(responseText, streaming = streaming,
-                    answered = answered, onReply = if (streaming) null else onReply, selectable = !streaming)
-              }
             }
         }
-        if(item.text.isNotBlank() && item.stop!="STREAMING") Row(Modifier.padding(horizontal=NexusTokens.space12),verticalAlignment=Alignment.CenterVertically) {
+        if (item.text.isNotBlank() && item.stop != "STREAMING") {
             val responseHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
-            MessageMeta(item.at,item.tookMs,Modifier.weight(1f),item.by)
-            Box {
-                IconButton(onClick={ responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); actionsExpanded=true },modifier=Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreVert,"Acciones de la respuesta",Modifier.size(NexusTokens.iconSmall),tint=TextSecondary)
+            Box(Modifier.padding(start = NexusTokens.space4)) {
+                Row(
+                    modifier = Modifier
+                        .clip(NexusTokens.pill)
+                        .clickable(onClickLabel = "Acciones de la respuesta") {
+                            responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
+                            actionsExpanded = true
+                        }
+                        .padding(horizontal = NexusTokens.space8, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    MessageMeta(item.at, item.tookMs, by = item.by)
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Acciones de la respuesta",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    )
                 }
-                DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
-                    DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
+                DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                    DropdownMenuItem(text = { Text("Copiar respuesta") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = {
                         responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
-                        clipboard.setText(AnnotatedString(item.text));actionsExpanded=false
-                        Toast.makeText(context,"Respuesta copiada",Toast.LENGTH_SHORT).show()
+                        clipboard.setText(AnnotatedString(item.text)); actionsExpanded = false
+                        Toast.makeText(context, "Respuesta copiada", Toast.LENGTH_SHORT).show()
                     })
-                    DropdownMenuItem(text={Text("Compartir respuesta")},leadingIcon={Icon(Icons.Default.Share,null)},onClick={
-                        actionsExpanded=false
+                    DropdownMenuItem(text = { Text("Compartir respuesta") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = {
+                        actionsExpanded = false
                         runCatching {
-                            val intent=Intent(Intent.ACTION_SEND).apply {type="text/plain";putExtra(Intent.EXTRA_TEXT,item.text)}
-                            context.startActivity(Intent.createChooser(intent,"Compartir respuesta"))
-                        }.onFailure {Toast.makeText(context,"No se pudo compartir la respuesta",Toast.LENGTH_SHORT).show()}
+                            val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, item.text) }
+                            context.startActivity(Intent.createChooser(intent, "Compartir respuesta"))
+                        }.onFailure { Toast.makeText(context, "No se pudo compartir la respuesta", Toast.LENGTH_SHORT).show() }
                     })
-                    if(item.toolCalls.isNotEmpty()) DropdownMenuItem(text={Text(if(showSteps) "Ocultar pasos" else "Ver pasos (${item.toolCalls.size})")},
-                        leadingIcon={Icon(Icons.Default.Build,null)},onClick={showSteps=!showSteps;actionsExpanded=false})
+                    if (item.toolCalls.isNotEmpty()) DropdownMenuItem(
+                        text = { Text(if (showSteps) "Ocultar pasos" else "Ver pasos (${item.toolCalls.size})") },
+                        leadingIcon = { Icon(Icons.Default.Build, null) },
+                        onClick = { showSteps = !showSteps; actionsExpanded = false },
+                    )
                 }
             }
         }
@@ -1160,11 +1339,18 @@ private fun NoticeRow(
     onRetry: (() -> Unit)? = null,
     onChangeModel: (() -> Unit)? = null,
     onNewChat: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
-    if(item.error) AgentErrorNotice(item.id, item.text, onRetry = onRetry, onChangeModel = onChangeModel, onNewChat = onNewChat,
-        onOpenHistory = if(history) onOpenHistory else null)
+    if (item.error) AgentErrorNotice(
+        item.id, item.text,
+        onRetry = onRetry,
+        onChangeModel = onChangeModel,
+        onNewChat = onNewChat,
+        onOpenHistory = if (history) onOpenHistory else null,
+        compact = compact,
+    )
     else Column {
         Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         if(history) HistoryLinkButton(onOpenHistory)
