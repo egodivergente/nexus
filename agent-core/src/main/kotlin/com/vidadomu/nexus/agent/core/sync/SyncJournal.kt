@@ -2,7 +2,9 @@ package com.vidadomu.nexus.agent.core.sync
 
 import java.io.File
 import java.util.UUID
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
@@ -39,11 +41,24 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
             temporary.outputStream().use {it.write(text.toByteArray());it.fd.sync()}
             java.nio.file.Files.move(temporary.toPath(),file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         }
+        /**
+         * Same file as [atomic] with the encoded text, written without ever holding that text in memory.
+         * A 28 MB journal needed a single 90 MB buffer and Android stopped every exchange with OutOfMemoryError
+         * (S25, 6-14/11/2026: nothing uploaded or received meanwhile).
+         */
+        @OptIn(ExperimentalSerializationApi::class)
+        fun <T> atomic(file:File,serializer:SerializationStrategy<T>,value:T) {
+            file.parentFile?.mkdirs()
+            val temporary=File(file.parentFile,file.name+".tmp")
+            temporary.outputStream().use {raw->val buffered=raw.buffered(1 shl 16);json.encodeToStream(serializer,value,buffered);buffered.flush();raw.fd.sync()}
+            java.nio.file.Files.move(temporary.toPath(),file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
     }
-    private var state=if(file.exists())json.decodeFromString<SyncState>(file.readText()) else SyncState(label=deviceLabel)
+    @OptIn(ExperimentalSerializationApi::class)
+    private var state=if(file.exists())file.inputStream().buffered(1 shl 16).use {json.decodeFromStream(SyncState.serializer(),it)} else SyncState(label=deviceLabel)
     private fun accepts(key:String)=key.substringBefore(':') in allowedKinds && key.length in 3..250 && !key.any {it<' '}
     @Synchronized fun knownKeys():Set<String> = state.revisions.values.map {it.key}.toSet()
-    private fun save(next:SyncState) { atomic(file,json.encodeToString(next));state=next }
+    private fun save(next:SyncState) { atomic(file,SyncState.serializer(),next);state=next }
     private fun heads(key:String):List<SyncRevision> {
         val rows=state.revisions.values.filter {it.key==key}
         val superseded=rows.flatMap {it.parents}.toSet()

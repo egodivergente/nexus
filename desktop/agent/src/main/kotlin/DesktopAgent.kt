@@ -466,6 +466,10 @@ fun main(args: Array<String>) {
                 obj("ok" to JsonPrimitive(true),"value" to result)
             } catch(e: Exception) {
                 obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive(if(cancelled.get()) "Turno detenido por el usuario. Las operaciones ya enviadas conservan su estado." else Redactor.redact(e.message ?: "Error del agente")))
+            } catch(e: Throwable) {
+                // An Error (out of memory, linkage) used to end this thread without a reply: the host
+                // waited for ever and every later command found the agent busy until Nexus restarted.
+                obj("ok" to JsonPrimitive(false),"error" to JsonPrimitive("El motor no pudo completar la operación (${e.javaClass.simpleName}). No se ha borrado nada."))
             }
             activeRequestId="";worker.set(null)
             emit(JsonObject(reply + ("requestId" to JsonPrimitive(id))))
