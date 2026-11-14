@@ -25,16 +25,23 @@ class ComposerMediaStateTest {
         assertEquals(listOf("3","4"),state.retainedMedia.map {it.id})
         assertEquals(refs, (state.attachedMedia+state.retainedMedia))
     }
-    @Test fun modeChangePreservesNamedResourcesAndReactivatesThem() {
-        val model=model("modes").copy(providerId="google_flow",contractEndpoint="video",
+    /**
+     * Los modos de Google Flow se fueron con el proveedor (RetiredProviders) y con ellos el
+     * estrechamiento de entradas por modo. Lo que el compositor garantiza hoy es que cada archivo va a
+     * la entrada que declara el contrato y que lo que no cabe se conserva sin enviarse.
+     */
+    @Test fun eachFileGoesToItsDeclaredContractInputAndOverflowIsKept() {
+        val model=model("modes").copy(contractEndpoint="video",
             contractMedia=listOf(ContractMediaField("initial_frame","Inicio","image/*",false,1),
                 ContractMediaField("reference_ids","Referencias","image/*",false,3)))
         val frame=image("start").copy(fieldKey="initial_frame")
         val reference=image("ref").copy(fieldKey="reference_ids")
-        val state=CreateUiState(parameters=mapOf("mode" to "Referencias"),attachedMedia=listOf(frame,reference)).withModelMedia(model)
-        assertEquals(listOf(reference),state.attachedMedia);assertEquals(listOf(frame),state.retainedMedia)
-        val frames=state.copy(parameters=mapOf("mode" to "Fotogramas")).withModelMedia(model)
-        assertEquals(listOf(frame),frames.attachedMedia);assertEquals(listOf(reference),frames.retainedMedia)
+        val state=CreateUiState(attachedMedia=listOf(frame,reference)).withModelMedia(model)
+        assertEquals(listOf(frame,reference),state.attachedMedia);assertTrue(state.retainedMedia.isEmpty())
+        val extra=(1..3).map {image("r$it").copy(fieldKey="reference_ids")}
+        val full=CreateUiState(attachedMedia=listOf(frame,reference)+extra).withModelMedia(model)
+        assertEquals(listOf("start","ref","r1","r2"),full.attachedMedia.map {it.id})
+        assertEquals(listOf("r3"),full.retainedMedia.map {it.id})
     }
     @Test fun preferencesAreSeparatedByProviderEndpointAndModality() {
         val a=ModelWorkDraft("same","prompt",providerId="a",endpoint="image",modality=Modality.IMAGE,parameters=mapOf("quality" to "high"))

@@ -22,21 +22,34 @@ class CreationFixTargetTest {
             assertEquals(CreationFixTarget.MEDIA,creationReadiness(state(it)).fixTarget)
         }
     }
+    /** El modo se declara como parámetro con «simple» por defecto, igual que en el catálogo real. */
+    private val suno=model.copy(contractEndpoint="/music",providerModelId="suno/music-generate",
+        parameters=listOf(ModelParameter("mode","Cómo componer",ParameterType.ENUM,"simple",options=listOf("simple","custom"),isRequired=true,nativeType="string"),
+            ModelParameter("title","Título (modo custom)",ParameterType.TEXT,"",nativeType="string")))
     @Test fun sunoSimpleDescriptionLeadsToPromptNotMedia() {
-        assertEquals(CreationFixTarget.PROMPT,creationReadiness(state(model.copy(contractEndpoint="/music",providerModelId="suno/music-generate"))).fixTarget)
+        assertEquals(CreationFixTarget.PROMPT,creationReadiness(state(suno)
+            .copy(parameters=FormContract.restoredValues(suno,emptyMap()))).fixTarget)
     }
     @Test fun sunoCustomTitleLeadsToParametersNotMedia() {
-        assertEquals(CreationFixTarget.PARAMETERS,creationReadiness(state(model.copy(contractEndpoint="/music",providerModelId="suno/music-generate"))
+        assertEquals(CreationFixTarget.PARAMETERS,creationReadiness(state(suno)
             .copy(parameters=mapOf("mode" to "custom"))).fixTarget)
     }
     @Test fun missingNamedContractMediaLeadsToMedia() {
         assertEquals(CreationFixTarget.MEDIA,creationReadiness(state(model.copy(contractEndpoint="/video",
             contractMedia=listOf(ContractMediaField("mask","Máscara precisa","image/*",required=true))))).fixTarget)
     }
+    /**
+     * Con un modelo que no admite ningún archivo, lo que procede es cambiar de modelo; para que el aviso
+     * apunte a los archivos, el modelo tiene que aceptarlos y el problema estar en ellos.
+     */
     @Test fun invalidTypeAndExcessReferencesLeadToMedia() {
-        val media=AttachedMedia("a","file:///test","video/mp4",MediaSlotType.PRIMARY_IMAGE)
-        assertEquals(CreationFixTarget.MEDIA,creationReadiness(state().copy(attachedMedia=listOf(media))).fixTarget)
-        assertEquals(CreationFixTarget.MEDIA,creationReadiness(state().copy(attachedMedia=listOf(media.copy(slotType=MediaSlotType.REFERENCE_IMAGE,mimeType="image/png")))).fixTarget)
+        val frames=model.copy(firstFrameField="start",nativeRequiredFields=listOf("start"))
+        val video=AttachedMedia("a","file:///test","video/mp4",MediaSlotType.PRIMARY_IMAGE)
+        assertEquals(CreationFixTarget.MEDIA,creationReadiness(state(frames).copy(attachedMedia=listOf(video))).fixTarget)
+        // El modelo tiene que declarar algo; si no, el aviso correcto es que no hay contrato cargado.
+        val one=model.copy(imagesArrayField="images",maxImages=1,nativeRequiredFields=listOf("images"))
+        val refs=(1..2).map {AttachedMedia("r$it","file:///r$it.png","image/png",MediaSlotType.REFERENCE_IMAGE)}
+        assertEquals(CreationFixTarget.MEDIA,creationReadiness(state(one).copy(attachedMedia=refs)).fixTarget)
     }
     @Test fun requiredScalarLeadsToParameters() {
         val m=model.copy(contractEndpoint="/fixture",parameters=listOf(ModelParameter("quality","Calidad",ParameterType.TEXT,isRequired=true)))

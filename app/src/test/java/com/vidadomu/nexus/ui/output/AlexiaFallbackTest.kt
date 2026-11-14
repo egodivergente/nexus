@@ -7,7 +7,9 @@ class AlexiaFallbackTest {
     @Test fun messageStatesTheResultStaysInNexusAndOnlyOffersRealActions() {
         val local = alexiaUnavailableMessage(hasLocalCopy = true)
         val remote = alexiaUnavailableMessage(hasLocalCopy = false)
-        assertTrue(local.startsWith("No se pudo abrir Alexia") && "sigue guardado en Nexus" in local && "otra app" in local)
+        // El aviso vale para cualquier app externa, no solo Alexia; lo que no puede perderse es que el
+        // resultado sigue en Nexus y que solo se ofrezcan acciones que existen de verdad.
+        assertTrue(local.startsWith("No se pudo abrir la app externa") && "sigue guardado en Nexus" in local && "otra app" in local)
         assertTrue("sigue en Nexus" in remote && "Descargar archivo" in remote && "otra app" !in remote)
         assertEquals("com.axel.library", ALEXIA_PACKAGE)
     }

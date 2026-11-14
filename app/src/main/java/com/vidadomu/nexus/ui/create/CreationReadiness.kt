@@ -45,7 +45,13 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
             com.vidadomu.nexus.provider.runway.ContractPayload.validate(model,request)
             com.vidadomu.nexus.provider.crun.CrunTextCatalog.validateSuno(model,request)
         } catch(error:IllegalArgumentException) {
-            return result(CreationPhase.INVALID,error.message ?: "Revisa las opciones del modelo.",CreationFixTarget.PARAMETERS)
+            // El adaptador dice de qué entrada se queja: Suno en modo simple pedía «Describe la canción»
+            // y el botón llevaba a Parámetros, donde no hay nada que escribir. En modo custom la queja es
+            // del título y sigue siendo de opciones, así que no vale deducirlo del prompt vacío.
+            val field=(error as? ContractInputError)?.fieldKey
+            val target=if(field=="prompt" || field==model.contractPromptField) CreationFixTarget.PROMPT
+                else CreationFixTarget.PARAMETERS
+            return result(CreationPhase.INVALID,error.message ?: "Revisa las opciones del modelo.",target)
         }
     }
     return CreationReadiness(CreationPhase.READY)

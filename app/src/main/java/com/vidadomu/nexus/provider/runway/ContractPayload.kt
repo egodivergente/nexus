@@ -1,11 +1,12 @@
 package com.vidadomu.nexus.provider.runway
 
+import com.vidadomu.nexus.core.model.ContractInputError
 import com.vidadomu.nexus.core.model.*
 import kotlinx.serialization.json.*
 
 object ContractPayload {
     fun validate(model:NexusModel,request:GenerationRequest) {
-        require(!model.promptRequired || request.prompt.isNotBlank()) { "Escribe las instrucciones." }
+        if(model.promptRequired && request.prompt.isBlank()) throw ContractInputError("Escribe las instrucciones.","prompt")
         model.parameters.forEach { p ->
             val value=(request.parameters[p.key] ?: p.defaultValue).trim()
             require(!p.isRequired || value.isNotEmpty()) { "Falta ${p.displayName}" }

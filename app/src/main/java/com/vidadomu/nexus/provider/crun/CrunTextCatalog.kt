@@ -1,4 +1,5 @@
 package com.vidadomu.nexus.provider.crun
+import com.vidadomu.nexus.core.model.ContractInputError
 import com.vidadomu.nexus.core.model.*
 import kotlinx.serialization.json.*
 
@@ -37,7 +38,10 @@ object CrunTextCatalog {
     fun validateSuno(model:NexusModel,request:GenerationRequest) {
         if(model.providerModelId!="suno/music-generate") return
         val p=model.parameters.associate { it.key to it.defaultValue }+request.parameters
-        if(p["mode"]=="simple") require(request.prompt.isNotBlank() && request.prompt.length<=500) { "Describe la canción con entre 1 y 500 caracteres." }
+        if(p["mode"]=="simple") {
+            if(request.prompt.isBlank() || request.prompt.length>500)
+                throw ContractInputError("Describe la canción con entre 1 y 500 caracteres.","prompt")
+        }
         else {
             require(!p["title"].isNullOrBlank() && p["title"]!!.length<=100) { "Añade un título de hasta 100 caracteres." }
             val v4=model.contractDefaults["model"]=="v4"
