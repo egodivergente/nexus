@@ -1,3 +1,28 @@
+# Cut: gestos, paneles, copia y exportación individual vc217 — 14/11/2026
+
+Rama `codex/cut-video-gestures-20261114`, sobre vc214 realmente instalada,
+fuente `c0961dd1` (`aki/story-sync-hydrogen-20261114`). APK fuente
+`88102ee24c87102f86734d73e03f394dc8216266`: **1.9.181-agent-preview / vc217**.
+AWS CodeBuild `7b074c77-e1ed-48b8-ab70-328ee639995e`: APK y **135 JVM PASS**.
+S25 actualizado con `adb install -r -t`: misma firma, alineación 16 KiB,
+tres bibliotecas ARM64 originales y hash instalado comprobados:
+`b010a2acf05dbb304d14444b78825262115b1bda018a99aec16a04df96e56f1c`.
+**3 pruebas físicas PASS**: copia íntegra/múltiple, gestos/paneles/minimizar y dos
+MP4 secuenciales con vídeo/audio comprobados por FFprobe. Sin crash/ANR registrado.
+Ocho archivos de dos montajes idénticos y todos los IDs previos conservados.
+Sin llamadas de prueba a modelos ni proveedores.
+
+`render.export` admite `each_clip=true` o `clip_ids`; no borrar/ripple/undo.
+Un MP4 por intervalo con audio/capas, cola y `asset_ids`. Pinch en preview,
+paneles regulables, minimizar agente a un círculo y copia de varios mensajes.
+Valida vídeo incompleto aunque el audio llene el contenedor; un reintento local
+como máximo antes de informar error y no guardar en Biblioteca.
+
+**Datos:** Montaje 1 ya era r15, con un segmento visual y audio; el ejemplo era
+r6 con cinco. No reconstruir r6 sin petición expresa. Pixel no conectado/no probado.
+Detector de integridad probado en JVM; reintento automático no observado en la
+pasada física final. Informe y límites: `docs/CUT_VIDEO_FEEDBACK_20261114.md`.
+
 # Pruebas en verde y streaming cortado - 14/11/2026
 
 Rama `aki/fix-tests-stream-20261114`, sobre `feat/agy-hydrogen-20261113` (`7f838f27`, vc212). Sin cambio de version ni APK.

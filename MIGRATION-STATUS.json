@@ -1,4 +1,26 @@
 ﻿{
+    "cutVideoFeedback20261114": {
+        "branch": "codex/cut-video-gestures-20261114",
+        "baseInstalledSource": "c0961dd1",
+        "apkSourceCommit": "88102ee24c87102f86734d73e03f394dc8216266",
+        "versionCode": 217,
+        "versionName": "1.9.181-agent-preview",
+        "build": "AWS CodeBuild 7b074c77-e1ed-48b8-ab70-328ee639995e",
+        "jvmTestsPassed": 135,
+        "s25DeviceTestsPassed": 3,
+        "testFailures": 0,
+        "apkSha256": "b010a2acf05dbb304d14444b78825262115b1bda018a99aec16a04df96e56f1c",
+        "s25InstalledAsUpdate": true,
+        "certificatePreserved": true,
+        "originalArm64LibrariesEqual": 3,
+        "cutFilesIdentical": 8,
+        "existingIndexIdsPreserved": true,
+        "observedNexusCrashAnrEvents": 0,
+        "pixelVerified": false,
+        "automaticIntegrityRetryObserved": false,
+        "historicalMontage": "Already r15 with one visual segment before changes; r6 with five segments not restored",
+        "report": "docs/CUT_VIDEO_FEEDBACK_20261114.md"
+    },
     "livingAudiovisualTab20261108": {
         "branch": "codex/audiovisual-project-20261108",
         "apkSourceCommit": "88b035eeb7053dd67a4acfc8663890ff1980d968",
