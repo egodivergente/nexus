@@ -113,7 +113,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val mediaAgeStore = DraftMediaAgeStore(app)
     // Vidal 14-11: references older than 24 h leave the drafts before the form is rebuilt from them.
     private val startupMedia = DraftMediaAge.startup(creationPreferences.draft(), workDraftStore.load(),
-        mediaAgeStore.load(), System.currentTimeMillis())
+        mediaAgeStore.load(), System.currentTimeMillis(), purgeAll = mediaAgeStore.consumePurge())
     private val restoredDraft = startupMedia.draft
     @Volatile private var workDrafts = startupMedia.workDrafts
     @Volatile private var mediaAges = startupMedia.ages

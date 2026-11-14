@@ -69,6 +69,16 @@ class DraftMediaAgeTest {
         assertEquals(setOf(fresh.uriString), result.ages.keys)
     }
 
+    @Test fun oneTimePurgeClearsEverythingStoredEvenIfFresh() {
+        val a = image("a"); val b = image("b")
+        val saved = mapOf(a.uriString to 29 * hour, b.uriString to 29 * hour)
+        val result = DraftMediaAge.startup(draft(listOf(a), retained = listOf(b)), listOf(work("x", a, b)), saved,
+            now = 30 * hour, purgeAll = true)
+        assertTrue(result.draft!!.media.isEmpty() && result.draft!!.retainedMedia.isEmpty())
+        assertTrue(result.workDrafts[0].media.isEmpty())
+        assertTrue(result.ages.isEmpty())
+    }
+
     @Test fun firstRunDatesTheExistingPileWithTheLegacyClock() {
         val pile = image("pile"); val today = image("today")
         val legacy = mapOf(pile.uriString to 0L, today.uriString to 29 * hour)

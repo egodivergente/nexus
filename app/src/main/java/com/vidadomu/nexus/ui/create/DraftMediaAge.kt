@@ -61,9 +61,10 @@ internal object DraftMediaAge {
 
     /** Drops expired references from the persisted drafts before the form is built from them. */
     fun startup(draft: CreationDraft?, workDrafts: List<ModelWorkDraft>, savedAges: Map<String, Long>?, now: Long,
-        legacy: (String) -> Long = { legacyFirstSeen(it, now) }): Startup {
+        purgeAll: Boolean = false, legacy: (String) -> Long = { legacyFirstSeen(it, now) }): Startup {
         val ages = track(savedAges.orEmpty(), uris(draft, workDrafts), now, if (savedAges == null) legacy else { _ -> now })
-        val expired = expired(ages, now)
+        // purgeAll: una sola vez, vacía de golpe todo lo acumulado antes de esta regla (solo referencias, no archivos).
+        val expired = if (purgeAll) ages.keys else expired(ages, now)
         if (expired.isEmpty()) return Startup(draft, workDrafts, ages, expired)
         return Startup(prune(draft, expired), pruneDrafts(workDrafts, uris = expired), ages - expired, expired)
     }
@@ -79,7 +80,14 @@ class DraftMediaAgeStore(context: Context) {
         runCatching { json.decodeFromString<Map<String, Long>>(raw) }.getOrDefault(emptyMap())
     }
 
+    /** Limpieza única de lo acumulado antes de la regla de 24 h; devuelve true la primera vez. */
+    fun consumePurge(): Boolean {
+        if (prefs.getBoolean(PURGED, false)) return false
+        prefs.edit().putBoolean(PURGED, true).apply()
+        return true
+    }
+
     fun save(ages: Map<String, Long>) { prefs.edit().putString(KEY, json.encodeToString(ages)).apply() }
 
-    private companion object { const val KEY = "ages" }
+    private companion object { const val KEY = "ages"; const val PURGED = "purged_v2" }
 }
