@@ -66,9 +66,18 @@ class CutFeedbackDeviceTest {
         requireForeground()
         var n = requireNotNull(node(label))
         while (!n.isClickable && n.parent != null) n = n.parent
-        assertTrue("Could not click $label", n.performAction(AccessibilityNodeInfo.ACTION_CLICK)); inst.waitForIdleSync()
+        tap(Rect().also { n.getBoundsInScreen(it) }); inst.waitForIdleSync()
     }
     private fun bounds(label: String) = Rect().also { requireNotNull(node(label)).getBoundsInScreen(it) }
+    private fun tap(r: Rect) {
+        val start = SystemClock.uptimeMillis()
+        for ((action, delay) in listOf(MotionEvent.ACTION_DOWN to 0L, MotionEvent.ACTION_UP to 60L)) {
+            requireForeground()
+            val e = MotionEvent.obtain(start, start + delay, action, r.exactCenterX(), r.exactCenterY(), 0)
+            e.source = InputDevice.SOURCE_TOUCHSCREEN
+            assertTrue(inst.uiAutomation.injectInputEvent(e, true)); e.recycle()
+        }
+    }
     private fun drag(x: Float, y: Float, dx: Float, dy: Float) {
         val start = SystemClock.uptimeMillis()
         for (i in 0..12) {
@@ -107,11 +116,13 @@ class CutFeedbackDeviceTest {
         try {
             open(); screenshot("copy-all"); click("Copiar todo")
             assertEquals(entries.joinToString("\n\n") { "${it.speaker}\n${it.text}" }, clipboard.primaryClip!!.getItemAt(0).text.toString())
-            val boxes = nodes().filter { it.className?.toString() == "android.widget.CheckBox" }
-            assertTrue(boxes.size >= 4)
-            requireForeground(); boxes[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            inst.waitForIdleSync()
-            for (i in 1..2) { requireForeground(); nodes().filter { it.className?.toString() == "android.widget.CheckBox" }[i].performAction(AccessibilityNodeInfo.ACTION_CLICK); inst.waitForIdleSync() }
+            fun choose(index: Int, count: Int) {
+                val boxes = nodes().filter { it.className?.toString() == "android.widget.CheckBox" }
+                assertTrue(boxes.size >= 4)
+                tap(Rect().also { boxes[index].getBoundsInScreen(it) })
+                waitFor { node("$count/3") != null }
+            }
+            choose(0, 0); choose(1, 1); choose(2, 2)
             screenshot("copy-selected")
             click("Copiar selección")
             assertEquals(entries.take(2).joinToString("\n\n") { "${it.speaker}\n${it.text}" }, clipboard.primaryClip!!.getItemAt(0).text.toString())
@@ -178,6 +189,9 @@ class CutFeedbackDeviceTest {
                 val formats = (0 until ex.trackCount).map { ex.getTrackFormat(it) }
                 assertTrue(formats.any { it.getString(MediaFormat.KEY_MIME)!!.startsWith("video/") })
                 assertTrue(formats.any { it.getString(MediaFormat.KEY_MIME)!!.startsWith("audio/") })
+                val videoFormat = formats.first { it.getString(MediaFormat.KEY_MIME)!!.startsWith("video/") }
+                assertTrue("Video track must cover the complete window", ExportMath.trackCoversWindow(1_000_000,
+                    videoFormat.getLong(MediaFormat.KEY_DURATION), 10.0))
             } finally { ex.release() }
         }
         assertEquals(original, project)

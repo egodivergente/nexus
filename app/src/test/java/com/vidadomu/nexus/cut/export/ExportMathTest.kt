@@ -12,6 +12,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExportMathTest {
+    @Test fun rejectsShortVideoEvenWhenTheAudioContainerIsComplete() {
+        assertTrue(!ExportMath.trackCoversWindow(1_000_000, 700_000, 10.0))
+        assertTrue(ExportMath.trackCoversWindow(1_000_000, 1_000_000, 10.0))
+        assertTrue(ExportMath.trackCoversWindow(1_000_000, 1_033_292, 30.0))
+        assertTrue(!ExportMath.trackCoversWindow(166_480_000, 165_980_000, 30.0))
+        assertTrue(!ExportMath.trackCoversWindow(1_000_000, 0, Double.NaN))
+    }
     @Test
     fun sizeFollowsProjectAspectAndShortSide() {
         assertEquals(1920 to 1080, ExportMath.outputSize(ProjectSettings(1920, 1080), 1080))

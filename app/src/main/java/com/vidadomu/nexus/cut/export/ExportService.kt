@@ -60,6 +60,7 @@ class ExportService : Service() {
     private var tmp: File? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastNotified = -1
+    private var validationRetries = 0
     /** Set once the job reached Done/Failed/Cancelled, so late callbacks cannot overwrite the result. */
     private var ended = false
 
@@ -213,8 +214,18 @@ class ExportService : Service() {
         val j = job ?: return
         report(99, "Verificando y guardando")
         scope.launch {
-            val error = withContext(Dispatchers.IO) { validate(file, j.plan.durationUs) }
-            if (error != null) { fail("El archivo renderizado no es válido: $error"); return@launch }
+            val error = withContext(Dispatchers.IO) { validate(file, j.plan.durationUs, j.plan.effectiveFps) }
+            if (ended) return@launch
+            if (error != null) {
+                if (validationRetries == 0) {
+                    validationRetries++
+                    Log.w(TAG, "Retrying an incomplete render: $error")
+                    file.delete(); tmp = null; transformer = null; lastNotified = -1
+                    report(0, "Repitiendo render incompleto")
+                    prepareAndRender(j)
+                } else fail("El archivo renderizado no es válido tras repetirlo: $error")
+                return@launch
+            }
             val moved = withContext(Dispatchers.IO) {
                 try {
                     j.destination.parentFile?.mkdirs()
@@ -240,7 +251,7 @@ class ExportService : Service() {
             val next = ExportManager.complete(j, ExportState.Done(j.project.id, assetId, j.destination, size, j.plan.durationUs, detail))
             if (ended) return@launch
             if (next != null) {
-                transformer = null; job = next; lastNotified = -1
+                transformer = null; job = next; lastNotified = -1; validationRetries = 0
                 report(0, "Preparando…")
                 prepareAndRender(next)
                 return@launch
@@ -251,15 +262,22 @@ class ExportService : Service() {
     }
 
     /** Null when OK, otherwise the reason. */
-    private fun validate(file: File, expectedUs: Long): String? {
+    private fun validate(file: File, expectedUs: Long, fps: Double): String? {
         if (!file.exists() || file.length() == 0L) return "archivo vacío"
         val ex = MediaExtractor()
         try {
             ex.setDataSource(file.absolutePath)
-            val mimes = (0 until ex.trackCount).mapNotNull { ex.getTrackFormat(it).getString(MediaFormat.KEY_MIME) }
-            if (mimes.none { it.startsWith("video/") }) return "no tiene pista de vídeo"
+            val video = (0 until ex.trackCount).map { ex.getTrackFormat(it) }
+                .firstOrNull { it.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true }
+                ?: return "no tiene pista de vídeo"
+            if (!video.containsKey(MediaFormat.KEY_DURATION)) return "sin duración de vídeo verificable"
+            val videoUs = video.getLong(MediaFormat.KEY_DURATION)
+            val videoFps = runCatching { video.getInteger(MediaFormat.KEY_FRAME_RATE).toDouble() }.getOrDefault(fps)
+            if (!ExportMath.trackCoversWindow(expectedUs, videoUs, videoFps)) return "la pista de vídeo dura ${videoUs / 1000} ms; se esperaban ${expectedUs / 1000} ms"
         } catch (e: IOException) {
             return "no se puede leer (${e.message})"
+        } catch (e: RuntimeException) {
+            return "pistas ilegibles (${e.message})"
         } finally {
             ex.release()
         }

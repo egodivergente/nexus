@@ -25,6 +25,13 @@ data class ExportPlan(
 
 /** Pure arithmetic, unit-tested on the JVM. */
 object ExportMath {
+    /** Container duration alone can hide a shortened video track behind intact audio. */
+    fun trackCoversWindow(expectedUs: Long, actualUs: Long, fps: Double): Boolean {
+        val validFps = fps.takeIf { it.isFinite() && it > 0.0 } ?: 30.0
+        val frameUs = 1_000_000.0 / validFps
+        val tolerance = maxOf(100_000L, (frameUs + 50_000).roundToLong())
+        return actualUs > 0 && kotlin.math.abs(expectedUs - actualUs) <= tolerance
+    }
     fun outputSize(project: ProjectSettings, shortSide: Int): Pair<Int, Int> {
         val pw = project.width
         val ph = project.height
