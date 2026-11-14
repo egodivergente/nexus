@@ -6,6 +6,8 @@ Petición del usuario actualizada: priorizar **AXELPC** (`100.72.111.97`) y el d
 - **Prioridad 2 — Pruebas y entorno móvil (Pixel 8 Pro)**: Para pruebas Android, priorizar el dispositivo físico conectado por ADB (directamente o por Tailscale). Verificar modelo y transporte actual; no arrancar un emulador local si el teléfono físico cubre la prueba y está disponible.
 - **ASUSVIDAL: SOLO Flow.** Prohibido compilar, ejecutar builds, Gradle, Kotlin o sus daemons salvo autorización explícita de Vidal para esa ejecución. Una petición general de desarrollo/pruebas/APK no basta. La indisponibilidad de AXELPC u otros equipos no autoriza usar ASUS como último recurso: esperar o usar otro equipo autorizado. Tras una excepción autorizada, detener los procesos propios y comprobar la RAM sin tocar Flow. Regla actualizada el 2026-10-21; sustituye la autorización anterior de último recurso.
 
+- **Núcleos Kotlin sin SDK de Android**: `./gradlew -c settings-jvm.gradle.kts :cut-core:test :agent-core:test` compila y prueba `cut-core` y `agent-core` en cualquier máquina con JDK 17+, incluidos contenedores sin SDK, sin tocar el arranque normal (`settings.gradle.kts`). `:app` sigue necesitando SDK y equipo autorizado.
+
 Al terminar, recuperar APK e informes y verificar identidad/integridad de los artefactos. Distinguir acceso comprobado, compilación realizada y pruebas ejecutadas.
 
 # Continuidad entre dispositivos — migración 2026-10-06

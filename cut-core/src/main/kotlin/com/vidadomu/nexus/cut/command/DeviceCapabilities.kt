@@ -41,7 +41,17 @@ object DeviceCapabilities {
     const val EXPORT = "engine.export"
     private const val MAX_IMPORT = 30
 
-    fun all(library: CutLibrary, renderer: CutRenderer): List<Capability> = listOf(import(library)) + render(renderer)
+    /**
+     * [analyzer] mide el audio de verdad decodificando el archivo. Donde no haya, «audio.find_silences»
+     * sigue en el catálogo pero marcada como no disponible: el agente necesita saber que existe y que
+     * aquí no puede usarla, en vez de no encontrarla.
+     */
+    fun all(library: CutLibrary, renderer: CutRenderer, analyzer: CutAudioAnalyzer = NO_ANALYZER): List<Capability> =
+        listOf(import(library)) + render(renderer) + AudioAnalysisCapabilities.all(analyzer)
+
+    private val NO_ANALYZER = CutAudioAnalyzer { _, _, _, _ ->
+        cutFail(ErrorCode.UNAVAILABLE, "Este motor no analiza el audio.")
+    }
 
     private fun import(library: CutLibrary) = Capability("media.import", EDIT,
         "Trae archivos de la Biblioteca de Nexus al montaje sin copiarlos y, por defecto, los coloca en la línea de tiempo en el orden dado. Un archivo que ya estaba en el montaje no se duplica: se reutiliza. Los planos del guion de cada archivo pasan a sus clips.",
