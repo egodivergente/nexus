@@ -79,6 +79,13 @@ class DeviceCapabilitiesTest {
         assertEquals("running", s.run("render.export", Origin.AGENT, "resolution" to "720p", "codec" to "h265").done().results.single()["state"]!!.jsonPrimitive.content)
         assertEquals(com.vidadomu.nexus.cut.model.ExportResolution.P720, renderer.started!!.resolution)
         assertEquals(rev, s.state.value.revision)
+        s.run("render.export", Origin.AGENT, "each_clip" to true).done()
+        assertTrue(renderer.started!!.eachClip)
+        val videoId = s.state.value.project.timeline.track("V1")!!.clips.single().id
+        s.run("render.export", Origin.AGENT, "clip_ids" to listOf(videoId)).done()
+        assertEquals(setOf(videoId), renderer.started!!.clipIds)
+        assertTrue(!renderer.started!!.eachClip)
+        assertEquals(rev, s.state.value.revision)
         assertEquals("running", s.run("render.status", Origin.AGENT).done().results.single()["state"]!!.jsonPrimitive.content)
         assertEquals(ErrorCode.INVALID_ARGUMENT, (s.run("render.export", Origin.AGENT, "resolution" to "8K") as Outcome.Failed).error.code)
     }

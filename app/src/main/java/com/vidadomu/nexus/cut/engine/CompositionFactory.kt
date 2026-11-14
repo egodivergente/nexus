@@ -74,7 +74,7 @@ object CompositionFactory {
         val titles = TitleEvaluator(project.timeline)
         if (fullPlan.durationUs <= 0 || (fullPlan.isEmpty && titles.isEmpty)) return null
         // Preview playback starts at the playhead by rendering a window of the plan (see
-        // PreviewController for why). Export always uses fromUs = 0.
+        // PreviewController for why). Segment exports also provide a bounded window.
         val plan = fullPlan.window(fromUs.coerceAtLeast(0), untilUs)
         if (plan.durationUs <= 0) return null
         val media = project.media.associateBy { it.id }
