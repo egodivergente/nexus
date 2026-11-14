@@ -182,6 +182,15 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
             // Support data is private and contains no exception messages, URLs or tokens.
             put("diagnostic",e.javaClass.simpleName+":"+(e.stackTrace.firstOrNull {it.className.startsWith("com.vidadomu.nexus.")}?.let {it.fileName+":"+it.lineNumber}?:"external"))
         });false}
+        // An Error is not an Exception: the worker died and Settings kept showing "syncing" for days (S25, 6-14/11/2026).
+        catch(e:OutOfMemoryError){setStatus(buildJsonObject {
+            put("state","retry");put("message","Sincronización pendiente. Tus archivos locales se conservan.")
+            put("narrativeSync",buildJsonObject {
+                put("supported",true);put("enabled",prefs.getBoolean("story",false));put("state",if(prefs.getBoolean("story",false))"error" else "disabled")
+                put("reason","El intercambio no ha terminado. Tus cambios locales se conservan.")
+            })
+            put("diagnostic","OutOfMemoryError")
+        });false}
     }
 }
 

@@ -41,6 +41,18 @@ class SyncJournalTest {
         val resolved=cycle(a,ar.rows);val received=cycle(b,br.rows)
         assertTrue(resolved.conflicts.isEmpty());assertEquals(row("Pixel"),received.rows["projects:p"])
     }
+    @Test fun journalIsStreamedToDiskInTheFormatEarlierVersionsRead() {
+        val cloud=Cloud();val state=file();val journal=SyncJournal(state,cloud)
+        val text="Niño «plano» 😀 \"cita\" \\ \u0001 \u2028 ".repeat(40)
+        val input=(1..400).associate {"scenes:s$it" to buildJsonObject {put("id","s$it");put("name",text);put("createdAt",it)}}
+        cycle(journal,input)
+        val bytes=state.readBytes()
+        val decoded=SyncJournal.json.decodeFromString(SyncState.serializer(),bytes.decodeToString())
+        assertContentEquals(SyncJournal.json.encodeToString(SyncState.serializer(),decoded).toByteArray(),bytes)
+        assertFalse(File(state.parentFile,state.name+".tmp").exists())
+        val again=cycle(SyncJournal(state,cloud),input)
+        assertEquals(input,again.rows);assertEquals(0,again.uploaded);assertEquals(1,cloud.commits.size)
+    }
     @Test fun failedUploadSurvivesProcessRestartWithoutDuplicates() {
         val cloud=Cloud();val state=file();var journal=SyncJournal(state,cloud)
         val input=mapOf("projects:p" to row("local"));cloud.fail=true
