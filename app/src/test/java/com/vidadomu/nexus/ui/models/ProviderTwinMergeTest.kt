@@ -29,7 +29,8 @@ class ProviderTwinMergeTest {
         val atlasOnly = catalogModelGroups(atlasH3).single { g -> g.routes.any { it.id == "minimax/h3/image-to-video" } }
         assertEquals(atlasOnly.routes.map { it.id }.toSet(), h3.routes.filter { it.providerId != "crun" }.map { it.id }.toSet())
         // Developer and Max keep their own cards. Fast is not listed: computeGroupTitle drops "Fast" from a title without a
-        // version, so H3 Fast has shared the base card since before the merge existed. Whether it should is a product decision.
+        // version, so on this unfiltered catalog H3 Fast lands in the base card. The app never shows that card:
+        // CuratedVideoSelection leaves H3 Fast out of what is offered (Vidal's video list of 01-11; confirmed 14-11).
         assertFalse(h3.routes.any { listOf("h3-developer", "h3-max").any { tier -> tier in it.id } })
         assertEquals(routes.map(::modelBookmark).toSet(), groups.flatMap { it.routes }.map(::modelBookmark).toSet())
         assertEquals(groups.size, groups.map { it.key }.distinct().size)

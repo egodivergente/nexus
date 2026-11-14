@@ -9,9 +9,12 @@ y un campo nativo `prompt` exigido cuenta como el editor de prompt (`CapabilityC
 desactualizadas: barra de 6 pestanas, texto «la app externa», contrato en lugar del modo de Google Flow, entrada declarada
 y tarjeta H3.
 
-**Decision pendiente de Vidal.** MiniMax H3 Fast comparte tarjeta con H3 base en el catalogo: `computeGroupTitle` quita
-«Fast» de un titulo sin version y el patron de version de la familia «MiniMax H3» no casa con `minimax/h3/...`.
-`ProviderTwinMergeTest` pedia tarjeta propia para Fast; ahora describe lo que hace el codigo. El catalogo no se ha tocado.
+**H3 Fast (aclarado el 14-11, sin decision pendiente).** Vidal no quiere H3 Fast en Nexus y no hay nada que quitar: su lista
+de video del 01-11 (`CuratedVideoSelection`, vc176) no la incluye, asi que la app no la ofrece en Modelos, en el Lienzo ni
+al agente. Comprobado en el S25: vc209 instalada y `curated_video_v1` sin tocar. `ProviderTwinMergeTest` agrupa el catalogo
+SIN filtrar; solo ahi H3 Fast cae en la tarjeta de H3 base, porque `computeGroupTitle` quita «Fast» de un titulo sin version
+y el patron de version de la familia «MiniMax H3» no casa con `minimax/h3/...`. La prueba pedia tarjeta propia para Fast y
+ahora describe eso. El catalogo no se ha tocado. El escritorio (`desktop/ui`) muestra el catalogo completo y si lista H3 Fast.
 
 **Streaming.** `OpenAiCompatibleStreamingProvider` y `ResponsesApiStreamingProvider`: un flujo sin marca de final
 (`[DONE]`, `finish_reason` o evento final) es un corte. Con una herramienta recibida: `LlmException` NETWORK y no se ejecuta
