@@ -117,7 +117,9 @@ internal object CapabilityConstraintEngine {
                 issue(CapabilityIssueKind.DEPENDENCY, rule.fieldKey,
                     "«${rule.fieldKey}» no es compatible con ${rule.whenValues.keys.joinToString()}. Elige una combinación publicada.")
         }
-        val represented = known + capabilities.inputs.map {it.field.key} + capabilities.prompt.fieldKey + "model"
+        // A native "prompt" requirement is the prompt editor, as in ModelCapabilityRegistry and missingRequiredFields.
+        val represented = known + capabilities.inputs.map {it.field.key} + capabilities.prompt.fieldKey + "model" +
+            listOfNotNull("prompt".takeIf {capabilities.prompt.support != CapabilitySupport.UNSUPPORTED})
         model.nativeRequiredFields.filter {it !in represented}.forEach { key ->
             issue(CapabilityIssueKind.UNKNOWN, key, "El contrato exige una entrada aún no representada: $key.")
         }

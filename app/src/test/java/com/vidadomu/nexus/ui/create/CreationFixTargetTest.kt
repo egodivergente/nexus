@@ -34,9 +34,11 @@ class CreationFixTargetTest {
             contractMedia=listOf(ContractMediaField("mask","Máscara precisa","image/*",required=true))))).fixTarget)
     }
     @Test fun invalidTypeAndExcessReferencesLeadToMedia() {
+        // A declared input is needed: without a contract the model itself is UNKNOWN and the fix is choosing another one.
+        val declared=state(model.copy(capabilities=listOf(ModelCapability.IMAGE_TO_IMAGE),firstFrameField="image"))
         val media=AttachedMedia("a","file:///test","video/mp4",MediaSlotType.PRIMARY_IMAGE)
-        assertEquals(CreationFixTarget.MEDIA,creationReadiness(state().copy(attachedMedia=listOf(media))).fixTarget)
-        assertEquals(CreationFixTarget.MEDIA,creationReadiness(state().copy(attachedMedia=listOf(media.copy(slotType=MediaSlotType.REFERENCE_IMAGE,mimeType="image/png")))).fixTarget)
+        assertEquals(CreationFixTarget.MEDIA,creationReadiness(declared.copy(attachedMedia=listOf(media))).fixTarget)
+        assertEquals(CreationFixTarget.MEDIA,creationReadiness(declared.copy(attachedMedia=listOf(media.copy(slotType=MediaSlotType.REFERENCE_IMAGE,mimeType="image/png")))).fixTarget)
     }
     @Test fun requiredScalarLeadsToParameters() {
         val m=model.copy(contractEndpoint="/fixture",parameters=listOf(ModelParameter("quality","Calidad",ParameterType.TEXT,isRequired=true)))

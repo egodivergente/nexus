@@ -45,7 +45,8 @@ fun creationReadiness(state:CreateUiState):CreationReadiness {
             com.vidadomu.nexus.provider.runway.ContractPayload.validate(model,request)
             com.vidadomu.nexus.provider.crun.CrunTextCatalog.validateSuno(model,request)
         } catch(error:IllegalArgumentException) {
-            return result(CreationPhase.INVALID,error.message ?: "Revisa las opciones del modelo.",CreationFixTarget.PARAMETERS)
+            val target=if(error.message==com.vidadomu.nexus.provider.crun.CrunTextCatalog.SUNO_DESCRIPTION_MESSAGE) CreationFixTarget.PROMPT else CreationFixTarget.PARAMETERS
+            return result(CreationPhase.INVALID,error.message ?: "Revisa las opciones del modelo.",target)
         }
     }
     return CreationReadiness(CreationPhase.READY)

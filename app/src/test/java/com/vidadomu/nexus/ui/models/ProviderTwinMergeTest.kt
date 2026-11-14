@@ -25,8 +25,12 @@ class ProviderTwinMergeTest {
         val groups = catalogModelGroups(routes)
         val h3 = groups.single { g -> g.routes.any { it.id == "minimax/h3/image-to-video" } }
         assertTrue(h3.routes.map { it.id }.toString(), h3.routes.count { it.providerId == "crun" } == 2)
-        // Other products of the family (Developer, Fast, Max) keep their own cards.
-        assertFalse(h3.routes.any { listOf("h3-developer", "h3-fast", "h3-max").any { tier -> tier in it.id } })
+        // The merge adds the Crun routes and nothing else: the Atlas side is exactly the card Atlas had on its own.
+        val atlasOnly = catalogModelGroups(atlasH3).single { g -> g.routes.any { it.id == "minimax/h3/image-to-video" } }
+        assertEquals(atlasOnly.routes.map { it.id }.toSet(), h3.routes.filter { it.providerId != "crun" }.map { it.id }.toSet())
+        // Developer and Max keep their own cards. Fast is not listed: computeGroupTitle drops "Fast" from a title without a
+        // version, so H3 Fast has shared the base card since before the merge existed. Whether it should is a product decision.
+        assertFalse(h3.routes.any { listOf("h3-developer", "h3-max").any { tier -> tier in it.id } })
         assertEquals(routes.map(::modelBookmark).toSet(), groups.flatMap { it.routes }.map(::modelBookmark).toSet())
         assertEquals(groups.size, groups.map { it.key }.distinct().size)
     }
