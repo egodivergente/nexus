@@ -1,7 +1,9 @@
-# Agente: burbuja en vivo cortada en palabras con cerebros propios — 17/11/2026
+# vc220 / 1.9.184-agent: burbuja en vivo acumulada sobre vc219 — 17/11/2026 (EN CURSO)
 
-Rama `fix/agente-streaming-acumulado-20261117`, sobre `codex/widgets-v218-install-20261116` (vc218 instalada en el S25).
-**Sin cambio de versión, sin APK y sin instalar.** Aplica limpio sobre `aki/sync-assets-v218-20261116` (no toca los mismos archivos).
+Rama `merge/v219-streaming-20261117` = `merge/v218-con-polish-20261116` (47d90d76, vc219 de otro agente) +
+el arreglo de `fix/agente-streaming-acumulado-20261117` (50318bf). Compilación en AWS CodeBuild; se instala en el
+S25 solo después de la vc219. Coordinación: `C:\Users\User\.agent-infra\coordinacion-nexus-20261117.md` (AXELPC).
+**Estado: rama preparada; APK pendiente; sin instalar.**
 
 **Síntoma (S25, AKI · Haiku):** encima de «Pensando…» salía una sola palabra que sustituía a la anterior («t», «fuerza»).
 **Causa:** `OpenAiCompatibleStreamingProvider` y `ResponsesApiStreamingProvider` entregaban a `onTextDelta` solo el trozo
