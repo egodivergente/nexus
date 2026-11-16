@@ -128,7 +128,7 @@ class AgentHost:
             raise RuntimeError('Falta Java 17 o el motor del asistente.')
         self.lines = queue.Queue()
         self.process = subprocess.Popen(
-            [java, '-Xms32m', '-Xmx256m', '-XX:+UseSerialGC', '-XX:ActiveProcessorCount=2', '-Xlog:all=warning:stderr', '-Dfile.encoding=UTF-8', '-cp',
+            [java, '-Xms32m', '-Xmx512m', '-XX:+UseSerialGC', '-XX:ActiveProcessorCount=2', '-Xlog:all=warning:stderr', '-Dfile.encoding=UTF-8', '-cp',
              str(self.root / 'runtime' / '*'), 'DesktopAgentKt', str(self.root), str(self.data)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding='utf-8', bufsize=1,
