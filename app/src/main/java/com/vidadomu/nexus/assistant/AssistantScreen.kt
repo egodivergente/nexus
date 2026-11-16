@@ -895,9 +895,7 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
 }
 
 @Composable
-internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {},
-    widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
-    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null) {
+internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {}) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var actions by rememberSaveable(item.id) { mutableStateOf(false) }
@@ -1020,7 +1018,9 @@ internal fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): ChatI
 }
 
 @Composable
-internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {}) {
+internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {},
+    widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
+    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
