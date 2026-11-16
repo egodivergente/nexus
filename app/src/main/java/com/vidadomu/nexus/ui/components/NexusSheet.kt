@@ -31,6 +31,8 @@ fun NexusSheet(
     val canDismiss by rememberUpdatedState(dismissEnabled)
     ModalBottomSheet(onDismissRequest = { if (canDismiss) onDismiss() }, shape = com.vidadomu.nexus.ui.theme.NexusThemeSpecs.treatment(com.vidadomu.nexus.ui.theme.LocalNexusAppearance.current).sheet,
         containerColor=com.vidadomu.nexus.ui.theme.LocalNexusVisuals.current.sheetSurface,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.56f),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
             confirmValueChange = { it != SheetValue.Hidden || canDismiss })) {
         NexusSheetSystemBars()

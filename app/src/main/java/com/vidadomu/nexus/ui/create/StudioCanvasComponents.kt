@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -45,6 +46,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.vidadomu.nexus.ui.components.StudioTactileCard
+import com.vidadomu.nexus.ui.components.studioSpecularBorder
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.LocalNexusVisuals
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
@@ -96,23 +99,32 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
     val motion=rememberNexusMotionAllowed()
     val visuals=LocalNexusVisuals.current
     val borderColor by animateColorAsState(
-        if(focused) MaterialTheme.colorScheme.primary else visuals.promptBorder,
-        tween(if(motion) NexusTokens.contentDuration else 0), label = "Prompt focus")
+        if(focused) MaterialTheme.colorScheme.primary else Color.Transparent,
+        if(motion) spring(dampingRatio = 0.84f, stiffness = 480f) else snap(), label = "Prompt focus")
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
     val toolbarTint=if(enabled) MaterialTheme.colorScheme.onSurfaceVariant else visuals.disabledText
-    Column(modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(visuals.promptSurface)
-        .border(if(focused) NexusTokens.divider*2 else NexusTokens.divider,borderColor,MaterialTheme.shapes.medium)
-        .then(if(initiallyExpanded || onExpand==null) Modifier.animateContentSize(tween(if(motion) NexusTokens.contentDuration else 0)) else Modifier)) {
+    StudioTactileCard(
+        modifier = modifier.fillMaxWidth()
+            .then(if(initiallyExpanded || onExpand==null) Modifier.animateContentSize(if(motion) spring(dampingRatio = 0.84f, stiffness = 460f) else snap()) else Modifier),
+        shape = NexusTokens.card,
+        containerColor = visuals.promptSurface,
+        shadowElevation = if (focused) 6.dp else 3.dp,
+        border = studioSpecularBorder(
+            width = if (focused) 1.5.dp else 1.dp,
+            accentTint = if (borderColor.alpha > 0.01f) borderColor else null
+        )
+    ) {
+        Column(Modifier.fillMaxWidth()) {
         BasicTextField(value, onValueChange, modifier = Modifier.fillMaxWidth()
             .then(if(focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .bringIntoViewRequester(bringPromptIntoView)
             .onFocusChanged { focused = it.isFocused;onEditorFocusChanged(it.isFocused) }
             .semantics { contentDescription = "Prompt de creación" }
-            .heightIn(min = if(expanded) 176.dp else 72.dp)
-            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8),
+            .heightIn(min = if(expanded) 176.dp else 96.dp)
+            .padding(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space12, bottom = NexusTokens.space4),
             textStyle = textStyle, cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            // Collapsed editor stays around 120–128 dp including its toolbar. Text scrolls; no text is discarded.
-            enabled = enabled, minLines = 2, maxLines = if(expanded) 18 else 3,
+            // Dedicated prompt drawer breathes cleanly; longer drafts scroll without losing content.
+            enabled = enabled, minLines = 3, maxLines = if(expanded) 18 else 5,
             decorationBox = { field ->
                 Box {
                     if(value.isEmpty()) Text(placeholder, style = textStyle,
@@ -124,6 +136,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
         val warning=rules.value("prompt.softWarning",ruleScope).toLongOrNull() ?: 0
         if(warning>0 && value.codePointCount(0,value.length)>warning) Text("Has superado tu aviso de longitud. El texto se conserva y puedes enviarlo.",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=visuals.warning)
         rules.value("prompt.observation",ruleScope).takeIf {it.isNotBlank()}?.let {observation->Text("Tu observación · $observation",Modifier.padding(horizontal=NexusTokens.space16),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
         Row(Modifier.fillMaxWidth().background(visuals.chromeSurface).padding(start = NexusTokens.space4, end = NexusTokens.space8), verticalAlignment = Alignment.CenterVertically) {
             com.vidadomu.nexus.ui.components.NexusHintedIconButton("Pegar prompt",modifier=Modifier.size(NexusTokens.minimumTouch),enabled=enabled,onClick={
                 val pasted=clipboard.getText()?.text
@@ -152,6 +165,7 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             }
         }
         attachments()
+        }
     }
 }
 
@@ -162,16 +176,24 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
     disabledLabel: String? = null, showCost: Boolean = true) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
-    val scale by animateFloatAsState(if(pressed) .985f else 1f, tween(NexusTokens.pressDuration), label = "Generate press")
+    val scale by animateFloatAsState(if(pressed) .98f else 1f, spring(dampingRatio = 0.72f, stiffness = 560f), label = "Generate press")
     val haptic = rememberNexusHaptics()
     val scheme = MaterialTheme.colorScheme
     val visuals = LocalNexusVisuals.current
     val busyInk = visuals.onProcessing
     val motionAllowed = rememberNexusMotionAllowed(requested = busy)
-    Box(modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }) {
+    Box(
+        modifier.fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(
+                if (enabled && !busy) Modifier.shadow(elevation = 6.dp, shape = NexusTokens.action, clip = false)
+                else Modifier
+            )
+    ) {
         Button(onClick = { haptic.perform(NexusHapticEvent.SELECTION); onClick() },
             enabled = enabled && !busy, interactionSource = interactions,
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = NexusTokens.action,
+            border = if (enabled && !busy) studioSpecularBorder(accentTint = scheme.onPrimary.copy(alpha = 0.30f)) else null,
             colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary,
                 disabledContainerColor = if(busy) visuals.processing else scheme.surfaceContainerHigh,
                 disabledContentColor = if(busy) busyInk else visuals.disabledText)) {

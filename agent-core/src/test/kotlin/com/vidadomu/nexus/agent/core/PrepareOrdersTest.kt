@@ -115,6 +115,27 @@ class PrepareOrdersTest {
         assertTrue(summary(tool.run(call("""{"prompt":"Otro","media":[${frame()}],"orders":[{"model_id":"${KLING_PRO.modelId}"}]}"""), s))!!.startsWith("Preparado 1 encargo"))
     }
 
+    /** Vidal 14-11: «Preparado 1 encargo» mientras en el mismo turno se habían corregido otras dos tarjetas. */
+    @Test fun `el resumen nombra tambien las tarjetas corregidas en el mismo turno`() = runTest {
+        val h = harness(); val s = session(1); val tool = PrepareOrdersTool(h.deps)
+        val old = tool.run(call("""{"prompt":"Mateo","media":[${frame()}],"orders":[{"model_id":"${KLING_PRO.modelId}"}]}"""), s)
+        val oldId = orders(old).single()["order_id"]!!.jsonPrimitive.content
+        // Turno nuevo: corrige la tarjeta anterior en su sitio y prepara otra.
+        s.preparedThisTurn.clear(); s.turnOrderLines.clear(); s.revisedThisTurn.clear()
+        val revised = UpdatePlanTool(h.deps).run(call("""{"order_id":"$oldId","prompt":"Mateo mirando por la ventana, noche lluviosa"}"""), s)
+        assertFalse(revised.isError, revised.result.toString())
+        val text = tool.run(call("""{"prompt":"Mateo mirando por la ventana, noche lluviosa","media":[${frame()}],
+            "orders":[{"model_id":"${SEEDANCE.modelId}"}]}"""), s).result.jsonObject["summary_for_user"]!!.jsonPrimitive.content
+        assertTrue(text.startsWith("Preparado 1 encargo"), text)
+        assertTrue("Y 1 corregido en su tarjeta" in text && "Kling O3 Pro" in text && "Seedance 2.0" in text, text)
+        assertTrue("Coste estimado total" in text, text)
+        // Sin correcciones en el turno, el resumen no cambia.
+        s.preparedThisTurn.clear(); s.turnOrderLines.clear(); s.revisedThisTurn.clear()
+        val plain = tool.run(call("""{"prompt":"Otro","media":[${frame()}],"orders":[{"model_id":"${VEO.modelId}"}]}"""), s)
+            .result.jsonObject["summary_for_user"]!!.jsonPrimitive.content
+        assertFalse("corregido" in plain, plain)
+    }
+
     @Test fun `un lote preparado cierra el turno en una sola llamada al modelo y el siguiente turno ya trae su detalle`() = runTest {
         val h = harness(); val att = (0 until 2).map { Attachment("ref$it", "file:///ref$it.png", "image/png") }
         val llm = com.vidadomu.nexus.agent.core.llm.ScriptedLlmProvider(listOf(

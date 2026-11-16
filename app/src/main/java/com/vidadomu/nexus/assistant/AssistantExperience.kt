@@ -4,6 +4,8 @@ package com.vidadomu.nexus.assistant
 
 import com.vidadomu.nexus.ui.theme.*
 import com.vidadomu.nexus.ui.components.InlineNotice
+import com.vidadomu.nexus.ui.components.StudioTactileCard
+import com.vidadomu.nexus.ui.components.studioSpecularBorder
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -14,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -110,9 +113,16 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
           }
       }
       Column {
-        Surface(color=LocalNexusVisuals.current.promptSurface,shape=MaterialTheme.shapes.medium,
-            border=androidx.compose.foundation.BorderStroke(NexusTokens.divider,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space4,vertical=2.dp)) {
+        StudioTactileCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = NexusTokens.radiusLarge,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            border = studioSpecularBorder(
+                accentTint = if (inputFocused) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else null
+            ),
+        ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space8,vertical=4.dp)) {
             // The active model lives in the chat header now: the composer stays a single slim row.
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(inputFocused && ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
@@ -190,11 +200,23 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                         else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
                     }
                     IconButton(onClick = onSend, enabled = canSend, modifier = Modifier.size(NexusTokens.minimumTouch)) {
-                        Box(Modifier.size(36.dp).background(
-                            if(canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
-                            MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Filled.Send, "Enviar mensaje", Modifier.size(NexusTokens.iconMedium),
-                                tint = if(canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))
+                        Surface(
+                            modifier = Modifier.size(38.dp),
+                            shape = CircleShape,
+                            color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shadowElevation = if (canSend) 4.dp else 1.dp,
+                            border = studioSpecularBorder(
+                                accentTint = if (canSend) MaterialTheme.colorScheme.primary else null
+                            ),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Send,
+                                    "Enviar mensaje",
+                                    Modifier.size(NexusTokens.iconSmall),
+                                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                )
+                            }
                         }
                     }
                 }

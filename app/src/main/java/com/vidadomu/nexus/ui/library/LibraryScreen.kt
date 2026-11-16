@@ -8,8 +8,11 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.scrollBy
 import com.vidadomu.nexus.ui.models.DragHaptics
 import com.vidadomu.nexus.ui.components.NexusTopAppBar as TopAppBar
-import com.vidadomu.nexus.ui.components.StudioTextField
+import com.vidadomu.nexus.ui.components.StudioChrome
+import com.vidadomu.nexus.ui.components.StudioCircleButton
 import com.vidadomu.nexus.ui.components.StudioFilterChip
+import com.vidadomu.nexus.ui.components.StudioTactileCard
+import com.vidadomu.nexus.ui.components.StudioTextField
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.*
 import androidx.compose.ui.graphics.graphicsLayer
@@ -538,32 +541,98 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 }
             }
             marked=emptySet();open()
-        }}}) else Row(Modifier.fillMaxWidth().windowInsetsPadding(NexusInsets.top).padding(start=if(openFolder!=null) NexusTokens.space4 else NexusTokens.space16),verticalAlignment=Alignment.CenterVertically) {
-        // Dentro de una carpeta: flecha atrás y su nombre en lugar de «Biblioteca».
-        if(openFolder!=null) IconButton(onClick={openFolder=null}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver a la Biblioteca")}
-        // Título, recuento y saldo comparten una sola cabecera: ya no hay una fila entera solo para «N archivos · saldo».
-        Column(Modifier.weight(1f)) {
-            Text(folderName ?: "Biblioteca",style=MaterialTheme.typography.headlineSmall,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                val count=completed.sumOf {it.outputs.size}+localAssets.size
-                Text(if(count==1) "1 archivo" else "$count archivos",style=MaterialTheme.typography.labelMedium,color=TextSecondary,maxLines=1)
-                com.vidadomu.nexus.ui.components.NexusBalanceChip(compact=true)
+        }}}) else StudioChrome(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth()
+                .windowInsetsPadding(NexusInsets.top)
+                .padding(
+                    start = if (openFolder != null) NexusTokens.space8 else NexusTokens.space16,
+                    end = NexusTokens.space12,
+                    top = NexusTokens.space8,
+                    bottom = NexusTokens.space8
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
+        ) {
+            // Dentro de una carpeta: botón circular esculpido para volver.
+            if (openFolder != null) {
+                StudioCircleButton(
+                    onClick = { openFolder = null },
+                    contentDescription = "Volver a la Biblioteca"
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(20.dp))
+                }
             }
-        }
+            // Título, recuento y saldo comparten una sola cabecera respirable y bien jerarquizada.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    folderName ?: "Biblioteca",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8)
+                ) {
+                    val count = completed.sumOf { it.outputs.size } + localAssets.size
+                    Text(
+                        if (count == 1) "1 archivo" else "$count archivos",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextSecondary,
+                        maxLines = 1
+                    )
+                    com.vidadomu.nexus.ui.components.NexusBalanceChip(compact = true)
+                }
+            }
 
-        onOpenHistory?.let {go->IconButton(onClick=go) {Icon(Icons.Default.History,"Historial de trabajos")}}
+            StudioTactileCard(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                shadowElevation = 2.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    onOpenHistory?.let { go ->
+                        IconButton(onClick = go, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.History, "Historial de trabajos", modifier = Modifier.size(20.dp), tint = TextSecondary)
+                        }
+                    }
+                    IconButton(onClick = { searchVisible = !searchVisible }, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            Icons.Default.Search,
+                            if (searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",
+                            modifier = Modifier.size(20.dp),
+                            tint = if (searchVisible) MaterialTheme.colorScheme.primary else TextSecondary
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { moreVisible = true }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.MoreVert, "Más opciones de biblioteca", modifier = Modifier.size(20.dp), tint = TextSecondary)
+                        }
+                        DropdownMenu(expanded = moreVisible, onDismissRequest = { moreVisible = false }) {
+                            DropdownMenuItem(text = { Text("Nueva carpeta") }, leadingIcon = { Icon(Icons.Default.CreateNewFolder, null) }, onClick = { moreVisible = false; creatingFolder = true })
+                            DropdownMenuItem(text = { Text(if (showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas") }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = {
+                                moreVisible = false; showDetails = !showDetails; prefs.edit().putBoolean("tile_details", showDetails).apply()
+                            })
+                            DropdownMenuItem(text = { Text("Ediciones locales") }, leadingIcon = { Icon(Icons.Default.Movie, null) }, onClick = { moreVisible = false; showLocalEdits = true })
+                            DropdownMenuItem(text = { Text("Imágenes del proyecto") }, leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) }, onClick = { moreVisible = false; projectLibrary.launch(arrayOf("image/*")) })
+                        }
+                    }
+                }
+            }
 
-        IconButton(onClick={searchVisible=!searchVisible}) {Icon(Icons.Default.Search,if(searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",tint=if(searchVisible) MaterialTheme.colorScheme.primary else TextSecondary)}
-        IconButton(enabled=!importing,onClick={importPicker.launch(arrayOf("image/*","video/*","audio/*","application/pdf","text/*"))}) {Icon(Icons.Default.Add,"Importar archivos")}
-        Box {
-        IconButton(onClick={moreVisible=true}) {Icon(Icons.Default.MoreVert,"Más opciones de biblioteca",tint=TextSecondary)}
-        DropdownMenu(expanded=moreVisible,onDismissRequest={moreVisible=false}) {
-        DropdownMenuItem(text={Text("Nueva carpeta")},leadingIcon={Icon(Icons.Default.CreateNewFolder,null)},onClick={moreVisible=false;creatingFolder=true})
-        DropdownMenuItem(text={Text(if(showDetails) "Ocultar detalles de miniaturas" else "Mostrar detalles de miniaturas")},leadingIcon={Icon(Icons.Default.Info,null)},onClick={
-            moreVisible=false;showDetails=!showDetails;prefs.edit().putBoolean("tile_details",showDetails).apply()})
-        DropdownMenuItem(text={Text("Ediciones locales")},leadingIcon={Icon(Icons.Default.Movie,null)},onClick={moreVisible=false;showLocalEdits=true})
-        DropdownMenuItem(text={Text("Imágenes del proyecto")},leadingIcon={Icon(Icons.Default.PhotoLibrary,null)},onClick={moreVisible=false;projectLibrary.launch(arrayOf("image/*"))})
-        }
+            StudioCircleButton(
+                onClick = { importPicker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/*")) },
+                contentDescription = "Importar archivos",
+                enabled = !importing,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
+            }
         }
     }}) {padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -571,7 +640,13 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             if(searchVisible || query.isNotBlank()) StudioTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space8),singleLine=true,
                 placeholder={Text("Buscar por modelo o descripción")},shape=NexusTokens.field,
                 trailingIcon={if(query.isNotBlank()) IconButton(onClick={query=""}) {Icon(Icons.Default.Close,"Borrar búsqueda")}})
-            LazyRow(contentPadding=PaddingValues(horizontal=NexusTokens.screenMargin,vertical=NexusTokens.space4),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8),verticalAlignment=Alignment.CenterVertically) {
+            val filterHaptics = rememberNexusHaptics()
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.space24, top = NexusTokens.space4, bottom = NexusTokens.space4),
+                horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 item {StudioFilterChip(filter==null,{filter=null},label={Text("Todos")},shape=NexusTokens.filter)}
                 items(listOf(Modality.IMAGE to "Imagen",Modality.VIDEO to "Vídeo",Modality.AUDIO to "Audio")) {(value,label) ->
                     StudioFilterChip(filter==value,{filter=value},label={Text(label)},shape=NexusTokens.filter)
@@ -586,7 +661,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     DropdownMenu(expanded=originMenu,onDismissRequest={originMenu=false}) {
                         origins.forEach {origin -> DropdownMenuItem(text={Text(origin.label)},
                             trailingIcon={if(origin==originFilter) Icon(Icons.Default.Check,null,tint=MaterialTheme.colorScheme.primary)},
-                            onClick={originFilter=origin;originMenu=false})}
+                            onClick={filterHaptics.perform(NexusHapticEvent.SELECTION, changed = origin != originFilter); originFilter=origin; originMenu=false})}
                     }
                 }}
                 item {StudioFilterChip(favoriteOnly,{favoriteOnly=!favoriteOnly},label={Icon(Icons.Default.Star,null,Modifier.size(NexusTokens.space16))},

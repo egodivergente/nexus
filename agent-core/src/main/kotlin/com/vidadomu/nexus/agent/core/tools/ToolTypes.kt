@@ -84,6 +84,8 @@ class AgentSession(
     val preparedThisTurn = mutableListOf<String>()
     /** Línea del resumen y coste de cada encargo preparado en el turno (order_id → línea a coste). */
     val turnOrderLines = mutableMapOf<String, Pair<String, Double>>()
+    /** Encargos corregidos en su tarjeta en ESTE turno (order_id → línea a coste): el resumen automático también los cuenta. */
+    val revisedThisTurn = linkedMapOf<String, Pair<String, Double>>()
 
     fun attachment(id: String): Attachment? = attachments.firstOrNull { it.id == id }
 }

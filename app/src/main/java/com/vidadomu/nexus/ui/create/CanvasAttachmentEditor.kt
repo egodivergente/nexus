@@ -238,7 +238,7 @@ internal fun CanvasAttachmentTile(media: AttachedMedia, label: String, enabled: 
     Column(Modifier.width(thumbnailSize), verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
         Box(Modifier.width(thumbnailSize).height(previewHeight).clip(NexusTokens.field).background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(enabled = visual || onMoveBefore!=null || onMoveAfter!=null) { preview = true }.semantics { contentDescription = "Revisar $label" }) {
-            if (visual) AsyncImage(imageModel, label, Modifier.fillMaxSize(), contentScale = ContentScale.Fit,
+            if (visual) AsyncImage(imageModel, label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
                 onError = { imageFailed = true }, onSuccess = { imageFailed = false })
             else Column(Modifier.align(Alignment.Center).padding(NexusTokens.space8),horizontalAlignment=Alignment.CenterHorizontally) {
                 Icon(Icons.Default.GraphicEq,null)

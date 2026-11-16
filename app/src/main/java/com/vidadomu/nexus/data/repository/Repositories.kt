@@ -159,6 +159,21 @@ class GenerationRepository(
     private val database: NexusDatabase,
     private val providerRegistry: ProviderRegistry
 ) {
+    private val saveScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /** Resultado que el proveedor devuelve ya terminado al enviar: nunca pasa por el sondeo, así que se guarda aquí. */
+    private fun saveCompletedInBackground(job: GenerationJob) {
+        val ctx = context ?: return
+        if (job.status != GenerationStatus.COMPLETED || job.outputs.isEmpty() || com.vidadomu.nexus.BuildConfig.OFFLINE_QA) return
+        saveScope.launch {
+            try {
+                com.vidadomu.nexus.core.alexia.AlexiaBridge.classifyJob(ctx, job, this@GenerationRepository)
+            } catch (e: Exception) {
+                Log.e("GenerationRepository", "Guardado automático: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
     val allJobs: StateFlow<List<GenerationJob>> = database.jobsFlow
     val historyLoading = database.loading
     val historyError = database.loadError
@@ -209,6 +224,7 @@ class GenerationRepository(
                 if (context != null && submitted.status != GenerationStatus.COMPLETED) {
                     com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context, submitted.id)
                 }
+                saveCompletedInBackground(submitted)
             } else {
                 val error=result.exceptionOrNull()
                 val definite = SubmissionSafety.definitelyRejected(error)
@@ -282,6 +298,7 @@ class GenerationRepository(
                                 diagnostics.joinToString("\n")+"\nIntentos: "+kotlinx.serialization.json.JsonArray(events)).joinToString("\n"))
                         database.insertOrUpdateJob(job)
                         if(context!=null && job.status!=GenerationStatus.COMPLETED) com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(context,job.id)
+                        saveCompletedInBackground(job)
                         Result.success(job)
                     } else {
                         lastError=result.exceptionOrNull()

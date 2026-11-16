@@ -140,7 +140,7 @@ object NativeOperationTools {
                 string("project_id", "Proyecto; vacío = el abierto.")
             }),
         NativeTool(operations, "corte_create_project", ToolCategory.ORGANIZE,
-            "Crea un proyecto NUEVO y vacío en Corte y lo abre en pantalla, listo para corte_import_media y corte_apply_ops. Úsalo cuando el usuario quiera montar algo desde cero o no haya ningún proyecto abierto adecuado.",
+            "Crea un proyecto NUEVO y vacío en Corte (app externa) y lo abre en pantalla, listo para corte_import_media y corte_apply_ops. Solo si el usuario pide Corte expresamente: para montar desde cero en Nexus («llévalo al editor») usa cut_create de Nexus Cut.",
             schema { string("name", "Nombre del proyecto; vacío = «Proyecto N».") }),
         NativeTool(operations, "corte_undo", ToolCategory.ORGANIZE,
             "Deshace en Corte la última edición (la del agente si fue la última).",

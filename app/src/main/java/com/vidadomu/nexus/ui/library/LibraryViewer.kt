@@ -53,7 +53,11 @@ internal fun LibraryViewer(entries: List<LibraryEntry>, start: Int, conflicts: S
     onClose: () -> Unit, onOptions: (LibraryEntry) -> Unit, onOpenDocument: (LibraryEntry) -> Unit, overlay: @Composable () -> Unit) {
     val pager = rememberPagerState(start.coerceIn(0, (entries.size - 1).coerceAtLeast(0))) { entries.size }
     val scope = rememberCoroutineScope()
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        com.vidadomu.nexus.ui.theme.NexusSheetSystemBars()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { entries.getOrNull(it)?.key ?: it }) { page ->
                 val entry = entries.getOrNull(page) ?: return@HorizontalPager
@@ -78,8 +82,17 @@ internal fun LibraryViewer(entries: List<LibraryEntry>, start: Int, conflicts: S
                 }
             }
             val entry = entries.getOrNull(pager.currentPage)
-            Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .45f)).windowInsetsPadding(NexusInsets.chromeOnly),
-                verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = .72f), Color.Black.copy(alpha = .28f), Color.Transparent)
+                        )
+                    )
+                    .windowInsetsPadding(NexusInsets.chromeOnly)
+                    .padding(bottom = NexusTokens.space8),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás", tint = Color.White) }
                 Text(entry?.let(name).orEmpty(), Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.titleMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)

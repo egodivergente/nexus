@@ -77,5 +77,51 @@ class MediaTest(unittest.TestCase):
             else:
                 with self.assertRaises(ProxyError): client.converse(**request)
 
+    def _events_client(self, make_events, models=(MODEL,)):
+        def run(command, **kwargs):
+            profile = Path.home() / ".aki/profiles_v3" / command[2]
+            views = json.loads((profile / "allowed.json").read_text())
+            events = make_events(views) + [
+                {"type": "text_delta", "content": '{"content":[{"text":"Seen"}],"stopReason":"end_turn"}'}]
+            tools = sum(e["type"] == "tool_result" for e in events)
+            events.append({"type": "done", "total_tools": tools, "input_tokens": 5, "output_tokens": 5})
+            return subprocess.CompletedProcess(command, 0, "\n".join(map(json.dumps, events)), "")
+        return AkiClient("aki", "/tmp", runner=run, allowed_models=models)
+
+    def test_blocked_chained_attempt_is_tolerated_if_every_view_still_happens(self):
+        request = self.request({"image": {"format": "png", "source": {"bytes": b"fixture"}}})
+        def events(views):
+            use = lambda c: {"type": "tool_use", "name": "Bash", "input": {"command": c}}
+            res = lambda st: {"type": "tool_result", "name": "Bash", "status": st, "output": ""}
+            return [use(views[0] + "; id"), res("error"), use(" " + views[0] + " "), res("done")]
+        self.assertEqual(self._events_client(events).converse(**request)["stopReason"], "end_turn")
+
+    def test_attempt_that_actually_ran_is_rejected(self):
+        request = self.request({"image": {"format": "png", "source": {"bytes": b"fixture"}}})
+        def events(views):
+            use = lambda c: {"type": "tool_use", "name": "Bash", "input": {"command": c}}
+            res = lambda: {"type": "tool_result", "name": "Bash", "status": "done", "output": ""}
+            return [use(views[0] + "; id"), res(), use(views[0]), res()]
+        with self.assertRaises(ProxyError): self._events_client(events).converse(**request)
+
+    def test_blocked_attempts_without_viewing_everything_still_fail(self):
+        request = self.request({"image": {"format": "png", "source": {"bytes": b"fixture"}}})
+        def events(views):
+            return [{"type": "tool_use", "name": "Bash", "input": {"command": "id"}},
+                    {"type": "tool_result", "name": "Bash", "status": "error", "output": ""}]
+        with self.assertRaises(ProxyError): self._events_client(events).converse(**request)
+
+    def test_configured_haiku_is_exact_allowlist(self):
+        haiku = "anthropic.claude-haiku-5-5"
+        request = {"modelId": haiku, "messages": [{"role": "user", "content": [{"text": "hola"}]}]}
+        def run(command, **kwargs):
+            assert command[command.index("--model") + 1] == haiku
+            events = [{"type": "text_delta", "content": '{"content":[{"text":"ok"}],"stopReason":"end_turn"}'},
+                      {"type": "done", "total_tools": 0, "input_tokens": 1, "output_tokens": 1}]
+            return subprocess.CompletedProcess(command, 0, "\n".join(map(json.dumps, events)), "")
+        self.assertEqual(AkiClient("aki", "/tmp", runner=run, allowed_models=(haiku,)).converse(**request)["stopReason"], "end_turn")
+        with self.assertRaises(ProxyError):
+            AkiClient("aki", "/tmp", runner=run, allowed_models=(MODEL,)).converse(**request)
+
 
 if __name__ == "__main__": unittest.main()
