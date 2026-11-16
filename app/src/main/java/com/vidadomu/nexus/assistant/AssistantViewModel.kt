@@ -38,7 +38,8 @@ import kotlinx.coroutines.sync.withLock
 sealed interface ChatItem {
     val id: String
     @kotlinx.serialization.Serializable
-    data class User(override val id: String, val text: String, val attachments: List<Attachment>) : ChatItem
+    data class User(override val id: String, val text: String, val attachments: List<Attachment>,
+        val widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null) : ChatItem
     @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
         val media: List<Attachment> = emptyList()) : ChatItem
@@ -155,7 +156,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if(_ui.value.thinking) return
         send(request.first,request.second)
     }
-    fun send(text: String, retryAttachments: List<Attachment>? = null): Boolean {
+    fun send(text: String, retryAttachments: List<Attachment>? = null,
+        widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null): Boolean {
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
@@ -175,7 +177,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val shown = clean.ifEmpty { "(adjuntos)" }
         val itemsBefore = _ui.value.items.map { it.id }.toSet()
-        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+        _ui.update { it.copy(items = it.items + ChatItem.User(newId(), shown, atts, widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, streamingText = "", replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         // A ViewModel coroutine keeps the turn alive across navigation, but Android may reclaim
         // the app once its Activity is backgrounded. Promote the user-started request first.
         runCatching { AssistantTurnService.start(app) }

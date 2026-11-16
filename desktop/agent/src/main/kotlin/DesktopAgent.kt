@@ -25,13 +25,20 @@ private fun htmlEscape(value: String) = value.replace("&", "&amp;").replace("<",
 private fun spansHtml(spans: List<MdSpan>) = spans.joinToString("") { span ->
     var text = htmlEscape(span.text)
     if (span.code) text = "<code>$text</code>"
+    if (span.mark) text = "<mark>$text</mark>"
     if (span.bold) text = "<strong>$text</strong>"
     if (span.italic) text = "<em>$text</em>"
     if (span.strike) text = "<s>$text</s>"
     text
 }
-private fun markdownHtml(text: String) = ChatMarkdown.parse(text).joinToString("") { block ->
+private fun markdownHtml(text: String) = blocksHtml(ChatMarkdown.parse(text))
+private val calloutLabels = mapOf(CalloutKind.TLDR to "En breve", CalloutKind.TIP to "Consejo", CalloutKind.WARN to "Ojo",
+    CalloutKind.DECISION to "Decisión", CalloutKind.RESULT to "Resultado")
+private fun blocksHtml(blocks: List<MdBlock>): String = blocks.joinToString("") { block ->
     when (block) {
+        is MdBlock.Callout -> "<div class=\"agent-callout agent-callout-${block.kind.name.lowercase()}\"><div class=agent-callout-label>${calloutLabels.getValue(block.kind)}</div>${blocksHtml(block.blocks)}</div>"
+        // Esta edición no tiene paneles interactivos: se muestran como tarjeta de solo lectura con el mismo texto.
+        is MdBlock.Widget -> "<div class=agent-widget>" + htmlEscape(ChatWidgets.plain(block.spec)).replace("\n", "<br>") + "</div>"
         is MdBlock.Heading -> "<h3>${spansHtml(block.spans)}</h3>"
         is MdBlock.Paragraph -> "<p>${spansHtml(block.spans)}</p>"
         is MdBlock.Quote -> "<blockquote>${spansHtml(block.spans)}</blockquote>"
