@@ -79,7 +79,7 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         if(watching)return
         watching=true
         app.registerActivityLifecycleCallbacks(object:Application.ActivityLifecycleCallbacks {
-            override fun onActivityResumed(activity:Activity){enqueue()}
+            override fun onActivityResumed(activity:Activity){enqueue(resumed=true)}
             override fun onActivityCreated(activity:Activity,state:Bundle?){}
             override fun onActivityStarted(activity:Activity){}
             override fun onActivityPaused(activity:Activity){}
@@ -92,12 +92,21 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         }
     }
     private fun constraints()=Constraints.Builder().setRequiredNetworkType(if(prefs.getBoolean("wifi",true))NetworkType.UNMETERED else NetworkType.CONNECTED).setRequiresStorageNotLow(true).build()
-    fun enqueue(manual:Boolean=false) {
+    fun enqueue(manual:Boolean=false,resumed:Boolean=false) {
         if(BuildConfig.OFFLINE_QA || prefs.getString("account",null)==null || (!manual && !prefs.getBoolean("enabled",false)))return
         // A user's request must not sit behind an automatic exponential backoff.
         // Separate queues still share gate, so an ongoing transfer is never cancelled.
-        WorkManager.getInstance(app).enqueueUniqueWork(if(manual)"nexus-drive-manual" else "nexus-drive-now",ExistingWorkPolicy.KEEP,
-            OneTimeWorkRequestBuilder<NexusDriveSyncWorker>().setInputData(workDataOf("manual" to manual)).setConstraints(constraints()).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
+        val name=if(manual)"nexus-drive-manual" else "nexus-drive-now"
+        val request=OneTimeWorkRequestBuilder<NexusDriveSyncWorker>().setInputData(workDataOf("manual" to manual)).setConstraints(constraints()).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build()
+        if(manual || !resumed){WorkManager.getInstance(app).enqueueUniqueWork(name,ExistingWorkPolicy.KEEP,request);return}
+        // After a run of failures WorkManager spaces the retries up to 5 h apart, and KEEP left that wait in place when
+        // the user came back to Nexus (S25, 16/11/2026). Returning to the app replaces a retry that is only waiting.
+        scope.launch {
+            val manager=WorkManager.getInstance(app)
+            val work=runCatching {manager.getWorkInfosForUniqueWork(name).get(30,TimeUnit.SECONDS).map {it.state to it.runAttemptCount}}.getOrDefault(emptyList())
+            if(prefs.getString("account",null)==null || !prefs.getBoolean("enabled",false))return@launch
+            manager.enqueueUniqueWork(name,if(replacesWaitingRetry(work))ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,request)
+        }
     }
     fun disconnect() {
         prefs.edit().putBoolean("enabled",false).remove("account").remove("folder").apply()
@@ -195,6 +204,10 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         });false}
     }
 }
+
+/** True when the automatic sync is only waiting out a retry delay: none of its work is running and some has already failed. */
+internal fun replacesWaitingRetry(work:List<Pair<WorkInfo.State,Int>>)=
+    work.none {it.first==WorkInfo.State.RUNNING} && work.any {it.first==WorkInfo.State.ENQUEUED && it.second>0}
 
 class NexusDriveSyncWorker(context:Context,parameters:WorkerParameters):CoroutineWorker(context,parameters) {
     override suspend fun doWork():Result=withContext(Dispatchers.IO) {
