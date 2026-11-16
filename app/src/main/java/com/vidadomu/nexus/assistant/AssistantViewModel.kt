@@ -40,7 +40,8 @@ import kotlinx.coroutines.sync.withLock
 sealed interface ChatItem {
     val id: String
     @kotlinx.serialization.Serializable
-    data class User(override val id: String, val text: String, val attachments: List<Attachment>, val at: Long = 0L) : ChatItem
+    data class User(override val id: String, val text: String, val attachments: List<Attachment>, val at: Long = 0L,
+        val widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null) : ChatItem
     @kotlinx.serialization.Serializable
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
         val media: List<Attachment> = emptyList(), val at: Long = 0L, val tookMs: Long = 0L,
@@ -267,7 +268,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         send(request.first,request.second)
     }
     /** [note] reaches the agent with the message but is not shown in the user's bubble (e.g. what changed on a board). */
-    fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = ""): Boolean {
+    fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = "",
+        widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null): Boolean {
         val clean = text.trim()
         val atts = retryAttachments ?: _ui.value.pendingAttachments
         if ((clean.isEmpty() && atts.isEmpty()) || _ui.value.thinking || _ui.value.plans.values.any { it.busy }) return false
@@ -306,7 +308,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
         val started = android.os.SystemClock.elapsedRealtime()
         _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
-            ChatItem.User(newId(), shown, atts, System.currentTimeMillis()), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, streamingText = "", activity = emptyList(), replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, streamingText = "", activity = emptyList(), replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
