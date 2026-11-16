@@ -40,13 +40,15 @@ internal object AssetLocalizer {
         val libraryCopies = libraryCopiesByUrl(context)
         for (asset in pending) {
             val modality = when (asset.type) { AssetType.VIDEO -> Modality.VIDEO; AssetType.AUDIO -> Modality.AUDIO; else -> Modality.IMAGE }
-            val file = libraryCopies[asset.uri]
+            val reused = libraryCopies[asset.uri]
+            val file = reused
                 ?: runCatching { download(asset.uri, asset.mimeType, asset.id, AlexiaBridge.getNexusFolderForModality(modality)) }.getOrNull()
             if (file == null) { failed += asset.id; continue }
             val ok = runCatching {
                 runtime.assets.relocateAsset(asset.id, asset.uri, android.net.Uri.fromFile(file).toString(), file.name)
             }.isSuccess
-            if (ok) saved++ else { file.delete(); failed += asset.id }
+            // Solo se borra lo que descargó esta operación; la copia de la biblioteca nunca.
+            if (ok) saved++ else { if (reused == null) file.delete(); failed += asset.id }
         }
         prefs.edit().putStringSet(FAILED, failed).apply()
         saved + mergeExistingDuplicates(context, runtime, prefs)
