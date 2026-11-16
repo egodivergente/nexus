@@ -7,7 +7,8 @@ import kotlinx.serialization.json.*
 /** Conversations are imported as inert history. Plans and credentials cannot execute on import. */
 class SyncDocuments(private val directory:File) {
     private val cache=File(directory,"documents.json")
-    private fun cached():Map<String,JsonObject> = if(cache.exists())Json.parseToJsonElement(cache.readText()).jsonObject.mapValues {it.value.jsonObject}else emptyMap()
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun cached():Map<String,JsonObject> = if(cache.exists())cache.inputStream().buffered(1 shl 16).use {Json.decodeFromStream(JsonObject.serializer(),it)}.mapValues {it.value.jsonObject}else emptyMap()
     fun capture(chats:List<JsonObject>,montages:Map<String,JsonObject>):Map<String,JsonObject> {
         val rows=cached().toMutableMap()
         for(chat in chats) {
@@ -35,6 +36,6 @@ class SyncDocuments(private val directory:File) {
             val id=key.substringAfter(':');require(id.matches(Regex("[A-Za-z0-9_-]{1,100}")))
             if(key.startsWith("conversations:"))archive("sync_$id",row)
         }
-        SyncJournal.atomic(cache,JsonObject(rows).toString())
+        SyncJournal.atomic(cache,JsonObject.serializer(),JsonObject(rows))
     }
 }

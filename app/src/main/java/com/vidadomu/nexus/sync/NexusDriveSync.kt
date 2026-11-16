@@ -150,7 +150,9 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
             val documents=SyncDocuments(directory)
             val conversationDir=File(app.filesDir,"assistant/conversations")
             val chatFiles=conversationDir.listFiles().orEmpty().filter {it.extension=="json" && !it.name.startsWith("sync_")}+listOf(File(app.filesDir,"assistant/chat-v1.json")).filter {it.exists()}
-            val chats=chatFiles.map {file->require(file.length()<=8_000_000);Json.parseToJsonElement(file.readText()).jsonObject}
+            // Parsed from the file stream: an 8 MB conversation no longer needs a 16 MB String first.
+            @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+            val chats=chatFiles.map {file->require(file.length()<=8_000_000);file.inputStream().buffered(1 shl 16).use {Json.decodeFromStream(JsonObject.serializer(),it)}}
             prefs.getString("resolution",null)?.let {raw->
                 val resolution=Json.parseToJsonElement(raw).jsonObject
                 workspace.resolve(resolution["key"]!!.jsonPrimitive.content,resolution["revision"]!!.jsonPrimitive.content)
