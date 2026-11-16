@@ -27,7 +27,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-DESKTOP_VERSION = '2026.11.14-desktop-continuity.2'
+DESKTOP_VERSION = '2026.11.16-desktop-continuity.4'
 UI = ROOT / 'ui'
 DATA = Path(os.environ['LOCALAPPDATA']) / 'NexusDesktop'
 MEDIA = DATA / 'media'

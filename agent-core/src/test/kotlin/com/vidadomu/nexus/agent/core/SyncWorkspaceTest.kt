@@ -38,6 +38,40 @@ class SyncWorkspaceTest {
         assertContentEquals(original.readBytes(),downloaded.readBytes())
         assertEquals(1,cloud.blobs.size)
     }
+    @Test fun downloadedCopyIsNotCapturedAgainNorPublishedAsADevicePath()=runTest {
+        val cloud=SyncJournalTest.Cloud();val a=root();val b=root();val original=File(a,"image.png").apply {writeBytes(byteArrayOf(1,2,3,4,5))}
+        val sourceFile=File(a,"index.json").apply {writeText(buildJsonObject {
+            put("projects",buildJsonArray {add(buildJsonObject {put("id","p");put("name","Mateo");put("createdAt",1)})})
+            put("assets",buildJsonArray {add(buildJsonObject {put("id","a");put("projectId","p");put("uri",original.toURI().toString());put("type","IMAGE");put("displayName","Plano");put("createdAt",2)})})
+            put("generations",buildJsonArray {add(buildJsonObject {put("id","g");put("projectId","p");put("providerId","atlas");put("modelId","m");put("modality","IMAGE");put("status","SUCCEEDED");put("prompt","x");put("referenceUris",buildJsonArray {add(original.toURI().toString())});put("createdAt",3)})})
+        }.toString())}
+        workspace(AssetIndex(sourceFile),File(a,"sync"),cloud).cycle(null)
+        val target=AssetIndex(File(b,"index.json"))
+        workspace(target,File(b,"sync"),cloud).cycle(setOf("p"))
+        val local=target.snapshot().assets.single().uri
+        assertTrue(local.startsWith("file:") && File(URI(local)).exists())
+        // Drive unreachable for uploads: the old code captured the copy again, failed and published the device path.
+        var uploads=0
+        val offline=object:SyncRemote by cloud {override fun putBlob(name:String,file:File){uploads++;throw java.io.IOException("offline")}}
+        val commits=cloud.commits.size
+        repeat(3) {
+            val result=workspace(target,File(b,"sync"),offline).cycle(setOf("p"))
+            assertEquals(0,result["missingMedia"]!!.jsonPrimitive.int)
+        }
+        assertEquals(0,uploads);assertEquals(commits,cloud.commits.size)
+        assertEquals(local,target.snapshot().assets.single().uri);assertEquals(listOf(local),target.snapshot().generations.single().referenceUris)
+    }
+    @Test fun anotherDevicesCopyPathIsLeftAloneAndNeverTriggersALocalCopy()=runTest {
+        val dir=root();val foreign="file:///data/user/0/com.vidadomu.nexus.agent/files/assistant/sync/workspaces/x/blobs/"+"ab".repeat(32)+".png"
+        val file=File(dir,"index.json").apply {writeText(buildJsonObject {
+            put("assets",buildJsonArray {add(buildJsonObject {put("id","a");put("uri",foreign);put("type","IMAGE");put("displayName","Del móvil");put("createdAt",1)})})
+        }.toString())}
+        val index=AssetIndex(file);var localized=0
+        val sync=SyncWorkspace(index,File(dir,"sync"),SyncJournalTest.Cloud(),open={null},localUri={localized++;error("no local copy may be made while capturing")})
+        val result=sync.cycle(null)
+        assertEquals(1,result["missingMedia"]!!.jsonPrimitive.int);assertEquals(0,localized)
+        assertEquals(foreign,index.snapshot().assets.single().uri)
+    }
     @Test fun unavailableProviderLinkDoesNotPretendItsOriginalWasCopied()=runTest {
         val dir=root();val file=File(dir,"index.json").apply {writeText("""{"assets":[{"id":"a","uri":"https://expired.invalid/image.png","type":"IMAGE","displayName":"Original perdido","createdAt":1}]}""")}
         val result=workspace(AssetIndex(file),File(dir,"sync"),SyncJournalTest.Cloud()).cycle(null)

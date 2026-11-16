@@ -26,6 +26,13 @@ class SyncWorkspace(
         fun portable(uri:String):String {
             if(uri.startsWith(SyncBlobs.PREFIX))return uri
             replacements[uri]?.let {return it}
+            // A downloaded copy is stored under its verified hash. Capturing it again put a Drive request in every
+            // cycle and, when one failed, published the device path: 9,000+ revisions in two days (S25, 14-16/11/2026).
+            // Recognised by its path only: localUri is not called here because on Windows it copies and hashes files.
+            val name=uri.substringAfterLast('/')
+            if(uri.startsWith("file:") && SyncBlobs.NAME.matches(name) &&
+                runCatching {File(java.net.URI(uri)).canonicalFile.parentFile==blobs.directory.canonicalFile}.getOrDefault(false))
+                return (SyncBlobs.PREFIX+name).also {replacements[uri]=it}
             return try {
                 val input=open(uri)?:return uri.also {missing+=uri}
                 blobs.capture(input.stream,input.extension).also {replacements[uri]=it}
@@ -103,7 +110,7 @@ class SyncWorkspace(
         val restored=StorySyncCodec.restore(decoded,expected,localizedStory,if(useStory)storyJournal!!.knownKeys()else storyRows.keys)
         val pending=restored.pendingKeys
         if(pending.isEmpty() && restored.snapshot.copy(projectSessions=expected.projectSessions)!=expected) {
-            SyncJournal.atomic(File(directory,"index-before-apply.json"),encoded.toString())
+            SyncJournal.atomic(File(directory,"index-before-apply.json"),JsonObject.serializer(),encoded)
             index.applySyncedSnapshot(expected,restored.snapshot)
         }
         if(pending.isEmpty()) {
@@ -118,7 +125,7 @@ class SyncWorkspace(
         val conflicts=JsonArray(allConflicts.map {conflict->buildJsonObject {
             put("key",conflict.key);put("versions",JsonArray(conflict.versions.map {version->buildJsonObject {put("id",version.id);put("device",version.device);put("at",version.at);put("value",version.value?:JsonNull)}}))
         }})
-        SyncJournal.atomic(File(directory,"conflicts.json"),conflicts.toString())
+        SyncJournal.atomic(File(directory,"conflicts.json"),JsonArray.serializer(),conflicts)
         return buildJsonObject {
             put("state",if(conflicts.isNotEmpty())"conflicts" else if(missing.isNotEmpty() || pending.isNotEmpty())"partial"else "synced")
             put("uploaded",result.uploaded+(storyResult?.uploaded?:0));put("downloaded",result.downloaded+(storyResult?.downloaded?:0));put("missingMedia",missing.size);put("deduplicated",deduplicated);put("conflicts",conflicts);put("completedAt",System.currentTimeMillis())
