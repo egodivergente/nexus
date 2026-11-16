@@ -122,7 +122,8 @@ internal fun AdvancedParameters(model:NexusModel,parameters:List<ModelParameter>
 
 /** Incompatible draft media remains inspectable and removable; these files are excluded from submission. */
 @Composable
-internal fun ConservedMediaSection(media: List<AttachedMedia>, enabled: Boolean, onRemove: (String)->Unit) {
+internal fun ConservedMediaSection(media: List<AttachedMedia>, enabled: Boolean, onRemove: (String)->Unit,
+    onClearAll: (()->Unit)? = null) {
     if(media.isEmpty()) return
     var expanded by rememberSaveable {mutableStateOf(false)}
     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
@@ -132,10 +133,12 @@ internal fun ConservedMediaSection(media: List<AttachedMedia>, enabled: Boolean,
             Icon(Icons.Default.Inventory2,null, tint=MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(NexusTokens.space8))
             Text("Conservados · ${media.size}",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+            // Vidal 14-11: con decenas de fotos, quitarlas una a una no era viable.
+            if(onClearAll!=null && media.size>1) TextButton(onClick=onClearAll,enabled=enabled) {Text("Quitar todos")}
             Icon(if(expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
         }
         if(expanded) {
-            Text("Estos archivos se conservan en el borrador y no se enviarán con el modelo actual.",
+            Text("Estos archivos se conservan en el borrador 24 h y no se enviarán con el modelo actual.",
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 items(media,key={it.id}) {item -> CanvasAttachmentTile(item,item.fileName ?: "Archivo conservado",enabled,

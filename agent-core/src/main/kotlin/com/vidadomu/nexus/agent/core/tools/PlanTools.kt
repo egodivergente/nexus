@@ -212,11 +212,16 @@ class UpdatePlanTool(private val d: ToolDeps) : BaseTool(
                 is PlanBuild.Invalid -> fail("El cambio no es válido; el encargo conserva su último plan válido y muestra lo que falta.") {
                     put("order_id", order.id); put("issues", built.issues.toJson())
                 }
-                is PlanBuild.Ready -> ok(buildJsonObject {
+                is PlanBuild.Ready -> {
+                    val cost = built.plan.estimate?.amountUsd
+                    session.revisedThisTurn[order.id] = ("- **${built.plan.modelName}** · " +
+                        (cost?.let { PrepareOrdersTool.usd(it) } ?: "coste por confirmar")) to (cost ?: Double.NaN)
+                    ok(buildJsonObject {
                     put("order_id", order.id); put("order_status", order.status.name); put("attempt", order.attempt)
                     put("plan", built.plan.cardJson(d.guard.state(built.plan.id)))
                     put("message", "Tarjeta ${order.id} corregida en su sitio. PREPARADA, NO enviada: el usuario debe pulsar su botón.")
                 }, listOf(UiEvent.PlanReady(built.plan, executable = true, orderId = order.id)))
+                }
             }
         }
         val id = input.str("plan_id") ?: throw ToolInputException("Indica order_id (recomendado) o plan_id.")

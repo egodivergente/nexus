@@ -2,6 +2,7 @@
 
 package com.vidadomu.nexus.assistant
 
+import androidx.compose.ui.res.imageResource
 import androidx.compose.foundation.background
 import com.vidadomu.nexus.ui.components.*
 import androidx.compose.animation.animateContentSize
@@ -800,16 +801,15 @@ private fun EmptyHint(onSuggest: ((String) -> Unit)? = null) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NexusTokens.space12),
     ) {
-        StudioTactileCard(
-            modifier = Modifier.size(72.dp),
-            shape = androidx.compose.foundation.shape.CircleShape,
-            containerColor = MaterialTheme.colorScheme.surface,
-            shadowElevation = 6.dp,
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                com.vidadomu.nexus.ui.theme.AxelMark(Modifier.size(44.dp), contentDescription = "Axel · Nexus")
-            }
-        }
+        // Vidal 14-11: la bienvenida es el onboarding, con el lobo de NEXUS en grande y a resolución completa.
+        // Va dentro de la lista, así que con el teclado abierto se desplaza en vez de tapar las sugerencias.
+        androidx.compose.foundation.Image(
+            bitmap = androidx.compose.ui.graphics.ImageBitmap.imageResource(com.vidadomu.nexus.R.drawable.nexus_logo),
+            contentDescription = "Logo de NEXUS",
+            modifier = Modifier.fillMaxWidth(.66f).widthIn(max = 300.dp).aspectRatio(1f),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+        )
         Text(
             text = "Las buenas ideas empiezan aquí.",
             style = MaterialTheme.typography.titleMedium,

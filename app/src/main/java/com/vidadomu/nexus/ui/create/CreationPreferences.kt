@@ -33,6 +33,8 @@ class CreationPreferences(private val context:Context) {
         prefs.edit().putString("draft",json.encodeToString(draft)).apply()
         if(rememberParameters()) prefs.edit().putString(configurationKey(provider,draft.modelId,draft.endpoint,draft.modality),json.encodeToString(draft.parameters)).apply()
     }
+    /** Rewrites only the stored draft (expired references left it); remembered parameters stay as they are. */
+    fun replaceDraft(draft:CreationDraft) {prefs.edit().putString("draft",json.encodeToString(draft)).apply()}
     fun draft():CreationDraft?=runCatching {json.decodeFromString<CreationDraft>(prefs.getString("draft",null) ?: return null)}.getOrNull()
     private fun key(model:NexusModel,modality:Modality)=
         "presets:v2:${model.providerId}:${model.id}:${(model.contractEndpoint ?: model.atlasEndpoint).orEmpty()}:${modality.name}"

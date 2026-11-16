@@ -17,16 +17,20 @@ from nexus_proxy import NexusProxy, ProxyError, load_config, make_handler
 from aki_media import prepare
 
 MODEL = "openai.gpt-5.6-sol"
+log = logging.getLogger("aki_proxy")
 
 
 class AkiClient:
-    def __init__(self, binary: str, workspace: str, runner=subprocess.run):
+    def __init__(self, binary: str, workspace: str, runner=subprocess.run, allowed_models=(MODEL,)):
         self.binary, self.workspace, self.runner = binary, workspace, runner
+        # Exact model ids only (Sol o un Haiku de AKI); sin alias ni sustitución silenciosa.
+        self.allowed_models = tuple(allowed_models)
         self.lock = threading.Lock()
 
     def converse(self, **request):
-        if request.get("modelId") != MODEL:
-            raise ProxyError(422, "model_not_allowed", "Este puente solo admite GPT-5.6 Sol.")
+        model = request.get("modelId")
+        if model not in self.allowed_models:
+            raise ProxyError(422, "model_not_allowed", "Este puente solo admite los modelos AKI configurados en allowed_models.")
         env = dict(os.environ)
         for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_BEARER_TOKEN_BEDROCK",
                     "AWS_PROFILE", "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
@@ -40,7 +44,7 @@ class AkiClient:
                 started = time.monotonic()
                 with prepare(request) as (converted, profile, allowed_views):
                     prompt = "Continue this Nexus request. Return only the specified response JSON:\n" + json.dumps(converted, ensure_ascii=False, separators=(",", ":"))
-                    result = self.runner([self.binary, "--profile", profile, "--model", MODEL,
+                    result = self.runner([self.binary, "--profile", profile, "--model", model,
                                           "--output-format", "stream-json"],
                                          input=prompt, text=True, capture_output=True, cwd=self.workspace,
                                          env=env, timeout=max(1, 150 - (time.monotonic() - started)))
@@ -52,6 +56,10 @@ class AkiClient:
             # Never forward CLI stderr: it may contain account information.
             raise ProxyError(502, "aki_failed", "AKI rechazó la petición. Comprueba su sesión y el modelo; no se utilizó AWS directo.")
         chunks, usage, viewed, host_calls = [], None, set(), 0
+        # Un intento fuera de la lista (p. ej. Haiku encadenando `view a; view b`) lo bloquea el hook
+        # PreToolUse y no ejecuta nada. Se tolera SOLO si su resultado confirma el bloqueo; si algo ajeno
+        # llegó a ejecutarse, falla. Aun así debe verse cada adjunto con su comando exacto.
+        calls, results, blocked = [], 0, 0
         for line in result.stdout.splitlines():
             try:
                 event = json.loads(line)
@@ -64,13 +72,24 @@ class AkiClient:
             elif event.get("type") == "tool_use" and event.get("input"):
                 tool_input = event["input"]
                 command = tool_input.get("command") if isinstance(tool_input, dict) else None
-                if event.get("name") != "Bash" or command not in allowed_views:
-                    raise ProxyError(502, "aki_tools", "AKI intentó una operación fuera de los adjuntos autorizados.")
-                viewed.add(command)
+                command = command.strip() if isinstance(command, str) else command
+                allowed_call = event.get("name") == "Bash" and command in allowed_views
+                calls.append(allowed_call)
+                if allowed_call:
+                    viewed.add(command)
             elif event.get("type") == "tool_result":
                 host_calls += 1
-                if event.get("name") != "Bash" or event.get("status") != "done" or event.get("output"):
-                    raise ProxyError(502, "aki_media", "No se pudo verificar la lectura visual del adjunto.")
+                allowed_call = calls[results] if results < len(calls) else False
+                results += 1
+                if allowed_call:
+                    if event.get("name") != "Bash" or event.get("status") != "done" or event.get("output"):
+                        raise ProxyError(502, "aki_media", "No se pudo verificar la lectura visual del adjunto.")
+                elif event.get("status") == "done":
+                    raise ProxyError(502, "aki_tools", "AKI intentó una operación fuera de los adjuntos autorizados.")
+                else:
+                    blocked += 1
+        if blocked:
+            log.warning("AKI intentó %d operaciones fuera de la lista; el hook las bloqueó", blocked)
         if not usage:
             stderr_text = result.stderr or ""
             if "failed to load AWS credentials" in stderr_text or "session may have expired" in stderr_text:
@@ -122,10 +141,11 @@ def main():
     cfg = load_config(args.config)
     if cfg.get("bind", "127.0.0.1") != "127.0.0.1":
         raise ValueError("AKI bridge must bind only to 127.0.0.1")
-    if cfg.get("allowed_models") != [MODEL]:
-        raise ValueError("Explicit Sol-only allowlist required")
+    models = cfg.get("allowed_models")
+    if not isinstance(models, list) or not models or not all(isinstance(m, str) and m for m in models):
+        raise ValueError("Explicit allowed_models list of exact AKI model ids required")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    proxy = AkiProxy(cfg, bedrock=AkiClient(cfg["aki_binary"], cfg["aki_workspace"]))
+    proxy = AkiProxy(cfg, bedrock=AkiClient(cfg["aki_binary"], cfg["aki_workspace"], allowed_models=models))
     handler = make_handler(proxy)
     # OkHttp reuses connections across tool rounds; frame every reply with Content-Length.
     handler.protocol_version = "HTTP/1.1"
