@@ -54,13 +54,17 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
             java.nio.file.Files.move(temporary.toPath(),file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         }
     }
+    /** Revisions grouped by key. heads() used to scan every revision for every key (minutes of CPU on 26,000 revisions). */
+    private var byKey:Map<String,List<SyncRevision>>?=null
+    private fun grouped():Map<String,List<SyncRevision>> = byKey?:state.revisions.values.groupBy {it.key}.also {byKey=it}
     @OptIn(ExperimentalSerializationApi::class)
     private var state=if(file.exists())file.inputStream().buffered(1 shl 16).use {json.decodeFromStream(SyncState.serializer(),it)} else SyncState(label=deviceLabel)
+        set(value) {field=value;byKey=null}
     private fun accepts(key:String)=key.substringBefore(':') in allowedKinds && key.length in 3..250 && !key.any {it<' '}
-    @Synchronized fun knownKeys():Set<String> = state.revisions.values.map {it.key}.toSet()
+    @Synchronized fun knownKeys():Set<String> = grouped().keys.toSet()
     private fun save(next:SyncState) { atomic(file,SyncState.serializer(),next);state=next }
     private fun heads(key:String):List<SyncRevision> {
-        val rows=state.revisions.values.filter {it.key==key}
+        val rows=grouped()[key].orEmpty()
         val superseded=rows.flatMap {it.parents}.toSet()
         return rows.filter {it.id !in superseded}.sortedWith(compareBy<SyncRevision> {
             if(it.key.startsWith("assets:") && it.value?.get("uri")?.jsonPrimitive?.contentOrNull?.startsWith(SyncBlobs.PREFIX)==true)1 else 0
@@ -131,8 +135,9 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
             save(state.copy(pending=state.pending.filterNot {it.id==commit.id},received=state.received+commit.id))
             uploaded++
         }
-        var downloaded=0
-        for(item in remote.commits()) {
+        var downloaded=0;var unsaved=0
+        // Each save rewrites the whole journal (41 MB on the S25): received commits are stored in batches.
+        try {for(item in remote.commits()) {
             val id=item.name.removePrefix("commit-").removeSuffix(".json")
             if(id in state.received)continue
             require(item.size in 1..8_388_608) {"Registro remoto demasiado grande."}
@@ -145,15 +150,16 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
                 val existing=state.revisions[r.id]
                 require(existing==null || existing==r) {"Una revisión remota ha cambiado de contenido."}
             }
-            save(state.copy(revisions=state.revisions+commit.revisions.associateBy {it.id},received=state.received+id))
+            state=state.copy(revisions=state.revisions+commit.revisions.associateBy {it.id},received=state.received+id)
             downloaded++
-        }
+            if(++unsaved>=25){save(state);unsaved=0}
+        }} finally {if(unsaved>0)save(state)}
         // Missing parents or cross-entity ancestry must never silently discard a local version.
         for(r in state.revisions.values) for(parent in r.parents) {
             require(state.revisions[parent]?.key==r.key) {"Falta una revisión del proyecto. Reintenta la sincronización."}
         }
         val rows=linkedMapOf<String,JsonObject>();val conflicts=mutableListOf<SyncConflict>()
-        for(key in state.revisions.values.map {it.key}.distinct().sorted()) {
+        for(key in grouped().keys.sorted()) {
             val h=heads(key)
             require(h.isNotEmpty()) {"Historial de sincronización inválido."}
             val normalized=values(h)
@@ -163,7 +169,7 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         return SyncResult(rows,conflicts,uploaded,downloaded)
     }
     @Synchronized fun acknowledge(rows:Map<String,JsonObject>,preserveKeys:Set<String> = emptySet()) {
-        val bases=state.revisions.values.map {it.key}.distinct().associateWith {key->
+        val bases=grouped().keys.associateWith {key->
             val h=heads(key);if(values(h).distinct().size>1)listOf(h.last().id)else h.map {it.id}
         }
         // A retained local conflict is not an implicit resolution. Keep its pre-apply baseline,
