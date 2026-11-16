@@ -1,4 +1,34 @@
 ﻿{
+    "widgetSelectionInstall20261116": {
+        "branch": "codex/widgets-v218-install-20261116",
+        "sourceCommit": "312ce35684883b7894d4602e72060d29e0322ed4",
+        "versionCode": 218,
+        "versionName": "1.9.182-agent-preview",
+        "buildId": "vidal-android-build:c963c17d-6d61-49a3-8fe7-0e17591f478f",
+        "buildStatus": "SUCCEEDED",
+        "apkSha256": "35946770472ce3f6bc6ece928b8b15487516f0ef95b8078d498c161c5b9cc04f",
+        "s25InstalledAsUpdate": true,
+        "certificatePreserved": true,
+        "sameAppUid": true,
+        "originalArm64LibrariesEqual": 3,
+        "zipAlignment16KiB": true,
+        "persistedStateFilesIdentical": 206,
+        "assistantMediaInventoryUnchanged": true,
+        "existingIndexIdsPreserved": true,
+        "indexCounts": {
+            "projects": 12,
+            "scenes": 2,
+            "shots": 5,
+            "characters": 9,
+            "assets": 3646,
+            "generations": 894
+        },
+        "sqliteGenerationCountBefore": 912,
+        "startupVerified": true,
+        "observedNexusCrashEntries": 0,
+        "pixelUpdatedInThisDelivery": false,
+        "report": "docs/WIDGETS_VC218_INSTALLED_20261116.md"
+    },
     "cutVideoFeedback20261114": {
         "branch": "codex/cut-video-gestures-20261114",
         "baseInstalledSource": "c0961dd1",
