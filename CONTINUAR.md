@@ -1,3 +1,17 @@
+# Agente: burbuja en vivo cortada en palabras con cerebros propios — 17/11/2026
+
+Rama `fix/agente-streaming-acumulado-20261117`, sobre `codex/widgets-v218-install-20261116` (vc218 instalada en el S25).
+**Sin cambio de versión, sin APK y sin instalar.** Aplica limpio sobre `aki/sync-assets-v218-20261116` (no toca los mismos archivos).
+
+**Síntoma (S25, AKI · Haiku):** encima de «Pensando…» salía una sola palabra que sustituía a la anterior («t», «fuerza»).
+**Causa:** `OpenAiCompatibleStreamingProvider` y `ResponsesApiStreamingProvider` entregaban a `onTextDelta` solo el trozo
+nuevo, mientras `AssistantViewModel` y `CutChatViewModel` sustituyen `streamingText` con cada `UiEvent.StreamingText`.
+Antigravity/Codex ya entregaban el texto acumulado, por eso con AGY se veía bien.
+**Arreglo:** los dos proveedores entregan el texto acumulado; contrato documentado en `StreamingLlmProvider` (`Llm.kt`).
+`BrainProvidersTest` pasa a esperar texto acumulado y `StreamingBubbleTest` cubre la burbuja de extremo a extremo por el
+orquestador (falla sin el arreglo: «Mantengo» → « la»). **agent-core: 525 pruebas JVM, 0 fallos** (4 omitidas, en vivo).
+Pruebas de `app` no ejecutadas (sin SDK de Android en el entorno). `desktop/agent` no se toca: su interfaz no muestra streaming.
+
 # Nexus vc218 — elecciones inequívocas instaladas en S25 — 16/11/2026
 
 **1.9.182-agent-preview / vc218 instalada sobre vc217 en el S25**, misma firma
