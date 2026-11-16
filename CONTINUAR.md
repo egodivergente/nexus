@@ -1,3 +1,18 @@
+# Nexus vc218 — elecciones inequívocas instaladas en S25 — 16/11/2026
+
+**1.9.182-agent-preview / vc218 instalada sobre vc217 en el S25**, misma firma
+y UID. Fuente `312ce3568488`, rama `codex/widgets-v218-install-20261116`.
+Compilación AWS CodeBuild `c963c17d-6d61-49a3-8fe7-0e17591f478f` SUCCEEDED.
+APK SHA-256 `35946770472ce3f6bc6ece928b8b15487516f0ef95b8078d498c161c5b9cc04f`.
+
+Selecciones por IDs de mensaje/panel/opción; recuperación exacta del historial,
+multiselección, comparaciones y bloqueo de envíos duplicados. Conserva Cut vc217.
+206 archivos de estado idénticos durante la actualización; inventario multimedia
+y todos los IDs previos del índice conservados. Arranque verificado, proceso vivo,
+sin nuevos registros de crash observados. Tres SO ARM64 originales y ZIP 16 KiB
+comprobados. Sin nuevas llamadas a modelos ni proveedores. Pixel sin actualizar.
+Informe: `docs/WIDGETS_VC218_INSTALLED_20261116.md`. Estados inferiores históricos.
+
 # Cut: gestos, paneles, copia y exportación individual vc217 — 14/11/2026
 
 Rama `codex/cut-video-gestures-20261114`, sobre vc214 realmente instalada,
