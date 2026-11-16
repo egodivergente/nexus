@@ -53,6 +53,26 @@ object ChatMarkdown {
      * enseñar su JSON a medias.
      */
     fun parse(text: String, streaming: Boolean = false): List<MdBlock> {
+        val used = mutableSetOf<String>()
+        fun scope(blocks: List<MdBlock>): List<MdBlock> = blocks.map { block ->
+            when (block) {
+                is MdBlock.Callout -> block.copy(blocks = scope(block.blocks))
+                is MdBlock.Widget -> {
+                    var id = block.spec.id
+                    while (!used.add(id)) id += "_"
+                    MdBlock.Widget(when (val spec = block.spec) {
+                        is WidgetSpec.Poll -> spec.copy(id = id)
+                        is WidgetSpec.Compare -> spec.copy(id = id)
+                        is WidgetSpec.Steps -> spec.copy(id = id)
+                    })
+                }
+                else -> block
+            }
+        }
+        return scope(parseBlocks(text, streaming))
+    }
+
+    private fun parseBlocks(text: String, streaming: Boolean): List<MdBlock> {
         val lines = text.replace("\r\n", "\n").replace('\r', '\n').split('\n')
         val out = mutableListOf<MdBlock>()
         val para = mutableListOf<String>()
@@ -104,7 +124,7 @@ object ChatMarkdown {
                 // Sin cierre: el recuadro llega hasta la primera línea en blanco (o el final) para no tragarse la respuesta.
                 val stop = end ?: (i + 1 until lines.size).firstOrNull { lines[it].isBlank() || calloutOpen.matches(lines[it]) } ?: lines.size
                 val inner = lines.subList(i + 1, stop).joinToString("\n")
-                out += MdBlock.Callout(kind, parse(inner, streaming))
+                out += MdBlock.Callout(kind, parseBlocks(inner, streaming))
                 i = if (end != null) end + 1 else stop
                 continue
             }

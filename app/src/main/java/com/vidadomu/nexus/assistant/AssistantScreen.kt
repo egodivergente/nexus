@@ -433,8 +433,9 @@ fun AssistantScreen(
                         is ChatItem.Assistant -> Box {
                             AssistantBubble(item, onOpenHistory,
                                 onSelectMessages = { copyMessageIds = setOf(item.id); showChatCopy = true },
-                                answered = if ("nexus-ui" in item.text) answerAfter(visibleItems, item) else null,
-                                onReply = { vm.send(it) })
+                                answered = answerAfter(ui.items, item)?.text,
+                                widgetAnswer = answerAfter(ui.items, item)?.widgetAnswer,
+                                onReply = { vm.send(it) }, onWidgetReply = { vm.send(it.text, widgetAnswer = it.answer) })
                         }
                         is ChatItem.Notice -> NoticeRow(item, onOpenHistory,
                             onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null,
@@ -1010,14 +1011,16 @@ internal fun formatTook(ms: Long): String = when {
 }
 
 /** Lo que el usuario contestó justo después de este mensaje (para bloquear sus paneles y marcar la opción elegida). */
-private fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): String? {
+internal fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): ChatItem.User? {
     val at = items.indexOfFirst { it.id == item.id }
     if (at < 0) return null
-    return items.drop(at + 1).filterIsInstance<ChatItem.User>().firstOrNull()?.text
+    return items.drop(at + 1).filterIsInstance<ChatItem.User>().firstOrNull()
 }
 
 @Composable
-internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {}) {
+internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {},
+    widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
+    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
@@ -1038,7 +1041,8 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                 }
                 // Selección nativa con pulsación larga y arrastre (al terminar de escribir; durante el streaming el texto cambia).
                 ChatMarkdownView(responseText, streaming = streaming,
-                    answered = answered, onReply = if (streaming) null else onReply, selectable = !streaming)
+                    answered = answered, onReply = if (streaming) null else onReply, selectable = !streaming,
+                    widgetAnswer = widgetAnswer, messageId = item.id, onWidgetReply = if (streaming) null else onWidgetReply)
               }
             }
         }

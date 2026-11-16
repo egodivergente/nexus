@@ -168,11 +168,21 @@ fun ChatMarkdownView(
     answered: String? = null,
     onReply: ((String) -> Boolean)? = null,
     selectable: Boolean = true,
+    widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
+    messageId: String? = null,
+    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null,
 ) {
     var selectedLink by remember {mutableStateOf<String?>(null)}
     val st = mdStyles().copy(onLink={selectedLink=it})
     val blocks = remember(text, streaming) { com.vidadomu.nexus.agent.core.chat.ChatPresentation.blocks(text, streaming) }
-    val ctx = remember(answered, onReply) { WidgetCtx(answered, onReply) }
+    val replyCallback = rememberUpdatedState(onWidgetReply)
+    val textCallback = rememberUpdatedState(onReply)
+    val canReply = onWidgetReply != null || onReply != null
+    val ctx = remember(answered, widgetAnswer, messageId, canReply) {
+        WidgetCtx(answered, widgetAnswer, messageId, if (canReply) { reply ->
+            replyCallback.value?.invoke(reply) ?: (textCallback.value?.invoke(reply.text) == true)
+        } else null)
+    }
     if (selectable) SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
     else Box(modifier) { MdBlockList(blocks, st, ctx) }
     selectedLink?.let {ChatLinkSheet(it,onDismiss={selectedLink=null})}

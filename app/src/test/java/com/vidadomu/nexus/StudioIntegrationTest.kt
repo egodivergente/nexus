@@ -10,13 +10,17 @@ import org.junit.Test
 
 class StudioIntegrationTest {
     @Test fun widgetChoicesAreExactAndDoNotSelectSubstrings() {
-        val answer=com.vidadomu.nexus.assistant.WidgetCtx("Elijo: Vídeo Pro",null)
-        assertTrue(answer.chose("Vídeo Pro"))
-        assertFalse(answer.chose("Vídeo"))
-        val multi=com.vidadomu.nexus.assistant.WidgetCtx("A, B\nC",null)
-        assertTrue(multi.chose("A, B"))
-        assertTrue(multi.chose("C"))
-        assertFalse(multi.chose("B"))
+        val compare = com.vidadomu.nexus.agent.core.chat.WidgetSpec.Compare("video", null, listOf(
+            com.vidadomu.nexus.agent.core.chat.WidgetOption("plain", "Vídeo"),
+            com.vidadomu.nexus.agent.core.chat.WidgetOption("pro", "Vídeo Pro")))
+        val answer = com.vidadomu.nexus.assistant.WidgetCtx("Elijo: Vídeo Pro", null, null, null)
+        assertEquals(setOf("pro"), answer.selectedIds(compare))
+        val poll = com.vidadomu.nexus.agent.core.chat.WidgetSpec.Poll("letters", "Elige", listOf(
+            com.vidadomu.nexus.agent.core.chat.WidgetOption("ab", "A, B"),
+            com.vidadomu.nexus.agent.core.chat.WidgetOption("c", "C"),
+            com.vidadomu.nexus.agent.core.chat.WidgetOption("b", "B")), true)
+        val multi = com.vidadomu.nexus.assistant.WidgetCtx("A, B\nC", null, null, null)
+        assertEquals(setOf("ab", "c"), multi.selectedIds(poll))
     }
     private val ref = ModelRef("provider", "model")
     private fun plan() = GenerationPlan("p", ref, "model", "VIDEO", prompt="scene", params=emptyMap(),
