@@ -112,10 +112,20 @@ fun ChatMarkdownView(
     streaming: Boolean = false,
     answered: String? = null,
     onReply: ((String) -> Boolean)? = null,
+    widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
+    messageId: String? = null,
+    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null,
 ) {
     val st = mdStyles()
     val blocks = remember(text, streaming) { ChatMarkdown.parse(text, streaming) }
-    val ctx = remember(answered, onReply) { WidgetCtx(answered, onReply) }
+    val replyCallback = rememberUpdatedState(onWidgetReply)
+    val textCallback = rememberUpdatedState(onReply)
+    val canReply = onWidgetReply != null || onReply != null
+    val ctx = remember(answered, widgetAnswer, messageId, canReply) {
+        WidgetCtx(answered, widgetAnswer, messageId, if (canReply) { reply ->
+            replyCallback.value?.invoke(reply) ?: (textCallback.value?.invoke(reply.text) == true)
+        } else null)
+    }
     SelectionContainer(modifier) { MdBlockList(blocks, st, ctx) }
 }
 

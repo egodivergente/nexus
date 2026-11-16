@@ -192,8 +192,8 @@ fun AssistantScreen(
                     when (item) {
                         is ChatItem.User -> UserBubble(item)
                         is ChatItem.Assistant -> AssistantBubble(item, onOpenHistory,
-                            answered = if ("nexus-ui" in item.text) answerAfter(visibleItems, item) else null,
-                            onReply = { vm.send(it) })
+                            answered = answerAfter(ui.items, item),
+                            onReply = { vm.send(it) }, onWidgetReply = { vm.send(it.text, widgetAnswer = it.answer) })
                         is ChatItem.Notice -> NoticeRow(item, onOpenHistory)
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
@@ -378,14 +378,15 @@ private fun UserBubble(item:ChatItem.User) {
 }
 
 /** Lo que el usuario contestó justo después de este mensaje (para bloquear sus paneles y marcar la opción elegida). */
-private fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): String? {
+internal fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): ChatItem.User? {
     val at = items.indexOfFirst { it.id == item.id }
     if (at < 0) return null
-    return items.drop(at + 1).filterIsInstance<ChatItem.User>().firstOrNull()?.text
+    return items.drop(at + 1).filterIsInstance<ChatItem.User>().firstOrNull()
 }
 
 @Composable
-private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null) {
+private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: ChatItem.User? = null, onReply: ((String) -> Boolean)? = null,
+    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
@@ -399,7 +400,8 @@ private fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit =
                 .semantics {onLongClick("Acciones de la respuesta") {actionsExpanded=true;true}}) {
               Box(Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8)) {
                 val streaming = item.stop == "STREAMING"
-                ChatMarkdownView(item.text, streaming = streaming, answered = answered, onReply = if (streaming) null else onReply)
+                ChatMarkdownView(item.text, streaming = streaming, answered = answered?.text, widgetAnswer = answered?.widgetAnswer, messageId = item.id,
+                    onReply = if (streaming) null else onReply, onWidgetReply = if (streaming) null else onWidgetReply)
                 DropdownMenu(expanded=actionsExpanded,onDismissRequest={actionsExpanded=false}) {
                     DropdownMenuItem(text={Text("Copiar respuesta")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},onClick={
                         clipboard.setText(AnnotatedString(item.text));actionsExpanded=false

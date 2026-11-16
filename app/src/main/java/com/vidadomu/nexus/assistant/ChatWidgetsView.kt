@@ -24,6 +24,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.vidadomu.nexus.agent.core.chat.ChatWidgets
+import com.vidadomu.nexus.agent.core.chat.WidgetAnswer
+import com.vidadomu.nexus.agent.core.chat.WidgetReply
 import com.vidadomu.nexus.agent.core.chat.WidgetOption
 import com.vidadomu.nexus.agent.core.chat.WidgetSpec
 import com.vidadomu.nexus.ui.theme.NexusTokens
@@ -33,9 +36,24 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
  * ocupado y el panel conserva su estado anterior); null = solo lectura. [answered] es lo que el usuario contestó
  * después de este mensaje: bloquea los paneles y marca lo que eligió.
  */
-internal class WidgetCtx(val answered: String?, val onReply: ((String) -> Boolean)?) {
-    val locked: Boolean get() = answered != null || onReply == null
-    fun chose(label: String): Boolean = answered?.contains(label, ignoreCase = true) == true
+internal class WidgetCtx(
+    val answered: String?,
+    private val answer: WidgetAnswer?,
+    private val messageId: String?,
+    private val onReply: ((WidgetReply) -> Boolean)?,
+) {
+    private var submitted by mutableStateOf(false)
+    private var localAnswer by mutableStateOf<WidgetAnswer?>(null)
+    val locked: Boolean get() = answered != null || answer != null || onReply == null || submitted
+    fun selectedIds(spec: WidgetSpec): Set<String> = ChatWidgets.selectedIds(spec, answered, answer ?: localAnswer, messageId)
+    fun submit(spec: WidgetSpec, ids: Set<String>): Boolean {
+        if (locked) return false
+        val reply = ChatWidgets.reply(spec, ids)?.let { it.copy(answer = it.answer.copy(messageId = messageId)) } ?: return false
+        if (onReply?.invoke(reply) != true) return false
+        localAnswer = reply.answer
+        submitted = true
+        return true
+    }
 }
 
 @Composable
@@ -90,25 +108,23 @@ private fun ChoiceRow(option: WidgetOption, selected: Boolean, dimmed: Boolean, 
 
 @Composable
 private fun PollPanel(p: WidgetSpec.Poll, ctx: WidgetCtx) {
-    var pickedKey by rememberSaveable(p.id) { mutableStateOf("") }
-    val picked = indicesOf(pickedKey)
+    var pickedIds by rememberSaveable(p) { mutableStateOf(arrayListOf<String>()) }
+    val picked = pickedIds.toSet()
     PanelSurface {
         Text(p.question, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-        p.options.forEachIndexed { i, option ->
-            val selected = if (ctx.answered != null) ctx.chose(option.label) else i in picked
+        p.options.forEach { option ->
+            val selected = if (ctx.locked) option.id in ctx.selectedIds(p) else option.id in picked
             ChoiceRow(option, selected = selected, dimmed = ctx.answered != null && !selected, enabled = !ctx.locked, round = !p.multi) {
                 if (p.multi) {
-                    pickedKey = (if (i in picked) picked - i else picked + i).sorted().joinToString(",")
+                    pickedIds = ArrayList(if (option.id in picked) picked - option.id else picked + option.id)
                 } else {
-                    pickedKey = i.toString()
-                    if (ctx.onReply?.invoke(option.label) != true) pickedKey = ""
+                    if (ctx.submit(p, setOf(option.id))) pickedIds = arrayListOf(option.id)
                 }
             }
         }
         if (p.multi && !ctx.locked) {
             Button(onClick = {
-                val labels = p.options.filterIndexed { i, _ -> i in picked }.joinToString(", ") { it.label }
-                ctx.onReply?.invoke(labels)
+                ctx.submit(p, picked)
             }, enabled = picked.isNotEmpty(), modifier = Modifier.align(Alignment.End)) {
                 Text(if (picked.isEmpty()) "Enviar" else "Enviar (${picked.size})")
             }
@@ -122,16 +138,16 @@ private fun ComparePanel(c: WidgetSpec.Compare, ctx: WidgetCtx) {
         c.title?.let { Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface) }
         if (c.options.size == 2) {
             Row(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8), modifier = Modifier.height(IntrinsicSize.Max)) {
-                c.options.forEach { CompareCard(it, ctx, Modifier.weight(1f).fillMaxHeight()) }
+                c.options.forEach { CompareCard(c, it, ctx, Modifier.weight(1f).fillMaxHeight()) }
             }
-        } else c.options.forEach { CompareCard(it, ctx, Modifier.fillMaxWidth()) }
+        } else c.options.forEach { CompareCard(c, it, ctx, Modifier.fillMaxWidth()) }
     }
 }
 
 @Composable
-private fun CompareCard(option: WidgetOption, ctx: WidgetCtx, modifier: Modifier) {
+private fun CompareCard(spec: WidgetSpec.Compare, option: WidgetOption, ctx: WidgetCtx, modifier: Modifier) {
     val cs = MaterialTheme.colorScheme
-    val chosen = ctx.chose(option.label)
+    val chosen = option.id in ctx.selectedIds(spec)
     val edge by animateColorAsState(if (chosen) cs.primary else cs.outlineVariant, tween(NexusTokens.contentDuration), label = "Borde tarjeta")
     Surface(color = if (chosen) cs.primary.copy(alpha = 0.10f) else Color.Transparent, shape = NexusTokens.field, border = BorderStroke(1.dp, edge),
         modifier = modifier.alpha(if (ctx.answered != null && !chosen) 0.5f else 1f)) {
@@ -140,7 +156,7 @@ private fun CompareCard(option: WidgetOption, ctx: WidgetCtx, modifier: Modifier
             option.hint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant) }
             Spacer(Modifier.height(NexusTokens.space4))
             if (chosen) Text("Elegida", style = MaterialTheme.typography.labelMedium, color = cs.primary)
-            else OutlinedButton(onClick = { ctx.onReply?.invoke("Elijo: ${option.label}") }, enabled = !ctx.locked,
+            else OutlinedButton(onClick = { ctx.submit(spec, setOf(option.id)) }, enabled = !ctx.locked,
                 contentPadding = PaddingValues(horizontal = NexusTokens.space12, vertical = 0.dp)) { Text("Elegir") }
         }
     }
