@@ -46,6 +46,20 @@ class ChatWidgetSelectionUiTest {
         compose.runOnIdle { assertEquals(setOf("pro", "max"), replies.single().answer.optionIds) }
     }
 
+    @Test fun comparisonClickSendsOnlyTheChosenCardAndLocksBothButtons() {
+        val c = WidgetSpec.Compare("c", "Comparar", options)
+        val replies = mutableListOf<WidgetReply>()
+        val ctx = WidgetCtx(null, null, null) { replies += it; true }
+        compose.setContent { NexusTheme { MdWidget(c, ctx) } }
+        compose.onAllNodesWithText("Elegir")[1].performClick()
+        compose.onAllNodesWithText("Elegida").assertCountEquals(1)
+        compose.onNodeWithText("Elegir").assertIsNotEnabled()
+        compose.runOnIdle {
+            assertEquals("Elijo: Kling Pro", replies.single().text)
+            assertEquals(setOf("pro"), replies.single().answer.optionIds)
+        }
+    }
+
     @Test fun comparisonRestoresOnlyOneChosenCardAndDoesNotSendDuringRendering() {
         val c = WidgetSpec.Compare("c", "Comparar", options)
         val reply = ChatWidgets.reply(c, setOf("pro"))!!
