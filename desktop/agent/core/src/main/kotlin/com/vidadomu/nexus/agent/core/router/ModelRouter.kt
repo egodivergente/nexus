@@ -237,10 +237,15 @@ class ModelRouter(
             else if (p != null && p.options.isNotEmpty()) warnings += "Resolución $want no disponible; opciones: ${p.options.joinToString()}"
         }
         task.aspectRatio?.let { want ->
-            val p = schema.parameters.firstOrNull { it.uiType == "ASPECT_RATIO" || it.key in ASPECT_KEYS }
-            val opt = p?.options?.firstOrNull { it == want }
-            if (p != null && opt != null) params[p.key] = opt
-            else if (p != null && p.options.isNotEmpty()) warnings += "Relación $want no disponible; opciones: ${p.options.joinToString()}"
+            // Un modelo que da 9:16 como «1584*2816» también vale (mismo traductor que la versión Android).
+            val format = com.vidadomu.nexus.agent.core.schema.AspectFormat.param(schema, want)
+            if (format != null) {
+                params[format.first] = format.second
+                if (format.second != want) reasons += "Formato $want como ${format.first}=${format.second}"
+            } else {
+                val p = schema.parameters.firstOrNull { it.uiType == "ASPECT_RATIO" || it.key in ASPECT_KEYS }
+                if (p != null && p.options.isNotEmpty()) warnings += "Relación $want no disponible; opciones: ${p.options.joinToString()}"
+            }
         }
         task.needsAudio?.let { want ->
             val p = schema.parameters.firstOrNull { it.key in AUDIO_KEYS && (it.nativeType ?: it.uiType).equals("boolean", true) }
