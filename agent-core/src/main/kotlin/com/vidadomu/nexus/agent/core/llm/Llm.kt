@@ -95,6 +95,11 @@ interface LlmProvider {
 }
 
 interface StreamingLlmProvider : LlmProvider {
+    /**
+     * [onTextDelta] recibe el texto visible ACUMULADO hasta ese momento, no solo el trozo nuevo:
+     * la interfaz (`UiEvent.StreamingText`) sustituye la burbuja en vivo con cada valor. Un proveedor
+     * que entregue trozos sueltos hace que la burbuja muestre una palabra que sustituye a la anterior.
+     */
     suspend fun completeStreaming(
         request: LlmRequest,
         onTextDelta: (String) -> Unit,

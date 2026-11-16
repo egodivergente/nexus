@@ -83,7 +83,7 @@ class ResponsesApiStreamingProvider(
                     val data = runCatching { Json.parseToJsonElement(ev.data).jsonObject }.getOrNull() ?: return@read true
                     when (data["type"]?.jsonPrimitive?.contentOrNull ?: ev.event) {
                         "response.output_text.delta" -> data["delta"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotEmpty() }
-                            ?.let { text.append(it); onTextDelta(it) }
+                            ?.let { text.append(it); onTextDelta(text.toString()) }
                         "response.output_item.done" -> data["item"]?.let { items += it }
                         "response.completed", "response.incomplete" -> { finalResponse = data["response"] as? JsonObject; return@read false }
                         "response.failed" -> throw ResponsesCodec.failure(data["response"]?.jsonObject?.get("error"), who)

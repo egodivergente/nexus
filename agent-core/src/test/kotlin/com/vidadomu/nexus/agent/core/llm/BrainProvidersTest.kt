@@ -115,7 +115,7 @@ class BrainProvidersTest {
         assertNull(encoded["tools"])
     }
 
-    @Test fun `streaming de Responses entrega los trozos en orden y reensambla la llamada a herramienta del evento final`() = runTest {
+    @Test fun `streaming de Responses entrega el texto acumulado en orden y reensambla la llamada a herramienta del evento final`() = runTest {
         MockWebServer().use { server ->
             val sse = buildString {
                 append("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"Hola\"}\n\n")
@@ -130,7 +130,8 @@ class BrainProvidersTest {
             assertTrue(provider is StreamingLlmProvider)
             val deltas = mutableListOf<String>()
             val r = (provider as StreamingLlmProvider).completeStreaming(request(user("hola"))) { deltas += it }
-            assertEquals(listOf("Hola", ", mundo"), deltas)
+            // Texto acumulado, no trozos sueltos: la burbuja en vivo se sustituye con cada valor.
+            assertEquals(listOf("Hola", "Hola, mundo"), deltas)
             assertEquals("Hola, mundo", r.message.text())
             assertEquals("c1", r.message.toolUses().single().id)
             assertEquals(StopReason.TOOL_USE, r.stopReason)
@@ -183,7 +184,7 @@ class BrainProvidersTest {
             val provider = BrainFactory.create(profile(server, BrainProtocol.OPENAI_CHAT) { it.copy(capabilities = it.capabilities.copy(streaming = true)) }, { "k" }) as StreamingLlmProvider
             val deltas = mutableListOf<String>()
             val r = provider.completeStreaming(request(user("hola"))) { deltas += it }
-            assertEquals(listOf("Voy", " a mirar"), deltas)
+            assertEquals(listOf("Voy", "Voy a mirar"), deltas)
             val call = r.message.toolUses().single()
             assertEquals("c7", call.id)
             assertEquals("o1", call.input["order_id"]!!.jsonPrimitive.content)

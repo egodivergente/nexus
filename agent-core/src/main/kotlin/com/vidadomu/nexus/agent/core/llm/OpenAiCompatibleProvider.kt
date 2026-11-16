@@ -106,7 +106,7 @@ class OpenAiCompatibleStreamingProvider(
                     val choice = (chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return@read true
                     choice["finish_reason"]?.jsonPrimitive?.contentOrNull?.let { finish = it }
                     val delta = choice["delta"] as? JsonObject ?: return@read true
-                    (delta["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }?.let { text.append(it); onTextDelta(it) }
+                    (delta["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }?.let { text.append(it); onTextDelta(text.toString()) }
                     (delta["tool_calls"] as? JsonArray)?.forEach { tc ->
                         val o = tc as? JsonObject ?: return@forEach
                         val slot = calls.getOrPut(o["index"]?.jsonPrimitive?.intOrNull ?: calls.size) { Triple(StringBuilder(), StringBuilder(), StringBuilder()) }
